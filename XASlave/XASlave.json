@@ -1,0 +1,15 @@
+{
+  "Author": "XA",
+  "Name": "XA Slave",
+  "InternalName": "XASlave",
+  "Punchline": "Don't manual.",
+  "Description": "Don't manual.",
+  "ApplicableVersion": "any",
+  "Tags": [
+    "xa",
+    "automation",
+    "data",
+    "ipc",
+    "utility"
+  ]
+}
