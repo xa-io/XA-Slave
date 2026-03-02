@@ -20,6 +20,8 @@ docs/
 
 # Root-level images (not plugin assets)
 *.png
+# But allow plugin icon
+!**/images/icon.png
 
 # Python cache
 __pycache__/
