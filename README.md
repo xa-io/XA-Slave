@@ -31,7 +31,12 @@ This means that there are still features being implemented and enhanced. Suggest
 1. Install [FFXIVQuickLauncher](https://github.com/goatcorp/FFXIVQuickLauncher) and enable Dalamud in its settings. You must run the game through FFXIVQuickLauncher for plugins to work.
 2. Open Dalamud settings by typing `/xlsettings` in game chat.
 3. Go to the "Experimental" tab.
-4. In the "Custom Plugin Repositories" section, paste the following URL: `https://raw.githubusercontent.com/xa-io/MyDalamudPlugins/master/pluginmaster.json`
+4. In the "Custom Plugin Repositories" section, paste the following URL:
+
+```
+https://raw.githubusercontent.com/xa-io/MyDalamudPlugins/master/pluginmaster.json
+```
+
 5. Click "Save".
 6. Open the plugin installer with `/xlplugins`, go to "All Plugins", and search for **XA Slave**.
 
