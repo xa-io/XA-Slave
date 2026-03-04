@@ -26,6 +26,7 @@ public sealed class AutoRetainerConfigReader
     public record ArCharacterInfo(
         string Name,
         string World,
+        string CurrentWorld,
         long CID,
         int Gil,
         int HighestLevel,
@@ -136,6 +137,13 @@ public sealed class AutoRetainerConfigReader
         var name = nameProp.GetString() ?? "Unknown";
         var world = worldProp.GetString() ?? "Unknown";
 
+        var currentWorld = world; // default to homeworld
+        if (entry.TryGetProperty("CurrentWorld", out var cwProp) && cwProp.ValueKind == JsonValueKind.String)
+        {
+            var cw = cwProp.GetString();
+            if (!string.IsNullOrEmpty(cw)) currentWorld = cw;
+        }
+
         if (string.IsNullOrWhiteSpace(name) || name == "Unknown") return null;
 
         var gil = 0;
@@ -199,6 +207,7 @@ public sealed class AutoRetainerConfigReader
         return new ArCharacterInfo(
             Name: name,
             World: world,
+            CurrentWorld: currentWorld,
             CID: cid,
             Gil: gil,
             HighestLevel: highestLevel,

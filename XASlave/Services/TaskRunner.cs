@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.Gui.Dtr;
 using Dalamud.Plugin.Services;
 
 namespace XASlave.Services;
@@ -15,6 +16,9 @@ public sealed class TaskRunner : IDisposable
     private readonly ICondition condition;
     private readonly IFramework framework;
     private readonly IPluginLog log;
+    private readonly IDtrBar dtrBar;
+    private readonly IToastGui toastGui;
+    private IDtrBarEntry? dtrEntry;
 
     private readonly List<TaskStep> steps = new();
     private int stepIndex = -1;
@@ -25,6 +29,12 @@ public sealed class TaskRunner : IDisposable
     private Action<string>? onLog;
 
     public bool IsRunning => running;
+
+    /// <summary>
+    /// When true, the logout handler should NOT cancel this task.
+    /// Set by the relogger since logout is expected during /ays relog.
+    /// </summary>
+    public bool SuppressLogoutCancel { get; set; }
     public string CurrentTaskName { get; private set; } = string.Empty;
     public string StatusText { get; private set; } = string.Empty;
     public int CurrentStep => stepIndex;
@@ -40,11 +50,19 @@ public sealed class TaskRunner : IDisposable
     public IReadOnlyList<string> LogMessages => logMessages;
     private const int MaxLogMessages = 200;
 
-    public TaskRunner(ICondition condition, IFramework framework, IPluginLog log)
+    // Characters that failed to relog — for summary at end of task
+    public List<string> FailedCharacters { get; } = new();
+
+    public TaskRunner(ICondition condition, IFramework framework, IPluginLog log, IDtrBar dtrBar, IToastGui toastGui)
     {
         this.condition = condition;
         this.framework = framework;
         this.log = log;
+        this.dtrBar = dtrBar;
+        this.toastGui = toastGui;
+
+        // DTR bar always available — shows "Idle" when no task running
+        InitDtrBar();
     }
 
     /// <summary>Start executing a list of steps as a named task.</summary>
@@ -59,6 +77,7 @@ public sealed class TaskRunner : IDisposable
         TotalItems = 0;
         CurrentItemLabel = string.Empty;
         logMessages.Clear();
+        FailedCharacters.Clear();
 
         steps.Clear();
         steps.AddRange(taskSteps);
@@ -78,6 +97,9 @@ public sealed class TaskRunner : IDisposable
 
         AddLog($"[{taskName}] Started with {steps.Count} steps.");
         log.Information($"[XASlave] TaskRunner: '{taskName}' started with {steps.Count} steps.");
+
+        // Show DTR bar progress
+        UpdateDtrBar();
     }
 
     /// <summary>Append additional steps to a running task (for dynamic character rotation).</summary>
@@ -95,6 +117,7 @@ public sealed class TaskRunner : IDisposable
         StatusText = "Cancelled";
         AddLog($"[{CurrentTaskName}] Cancelled.");
         log.Information($"[XASlave] TaskRunner: '{CurrentTaskName}' cancelled.");
+        SetDtrIdle();
     }
 
     public void AddLog(string message)
@@ -175,6 +198,8 @@ public sealed class TaskRunner : IDisposable
 
             AddLog($"Timeout on '{step.Name}' after {step.TimeoutSec}s — skipping.");
             log.Warning($"[XASlave] TaskRunner step '{step.Name}' timed out after {step.TimeoutSec}s.");
+            try { step.OnTimeout?.Invoke(); }
+            catch (Exception ex) { log.Error($"[XASlave] TaskRunner step '{step.Name}' OnTimeout error: {ex.Message}"); }
             AdvanceStep();
         }
     }
@@ -190,6 +215,7 @@ public sealed class TaskRunner : IDisposable
         stepStart = DateTime.UtcNow;
         stepActionDone = false;
         StatusText = steps[stepIndex].Name;
+        UpdateDtrBar();
     }
 
     private void Finish()
@@ -201,8 +227,81 @@ public sealed class TaskRunner : IDisposable
         StatusText = "Complete";
         AddLog($"[{CurrentTaskName}] Finished.");
         log.Information($"[XASlave] TaskRunner: '{CurrentTaskName}' finished.");
+
+        // Reset DTR bar to idle
+        SetDtrIdle();
+
+        // Toast notification — must run on framework thread
+        try
+        {
+            var taskName = CurrentTaskName;
+            var completed = CompletedItems;
+            var total = TotalItems;
+            var failCount = FailedCharacters.Count;
+            framework.RunOnFrameworkThread(() =>
+            {
+                var msg = failCount > 0
+                    ? $"XA Slave: {taskName} complete ({completed}/{total}, {failCount} failed)"
+                    : $"XA Slave: {taskName} complete ({completed}/{total})";
+                toastGui.ShowNormal(msg);
+            });
+        }
+        catch { /* toast may fail silently */ }
+
         try { onFinished?.Invoke(); }
         catch (Exception ex) { log.Error($"[XASlave] TaskRunner onFinished error: {ex.Message}"); }
+    }
+
+    /// <summary>Initialize DTR bar entry — always visible, shows "Idle" by default.</summary>
+    private void InitDtrBar()
+    {
+        try
+        {
+            dtrEntry ??= dtrBar.Get("XA Slave");
+            dtrEntry.Text = "XA: Idle";
+            dtrEntry.Shown = true;
+        }
+        catch { /* DTR bar may not be available */ }
+    }
+
+    private void UpdateDtrBar()
+    {
+        try
+        {
+            dtrEntry ??= dtrBar.Get("XA Slave");
+            if (TotalItems > 0)
+                dtrEntry.Text = $"XA: {CompletedItems}/{TotalItems}";
+            else
+                dtrEntry.Text = $"XA: {CurrentTaskName}";
+            dtrEntry.Shown = true;
+        }
+        catch { /* DTR bar may not be available */ }
+    }
+
+    /// <summary>Reset DTR bar to idle state (always stays visible).</summary>
+    private void SetDtrIdle()
+    {
+        try
+        {
+            dtrEntry ??= dtrBar.Get("XA Slave");
+            dtrEntry.Text = "XA: Idle";
+            dtrEntry.Shown = true;
+        }
+        catch { }
+    }
+
+    private void RemoveDtrBar()
+    {
+        try
+        {
+            if (dtrEntry != null)
+            {
+                dtrEntry.Shown = false;
+                dtrEntry.Remove();
+                dtrEntry = null;
+            }
+        }
+        catch { }
     }
 
     public void Dispose()
@@ -212,6 +311,7 @@ public sealed class TaskRunner : IDisposable
             running = false;
             framework.Update -= OnTick;
         }
+        RemoveDtrBar();
     }
 }
 
@@ -226,5 +326,6 @@ public class TaskStep
     public Func<bool> IsComplete { get; init; } = () => true;
     public float TimeoutSec { get; init; } = 10f;
     public int MaxRetries { get; init; } = 0;
+    public Action? OnTimeout { get; init; }
     internal int RetryCount { get; set; } = 0;
 }

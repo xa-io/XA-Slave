@@ -18,6 +18,10 @@ public class ReloggerCharacterData
     public string FcName { get; set; } = "";
     public long FCID { get; set; }
     public DateTime LastLoggedIn { get; set; } = DateTime.MinValue;
+    public string PersonalEstate { get; set; } = "";
+    public string Apartment { get; set; } = "";
+    public string FcEstate { get; set; } = "";
+    public string CurrentWorld { get; set; } = "";
 }
 
 [Serializable]
@@ -50,6 +54,7 @@ public class Configuration : IPluginConfiguration
     public bool ReloggerDoReturnToHome { get; set; } = true;
     public bool ReloggerDoReturnToFc { get; set; } = true;
     public bool ReloggerDoParseForXaDatabase { get; set; } = true;
+    public bool ReloggerDoEnableArMultiOnComplete { get; set; } = false;
 
     // Region filter for character list display
     public string ReloggerRegionFilter { get; set; } = "All";
@@ -60,6 +65,38 @@ public class Configuration : IPluginConfiguration
 
     // Legacy CID → last login timestamp. Migrated to ReloggerCharacterInfo on load.
     public Dictionary<long, DateTime> ReloggerLastSeen { get; set; } = new();
+
+    // ── City Chat Flooder ──
+    public List<string> FloorderSelectedWorlds { get; set; } = new();
+    public List<string> FloorderSelectedCities { get; set; } = new();
+    public List<string> FloorderCustomCities { get; set; } = new();
+    public List<string> FloorderAnnouncements { get; set; } = new();
+    public string FloorderChatChannel { get; set; } = "/echo";
+    public float FloorderWaitBetweenCities { get; set; } = 3.0f;
+    public float FloorderWaitAfterAnnounce { get; set; } = 1.0f;
+    public bool FloorderEnableLooping { get; set; } = false;
+    public float FloorderLoopDelayMinutes { get; set; } = 5.0f;
+    public bool FloorderInitialized { get; set; } = false;
+
+    public void InitializeFloorderDefaults()
+    {
+        if (FloorderInitialized) return;
+        FloorderInitialized = true;
+        if (FloorderSelectedCities.Count == 0)
+        {
+            FloorderSelectedCities.AddRange(new[] { "Limsa Lominsa Lower Decks", "New Gridania", "Ul'dah - Steps of Nald" });
+        }
+        if (FloorderAnnouncements.Count == 0)
+        {
+            FloorderAnnouncements.AddRange(new[]
+            {
+                "I'm the real warrior of light",
+                "What are you talking about, I'm totally real.",
+                "I'm just looking for a new sidequest.",
+            });
+        }
+        Save();
+    }
 
     public void Save()
     {

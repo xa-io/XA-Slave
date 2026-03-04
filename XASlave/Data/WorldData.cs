@@ -18,7 +18,7 @@ public static class WorldData
     /// <summary>Data center display order within each region.</summary>
     public static readonly Dictionary<string, string[]> DataCenterOrder = new()
     {
-        ["NA"] = new[] { "Aether", "Primal", "Crystal", "Dynamis" },
+        ["NA"] = new[] { "Aether", "Crystal", "Dynamis", "Primal" },
         ["EU"] = new[] { "Chaos", "Light" },
         ["JP"] = new[] { "Elemental", "Gaia", "Mana", "Meteor" },
         ["OCE"] = new[] { "Materia" },
@@ -37,16 +37,6 @@ public static class WorldData
         new(99,  "Sargatanas",  "Aether", "NA"),
         new(57,  "Siren",       "Aether", "NA"),
 
-        // ── NA — Primal ──
-        new(78,  "Behemoth",    "Primal", "NA"),
-        new(93,  "Excalibur",   "Primal", "NA"),
-        new(53,  "Exodus",      "Primal", "NA"),
-        new(35,  "Famfrit",     "Primal", "NA"),
-        new(95,  "Hyperion",    "Primal", "NA"),
-        new(55,  "Lamia",       "Primal", "NA"),
-        new(64,  "Leviathan",   "Primal", "NA"),
-        new(77,  "Ultros",      "Primal", "NA"),
-
         // ── NA — Crystal ──
         new(91,  "Balmung",     "Crystal", "NA"),
         new(34,  "Brynhildr",   "Crystal", "NA"),
@@ -58,14 +48,24 @@ public static class WorldData
         new(41,  "Zalera",      "Crystal", "NA"),
 
         // ── NA — Dynamis ──
+        new(408, "Cuchulainn",  "Dynamis", "NA"),
+        new(411, "Golem",       "Dynamis", "NA"),
         new(406, "Halicarnassus","Dynamis", "NA"),
+        new(409, "Kraken",      "Dynamis", "NA"),
         new(407, "Maduin",      "Dynamis", "NA"),
         new(404, "Marilith",    "Dynamis", "NA"),
-        new(405, "Seraph",      "Dynamis", "NA"),
-        new(408, "Cuchulainn",  "Dynamis", "NA"),
-        new(409, "Kraken",      "Dynamis", "NA"),
         new(410, "Rafflesia",   "Dynamis", "NA"),
-        new(411, "Golem",       "Dynamis", "NA"),
+        new(405, "Seraph",      "Dynamis", "NA"),
+
+        // ── NA — Primal ──
+        new(78,  "Behemoth",    "Primal", "NA"),
+        new(93,  "Excalibur",   "Primal", "NA"),
+        new(53,  "Exodus",      "Primal", "NA"),
+        new(35,  "Famfrit",     "Primal", "NA"),
+        new(95,  "Hyperion",    "Primal", "NA"),
+        new(55,  "Lamia",       "Primal", "NA"),
+        new(64,  "Leviathan",   "Primal", "NA"),
+        new(77,  "Ultros",      "Primal", "NA"),
 
         // ── EU — Chaos ──
         new(80,  "Cerberus",    "Chaos", "EU"),
@@ -106,7 +106,6 @@ public static class WorldData
         new(98,  "Ridill",      "Gaia", "JP"),
         new(76,  "Tiamat",      "Gaia", "JP"),
         new(51,  "Ultima",      "Gaia", "JP"),
-        new(52,  "Valefor",     "Gaia", "JP"),
 
         // ── JP — Mana ──
         new(44,  "Anima",       "Mana", "JP"),
@@ -114,33 +113,26 @@ public static class WorldData
         new(70,  "Chocobo",     "Mana", "JP"),
         new(47,  "Hades",       "Mana", "JP"),
         new(48,  "Ixion",       "Mana", "JP"),
-        new(82,  "Mandragora",  "Mana", "JP"),
         new(96,  "Masamune",    "Mana", "JP"),
         new(28,  "Pandaemonium","Mana", "JP"),
-        new(29,  "Shinryu",     "Mana", "JP"),
         new(61,  "Titan",       "Mana", "JP"),
 
         // ── JP — Meteor ──
         new(24,  "Belias",      "Meteor", "JP"),
-        new(22,  "Bismarck",    "Meteor", "JP"),
+        new(82,  "Mandragora",  "Meteor", "JP"),
         new(60,  "Ramuh",       "Meteor", "JP"),
-        new(21,  "Ravana",      "Meteor", "JP"),
-        new(86,  "Sephirot",    "Meteor", "JP"),
-        new(87,  "Sophia",      "Meteor", "JP"),
+        new(29,  "Shinryu",     "Meteor", "JP"),
         new(30,  "Unicorn",     "Meteor", "JP"),
+        new(52,  "Valefor",     "Meteor", "JP"),
         new(31,  "Yojimbo",     "Meteor", "JP"),
         new(32,  "Zeromus",     "Meteor", "JP"),
-        new(88,  "Zurvan",      "Meteor", "JP"),
 
         // ── OCE — Materia ──
-        new(412, "Titania",     "Materia", "OCE"),
-        new(413, "Innocence",   "Materia", "OCE"),
-        new(414, "Pixie",       "Materia", "OCE"),
-        new(415, "Tycoon",      "Materia", "OCE"),
-        new(416, "Wyvern",      "Materia", "OCE"),
-        new(417, "Lakshmi",     "Materia", "OCE"),
-        new(418, "Eden",        "Materia", "OCE"),
-        new(419, "Syldra",      "Materia", "OCE"),
+        new(22,  "Bismarck",    "Materia", "OCE"),
+        new(21,  "Ravana",      "Materia", "OCE"),
+        new(86,  "Sephirot",    "Materia", "OCE"),
+        new(87,  "Sophia",      "Materia", "OCE"),
+        new(88,  "Zurvan",      "Materia", "OCE"),
     };
 
     // ── Lookup helpers ──
