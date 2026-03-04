@@ -4,6 +4,7 @@ obj/
 
 # IDE
 .vs/
+.windsurf/
 *.user
 *.suo
 *.cache
