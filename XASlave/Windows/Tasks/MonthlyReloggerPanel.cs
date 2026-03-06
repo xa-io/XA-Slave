@@ -647,6 +647,8 @@ public partial class SlaveWindow
         data.FcName = ar.FcName;
         data.FCID = ar.FCID;
         data.CurrentWorld = ar.CurrentWorld;
+        data.RetainerCount = ar.RetainerCount;
+        data.SubmarineCount = ar.SubmarineCount;
         cfg.ReloggerCharacterInfo[key] = data;
     }
 
@@ -672,6 +674,32 @@ public partial class SlaveWindow
         }
 
         cfg.ReloggerLastSeen.Clear();
+    }
+
+    /// <summary>
+    /// Shared helper: import characters from AutoRetainer into a target list and update shared data.
+    /// Returns (added, total) count.
+    /// </summary>
+    private (int Added, int Total) ImportCharactersFromArToList(List<string> targetList)
+    {
+        var arChars = plugin.ArConfigReader.ReadCharacters();
+        var cfg = plugin.Configuration;
+        var added = 0;
+
+        foreach (var c in arChars)
+        {
+            var key = $"{c.Name}@{c.World}";
+            if (!targetList.Contains(key))
+            {
+                targetList.Add(key);
+                added++;
+            }
+            UpdateCharacterInfo(cfg, key, c);
+        }
+
+        MigrateLegacyLastSeen(cfg, arChars);
+        cfg.Save();
+        return (added, arChars.Count);
     }
 
     /// <summary>
@@ -704,11 +732,13 @@ public partial class SlaveWindow
                        c.personal_estate, c.apartment,
                        COALESCE(g.amount, 0) AS gil,
                        COALESCE(j.max_level, 0) AS highest_level,
-                       fc.name AS fc_name, fc.fc_id, fc.estate AS fc_estate
+                       fc.name AS fc_name, fc.fc_id, fc.estate AS fc_estate,
+                       COALESCE(r.retainer_count, 0) AS retainer_count
                 FROM characters c
                 LEFT JOIN currency_balances g ON g.content_id = c.content_id AND g.currency_name = 'Gil'
                 LEFT JOIN (SELECT content_id, MAX(level) AS max_level FROM job_levels GROUP BY content_id) j ON j.content_id = c.content_id
                 LEFT JOIN free_companies fc ON fc.content_id = c.content_id
+                LEFT JOIN (SELECT content_id, COUNT(*) AS retainer_count FROM retainers GROUP BY content_id) r ON r.content_id = c.content_id
                 ORDER BY c.name";
 
             using var reader = cmd.ExecuteReader();
@@ -745,6 +775,10 @@ public partial class SlaveWindow
                 data.PersonalEstate = reader["personal_estate"]?.ToString() ?? "";
                 data.Apartment = reader["apartment"]?.ToString() ?? "";
                 data.FcEstate = reader["fc_estate"]?.ToString() ?? "";
+
+                var dbRetainerCount = Convert.ToInt32(reader["retainer_count"]);
+                if (dbRetainerCount > 0)
+                    data.RetainerCount = dbRetainerCount;
 
                 var lastSeenStr = reader["last_seen_utc"].ToString() ?? "";
                 if (DateTime.TryParse(lastSeenStr, null, System.Globalization.DateTimeStyles.AssumeUniversal, out var lastSeen))

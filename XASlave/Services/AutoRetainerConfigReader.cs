@@ -31,6 +31,7 @@ public sealed class AutoRetainerConfigReader
         int Gil,
         int HighestLevel,
         int RetainerCount,
+        int SubmarineCount,
         int TotalRetainerGil,
         int Ventures,
         int InventorySpace,
@@ -204,6 +205,21 @@ public sealed class AutoRetainerConfigReader
         if (entry.TryGetProperty("FCID", out var fcidProp) && fcidProp.ValueKind == JsonValueKind.Number)
             fcidProp.TryGetInt64(out fcid);
 
+        // Submarine data — count entries in OfflineSubmarineData or AdditionalSubmarineData
+        var submarineCount = 0;
+        if (entry.TryGetProperty("OfflineSubmarineData", out var subArr) && subArr.ValueKind == JsonValueKind.Array)
+        {
+            submarineCount = subArr.GetArrayLength();
+        }
+        else if (entry.TryGetProperty("SubmarineData", out var subArr2) && subArr2.ValueKind == JsonValueKind.Array)
+        {
+            submarineCount = subArr2.GetArrayLength();
+        }
+        else if (entry.TryGetProperty("Submarines", out var subArr3) && subArr3.ValueKind == JsonValueKind.Array)
+        {
+            submarineCount = subArr3.GetArrayLength();
+        }
+
         return new ArCharacterInfo(
             Name: name,
             World: world,
@@ -212,6 +228,7 @@ public sealed class AutoRetainerConfigReader
             Gil: gil,
             HighestLevel: highestLevel,
             RetainerCount: retainerCount,
+            SubmarineCount: submarineCount,
             TotalRetainerGil: totalRetainerGil,
             Ventures: ventures,
             InventorySpace: inventorySpace,

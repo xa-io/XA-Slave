@@ -22,6 +22,8 @@ public class ReloggerCharacterData
     public string Apartment { get; set; } = "";
     public string FcEstate { get; set; } = "";
     public string CurrentWorld { get; set; } = "";
+    public int RetainerCount { get; set; }
+    public int SubmarineCount { get; set; }
 }
 
 [Serializable]
@@ -65,6 +67,39 @@ public class Configuration : IPluginConfiguration
 
     // Legacy CID → last login timestamp. Migrated to ReloggerCharacterInfo on load.
     public Dictionary<long, DateTime> ReloggerLastSeen { get; set; } = new();
+
+    // ── Refresh AR Subs/Bell ──
+    public List<string> RefreshSubsCharacters { get; set; } = new();
+
+    // ── FC Permissions Updater ──
+    public List<string> FcPermsCharacters { get; set; } = new();
+
+    // ── AR Pre-Processing ──
+    // Master toggle — when enabled, runs collection steps on login BEFORE AR starts retainer processing
+    // Uses AR Suppressed pattern: suppress AR → run steps → un-suppress AR
+    public bool ArPreProcessEnabled { get; set; } = false;
+    public float ArPreProcessLoginDelay { get; set; } = 5f;
+    // Per-step toggles — what to do before AR processes retainers
+    public bool ArPreProcessOpenInventory { get; set; } = true;
+    public bool ArPreProcessOpenArmouryChest { get; set; } = true;
+    public bool ArPreProcessOpenSaddlebags { get; set; } = true;
+    public bool ArPreProcessFcWindow { get; set; } = true;
+    public bool ArPreProcessSaveToXaDatabase { get; set; } = true;
+
+    // ── AR Post-Processing ──
+    // Master toggle — when enabled, registers with AR for character post-processing in multi-mode
+    public bool ArPostProcessEnabled { get; set; } = false;
+    // Per-step toggles — what to do after AR finishes each character
+    public bool ArPostProcessOpenInventory { get; set; } = true;
+    public bool ArPostProcessOpenArmouryChest { get; set; } = true;
+    public bool ArPostProcessOpenSaddlebags { get; set; } = true;
+    public bool ArPostProcessFcWindow { get; set; } = true;
+    public bool ArPostProcessSaveToXaDatabase { get; set; } = true;
+
+    // ── Window Renamer ──
+    public bool WindowRenamerEnabled { get; set; } = false;
+    public string WindowRenamerTitle { get; set; } = "";
+    public bool WindowRenamerUseProcessId { get; set; } = false;
 
     // ── City Chat Flooder ──
     public List<string> FloorderSelectedWorlds { get; set; } = new();

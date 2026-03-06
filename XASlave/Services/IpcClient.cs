@@ -5,6 +5,8 @@ using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
 
+// List<Vector3> needed for vnavmesh.Path.MoveTo IPC
+
 namespace XASlave.Services;
 
 /// <summary>
@@ -15,7 +17,7 @@ namespace XASlave.Services;
 ///   XA Database    — Save, Refresh, IsReady, GetDbPath, GetVersion, GetCharacterName, GetGil,
 ///                    GetRetainerGil, GetFcInfo, GetPlotInfo, GetPersonalPlotInfo, SearchItems
 ///   vnavmesh       — Nav mesh pathfinding, movement, rebuild
-///   AutoRetainer   — Suppressed/busy check, multi mode toggle
+///   AutoRetainer   — Suppressed/busy check, multi mode toggle, character/retainer post-processing
 ///   Lifestream     — IsBusy, Abort, ExecuteCommand, ChangeWorld, teleport shortcuts
 ///   YesAlready     — IsEnabled, SetEnabled, PausePlugin
 ///   Deliveroo      — GC turn-in running check
@@ -52,12 +54,23 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<bool> vnavNavPathfindInProgressSubscriber;
     private readonly ICallGateSubscriber<bool> vnavSimpleMovePathfindInProgressSubscriber;
     private readonly ICallGateSubscriber<object> vnavStopSubscriber;
+    private readonly ICallGateSubscriber<List<Vector3>, bool, object> vnavMoveToSubscriber;
 
-    // ── AutoRetainer (source: AutoRetainer/Modules/IPC.cs — explicit channel names) ──
+    // ── AutoRetainer (source: AutoRetainer/Modules/IPC.cs + AutoRetainerAPI/ApiConsts.cs — explicit channel names) ──
     private readonly ICallGateSubscriber<bool> arGetSuppressedSubscriber;
     private readonly ICallGateSubscriber<bool, object> arSetSuppressedSubscriber;
     private readonly ICallGateSubscriber<bool> arGetMultiModeEnabledSubscriber;
     private readonly ICallGateSubscriber<bool, object> arSetMultiModeEnabledSubscriber;
+    // Character post-processing — runs after all retainers done for a character, before relog
+    private readonly ICallGateSubscriber<string, object> arRequestCharacterPostProcessSubscriber;
+    private readonly ICallGateSubscriber<object> arFinishCharacterPostProcessSubscriber;
+    private readonly ICallGateSubscriber<string, object> arOnCharacterReadyForPostprocessSubscriber;
+    private readonly ICallGateSubscriber<object> arOnCharacterAdditionalTaskSubscriber;
+    // Retainer post-processing — runs after each retainer is done
+    private readonly ICallGateSubscriber<string, object> arRequestRetainerPostProcessSubscriber;
+    private readonly ICallGateSubscriber<object> arFinishRetainerPostProcessSubscriber;
+    private readonly ICallGateSubscriber<string, string, object> arOnRetainerReadyForPostprocessSubscriber;
+    private readonly ICallGateSubscriber<string, object> arOnRetainerAdditionalTaskSubscriber;
 
     // ── Lifestream (source: Lifestream/IPC/IPCProvider.cs — EzIPC prefix "Lifestream.") ──
     private readonly ICallGateSubscriber<bool> lsIsBusySubscriber;
@@ -137,12 +150,23 @@ public sealed class IpcClient
         vnavNavPathfindInProgressSubscriber = pluginInterface.GetIpcSubscriber<bool>("vnavmesh.Nav.PathfindInProgress");
         vnavSimpleMovePathfindInProgressSubscriber = pluginInterface.GetIpcSubscriber<bool>("vnavmesh.SimpleMove.PathfindInProgress");
         vnavStopSubscriber = pluginInterface.GetIpcSubscriber<object>("vnavmesh.Path.Stop");
+        vnavMoveToSubscriber = pluginInterface.GetIpcSubscriber<List<Vector3>, bool, object>("vnavmesh.Path.MoveTo");
 
         // AutoRetainer — explicit IPC channel registration in IPC.Init()
         arGetSuppressedSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.GetSuppressed");
         arSetSuppressedSubscriber = pluginInterface.GetIpcSubscriber<bool, object>("AutoRetainer.SetSuppressed");
         arGetMultiModeEnabledSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.GetMultiModeEnabled");
         arSetMultiModeEnabledSubscriber = pluginInterface.GetIpcSubscriber<bool, object>("AutoRetainer.SetMultiModeEnabled");
+        // Character post-processing (source: AutoRetainerAPI/ApiConsts.cs)
+        arRequestCharacterPostProcessSubscriber = pluginInterface.GetIpcSubscriber<string, object>("AutoRetainer.RequestCharacterPostprocess");
+        arFinishCharacterPostProcessSubscriber = pluginInterface.GetIpcSubscriber<object>("AutoRetainer.FinishCharacterPostprocessRequest");
+        arOnCharacterReadyForPostprocessSubscriber = pluginInterface.GetIpcSubscriber<string, object>("AutoRetainer.OnCharacterReadyForPostprocess");
+        arOnCharacterAdditionalTaskSubscriber = pluginInterface.GetIpcSubscriber<object>("AutoRetainer.OnCharacterAdditionalTask");
+        // Retainer post-processing
+        arRequestRetainerPostProcessSubscriber = pluginInterface.GetIpcSubscriber<string, object>("AutoRetainer.RequestPostprocess");
+        arFinishRetainerPostProcessSubscriber = pluginInterface.GetIpcSubscriber<object>("AutoRetainer.FinishPostprocessRequest");
+        arOnRetainerReadyForPostprocessSubscriber = pluginInterface.GetIpcSubscriber<string, string, object>("AutoRetainer.OnRetainerReadyForPostprocess");
+        arOnRetainerAdditionalTaskSubscriber = pluginInterface.GetIpcSubscriber<string, object>("AutoRetainer.OnRetainerAdditionalTask");
 
         // Lifestream — EzIPC prefix "Lifestream." + method name
         lsIsBusySubscriber = pluginInterface.GetIpcSubscriber<bool>("Lifestream.IsBusy");
@@ -397,6 +421,22 @@ public sealed class IpcClient
         catch { return false; }
     }
 
+    /// <summary>
+    /// Direct waypoint movement — moves in a straight line to the exact coordinates.
+    /// This is vnavmesh.Path.MoveTo (NOT PathfindAndMoveTo which uses navmesh pathfinding).
+    /// Critical for jump puzzles where exact stop positions are required.
+    /// Matches SND's IPC.vnavmesh.MoveTo(vectorList, false) used by pot0to's scripts.
+    /// </summary>
+    public void VnavMoveTo(Vector3 destination, bool fly)
+    {
+        try
+        {
+            var waypoints = new List<Vector3> { destination };
+            vnavMoveToSubscriber.InvokeAction(waypoints, fly);
+        }
+        catch (Exception ex) { log.Error($"[XASlave] IPC: vnavmesh.Path.MoveTo failed — {ex.Message}"); }
+    }
+
     // ═══════════════════════════════════════════════════
     //  AutoRetainer
     // ═══════════════════════════════════════════════════
@@ -423,6 +463,79 @@ public sealed class IpcClient
     {
         try { arSetMultiModeEnabledSubscriber.InvokeAction(enabled); return true; }
         catch { return false; }
+    }
+
+    // ── Character Post-Processing ──
+
+    /// <summary>Register XA Slave for character-level post-processing in AR multi-mode.
+    /// AR will pause before relogging and fire OnCharacterReadyForPostprocess.</summary>
+    public bool AutoRetainerRequestCharacterPostProcess(string pluginName)
+    {
+        try { arRequestCharacterPostProcessSubscriber.InvokeAction(pluginName); return true; }
+        catch (Exception ex) { log.Error($"[XASlave] IPC: AR.RequestCharacterPostprocess failed — {ex.Message}"); return false; }
+    }
+
+    /// <summary>Signal AR that character post-processing is done. AR will resume (relog to next character).</summary>
+    public bool AutoRetainerFinishCharacterPostProcess()
+    {
+        try { arFinishCharacterPostProcessSubscriber.InvokeAction(); return true; }
+        catch (Exception ex) { log.Error($"[XASlave] IPC: AR.FinishCharacterPostprocessRequest failed — {ex.Message}"); return false; }
+    }
+
+    /// <summary>Subscribe to the character post-processing event.
+    /// AR fires this with pluginName when it's ready for your post-processing.</summary>
+    public void AutoRetainerSubscribeCharacterPostProcess(Action<string> callback)
+    {
+        arOnCharacterReadyForPostprocessSubscriber.Subscribe(callback);
+    }
+
+    /// <summary>Unsubscribe from the character post-processing event.</summary>
+    public void AutoRetainerUnsubscribeCharacterPostProcess(Action<string> callback)
+    {
+        arOnCharacterReadyForPostprocessSubscriber.Unsubscribe(callback);
+    }
+
+    /// <summary>Subscribe to OnCharacterAdditionalTask — AR fires this PER CHARACTER before
+    /// checking the postprocess list. Plugins must call RequestCharacterPostProcess in response
+    /// to get into the list for this character.</summary>
+    public void AutoRetainerSubscribeCharacterAdditionalTask(Action callback)
+    {
+        arOnCharacterAdditionalTaskSubscriber.Subscribe(callback);
+    }
+
+    /// <summary>Unsubscribe from OnCharacterAdditionalTask.</summary>
+    public void AutoRetainerUnsubscribeCharacterAdditionalTask(Action callback)
+    {
+        arOnCharacterAdditionalTaskSubscriber.Unsubscribe(callback);
+    }
+
+    // ── Retainer Post-Processing ──
+
+    /// <summary>Register for retainer-level post-processing in AR. AR will pause after each retainer.</summary>
+    public bool AutoRetainerRequestRetainerPostProcess(string pluginName)
+    {
+        try { arRequestRetainerPostProcessSubscriber.InvokeAction(pluginName); return true; }
+        catch (Exception ex) { log.Error($"[XASlave] IPC: AR.RequestPostprocess failed — {ex.Message}"); return false; }
+    }
+
+    /// <summary>Signal AR that retainer post-processing is done.</summary>
+    public bool AutoRetainerFinishRetainerPostProcess()
+    {
+        try { arFinishRetainerPostProcessSubscriber.InvokeAction(); return true; }
+        catch (Exception ex) { log.Error($"[XASlave] IPC: AR.FinishPostprocessRequest failed — {ex.Message}"); return false; }
+    }
+
+    /// <summary>Subscribe to the retainer post-processing event.
+    /// AR fires this with (pluginName, retainerName) when a retainer is ready.</summary>
+    public void AutoRetainerSubscribeRetainerPostProcess(Action<string, string> callback)
+    {
+        arOnRetainerReadyForPostprocessSubscriber.Subscribe(callback);
+    }
+
+    /// <summary>Unsubscribe from the retainer post-processing event.</summary>
+    public void AutoRetainerUnsubscribeRetainerPostProcess(Action<string, string> callback)
+    {
+        arOnRetainerReadyForPostprocessSubscriber.Unsubscribe(callback);
     }
 
     // ═══════════════════════════════════════════════════

@@ -40,6 +40,8 @@ public sealed class Plugin : IDalamudPlugin
     public TaskRunner TaskRunner { get; init; }
     public AutoRetainerConfigReader ArConfigReader { get; init; }
     public ExternalTaskLoader ExternalTaskLoader { get; init; }
+    public WindowRenamerService WindowRenamer { get; init; }
+    public ArPostProcessService ArPostProcessor { get; init; }
 
     public Plugin()
     {
@@ -54,9 +56,15 @@ public sealed class Plugin : IDalamudPlugin
         ArConfigReader = new AutoRetainerConfigReader(PluginInterface, Log);
         IpcProvider = new IpcProvider(PluginInterface, this, Log);
         ExternalTaskLoader = new ExternalTaskLoader(this, PluginInterface, Log);
+        WindowRenamer = new WindowRenamerService(Log);
+        ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
 
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
+
+        // Apply window rename on plugin load if enabled
+        if (Configuration.WindowRenamerEnabled)
+            WindowRenamer.ApplyFromConfig(Configuration);
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -75,6 +83,8 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
+        ArPostProcessor.Dispose();
+        WindowRenamer.Dispose();
         IpcProvider.Dispose();
         ExternalTaskLoader.Dispose();
         TaskRunner.Dispose();

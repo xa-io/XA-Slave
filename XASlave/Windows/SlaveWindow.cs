@@ -22,28 +22,52 @@ namespace XASlave.Windows;
 public partial class SlaveWindow : Window, IDisposable
 {
     private readonly Plugin plugin;
-    private const string PluginVersion = "0.0.0.6";
+    private const string PluginVersion = "0.0.0.8";
 
     // Task menu
     private enum SlaveTask
     {
+        // Tasks
         SaveToXaDatabase,
+        CityChatFlooder,
+        AutoGlamWeather,
+        ArPostProcess,
+        // FC
         MonthlyRelogger,
         CheckDuplicatePlots,
         ReturnAltsToHomeworlds,
-        CityChatFlooder,
+        RefreshArSubsBell,
+        MultiFcPermissions,
+        AutoAcceptFcInvite,
+        // Reference
+        WindowRenamer,
         DebugCommands,
         IpcCallsAvailable,
     }
 
-    private static readonly (SlaveTask Task, string Label)[] TaskList =
+    private static readonly (SlaveTask Task, string Label)[] TaskItems =
     {
         (SlaveTask.SaveToXaDatabase, "Save to XA Database"),
+        (SlaveTask.CityChatFlooder, "City Chat Flooder"),
+        (SlaveTask.AutoGlamWeather, "Auto-Glam Weather"),
+        (SlaveTask.ArPostProcess, "AR Post-Processing"),
+    };
+
+    private static readonly (SlaveTask Task, string Label)[] FcItems =
+    {
         (SlaveTask.MonthlyRelogger, "Monthly Relogger"),
         (SlaveTask.CheckDuplicatePlots, "Check Duplicate Plots"),
         (SlaveTask.ReturnAltsToHomeworlds, "Return Alts To Homeworlds"),
-        (SlaveTask.CityChatFlooder, "City Chat Flooder"),
+        (SlaveTask.RefreshArSubsBell, "Refresh AR Subs/Bell"),
+        (SlaveTask.MultiFcPermissions, "FC Permissions Updater"),
+        (SlaveTask.AutoAcceptFcInvite, "Auto-Accept FC Invites"),
+    };
+
+    private static readonly (SlaveTask Task, string Label)[] ReferenceItems =
+    {
+        (SlaveTask.WindowRenamer, "Window Renamer"),
         (SlaveTask.DebugCommands, "Debug / Test"),
+        (SlaveTask.IpcCallsAvailable, "IPC Calls Available"),
     };
 
     private SlaveTask selectedTask = SlaveTask.SaveToXaDatabase;
@@ -90,19 +114,8 @@ public partial class SlaveWindow : Window, IDisposable
         {
             if (child.Success)
             {
-                ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Tasks");
-                ImGui.Separator();
-                ImGui.Spacing();
-
-                foreach (var (task, label) in TaskList)
-                {
-                    var isSelected = selectedExternalTask == null && selectedTask == task;
-                    if (ImGui.Selectable(label, isSelected))
-                    {
-                        selectedTask = task;
-                        selectedExternalTask = null;
-                    }
-                }
+                DrawMenuSection("Tasks", TaskItems, new Vector4(0.4f, 0.8f, 1.0f, 1.0f));
+                DrawMenuSection("FC", FcItems, new Vector4(0.8f, 0.6f, 1.0f, 1.0f));
 
                 foreach (var ext in plugin.ExternalTaskLoader.Tasks)
                 {
@@ -111,19 +124,7 @@ public partial class SlaveWindow : Window, IDisposable
                         selectedExternalTask = ext;
                 }
 
-                // IPC reference at the bottom of the task list
-                ImGui.Spacing();
-                ImGui.Separator();
-                ImGui.Spacing();
-                ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), "Reference");
-                {
-                    var isSelected = selectedExternalTask == null && selectedTask == SlaveTask.IpcCallsAvailable;
-                    if (ImGui.Selectable("IPC Calls Available", isSelected))
-                    {
-                        selectedTask = SlaveTask.IpcCallsAvailable;
-                        selectedExternalTask = null;
-                    }
-                }
+                DrawMenuSection("Reference", ReferenceItems, new Vector4(0.6f, 0.6f, 0.6f, 1.0f));
             }
         }
 
@@ -161,6 +162,24 @@ public partial class SlaveWindow : Window, IDisposable
                         case SlaveTask.CityChatFlooder:
                             DrawCityChatFlooder();
                             break;
+                        case SlaveTask.AutoGlamWeather:
+                            DrawAutoGlamWeatherTask();
+                            break;
+                        case SlaveTask.ArPostProcess:
+                            DrawArPostProcessTask();
+                            break;
+                        case SlaveTask.RefreshArSubsBell:
+                            DrawRefreshArSubsBellTask();
+                            break;
+                        case SlaveTask.AutoAcceptFcInvite:
+                            DrawAutoAcceptFcInviteTask();
+                            break;
+                        case SlaveTask.MultiFcPermissions:
+                            DrawMultiFcPermissionsTask();
+                            break;
+                        case SlaveTask.WindowRenamer:
+                            DrawWindowRenamerTask();
+                            break;
                         case SlaveTask.DebugCommands:
                             DrawDebugCommands();
                             break;
@@ -180,6 +199,23 @@ public partial class SlaveWindow : Window, IDisposable
     // ───────────────────────────────────────────────
     //  Status Bar
     // ───────────────────────────────────────────────
+    /// <summary>Renders a menu section with header and selectable items.</summary>
+    private void DrawMenuSection(string header, (SlaveTask Task, string Label)[] items, Vector4 headerColor)
+    {
+        ImGui.Spacing();
+        ImGui.TextColored(headerColor, header);
+        ImGui.Separator();
+        foreach (var (task, label) in items)
+        {
+            var isSelected = selectedExternalTask == null && selectedTask == task;
+            if (ImGui.Selectable(label, isSelected))
+            {
+                selectedTask = task;
+                selectedExternalTask = null;
+            }
+        }
+    }
+
     private void DrawStatusBar()
     {
         ImGui.TextDisabled($"XA Slave v{PluginVersion}");
