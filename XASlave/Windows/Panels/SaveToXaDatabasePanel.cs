@@ -61,7 +61,7 @@ public partial class SlaveWindow
             if (ImGui.Button("Collect Now"))
                 RunAutoCollection();
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Opens saddlebag/FC windows to collect data, then saves to XA Database via IPC.");
+                ImGui.SetTooltip("Runs the checked Collection Options below, then saves to XA Database via IPC.");
 
             ImGui.SameLine();
             if (ImGui.Button("IPC Save"))
@@ -86,6 +86,50 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Collection Options");
+        ImGui.Spacing();
+
+        var collectArmoury = plugin.Configuration.AutoCollectArmouryChest;
+        if (ImGui.Checkbox("Collect Armoury Chest", ref collectArmoury))
+        {
+            plugin.Configuration.AutoCollectArmouryChest = collectArmoury;
+            plugin.Configuration.Save();
+        }
+
+        var collectSaddlebag = plugin.Configuration.AutoCollectSaddlebag;
+        if (ImGui.Checkbox("Collect Saddlebag", ref collectSaddlebag))
+        {
+            plugin.Configuration.AutoCollectSaddlebag = collectSaddlebag;
+            plugin.Configuration.Save();
+        }
+
+        var collectJournal = plugin.Configuration.AutoCollectJournal;
+        if (ImGui.Checkbox("Collect Journal", ref collectJournal))
+        {
+            plugin.Configuration.AutoCollectJournal = collectJournal;
+            plugin.Configuration.Save();
+        }
+
+        var collectPlot = plugin.Configuration.AutoCollectPersonalPlotInfo;
+        if (ImGui.Checkbox("Collect Personal Plot Info", ref collectPlot))
+        {
+            plugin.Configuration.AutoCollectPersonalPlotInfo = collectPlot;
+            plugin.Configuration.Save();
+        }
+
+        var collectFc = plugin.Configuration.AutoCollectFc;
+        if (ImGui.Checkbox("Collect FC Data (Members, Info, Housing)", ref collectFc))
+        {
+            plugin.Configuration.AutoCollectFc = collectFc;
+            plugin.Configuration.Save();
+        }
+
+        ImGui.TextDisabled("Collect Now and Auto-Collection on Login both use these options.");
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
         if (Plugin.PlayerState.IsLoaded)
         {
             var lastSyncedUtc = plugin.GetCurrentCharacterLastSyncedToXaDbUtc();
@@ -105,25 +149,11 @@ public partial class SlaveWindow
             plugin.Configuration.AutoCollectOnLogin = autoCollect;
             plugin.Configuration.Save();
         }
-        ImGui.TextDisabled("Automatically opens saddlebag and FC windows after login to collect data.");
+        ImGui.TextDisabled("Automatically runs the selected Collection Options after login.");
 
         if (autoCollect)
         {
             ImGui.Spacing();
-            var acSaddlebag = plugin.Configuration.AutoCollectSaddlebag;
-            if (ImGui.Checkbox("  Collect Saddlebag", ref acSaddlebag))
-            {
-                plugin.Configuration.AutoCollectSaddlebag = acSaddlebag;
-                plugin.Configuration.Save();
-            }
-
-            var acFc = plugin.Configuration.AutoCollectFc;
-            if (ImGui.Checkbox("  Collect FC Data (Members, Info, Housing)", ref acFc))
-            {
-                plugin.Configuration.AutoCollectFc = acFc;
-                plugin.Configuration.Save();
-            }
-
             var disableOnArMulti = plugin.Configuration.AutoCollectDisableWhenArMultiEnabled;
             if (ImGui.Checkbox("  Disable if AR Multi is enabled", ref disableOnArMulti))
             {
@@ -175,7 +205,10 @@ public partial class SlaveWindow
         var saveAttempted = false;
         var lastSaveOk = false;
         plugin.AutoCollector.StartCollection(
+            plugin.Configuration.AutoCollectArmouryChest,
             plugin.Configuration.AutoCollectSaddlebag,
+            plugin.Configuration.AutoCollectJournal,
+            plugin.Configuration.AutoCollectPersonalPlotInfo,
             plugin.Configuration.AutoCollectFc,
             () =>
             {

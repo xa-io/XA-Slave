@@ -21,5 +21,16 @@ public partial class SlaveWindow
         }
 
         ImGui.TextDisabled("Opens XA Slave when the plugin loads and when the character logs in.");
+
+        ImGui.Spacing();
+
+        var verboseTaskLogging = plugin.Configuration.VerboseTaskLogging;
+        if (ImGui.Checkbox("Verbose Task Logging", ref verboseTaskLogging))
+        {
+            plugin.Configuration.VerboseTaskLogging = verboseTaskLogging;
+            plugin.Configuration.Save();
+        }
+
+        ImGui.TextDisabled("Off: normal user-facing task logs. On: detailed step timing, relog wait state, and CharacterSafeWait diagnostics.");
     }
 }

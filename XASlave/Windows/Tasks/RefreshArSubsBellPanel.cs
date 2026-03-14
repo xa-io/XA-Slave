@@ -578,7 +578,7 @@ public partial class SlaveWindow
                 Name = $"AR Busy Check (Sub): {charName}",
                 OnEnter = () =>
                 {
-                    runner.AddLog("Checking if AutoRetainer is busy after sub console...");
+                    runner.AddVerboseLog("Checking if AutoRetainer is busy after sub console...");
                 },
                 IsComplete = () =>
                 {
@@ -658,7 +658,7 @@ public partial class SlaveWindow
                 Name = $"AR Busy Check (Bell): {charName}",
                 OnEnter = () =>
                 {
-                    runner.AddLog("Checking if AutoRetainer is busy after summoning bell...");
+                    runner.AddVerboseLog("Checking if AutoRetainer is busy after summoning bell...");
                 },
                 IsComplete = () =>
                 {

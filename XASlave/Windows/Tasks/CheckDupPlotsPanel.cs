@@ -25,9 +25,12 @@ public partial class SlaveWindow
     private bool dupDoOpenInventory = true;
     private bool dupDoOpenArmoury = true;
     private bool dupDoOpenSaddlebags = true;
+    private bool dupDoOpenJournal = true;
     private bool dupDoReturnToHome = true;
+    private bool dupDoCollectPersonalPlotInfo = true;
     private bool dupDoReturnToFc = true;
     private bool dupDoParseForXaDatabase = true;
+    private bool dupDoLogoutOnComplete;
     private bool dupDoEnableArMulti = true;
 
     // ───────────────────────────────────────────────
@@ -64,7 +67,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // ── Plugin Status ──
-        DrawTaskPluginStatus(dupDoParseForXaDatabase);
+        DrawTaskPluginStatus(dupDoCollectPersonalPlotInfo || dupDoParseForXaDatabase);
 
         ImGui.Separator();
         ImGui.Spacing();
@@ -158,14 +161,16 @@ public partial class SlaveWindow
 
             var canStart = selectedChars.Count > 0 && !runner.IsRunning
                 && plugin.IpcClient.IsAutoRetainerAvailable()
-                && plugin.IpcClient.IsLifestreamAvailable();
+                && plugin.IpcClient.IsLifestreamAvailable()
+                && (!(dupDoCollectPersonalPlotInfo || dupDoParseForXaDatabase) || plugin.IpcClient.IsXaDatabaseAvailable());
 
             if (!canStart) ImGui.BeginDisabled();
             if (ImGui.Button($"Start ({selectedChars.Count} chars)##dup"))
             {
                 StartTaskWithConfig("Check Duplicate Plots", selectedChars, dupPlotsSelectedIndices,
                     dupDoTextAdvance, dupDoRemoveSprout, dupDoOpenInventory, dupDoOpenArmoury,
-                    dupDoOpenSaddlebags, dupDoReturnToHome, dupDoReturnToFc, dupDoParseForXaDatabase, dupDoEnableArMulti);
+                    dupDoOpenSaddlebags, dupDoOpenJournal, dupDoReturnToHome, dupDoCollectPersonalPlotInfo,
+                    dupDoReturnToFc, dupDoParseForXaDatabase, dupDoLogoutOnComplete, dupDoEnableArMulti);
                 dupPlotsShowLog = true;
             }
             if (!canStart) ImGui.EndDisabled();
@@ -284,16 +289,16 @@ public partial class SlaveWindow
         ImGui.Checkbox("Open Inventory##dup", ref dupDoOpenInventory);
         ImGui.Checkbox("Open Armoury Chest##dup", ref dupDoOpenArmoury);
         ImGui.Checkbox("Open Saddlebags##dup", ref dupDoOpenSaddlebags);
+        ImGui.Checkbox("Open Journal##dup", ref dupDoOpenJournal);
         ImGui.Checkbox("Teleport Home (Lifestream)##dup", ref dupDoReturnToHome);
+        ImGui.Checkbox("Collect Personal Plot Info##dup", ref dupDoCollectPersonalPlotInfo);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Opens /housing, checks Apartment, Private Estate, and Shared Estate signboards when available,\nand triggers XA Database saves after each housing pass.");
         ImGui.Checkbox("Teleport FC (Lifestream)##dup", ref dupDoReturnToFc);
         ImGui.Checkbox("Parse for XA Database (FC window + save)##dup", ref dupDoParseForXaDatabase);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Opens FC window, navigates Members/Info/Housing tabs to collect\nall FC data, then saves to XA Database.");
-        ImGui.Separator();
-        ImGui.Checkbox("Enable AR Multi Mode on completion##dup", ref dupDoEnableArMulti);
-
-        // ── Log with Copy/Clear ──
-        DrawTaskLog("duplog", ref dupPlotsShowLog, runner);
+        DrawSharedCompletionAndLogFooter("dup", "duplog", ref dupDoLogoutOnComplete, ref dupDoEnableArMulti, ref dupPlotsShowLog, runner);
     }
 
     private void RefreshDupPlotsList()

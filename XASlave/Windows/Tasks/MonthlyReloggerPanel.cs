@@ -15,9 +15,12 @@ namespace XASlave.Windows;
 /// </summary>
 public partial class SlaveWindow
 {
+    private const int ReloggerStaleSliderMaxValue = 45;
+
     // ── Monthly Relogger state ──
     private MonthlyReloggerTask? reloggerTask;
     private readonly HashSet<int> reloggerSelectedIndices = new();
+    private int reloggerStaleSelectDaysInput = -1;
     private string reloggerAddInput = string.Empty;
     private string reloggerSearchFilter = string.Empty;
     private bool reloggerShowLog;
@@ -34,6 +37,17 @@ public partial class SlaveWindow
         var cfg = plugin.Configuration;
         var runner = plugin.TaskRunner;
         var chars = cfg.ReloggerCharacters;
+        var configuredStaleSelectDays = Math.Clamp(cfg.ReloggerStaleSelectDays, 1, ReloggerStaleSliderMaxValue);
+        if (configuredStaleSelectDays != cfg.ReloggerStaleSelectDays)
+        {
+            cfg.ReloggerStaleSelectDays = configuredStaleSelectDays;
+            cfg.Save();
+        }
+
+        if (reloggerStaleSelectDaysInput < 1 || reloggerStaleSelectDaysInput > ReloggerStaleSliderMaxValue)
+            reloggerStaleSelectDaysInput = configuredStaleSelectDays;
+
+        var staleSelectDays = reloggerStaleSelectDaysInput;
 
         // ── Title + Description ──
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Monthly Relogger");
@@ -108,10 +122,12 @@ public partial class SlaveWindow
         {
             var selectedChars = GetSelectedReloggerCharacters();
             var ipc = plugin.IpcClient;
+            var requiresXaDb = plugin.Configuration.ReloggerDoCollectPersonalPlotInfo || plugin.Configuration.ReloggerDoParseForXaDatabase;
             var allRequiredPluginsOk = ipc.IsAutoRetainerAvailable()
                 && ipc.IsLifestreamAvailable()
                 && ipc.IsTextAdvanceAvailable()
-                && ipc.IsVnavAvailable();
+                && ipc.IsVnavAvailable()
+                && (!requiresXaDb || ipc.IsXaDatabaseAvailable());
             var canStart = selectedChars.Count > 0 && allRequiredPluginsOk;
 
             if (!canStart) ImGui.BeginDisabled();
@@ -146,19 +162,24 @@ public partial class SlaveWindow
             if (ImGui.Button("Clear All"))
                 reloggerSelectedIndices.Clear();
             ImGui.SameLine();
-            if (ImGui.Button("Select Stale (>20d)"))
+            var staleButtonLabel = $"Select Stale ({GetReloggerStaleButtonLabel(staleSelectDays)})";
+            var staleButtonWidth = ImGui.CalcTextSize("Select Stale (>45d)").X + ImGui.GetStyle().FramePadding.X * 2f;
+            if (ImGui.Button(staleButtonLabel, new Vector2(staleButtonWidth, 0f)))
+                SelectReloggerStaleCharacters(staleSelectDays);
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip($"Select all characters with Last Logged In {GetReloggerStaleTooltipText(staleSelectDays)} (or never logged in).");
+
+            ImGui.SameLine();
+            ImGui.SetNextItemWidth(170f);
+            if (ImGui.SliderInt("##ReloggerStaleDays", ref staleSelectDays, 1, ReloggerStaleSliderMaxValue, "%d"))
+                reloggerStaleSelectDaysInput = staleSelectDays;
+            if (ImGui.IsItemDeactivatedAfterEdit() && cfg.ReloggerStaleSelectDays != reloggerStaleSelectDaysInput)
             {
-                var cutoff = DateTime.UtcNow.AddDays(-20);
-                for (int i = 0; i < chars.Count; i++)
-                {
-                    var cn = chars[i];
-                    cfg.ReloggerCharacterInfo.TryGetValue(cn, out var info);
-                    if (info == null || info.LastLoggedIn == default || info.LastLoggedIn < cutoff)
-                        reloggerSelectedIndices.Add(i);
-                }
+                cfg.ReloggerStaleSelectDays = reloggerStaleSelectDaysInput;
+                cfg.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Select all characters with Last Logged In over 20 days ago (or never logged in).");
+                ImGui.SetTooltip("Set the stale-day threshold used by the stale mass-select button. The maximum slider value is 45, which selects characters with Last Logged In over 45 days ago.");
         }
 
         ImGui.Spacing();
@@ -410,23 +431,32 @@ public partial class SlaveWindow
         var v3 = cfg.ReloggerDoOpenInventory;
         var v4 = cfg.ReloggerDoOpenArmouryChest;
         var v5 = cfg.ReloggerDoOpenSaddlebags;
-        var v6 = cfg.ReloggerDoReturnToHome;
-        var v7 = cfg.ReloggerDoReturnToFc;
-        var v8 = cfg.ReloggerDoParseForXaDatabase;
-        var v9 = cfg.ReloggerDoEnableArMultiOnComplete;
+        var v6 = cfg.ReloggerDoOpenJournal;
+        var v7 = cfg.ReloggerDoReturnToHome;
+        var v8 = cfg.ReloggerDoCollectPersonalPlotInfo;
+        var v9 = cfg.ReloggerDoReturnToFc;
+        var v10 = cfg.ReloggerDoParseForXaDatabase;
+        var v11 = cfg.ReloggerDoLogoutOnComplete;
+        var v12 = cfg.ReloggerDoEnableArMultiOnComplete;
 
         changed |= ImGui.Checkbox("Enable TextAdvance (/at y)", ref v1);
         changed |= ImGui.Checkbox("Remove Sprout (/nastatus off)", ref v2);
         changed |= ImGui.Checkbox("Open Inventory", ref v3);
         changed |= ImGui.Checkbox("Open Armoury Chest", ref v4);
         changed |= ImGui.Checkbox("Open Saddlebags", ref v5);
-        changed |= ImGui.Checkbox("Teleport Home (Lifestream)", ref v6);
-        changed |= ImGui.Checkbox("Teleport FC (Lifestream)", ref v7);
-        changed |= ImGui.Checkbox("Parse for XA Database (FC window + save)", ref v8);
+        changed |= ImGui.Checkbox("Open Journal", ref v6);
+        changed |= ImGui.Checkbox("Teleport Home (Lifestream)", ref v7);
+        changed |= ImGui.Checkbox("Collect Personal Plot Info (/housing -> signboard -> save)", ref v8);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Opens the housing menu, checks Apartment, Private Estate, and Shared Estate signboards when available,\nand triggers XA Database saves after each housing pass.");
+        changed |= ImGui.Checkbox("Teleport FC (Lifestream)", ref v9);
+        changed |= ImGui.Checkbox("Parse for XA Database (FC window + save)", ref v10);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Opens FC window to collect FC data (name, members, points, plot),\nthen saves all collected data to XA Database.");
         ImGui.Separator();
-        changed |= ImGui.Checkbox("Enable AR Multi Mode on completion", ref v9);
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Task Options on Complete");
+        changed |= ImGui.Checkbox("Logout on completion", ref v11);
+        changed |= ImGui.Checkbox("Enable AR Multi Mode on completion", ref v12);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Re-enables AutoRetainer Multi Mode after ALL characters have been processed.\nOnly fires after the summary step at the very end.");
 
@@ -437,10 +467,13 @@ public partial class SlaveWindow
             cfg.ReloggerDoOpenInventory = v3;
             cfg.ReloggerDoOpenArmouryChest = v4;
             cfg.ReloggerDoOpenSaddlebags = v5;
-            cfg.ReloggerDoReturnToHome = v6;
-            cfg.ReloggerDoReturnToFc = v7;
-            cfg.ReloggerDoParseForXaDatabase = v8;
-            cfg.ReloggerDoEnableArMultiOnComplete = v9;
+            cfg.ReloggerDoOpenJournal = v6;
+            cfg.ReloggerDoReturnToHome = v7;
+            cfg.ReloggerDoCollectPersonalPlotInfo = v8;
+            cfg.ReloggerDoReturnToFc = v9;
+            cfg.ReloggerDoParseForXaDatabase = v10;
+            cfg.ReloggerDoLogoutOnComplete = v11;
+            cfg.ReloggerDoEnableArMultiOnComplete = v12;
             cfg.Save();
         }
 
@@ -494,7 +527,10 @@ public partial class SlaveWindow
         if (runner.CurrentTaskName == "Monthly Relogger" && runner.StatusText == "Complete")
         {
             ImGui.Spacing();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Relogger completed successfully.");
+            if (runner.FailedCharacters.Count > 0)
+                ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"Relogger completed with {runner.FailedCharacters.Count} failed character(s).");
+            else
+                ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Relogger completed successfully.");
         }
     }
 
@@ -514,6 +550,36 @@ public partial class SlaveWindow
             .ToList();
     }
 
+    private void SelectReloggerStaleCharacters(int staleDays)
+    {
+        var cfg = plugin.Configuration;
+        var chars = cfg.ReloggerCharacters;
+
+        for (int i = 0; i < chars.Count; i++)
+        {
+            var cn = chars[i];
+            cfg.ReloggerCharacterInfo.TryGetValue(cn, out var info);
+            if (info == null || info.LastLoggedIn == default)
+            {
+                reloggerSelectedIndices.Add(i);
+                continue;
+            }
+
+            if ((DateTime.UtcNow - info.LastLoggedIn).TotalDays > staleDays)
+                reloggerSelectedIndices.Add(i);
+        }
+    }
+
+    private static string GetReloggerStaleButtonLabel(int staleDays)
+    {
+        return $">{staleDays}d";
+    }
+
+    private static string GetReloggerStaleTooltipText(int staleDays)
+    {
+        return $"over {staleDays} days ago";
+    }
+
     /// <summary>Start the Monthly Relogger task with the given character list.</summary>
     private void StartMonthlyRelogger(List<string> characters)
     {
@@ -524,9 +590,12 @@ public partial class SlaveWindow
             DoOpenInventory = plugin.Configuration.ReloggerDoOpenInventory,
             DoOpenArmouryChest = plugin.Configuration.ReloggerDoOpenArmouryChest,
             DoOpenSaddlebags = plugin.Configuration.ReloggerDoOpenSaddlebags,
+            DoOpenJournal = plugin.Configuration.ReloggerDoOpenJournal,
             DoReturnToHome = plugin.Configuration.ReloggerDoReturnToHome,
+            DoCollectPersonalPlotInfo = plugin.Configuration.ReloggerDoCollectPersonalPlotInfo,
             DoReturnToFc = plugin.Configuration.ReloggerDoReturnToFc,
             DoParseForXaDatabase = plugin.Configuration.ReloggerDoParseForXaDatabase,
+            DoLogoutOnComplete = plugin.Configuration.ReloggerDoLogoutOnComplete,
             DoEnableArMultiOnComplete = plugin.Configuration.ReloggerDoEnableArMultiOnComplete,
         };
 

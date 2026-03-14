@@ -48,7 +48,7 @@ public sealed class TaskRunner : IDisposable
     // Log messages for UI display
     private readonly List<string> logMessages = new();
     public IReadOnlyList<string> LogMessages => logMessages;
-    private const int MaxLogMessages = 200;
+    private const int MaxLogMessages = 8000;
 
     // Characters that failed to relog — for summary at end of task
     public List<string> FailedCharacters { get; } = new();
@@ -115,6 +115,7 @@ public sealed class TaskRunner : IDisposable
         framework.Update -= OnTick;
         stepIndex = -1;
         StatusText = "Cancelled";
+        SuppressLogoutCancel = false;
         AddLog($"[{CurrentTaskName}] Cancelled.");
         log.Information($"[XASlave] TaskRunner: '{CurrentTaskName}' cancelled.");
         SetDtrIdle();
@@ -128,6 +129,14 @@ public sealed class TaskRunner : IDisposable
         onLog?.Invoke(message);
     }
 
+    public bool VerboseTaskLoggingEnabled => IsVerboseTaskLoggingEnabled();
+
+    public void AddVerboseLog(string message)
+    {
+        if (IsVerboseTaskLoggingEnabled())
+            AddLog(message);
+    }
+
     public void ClearLog()
     {
         logMessages.Clear();
@@ -135,16 +144,58 @@ public sealed class TaskRunner : IDisposable
 
     public bool IsNormalCondition()
     {
-        return !condition[ConditionFlag.InCombat]
-            && !condition[ConditionFlag.BoundByDuty]
-            && !condition[ConditionFlag.WatchingCutscene]
-            && !condition[ConditionFlag.OccupiedInCutSceneEvent]
-            && !condition[ConditionFlag.BetweenAreas]
-            && !condition[ConditionFlag.BetweenAreas51];
+        return CharacterSafetyHelper.IsNormalCondition(condition);
+    }
+
+    private string FormatStepLabel(int index, TaskStep step)
+    {
+        return $"[{index + 1}/{steps.Count}] {step.Name}";
+    }
+
+    private static bool IsVerboseTaskLoggingEnabled()
+    {
+        return Plugin.Instance?.Configuration.VerboseTaskLogging ?? false;
+    }
+
+    private void LogStepStart(int index, TaskStep step)
+    {
+        if (IsVerboseTaskLoggingEnabled())
+            AddLog($"STEP START {FormatStepLabel(index, step)} (timeout {step.TimeoutSec:0.##}s)");
+    }
+
+    private void LogStepComplete(int index, TaskStep step, float elapsed)
+    {
+        if (IsVerboseTaskLoggingEnabled())
+            AddLog($"STEP DONE {FormatStepLabel(index, step)} in {elapsed:0.00}s");
     }
 
     private void OnTick(IFramework fw)
     {
+        if (!running || stepIndex < 0 || stepIndex >= steps.Count)
+        {
+            Finish();
+            return;
+        }
+
+        while (running && stepIndex >= 0 && stepIndex < steps.Count)
+        {
+            var pendingStep = steps[stepIndex];
+            if (pendingStep.ShouldSkip == null || !pendingStep.ShouldSkip())
+                break;
+
+            stepIndex++;
+            if (stepIndex >= steps.Count)
+            {
+                Finish();
+                return;
+            }
+
+            stepStart = DateTime.UtcNow;
+            stepActionDone = false;
+            StatusText = steps[stepIndex].Name;
+            UpdateDtrBar();
+        }
+
         if (!running || stepIndex < 0 || stepIndex >= steps.Count)
         {
             Finish();
@@ -157,6 +208,7 @@ public sealed class TaskRunner : IDisposable
         // Execute OnEnter once
         if (!stepActionDone)
         {
+            LogStepStart(stepIndex, step);
             if (step.OnEnter != null)
             {
                 try { step.OnEnter(); }
@@ -174,6 +226,7 @@ public sealed class TaskRunner : IDisposable
         {
             if (step.IsComplete())
             {
+                LogStepComplete(stepIndex, step, elapsed);
                 AdvanceStep();
                 return;
             }
@@ -192,11 +245,12 @@ public sealed class TaskRunner : IDisposable
                 step.RetryCount++;
                 stepActionDone = false;
                 stepStart = DateTime.UtcNow;
-                AddLog($"Retrying '{step.Name}' ({step.RetryCount}/{step.MaxRetries})");
+                if (IsVerboseTaskLoggingEnabled())
+                    AddLog($"STEP RETRY {FormatStepLabel(stepIndex, step)} ({step.RetryCount}/{step.MaxRetries}) after {elapsed:0.00}s");
                 return;
             }
 
-            AddLog($"Timeout on '{step.Name}' after {step.TimeoutSec}s — skipping.");
+            AddLog($"STEP TIMEOUT {FormatStepLabel(stepIndex, step)} after {elapsed:0.00}s (limit {step.TimeoutSec:0.##}s) — skipping.");
             log.Warning($"[XASlave] TaskRunner step '{step.Name}' timed out after {step.TimeoutSec}s.");
             try { step.OnTimeout?.Invoke(); }
             catch (Exception ex) { log.Error($"[XASlave] TaskRunner step '{step.Name}' OnTimeout error: {ex.Message}"); }
@@ -225,6 +279,7 @@ public sealed class TaskRunner : IDisposable
         framework.Update -= OnTick;
         stepIndex = -1;
         StatusText = "Complete";
+        SuppressLogoutCancel = false;
         AddLog($"[{CurrentTaskName}] Finished.");
         log.Information($"[XASlave] TaskRunner: '{CurrentTaskName}' finished.");
 
@@ -324,6 +379,7 @@ public class TaskStep
     public string Name { get; init; } = string.Empty;
     public Action? OnEnter { get; init; }
     public Func<bool> IsComplete { get; init; } = () => true;
+    public Func<bool>? ShouldSkip { get; init; }
     public float TimeoutSec { get; init; } = 10f;
     public int MaxRetries { get; init; } = 0;
     public Action? OnTimeout { get; init; }

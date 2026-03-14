@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
@@ -97,6 +98,184 @@ public static class AddonHelper
             try { addon->Close(true); }
             catch (Exception ex) { Plugin.Log.Warning($"[XASlave] AddonHelper.CloseAddon '{name}' error: {ex.Message}"); }
         }
+    }
+
+    public static unsafe List<string> GetAddonTextEntries(string addonName)
+    {
+        var results = new List<string>();
+        var addon = GetAddon(addonName);
+        if (addon == null || !addon->IsVisible)
+            return results;
+
+        for (var i = 0; i < addon->UldManager.NodeListCount; i++)
+        {
+            var node = addon->UldManager.NodeList[i];
+            if (node != null)
+                CollectText(node, results, 0);
+        }
+
+        return results;
+    }
+
+    public static unsafe int GetAddonTextEntryCount(string addonName)
+    {
+        return GetAddonTextEntries(addonName).Count;
+    }
+
+    public static unsafe bool AddonHasText(string addonName, string text, bool contains = false)
+    {
+        var addon = GetAddon(addonName);
+        if (addon == null || !addon->IsVisible)
+            return false;
+
+        return FindMatchingTextNode(addon, text, contains) != null;
+    }
+
+    public static unsafe string GetFirstAddonText(string addonName, string text, bool contains = true)
+    {
+        var entries = GetAddonTextEntries(addonName);
+        foreach (var entry in entries)
+        {
+            if (contains)
+            {
+                if (entry.Contains(text, StringComparison.OrdinalIgnoreCase))
+                    return entry;
+            }
+            else if (entry.Equals(text, StringComparison.OrdinalIgnoreCase))
+            {
+                return entry;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    public static unsafe bool ClickAddonText(string addonName, string text, bool contains = false)
+    {
+        var addon = GetAddon(addonName);
+        if (addon == null || !addon->IsVisible)
+        {
+            Plugin.Log.Warning($"[XASlave] AddonHelper.ClickAddonText: '{addonName}' not visible or null.");
+            return false;
+        }
+
+        var matchedNode = FindMatchingTextNode(addon, text, contains);
+        if (matchedNode == null)
+        {
+            Plugin.Log.Warning($"[XASlave] AddonHelper.ClickAddonText: text '{text}' not found in '{addonName}'.");
+            return false;
+        }
+
+        var clickableNode = FindClickableNode(matchedNode);
+        if (clickableNode == null)
+        {
+            Plugin.Log.Warning($"[XASlave] AddonHelper.ClickAddonText: no clickable ancestor found for text '{text}' in '{addonName}'.");
+            return false;
+        }
+
+        try
+        {
+            var evt = clickableNode->AtkEventManager.Event;
+            if (evt == null)
+            {
+                Plugin.Log.Warning($"[XASlave] AddonHelper.ClickAddonText: clickable ancestor for '{text}' in '{addonName}' has no event.");
+                return false;
+            }
+
+            addon->ReceiveEvent((AtkEventType)25, (int)evt->Param, evt);
+            Plugin.Log.Information($"[XASlave] AddonHelper.ClickAddonText: clicked text '{text}' in '{addonName}' (contains={contains}, param: {evt->Param})");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[XASlave] AddonHelper.ClickAddonText error on '{addonName}' text '{text}': {ex.Message}");
+            return false;
+        }
+    }
+
+    public static unsafe int GetAddonListTextCallbackIndex(string addonName, string text, bool contains = false)
+    {
+        var addon = GetAddon(addonName);
+        if (addon == null || !addon->IsVisible)
+            return -1;
+
+        return TryResolveAddonListSelection(addon, text, contains, out var callbackIndex, out _, out _)
+            ? callbackIndex
+            : -1;
+    }
+
+    public static unsafe bool SelectAddonListText(string addonName, string text, bool contains = false)
+    {
+        var addon = GetAddon(addonName);
+        if (addon == null || !addon->IsVisible)
+        {
+            Plugin.Log.Warning($"[XASlave] AddonHelper.SelectAddonListText: '{addonName}' not visible or null.");
+            return false;
+        }
+
+        if (!TryResolveAddonListSelection(addon, text, contains, out var callbackIndex, out var path, out var matchedText))
+        {
+            Plugin.Log.Warning($"[XASlave] AddonHelper.SelectAddonListText: text '{text}' not resolved in '{addonName}'.");
+            return false;
+        }
+
+        var ok = FireCallbackAndClose(addonName, callbackIndex);
+        if (ok)
+            Plugin.Log.Information($"[XASlave] AddonHelper.SelectAddonListText: selected text '{matchedText}' in '{addonName}' via callback index {callbackIndex} (path: {path}, contains={contains})");
+        return ok;
+    }
+
+    public static unsafe bool SelectFirstAddonListText(string addonName, out int callbackIndex, out string matchedText, params (string Text, bool Contains)[] candidates)
+    {
+        callbackIndex = -1;
+        matchedText = string.Empty;
+
+        var addon = GetAddon(addonName);
+        if (addon == null || !addon->IsVisible)
+        {
+            Plugin.Log.Warning($"[XASlave] AddonHelper.SelectFirstAddonListText: '{addonName}' not visible or null.");
+            return false;
+        }
+
+        foreach (var candidate in candidates)
+        {
+            if (!TryResolveAddonListSelection(addon, candidate.Text, candidate.Contains, out callbackIndex, out var path, out matchedText))
+                continue;
+
+            var ok = FireCallbackAndClose(addonName, callbackIndex);
+            if (ok)
+                Plugin.Log.Information($"[XASlave] AddonHelper.SelectFirstAddonListText: selected text '{matchedText}' in '{addonName}' via callback index {callbackIndex} (path: {path}, candidate='{candidate.Text}', contains={candidate.Contains})");
+            return ok;
+        }
+
+        Plugin.Log.Warning($"[XASlave] AddonHelper.SelectFirstAddonListText: none of the candidate texts [{FormatAddonTextCandidates(candidates)}] resolved in '{addonName}'.");
+        return false;
+    }
+
+    private static string FormatAddonTextCandidates((string Text, bool Contains)[] candidates)
+    {
+        if (candidates == null || candidates.Length == 0)
+            return string.Empty;
+
+        var parts = new string[candidates.Length];
+        for (var i = 0; i < candidates.Length; i++)
+            parts[i] = candidates[i].Contains ? $"{candidates[i].Text} (contains)" : candidates[i].Text;
+
+        return string.Join(", ", parts);
+    }
+
+    public static string GetHousingMenuVariant()
+    {
+        var count = GetAddonTextEntryCount("HousingMenu");
+        return count switch
+        {
+            2 => "HousingMenuWorkshop",
+            3 => "HousingMenuLobby",
+            8 => "HousingMenuApartment",
+            9 => "HousingMenuHouse",
+            10 => "HousingMenuMain",
+            _ => count > 0 ? $"HousingMenu({count})" : string.Empty,
+        };
     }
 
     // ═══════════════════════════════════════════════════
@@ -242,6 +421,233 @@ public static class AddonHelper
             Plugin.Log.Error($"[XASlave] AddonHelper.ClickAddonButton error on '{addonName}' node {nodeListIndex}: {ex.Message}");
             return false;
         }
+    }
+
+    private static unsafe void CollectText(AtkResNode* node, List<string> results, int depth)
+    {
+        if (node == null || depth > 6)
+            return;
+
+        if (node->Type == NodeType.Text)
+        {
+            var text = ((AtkTextNode*)node)->NodeText.ToString();
+            if (!string.IsNullOrWhiteSpace(text))
+                results.Add(text.Trim());
+        }
+        else if (node->Type == NodeType.Counter)
+        {
+            var text = ((AtkCounterNode*)node)->NodeText.ToString();
+            if (!string.IsNullOrWhiteSpace(text))
+                results.Add(text.Trim());
+        }
+
+        if ((int)node->Type < 1000)
+            return;
+
+        var compNode = (AtkComponentNode*)node;
+        if (compNode->Component == null)
+            return;
+
+        var childCount = compNode->Component->UldManager.NodeListCount;
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = compNode->Component->UldManager.NodeList[i];
+            if (child != null)
+                CollectText(child, results, depth + 1);
+        }
+    }
+
+    private static unsafe void CollectTextEntries(AtkResNode* node, string path, List<(string Path, string Text)> results, int depth)
+    {
+        if (node == null || depth > 6)
+            return;
+
+        if (node->Type == NodeType.Text)
+        {
+            var text = ((AtkTextNode*)node)->NodeText.ToString();
+            if (!string.IsNullOrWhiteSpace(text))
+                results.Add((path, text.Trim()));
+        }
+        else if (node->Type == NodeType.Counter)
+        {
+            var text = ((AtkCounterNode*)node)->NodeText.ToString();
+            if (!string.IsNullOrWhiteSpace(text))
+                results.Add((path, text.Trim()));
+        }
+
+        if ((int)node->Type < 1000)
+            return;
+
+        var compNode = (AtkComponentNode*)node;
+        if (compNode->Component == null)
+            return;
+
+        var childCount = compNode->Component->UldManager.NodeListCount;
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = compNode->Component->UldManager.NodeList[i];
+            if (child != null)
+                CollectTextEntries(child, $"{path}->[{i}]", results, depth + 1);
+        }
+    }
+
+    private static unsafe bool TryResolveAddonListSelection(AtkUnitBase* addon, string text, bool contains, out int callbackIndex, out string path, out string matchedText)
+    {
+        callbackIndex = -1;
+        path = string.Empty;
+        matchedText = string.Empty;
+
+        var entries = new List<(string Path, string Text)>();
+        for (var i = 0; i < addon->UldManager.NodeListCount; i++)
+        {
+            var node = addon->UldManager.NodeList[i];
+            if (node != null)
+                CollectTextEntries(node, $"[{i}]", entries, 0);
+        }
+
+        foreach (var entry in entries)
+        {
+            if (!TextMatches(entry.Text, text, contains))
+                continue;
+
+            if (!TryGetListItemCallbackIndex(entry.Path, out callbackIndex))
+                continue;
+
+            path = entry.Path;
+            matchedText = entry.Text;
+            return true;
+        }
+
+        return false;
+    }
+
+    private static bool TextMatches(string entryText, string text, bool contains)
+    {
+        if (string.IsNullOrWhiteSpace(entryText))
+            return false;
+
+        if (contains)
+            return entryText.Contains(text, StringComparison.OrdinalIgnoreCase);
+
+        return entryText.Equals(text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryGetListItemCallbackIndex(string path, out int callbackIndex)
+    {
+        callbackIndex = -1;
+
+        if (string.IsNullOrWhiteSpace(path))
+            return false;
+
+        var segments = path.Split("->", StringSplitOptions.RemoveEmptyEntries);
+        if (segments.Length < 2)
+            return false;
+
+        if (!TryParsePathIndex(segments[1], out var visibleRowIndex) || visibleRowIndex <= 0)
+            return false;
+
+        callbackIndex = visibleRowIndex - 1;
+        return true;
+    }
+
+    private static bool TryParsePathIndex(string segment, out int index)
+    {
+        index = -1;
+
+        if (string.IsNullOrWhiteSpace(segment) || segment.Length < 3 || segment[0] != '[' || segment[segment.Length - 1] != ']')
+            return false;
+
+        return int.TryParse(segment.Substring(1, segment.Length - 2), out index);
+    }
+
+    private static unsafe AtkResNode* FindMatchingTextNode(AtkUnitBase* addon, string text, bool contains)
+    {
+        for (var i = 0; i < addon->UldManager.NodeListCount; i++)
+        {
+            var node = addon->UldManager.NodeList[i];
+            if (node == null)
+                continue;
+
+            var match = FindMatchingTextNode(node, text, contains, 0);
+            if (match != null)
+                return match;
+        }
+
+        return null;
+    }
+
+    private static unsafe AtkResNode* FindMatchingTextNode(AtkResNode* node, string text, bool contains, int depth)
+    {
+        if (node == null || depth > 6)
+            return null;
+
+        if (node->Type == NodeType.Text)
+        {
+            var nodeText = ((AtkTextNode*)node)->NodeText.ToString();
+            if (!string.IsNullOrWhiteSpace(nodeText))
+            {
+                if (contains)
+                {
+                    if (nodeText.Contains(text, StringComparison.OrdinalIgnoreCase))
+                        return node;
+                }
+                else if (nodeText.Equals(text, StringComparison.OrdinalIgnoreCase))
+                {
+                    return node;
+                }
+            }
+        }
+        else if (node->Type == NodeType.Counter)
+        {
+            var nodeText = ((AtkCounterNode*)node)->NodeText.ToString();
+            if (!string.IsNullOrWhiteSpace(nodeText))
+            {
+                if (contains)
+                {
+                    if (nodeText.Contains(text, StringComparison.OrdinalIgnoreCase))
+                        return node;
+                }
+                else if (nodeText.Equals(text, StringComparison.OrdinalIgnoreCase))
+                {
+                    return node;
+                }
+            }
+        }
+
+        if ((int)node->Type < 1000)
+            return null;
+
+        var compNode = (AtkComponentNode*)node;
+        if (compNode->Component == null)
+            return null;
+
+        var childCount = compNode->Component->UldManager.NodeListCount;
+        for (var i = 0; i < childCount; i++)
+        {
+            var child = compNode->Component->UldManager.NodeList[i];
+            if (child == null)
+                continue;
+
+            var match = FindMatchingTextNode(child, text, contains, depth + 1);
+            if (match != null)
+                return match;
+        }
+
+        return null;
+    }
+
+    private static unsafe AtkResNode* FindClickableNode(AtkResNode* node)
+    {
+        var current = node;
+        while (current != null)
+        {
+            if (current->AtkEventManager.Event != null)
+                return current;
+
+            current = current->ParentNode;
+        }
+
+        return null;
     }
 
     // ═══════════════════════════════════════════════════

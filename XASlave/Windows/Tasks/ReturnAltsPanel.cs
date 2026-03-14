@@ -25,9 +25,12 @@ public partial class SlaveWindow
     private bool raDoOpenInventory = true;
     private bool raDoOpenArmoury = true;
     private bool raDoOpenSaddlebags = true;
+    private bool raDoOpenJournal = true;
     private bool raDoReturnToHome = true;
+    private bool raDoCollectPersonalPlotInfo = true;
     private bool raDoReturnToFc = true;
     private bool raDoParseForXaDatabase = true;
+    private bool raDoLogoutOnComplete;
     private bool raDoEnableArMulti = true;
 
     // ───────────────────────────────────────────────
@@ -80,7 +83,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // ── Plugin Status ──
-        DrawTaskPluginStatus(raDoParseForXaDatabase);
+        DrawTaskPluginStatus(raDoCollectPersonalPlotInfo || raDoParseForXaDatabase);
 
         ImGui.Separator();
         ImGui.Spacing();
@@ -109,14 +112,16 @@ public partial class SlaveWindow
 
             var canStart = selectedChars.Count > 0 && !runner.IsRunning
                 && plugin.IpcClient.IsAutoRetainerAvailable()
-                && plugin.IpcClient.IsLifestreamAvailable();
+                && plugin.IpcClient.IsLifestreamAvailable()
+                && (!(raDoCollectPersonalPlotInfo || raDoParseForXaDatabase) || plugin.IpcClient.IsXaDatabaseAvailable());
 
             if (!canStart) ImGui.BeginDisabled();
             if (ImGui.Button($"Start ({selectedChars.Count} chars)##ra"))
             {
                 StartTaskWithConfig("Return Alts To Homeworlds", selectedChars, returnAltsSelectedIndices,
                     raDoTextAdvance, raDoRemoveSprout, raDoOpenInventory, raDoOpenArmoury,
-                    raDoOpenSaddlebags, raDoReturnToHome, raDoReturnToFc, raDoParseForXaDatabase, raDoEnableArMulti);
+                    raDoOpenSaddlebags, raDoOpenJournal, raDoReturnToHome, raDoCollectPersonalPlotInfo,
+                    raDoReturnToFc, raDoParseForXaDatabase, raDoLogoutOnComplete, raDoEnableArMulti);
                 returnAltsShowLog = true;
             }
             if (!canStart) ImGui.EndDisabled();
@@ -220,16 +225,16 @@ public partial class SlaveWindow
         ImGui.Checkbox("Open Inventory##ra", ref raDoOpenInventory);
         ImGui.Checkbox("Open Armoury Chest##ra", ref raDoOpenArmoury);
         ImGui.Checkbox("Open Saddlebags##ra", ref raDoOpenSaddlebags);
+        ImGui.Checkbox("Open Journal##ra", ref raDoOpenJournal);
         ImGui.Checkbox("Teleport Home (Lifestream)##ra", ref raDoReturnToHome);
+        ImGui.Checkbox("Collect Personal Plot Info##ra", ref raDoCollectPersonalPlotInfo);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Opens /housing, checks Apartment, Private Estate, and Shared Estate signboards when available,\nand triggers XA Database saves after each housing pass.");
         ImGui.Checkbox("Teleport FC (Lifestream)##ra", ref raDoReturnToFc);
         ImGui.Checkbox("Parse for XA Database (FC window + save)##ra", ref raDoParseForXaDatabase);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Opens FC window, navigates Members/Info/Housing tabs to collect\nall FC data, then saves to XA Database.");
-        ImGui.Separator();
-        ImGui.Checkbox("Enable AR Multi Mode on completion##ra", ref raDoEnableArMulti);
-
-        // ── Log with Copy/Clear ──
-        DrawTaskLog("ralog", ref returnAltsShowLog, runner);
+        DrawSharedCompletionAndLogFooter("ra", "ralog", ref raDoLogoutOnComplete, ref raDoEnableArMulti, ref returnAltsShowLog, runner);
     }
 
     private void RefreshReturnAltsList()

@@ -34,14 +34,27 @@ public sealed class MonthlyReloggerTask
     public bool DoOpenInventory { get; set; } = true;
     public bool DoOpenArmouryChest { get; set; } = true;
     public bool DoOpenSaddlebags { get; set; } = true;
+    public bool DoOpenJournal { get; set; } = true;
     public bool DoReturnToHome { get; set; } = true;
+    public bool DoCollectPersonalPlotInfo { get; set; } = true;
     public bool DoReturnToFc { get; set; } = true;
     public bool DoParseForXaDatabase { get; set; } = true;
+    public bool DoLogoutOnComplete { get; set; } = false;
     public bool DoEnableArMultiOnComplete { get; set; } = false;
 
     public MonthlyReloggerTask(Plugin plugin)
     {
         this.plugin = plugin;
+    }
+
+    private bool IsVerboseTaskLoggingEnabled()
+    {
+        return plugin.Configuration.VerboseTaskLogging;
+    }
+
+    private static bool IsVerboseTaskLoggingEnabledStatic()
+    {
+        return Plugin.Instance?.Configuration.VerboseTaskLogging ?? false;
     }
 
     /// <summary>
@@ -106,36 +119,8 @@ public sealed class MonthlyReloggerTask
             var relogState = new RelogState();
             steps.AddRange(BuildRelogSteps(charName, runner, relogState));
 
-            // CharacterSafeWait 3-Pass — gated by relog success
-            // Each pass checks if relog failed and skips immediately if so
-            foreach (var sw in BuildCharacterSafeWait3Pass($"Post-Relog SafeWait ({charName})", 30f))
-            {
-                var originalComplete = sw.IsComplete;
-                var gatedStep = new TaskStep
-                {
-                    Name = sw.Name,
-                    OnEnter = sw.OnEnter,
-                    IsComplete = () => relogState.Failed || originalComplete(),
-                    TimeoutSec = sw.TimeoutSec,
-                };
-                steps.Add(gatedStep);
-            }
-
-            // Duty Guard — step-based (no blocking .Wait())
-            // Checks if character is in a duty after login.
-            // If in duty, attempts to leave via step-based sequence.
-            foreach (var dutyStep in BuildDutyGuardSteps(charName, runner, relogState))
-            {
-                steps.Add(dutyStep);
-            }
-
-            // Homeworld check — always-on, cannot be disabled
-            // If character is not on their homeworld, use Lifestream to return.
-            // This ensures housing/FC data collection is accurate (only available on homeworld).
-            foreach (var hwStep in BuildHomeworldCheckSteps(charName, runner, relogState))
-            {
-                steps.Add(hwStep);
-            }
+            steps.AddRange(BuildDutyGuardSteps(charName, runner, relogState));
+            steps.AddRange(BuildHomeworldCheckSteps(charName, runner, relogState));
 
             // Per-character actions — built inline so ordering is correct
             // Each action step is gated by relog success
@@ -144,9 +129,13 @@ public sealed class MonthlyReloggerTask
             {
                 var origEnter = action.OnEnter;
                 var origComplete = action.IsComplete;
+                var origSkip = action.ShouldSkip;
+                var origOnTimeout = action.OnTimeout;
+                var origMaxRetries = action.MaxRetries;
                 steps.Add(new TaskStep
                 {
                     Name = action.Name,
+                    ShouldSkip = () => relogState.Failed || (origSkip?.Invoke() ?? false),
                     OnEnter = () =>
                     {
                         if (relogState.Failed) return;
@@ -154,6 +143,12 @@ public sealed class MonthlyReloggerTask
                     },
                     IsComplete = () => relogState.Failed || origComplete(),
                     TimeoutSec = action.TimeoutSec,
+                    MaxRetries = origMaxRetries,
+                    OnTimeout = () =>
+                    {
+                        if (relogState.Failed) return;
+                        origOnTimeout?.Invoke();
+                    },
                 });
             }
 
@@ -205,7 +200,8 @@ public sealed class MonthlyReloggerTask
             Name = "Relogger Summary",
             OnEnter = () =>
             {
-                runner.SuppressLogoutCancel = false; // Re-enable logout cancellation now that relogger is done
+                if (!DoLogoutOnComplete)
+                    runner.SuppressLogoutCancel = false;
 
                 if (runner.FailedCharacters.Count > 0)
                 {
@@ -222,6 +218,9 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 1f,
         });
 
+        if (DoLogoutOnComplete)
+            AddLogoutOnCompleteSteps(steps, runner);
+
         // ── Optional: Re-enable AR Multi Mode after all characters processed ──
         if (DoEnableArMultiOnComplete)
         {
@@ -236,6 +235,7 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => true,
                 TimeoutSec = 3f,
             });
+            steps.Add(MakeDelay("AR Enable Cooldown", 1.0f));
         }
 
         steps.Add(MakeDelay("Final Cooldown", 1.0f));
@@ -259,193 +259,142 @@ public sealed class MonthlyReloggerTask
     {
         var steps = new List<TaskStep>();
 
-        // Step 1: Check if already logged in, or send relog command
-        steps.Add(new TaskStep
+        for (var attempt = 1; attempt <= MaxRelogAttempts; attempt++)
         {
-            Name = $"Relog: {charName} [attempt]",
-            OnEnter = () =>
+            var capturedAttempt = attempt;
+            Func<bool> skipAttempt = () => relogState.Failed || (relogState.Confirmed && relogState.Attempt != capturedAttempt);
+
+            steps.Add(new TaskStep
             {
-                var current = GetCurrentCharacterNameWorld();
-                Plugin.Log.Information($"[XASlave] Relog check: current='{current}' target='{charName}' match={current == charName}");
-                if (current.Equals(charName, StringComparison.OrdinalIgnoreCase))
+                Name = $"Relog Attempt {capturedAttempt}: {charName}",
+                ShouldSkip = skipAttempt,
+                OnEnter = () =>
                 {
-                    runner.AddLog($"Already logged in as {charName}");
-                    relogState.Confirmed = true;
-                    return;
-                }
+                    if (skipAttempt())
+                        return;
 
-                relogState.Attempt++;
-                if (relogState.Attempt > MaxRelogAttempts)
-                {
-                    runner.AddLog($"FAILED: {charName} — exhausted {MaxRelogAttempts} relog attempts");
-                    runner.FailedCharacters.Add(charName);
-                    relogState.Failed = true;
-                    return;
-                }
+                    relogState.Attempt = capturedAttempt;
+                    relogState.SawTransition = false;
 
-                runner.AddLog($"Relogging to {charName} (attempt {relogState.Attempt}/{MaxRelogAttempts})...");
-                ChatHelper.SendMessage($"/ays relog {charName}");
-            },
-            IsComplete = () => true,
-            TimeoutSec = 3f,
-        });
-
-        // Step 2: Delay for AR to start the relog process (plain delay, no condition check)
-        steps.Add(MakeDelay($"Relog Init: {charName}", 2.0f));
-
-        // Step 3: Wait for character to be fully logged in (SafeWait)
-        // Relog can take 1-2 minutes — use 120s timeout
-        steps.Add(new TaskStep
-        {
-            Name = $"Wait Relog: {charName}",
-            IsComplete = () =>
-            {
-                if (relogState.Confirmed || relogState.Failed) return true;
-                try
-                {
-                    if (!Plugin.PlayerState.IsLoaded) return false;
-                    var local = Plugin.ObjectTable.LocalPlayer;
-                    if (local == null) return false;
-                    return IsNamePlateReady() && IsPlayerAvailable();
-                }
-                catch { return false; }
-            },
-            TimeoutSec = 120f,
-        });
-
-        // Step 4: Verify correct character logged in
-        steps.Add(new TaskStep
-        {
-            Name = $"Verify Relog: {charName}",
-            OnEnter = () =>
-            {
-                if (relogState.Confirmed || relogState.Failed) return;
-
-                var current = GetCurrentCharacterNameWorld();
-                if (current == charName)
-                {
-                    runner.AddLog($"Relog confirmed: {charName} (attempt {relogState.Attempt}/{MaxRelogAttempts})");
-                    relogState.Confirmed = true;
-                }
-                else
-                {
-                    runner.AddLog($"Relog verification failed: expected '{charName}', got '{current}' (attempt {relogState.Attempt}/{MaxRelogAttempts})");
-
-                    if (relogState.Attempt >= MaxRelogAttempts)
+                    var current = GetCurrentCharacterNameWorld();
+                    Plugin.Log.Information($"[XASlave] Relog check: current='{current}' target='{charName}' attempt={capturedAttempt}/{MaxRelogAttempts}");
+                    if (current.Equals(charName, StringComparison.OrdinalIgnoreCase))
                     {
-                        runner.AddLog($"FAILED: {charName} — exhausted {MaxRelogAttempts} relog attempts");
-                        runner.FailedCharacters.Add(charName);
-                        relogState.Failed = true;
+                        runner.AddLog($"Already logged in as {charName}");
+                        relogState.Confirmed = true;
+                        return;
+                    }
+
+                    runner.SuppressLogoutCancel = true;
+                    var actionLabel = capturedAttempt == 1 ? "Relogging" : "Retrying relog";
+                    runner.AddLog($"{actionLabel} to {charName} (attempt {capturedAttempt}/{MaxRelogAttempts})...");
+                    ChatHelper.SendMessage($"/ays relog {charName}");
+                },
+                IsComplete = () => true,
+                TimeoutSec = 3f,
+            });
+
+            steps.Add(MakeDelay($"Relog Init ({charName}) [attempt {capturedAttempt}/{MaxRelogAttempts}]", 2.0f, skipAttempt));
+
+            bool? lastRelogPlayerLoaded = null;
+            bool? lastRelogBusy = null;
+            bool? lastRelogSawTransition = null;
+            steps.Add(new TaskStep
+            {
+                Name = $"Relog Wait Lifestream ({charName}) [attempt {capturedAttempt}/{MaxRelogAttempts}]",
+                ShouldSkip = skipAttempt,
+                OnEnter = () =>
+                {
+                    lastRelogPlayerLoaded = null;
+                    lastRelogBusy = null;
+                    lastRelogSawTransition = null;
+                    if (IsVerboseTaskLoggingEnabled())
+                        runner.AddLog($"Relog wait: monitoring login transition for {charName} (attempt {capturedAttempt}/{MaxRelogAttempts})...");
+                },
+                IsComplete = () =>
+                {
+                    if (relogState.Failed || (relogState.Confirmed && relogState.Attempt != capturedAttempt))
+                        return true;
+                    if (relogState.Confirmed)
+                        return true;
+
+                    try
+                    {
+                        var playerLoaded = Plugin.PlayerState.IsLoaded && Plugin.ObjectTable.LocalPlayer != null;
+                        var lifestreamBusy = plugin.IpcClient.LifestreamIsBusy();
+
+                        if (IsVerboseTaskLoggingEnabled() && (lastRelogPlayerLoaded != playerLoaded || lastRelogBusy != lifestreamBusy || lastRelogSawTransition != relogState.SawTransition))
+                        {
+                            runner.AddLog($"Relog wait status: playerLoaded={playerLoaded}, lifestreamBusy={lifestreamBusy}, sawTransition={relogState.SawTransition}");
+                            lastRelogPlayerLoaded = playerLoaded;
+                            lastRelogBusy = lifestreamBusy;
+                            lastRelogSawTransition = relogState.SawTransition;
+                        }
+
+                        if (!playerLoaded || lifestreamBusy)
+                        {
+                            relogState.SawTransition = true;
+                            if (IsVerboseTaskLoggingEnabled() && lastRelogSawTransition != relogState.SawTransition)
+                            {
+                                runner.AddLog($"Relog wait status: playerLoaded={playerLoaded}, lifestreamBusy={lifestreamBusy}, sawTransition={relogState.SawTransition}");
+                                lastRelogSawTransition = relogState.SawTransition;
+                            }
+                            return false;
+                        }
+
+                        return relogState.SawTransition && !lifestreamBusy;
+                    }
+                    catch
+                    {
+                        return relogState.SawTransition;
+                    }
+                },
+                TimeoutSec = 180f,
+                OnTimeout = () =>
+                {
+                    if (!relogState.Failed && !(relogState.Confirmed && relogState.Attempt != capturedAttempt))
+                        runner.AddLog($"Relog attempt {capturedAttempt}/{MaxRelogAttempts} timed out waiting for relog to complete.");
+                },
+            });
+
+            AddLoggedCharacterSafeWait3Pass(
+                steps,
+                $"Relog SafeWait ({charName}) [attempt {capturedAttempt}/{MaxRelogAttempts}]",
+                30f,
+                runner,
+                skipAttempt);
+
+            steps.Add(new TaskStep
+            {
+                Name = $"Relog Verify ({charName}) [attempt {capturedAttempt}/{MaxRelogAttempts}]",
+                ShouldSkip = skipAttempt,
+                OnEnter = () =>
+                {
+                    if (relogState.Failed || relogState.Confirmed)
+                        return;
+
+                    var current = GetCurrentCharacterNameWorld();
+                    if (current.Equals(charName, StringComparison.OrdinalIgnoreCase))
+                    {
+                        runner.AddLog($"Relog confirmed: {charName} (attempt {capturedAttempt}/{MaxRelogAttempts})");
+                        relogState.Confirmed = true;
+                        return;
+                    }
+
+                    if (capturedAttempt >= MaxRelogAttempts)
+                    {
+                        RecordRelogFailure(runner, relogState, charName,
+                            $"FAILED: {charName} — could not relog after {MaxRelogAttempts} attempts (current: '{current}')");
                     }
                     else
                     {
-                        // Retry: re-send relog command
-                        relogState.Attempt++;
-                        runner.AddLog($"Retrying relog to {charName} (attempt {relogState.Attempt}/{MaxRelogAttempts})...");
-                        ChatHelper.SendMessage($"/ays relog {charName}");
+                        runner.AddLog($"Relog verification failed: expected '{charName}', got '{current}' (attempt {capturedAttempt}/{MaxRelogAttempts})");
                     }
-                }
-            },
-            IsComplete = () => relogState.Confirmed || relogState.Failed,
-            TimeoutSec = 3f,
-        });
-
-        // Step 5: If retry was triggered, wait again for relog (2nd attempt)
-        steps.Add(new TaskStep
-        {
-            Name = $"Wait Retry 2: {charName}",
-            IsComplete = () =>
-            {
-                if (relogState.Confirmed || relogState.Failed) return true;
-                try
-                {
-                    if (!Plugin.PlayerState.IsLoaded) return false;
-                    var local = Plugin.ObjectTable.LocalPlayer;
-                    if (local == null) return false;
-                    return IsNamePlateReady() && IsPlayerAvailable();
-                }
-                catch { return false; }
-            },
-            TimeoutSec = 120f,
-        });
-
-        // Step 6: Verify again after 2nd attempt
-        steps.Add(new TaskStep
-        {
-            Name = $"Verify Retry 2: {charName}",
-            OnEnter = () =>
-            {
-                if (relogState.Confirmed || relogState.Failed) return;
-
-                var current = GetCurrentCharacterNameWorld();
-                if (current == charName)
-                {
-                    runner.AddLog($"Relog confirmed: {charName} (attempt {relogState.Attempt}/{MaxRelogAttempts})");
-                    relogState.Confirmed = true;
-                }
-                else
-                {
-                    if (relogState.Attempt >= MaxRelogAttempts)
-                    {
-                        runner.AddLog($"FAILED: {charName} — exhausted {MaxRelogAttempts} relog attempts");
-                        runner.FailedCharacters.Add(charName);
-                        relogState.Failed = true;
-                    }
-                    else
-                    {
-                        relogState.Attempt++;
-                        runner.AddLog($"Retrying relog to {charName} (attempt {relogState.Attempt}/{MaxRelogAttempts})...");
-                        ChatHelper.SendMessage($"/ays relog {charName}");
-                    }
-                }
-            },
-            IsComplete = () => relogState.Confirmed || relogState.Failed,
-            TimeoutSec = 3f,
-        });
-
-        // Step 7: If retry was triggered, wait again for relog (3rd attempt)
-        steps.Add(new TaskStep
-        {
-            Name = $"Wait Retry 3: {charName}",
-            IsComplete = () =>
-            {
-                if (relogState.Confirmed || relogState.Failed) return true;
-                try
-                {
-                    if (!Plugin.PlayerState.IsLoaded) return false;
-                    var local = Plugin.ObjectTable.LocalPlayer;
-                    if (local == null) return false;
-                    return IsNamePlateReady() && IsPlayerAvailable();
-                }
-                catch { return false; }
-            },
-            TimeoutSec = 120f,
-        });
-
-        // Step 8: Final verification after 3rd attempt
-        steps.Add(new TaskStep
-        {
-            Name = $"Verify Final: {charName}",
-            OnEnter = () =>
-            {
-                if (relogState.Confirmed || relogState.Failed) return;
-
-                var current = GetCurrentCharacterNameWorld();
-                if (current == charName)
-                {
-                    runner.AddLog($"Relog confirmed: {charName} (attempt {relogState.Attempt}/{MaxRelogAttempts})");
-                    relogState.Confirmed = true;
-                }
-                else
-                {
-                    runner.AddLog($"FAILED: {charName} — could not relog after {MaxRelogAttempts} attempts (current: '{current}')");
-                    runner.FailedCharacters.Add(charName);
-                    relogState.Failed = true;
-                }
-            },
-            IsComplete = () => true,
-            TimeoutSec = 3f,
-        });
+                },
+                IsComplete = () => true,
+                TimeoutSec = 3f,
+            });
+        }
 
         return steps;
     }
@@ -458,6 +407,15 @@ public sealed class MonthlyReloggerTask
         public int Attempt;
         public bool Confirmed;
         public bool Failed;
+        public bool SawTransition;
+    }
+
+    private static void RecordRelogFailure(TaskRunner runner, RelogState relogState, string charName, string message)
+    {
+        runner.AddLog(message);
+        if (!runner.FailedCharacters.Contains(charName))
+            runner.FailedCharacters.Add(charName);
+        relogState.Failed = true;
     }
 
     /// <summary>
@@ -554,12 +512,33 @@ public sealed class MonthlyReloggerTask
             steps.Add(MakeDelay("Saddlebag Delay", 0.5f));
         }
 
+        if (DoOpenJournal)
+        {
+            steps.Add(new TaskStep
+            {
+                Name = "Open Journal",
+                OnEnter = () =>
+                {
+                    runner.AddLog("Opening Journal...");
+                    ChatHelper.SendMessage("/journal");
+                },
+                IsComplete = () => true,
+                TimeoutSec = 2f,
+            });
+            steps.Add(MakeDelay("Journal Delay", 0.5f));
+        }
+
         // return_to_homeXA() → Lifestream: /li home
         // Short timeout (5s) for "wait busy" — if char has no house, Lifestream never becomes busy
         if (DoReturnToHome)
         {
             steps.AddRange(BuildLifestreamTeleportSteps(
                 "Home", "home", runner, waitBusyTimeoutSec: 5f));
+        }
+
+        if (DoCollectPersonalPlotInfo)
+        {
+            steps.AddRange(BuildCollectPersonalPlotInfoSteps(runner));
         }
 
         // return_to_fcXA() → Lifestream: /li fc
@@ -714,6 +693,189 @@ public sealed class MonthlyReloggerTask
             });
             steps.Add(MakeDelay("Parse XA: Save Delay", 0.5f));
         }
+
+        return steps;
+    }
+
+    private List<TaskStep> BuildCollectPersonalPlotInfoSteps(TaskRunner runner)
+    {
+        return BuildCollectPersonalPlotInfoSteps(plugin, runner.AddLog);
+    }
+
+    internal static List<TaskStep> BuildCollectPersonalPlotInfoSteps(Plugin plugin, Action<string> addLog)
+    {
+        var steps = new List<TaskStep>();
+        steps.AddRange(BuildCollectHousingTypeSteps(plugin, "Apartment", "Apartment", () =>
+            AddonHelper.AddonHasText("HousingSubmenu", "Apartment Options")
+            || AddonHelper.AddonHasText("HousingSubmenu", "View Room Details"), addLog));
+        steps.AddRange(BuildCollectHousingTypeSteps(plugin, "Private Estate", "Private Estate", () =>
+            AddonHelper.AddonHasText("HousingSubmenu", "Private Estate"), addLog));
+        steps.AddRange(BuildCollectHousingTypeSteps(plugin, "Shared Estate", "Shared Estate", () =>
+            AddonHelper.AddonHasText("HousingSubmenu", "Shared Estate", true), addLog, selectionContains: true));
+        return steps;
+    }
+
+    private static List<TaskStep> BuildCollectHousingTypeSteps(Plugin plugin, string label, string selectionText, Func<bool> isDirectSubmenuMatch, Action<string> addLog, bool selectionContains = false)
+    {
+        var steps = new List<TaskStep>();
+        var housingUiVisible = false;
+        var canCollect = false;
+        var selectionClicked = false;
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Plot Info: Open Housing ({label})",
+            OnEnter = () =>
+            {
+                housingUiVisible = false;
+                canCollect = false;
+                selectionClicked = false;
+                addLog($"Plot Info: opening housing menu for {label}...");
+                ChatHelper.SendMessage("/housing");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+
+        steps.Add(MakeDelay($"Plot Info: Housing Init ({label})", 1.0f));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Plot Info: Estate Settings ({label})",
+            OnEnter = () =>
+            {
+                housingUiVisible = AddonHelper.IsAddonVisible("HousingMenu")
+                    || AddonHelper.IsAddonVisible("HousingSubmenu")
+                    || AddonHelper.IsAddonVisible("HousingSelectHouse");
+
+                if (!housingUiVisible)
+                {
+                    addLog($"Plot Info: housing UI did not open for {label}.");
+                    return;
+                }
+
+                if (AddonHelper.IsAddonVisible("HousingMenu"))
+                {
+                    var variant = AddonHelper.GetHousingMenuVariant();
+                    if (!string.IsNullOrEmpty(variant))
+                        addLog($"Plot Info: detected {variant}.");
+
+                    if (!AddonHelper.SelectAddonListText("HousingMenu", "Estate Settings"))
+                        addLog($"Plot Info: failed to click Estate Settings for {label}.");
+                }
+            },
+            IsComplete = () => true,
+            TimeoutSec = 3f,
+        });
+
+        steps.Add(MakeDelay($"Plot Info: Estate Settings Wait ({label})", 1.0f));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Plot Info: Select {label}",
+            OnEnter = () =>
+            {
+                canCollect = false;
+                selectionClicked = false;
+
+                if (!housingUiVisible && !AddonHelper.IsAddonVisible("HousingSelectHouse") && !AddonHelper.IsAddonVisible("HousingSubmenu"))
+                    return;
+
+                if (AddonHelper.IsAddonVisible("HousingSelectHouse"))
+                {
+                    if (AddonHelper.AddonHasText("HousingSelectHouse", selectionText, selectionContains))
+                    {
+                        selectionClicked = AddonHelper.SelectAddonListText("HousingSelectHouse", selectionText, selectionContains);
+                        canCollect = selectionClicked;
+                        if (selectionClicked)
+                            addLog($"Plot Info: selected {label}.");
+                        else
+                            addLog($"Plot Info: failed to select {label}.");
+                        return;
+                    }
+
+                    addLog($"Plot Info: {label} not available in HousingSelectHouse.");
+                    return;
+                }
+
+                if (AddonHelper.IsAddonVisible("HousingSubmenu") && isDirectSubmenuMatch())
+                {
+                    canCollect = true;
+                    addLog($"Plot Info: {label} available via direct HousingSubmenu.");
+                    return;
+                }
+
+                addLog($"Plot Info: {label} not available for this character.");
+            },
+            IsComplete = () => !selectionClicked || AddonHelper.IsAddonVisible("HousingSubmenu") || !AddonHelper.IsAddonVisible("HousingSelectHouse"),
+            TimeoutSec = 5f,
+        });
+
+        steps.Add(MakeDelay($"Plot Info: Submenu Wait ({label})", 0.75f, () => !canCollect));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Plot Info: View Details ({label})",
+            ShouldSkip = () => !canCollect,
+            OnEnter = () =>
+            {
+                var clicked = AddonHelper.SelectFirstAddonListText(
+                    "HousingSubmenu",
+                    out _,
+                    out _,
+                    ("View Room Details", false),
+                    ("View Estate Details", false),
+                    ("Details", true));
+
+                if (clicked)
+                    addLog($"Plot Info: opening {label} details...");
+                else
+                    addLog($"Plot Info: failed to open {label} details.");
+            },
+            IsComplete = () => AddonHelper.IsAddonVisible("HousingSignBoard"),
+            TimeoutSec = 5f,
+        });
+
+        steps.Add(MakeDelay($"Plot Info: SignBoard Wait ({label})", 1.0f, () => !canCollect));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Plot Info: Save {label}",
+            ShouldSkip = () => !canCollect,
+            OnEnter = () =>
+            {
+                var address = AddonHelper.GetAddonTextEntries("HousingSignBoard")
+                    .FirstOrDefault(text => text.Contains("Ward", StringComparison.OrdinalIgnoreCase) && text.Contains(",", StringComparison.Ordinal));
+
+                if (!string.IsNullOrEmpty(address))
+                    addLog($"Plot Info: {label} address = {address}");
+                else
+                    addLog($"Plot Info: {label} address text not found.");
+
+                if (plugin.SaveToXaDatabaseAndRecordSync())
+                    addLog($"Plot Info: saved {label} data to XA Database.");
+                else
+                    addLog($"Plot Info: XA Database save failed while collecting {label}.");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 3f,
+        });
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Plot Info: Close Addons ({label})",
+            OnEnter = () =>
+            {
+                AddonHelper.CloseAddon("HousingSignBoard");
+                AddonHelper.CloseAddon("HousingSubmenu");
+                AddonHelper.CloseAddon("HousingSelectHouse");
+                AddonHelper.CloseAddon("HousingMenu");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+
+        steps.Add(MakeDelay($"Plot Info: Close Wait ({label})", 0.5f));
 
         return steps;
     }
@@ -968,18 +1130,7 @@ public sealed class MonthlyReloggerTask
             steps.Add(dutyStep);
         }
 
-        // Step 5: CharacterSafeWait 3-Pass (only if logged in)
-        foreach (var sw in BuildCharacterSafeWait3Pass("Pre-Flight SafeWait", 30f))
-        {
-            var originalComplete = sw.IsComplete;
-            steps.Add(new TaskStep
-            {
-                Name = sw.Name,
-                OnEnter = sw.OnEnter,
-                IsComplete = () => !preFlightState.IsLoggedIn || originalComplete(),
-                TimeoutSec = sw.TimeoutSec,
-            });
-        }
+        AddLoggedCharacterSafeWait3Pass(steps, "Pre-Flight SafeWait", 30f, runner, () => !preFlightState.IsLoggedIn);
 
         // Step 6: Reorder character list — move currently-logged-in character to position 0
         steps.Add(new TaskStep
@@ -1142,18 +1293,7 @@ public sealed class MonthlyReloggerTask
         var steps = new List<TaskStep>();
         var needsReturn = false;
 
-        // 3x SafeWait before homeworld check — ensure character is fully loaded
-        foreach (var sw in BuildCharacterSafeWait3Pass($"Homeworld Pre-SafeWait ({charName})", 30f))
-        {
-            var origComplete = sw.IsComplete;
-            steps.Add(new TaskStep
-            {
-                Name = sw.Name,
-                OnEnter = sw.OnEnter,
-                IsComplete = () => relogState.Failed || origComplete(),
-                TimeoutSec = sw.TimeoutSec,
-            });
-        }
+        AddLoggedCharacterSafeWait3Pass(steps, $"Homeworld Pre-SafeWait ({charName})", 30f, runner, () => relogState.Failed);
 
         // Check if on homeworld
         steps.Add(new TaskStep
@@ -1165,15 +1305,23 @@ public sealed class MonthlyReloggerTask
                 try
                 {
                     var local = Plugin.ObjectTable.LocalPlayer;
-                    if (local == null) return;
+                    if (local == null)
+                    {
+                        runner.AddLog($"Homeworld Check: LocalPlayer unavailable for {charName}.");
+                        return;
+                    }
                     var currentWorldId = local.CurrentWorld.RowId;
                     var homeWorldId = local.HomeWorld.RowId;
+                    var currentName = local.CurrentWorld.Value.Name.ToString();
+                    var homeName = local.HomeWorld.Value.Name.ToString();
                     if (currentWorldId != homeWorldId)
                     {
-                        var currentName = local.CurrentWorld.Value.Name.ToString();
-                        var homeName = local.HomeWorld.Value.Name.ToString();
                         runner.AddLog($"Not on homeworld — currently on {currentName}, returning to {homeName}...");
                         needsReturn = true;
+                    }
+                    else
+                    {
+                        runner.AddLog($"Homeworld Check: already on homeworld {homeName}.");
                     }
                 }
                 catch { /* player not loaded yet, skip */ }
@@ -1263,18 +1411,7 @@ public sealed class MonthlyReloggerTask
             });
         }
 
-        // SafeWait after world travel
-        foreach (var sw in BuildCharacterSafeWait3Pass($"Homeworld Return: SafeWait ({charName})", 30f))
-        {
-            var origComplete = sw.IsComplete;
-            steps.Add(new TaskStep
-            {
-                Name = sw.Name,
-                OnEnter = sw.OnEnter,
-                IsComplete = () => relogState.Failed || !needsReturn || origComplete(),
-                TimeoutSec = sw.TimeoutSec,
-            });
-        }
+        AddLoggedCharacterSafeWait3Pass(steps, $"Homeworld Return: SafeWait ({charName})", 30f, runner, () => relogState.Failed || !needsReturn);
 
         // Verify we're on homeworld now
         steps.Add(new TaskStep
@@ -1319,19 +1456,7 @@ public sealed class MonthlyReloggerTask
         var steps = new List<TaskStep>();
         var dutyDetected = false;
 
-        // SafeWait 3-pass BEFORE duty check — ensure character is fully loaded
-        // Without this, duty guard fires too soon after relog (UI not ready)
-        foreach (var sw in BuildCharacterSafeWait3Pass($"Duty Guard: Pre-SafeWait ({charName})", 30f))
-        {
-            var origComplete = sw.IsComplete;
-            steps.Add(new TaskStep
-            {
-                Name = sw.Name,
-                OnEnter = sw.OnEnter,
-                IsComplete = () => relogState.Failed || origComplete(),
-                TimeoutSec = sw.TimeoutSec,
-            });
-        }
+        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Pre-SafeWait ({charName})", 30f, runner, () => relogState.Failed);
 
         // Check if in duty
         steps.Add(new TaskStep
@@ -1343,28 +1468,27 @@ public sealed class MonthlyReloggerTask
                 dutyDetected = Plugin.Condition[ConditionFlag.BoundByDuty];
                 if (dutyDetected)
                     runner.AddLog($"WARNING: {charName} is in a duty — attempting to leave...");
+                else
+                    runner.AddLog($"Duty Guard: {charName} is not in a duty.");
             },
             IsComplete = () => true,
             TimeoutSec = 3f,
         });
 
-        // SafeWait 3-pass again if in duty — confirm character fully loaded in the duty instance
-        foreach (var sw in BuildCharacterSafeWait3Pass($"Duty Guard: Duty SafeWait ({charName})", 30f))
-        {
-            var origComplete = sw.IsComplete;
-            steps.Add(new TaskStep
-            {
-                Name = sw.Name,
-                OnEnter = sw.OnEnter,
-                IsComplete = () => relogState.Failed || !dutyDetected || origComplete(),
-                TimeoutSec = sw.TimeoutSec,
-            });
-        }
+        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Duty SafeWait ({charName})", 30f, runner, () => relogState.Failed || !dutyDetected);
 
         // Wait for combat to end
         steps.Add(new TaskStep
         {
             Name = $"Duty Guard: Wait Combat ({charName})",
+            OnEnter = () =>
+            {
+                if (relogState.Failed || !dutyDetected) return;
+                if (Plugin.Condition[ConditionFlag.InCombat])
+                    runner.AddLog($"Duty Guard: {charName} is in combat, waiting to leave duty...");
+                else
+                    runner.AddLog($"Duty Guard: {charName} is not in combat.");
+            },
             IsComplete = () => relogState.Failed || !dutyDetected || !Plugin.Condition[ConditionFlag.InCombat],
             TimeoutSec = 35f,
         });
@@ -1418,25 +1542,12 @@ public sealed class MonthlyReloggerTask
             {
                 if (!relogState.Failed && dutyDetected && Plugin.Condition[ConditionFlag.BoundByDuty])
                 {
-                    runner.AddLog($"FAILED: {charName} — unable to leave duty, halting.");
-                    runner.FailedCharacters.Add(charName);
-                    relogState.Failed = true;
+                    RecordRelogFailure(runner, relogState, charName, $"FAILED: {charName} — unable to leave duty, halting.");
                 }
             },
         });
 
-        // SafeWait 3-pass AFTER leaving duty — ensure character is fully loaded in overworld
-        foreach (var sw in BuildCharacterSafeWait3Pass($"Duty Guard: Post-SafeWait ({charName})", 30f))
-        {
-            var origComplete = sw.IsComplete;
-            steps.Add(new TaskStep
-            {
-                Name = sw.Name,
-                OnEnter = sw.OnEnter,
-                IsComplete = () => relogState.Failed || !dutyDetected || origComplete(),
-                TimeoutSec = sw.TimeoutSec,
-            });
-        }
+        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Post-SafeWait ({charName})", 30f, runner, () => relogState.Failed || !dutyDetected);
 
         return steps;
     }
@@ -1445,13 +1556,107 @@ public sealed class MonthlyReloggerTask
     //  Helper step builders
     // ═══════════════════════════════════════════════════════
 
+    private static void AddLoggedCharacterSafeWait3Pass(List<TaskStep> steps, string label, float timeoutSec, TaskRunner runner, Func<bool>? skip = null)
+    {
+        skip ??= () => false;
+        var verboseLogging = IsVerboseTaskLoggingEnabledStatic();
+
+        for (var pass = 1; pass <= 3; pass++)
+        {
+            var passLabel = $"{label} [pass {pass}/3]";
+            string? lastMessage = null;
+
+            steps.Add(new TaskStep
+            {
+                Name = passLabel,
+                ShouldSkip = skip,
+                OnEnter = () =>
+                {
+                    lastMessage = null;
+                    if (!skip() && verboseLogging)
+                        runner.AddLog($"{passLabel}: waiting for CharacterSafeWait readiness...");
+                },
+                IsComplete = () =>
+                {
+                    if (skip())
+                        return true;
+
+                    var ready = CharacterSafetyHelper.IsCharacterSafeWaitReady();
+                    var message = ready
+                        ? $"{passLabel}: ready ({GetCharacterSafeWaitStatusText()})"
+                        : $"{passLabel}: waiting ({GetCharacterSafeWaitStatusText()})";
+
+                    if (verboseLogging && !string.Equals(lastMessage, message, StringComparison.Ordinal))
+                    {
+                        runner.AddLog(message);
+                        lastMessage = message;
+                    }
+
+                    return ready;
+                },
+                TimeoutSec = timeoutSec,
+            });
+
+            if (pass < 3)
+                steps.Add(MakeDelay($"{label} [wait 1s]", 1.0f, skip));
+        }
+    }
+
+    private static string GetCharacterSafeWaitStatusText()
+    {
+        try
+        {
+            var playerLoaded = Plugin.PlayerState.IsLoaded;
+            var localAvailable = Plugin.ObjectTable.LocalPlayer != null;
+            var namePlateReady = CharacterSafetyHelper.IsNamePlateReady();
+            var normalCondition = CharacterSafetyHelper.IsNormalCondition(Plugin.Condition);
+            var blockers = GetActiveConditionBlockers();
+            var blockerText = blockers.Count > 0 ? string.Join(", ", blockers) : "none";
+            return $"loaded={playerLoaded}, localPlayer={localAvailable}, namePlate={namePlateReady}, normal={normalCondition}, blockers={blockerText}";
+        }
+        catch (Exception ex)
+        {
+            return $"state unavailable ({ex.Message})";
+        }
+    }
+
+    private static List<string> GetActiveConditionBlockers()
+    {
+        var blockers = new List<string>();
+
+        try
+        {
+            var condition = Plugin.Condition;
+            if (condition[ConditionFlag.InCombat]) blockers.Add(nameof(ConditionFlag.InCombat));
+            if (condition[ConditionFlag.BoundByDuty]) blockers.Add(nameof(ConditionFlag.BoundByDuty));
+            if (condition[ConditionFlag.WatchingCutscene]) blockers.Add(nameof(ConditionFlag.WatchingCutscene));
+            if (condition[ConditionFlag.OccupiedInCutSceneEvent]) blockers.Add(nameof(ConditionFlag.OccupiedInCutSceneEvent));
+            if (condition[ConditionFlag.Occupied]) blockers.Add(nameof(ConditionFlag.Occupied));
+            if (condition[ConditionFlag.Occupied30]) blockers.Add(nameof(ConditionFlag.Occupied30));
+            if (condition[ConditionFlag.Occupied33]) blockers.Add(nameof(ConditionFlag.Occupied33));
+            if (condition[ConditionFlag.Occupied38]) blockers.Add(nameof(ConditionFlag.Occupied38));
+            if (condition[ConditionFlag.Occupied39]) blockers.Add(nameof(ConditionFlag.Occupied39));
+            if (condition[ConditionFlag.OccupiedInEvent]) blockers.Add(nameof(ConditionFlag.OccupiedInEvent));
+            if (condition[ConditionFlag.OccupiedInQuestEvent]) blockers.Add(nameof(ConditionFlag.OccupiedInQuestEvent));
+            if (condition[ConditionFlag.OccupiedSummoningBell]) blockers.Add(nameof(ConditionFlag.OccupiedSummoningBell));
+            if (condition[ConditionFlag.BetweenAreas]) blockers.Add(nameof(ConditionFlag.BetweenAreas));
+            if (condition[ConditionFlag.BetweenAreas51]) blockers.Add(nameof(ConditionFlag.BetweenAreas51));
+        }
+        catch
+        {
+        }
+
+        return blockers;
+    }
+
     /// <summary>Creates a simple delay step.</summary>
-    public static TaskStep MakeDelay(string name, float seconds)
+    public static TaskStep MakeDelay(string name, float seconds, Func<bool>? shouldSkip = null)
     {
         DateTime? start = null;
         return new TaskStep
         {
             Name = name,
+            ShouldSkip = shouldSkip,
             OnEnter = () => start = DateTime.UtcNow,
             IsComplete = () => start.HasValue && (DateTime.UtcNow - start.Value).TotalSeconds >= seconds,
             TimeoutSec = seconds + 2f,
@@ -1467,7 +1672,7 @@ public sealed class MonthlyReloggerTask
         return new TaskStep
         {
             Name = name,
-            IsComplete = () => IsNamePlateReady() && IsPlayerAvailable(),
+            IsComplete = () => CharacterSafetyHelper.IsCharacterSafeWaitReady(),
             TimeoutSec = timeoutSec,
         };
     }
@@ -1493,6 +1698,53 @@ public sealed class MonthlyReloggerTask
             MakeDelay($"{label} [wait 1s]", 1.0f),
             BuildCharacterSafeWait($"{label} [pass 3/3]", perPassTimeoutSec),
         };
+    }
+
+    public static void AddLogoutOnCompleteSteps(List<TaskStep> steps, TaskRunner runner)
+    {
+        var logoutConfirmStart = DateTime.MinValue;
+        var logoutConfirmed = false;
+
+        steps.Add(new TaskStep
+        {
+            Name = "Logout",
+            OnEnter = () =>
+            {
+                runner.AddLog("Sending /logout...");
+                ChatHelper.SendMessage("/logout");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+
+        steps.Add(MakeDelay("Logout Dialog Wait", 1.0f));
+
+        steps.Add(new TaskStep
+        {
+            Name = "Logout Confirm",
+            OnEnter = () =>
+            {
+                logoutConfirmStart = DateTime.UtcNow;
+                logoutConfirmed = false;
+                runner.AddLog("Waiting for logout confirmation dialog...");
+            },
+            IsComplete = () =>
+            {
+                if (logoutConfirmed)
+                    return true;
+
+                if (AddonHelper.IsAddonReady("SelectYesno"))
+                {
+                    runner.AddLog("Confirming logout via SelectYesno...");
+                    AddonHelper.ClickYesNo(true);
+                    logoutConfirmed = true;
+                    return true;
+                }
+
+                return (DateTime.UtcNow - logoutConfirmStart).TotalSeconds >= 5;
+            },
+            TimeoutSec = 6f,
+        });
     }
 
     /// <summary>
@@ -1537,14 +1789,9 @@ public sealed class MonthlyReloggerTask
     /// Checks if NamePlate addon is ready and visible.
     /// Part of CharacterSafeWaitXA() checks.
     /// </summary>
-    public static unsafe bool IsNamePlateReady()
+    public static bool IsNamePlateReady()
     {
-        try
-        {
-            var addon = AtkStage.Instance()->RaptureAtkUnitManager->GetAddonByName("NamePlate");
-            return addon != null && addon->IsVisible;
-        }
-        catch { return false; }
+        return CharacterSafetyHelper.IsNamePlateReady();
     }
 
     /// <summary>
@@ -1553,23 +1800,6 @@ public sealed class MonthlyReloggerTask
     /// </summary>
     public static bool IsPlayerAvailable()
     {
-        try
-        {
-            if (!Plugin.PlayerState.IsLoaded) return false;
-            var local = Plugin.ObjectTable.LocalPlayer;
-            if (local == null) return false;
-            // Not zoning
-            if (Plugin.Condition[ConditionFlag.BetweenAreas] || Plugin.Condition[ConditionFlag.BetweenAreas51]) return false;
-            // Not in cutscene (commands silently dropped during cutscenes)
-            if (Plugin.Condition[ConditionFlag.OccupiedInCutSceneEvent]) return false;
-            if (Plugin.Condition[ConditionFlag.WatchingCutscene]) return false;
-            if (Plugin.Condition[ConditionFlag.WatchingCutscene78]) return false;
-            // Not logging out
-            if (Plugin.Condition[ConditionFlag.LoggingOut]) return false;
-            // Not casting (mid-cast blocks interaction)
-            if (Plugin.Condition[ConditionFlag.Casting]) return false;
-            return true;
-        }
-        catch { return false; }
+        return CharacterSafetyHelper.IsPlayerAvailable();
     }
 }

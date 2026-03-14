@@ -17,8 +17,8 @@ public partial class SlaveWindow
     // ───────────────────────────────────────────────
     private void DrawArPostProcessTask()
     {
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "AR Pre/Post Processing");
-        ImGui.TextDisabled("Pre/post-processing steps around AutoRetainer multi-mode character cycles.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "AutoRetainer Tasks");
+        ImGui.TextDisabled("Bailout, pre-processing, and post-processing steps around AutoRetainer multi-mode character cycles.");
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -51,6 +51,39 @@ public partial class SlaveWindow
             plugin.Configuration.Save();
         }
         ImGui.TextDisabled("Controls how often XA Slave will run AR pre/post scans per character. Always = every checkpoint.");
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
+        ImGui.TextColored(new Vector4(1.0f, 0.6f, 0.6f, 1.0f), "Ship Exploration Result Bailout");
+        ImGui.TextDisabled("Watches SelectString and ship result windows, then suppresses AutoRetainer and presses ESC if either stays open too long.");
+        ImGui.Spacing();
+
+        var bailoutEnabled = plugin.Configuration.ArShipExplorationBailoutEnabled;
+        if (ImGui.Checkbox("Enable Ship Exploration Result Bailout", ref bailoutEnabled))
+        {
+            plugin.Configuration.ArShipExplorationBailoutEnabled = bailoutEnabled;
+            plugin.Configuration.Save();
+            UpdateRegistration();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Monitors both AirShipExplorationResult and SelectString while AutoRetainer multi-mode is enabled. \n If either stays open past the selected timer, XA Slave suppresses AutoRetainer, sends ESC until the watched \n menus are gone, runs CharacterSafeWait, sends /ays reset, and then resumes AutoRetainer.");
+
+        if (bailoutEnabled)
+        {
+            var bailoutOptions = new[] { 30, 60, 90 };
+            var bailoutIndex = Array.IndexOf(bailoutOptions, plugin.Configuration.ArShipExplorationBailoutSeconds);
+            if (bailoutIndex < 0) bailoutIndex = 0;
+            ImGui.SetNextItemWidth(180);
+            if (ImGui.SliderInt("Bailout Timer##shipBailout", ref bailoutIndex, 0, bailoutOptions.Length - 1,
+                    $"{bailoutOptions[bailoutIndex]} sec"))
+            {
+                plugin.Configuration.ArShipExplorationBailoutSeconds = bailoutOptions[bailoutIndex];
+                plugin.Configuration.Save();
+            }
+            ImGui.TextDisabled("This will only work when Multi is enabled.");
+        }
 
         // ═══════════════════════════════════════════════════
         //  PRE-PROCESSING SECTION
@@ -96,6 +129,10 @@ public partial class SlaveWindow
             if (ImGui.Checkbox("Open Armoury Chest##pre", ref preArm)) { plugin.Configuration.ArPreProcessOpenArmouryChest = preArm; preChanged = true; }
             var preSad = plugin.Configuration.ArPreProcessOpenSaddlebags;
             if (ImGui.Checkbox("Open Saddlebags##pre", ref preSad)) { plugin.Configuration.ArPreProcessOpenSaddlebags = preSad; preChanged = true; }
+            var preJournal = plugin.Configuration.ArPreProcessOpenJournal;
+            if (ImGui.Checkbox("Open Journal##pre", ref preJournal)) { plugin.Configuration.ArPreProcessOpenJournal = preJournal; preChanged = true; }
+            var prePlot = plugin.Configuration.ArPreProcessCollectPersonalPlotInfo;
+            if (ImGui.Checkbox("Collect Personal Plot Info##pre", ref prePlot)) { plugin.Configuration.ArPreProcessCollectPersonalPlotInfo = prePlot; preChanged = true; }
             var preFc = plugin.Configuration.ArPreProcessFcWindow;
             if (ImGui.Checkbox("Full FC Window Processing##pre", ref preFc)) { plugin.Configuration.ArPreProcessFcWindow = preFc; preChanged = true; }
             var preSave = plugin.Configuration.ArPreProcessSaveToXaDatabase;
@@ -136,6 +173,10 @@ public partial class SlaveWindow
             if (ImGui.Checkbox("Open Armoury Chest##post", ref postArm)) { plugin.Configuration.ArPostProcessOpenArmouryChest = postArm; postChanged = true; }
             var postSad = plugin.Configuration.ArPostProcessOpenSaddlebags;
             if (ImGui.Checkbox("Open Saddlebags##post", ref postSad)) { plugin.Configuration.ArPostProcessOpenSaddlebags = postSad; postChanged = true; }
+            var postJournal = plugin.Configuration.ArPostProcessOpenJournal;
+            if (ImGui.Checkbox("Open Journal##post", ref postJournal)) { plugin.Configuration.ArPostProcessOpenJournal = postJournal; postChanged = true; }
+            var postPlot = plugin.Configuration.ArPostProcessCollectPersonalPlotInfo;
+            if (ImGui.Checkbox("Collect Personal Plot Info##post", ref postPlot)) { plugin.Configuration.ArPostProcessCollectPersonalPlotInfo = postPlot; postChanged = true; }
             var postFc = plugin.Configuration.ArPostProcessFcWindow;
             if (ImGui.Checkbox("Full FC Window Processing##post", ref postFc)) { plugin.Configuration.ArPostProcessFcWindow = postFc; postChanged = true; }
             var postSave = plugin.Configuration.ArPostProcessSaveToXaDatabase;
@@ -166,7 +207,7 @@ public partial class SlaveWindow
         {
             ImGui.TextDisabled(plugin.ArPostProcessor.IsRegistered
                 ? "Idle — waiting for AutoRetainer multi-mode events."
-                : "Not registered (enable Pre or Post processing).");
+                : "Not registered (enable Ship Bailout, Pre-Processing, or Post-Processing).");
         }
 
         if (plugin.ArPostProcessor.CharactersPreProcessed > 0 || plugin.ArPostProcessor.CharactersProcessed > 0)
@@ -231,6 +272,7 @@ public partial class SlaveWindow
                 "PRE-PROCESSING: On character login during AR multi-mode, XA Slave immediately " +
                 "suppresses AR (SetSuppressed=true), runs configured collection steps, then " +
                 "un-suppresses AR so it can proceed to retainer processing.\n\n" +
+                "SHIP BAILOUT: XA Slave watches both AirShipExplorationResult and SelectString while AutoRetainer multi-mode is enabled. If either stays open past the configured timer, XA Slave suppresses AR, sends ESC until no watched menus remain, runs CharacterSafeWait, sends /ays reset, and then resumes AutoRetainer.\n\n" +
                 "POST-PROCESSING: After AR finishes all retainers/subs for a character, AR fires " +
                 "OnCharacterAdditionalTask → XA Slave registers → AR fires OnCharacterReadyForPostprocess " +
                 "→ XA Slave runs steps → signals AR to continue relogging.");
@@ -240,7 +282,7 @@ public partial class SlaveWindow
     /// <summary>Register or unregister based on whether either pre or post processing is enabled.</summary>
     private void UpdateRegistration()
     {
-        var needsRegistration = plugin.Configuration.ArPreProcessEnabled || plugin.Configuration.ArPostProcessEnabled;
+        var needsRegistration = plugin.Configuration.ArShipExplorationBailoutEnabled || plugin.Configuration.ArPreProcessEnabled || plugin.Configuration.ArPostProcessEnabled;
         if (needsRegistration)
             plugin.ArPostProcessor.Register();
         else

@@ -8,6 +8,7 @@ using Lumina.Excel.Sheets;
 using XASlave.Services;
 using XASlave.Services.Tasks;
 
+#if XA_SLAVE_TESTING_BUILD
 namespace XASlave.Windows;
 
 /// <summary>
@@ -1401,10 +1402,85 @@ public partial class SlaveWindow
             SetDebugResult($"Personal Plot: {info}");
         }
         ImGui.SameLine();
+        if (ImGui.Button("Housing Command"))
+        {
+            ChatHelper.SendMessage("/housing");
+            SetDebugResult("Sent: /housing");
+        }
+        ImGui.SameLine();
         if (ImGui.Button("XA: GetVersion"))
         {
             var ver = plugin.IpcClient.GetVersion();
             SetDebugResult($"XA Database Version: {ver}");
+        }
+
+        ImGui.Spacing();
+
+        if (ImGui.Button("Housing: Click Estate Menu"))
+        {
+            var variant = AddonHelper.GetHousingMenuVariant();
+            var callbackIndex = AddonHelper.GetAddonListTextCallbackIndex("HousingMenu", "Estate Settings");
+            var ok = callbackIndex >= 0 && AddonHelper.SelectAddonListText("HousingMenu", "Estate Settings");
+            SetDebugResult(ok
+                ? $"Selected Estate Settings via callback {callbackIndex} ({(string.IsNullOrEmpty(variant) ? "HousingMenu" : variant)})"
+                : "HousingMenu not visible or Estate Settings callback not resolved");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Housing: Variant"))
+        {
+            var variant = AddonHelper.GetHousingMenuVariant();
+            SetDebugResult(!string.IsNullOrEmpty(variant) ? $"Housing menu: {variant}" : "HousingMenu not visible");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Housing: Read Address"))
+        {
+            var address = AddonHelper.GetAddonTextEntries("HousingSignBoard")
+                .FirstOrDefault(text => text.Contains("Ward", StringComparison.OrdinalIgnoreCase) && text.Contains(",", StringComparison.Ordinal));
+            SetDebugResult(!string.IsNullOrEmpty(address) ? $"HousingSignBoard: {address}" : "HousingSignBoard not visible or address text not found");
+        }
+
+        ImGui.Spacing();
+
+        if (ImGui.Button("Housing: Apartment"))
+        {
+            var callbackIndex = AddonHelper.GetAddonListTextCallbackIndex("HousingSelectHouse", "Apartment");
+            var ok = callbackIndex >= 0 && AddonHelper.SelectAddonListText("HousingSelectHouse", "Apartment");
+            SetDebugResult(ok ? $"Selected HousingSelectHouse -> Apartment via callback {callbackIndex}" : "HousingSelectHouse not visible or Apartment callback not resolved");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Housing: FC Estate"))
+        {
+            var callbackIndex = AddonHelper.GetAddonListTextCallbackIndex("HousingSelectHouse", "Free Company Estate");
+            var ok = callbackIndex >= 0 && AddonHelper.SelectAddonListText("HousingSelectHouse", "Free Company Estate");
+            SetDebugResult(ok ? $"Selected HousingSelectHouse -> Free Company Estate via callback {callbackIndex}" : "HousingSelectHouse not visible or Free Company Estate callback not resolved");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Housing: Private Estate"))
+        {
+            var callbackIndex = AddonHelper.GetAddonListTextCallbackIndex("HousingSelectHouse", "Private Estate");
+            var ok = callbackIndex >= 0 && AddonHelper.SelectAddonListText("HousingSelectHouse", "Private Estate");
+            SetDebugResult(ok ? $"Selected HousingSelectHouse -> Private Estate via callback {callbackIndex}" : "HousingSelectHouse not visible or Private Estate callback not resolved");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Housing: Shared Estate"))
+        {
+            var callbackIndex = AddonHelper.GetAddonListTextCallbackIndex("HousingSelectHouse", "Shared Estate", true);
+            var ok = callbackIndex >= 0 && AddonHelper.SelectAddonListText("HousingSelectHouse", "Shared Estate", true);
+            SetDebugResult(ok ? $"Selected HousingSelectHouse -> Shared Estate via callback {callbackIndex}" : "HousingSelectHouse not visible or Shared Estate callback not resolved");
+        }
+
+        ImGui.Spacing();
+
+        if (ImGui.Button("Housing: View Details"))
+        {
+            var ok = AddonHelper.SelectFirstAddonListText(
+                "HousingSubmenu",
+                out var callbackIndex,
+                out var matchedText,
+                ("View Room Details", false),
+                ("View Estate Details", false),
+                ("Details", true));
+            SetDebugResult(ok ? $"Selected HousingSubmenu -> {matchedText} via callback {callbackIndex}" : "HousingSubmenu not visible or no details callback resolved");
         }
 
         ImGui.Spacing();
@@ -1887,6 +1963,57 @@ public partial class SlaveWindow
         ImGui.TextDisabled("  Letters:   0x41–0x5A (A–Z)    Numbers: 0x30–0x39 (0–9)");
 
         ImGui.Spacing();
+        ImGui.TextDisabled("Tap Tests:");
+
+        if (ImGui.Button("Tap ESC"))
+        {
+            KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
+            SetDebugResult("KeyInput test: tapped ESC");
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Tap SPACE"))
+        {
+            KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE);
+            SetDebugResult("KeyInput test: tapped SPACE");
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Tap U"))
+        {
+            KeyInputHelper.PressKey(0x55);
+            SetDebugResult("KeyInput test: tapped U (0x55)");
+        }
+
+        if (ImGui.Button("Tap NUMPAD0"))
+        {
+            KeyInputHelper.PressKey(KeyInputHelper.VK_NUMPAD0);
+            SetDebugResult("KeyInput test: tapped NUMPAD0");
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Tap CTRL"))
+        {
+            KeyInputHelper.PressKey(KeyInputHelper.VK_CONTROL);
+            SetDebugResult("KeyInput test: tapped CTRL");
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Hold CTRL"))
+        {
+            KeyInputHelper.HoldKey(KeyInputHelper.VK_CONTROL);
+            SetDebugResult("KeyInput test: holding CTRL");
+        }
+
+        ImGui.SameLine();
+        if (ImGui.Button("Release CTRL"))
+        {
+            KeyInputHelper.ReleaseKey(KeyInputHelper.VK_CONTROL);
+            SetDebugResult("KeyInput test: released CTRL");
+        }
+
+        ImGui.TextDisabled("Use these to confirm whether tap/hold/release inputs are actually accepted by the game client.");
+        ImGui.Spacing();
         } // end Key Inputs
 
         // ╔══════════════════════════════════════════════╗
@@ -1894,7 +2021,7 @@ public partial class SlaveWindow
         // ╚══════════════════════════════════════════════╝
         if (ImGui.CollapsingHeader("Braindead Functions"))
         {
-        ImGui.TextDisabled("Multi-step scripted sequences. These will be implemented as full task chains.");
+        ImGui.TextDisabled("Multi-step scripted sequences. These will be implemented as full task chains in future updates.");
         ImGui.Spacing();
 
         ImGui.TextDisabled("• FreshLimsaToSummer — Complete Limsa intro → Summerford Farms");
@@ -2024,3 +2151,4 @@ public partial class SlaveWindow
         return false;
     }
 }
+#endif

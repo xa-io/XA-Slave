@@ -57,7 +57,7 @@ public sealed class Plugin : IDalamudPlugin
 
         IpcClient = new IpcClient(PluginInterface, Log);
         SlaveDatabase = new SlaveDatabaseService(PluginInterface, Log);
-        AutoCollector = new AutoCollectionService(Condition, Framework, ObjectTable, Log);
+        AutoCollector = new AutoCollectionService(this, Condition, Framework, ObjectTable, Log);
         TaskRunner = new TaskRunner(Condition, Framework, Log, DtrBar, ToastGui);
         ArConfigReader = new AutoRetainerConfigReader(PluginInterface, Log);
         IpcProvider = new IpcProvider(PluginInterface, this, Log);
@@ -153,6 +153,8 @@ public sealed class Plugin : IDalamudPlugin
     private void OnLogin()
     {
         Log.Information("[XASlave] Character logged in.");
+        if (TaskRunner.IsRunning)
+            TaskRunner.AddLog("EVENT: Character logged in.");
 
         if (Configuration.OpenPluginOnLoad)
             SlaveWindow.IsOpen = true;
@@ -175,14 +177,18 @@ public sealed class Plugin : IDalamudPlugin
         if (TaskRunner.IsRunning && !TaskRunner.SuppressLogoutCancel)
         {
             Log.Information("[XASlave] Character logged out — cancelling running task.");
+            TaskRunner.AddLog("EVENT: Character logged out — cancelling running task.");
             TaskRunner.Cancel();
         }
         else if (TaskRunner.IsRunning)
         {
             Log.Information("[XASlave] Character logged out — relogger active, not cancelling.");
+            TaskRunner.AddLog("EVENT: Character logged out — relogger active, not cancelling.");
         }
 
         Log.Information("[XASlave] Character logged out — sending final save to XA Database.");
+        if (TaskRunner.IsRunning)
+            TaskRunner.AddLog("EVENT: Character logged out — sending final save to XA Database.");
         SaveToXaDatabaseAndRecordSync(contentId, characterName);
     }
 
@@ -195,6 +201,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+#if XA_SLAVE_TESTING_BUILD
         // /xa run <task> — test IPC RunTask locally
         if (trimmed.StartsWith("run ", StringComparison.OrdinalIgnoreCase))
         {
@@ -208,6 +215,7 @@ public sealed class Plugin : IDalamudPlugin
             IpcProvider.InvokeRunTask(taskName);
             return;
         }
+#endif
 
         // Unknown subcommand — toggle window
         SlaveWindow.Toggle();
@@ -218,5 +226,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.10";
+    public const string Version = "0.0.0.11";
 }

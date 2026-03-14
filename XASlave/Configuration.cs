@@ -31,10 +31,14 @@ public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 0;
     public bool OpenPluginOnLoad { get; set; } = false;
+    public bool VerboseTaskLogging { get; set; } = false;
 
     // Auto-collection on login — opens saddlebag/FC windows to collect data
     public bool AutoCollectOnLogin { get; set; } = false;
+    public bool AutoCollectArmouryChest { get; set; } = true;
     public bool AutoCollectSaddlebag { get; set; } = true;
+    public bool AutoCollectJournal { get; set; } = true;
+    public bool AutoCollectPersonalPlotInfo { get; set; } = true;
     public bool AutoCollectFc { get; set; } = true;
     public int AutoCollectCheckEveryHours { get; set; } = 0;
     public bool AutoCollectDisableWhenArMultiEnabled { get; set; } = false;
@@ -56,13 +60,17 @@ public class Configuration : IPluginConfiguration
     public bool ReloggerDoOpenInventory { get; set; } = true;
     public bool ReloggerDoOpenArmouryChest { get; set; } = true;
     public bool ReloggerDoOpenSaddlebags { get; set; } = true;
+    public bool ReloggerDoOpenJournal { get; set; } = true;
     public bool ReloggerDoReturnToHome { get; set; } = true;
+    public bool ReloggerDoCollectPersonalPlotInfo { get; set; } = true;
     public bool ReloggerDoReturnToFc { get; set; } = true;
     public bool ReloggerDoParseForXaDatabase { get; set; } = true;
+    public bool ReloggerDoLogoutOnComplete { get; set; } = false;
     public bool ReloggerDoEnableArMultiOnComplete { get; set; } = false;
 
     // Region filter for character list display
     public string ReloggerRegionFilter { get; set; } = "All";
+    public int ReloggerStaleSelectDays { get; set; } = 20;
 
     // Per-character persistent data for table columns (Lv, Gil, FC, In FC, Last Logged In).
     // Keyed by "Name@World". Updated from AutoRetainer imports and relogger runs.
@@ -74,6 +82,13 @@ public class Configuration : IPluginConfiguration
     // ── Refresh AR Subs/Bell ──
     public List<string> RefreshSubsCharacters { get; set; } = new();
 
+    // ── Prep Logistics ──
+    public List<string> PrepLogisticsCharacters { get; set; } = new();
+    public string PrepLogisticsTargetWorld { get; set; } = string.Empty;
+    public string PrepLogisticsTargetAetheryte { get; set; } = string.Empty;
+    public bool PrepLogisticsEnableArMultiOnComplete { get; set; } = true;
+    public bool PrepLogisticsLogoutOnComplete { get; set; } = false;
+
     // ── FC Permissions Updater ──
     public List<string> FcPermsCharacters { get; set; } = new();
 
@@ -83,10 +98,14 @@ public class Configuration : IPluginConfiguration
     public bool ArPreProcessEnabled { get; set; } = false;
     public float ArPreProcessLoginDelay { get; set; } = 5f;
     public int ArPrePostCheckEveryHours { get; set; } = 0;
+    public bool ArShipExplorationBailoutEnabled { get; set; } = false;
+    public int ArShipExplorationBailoutSeconds { get; set; } = 30;
     // Per-step toggles — what to do before AR processes retainers
     public bool ArPreProcessOpenInventory { get; set; } = true;
     public bool ArPreProcessOpenArmouryChest { get; set; } = true;
     public bool ArPreProcessOpenSaddlebags { get; set; } = true;
+    public bool ArPreProcessOpenJournal { get; set; } = true;
+    public bool ArPreProcessCollectPersonalPlotInfo { get; set; } = true;
     public bool ArPreProcessFcWindow { get; set; } = true;
     public bool ArPreProcessSaveToXaDatabase { get; set; } = true;
 
@@ -97,6 +116,8 @@ public class Configuration : IPluginConfiguration
     public bool ArPostProcessOpenInventory { get; set; } = true;
     public bool ArPostProcessOpenArmouryChest { get; set; } = true;
     public bool ArPostProcessOpenSaddlebags { get; set; } = true;
+    public bool ArPostProcessOpenJournal { get; set; } = true;
+    public bool ArPostProcessCollectPersonalPlotInfo { get; set; } = true;
     public bool ArPostProcessFcWindow { get; set; } = true;
     public bool ArPostProcessSaveToXaDatabase { get; set; } = true;
     public bool ArProcessLogEnabled { get; set; } = false;

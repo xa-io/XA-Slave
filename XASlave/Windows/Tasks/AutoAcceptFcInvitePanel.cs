@@ -192,7 +192,7 @@ public partial class SlaveWindow
             Name = $"FC Floater: Open {invitationName}",
             OnEnter = () =>
             {
-                runner.AddLog($"Opening {invitationName} notification...");
+                runner.AddVerboseLog($"Opening {invitationName} notification...");
                 AddonHelper.FireCallback("_Notification", 0, invitationType);
             },
             IsComplete = () => true,
@@ -249,7 +249,7 @@ public partial class SlaveWindow
             Name = "FC Floater: Open FC Window",
             OnEnter = () =>
             {
-                runner.AddLog("Opening FC window to leave...");
+                runner.AddVerboseLog("Opening FC window to leave...");
                 ChatHelper.SendMessage("/freecompanycmd");
             },
             IsComplete = () => AddonHelper.IsAddonVisible("FreeCompany"),
@@ -263,7 +263,7 @@ public partial class SlaveWindow
             Name = "FC Floater: Info Tab",
             OnEnter = () =>
             {
-                runner.AddLog("Navigating to FC Info tab...");
+                runner.AddVerboseLog("Navigating to FC Info tab...");
                 if (AddonHelper.IsAddonReady("FreeCompany"))
                     AddonHelper.FireCallback("FreeCompany", 0, 5);
             },
@@ -278,7 +278,7 @@ public partial class SlaveWindow
             Name = "FC Floater: Click Leave",
             OnEnter = () =>
             {
-                runner.AddLog("Clicking Leave Free Company...");
+                runner.AddVerboseLog("Clicking Leave Free Company...");
                 if (AddonHelper.IsAddonReady("FreeCompanyStatus"))
                     AddonHelper.FireCallback("FreeCompanyStatus", 3);
             },
@@ -295,7 +295,7 @@ public partial class SlaveWindow
             {
                 if (AddonHelper.IsAddonReady("SelectYesno"))
                 {
-                    runner.AddLog("Confirming FC leave...");
+                    runner.AddVerboseLog("Confirming FC leave...");
                     AddonHelper.ClickYesNo(true);
                 }
             },

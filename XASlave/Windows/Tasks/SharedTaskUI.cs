@@ -17,7 +17,7 @@ public partial class SlaveWindow
 {
     /// <summary>Draw plugin status checker for tasks — same pattern as Monthly Relogger.
     /// XA Database becomes required when parseForXaDb is checked.</summary>
-    private void DrawTaskPluginStatus(bool parseForXaDb)
+    private void DrawTaskPluginStatus(bool requiresXaDb)
     {
         var ipc = plugin.IpcClient;
         var green = new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
@@ -30,7 +30,7 @@ public partial class SlaveWindow
         var vnavOk = ipc.IsVnavAvailable();
         var xaDbOk = ipc.IsXaDatabaseAvailable();
 
-        var allRequired = arOk && lsOk && taOk && vnavOk && (!parseForXaDb || xaDbOk);
+        var allRequired = arOk && lsOk && taOk && vnavOk && (!requiresXaDb || xaDbOk);
 
         if (allRequired)
             ImGui.TextColored(green, "All required plugins loaded.");
@@ -42,7 +42,7 @@ public partial class SlaveWindow
         ImGui.SameLine(); ImGui.TextColored(lsOk ? green : red, lsOk ? "[Lifestream]" : "[Lifestream \u2717]");
         ImGui.SameLine(); ImGui.TextColored(taOk ? green : red, taOk ? "[TextAdvance]" : "[TextAdvance \u2717]");
         ImGui.SameLine(); ImGui.TextColored(vnavOk ? green : red, vnavOk ? "[vnavmesh]" : "[vnavmesh \u2717]");
-        if (parseForXaDb)
+        if (requiresXaDb)
         {
             ImGui.SameLine(); ImGui.TextColored(xaDbOk ? green : red, xaDbOk ? "[XA Database]" : "[XA Database \u2717]");
         }
@@ -52,7 +52,7 @@ public partial class SlaveWindow
             ("YesAlready", ipc.IsYesAlreadyAvailable()),
             ("PandorasBox", ipc.IsPandorasBoxAvailable()),
         };
-        if (!parseForXaDb)
+        if (!requiresXaDb)
         {
             ImGui.Text("Optional: ");
             ImGui.SameLine(); ImGui.TextColored(xaDbOk ? green : dim, xaDbOk ? "[XA Database]" : "[XA Database -]");
@@ -111,6 +111,20 @@ public partial class SlaveWindow
         }
     }
 
+    private void DrawSharedCompletionAndLogFooter(string optionId, string logId,
+        ref bool logoutOnComplete, ref bool enableArMultiOnComplete, ref bool showLog,
+        Services.TaskRunner runner)
+    {
+        ImGui.Separator();
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Task Options on Complete");
+        ImGui.Checkbox($"Logout on completion##{optionId}", ref logoutOnComplete);
+        ImGui.Checkbox($"Enable AR Multi Mode on completion##{optionId}", ref enableArMultiOnComplete);
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+        DrawTaskLog(logId, ref showLog, runner);
+    }
+
     /// <summary>Draw the processing list shown during a running task.</summary>
     private void DrawProcessingList(Services.TaskRunner runner)
     {
@@ -121,10 +135,12 @@ public partial class SlaveWindow
             for (int ci = 0; ci < reloggerRunList.Count; ci++)
             {
                 var ch = reloggerRunList[ci];
-                if (ci < runner.CompletedItems)
-                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"  \u2713 {ci + 1}. {ch}");
+                if (runner.FailedCharacters.Contains(ch))
+                    ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), $"  ✗ {ci + 1}. {ch}");
+                else if (ci < runner.CompletedItems)
+                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"  ✓ {ci + 1}. {ch}");
                 else if (ci == runner.CompletedItems)
-                    ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"  \u2192 {ci + 1}. {ch}");
+                    ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"  → {ci + 1}. {ch}");
                 else
                     ImGui.TextDisabled($"     {ci + 1}. {ch}");
             }
@@ -137,8 +153,8 @@ public partial class SlaveWindow
     /// </summary>
     private void StartTaskWithConfig(string taskName, List<string> characters, HashSet<int> selectedIndices,
         bool doTextAdvance, bool doRemoveSprout, bool doOpenInventory, bool doOpenArmoury,
-        bool doOpenSaddlebags, bool doReturnToHome, bool doReturnToFc,
-        bool doParseForXaDatabase, bool doEnableArMulti)
+        bool doOpenSaddlebags, bool doOpenJournal, bool doReturnToHome, bool doCollectPersonalPlotInfo,
+        bool doReturnToFc, bool doParseForXaDatabase, bool doLogoutOnComplete, bool doEnableArMulti)
     {
         reloggerTask = new MonthlyReloggerTask(plugin)
         {
@@ -147,9 +163,12 @@ public partial class SlaveWindow
             DoOpenInventory = doOpenInventory,
             DoOpenArmouryChest = doOpenArmoury,
             DoOpenSaddlebags = doOpenSaddlebags,
+            DoOpenJournal = doOpenJournal,
             DoReturnToHome = doReturnToHome,
+            DoCollectPersonalPlotInfo = doCollectPersonalPlotInfo,
             DoReturnToFc = doReturnToFc,
             DoParseForXaDatabase = doParseForXaDatabase,
+            DoLogoutOnComplete = doLogoutOnComplete,
             DoEnableArMultiOnComplete = doEnableArMulti,
         };
 

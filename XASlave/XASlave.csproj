@@ -1,10 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/14.0.2">
   <PropertyGroup>
-    <Version>0.0.0.10</Version>
+    <Version>0.0.0.11</Version>
     <PackageProjectUrl>https://github.com/xa-io</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
+    <XAExtraDefineConstants></XAExtraDefineConstants>
+    <DefineConstants Condition="'$(XAExtraDefineConstants)' != ''">$(DefineConstants);$(XAExtraDefineConstants)</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)' == 'Debug'">
+    <DefineConstants>$(DefineConstants);XA_SLAVE_TESTING_BUILD</DefineConstants>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="backups\**" />

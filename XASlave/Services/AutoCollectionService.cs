@@ -6,6 +6,7 @@ using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using XASlave.Services.Tasks;
 
 namespace XASlave.Services;
 
@@ -19,12 +20,13 @@ namespace XASlave.Services;
 /// </summary>
 public sealed class AutoCollectionService : IDisposable
 {
+    private readonly Plugin plugin;
     private readonly ICondition condition;
     private readonly IFramework framework;
     private readonly IObjectTable objectTable;
     private readonly IPluginLog log;
 
-    private readonly List<CollectionStep> steps = new();
+    private readonly List<TaskStep> steps = new();
     private int stepIndex = -1;
     private DateTime stepStart;
     private bool stepActionDone;
@@ -35,16 +37,9 @@ public sealed class AutoCollectionService : IDisposable
     public bool IsRunning => running;
     public string StatusText { get; private set; } = string.Empty;
 
-    private class CollectionStep
+    public AutoCollectionService(Plugin plugin, ICondition condition, IFramework framework, IObjectTable objectTable, IPluginLog log)
     {
-        public string Name { get; init; } = string.Empty;
-        public Action? OnEnter { get; init; }
-        public Func<bool> IsComplete { get; init; } = () => true;
-        public float TimeoutSec { get; init; } = 5f;
-    }
-
-    public AutoCollectionService(ICondition condition, IFramework framework, IObjectTable objectTable, IPluginLog log)
-    {
+        this.plugin = plugin;
         this.condition = condition;
         this.framework = framework;
         this.objectTable = objectTable;
@@ -74,23 +69,10 @@ public sealed class AutoCollectionService : IDisposable
 
     public bool IsNormalCondition()
     {
-        return !condition[ConditionFlag.InCombat]
-            && !condition[ConditionFlag.BoundByDuty]
-            && !condition[ConditionFlag.WatchingCutscene]
-            && !condition[ConditionFlag.OccupiedInCutSceneEvent]
-            && !condition[ConditionFlag.Occupied]
-            && !condition[ConditionFlag.Occupied30]
-            && !condition[ConditionFlag.Occupied33]
-            && !condition[ConditionFlag.Occupied38]
-            && !condition[ConditionFlag.Occupied39]
-            && !condition[ConditionFlag.OccupiedInEvent]
-            && !condition[ConditionFlag.OccupiedInQuestEvent]
-            && !condition[ConditionFlag.OccupiedSummoningBell]
-            && !condition[ConditionFlag.BetweenAreas]
-            && !condition[ConditionFlag.BetweenAreas51];
+        return CharacterSafetyHelper.IsNormalCondition(condition);
     }
 
-    public void StartCollection(bool doSaddlebag, bool doFc, Action? onSave = null, Action<bool>? onCompletion = null)
+    public void StartCollection(bool doArmouryChest, bool doSaddlebag, bool doJournal, bool doPersonalPlotInfo, bool doFc, Action? onSave = null, Action<bool>? onCompletion = null)
     {
         if (running) return;
 
@@ -98,13 +80,43 @@ public sealed class AutoCollectionService : IDisposable
         this.onCompletion = onCompletion;
         steps.Clear();
 
+        if (doArmouryChest)
+        {
+            steps.Add(new TaskStep
+            {
+                Name = "Open Armoury Chest",
+                OnEnter = () => ChatHelper.SendMessage("/armourychest"),
+                IsComplete = () => true,
+                TimeoutSec = 2f,
+            });
+            steps.Add(new TaskStep { Name = "Armoury Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+        }
+
         // ── Saddlebag collection ──
         if (doSaddlebag)
         {
-            steps.Add(new CollectionStep { Name = "Open Saddlebag", OnEnter = () => OpenAgentWindow(AgentId.InventoryBuddy, "InventoryBuddy"), IsComplete = () => IsAddonReady("InventoryBuddy"), TimeoutSec = 3f });
-            steps.Add(new CollectionStep { Name = "Read Saddlebag", IsComplete = () => !IsAddonReady("InventoryBuddy") || DelayComplete(1.0f), TimeoutSec = 2f });
-            steps.Add(new CollectionStep { Name = "Close Saddlebag", OnEnter = () => CloseAddon("InventoryBuddy"), IsComplete = () => !IsAddonReady("InventoryBuddy"), TimeoutSec = 3f });
-            steps.Add(new CollectionStep { Name = "Saddlebag Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new TaskStep { Name = "Open Saddlebag", OnEnter = () => OpenAgentWindow(AgentId.InventoryBuddy, "InventoryBuddy"), IsComplete = () => IsAddonReady("InventoryBuddy"), TimeoutSec = 3f });
+            steps.Add(new TaskStep { Name = "Read Saddlebag", IsComplete = () => !IsAddonReady("InventoryBuddy") || DelayComplete(1.0f), TimeoutSec = 2f });
+            steps.Add(new TaskStep { Name = "Close Saddlebag", OnEnter = () => CloseAddon("InventoryBuddy"), IsComplete = () => !IsAddonReady("InventoryBuddy"), TimeoutSec = 3f });
+            steps.Add(new TaskStep { Name = "Saddlebag Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+        }
+
+        if (doJournal)
+        {
+            steps.Add(new TaskStep
+            {
+                Name = "Open Journal",
+                OnEnter = () => ChatHelper.SendMessage("/journal"),
+                IsComplete = () => true,
+                TimeoutSec = 2f,
+            });
+            steps.Add(new TaskStep { Name = "Journal Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+        }
+
+        if (doPersonalPlotInfo)
+        {
+            steps.AddRange(MonthlyReloggerTask.BuildCollectPersonalPlotInfoSteps(plugin,
+                msg => log.Information($"[XASlave] AutoCollection: {msg}")));
         }
 
         // ── FC collection — requires homeworld first, then FC membership ──
@@ -120,29 +132,29 @@ public sealed class AutoCollectionService : IDisposable
             }
             else
             {
-                steps.Add(new CollectionStep { Name = "Open FC Window", OnEnter = () => OpenAgentWindow(AgentId.FreeCompany, "FreeCompany"), IsComplete = () => IsAddonReady("FreeCompany"), TimeoutSec = 5f });
-                steps.Add(new CollectionStep { Name = "FC Load Delay", IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { Name = "Open FC Window", OnEnter = () => OpenAgentWindow(AgentId.FreeCompany, "FreeCompany"), IsComplete = () => IsAddonReady("FreeCompany"), TimeoutSec = 5f });
+                steps.Add(new TaskStep { Name = "FC Load Delay", IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
 
-                steps.Add(new CollectionStep { Name = "Click Members Tab", OnEnter = () => { FireAddonCallback("FreeCompany", 1); ClickAddonNode("FreeCompany", 8); }, IsComplete = () => IsAddonReady("FreeCompanyMember") || DelayComplete(3.0f), TimeoutSec = 5f });
-                steps.Add(new CollectionStep { Name = "Members Load Delay", IsComplete = () => DelayComplete(1.5f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { Name = "Click Members Tab", OnEnter = () => { FireAddonCallback("FreeCompany", 1); ClickAddonNode("FreeCompany", 8); }, IsComplete = () => IsAddonReady("FreeCompanyMember") || DelayComplete(3.0f), TimeoutSec = 5f });
+                steps.Add(new TaskStep { Name = "Members Load Delay", IsComplete = () => DelayComplete(1.5f), TimeoutSec = 2f });
 
                 // IPC save after members tab — XA Database addon watcher will also trigger on close
-                steps.Add(new CollectionStep { Name = "Save Members", OnEnter = () => onSave?.Invoke(), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { Name = "Save Members", OnEnter = () => onSave?.Invoke(), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
 
-                steps.Add(new CollectionStep { Name = "Click Info Tab", OnEnter = () => { FireAddonCallback("FreeCompany", 3); ClickAddonNode("FreeCompany", 4); }, IsComplete = () => IsAddonReady("FreeCompanyStatus") || DelayComplete(3.0f), TimeoutSec = 5f });
-                steps.Add(new CollectionStep { Name = "Status Load Delay", IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { Name = "Click Info Tab", OnEnter = () => { FireAddonCallback("FreeCompany", 3); ClickAddonNode("FreeCompany", 4); }, IsComplete = () => IsAddonReady("FreeCompanyStatus") || DelayComplete(3.0f), TimeoutSec = 5f });
+                steps.Add(new TaskStep { Name = "Status Load Delay", IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
 
-                steps.Add(new CollectionStep { Name = "Click Housing Search", OnEnter = () => { if (IsAddonReady("FreeCompanyStatus")) ClickAddonNode("FreeCompanyStatus", 12); }, IsComplete = () => IsAddonReady("HousingSignBoard") || DelayComplete(3.0f), TimeoutSec = 5f });
-                steps.Add(new CollectionStep { Name = "Housing Load Delay", IsComplete = () => DelayComplete(1.5f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { Name = "Click Housing Search", OnEnter = () => { if (IsAddonReady("FreeCompanyStatus")) ClickAddonNode("FreeCompanyStatus", 12); }, IsComplete = () => IsAddonReady("HousingSignBoard") || DelayComplete(3.0f), TimeoutSec = 5f });
+                steps.Add(new TaskStep { Name = "Housing Load Delay", IsComplete = () => DelayComplete(1.5f), TimeoutSec = 2f });
 
-                steps.Add(new CollectionStep { Name = "Close Sub-Addons", OnEnter = () => { CloseAddon("HousingSignBoard"); CloseAddon("FreeCompanyStatus"); CloseAddon("FreeCompanyMember"); }, IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
-                steps.Add(new CollectionStep { Name = "Close FC Window", OnEnter = () => CloseAddon("FreeCompany"), IsComplete = () => !IsAddonReady("FreeCompany"), TimeoutSec = 5f });
-                steps.Add(new CollectionStep { Name = "FC Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+                steps.Add(new TaskStep { Name = "Close Sub-Addons", OnEnter = () => { CloseAddon("HousingSignBoard"); CloseAddon("FreeCompanyStatus"); CloseAddon("FreeCompanyMember"); }, IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { Name = "Close FC Window", OnEnter = () => CloseAddon("FreeCompany"), IsComplete = () => !IsAddonReady("FreeCompany"), TimeoutSec = 5f });
+                steps.Add(new TaskStep { Name = "FC Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
             }
         }
 
         // Final IPC save step
-        steps.Add(new CollectionStep { Name = "Final Save", OnEnter = () => onSave?.Invoke(), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
+        steps.Add(new TaskStep { Name = "Final Save", OnEnter = () => onSave?.Invoke(), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
 
         if (steps.Count == 0)
         {
@@ -175,6 +187,30 @@ public sealed class AutoCollectionService : IDisposable
 
     private void OnTick(IFramework fw)
     {
+        if (!running || stepIndex < 0 || stepIndex >= steps.Count)
+        {
+            Finish();
+            return;
+        }
+
+        while (running && stepIndex >= 0 && stepIndex < steps.Count)
+        {
+            var pendingStep = steps[stepIndex];
+            if (pendingStep.ShouldSkip == null || !pendingStep.ShouldSkip())
+                break;
+
+            stepIndex++;
+            if (stepIndex >= steps.Count)
+            {
+                Finish();
+                return;
+            }
+
+            stepStart = DateTime.UtcNow;
+            stepActionDone = false;
+            StatusText = steps[stepIndex].Name;
+        }
+
         if (!running || stepIndex < 0 || stepIndex >= steps.Count)
         {
             Finish();
@@ -217,7 +253,18 @@ public sealed class AutoCollectionService : IDisposable
 
         if (elapsed > step.TimeoutSec)
         {
+            if (step.MaxRetries > 0 && step.RetryCount < step.MaxRetries)
+            {
+                step.RetryCount++;
+                stepActionDone = false;
+                stepStart = DateTime.UtcNow;
+                log.Information($"[XASlave] AutoCollection step '{step.Name}' retrying ({step.RetryCount}/{step.MaxRetries}).");
+                return;
+            }
+
             log.Warning($"[XASlave] AutoCollection step '{step.Name}' timed out after {step.TimeoutSec}s, skipping.");
+            try { step.OnTimeout?.Invoke(); }
+            catch (Exception ex) { log.Error($"[XASlave] AutoCollection step '{step.Name}' timeout handler error: {ex.Message}"); }
             AdvanceStep();
         }
     }

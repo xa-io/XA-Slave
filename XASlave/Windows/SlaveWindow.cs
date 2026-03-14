@@ -33,10 +33,11 @@ public partial class SlaveWindow : Window, IDisposable
         SaveToXaDatabase,
         CityChatFlooder,
         AutoGlamWeather,
-        ArPostProcess,
+        AutoRetainerTasks,
         // FC
         MonthlyRelogger,
         CheckDuplicatePlots,
+        PrepLogistics,
         ReturnAltsToHomeworlds,
         RefreshArSubsBell,
         MultiFcPermissions,
@@ -45,7 +46,9 @@ public partial class SlaveWindow : Window, IDisposable
         WindowRenamer,
         PluginOperations,
         // Reference
+#if XA_SLAVE_TESTING_BUILD
         DebugCommands,
+#endif
         IpcCallsAvailable,
     }
 
@@ -54,7 +57,7 @@ public partial class SlaveWindow : Window, IDisposable
         (SlaveTask.SaveToXaDatabase, "Save to XA Database"),
         (SlaveTask.CityChatFlooder, "City Chat Flooder"),
         (SlaveTask.AutoGlamWeather, "Auto-Glam Weather"),
-        (SlaveTask.ArPostProcess, "AR Pre/Post Processing"),
+        (SlaveTask.AutoRetainerTasks, "AutoRetainer Tasks"),
     };
 
     private static readonly (SlaveTask Task, string Label)[] FcItems =
@@ -62,6 +65,7 @@ public partial class SlaveWindow : Window, IDisposable
         (SlaveTask.MonthlyRelogger, "Monthly Relogger"),
         (SlaveTask.CheckDuplicatePlots, "Check Duplicate Plots"),
         (SlaveTask.ReturnAltsToHomeworlds, "Return Alts To Homeworlds"),
+        (SlaveTask.PrepLogistics, "Prep Logistics"),
         (SlaveTask.RefreshArSubsBell, "Refresh AR Subs/Bell"),
         (SlaveTask.MultiFcPermissions, "FC Permissions Updater"),
         (SlaveTask.AutoAcceptFcInvite, "Auto-Accept FC Invites"),
@@ -75,7 +79,9 @@ public partial class SlaveWindow : Window, IDisposable
 
     private static readonly (SlaveTask Task, string Label)[] ReferenceItems =
     {
+#if XA_SLAVE_TESTING_BUILD
         (SlaveTask.DebugCommands, "Debug / Test"),
+#endif
         (SlaveTask.IpcCallsAvailable, "IPC Calls Available"),
     };
 
@@ -224,8 +230,10 @@ public partial class SlaveWindow : Window, IDisposable
 
                 foreach (var ext in plugin.ExternalTaskLoader.Tasks)
                 {
+                    if (!TryGetVisibleTaskLabel(ext.Label, out var visibleLabel))
+                        continue;
                     var isSelected = selectedExternalTask == ext;
-                    if (ImGui.Selectable(ext.Label, isSelected))
+                    if (ImGui.Selectable(visibleLabel, isSelected))
                         selectedExternalTask = ext;
                 }
 
@@ -270,8 +278,11 @@ public partial class SlaveWindow : Window, IDisposable
                         case SlaveTask.AutoGlamWeather:
                             DrawAutoGlamWeatherTask();
                             break;
-                        case SlaveTask.ArPostProcess:
+                        case SlaveTask.AutoRetainerTasks:
                             DrawArPostProcessTask();
+                            break;
+                        case SlaveTask.PrepLogistics:
+                            DrawPrepLogisticsTask();
                             break;
                         case SlaveTask.RefreshArSubsBell:
                             DrawRefreshArSubsBellTask();
@@ -288,9 +299,11 @@ public partial class SlaveWindow : Window, IDisposable
                         case SlaveTask.PluginOperations:
                             DrawPluginOperationsTask();
                             break;
+#if XA_SLAVE_TESTING_BUILD
                         case SlaveTask.DebugCommands:
                             DrawDebugCommands();
                             break;
+#endif
                         case SlaveTask.IpcCallsAvailable:
                             DrawIpcCallsAvailable();
                             break;
@@ -307,6 +320,24 @@ public partial class SlaveWindow : Window, IDisposable
     // ───────────────────────────────────────────────
     //  Status Bar
     // ───────────────────────────────────────────────
+    private static bool TryGetVisibleTaskLabel(string rawLabel, out string visibleLabel)
+    {
+        const string testingMarker = "[IF=Testing]";
+        if (rawLabel.StartsWith(testingMarker, StringComparison.OrdinalIgnoreCase))
+        {
+#if XA_SLAVE_TESTING_BUILD
+            visibleLabel = rawLabel.Substring(testingMarker.Length).TrimStart();
+            return true;
+#else
+            visibleLabel = string.Empty;
+            return false;
+#endif
+        }
+
+        visibleLabel = rawLabel;
+        return true;
+    }
+
     /// <summary>Renders a menu section with header and selectable items.</summary>
     private void DrawMenuSection(string header, (SlaveTask Task, string Label)[] items, Vector4 headerColor)
     {
@@ -315,8 +346,10 @@ public partial class SlaveWindow : Window, IDisposable
         ImGui.Separator();
         foreach (var (task, label) in items)
         {
+            if (!TryGetVisibleTaskLabel(label, out var visibleLabel))
+                continue;
             var isSelected = selectedExternalTask == null && selectedTask == task;
-            if (ImGui.Selectable(label, isSelected))
+            if (ImGui.Selectable(visibleLabel, isSelected))
             {
                 selectedTask = task;
                 selectedExternalTask = null;
