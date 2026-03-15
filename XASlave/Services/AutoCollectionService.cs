@@ -33,9 +33,12 @@ public sealed class AutoCollectionService : IDisposable
     private bool running;
     private Action? onSave;
     private Action<bool>? onCompletion;
+    private readonly List<string> logMessages = new();
+    private const int MaxLogMessages = 8000;
 
     public bool IsRunning => running;
     public string StatusText { get; private set; } = string.Empty;
+    public IReadOnlyList<string> LogMessages => logMessages;
 
     public AutoCollectionService(Plugin plugin, ICondition condition, IFramework framework, IObjectTable objectTable, IPluginLog log)
     {
@@ -72,6 +75,18 @@ public sealed class AutoCollectionService : IDisposable
         return CharacterSafetyHelper.IsNormalCondition(condition);
     }
 
+    public void AddLog(string message)
+    {
+        if (logMessages.Count >= MaxLogMessages)
+            logMessages.RemoveAt(0);
+        logMessages.Add($"[{DateTime.Now:HH:mm:ss}] {message}");
+    }
+
+    public void ClearLog()
+    {
+        logMessages.Clear();
+    }
+
     public void StartCollection(bool doArmouryChest, bool doSaddlebag, bool doJournal, bool doPersonalPlotInfo, bool doFc, Action? onSave = null, Action<bool>? onCompletion = null)
     {
         if (running) return;
@@ -79,6 +94,8 @@ public sealed class AutoCollectionService : IDisposable
         this.onSave = onSave;
         this.onCompletion = onCompletion;
         steps.Clear();
+        logMessages.Clear();
+        AddLog("XA Database collection started.");
 
         if (doArmouryChest)
         {
@@ -124,10 +141,12 @@ public sealed class AutoCollectionService : IDisposable
         {
             if (!IsOnHomeWorld())
             {
+                AddLog("Not on home world, skipping FC collection.");
                 log.Information("[XASlave] AutoCollection: not on home world, skipping FC steps.");
             }
             else if (!IsInFreeCompany())
             {
+                AddLog("Character is not in a Free Company, skipping FC collection.");
                 log.Information("[XASlave] AutoCollection: character is not in a Free Company, skipping FC steps.");
             }
             else
@@ -158,6 +177,7 @@ public sealed class AutoCollectionService : IDisposable
 
         if (steps.Count == 0)
         {
+            AddLog("No collection steps were enabled.");
             onCompletion?.Invoke(true);
             return;
         }
@@ -168,6 +188,7 @@ public sealed class AutoCollectionService : IDisposable
         running = true;
         StatusText = steps[0].Name;
         framework.Update += OnTick;
+        AddLog($"Collection queued with {steps.Count} steps.");
         log.Information($"[XASlave] AutoCollection started with {steps.Count} steps.");
     }
 
@@ -181,6 +202,7 @@ public sealed class AutoCollectionService : IDisposable
         var completion = onCompletion;
         onSave = null;
         onCompletion = null;
+        AddLog("Collection cancelled.");
         log.Information("[XASlave] AutoCollection cancelled.");
         completion?.Invoke(false);
     }
@@ -219,6 +241,7 @@ public sealed class AutoCollectionService : IDisposable
 
         if (!IsNormalCondition())
         {
+            AddLog("Character conditions are no longer normal. Cancelling collection.");
             log.Warning("[XASlave] AutoCollection: conditions no longer normal, cancelling.");
             Cancel();
             return;
@@ -229,10 +252,15 @@ public sealed class AutoCollectionService : IDisposable
 
         if (!stepActionDone)
         {
+            AddLog($"STEP START {step.Name}");
             if (step.OnEnter != null)
             {
                 try { step.OnEnter(); }
-                catch (Exception ex) { log.Error($"[XASlave] AutoCollection step '{step.Name}' action error: {ex.Message}"); }
+                catch (Exception ex)
+                {
+                    AddLog($"Action error in '{step.Name}': {ex.Message}");
+                    log.Error($"[XASlave] AutoCollection step '{step.Name}' action error: {ex.Message}");
+                }
             }
             stepActionDone = true;
         }
@@ -241,6 +269,7 @@ public sealed class AutoCollectionService : IDisposable
         {
             if (step.IsComplete())
             {
+                AddLog($"STEP DONE {step.Name}");
                 log.Information($"[XASlave] AutoCollection step '{step.Name}' completed.");
                 AdvanceStep();
                 return;
@@ -248,6 +277,7 @@ public sealed class AutoCollectionService : IDisposable
         }
         catch (Exception ex)
         {
+            AddLog($"Check error in '{step.Name}': {ex.Message}");
             log.Error($"[XASlave] AutoCollection step '{step.Name}' check error: {ex.Message}");
         }
 
@@ -258,10 +288,12 @@ public sealed class AutoCollectionService : IDisposable
                 step.RetryCount++;
                 stepActionDone = false;
                 stepStart = DateTime.UtcNow;
+                AddLog($"STEP RETRY {step.Name} ({step.RetryCount}/{step.MaxRetries})");
                 log.Information($"[XASlave] AutoCollection step '{step.Name}' retrying ({step.RetryCount}/{step.MaxRetries}).");
                 return;
             }
 
+            AddLog($"STEP TIMEOUT {step.Name} after {elapsed:0.00}s (limit {step.TimeoutSec:0.##}s)");
             log.Warning($"[XASlave] AutoCollection step '{step.Name}' timed out after {step.TimeoutSec}s, skipping.");
             try { step.OnTimeout?.Invoke(); }
             catch (Exception ex) { log.Error($"[XASlave] AutoCollection step '{step.Name}' timeout handler error: {ex.Message}"); }
@@ -287,6 +319,7 @@ public sealed class AutoCollectionService : IDisposable
         var completion = onCompletion;
         onSave = null;
         onCompletion = null;
+        AddLog("Collection finished.");
         log.Information("[XASlave] AutoCollection finished.");
         completion?.Invoke(true);
     }

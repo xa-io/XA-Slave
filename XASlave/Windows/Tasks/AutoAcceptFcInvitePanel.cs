@@ -98,27 +98,17 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // Start/Stop
-        if (!fcFloaterRunning)
+        var started = DrawPriorityTaskActionButton(
+            SlaveTask.AutoAcceptFcInvite,
+            "Start FC Floater##fcFloaterStart",
+            !plugin.TaskRunner.IsRunning,
+            StartAutoAcceptFcInviteTask,
+            "Another XA Slave task is already using the task runner.");
+        if (started)
+            fcFloaterShowLog = true;
+
+        if (fcFloaterRunning)
         {
-            if (plugin.TaskRunner.IsRunning) ImGui.BeginDisabled();
-            if (ImGui.Button("Start FC Floater##fcFloaterStart"))
-            {
-                fcFloaterRunning = true;
-                fcFloaterStartTime = DateTime.UtcNow;
-                fcFloaterLastCheck = DateTime.MinValue;
-                fcFloaterInvitesProcessed = 0;
-                plugin.TaskRunner.AddLog("[FC Floater] Started monitoring for FC invitations...");
-                plugin.TaskRunner.AddLog($"[FC Floater] Timeout: {fcFloaterTimeoutMinutes} minutes, Wait after join: {fcFloaterWaitAfterJoin}s");
-            }
-            if (plugin.TaskRunner.IsRunning) ImGui.EndDisabled();
-        }
-        else
-        {
-            if (ImGui.Button("Stop FC Floater##fcFloaterStop"))
-            {
-                fcFloaterRunning = false;
-                plugin.TaskRunner.AddLog("[FC Floater] Stopped.");
-            }
             ImGui.SameLine();
 
             var elapsed = (DateTime.UtcNow - fcFloaterStartTime).TotalSeconds;
@@ -133,16 +123,46 @@ public partial class SlaveWindow
                 fcFloaterRunning = false;
                 plugin.TaskRunner.AddLog($"[FC Floater] Timeout reached ({fcFloaterTimeoutMinutes} minutes). Stopping.");
             }
-
-            // Polling logic
-            if (fcFloaterRunning && (DateTime.UtcNow - fcFloaterLastCheck).TotalSeconds >= fcFloaterCheckInterval)
-            {
-                fcFloaterLastCheck = DateTime.UtcNow;
-                PollFcInvitations();
-            }
+        }
+        else if (plugin.TaskRunner.IsRunning && TryMapPriorityTaskName(plugin.TaskRunner.CurrentTaskName, out var activeTask) && activeTask == SlaveTask.AutoAcceptFcInvite)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Processing current invite...");
         }
 
         DrawTaskLog("fcFloater", ref fcFloaterShowLog, plugin.TaskRunner);
+    }
+
+    private void StartAutoAcceptFcInviteTask()
+    {
+        if (fcFloaterRunning)
+            return;
+
+        fcFloaterRunning = true;
+        fcFloaterStartTime = DateTime.UtcNow;
+        fcFloaterLastCheck = DateTime.MinValue;
+        fcFloaterInvitesProcessed = 0;
+        plugin.TaskRunner.AddLog("[FC Floater] Started monitoring for FC invitations...");
+        plugin.TaskRunner.AddLog($"[FC Floater] Timeout: {fcFloaterTimeoutMinutes} minutes, Wait after join: {fcFloaterWaitAfterJoin}s");
+        UpdatePriorityTaskExternalStatus();
+    }
+
+    private void StopAutoAcceptFcInviteTask()
+    {
+        var stoppedMonitor = false;
+        if (fcFloaterRunning)
+        {
+            fcFloaterRunning = false;
+            stoppedMonitor = true;
+        }
+
+        if (plugin.TaskRunner.IsRunning && TryMapPriorityTaskName(plugin.TaskRunner.CurrentTaskName, out var activeTask) && activeTask == SlaveTask.AutoAcceptFcInvite)
+            plugin.TaskRunner.Cancel();
+
+        if (stoppedMonitor)
+            plugin.TaskRunner.AddLog("[FC Floater] Stopped.");
+
+        UpdatePriorityTaskExternalStatus();
     }
 
     /// <summary>
@@ -337,5 +357,7 @@ public partial class SlaveWindow
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
         });
+
+        UpdatePriorityTaskExternalStatus();
     }
 }

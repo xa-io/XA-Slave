@@ -36,14 +36,47 @@ public partial class SlaveWindow
     private bool refreshSubsShowLog;
     private bool refreshSubsGoWorkshop = true;
     private float refreshSubsExtraWait = 3.0f;
+    private bool refreshSubsArSuppressedByTask;
+    private bool refreshSubsDoLogoutOnComplete;
+    private bool refreshSubsDoEnableArMulti = true;
+    private bool refreshSubsDoOpenArmoury;
+    private bool refreshSubsDoOpenSaddlebags;
+    private bool refreshSubsDoOpenJournal;
+    private bool refreshSubsDoReturnToHome;
+    private bool refreshSubsDoCollectPersonalPlotInfo;
+    private bool refreshSubsActionOptionsInitialized;
+
+    private void ReleaseRefreshSubsArSuppression()
+    {
+        if (!refreshSubsArSuppressedByTask)
+            return;
+
+        plugin.IpcClient.AutoRetainerSetSuppressed(false);
+        refreshSubsArSuppressedByTask = false;
+    }
+
+    private void EnsureRefreshSubsActionOptionsInitialized()
+    {
+        if (refreshSubsActionOptionsInitialized)
+            return;
+
+        var config = plugin.Configuration;
+        refreshSubsDoOpenArmoury = config.AutoCollectArmouryChest;
+        refreshSubsDoOpenSaddlebags = config.AutoCollectSaddlebag;
+        refreshSubsDoOpenJournal = config.AutoCollectJournal;
+        refreshSubsDoCollectPersonalPlotInfo = config.AutoCollectPersonalPlotInfo;
+        refreshSubsDoReturnToHome = config.AutoCollectPersonalPlotInfo;
+        refreshSubsActionOptionsInitialized = true;
+    }
 
     private void DrawRefreshArSubsBellTask()
     {
         var cfg = plugin.Configuration;
         var chars = cfg.RefreshSubsCharacters;
+        EnsureRefreshSubsActionOptionsInitialized();
 
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Refresh AR Subs/Bell");
-        ImGui.TextDisabled("Rotate characters, teleport to FC house, interact with sub console & summoning bell.");
+        ImGui.TextDisabled("Rotate characters, teleport to FC house, interact with sub console & summoning bell.\n\nTHIS REQUIRES LIFESTREAM TO HAVE PATH TO THE DOOR\nAND TO ENTER THE HOUSE, IF NOT IT WILL FAIL!");
         ImGui.Spacing();
 
         // ── Import / Refresh buttons ──
@@ -94,13 +127,19 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // Plugin status
-        DrawTaskPluginStatus(false);
+        DrawTaskPluginStatus(refreshSubsDoCollectPersonalPlotInfo);
 
         // Config
-        ImGui.Checkbox("Enter Workshop (Additional Chambers)##refreshSubsWorkshop", ref refreshSubsGoWorkshop);
-        ImGui.SameLine();
-        ImGui.TextDisabled("Uncheck if sub console is in main FC room");
-
+        ImGui.Checkbox("##refreshSubsWorkshop", ref refreshSubsGoWorkshop);
+        ImGui.SameLine(0f, ImGui.GetStyle().ItemInnerSpacing.X);
+        ImGui.BeginGroup();
+        ImGui.AlignTextToFramePadding();
+        ImGui.TextUnformatted("Enter Workshop and tap the Voyage Console and Summoning bell to refresh AutoRetainer.");
+        ImGui.TextUnformatted("If not selected it will only collect the summoning bell inside the plot.");
+        ImGui.EndGroup();
+        if (ImGui.IsItemClicked())
+            refreshSubsGoWorkshop = !refreshSubsGoWorkshop;
+        
         ImGui.SetNextItemWidth(80);
         var wait = refreshSubsExtraWait;
         if (ImGui.InputFloat("Extra Wait (sec)##refreshSubsWait", ref wait, 0.5f, 1.0f, "%.1f"))
@@ -126,16 +165,31 @@ public partial class SlaveWindow
             DrawProcessingList(plugin.TaskRunner);
             ImGui.Spacing();
             if (ImGui.Button("Cancel##refreshSubsCancel"))
+            {
+                ReleaseRefreshSubsArSuppression();
                 plugin.TaskRunner.Cancel();
+            }
         }
         else
         {
             var selectedChars = GetSelectedRefreshSubsCharacters();
-            var canStart = selectedChars.Count > 0 && !plugin.TaskRunner.IsRunning;
-            if (!canStart) ImGui.BeginDisabled();
-            if (ImGui.Button($"Start ({selectedChars.Count} chars)##refreshSubsStart"))
-                StartRefreshArSubsBell();
-            if (!canStart) ImGui.EndDisabled();
+            var canStart = selectedChars.Count > 0
+                && !plugin.TaskRunner.IsRunning
+                && plugin.IpcClient.IsAutoRetainerAvailable()
+                && plugin.IpcClient.IsLifestreamAvailable()
+                && (!refreshSubsDoCollectPersonalPlotInfo || plugin.IpcClient.IsXaDatabaseAvailable());
+            var started = DrawPriorityTaskActionButton(
+                SlaveTask.RefreshArSubsBell,
+                $"Start ({selectedChars.Count} chars)##refreshSubsStart",
+                canStart,
+                StartRefreshArSubsBell,
+                !plugin.IpcClient.IsAutoRetainerAvailable()
+                    || !plugin.IpcClient.IsLifestreamAvailable()
+                    || (refreshSubsDoCollectPersonalPlotInfo && !plugin.IpcClient.IsXaDatabaseAvailable())
+                    ? "Missing required plugins. Check the plugin status above."
+                    : "Select at least one character to start.");
+            if (started)
+                refreshSubsShowLog = true;
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##refreshSubsAll"))
@@ -300,7 +354,21 @@ public partial class SlaveWindow
         ImGui.SameLine();
         ImGui.TextDisabled("Format: FirstName LastName@World");
 
-        DrawTaskLog("refreshSubs", ref refreshSubsShowLog, plugin.TaskRunner);
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Actions Per Character");
+        ImGui.Spacing();
+        ImGui.Checkbox("Open Armoury Chest##refreshSubsArmoury", ref refreshSubsDoOpenArmoury);
+        ImGui.Checkbox("Open Saddlebags##refreshSubsSaddlebags", ref refreshSubsDoOpenSaddlebags);
+        ImGui.Checkbox("Open Journal##refreshSubsJournal", ref refreshSubsDoOpenJournal);
+        ImGui.Checkbox("Teleport Home (Lifestream)##refreshSubsHome", ref refreshSubsDoReturnToHome);
+        ImGui.Checkbox("Collect Personal Plot Info##refreshSubsPlot", ref refreshSubsDoCollectPersonalPlotInfo);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Opens /housing, checks Apartment, Private Estate, and Shared Estate signboards when available,\nand triggers XA Database saves after each housing pass.");
+
+        DrawSharedCompletionAndLogFooter("refreshSubs", "refreshSubs", ref refreshSubsDoLogoutOnComplete, ref refreshSubsDoEnableArMulti, ref refreshSubsShowLog, plugin.TaskRunner);
     }
 
     private List<string> GetSelectedRefreshSubsCharacters()
@@ -321,12 +389,19 @@ public partial class SlaveWindow
             .Select(i => chars[i])
             .ToList();
 
+        HaltAutoCollectionForPriorityTask("Refresh AR Subs/Bell");
+
+        refreshSubsArSuppressedByTask = false;
+
         var steps = BuildRefreshSubsBellSteps(selected, plugin.TaskRunner);
 
         // Set reloggerRunList for DrawProcessingList
         reloggerRunList = new List<string>(selected);
 
-        plugin.TaskRunner.Start("Refresh AR Subs/Bell", steps, onLog: (msg) =>
+        plugin.TaskRunner.Start("Refresh AR Subs/Bell", steps, onFinished: () =>
+        {
+            ReleaseRefreshSubsArSuppression();
+        }, onLog: (msg) =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
         });
@@ -422,50 +497,9 @@ public partial class SlaveWindow
             if (refreshSubsExtraWait > 0)
                 steps.Add(MonthlyReloggerTask.MakeDelay($"Extra Wait: {charName}", refreshSubsExtraWait));
 
-            // Teleport to FC via Lifestream
-            steps.Add(new TaskStep
-            {
-                Name = $"Teleport FC: {charName}",
-                OnEnter = () =>
-                {
-                    runner.AddLog($"Teleporting to FC house...");
-                    plugin.IpcClient.LifestreamExecuteCommand("fc");
-                },
-                IsComplete = () => true,
-                TimeoutSec = 2f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"TP FC Init: {charName}", 1.0f));
-
-            // Wait for Lifestream busy
-            steps.Add(new TaskStep
-            {
-                Name = $"TP FC Wait Start: {charName}",
-                IsComplete = () =>
-                {
-                    try { return plugin.IpcClient.LifestreamIsBusy(); }
-                    catch { return true; }
-                },
-                TimeoutSec = 8f,
-            });
-
-            // Wait for Lifestream complete
-            steps.Add(new TaskStep
-            {
-                Name = $"TP FC Wait Complete: {charName}",
-                IsComplete = () =>
-                {
-                    try { return !plugin.IpcClient.LifestreamIsBusy(); }
-                    catch { return true; }
-                },
-                TimeoutSec = 60f,
-            });
-
-            // SafeWait after teleport
-            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"TP FC SafeWait ({charName})"))
-            {
-                steps.Add(sw);
-            }
-            steps.Add(MonthlyReloggerTask.MakeDelay($"TP FC Settle: {charName}", 2.0f));
+            AddRefreshSubsSelectedActionSteps(steps, runner, charName);
+            AddRefreshSubsTeleportSteps(steps, runner, charName, "FC", "fc", 8f);
+            steps.Add(MonthlyReloggerTask.MakeDelay($"TP FC Final Settle: {charName}", 1.0f));
 
             // Enter workshop if configured
             if (refreshSubsGoWorkshop)
@@ -508,7 +542,26 @@ public partial class SlaveWindow
                     IsComplete = () => true,
                     TimeoutSec = 2f,
                 });
-                steps.Add(MonthlyReloggerTask.MakeDelay($"Workshop Wait: {charName}", 2.0f));
+                steps.Add(MonthlyReloggerTask.MakeDelay($"Workshop Wait: {charName}", 1.0f));
+
+                steps.Add(new TaskStep
+                {
+                    Name = $"Workshop Menu: {charName}",
+                    OnEnter = () =>
+                    {
+                        if (!AddonHelper.IsAddonReady("SelectString"))
+                            return;
+
+                        AddonHelper.SelectFirstAddonListText(
+                            "SelectString",
+                            out _,
+                            out _,
+                            ("Move to the company workshop", false));
+                    },
+                    IsComplete = () => true,
+                    TimeoutSec = 2f,
+                });
+                steps.Add(MonthlyReloggerTask.MakeDelay($"Workshop Menu Wait: {charName}", 1.0f));
 
                 // SafeWait after zone
                 foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"Workshop SafeWait ({charName})"))
@@ -518,168 +571,19 @@ public partial class SlaveWindow
                 steps.Add(MonthlyReloggerTask.MakeDelay($"Workshop Settle: {charName}", 1.0f));
             }
 
-            // Interact with Voyage Control Panel (sub console)
-            steps.Add(new TaskStep
+            if (refreshSubsGoWorkshop)
             {
-                Name = $"Target Sub Console: {charName}",
-                OnEnter = () =>
-                {
-                    runner.AddLog("Targeting Voyage Control Panel...");
-                    ChatHelper.SendMessage("/target \"Voyage Control Panel\"");
-                },
-                IsComplete = () => true,
-                TimeoutSec = 2f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Target: {charName}", 0.5f));
-
-            steps.Add(new TaskStep
+                AddRefreshSubsSuppressArSteps(steps, runner, charName, "Sub/Bell");
+                AddRefreshSubsSubConsoleSteps(steps, runner, charName);
+                AddRefreshSubsBellSteps(steps, runner, charName);
+                AddRefreshSubsResumeArSteps(steps, runner, charName, "sub/bell");
+            }
+            else
             {
-                Name = $"Walk to Sub Console: {charName}",
-                OnEnter = () =>
-                {
-                    ChatHelper.SendMessage("/lockon on");
-                    ChatHelper.SendMessage("/automove on");
-                },
-                IsComplete = () => true,
-                TimeoutSec = 1f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Walk: {charName}", 1.5f));
-
-            steps.Add(new TaskStep
-            {
-                Name = $"Interact Sub Console: {charName}",
-                OnEnter = () =>
-                {
-                    ChatHelper.SendMessage("/automove off");
-                    AddonHelper.InteractWithTarget();
-                },
-                IsComplete = () => true,
-                TimeoutSec = 2f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Interact: {charName}", 1.0f));
-
-            // Click on "View previous reports" (SelectString index 1) to force AR to read subs
-            steps.Add(new TaskStep
-            {
-                Name = $"Sub Reports: {charName}",
-                OnEnter = () =>
-                {
-                    if (AddonHelper.IsAddonReady("SelectString"))
-                        AddonHelper.FireCallbackAndClose("SelectString", 1);
-                },
-                IsComplete = () => true,
-                TimeoutSec = 3f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Reports Wait: {charName}", 1.0f));
-
-            // Check if AR is busy, if not press ESC after 2 seconds
-            steps.Add(new TaskStep
-            {
-                Name = $"AR Busy Check (Sub): {charName}",
-                OnEnter = () =>
-                {
-                    runner.AddVerboseLog("Checking if AutoRetainer is busy after sub console...");
-                },
-                IsComplete = () =>
-                {
-                    try { return !plugin.IpcClient.AutoRetainerGetSuppressed(); }
-                    catch { return true; }
-                },
-                TimeoutSec = 30f,
-            });
-
-            // Press ESC to close any remaining sub console windows
-            steps.Add(new TaskStep
-            {
-                Name = $"Close Sub Console: {charName}",
-                OnEnter = () =>
-                {
-                    KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
-                },
-                IsComplete = () => true,
-                TimeoutSec = 1f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Close: {charName}", 0.5f));
-            steps.Add(new TaskStep
-            {
-                Name = $"Close Sub Console 2: {charName}",
-                OnEnter = () =>
-                {
-                    KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
-                },
-                IsComplete = () => true,
-                TimeoutSec = 1f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Close 2: {charName}", 0.5f));
-
-            // Now target and walk to Summoning Bell
-            steps.Add(new TaskStep
-            {
-                Name = $"Target Bell: {charName}",
-                OnEnter = () =>
-                {
-                    runner.AddLog("Targeting Summoning Bell...");
-                    ChatHelper.SendMessage("/target \"Summoning Bell\"");
-                },
-                IsComplete = () => true,
-                TimeoutSec = 2f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Target: {charName}", 0.5f));
-
-            steps.Add(new TaskStep
-            {
-                Name = $"Walk to Bell: {charName}",
-                OnEnter = () =>
-                {
-                    ChatHelper.SendMessage("/lockon on");
-                    ChatHelper.SendMessage("/automove on");
-                },
-                IsComplete = () => true,
-                TimeoutSec = 1f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Walk: {charName}", 3.0f));
-
-            steps.Add(new TaskStep
-            {
-                Name = $"Interact Bell: {charName}",
-                OnEnter = () =>
-                {
-                    ChatHelper.SendMessage("/automove off");
-                    AddonHelper.InteractWithTarget();
-                },
-                IsComplete = () => true,
-                TimeoutSec = 2f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Interact: {charName}", 2.0f));
-
-            // Check if AR is busy after bell
-            steps.Add(new TaskStep
-            {
-                Name = $"AR Busy Check (Bell): {charName}",
-                OnEnter = () =>
-                {
-                    runner.AddVerboseLog("Checking if AutoRetainer is busy after summoning bell...");
-                },
-                IsComplete = () =>
-                {
-                    try { return !plugin.IpcClient.AutoRetainerGetSuppressed(); }
-                    catch { return true; }
-                },
-                TimeoutSec = 30f,
-            });
-
-            // Press ESC to close bell
-            steps.Add(new TaskStep
-            {
-                Name = $"Close Bell: {charName}",
-                OnEnter = () =>
-                {
-                    KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
-                },
-                IsComplete = () => true,
-                TimeoutSec = 1f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Close: {charName}", 1.0f));
+                AddRefreshSubsSuppressArSteps(steps, runner, charName, "Bell");
+                AddRefreshSubsBellSteps(steps, runner, charName);
+                AddRefreshSubsResumeArSteps(steps, runner, charName, "bell");
+            }
 
             // SafeWait before next
             foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"Final SafeWait ({charName})"))
@@ -709,14 +613,430 @@ public partial class SlaveWindow
             Name = "Refresh Subs/Bell Summary",
             OnEnter = () =>
             {
-                runner.SuppressLogoutCancel = false;
+                if (!refreshSubsDoLogoutOnComplete)
+                    runner.SuppressLogoutCancel = false;
                 runner.AddLog($"══ SUMMARY: All {characters.Count} character(s) processed ══");
             },
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
 
+        if (refreshSubsDoLogoutOnComplete)
+            MonthlyReloggerTask.AddLogoutOnCompleteSteps(steps, runner);
+
+        if (refreshSubsDoEnableArMulti)
+        {
+            steps.Add(new TaskStep
+            {
+                Name = "Enable AR Multi Mode",
+                OnEnter = () =>
+                {
+                    runner.AddLog("Re-enabling AutoRetainer Multi Mode...");
+                    plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true);
+                },
+                IsComplete = () => true,
+                TimeoutSec = 3f,
+            });
+            steps.Add(MonthlyReloggerTask.MakeDelay("AR Enable Cooldown", 1.0f));
+        }
+
+        steps.Add(MonthlyReloggerTask.MakeDelay("Final Cooldown", 1.0f));
+
         return steps;
+    }
+
+    private void AddRefreshSubsSuppressArSteps(List<TaskStep> steps, TaskRunner runner, string charName, string sequenceLabel)
+    {
+        steps.Add(new TaskStep
+        {
+            Name = $"Suppress AR ({sequenceLabel}): {charName}",
+            OnEnter = () =>
+            {
+                var alreadySuppressed = false;
+                try { alreadySuppressed = plugin.IpcClient.AutoRetainerGetSuppressed(); }
+                catch { }
+
+                if (alreadySuppressed)
+                {
+                    refreshSubsArSuppressedByTask = false;
+                    runner.AddVerboseLog($"AutoRetainer was already suppressed before the manual {sequenceLabel.ToLowerInvariant()} sequence.");
+                    return;
+                }
+
+                runner.AddLog($"Suppressing AutoRetainer so the manual {sequenceLabel.ToLowerInvariant()} interactions stay under XA Slave control...");
+                plugin.IpcClient.AutoRetainerSetSuppressed(true);
+                refreshSubsArSuppressedByTask = true;
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Suppress AR Wait: {charName}", 0.5f));
+    }
+
+    private void AddRefreshSubsSelectedActionSteps(List<TaskStep> steps, TaskRunner runner, string charName)
+    {
+        if (refreshSubsDoOpenArmoury)
+        {
+            steps.Add(new TaskStep
+            {
+                Name = $"Open Armoury Chest: {charName}",
+                OnEnter = () =>
+                {
+                    runner.AddLog("Opening Armoury Chest...");
+                    ChatHelper.SendMessage("/armourychest");
+                },
+                IsComplete = () => true,
+                TimeoutSec = 2f,
+            });
+            steps.Add(MonthlyReloggerTask.MakeDelay($"Armoury Delay: {charName}", 0.5f));
+        }
+
+        if (refreshSubsDoOpenSaddlebags)
+        {
+            steps.Add(new TaskStep
+            {
+                Name = $"Open Saddlebags: {charName}",
+                OnEnter = () =>
+                {
+                    runner.AddLog("Opening Saddlebags...");
+                    ChatHelper.SendMessage("/saddlebag");
+                },
+                IsComplete = () => AddonHelper.IsAddonVisible("InventoryBuddy"),
+                TimeoutSec = 3f,
+            });
+            steps.Add(MonthlyReloggerTask.MakeDelay($"Saddlebag Read Delay: {charName}", 1.0f));
+            steps.Add(new TaskStep
+            {
+                Name = $"Close Saddlebags: {charName}",
+                OnEnter = () => AddonHelper.CloseAddon("InventoryBuddy"),
+                IsComplete = () => !AddonHelper.IsAddonVisible("InventoryBuddy"),
+                TimeoutSec = 3f,
+            });
+            steps.Add(MonthlyReloggerTask.MakeDelay($"Saddlebag Close Delay: {charName}", 0.5f));
+        }
+
+        if (refreshSubsDoOpenJournal)
+        {
+            steps.Add(new TaskStep
+            {
+                Name = $"Open Journal: {charName}",
+                OnEnter = () =>
+                {
+                    runner.AddLog("Opening Journal...");
+                    ChatHelper.SendMessage("/journal");
+                },
+                IsComplete = () => true,
+                TimeoutSec = 2f,
+            });
+            steps.Add(MonthlyReloggerTask.MakeDelay($"Journal Delay: {charName}", 0.5f));
+        }
+
+        var needsHomeLeg = refreshSubsDoReturnToHome || refreshSubsDoCollectPersonalPlotInfo;
+        if (needsHomeLeg)
+            AddRefreshSubsTeleportSteps(steps, runner, charName, "Home", "home", 5f);
+
+        if (refreshSubsDoCollectPersonalPlotInfo)
+            steps.AddRange(MonthlyReloggerTask.BuildCollectPersonalPlotInfoSteps(plugin, runner.AddLog));
+    }
+
+    private static void AddRefreshSubsTeleportSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string command, float waitBusyTimeoutSec)
+    {
+        steps.Add(new TaskStep
+        {
+            Name = $"Teleport {label}: {charName}",
+            OnEnter = () =>
+            {
+                runner.AddLog($"Teleporting to {label} (/li {command})...");
+                Plugin.Instance!.IpcClient.LifestreamExecuteCommand(command);
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Teleport {label} Init: {charName}", 1.0f));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Teleport {label} Wait Start: {charName}",
+            IsComplete = () =>
+            {
+                try { return Plugin.Instance!.IpcClient.LifestreamIsBusy(); }
+                catch { return true; }
+            },
+            TimeoutSec = waitBusyTimeoutSec,
+        });
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Teleport {label} Wait Complete: {charName}",
+            IsComplete = () =>
+            {
+                try { return !Plugin.Instance!.IpcClient.LifestreamIsBusy(); }
+                catch { return true; }
+            },
+            TimeoutSec = 60f,
+        });
+
+        var confirmCount = 0;
+        DateTime lastCheck = DateTime.MinValue;
+        steps.Add(new TaskStep
+        {
+            Name = $"Teleport {label} Confirm: {charName}",
+            OnEnter = () =>
+            {
+                confirmCount = 0;
+                lastCheck = DateTime.UtcNow;
+            },
+            IsComplete = () =>
+            {
+                try
+                {
+                    if ((DateTime.UtcNow - lastCheck).TotalSeconds < 1.0)
+                        return false;
+
+                    lastCheck = DateTime.UtcNow;
+                    if (!Plugin.Instance!.IpcClient.LifestreamIsBusy())
+                    {
+                        confirmCount++;
+                        return confirmCount >= 3;
+                    }
+
+                    confirmCount = 0;
+                    return false;
+                }
+                catch
+                {
+                    return true;
+                }
+            },
+            TimeoutSec = 15f,
+        });
+
+        foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"Teleport {label} SafeWait ({charName})"))
+            steps.Add(sw);
+
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Teleport {label} Settle: {charName}", 1.0f));
+    }
+
+    private static void AddRefreshSubsAddonExitSequenceSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName)
+    {
+        AddRefreshSubsAddonCloseSteps(steps, runner, charName, $"{label} Close", addonName);
+        AddRefreshSubsGuardedSafeWaitSteps(steps, runner, charName, $"{label} SafeWait", addonName);
+        AddRefreshSubsAddonCloseSteps(steps, runner, charName, $"{label} Final Close Check", addonName);
+    }
+
+    private static void AddRefreshSubsAddonCloseSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName)
+    {
+        DateTime lastCheck = DateTime.MinValue;
+        var clearChecks = 0;
+        var escAttempts = 0;
+
+        steps.Add(new TaskStep
+        {
+            Name = $"{label}: {charName}",
+            OnEnter = () =>
+            {
+                lastCheck = DateTime.UtcNow.AddSeconds(-1.0);
+                clearChecks = 0;
+                escAttempts = 0;
+
+                if (!AddonHelper.IsAddonVisible(addonName))
+                    return;
+
+                escAttempts = 1;
+                runner.AddVerboseLog($"{label}: '{addonName}' is open; pressing ESC.");
+                KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
+            },
+            IsComplete = () =>
+            {
+                if ((DateTime.UtcNow - lastCheck).TotalSeconds < 1.0)
+                    return false;
+
+                lastCheck = DateTime.UtcNow;
+                if (AddonHelper.IsAddonVisible(addonName))
+                {
+                    clearChecks = 0;
+                    escAttempts++;
+                    runner.AddVerboseLog($"{label}: '{addonName}' still open after ESC attempt {escAttempts - 1}; pressing ESC again.");
+                    KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
+                    return false;
+                }
+
+                clearChecks++;
+                return clearChecks >= 2;
+            },
+            TimeoutSec = 20f,
+            OnTimeout = () => runner.AddLog($"{label}: timed out waiting for '{addonName}' to close; continuing."),
+        });
+    }
+
+    private static void AddRefreshSubsGuardedSafeWaitSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName)
+    {
+        for (int pass = 1; pass <= 3; pass++)
+        {
+            var capturedPass = pass;
+            DateTime lastEscAt = DateTime.MinValue;
+
+            steps.Add(new TaskStep
+            {
+                Name = $"{label} [pass {capturedPass}/3]: {charName}",
+                OnEnter = () =>
+                {
+                    lastEscAt = DateTime.UtcNow.AddSeconds(-1.0);
+                },
+                IsComplete = () =>
+                {
+                    if (CharacterSafetyHelper.IsCharacterSafeWaitReady())
+                        return true;
+
+                    if (!AddonHelper.IsAddonVisible(addonName))
+                        return false;
+
+                    if ((DateTime.UtcNow - lastEscAt).TotalSeconds < 1.0)
+                        return false;
+
+                    lastEscAt = DateTime.UtcNow;
+                    runner.AddVerboseLog($"{label}: '{addonName}' is still visible during CharacterSafeWait pass {capturedPass}/3; pressing ESC again.");
+                    KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
+                    return false;
+                },
+                TimeoutSec = 15f,
+                OnTimeout = () =>
+                {
+                    if (AddonHelper.IsAddonVisible(addonName))
+                    {
+                        runner.AddLog($"{label}: CharacterSafeWait pass {capturedPass}/3 timed out while '{addonName}' was still open; pressing ESC and continuing.");
+                        KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
+                    }
+                },
+            });
+
+            if (capturedPass < 3)
+                steps.Add(MonthlyReloggerTask.MakeDelay($"{label} [wait 1s]: {charName}", 1.0f));
+        }
+    }
+
+    private static void AddRefreshSubsSubConsoleSteps(List<TaskStep> steps, TaskRunner runner, string charName)
+    {
+        steps.Add(new TaskStep
+        {
+            Name = $"Target Sub Console: {charName}",
+            OnEnter = () =>
+            {
+                runner.AddLog("Targeting Voyage Control Panel...");
+                ChatHelper.SendMessage("/target \"Voyage Control Panel\"");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Target: {charName}", 0.5f));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Walk to Sub Console: {charName}",
+            OnEnter = () =>
+            {
+                ChatHelper.SendMessage("/lockon on");
+                ChatHelper.SendMessage("/automove on");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 1f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Walk: {charName}", 1.5f));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Interact Sub Console: {charName}",
+            OnEnter = () =>
+            {
+                ChatHelper.SendMessage("/automove off");
+                AddonHelper.InteractWithTarget();
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Interact: {charName}", 1.0f));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Sub Reports: {charName}",
+            OnEnter = () =>
+            {
+                if (AddonHelper.IsAddonReady("SelectString"))
+                    AddonHelper.FireCallbackAndClose("SelectString", 1);
+            },
+            IsComplete = () => true,
+            TimeoutSec = 3f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Reports Wait: {charName}", 1.0f));
+
+        AddRefreshSubsAddonExitSequenceSteps(steps, runner, charName, "Sub Console Recovery", "SelectString");
+    }
+
+    private static void AddRefreshSubsBellSteps(List<TaskStep> steps, TaskRunner runner, string charName)
+    {
+        steps.Add(new TaskStep
+        {
+            Name = $"Target Bell: {charName}",
+            OnEnter = () =>
+            {
+                runner.AddLog("Targeting Summoning Bell...");
+                ChatHelper.SendMessage("/target \"Summoning Bell\"");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Target: {charName}", 0.5f));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Walk to Bell: {charName}",
+            OnEnter = () =>
+            {
+                ChatHelper.SendMessage("/lockon on");
+                ChatHelper.SendMessage("/automove on");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 1f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Walk: {charName}", 3.0f));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Interact Bell: {charName}",
+            OnEnter = () =>
+            {
+                ChatHelper.SendMessage("/automove off");
+                AddonHelper.InteractWithTarget();
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Interact: {charName}", 2.0f));
+
+        AddRefreshSubsAddonExitSequenceSteps(steps, runner, charName, "Retainer List Recovery", "RetainerList");
+    }
+
+    private void AddRefreshSubsResumeArSteps(List<TaskStep> steps, TaskRunner runner, string charName, string sequenceLabel)
+    {
+        steps.Add(new TaskStep
+        {
+            Name = $"Resume AR ({sequenceLabel}): {charName}",
+            OnEnter = () =>
+            {
+                if (!refreshSubsArSuppressedByTask)
+                {
+                    runner.AddVerboseLog($"Refresh AR Subs/Bell did not own AutoRetainer suppression for this {sequenceLabel} sequence; leaving it unchanged.");
+                    return;
+                }
+
+                runner.AddLog($"Resuming AutoRetainer after the manual {sequenceLabel} sequence...");
+                plugin.IpcClient.AutoRetainerSetSuppressed(false);
+                refreshSubsArSuppressedByTask = false;
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"Resume AR Wait: {charName}", 0.5f));
     }
 
     private class RefreshSubsRelogState

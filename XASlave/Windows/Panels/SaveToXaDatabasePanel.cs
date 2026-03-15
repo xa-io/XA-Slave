@@ -17,6 +17,7 @@ public partial class SlaveWindow
     private bool autoCollectResumeArOnCompletion;
     private string lastIpcResult = string.Empty;
     private DateTime lastIpcResultExpiry = DateTime.MinValue;
+    private bool saveToXaDatabaseShowLog;
 
     // ───────────────────────────────────────────────
     //  Task: Save to XA Database
@@ -59,13 +60,18 @@ public partial class SlaveWindow
         else
         {
             if (ImGui.Button("Collect Now"))
+            {
+                saveToXaDatabaseShowLog = true;
                 RunAutoCollection();
+            }
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Runs the checked Collection Options below, then saves to XA Database via IPC.");
 
             ImGui.SameLine();
             if (ImGui.Button("IPC Save"))
             {
+                saveToXaDatabaseShowLog = true;
+                plugin.AutoCollector.AddLog("Manual IPC save requested.");
                 if (plugin.SaveToXaDatabaseAndRecordSync())
                     SetIpcResult("Save sent to XA Database");
                 else
@@ -193,6 +199,8 @@ public partial class SlaveWindow
                 ImGui.TextDisabled($"Auto-collection starting in ~{remaining:F0}s...");
             }
         }
+
+        DrawTaskLog("saveToXaDatabase", ref saveToXaDatabaseShowLog, plugin.AutoCollector);
     }
 
     // ───────────────────────────────────────────────
@@ -204,6 +212,7 @@ public partial class SlaveWindow
 
         var saveAttempted = false;
         var lastSaveOk = false;
+        saveToXaDatabaseShowLog = true;
         plugin.AutoCollector.StartCollection(
             plugin.Configuration.AutoCollectArmouryChest,
             plugin.Configuration.AutoCollectSaddlebag,
@@ -213,7 +222,11 @@ public partial class SlaveWindow
             () =>
             {
                 saveAttempted = true;
+                plugin.AutoCollector.AddLog("Sending save to XA Database...");
                 lastSaveOk = plugin.SaveToXaDatabaseAndRecordSync();
+                plugin.AutoCollector.AddLog(lastSaveOk
+                    ? "XA Database save reported success."
+                    : "XA Database save reported failure.");
             },
             completed =>
             {
@@ -236,11 +249,15 @@ public partial class SlaveWindow
                     ? "Collection complete — saved to XA Database"
                     : "Collection complete — XA Database save failed");
             });
+
+        if (resumeArOnCompletion)
+            plugin.AutoCollector.AddLog("AutoRetainer will be resumed after collection.");
     }
 
     private void SetIpcResult(string message)
     {
         lastIpcResult = message;
         lastIpcResultExpiry = DateTime.UtcNow.AddSeconds(8);
+        plugin.AutoCollector.AddLog(message);
     }
 }

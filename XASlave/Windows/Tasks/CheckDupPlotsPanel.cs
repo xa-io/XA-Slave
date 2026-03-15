@@ -164,16 +164,17 @@ public partial class SlaveWindow
                 && plugin.IpcClient.IsLifestreamAvailable()
                 && (!(dupDoCollectPersonalPlotInfo || dupDoParseForXaDatabase) || plugin.IpcClient.IsXaDatabaseAvailable());
 
-            if (!canStart) ImGui.BeginDisabled();
-            if (ImGui.Button($"Start ({selectedChars.Count} chars)##dup"))
-            {
-                StartTaskWithConfig("Check Duplicate Plots", selectedChars, dupPlotsSelectedIndices,
+            var started = DrawPriorityTaskActionButton(
+                SlaveTask.CheckDuplicatePlots,
+                $"Start ({selectedChars.Count} chars)##dup",
+                canStart,
+                () => StartTaskWithConfig("Check Duplicate Plots", selectedChars, dupPlotsSelectedIndices,
                     dupDoTextAdvance, dupDoRemoveSprout, dupDoOpenInventory, dupDoOpenArmoury,
                     dupDoOpenSaddlebags, dupDoOpenJournal, dupDoReturnToHome, dupDoCollectPersonalPlotInfo,
-                    dupDoReturnToFc, dupDoParseForXaDatabase, dupDoLogoutOnComplete, dupDoEnableArMulti);
+                    dupDoReturnToFc, dupDoParseForXaDatabase, dupDoLogoutOnComplete, dupDoEnableArMulti),
+                "Select at least one character and ensure required plugins are loaded.");
+            if (started)
                 dupPlotsShowLog = true;
-            }
-            if (!canStart) ImGui.EndDisabled();
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##dup"))

@@ -112,19 +112,18 @@ public partial class SlaveWindow
             var hasWorld = !string.IsNullOrWhiteSpace(cfg.PrepLogisticsTargetWorld);
             var canStart = selectedChars.Count > 0 && hasWorld && !runner.IsRunning && allRequired;
 
-            if (!canStart) ImGui.BeginDisabled();
-            if (ImGui.Button($"Start ({selectedChars.Count} chars)##prepLogisticsStart"))
-                StartPrepLogistics();
-            if (!canStart) ImGui.EndDisabled();
-            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !canStart)
-            {
-                if (!allRequired)
-                    ImGui.SetTooltip("Missing required plugins. Check the plugin status above.");
-                else if (!hasWorld)
-                    ImGui.SetTooltip("Select a target world first.");
-                else
-                    ImGui.SetTooltip("Select at least one character to start.");
-            }
+            var started = DrawPriorityTaskActionButton(
+                SlaveTask.PrepLogistics,
+                $"Start ({selectedChars.Count} chars)##prepLogisticsStart",
+                canStart,
+                StartPrepLogistics,
+                !allRequired
+                    ? "Missing required plugins. Check the plugin status above."
+                    : !hasWorld
+                        ? "Select a target world first."
+                        : "Select at least one character to start.");
+            if (started)
+                prepLogisticsShowLog = true;
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##prepLogisticsAll"))
@@ -489,6 +488,8 @@ public partial class SlaveWindow
         var targetAetheryte = cfg.PrepLogisticsTargetAetheryte;
         if (selected.Count == 0 || string.IsNullOrWhiteSpace(targetWorld))
             return;
+
+        HaltAutoCollectionForPriorityTask("Prep Logistics");
 
         var steps = BuildPrepLogisticsSteps(
             selected,

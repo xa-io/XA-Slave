@@ -52,7 +52,8 @@ public sealed class Plugin : IDalamudPlugin
         var livePullsWereEnabled = Configuration.IpcLivePullsEnabled;
         Configuration.IpcLivePullsEnabled = false;
         Configuration.InitializeFloorderDefaults();
-        if (livePullsWereEnabled)
+        var autoGlamDefaultsInitialized = Configuration.InitializeAutoGlamWeatherDefaults();
+        if (livePullsWereEnabled || autoGlamDefaultsInitialized)
             Configuration.Save();
 
         IpcClient = new IpcClient(PluginInterface, Log);
@@ -226,5 +227,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.11";
+    public const string Version = "0.0.0.12";
 }

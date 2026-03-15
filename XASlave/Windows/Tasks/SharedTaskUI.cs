@@ -76,6 +76,16 @@ public partial class SlaveWindow
     /// <summary>Shared log display with Copy/Clear buttons, used by all task panels.</summary>
     private void DrawTaskLog(string id, ref bool showLog, Services.TaskRunner runner)
     {
+        DrawTaskLog(id, ref showLog, runner.LogMessages, runner.ClearLog);
+    }
+
+    private void DrawTaskLog(string id, ref bool showLog, Services.AutoCollectionService collector)
+    {
+        DrawTaskLog(id, ref showLog, collector.LogMessages, collector.ClearLog);
+    }
+
+    private void DrawTaskLog(string id, ref bool showLog, IReadOnlyList<string> logMessages, Action clearLog)
+    {
         ImGui.Spacing();
         if (ImGui.Checkbox($"Show Log##{id}", ref showLog)) { }
         if (showLog)
@@ -83,25 +93,25 @@ public partial class SlaveWindow
             ImGui.SameLine();
             if (ImGui.SmallButton($"Copy Log##{id}"))
             {
-                if (runner.LogMessages.Count > 0)
+                if (logMessages.Count > 0)
                 {
-                    ImGui.SetClipboardText(string.Join("\n", runner.LogMessages));
-                    arImportStatus = $"Copied {runner.LogMessages.Count} log lines to clipboard";
+                    ImGui.SetClipboardText(string.Join("\n", logMessages));
+                    arImportStatus = $"Copied {logMessages.Count} log lines to clipboard";
                     arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
                 }
             }
             ImGui.SameLine();
             if (ImGui.SmallButton($"Clear Log##{id}"))
-                runner.ClearLog();
+                clearLog();
 
-            if (runner.LogMessages.Count > 0)
+            if (logMessages.Count > 0)
             {
                 ImGui.Spacing();
                 using (var logChild = ImRaii.Child($"TaskLog{id}", new Vector2(0, 150), true))
                 {
                     if (logChild.Success)
                     {
-                        foreach (var msg in runner.LogMessages)
+                        foreach (var msg in logMessages)
                             ImGui.TextWrapped(msg);
                         if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY() - 20)
                             ImGui.SetScrollHereY(1.0f);
@@ -123,6 +133,28 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
         DrawTaskLog(logId, ref showLog, runner);
+    }
+
+    private bool DrawPriorityTaskActionButton(SlaveTask task, string buttonLabel, bool canStart, Action startAction, string disabledTooltip = "")
+    {
+        if (TryGetActivePriorityTask(out var activeTask, out var activeLabel))
+        {
+            var stopLabel = activeTask == task
+                ? $"Stop {GetPriorityTaskLabel(task)} Task##priorityStop{task}"
+                : $"Stop {activeLabel} Task##priorityStop{task}";
+            if (ImGui.Button(stopLabel))
+                StopPriorityTask(activeTask);
+            return false;
+        }
+
+        if (!canStart) ImGui.BeginDisabled();
+        var clicked = ImGui.Button(buttonLabel);
+        if (clicked)
+            startAction();
+        if (!canStart) ImGui.EndDisabled();
+        if (!canStart && !string.IsNullOrWhiteSpace(disabledTooltip) && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip(disabledTooltip);
+        return clicked;
     }
 
     /// <summary>Draw the processing list shown during a running task.</summary>
@@ -156,6 +188,8 @@ public partial class SlaveWindow
         bool doOpenSaddlebags, bool doOpenJournal, bool doReturnToHome, bool doCollectPersonalPlotInfo,
         bool doReturnToFc, bool doParseForXaDatabase, bool doLogoutOnComplete, bool doEnableArMulti)
     {
+        HaltAutoCollectionForPriorityTask(taskName);
+
         reloggerTask = new MonthlyReloggerTask(plugin)
         {
             DoEnableTextAdvance = doTextAdvance,

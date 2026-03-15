@@ -19,6 +19,7 @@ public sealed class TaskRunner : IDisposable
     private readonly IDtrBar dtrBar;
     private readonly IToastGui toastGui;
     private IDtrBarEntry? dtrEntry;
+    private string externalStatusText = string.Empty;
 
     private readonly List<TaskStep> steps = new();
     private int stepIndex = -1;
@@ -140,6 +141,20 @@ public sealed class TaskRunner : IDisposable
     public void ClearLog()
     {
         logMessages.Clear();
+    }
+
+    public void SetExternalStatus(string statusText)
+    {
+        externalStatusText = statusText?.Trim() ?? string.Empty;
+        if (!running)
+            UpdateDtrBar();
+    }
+
+    public void ClearExternalStatus()
+    {
+        externalStatusText = string.Empty;
+        if (!running)
+            UpdateDtrBar();
     }
 
     public bool IsNormalCondition()
@@ -313,8 +328,7 @@ public sealed class TaskRunner : IDisposable
         try
         {
             dtrEntry ??= dtrBar.Get("XA Slave");
-            dtrEntry.Text = "XA: Idle";
-            dtrEntry.Shown = true;
+            UpdateDtrBar();
         }
         catch { /* DTR bar may not be available */ }
     }
@@ -324,10 +338,14 @@ public sealed class TaskRunner : IDisposable
         try
         {
             dtrEntry ??= dtrBar.Get("XA Slave");
-            if (TotalItems > 0)
-                dtrEntry.Text = $"XA: {CompletedItems}/{TotalItems}";
-            else
+            if (running && TotalItems > 0)
+                dtrEntry.Text = $"XA: {CurrentTaskName} {CompletedItems}/{TotalItems}";
+            else if (running)
                 dtrEntry.Text = $"XA: {CurrentTaskName}";
+            else if (!string.IsNullOrWhiteSpace(externalStatusText))
+                dtrEntry.Text = $"XA: {externalStatusText}";
+            else
+                dtrEntry.Text = "XA: Idle";
             dtrEntry.Shown = true;
         }
         catch { /* DTR bar may not be available */ }
@@ -339,8 +357,7 @@ public sealed class TaskRunner : IDisposable
         try
         {
             dtrEntry ??= dtrBar.Get("XA Slave");
-            dtrEntry.Text = "XA: Idle";
-            dtrEntry.Shown = true;
+            UpdateDtrBar();
         }
         catch { }
     }

@@ -124,10 +124,14 @@ public partial class SlaveWindow
         {
             var selectedChars = GetSelectedFcPermsCharacters();
             var canStart = selectedChars.Count > 0 && !plugin.TaskRunner.IsRunning;
-            if (!canStart) ImGui.BeginDisabled();
-            if (ImGui.Button($"Start ({selectedChars.Count} chars)##fcPermsStart"))
-                StartFcPermissionsUpdater();
-            if (!canStart) ImGui.EndDisabled();
+            var started = DrawPriorityTaskActionButton(
+                SlaveTask.MultiFcPermissions,
+                $"Start ({selectedChars.Count} chars)##fcPermsStart",
+                canStart,
+                StartFcPermissionsUpdater,
+                "Select at least one character to start.");
+            if (started)
+                fcPermsShowLog = true;
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##fcPermsAll"))
@@ -312,6 +316,8 @@ public partial class SlaveWindow
             .Where(i => i < chars.Count)
             .Select(i => chars[i])
             .ToList();
+
+        HaltAutoCollectionForPriorityTask("FC Permissions Updater");
 
         var steps = BuildFcPermissionsSteps(selected, plugin.TaskRunner);
 

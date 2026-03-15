@@ -115,16 +115,17 @@ public partial class SlaveWindow
                 && plugin.IpcClient.IsLifestreamAvailable()
                 && (!(raDoCollectPersonalPlotInfo || raDoParseForXaDatabase) || plugin.IpcClient.IsXaDatabaseAvailable());
 
-            if (!canStart) ImGui.BeginDisabled();
-            if (ImGui.Button($"Start ({selectedChars.Count} chars)##ra"))
-            {
-                StartTaskWithConfig("Return Alts To Homeworlds", selectedChars, returnAltsSelectedIndices,
+            var started = DrawPriorityTaskActionButton(
+                SlaveTask.ReturnAltsToHomeworlds,
+                $"Start ({selectedChars.Count} chars)##ra",
+                canStart,
+                () => StartTaskWithConfig("Return Alts To Homeworlds", selectedChars, returnAltsSelectedIndices,
                     raDoTextAdvance, raDoRemoveSprout, raDoOpenInventory, raDoOpenArmoury,
                     raDoOpenSaddlebags, raDoOpenJournal, raDoReturnToHome, raDoCollectPersonalPlotInfo,
-                    raDoReturnToFc, raDoParseForXaDatabase, raDoLogoutOnComplete, raDoEnableArMulti);
+                    raDoReturnToFc, raDoParseForXaDatabase, raDoLogoutOnComplete, raDoEnableArMulti),
+                "Select at least one character and ensure required plugins are loaded.");
+            if (started)
                 returnAltsShowLog = true;
-            }
-            if (!canStart) ImGui.EndDisabled();
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##ra"))

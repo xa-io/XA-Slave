@@ -130,14 +130,16 @@ public partial class SlaveWindow
                 && (!requiresXaDb || ipc.IsXaDatabaseAvailable());
             var canStart = selectedChars.Count > 0 && allRequiredPluginsOk;
 
-            if (!canStart) ImGui.BeginDisabled();
-            if (ImGui.Button($"Start Relogger ({selectedChars.Count} chars)"))
-                StartMonthlyRelogger(selectedChars);
-            if (!canStart) ImGui.EndDisabled();
-            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled) && !canStart)
-                ImGui.SetTooltip(!allRequiredPluginsOk
+            var started = DrawPriorityTaskActionButton(
+                SlaveTask.MonthlyRelogger,
+                $"Start Relogger ({selectedChars.Count} chars)",
+                canStart,
+                () => StartMonthlyRelogger(selectedChars),
+                !allRequiredPluginsOk
                     ? "Missing required plugins. Check the Plugin Status section above."
                     : "Select at least one character to start.");
+            if (started)
+                reloggerShowLog = true;
 
             ImGui.SameLine();
             if (ImGui.Button("Check All"))
@@ -583,6 +585,8 @@ public partial class SlaveWindow
     /// <summary>Start the Monthly Relogger task with the given character list.</summary>
     private void StartMonthlyRelogger(List<string> characters)
     {
+        HaltAutoCollectionForPriorityTask("Monthly Relogger");
+
         reloggerTask = new MonthlyReloggerTask(plugin)
         {
             DoEnableTextAdvance = plugin.Configuration.ReloggerDoTextAdvance,

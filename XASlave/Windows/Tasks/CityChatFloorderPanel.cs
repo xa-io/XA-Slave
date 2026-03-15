@@ -88,10 +88,22 @@ public partial class SlaveWindow
             var canStart = lsOk && worldCount > 0 && cityCount > 0 && cfg.FloorderAnnouncements.Count > 0
                 && !runner.IsRunning && Plugin.PlayerState.IsLoaded;
 
-            if (!canStart) ImGui.BeginDisabled();
-            if (ImGui.Button("Start Flooding"))
-                StartCityChatFlooder();
-            if (!canStart) ImGui.EndDisabled();
+            DrawPriorityTaskActionButton(
+                SlaveTask.CityChatFlooder,
+                "Start Flooding",
+                canStart,
+                StartCityChatFlooder,
+                !lsOk
+                    ? "Lifestream is required."
+                    : worldCount == 0
+                        ? "Select at least one world."
+                        : cityCount == 0
+                            ? "Select at least one city."
+                            : cfg.FloorderAnnouncements.Count == 0
+                                ? "Add at least one announcement."
+                                : !Plugin.PlayerState.IsLoaded
+                                    ? "Player must be loaded to start City Chat Flooder."
+                                    : "Another XA Slave task is already running.");
 
             ImGui.SameLine();
             var looping = cfg.FloorderEnableLooping;

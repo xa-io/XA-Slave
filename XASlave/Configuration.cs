@@ -54,6 +54,18 @@ public class Configuration : IPluginConfiguration
     // Character list in "Name@World" format — persisted across sessions
     public List<string> ReloggerCharacters { get; set; } = new();
 
+    // ── Auto-Glam Weather ──
+    public int AutoGlamWeatherClassJob { get; set; } = 1;
+    public int AutoGlamWeatherSunnyPlate { get; set; } = 2;
+    public int AutoGlamWeatherRainPlate { get; set; } = 3;
+    public int AutoGlamWeatherFreezePlate { get; set; } = 1;
+    public string AutoGlamWeatherClassJobOptions { get; set; } = "1";
+    public string AutoGlamWeatherSunnyPlateOptions { get; set; } = "2";
+    public string AutoGlamWeatherRainPlateOptions { get; set; } = "3";
+    public string AutoGlamWeatherFreezePlateOptions { get; set; } = "1";
+    public bool AutoGlamWeatherOptionsInitialized { get; set; } = false;
+    public float AutoGlamWeatherCheckIntervalSeconds { get; set; } = 3.0f;
+
     // Per-character action toggles
     public bool ReloggerDoTextAdvance { get; set; } = true;
     public bool ReloggerDoRemoveSprout { get; set; } = true;
@@ -157,6 +169,46 @@ public class Configuration : IPluginConfiguration
             });
         }
         Save();
+    }
+
+    public bool InitializeAutoGlamWeatherDefaults()
+    {
+        if (AutoGlamWeatherOptionsInitialized)
+            return false;
+
+        var changed = false;
+        AutoGlamWeatherOptionsInitialized = true;
+        changed = true;
+
+        if (string.IsNullOrWhiteSpace(AutoGlamWeatherClassJobOptions)
+            || (AutoGlamWeatherClassJobOptions == "1" && AutoGlamWeatherClassJob != 1))
+        {
+            AutoGlamWeatherClassJobOptions = AutoGlamWeatherClassJob > 0 ? AutoGlamWeatherClassJob.ToString() : "1";
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(AutoGlamWeatherSunnyPlateOptions)
+            || (AutoGlamWeatherSunnyPlateOptions == "2" && AutoGlamWeatherSunnyPlate != 2))
+        {
+            AutoGlamWeatherSunnyPlateOptions = AutoGlamWeatherSunnyPlate > 0 ? AutoGlamWeatherSunnyPlate.ToString() : "2";
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(AutoGlamWeatherRainPlateOptions)
+            || (AutoGlamWeatherRainPlateOptions == "3" && AutoGlamWeatherRainPlate != 3))
+        {
+            AutoGlamWeatherRainPlateOptions = AutoGlamWeatherRainPlate > 0 ? AutoGlamWeatherRainPlate.ToString() : "3";
+            changed = true;
+        }
+
+        if (string.IsNullOrWhiteSpace(AutoGlamWeatherFreezePlateOptions)
+            || (AutoGlamWeatherFreezePlateOptions == "1" && AutoGlamWeatherFreezePlate != 1))
+        {
+            AutoGlamWeatherFreezePlateOptions = AutoGlamWeatherFreezePlate > 0 ? AutoGlamWeatherFreezePlate.ToString() : "1";
+            changed = true;
+        }
+
+        return changed;
     }
 
     public void Save()
