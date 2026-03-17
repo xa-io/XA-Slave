@@ -233,4 +233,72 @@ public partial class SlaveWindow
         var parts = key.Split('@');
         return parts.Length > 1 ? parts[1] : "";
     }
+
+    private static readonly string[] RegionFilterOptions = { "All", "NA", "EU", "JP", "OCE" };
+
+    private bool DrawRegionFilterCombo(string label, ref string regionFilter, float width = 80f)
+    {
+        var regionIdx = Array.IndexOf(RegionFilterOptions, regionFilter);
+        if (regionIdx < 0)
+            regionIdx = 0;
+
+        ImGui.SetNextItemWidth(width);
+        if (!ImGui.Combo(label, ref regionIdx, RegionFilterOptions, RegionFilterOptions.Length))
+            return false;
+
+        regionFilter = RegionFilterOptions[regionIdx];
+        return true;
+    }
+
+    private static bool MatchesRegionFilter(string world, string regionFilter)
+    {
+        if (string.IsNullOrWhiteSpace(regionFilter) || regionFilter.Equals("All", StringComparison.OrdinalIgnoreCase))
+            return true;
+
+        var worldInfo = WorldData.GetByName(world);
+        return worldInfo == null || worldInfo.Region.Equals(regionFilter, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool HasPersonalEstate(ReloggerCharacterData? info)
+    {
+        return info != null && !string.IsNullOrWhiteSpace(info.PersonalEstate);
+    }
+
+    private static bool IsFcMasterRank(ReloggerCharacterData? info)
+    {
+        if (info == null || info.FCID == 0)
+            return false;
+
+        if (!string.IsNullOrWhiteSpace(info.FcMemberRankName))
+            return info.FcMemberRankName.Equals("Master", StringComparison.OrdinalIgnoreCase);
+
+        return info.FcMemberRankSort == 0;
+    }
+
+    private static string GetFcMemberRankLabel(ReloggerCharacterData? info)
+    {
+        if (info == null || info.FCID == 0)
+            return string.Empty;
+
+        if (!string.IsNullOrWhiteSpace(info.FcMemberRankName))
+            return info.FcMemberRankName;
+
+        return info.FcMemberRankSort != int.MaxValue
+            ? $"Rank {info.FcMemberRankSort + 1}"
+            : string.Empty;
+    }
+
+    private static string GetFreeCompanyRankLabel(ReloggerCharacterData? info)
+    {
+        return info != null && info.FreeCompanyRank > 0
+            ? info.FreeCompanyRank.ToString()
+            : string.Empty;
+    }
+
+    private static string GetInventoryFreeSlotsLabel(ReloggerCharacterData? info)
+    {
+        return info != null && info.MainInventoryTotalSlots > 0
+            ? $"{info.MainInventoryFreeSlots}/{info.MainInventoryTotalSlots}"
+            : string.Empty;
+    }
 }

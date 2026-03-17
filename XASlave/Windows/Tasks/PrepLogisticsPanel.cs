@@ -127,7 +127,7 @@ public partial class SlaveWindow
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##prepLogisticsAll"))
-                for (var i = 0; i < chars.Count; i++) prepLogisticsSelectedIndices.Add(i);
+                SelectVisiblePrepLogisticsCharacters();
 
             ImGui.SameLine();
             if (ImGui.Button("Clear All##prepLogisticsNone"))
@@ -149,11 +149,19 @@ public partial class SlaveWindow
         ImGui.TextDisabled($"({chars.Count} total)");
         ImGui.Spacing();
 
+        var prepRegionFilter = cfg.PrepLogisticsRegionFilter;
+        if (DrawRegionFilterCombo("Region##prepLogisticsRegion", ref prepRegionFilter))
+        {
+            cfg.PrepLogisticsRegionFilter = prepRegionFilter;
+            cfg.Save();
+        }
+
+        ImGui.SameLine();
         ImGui.SetNextItemWidth(200);
         ImGui.InputTextWithHint("##prepLogisticsSearch", "Search name or world...", ref prepLogisticsSearchFilter, 128);
         ImGui.Spacing();
 
-        if (ImGui.BeginTable("PrepLogisticsCharTable", 6,
+        if (ImGui.BeginTable("PrepLogisticsCharTable", 7,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
             new Vector2(0, 250)))
         {
@@ -162,22 +170,29 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("Region / DC", ImGuiTableColumnFlags.WidthFixed, 120);
+            ImGui.TableSetupColumn("Inv Free", ImGuiTableColumnFlags.WidthFixed, 70);
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 25);
             ImGui.TableHeadersRow();
 
-            var filtered = new List<(int OrigIdx, string CharName, string World, string RegionDc)>();
+            var charInfo = cfg.ReloggerCharacterInfo;
+            var filtered = new List<(int OrigIdx, string CharName, string World, string RegionDc, ReloggerCharacterData? Info)>();
             for (var idx = 0; idx < chars.Count; idx++)
             {
                 var charName = chars[idx];
                 var world = GetWorldFromKey(charName);
                 var regionDc = WorldData.GetRegionDcLabel(world);
 
+                if (!MatchesRegionFilter(world, cfg.PrepLogisticsRegionFilter))
+                    continue;
+
                 if (!string.IsNullOrEmpty(prepLogisticsSearchFilter)
                     && !charName.Contains(prepLogisticsSearchFilter, StringComparison.OrdinalIgnoreCase)
+                    && !world.Contains(prepLogisticsSearchFilter, StringComparison.OrdinalIgnoreCase)
                     && !regionDc.Contains(prepLogisticsSearchFilter, StringComparison.OrdinalIgnoreCase))
                     continue;
 
-                filtered.Add((idx, charName, world, regionDc));
+                charInfo.TryGetValue(charName, out var info);
+                filtered.Add((idx, charName, world, regionDc, info));
             }
 
             var sortSpecs = ImGui.TableGetSortSpecs();
@@ -197,6 +212,7 @@ public partial class SlaveWindow
                             2 => string.Compare(a.CharName, b.CharName, StringComparison.OrdinalIgnoreCase),
                             3 => string.Compare(a.World, b.World, StringComparison.OrdinalIgnoreCase),
                             4 => string.Compare(a.RegionDc, b.RegionDc, StringComparison.OrdinalIgnoreCase),
+                            5 => (a.Info?.MainInventoryFreeSlots ?? 0).CompareTo(b.Info?.MainInventoryFreeSlots ?? 0),
                             _ => a.OrigIdx.CompareTo(b.OrigIdx),
                         };
                         return ascending ? cmp : -cmp;
@@ -205,7 +221,7 @@ public partial class SlaveWindow
             }
 
             var displayIndex = 0;
-            foreach (var (i, charName, world, regionDc) in filtered)
+            foreach (var (i, charName, world, regionDc, info) in filtered)
             {
                 displayIndex++;
                 ImGui.TableNextRow();
@@ -228,6 +244,13 @@ public partial class SlaveWindow
 
                 ImGui.TableNextColumn();
                 ImGui.TextDisabled(regionDc);
+
+                ImGui.TableNextColumn();
+                var inventoryLabel = GetInventoryFreeSlotsLabel(info);
+                if (!string.IsNullOrEmpty(inventoryLabel))
+                    ImGui.TextDisabled(inventoryLabel);
+                else
+                    ImGui.TextDisabled("-");
 
                 ImGui.TableNextColumn();
                 ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
@@ -478,6 +501,27 @@ public partial class SlaveWindow
             .OrderBy(i => i)
             .Select(i => chars[i])
             .ToList();
+    }
+
+    private void SelectVisiblePrepLogisticsCharacters()
+    {
+        var cfg = plugin.Configuration;
+        var chars = cfg.PrepLogisticsCharacters;
+        for (var i = 0; i < chars.Count; i++)
+        {
+            var charName = chars[i];
+            var world = GetWorldFromKey(charName);
+            var regionDc = WorldData.GetRegionDcLabel(world);
+            if (!MatchesRegionFilter(world, cfg.PrepLogisticsRegionFilter))
+                continue;
+            if (!string.IsNullOrEmpty(prepLogisticsSearchFilter)
+                && !charName.Contains(prepLogisticsSearchFilter, StringComparison.OrdinalIgnoreCase)
+                && !world.Contains(prepLogisticsSearchFilter, StringComparison.OrdinalIgnoreCase)
+                && !regionDc.Contains(prepLogisticsSearchFilter, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            prepLogisticsSelectedIndices.Add(i);
+        }
     }
 
     private void StartPrepLogistics()

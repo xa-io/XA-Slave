@@ -135,7 +135,7 @@ public partial class SlaveWindow
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##fcPermsAll"))
-                for (int i = 0; i < chars.Count; i++) fcPermsSelectedIndices.Add(i);
+                SelectVisibleFcPermsCharacters();
             ImGui.SameLine();
             if (ImGui.Button("Clear All##fcPermsNone"))
                 fcPermsSelectedIndices.Clear();
@@ -151,15 +151,23 @@ public partial class SlaveWindow
         ImGui.TextDisabled($"({chars.Count} total)");
         ImGui.Spacing();
 
+        var fcPermsRegionFilter = cfg.FcPermsRegionFilter;
+        if (DrawRegionFilterCombo("Region##fcPermsRegion", ref fcPermsRegionFilter))
+        {
+            cfg.FcPermsRegionFilter = fcPermsRegionFilter;
+            cfg.Save();
+        }
+
+        ImGui.SameLine();
         // Search filter
         ImGui.SetNextItemWidth(200);
         ImGui.InputTextWithHint("##fcPermsSearch", "Search name or world...", ref fcPermsSearchFilter, 128);
         ImGui.Spacing();
 
-        // Character table — columns: checkbox, #, character, world, FC name, in FC, remove
+        // Character table — columns: checkbox, #, character, world, FC name, member rank, FC rank, in FC, remove
         var charInfo = cfg.ReloggerCharacterInfo;
 
-        if (ImGui.BeginTable("FcPermsCharTable", 7,
+        if (ImGui.BeginTable("FcPermsCharTable", 9,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
             new Vector2(0, 250)))
         {
@@ -168,7 +176,9 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 90);
             ImGui.TableSetupColumn("FC Name", ImGuiTableColumnFlags.WidthFixed, 120);
-            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, 40);
+            ImGui.TableSetupColumn("Member Rank", ImGuiTableColumnFlags.WidthFixed, 95);
+            ImGui.TableSetupColumn("FC Rank", ImGuiTableColumnFlags.WidthFixed, 60);
+            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, 45);
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 25);
             ImGui.TableHeadersRow();
 
@@ -180,8 +190,12 @@ public partial class SlaveWindow
                 var nameParts = charName.Split('@');
                 var world = nameParts.Length > 1 ? nameParts[1] : "";
 
+                if (!MatchesRegionFilter(world, cfg.FcPermsRegionFilter))
+                    continue;
+
                 if (!string.IsNullOrEmpty(fcPermsSearchFilter) &&
-                    !charName.Contains(fcPermsSearchFilter, StringComparison.OrdinalIgnoreCase))
+                    !charName.Contains(fcPermsSearchFilter, StringComparison.OrdinalIgnoreCase) &&
+                    !world.Contains(fcPermsSearchFilter, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 charInfo.TryGetValue(charName, out var info);
@@ -206,7 +220,9 @@ public partial class SlaveWindow
                             2 => string.Compare(a.CharName, b.CharName, StringComparison.OrdinalIgnoreCase),
                             3 => string.Compare(a.World, b.World, StringComparison.OrdinalIgnoreCase),
                             4 => string.Compare(a.Info?.FcName ?? "", b.Info?.FcName ?? "", StringComparison.OrdinalIgnoreCase),
-                            5 => (a.Info != null && a.Info.FCID != 0).CompareTo(b.Info != null && b.Info.FCID != 0),
+                            5 => (a.Info?.FcMemberRankSort ?? int.MaxValue).CompareTo(b.Info?.FcMemberRankSort ?? int.MaxValue),
+                            6 => (a.Info?.FreeCompanyRank ?? 0).CompareTo(b.Info?.FreeCompanyRank ?? 0),
+                            7 => (a.Info != null && a.Info.FCID != 0).CompareTo(b.Info != null && b.Info.FCID != 0),
                             _ => a.OrigIdx.CompareTo(b.OrigIdx),
                         };
                         return ascending ? cmp : -cmp;
@@ -245,6 +261,22 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 if (info != null && !string.IsNullOrEmpty(info.FcName))
                     ImGui.TextDisabled(info.FcName);
+                else
+                    ImGui.TextDisabled("-");
+
+                // Member Rank
+                ImGui.TableNextColumn();
+                var memberRankLabel = GetFcMemberRankLabel(info);
+                if (!string.IsNullOrEmpty(memberRankLabel))
+                    ImGui.TextDisabled(memberRankLabel);
+                else
+                    ImGui.TextDisabled("-");
+
+                // FC Rank
+                ImGui.TableNextColumn();
+                var fcRankLabel = GetFreeCompanyRankLabel(info);
+                if (!string.IsNullOrEmpty(fcRankLabel))
+                    ImGui.TextDisabled(fcRankLabel);
                 else
                     ImGui.TextDisabled("-");
 
@@ -307,6 +339,25 @@ public partial class SlaveWindow
             .OrderBy(i => i)
             .Select(i => chars[i])
             .ToList();
+    }
+
+    private void SelectVisibleFcPermsCharacters()
+    {
+        var cfg = plugin.Configuration;
+        var chars = cfg.FcPermsCharacters;
+        for (var i = 0; i < chars.Count; i++)
+        {
+            var charName = chars[i];
+            var world = GetWorldFromKey(charName);
+            if (!MatchesRegionFilter(world, cfg.FcPermsRegionFilter))
+                continue;
+            if (!string.IsNullOrEmpty(fcPermsSearchFilter)
+                && !charName.Contains(fcPermsSearchFilter, StringComparison.OrdinalIgnoreCase)
+                && !world.Contains(fcPermsSearchFilter, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            fcPermsSelectedIndices.Add(i);
+        }
     }
 
     private void StartFcPermissionsUpdater()

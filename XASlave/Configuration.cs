@@ -24,6 +24,12 @@ public class ReloggerCharacterData
     public string CurrentWorld { get; set; } = "";
     public int RetainerCount { get; set; }
     public int SubmarineCount { get; set; }
+    public string FcMemberRankName { get; set; } = "";
+    public int FcMemberRankSort { get; set; } = int.MaxValue;
+    public int FreeCompanyRank { get; set; }
+    public int MainInventoryUsedSlots { get; set; }
+    public int MainInventoryTotalSlots { get; set; }
+    public int MainInventoryFreeSlots { get; set; }
 }
 
 [Serializable]
@@ -63,6 +69,7 @@ public class Configuration : IPluginConfiguration
     public string AutoGlamWeatherSunnyPlateOptions { get; set; } = "2";
     public string AutoGlamWeatherRainPlateOptions { get; set; } = "3";
     public string AutoGlamWeatherFreezePlateOptions { get; set; } = "1";
+    public Dictionary<int, string> AutoGlamWeatherPlateOptionsByWeatherId { get; set; } = new();
     public bool AutoGlamWeatherOptionsInitialized { get; set; } = false;
     public float AutoGlamWeatherCheckIntervalSeconds { get; set; } = 3.0f;
 
@@ -93,6 +100,7 @@ public class Configuration : IPluginConfiguration
 
     // ── Refresh AR Subs/Bell ──
     public List<string> RefreshSubsCharacters { get; set; } = new();
+    public string RefreshSubsRegionFilter { get; set; } = "All";
 
     // ── Prep Logistics ──
     public List<string> PrepLogisticsCharacters { get; set; } = new();
@@ -100,9 +108,11 @@ public class Configuration : IPluginConfiguration
     public string PrepLogisticsTargetAetheryte { get; set; } = string.Empty;
     public bool PrepLogisticsEnableArMultiOnComplete { get; set; } = true;
     public bool PrepLogisticsLogoutOnComplete { get; set; } = false;
+    public string PrepLogisticsRegionFilter { get; set; } = "All";
 
     // ── FC Permissions Updater ──
     public List<string> FcPermsCharacters { get; set; } = new();
+    public string FcPermsRegionFilter { get; set; } = "All";
 
     // ── AR Pre-Processing ──
     // Master toggle — when enabled, runs collection steps on login BEFORE AR starts retainer processing
@@ -151,6 +161,15 @@ public class Configuration : IPluginConfiguration
     public float FloorderLoopDelayMinutes { get; set; } = 5.0f;
     public bool FloorderInitialized { get; set; } = false;
 
+    public bool MenuAutomatedTasksExpanded { get; set; } = true;
+    public bool MenuCityShenanigansExpanded { get; set; } = true;
+    public bool MenuFcRelationsExpanded { get; set; } = true;
+    public bool MenuUtilityExpanded { get; set; } = true;
+    public bool MenuReferenceExpanded { get; set; } = true;
+    public float TaskMenuWidth { get; set; } = 180f;
+    public string LastSelectedBuiltInTask { get; set; } = "SaveToXaDatabase";
+    public string LastSelectedExternalTaskName { get; set; } = "";
+
     public void InitializeFloorderDefaults()
     {
         if (FloorderInitialized) return;
@@ -173,12 +192,12 @@ public class Configuration : IPluginConfiguration
 
     public bool InitializeAutoGlamWeatherDefaults()
     {
-        if (AutoGlamWeatherOptionsInitialized)
-            return false;
-
         var changed = false;
-        AutoGlamWeatherOptionsInitialized = true;
-        changed = true;
+        if (!AutoGlamWeatherOptionsInitialized)
+        {
+            AutoGlamWeatherOptionsInitialized = true;
+            changed = true;
+        }
 
         if (string.IsNullOrWhiteSpace(AutoGlamWeatherClassJobOptions)
             || (AutoGlamWeatherClassJobOptions == "1" && AutoGlamWeatherClassJob != 1))
@@ -208,7 +227,28 @@ public class Configuration : IPluginConfiguration
             changed = true;
         }
 
+        AutoGlamWeatherPlateOptionsByWeatherId ??= new Dictionary<int, string>();
+        foreach (var weatherId in new[] { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 14, 15, 16, 17, 49, 50, 148, 149 })
+        {
+            if (AutoGlamWeatherPlateOptionsByWeatherId.TryGetValue(weatherId, out var options)
+                && !string.IsNullOrWhiteSpace(options))
+                continue;
+
+            AutoGlamWeatherPlateOptionsByWeatherId[weatherId] = GetLegacyAutoGlamWeatherPlateOptions(weatherId);
+            changed = true;
+        }
+
         return changed;
+    }
+
+    private string GetLegacyAutoGlamWeatherPlateOptions(int weatherId)
+    {
+        return weatherId switch
+        {
+            4 or 6 or 7 or 8 or 9 or 10 => AutoGlamWeatherRainPlateOptions,
+            15 or 16 => AutoGlamWeatherFreezePlateOptions,
+            _ => AutoGlamWeatherSunnyPlateOptions,
+        };
     }
 
     public void Save()

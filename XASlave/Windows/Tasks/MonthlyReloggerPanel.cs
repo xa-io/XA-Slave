@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text.Json;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using XASlave.Data;
@@ -143,26 +144,16 @@ public partial class SlaveWindow
 
             ImGui.SameLine();
             if (ImGui.Button("Check All"))
-            {
-                for (int i = 0; i < chars.Count; i++)
-                {
-                    var cn = chars[i];
-                    var np = cn.Split('@');
-                    var w = np.Length > 1 ? np[1] : "";
-                    var wi = WorldData.GetByName(w);
-                    var rd = WorldData.GetRegionDcLabel(w);
-                    if (cfg.ReloggerRegionFilter != "All" && wi != null && wi.Region != cfg.ReloggerRegionFilter)
-                        continue;
-                    if (!string.IsNullOrEmpty(reloggerSearchFilter) &&
-                        !cn.Contains(reloggerSearchFilter, StringComparison.OrdinalIgnoreCase) &&
-                        !rd.Contains(reloggerSearchFilter, StringComparison.OrdinalIgnoreCase))
-                        continue;
-                    reloggerSelectedIndices.Add(i);
-                }
-            }
+                SelectVisibleReloggerCharacters(_ => true);
             ImGui.SameLine();
             if (ImGui.Button("Clear All"))
                 reloggerSelectedIndices.Clear();
+            ImGui.SameLine();
+            if (ImGui.Button("Check Masters"))
+                SelectVisibleReloggerCharacters(IsFcMasterRank);
+            ImGui.SameLine();
+            if (ImGui.Button("Check Personal"))
+                SelectVisibleReloggerCharacters(HasPersonalEstate);
             ImGui.SameLine();
             var staleButtonLabel = $"Select Stale ({GetReloggerStaleButtonLabel(staleSelectDays)})";
             var staleButtonWidth = ImGui.CalcTextSize("Select Stale (>45d)").X + ImGui.GetStyle().FramePadding.X * 2f;
@@ -195,13 +186,10 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // Region filter
-        var regionOptions = new[] { "All", "NA", "EU", "JP", "OCE" };
-        var regionIdx = Array.IndexOf(regionOptions, cfg.ReloggerRegionFilter);
-        if (regionIdx < 0) regionIdx = 0;
-        ImGui.SetNextItemWidth(80);
-        if (ImGui.Combo("Region##RelogFilter", ref regionIdx, regionOptions, regionOptions.Length))
+        var reloggerRegionFilter = cfg.ReloggerRegionFilter;
+        if (DrawRegionFilterCombo("Region##RelogFilter", ref reloggerRegionFilter))
         {
-            cfg.ReloggerRegionFilter = regionOptions[regionIdx];
+            cfg.ReloggerRegionFilter = reloggerRegionFilter;
             cfg.Save();
         }
 
@@ -213,11 +201,11 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // Character table — always shows all columns from persistent ReloggerCharacterInfo
-        // Columns: checkbox, #, character, region, lv, gil, fc, in fc, last logged in, remove
+        // Columns: checkbox, #, character, region, lv, gil, current rank, fc, in fc, personal, last logged in, remove
         var charInfo = cfg.ReloggerCharacterInfo;
 
-        if (ImGui.BeginTable("ReloggerCharTable", 10,
-            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.SortMulti,
+        if (ImGui.BeginTable("ReloggerCharTable", 12,
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
             new Vector2(0, 250)))
         {
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 30); // checkbox
@@ -226,8 +214,10 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Region / DC", ImGuiTableColumnFlags.WidthFixed, 110);
             ImGui.TableSetupColumn("Lv", ImGuiTableColumnFlags.WidthFixed, 30);
             ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, 80);
-            ImGui.TableSetupColumn("FC", ImGuiTableColumnFlags.WidthFixed, 100);
-            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, 40);
+            ImGui.TableSetupColumn("Current Rank", ImGuiTableColumnFlags.WidthFixed, 90);
+            ImGui.TableSetupColumn("FC", ImGuiTableColumnFlags.WidthFixed, 110);
+            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, 45);
+            ImGui.TableSetupColumn("Personal", ImGuiTableColumnFlags.WidthFixed, 55);
             ImGui.TableSetupColumn("Last Logged In", ImGuiTableColumnFlags.WidthFixed, 80);
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 25); // remove
             ImGui.TableHeadersRow();
@@ -240,9 +230,8 @@ public partial class SlaveWindow
                 var nameParts = charName.Split('@');
                 var world = nameParts.Length > 1 ? nameParts[1] : "";
                 var regionDc = WorldData.GetRegionDcLabel(world);
-                var worldInfo = WorldData.GetByName(world);
 
-                if (cfg.ReloggerRegionFilter != "All" && worldInfo != null && worldInfo.Region != cfg.ReloggerRegionFilter)
+                if (!MatchesRegionFilter(world, cfg.ReloggerRegionFilter))
                     continue;
                 if (!string.IsNullOrEmpty(reloggerSearchFilter) &&
                     !charName.Contains(reloggerSearchFilter, StringComparison.OrdinalIgnoreCase) &&
@@ -267,7 +256,7 @@ public partial class SlaveWindow
                     filtered.Sort((a, b) =>
                     {
                         int cmp = 0;
-                        // 0=checkbox, 1=#, 2=char, 3=region, 4=lv, 5=gil, 6=fc, 7=infc, 8=lastloggedin, 9=remove
+                        // 0=checkbox, 1=#, 2=char, 3=region, 4=lv, 5=gil, 6=current rank, 7=fc, 8=infc, 9=personal, 10=lastloggedin, 11=remove
                         switch (colIdx)
                         {
                             case 1: cmp = a.OrigIdx.CompareTo(b.OrigIdx); break;
@@ -275,17 +264,32 @@ public partial class SlaveWindow
                             case 3: cmp = string.Compare(WorldData.GetSortKey(a.World), WorldData.GetSortKey(b.World), StringComparison.Ordinal); break;
                             case 4: cmp = (a.Info?.HighestLevel ?? 0).CompareTo(b.Info?.HighestLevel ?? 0); break;
                             case 5: cmp = (a.Info?.Gil ?? 0).CompareTo(b.Info?.Gil ?? 0); break;
-                            case 6: cmp = string.Compare(a.Info?.FcName ?? "", b.Info?.FcName ?? "", StringComparison.OrdinalIgnoreCase); break;
-                            case 7:
+                            case 6:
+                                cmp = GetCurrentRankSortValue(a.Info).CompareTo(GetCurrentRankSortValue(b.Info));
+                                if (cmp == 0)
+                                    cmp = string.Compare(GetFcMemberRankLabel(a.Info), GetFcMemberRankLabel(b.Info), StringComparison.OrdinalIgnoreCase);
+                                break;
+                            case 7: cmp = string.Compare(a.Info?.FcName ?? "", b.Info?.FcName ?? "", StringComparison.OrdinalIgnoreCase); break;
+                            case 8:
                                 var aFc = a.Info != null && a.Info.FCID != 0;
                                 var bFc = b.Info != null && b.Info.FCID != 0;
                                 cmp = aFc.CompareTo(bFc); break;
-                            case 8:
+                            case 9:
+                                cmp = HasPersonalEstate(a.Info).CompareTo(HasPersonalEstate(b.Info)); break;
+                            case 10:
                                 var aLi = a.Info?.LastLoggedIn ?? DateTime.MinValue;
                                 var bLi = b.Info?.LastLoggedIn ?? DateTime.MinValue;
                                 cmp = aLi.CompareTo(bLi); break;
                             default: cmp = a.OrigIdx.CompareTo(b.OrigIdx); break;
                         }
+
+                        if (cmp == 0)
+                        {
+                            cmp = string.Compare(a.CharName, b.CharName, StringComparison.OrdinalIgnoreCase);
+                            if (cmp == 0)
+                                cmp = a.OrigIdx.CompareTo(b.OrigIdx);
+                        }
+
                         return ascending ? cmp : -cmp;
                     });
                 }
@@ -320,8 +324,13 @@ public partial class SlaveWindow
                     ImGui.Separator();
                     ImGui.Text($"Level: {info.HighestLevel}");
                     ImGui.Text($"Gil: {info.Gil:N0}");
+                    var rankLabel = GetFcMemberRankLabel(info);
+                    if (!string.IsNullOrEmpty(rankLabel))
+                        ImGui.Text($"Current Rank: {rankLabel}");
                     if (!string.IsNullOrEmpty(info.FcName))
                         ImGui.Text($"FC: {info.FcName}");
+                    if (!string.IsNullOrWhiteSpace(info.PersonalEstate))
+                        ImGui.Text($"Personal Estate: {info.PersonalEstate}");
                     if (info.LastLoggedIn != DateTime.MinValue)
                         ImGui.Text($"Last Logged In: {info.LastLoggedIn.ToLocalTime():yyyy-MM-dd HH:mm:ss}");
                     ImGui.EndTooltip();
@@ -345,6 +354,14 @@ public partial class SlaveWindow
                 else
                     ImGui.TextDisabled("-");
 
+                // Current Rank
+                ImGui.TableNextColumn();
+                var currentRankLabel = GetFcMemberRankLabel(info);
+                if (!string.IsNullOrEmpty(currentRankLabel))
+                    ImGui.TextDisabled(currentRankLabel);
+                else
+                    ImGui.TextDisabled("-");
+
                 // FC
                 ImGui.TableNextColumn();
                 if (info != null && !string.IsNullOrEmpty(info.FcName))
@@ -358,6 +375,19 @@ public partial class SlaveWindow
                     ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Yes");
                 else
                     ImGui.TextDisabled("-");
+
+                // Personal
+                ImGui.TableNextColumn();
+                if (HasPersonalEstate(info))
+                {
+                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Yes");
+                    if (ImGui.IsItemHovered() && info != null)
+                        ImGui.SetTooltip(info.PersonalEstate);
+                }
+                else
+                {
+                    ImGui.TextDisabled("-");
+                }
 
                 // Last Logged In
                 ImGui.TableNextColumn();
@@ -568,6 +598,28 @@ public partial class SlaveWindow
             }
 
             if ((DateTime.UtcNow - info.LastLoggedIn).TotalDays > staleDays)
+                reloggerSelectedIndices.Add(i);
+        }
+    }
+
+    private void SelectVisibleReloggerCharacters(Func<ReloggerCharacterData?, bool> predicate)
+    {
+        var cfg = plugin.Configuration;
+        var chars = cfg.ReloggerCharacters;
+        for (int i = 0; i < chars.Count; i++)
+        {
+            var charName = chars[i];
+            var world = GetWorldFromKey(charName);
+            var regionDc = WorldData.GetRegionDcLabel(world);
+            if (!MatchesRegionFilter(world, cfg.ReloggerRegionFilter))
+                continue;
+            if (!string.IsNullOrEmpty(reloggerSearchFilter)
+                && !charName.Contains(reloggerSearchFilter, StringComparison.OrdinalIgnoreCase)
+                && !regionDc.Contains(reloggerSearchFilter, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            cfg.ReloggerCharacterInfo.TryGetValue(charName, out var info);
+            if (predicate(info))
                 reloggerSelectedIndices.Add(i);
         }
     }
@@ -806,7 +858,10 @@ public partial class SlaveWindow
                        gil,
                        highest_job_level AS highest_level,
                        fc_name, fc_id, fc_estate,
-                       retainer_count
+                       retainer_count,
+                       free_company_json,
+                       fc_members_json,
+                       inventory_summaries_json
                 FROM xa_characters
                 ORDER BY character_name";
 
@@ -844,10 +899,20 @@ public partial class SlaveWindow
                 data.PersonalEstate = reader["personal_estate"]?.ToString() ?? "";
                 data.Apartment = reader["apartment"]?.ToString() ?? "";
                 data.FcEstate = reader["fc_estate"]?.ToString() ?? "";
+                data.FcMemberRankName = string.Empty;
+                data.FcMemberRankSort = int.MaxValue;
+                data.FreeCompanyRank = 0;
+                data.MainInventoryUsedSlots = 0;
+                data.MainInventoryTotalSlots = 0;
+                data.MainInventoryFreeSlots = 0;
 
                 var dbRetainerCount = Convert.ToInt32(reader["retainer_count"]);
                 if (dbRetainerCount > 0)
                     data.RetainerCount = dbRetainerCount;
+
+                UpdateCharacterFcMemberRank(data, name, world, reader["fc_members_json"]?.ToString() ?? "");
+                UpdateCharacterFreeCompanyRank(data, reader["free_company_json"]?.ToString() ?? "");
+                UpdateCharacterInventorySummary(data, reader["inventory_summaries_json"]?.ToString() ?? "");
 
                 var lastSeenStr = reader["updated_utc"].ToString() ?? "";
                 if (DateTime.TryParse(lastSeenStr, null, System.Globalization.DateTimeStyles.AssumeUniversal, out var lastSeen))
@@ -873,6 +938,163 @@ public partial class SlaveWindow
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
             Plugin.Log.Error($"[XASlave] PullXaDatabaseInfo error: {ex.Message}");
         }
+    }
+
+    private static void UpdateCharacterFcMemberRank(ReloggerCharacterData data, string name, string world, string fcMembersJson)
+    {
+        if (string.IsNullOrWhiteSpace(fcMembersJson))
+            return;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(fcMembersJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return;
+
+            foreach (var member in doc.RootElement.EnumerateArray())
+            {
+                var matchesContentId = member.TryGetProperty("ContentId", out var memberContentId)
+                    && TryGetJsonInt64(memberContentId, out var parsedContentId)
+                    && parsedContentId == data.CID;
+
+                var memberName = member.TryGetProperty("Name", out var memberNameElement)
+                    ? memberNameElement.GetString() ?? string.Empty
+                    : string.Empty;
+                var homeWorldName = member.TryGetProperty("HomeWorldName", out var homeWorldElement)
+                    ? homeWorldElement.GetString() ?? string.Empty
+                    : string.Empty;
+                var currentWorldName = member.TryGetProperty("CurrentWorldName", out var currentWorldElement)
+                    ? currentWorldElement.GetString() ?? string.Empty
+                    : string.Empty;
+                var matchesNameWorld = memberName.Equals(name, StringComparison.OrdinalIgnoreCase)
+                    && (homeWorldName.Equals(world, StringComparison.OrdinalIgnoreCase)
+                        || currentWorldName.Equals(world, StringComparison.OrdinalIgnoreCase));
+
+                if (!matchesContentId && !matchesNameWorld)
+                    continue;
+
+                if (member.TryGetProperty("RankName", out var rankNameElement))
+                    data.FcMemberRankName = rankNameElement.GetString() ?? string.Empty;
+
+                if (member.TryGetProperty("RankSort", out var rankSortElement)
+                    && TryGetJsonInt32(rankSortElement, out var rankSort))
+                    data.FcMemberRankSort = rankSort;
+
+                return;
+            }
+        }
+        catch
+        {
+        }
+    }
+
+    private static int GetCurrentRankSortValue(ReloggerCharacterData? info)
+    {
+        if (info == null || info.FCID == 0)
+            return int.MaxValue;
+
+        if (info.FcMemberRankSort != int.MaxValue)
+            return info.FcMemberRankSort;
+
+        if (info.FcMemberRankName.Equals("Master", StringComparison.OrdinalIgnoreCase))
+            return 0;
+
+        const string rankPrefix = "Rank ";
+        if (info.FcMemberRankName.StartsWith(rankPrefix, StringComparison.OrdinalIgnoreCase)
+            && int.TryParse(info.FcMemberRankName.Substring(rankPrefix.Length), out var parsedRank)
+            && parsedRank > 0)
+            return parsedRank - 1;
+
+        return string.IsNullOrWhiteSpace(info.FcMemberRankName)
+            ? int.MaxValue
+            : int.MaxValue - 1;
+    }
+
+    private static void UpdateCharacterFreeCompanyRank(ReloggerCharacterData data, string freeCompanyJson)
+    {
+        if (string.IsNullOrWhiteSpace(freeCompanyJson))
+            return;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(freeCompanyJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Object)
+                return;
+
+            if (doc.RootElement.TryGetProperty("Rank", out var rankElement)
+                && TryGetJsonInt32(rankElement, out var fcRank))
+                data.FreeCompanyRank = fcRank;
+        }
+        catch
+        {
+        }
+    }
+
+    private static void UpdateCharacterInventorySummary(ReloggerCharacterData data, string inventorySummariesJson)
+    {
+        if (string.IsNullOrWhiteSpace(inventorySummariesJson))
+            return;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(inventorySummariesJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return;
+
+            foreach (var summary in doc.RootElement.EnumerateArray())
+            {
+                if (!summary.TryGetProperty("Name", out var nameElement))
+                    continue;
+
+                var containerName = nameElement.GetString() ?? string.Empty;
+                if (!IsMainInventorySummary(containerName))
+                    continue;
+
+                if (summary.TryGetProperty("UsedSlots", out var usedElement)
+                    && TryGetJsonInt32(usedElement, out var usedSlots))
+                    data.MainInventoryUsedSlots += usedSlots;
+
+                if (summary.TryGetProperty("TotalSlots", out var totalElement)
+                    && TryGetJsonInt32(totalElement, out var totalSlots))
+                    data.MainInventoryTotalSlots += totalSlots;
+            }
+
+            data.MainInventoryFreeSlots = Math.Max(0, data.MainInventoryTotalSlots - data.MainInventoryUsedSlots);
+        }
+        catch
+        {
+        }
+    }
+
+    private static bool IsMainInventorySummary(string containerName)
+    {
+        return containerName.StartsWith("Inventory ", StringComparison.OrdinalIgnoreCase)
+            && !containerName.Contains("retainer", StringComparison.OrdinalIgnoreCase)
+            && !containerName.Contains("buddy", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool TryGetJsonInt32(JsonElement element, out int value)
+    {
+        if (element.ValueKind == JsonValueKind.Number)
+            return element.TryGetInt32(out value);
+
+        if (element.ValueKind == JsonValueKind.String)
+            return int.TryParse(element.GetString(), out value);
+
+        value = 0;
+        return false;
+    }
+
+    private static bool TryGetJsonInt64(JsonElement element, out long value)
+    {
+        if (element.ValueKind == JsonValueKind.Number)
+            return element.TryGetInt64(out value);
+
+        if (element.ValueKind == JsonValueKind.String)
+            return long.TryParse(element.GetString(), out value);
+
+        value = 0;
+        return false;
     }
 
     // ───────────────────────────────────────────────

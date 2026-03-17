@@ -24,6 +24,10 @@ public partial class SlaveWindow : Window, IDisposable
 {
     private readonly Plugin plugin;
     private const string PluginVersion = BuildInfo.Version;
+    private const float DefaultTaskMenuWidth = 100f;
+    private const float MinTaskMenuWidth = 30f;
+    private const float MaxTaskMenuWidth = DefaultTaskMenuWidth * 2f;
+    private const float TaskLayoutColumnGap = 3f;
     private static readonly int[] CheckEveryHourOptions = { 0, 6, 12, 24, 48, 72, 168, 336, 720, 1440, 2160 };
 
     // Task menu
@@ -32,9 +36,10 @@ public partial class SlaveWindow : Window, IDisposable
         // Tasks
         SaveToXaDatabase,
         CityChatFlooder,
+        // City Shenanigans
         AutoGlamWeather,
         AutoRetainerTasks,
-        // FC
+        // FC Relations
         MonthlyRelogger,
         CheckDuplicatePlots,
         PrepLogistics,
@@ -50,6 +55,15 @@ public partial class SlaveWindow : Window, IDisposable
         DebugCommands,
 #endif
         IpcCallsAvailable,
+    }
+
+    private enum MenuSection
+    {
+        AutomatedTasks,
+        CityShenanigans,
+        FcRelations,
+        Utility,
+        Reference,
     }
 
     private static readonly (SlaveTask Task, string Label)[] TaskItems =
@@ -103,6 +117,7 @@ public partial class SlaveWindow : Window, IDisposable
         };
 
         this.plugin = plugin;
+        RestoreLastSelectedTaskSelection();
         Plugin.Framework.Update += OnFrameworkUpdate;
     }
 
@@ -111,6 +126,61 @@ public partial class SlaveWindow : Window, IDisposable
         CancelScheduledAutoCollection(true);
         ReleaseRefreshSubsArSuppression();
         Plugin.Framework.Update -= OnFrameworkUpdate;
+    }
+
+    private void RestoreLastSelectedTaskSelection()
+    {
+        var cfg = plugin.Configuration;
+
+        if (!string.IsNullOrWhiteSpace(cfg.LastSelectedExternalTaskName))
+        {
+            var matchingExternalTask = plugin.ExternalTaskLoader.Tasks.FirstOrDefault(task =>
+                task.Name.Equals(cfg.LastSelectedExternalTaskName, StringComparison.Ordinal));
+            if (matchingExternalTask != null)
+            {
+                selectedExternalTask = matchingExternalTask;
+                return;
+            }
+        }
+
+        if (Enum.TryParse<SlaveTask>(cfg.LastSelectedBuiltInTask, out var restoredTask)
+            && Enum.IsDefined(restoredTask))
+        {
+            selectedTask = restoredTask;
+            selectedExternalTask = null;
+            return;
+        }
+
+        selectedTask = SlaveTask.SaveToXaDatabase;
+        selectedExternalTask = null;
+    }
+
+    private void PersistLastSelectedTaskSelection()
+    {
+        var cfg = plugin.Configuration;
+        var builtInTaskName = selectedTask.ToString();
+        var externalTaskName = selectedExternalTask?.Name ?? string.Empty;
+
+        if (string.Equals(cfg.LastSelectedBuiltInTask, builtInTaskName, StringComparison.Ordinal)
+            && string.Equals(cfg.LastSelectedExternalTaskName, externalTaskName, StringComparison.Ordinal))
+            return;
+
+        cfg.LastSelectedBuiltInTask = builtInTaskName;
+        cfg.LastSelectedExternalTaskName = externalTaskName;
+        cfg.Save();
+    }
+
+    private void SelectBuiltInTask(SlaveTask task)
+    {
+        selectedTask = task;
+        selectedExternalTask = null;
+        PersistLastSelectedTaskSelection();
+    }
+
+    private void SelectExternalTask(ITaskPanel task)
+    {
+        selectedExternalTask = task;
+        PersistLastSelectedTaskSelection();
     }
 
     private static int NormalizeCheckEveryHours(int hours)
@@ -136,10 +206,13 @@ public partial class SlaveWindow : Window, IDisposable
         if (normalized == 0)
             return "Always";
 
-        if (normalized > 72 && normalized % 24 == 0)
-            return $"{normalized / 24}d";
+        if (normalized % 24 == 0)
+        {
+            var days = normalized / 24;
+            return days == 1 ? "1 day" : $"{days} days";
+        }
 
-        return $"{normalized}hr";
+        return normalized == 1 ? "1 hour" : $"{normalized} hours";
     }
 
     public void ScheduleAutoCollection()
@@ -290,15 +363,57 @@ public partial class SlaveWindow : Window, IDisposable
     public override void Draw()
     {
         // ── Left panel: Task menu ──
-        var leftWidth = 180f;
-        using (var child = ImRaii.Child("TaskMenu", new Vector2(leftWidth, -30), true))
+        var leftWidth = ClampTaskMenuWidth(plugin.Configuration.TaskMenuWidth);
+        if (Math.Abs(leftWidth - plugin.Configuration.TaskMenuWidth) > 0.01f)
+        {
+            plugin.Configuration.TaskMenuWidth = leftWidth;
+            plugin.Configuration.Save();
+        }
+
+        var panelHeight = Math.Max(120f, ImGui.GetContentRegionAvail().Y - 30f);
+        ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(TaskLayoutColumnGap, 0f));
+        ImGui.PushStyleColor(ImGuiCol.Separator, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.SeparatorHovered, new Vector4(0.40f, 0.40f, 0.40f, 1.0f));
+        ImGui.PushStyleColor(ImGuiCol.SeparatorActive, new Vector4(0.55f, 0.55f, 0.55f, 1.0f));
+        if (ImGui.BeginTable("SlaveLayout", 2, ImGuiTableFlags.Resizable | ImGuiTableFlags.NoSavedSettings, new Vector2(0f, panelHeight)))
+        {
+            ImGui.TableSetupColumn("TaskMenuColumn", ImGuiTableColumnFlags.WidthFixed, leftWidth);
+            ImGui.TableSetupColumn("TaskContentColumn", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableNextRow();
+
+            ImGui.TableNextColumn();
+            DrawTaskMenuPanel(panelHeight);
+
+            var currentWidth = ClampTaskMenuWidth(ImGui.GetColumnWidth(0));
+            if (Math.Abs(plugin.Configuration.TaskMenuWidth - currentWidth) > 1f)
+            {
+                plugin.Configuration.TaskMenuWidth = currentWidth;
+                plugin.Configuration.Save();
+            }
+
+            ImGui.TableNextColumn();
+            DrawTaskContentPanel(panelHeight);
+            ImGui.EndTable();
+        }
+        ImGui.PopStyleColor(3);
+        ImGui.PopStyleVar();
+
+        // ── Status bar ──
+        ImGui.Separator();
+        DrawStatusBar();
+    }
+
+    private void DrawTaskMenuPanel(float panelHeight)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
+        using (var child = ImRaii.Child("TaskMenu", new Vector2(0f, panelHeight), true))
         {
             if (child.Success)
             {
-                DrawMenuSection("Automated Tasks", TaskItems, new Vector4(0.4f, 0.8f, 1.0f, 1.0f));
-                DrawMenuSection("City Shenanigans", CityShenanigansItems, new Vector4(1.0f, 0.7f, 0.4f, 1.0f));
-                DrawMenuSection("FC Relations", FcItems, new Vector4(0.8f, 0.6f, 1.0f, 1.0f));
-                DrawMenuSection("Utility", UtilityItems, new Vector4(0.6f, 1.0f, 0.6f, 1.0f));
+                DrawMenuSection(MenuSection.AutomatedTasks, "Automated Tasks", TaskItems, new Vector4(0.4f, 0.8f, 1.0f, 1.0f));
+                DrawMenuSection(MenuSection.CityShenanigans, "City Shenanigans", CityShenanigansItems, new Vector4(1.0f, 0.7f, 0.4f, 1.0f));
+                DrawMenuSection(MenuSection.FcRelations, "FC Relations", FcItems, new Vector4(0.8f, 0.6f, 1.0f, 1.0f));
+                DrawMenuSection(MenuSection.Utility, "Utility", UtilityItems, new Vector4(0.6f, 1.0f, 0.6f, 1.0f));
 
                 foreach (var ext in plugin.ExternalTaskLoader.Tasks)
                 {
@@ -306,17 +421,19 @@ public partial class SlaveWindow : Window, IDisposable
                         continue;
                     var isSelected = selectedExternalTask == ext;
                     if (ImGui.Selectable(visibleLabel, isSelected))
-                        selectedExternalTask = ext;
+                        SelectExternalTask(ext);
                 }
 
-                DrawMenuSection("Reference", ReferenceItems, new Vector4(0.6f, 0.6f, 0.6f, 1.0f));
+                DrawMenuSection(MenuSection.Reference, "Reference", ReferenceItems, new Vector4(0.6f, 0.6f, 0.6f, 1.0f));
             }
         }
+        ImGui.PopStyleColor();
+    }
 
-        ImGui.SameLine();
-
-        // ── Right panel: Task content ──
-        using (var child = ImRaii.Child("TaskContent", new Vector2(0, -30), true))
+    private void DrawTaskContentPanel(float panelHeight)
+    {
+        ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
+        using (var child = ImRaii.Child("TaskContent", new Vector2(0f, panelHeight), true))
         {
             if (child.Success)
             {
@@ -383,10 +500,7 @@ public partial class SlaveWindow : Window, IDisposable
                 }
             }
         }
-
-        // ── Status bar ──
-        ImGui.Separator();
-        DrawStatusBar();
+        ImGui.PopStyleColor();
     }
 
     // ───────────────────────────────────────────────
@@ -570,31 +684,118 @@ public partial class SlaveWindow : Window, IDisposable
         return new Vector4(colorScale, 1f, colorScale, 1f);
     }
 
+    private float ClampTaskMenuWidth(float width)
+    {
+        return Math.Clamp(width <= 0f ? DefaultTaskMenuWidth : width, MinTaskMenuWidth, MaxTaskMenuWidth);
+    }
+
     /// <summary>Renders a menu section with header and selectable items.</summary>
-    private void DrawMenuSection(string header, (SlaveTask Task, string Label)[] items, Vector4 headerColor)
+    private void DrawMenuSection(MenuSection section, string header, (SlaveTask Task, string Label)[] items, Vector4 headerColor)
     {
         ImGui.Spacing();
-        ImGui.TextColored(headerColor, header);
-        ImGui.Separator();
+        var expanded = GetMenuSectionExpanded(section);
+        ImGui.PushStyleColor(ImGuiCol.Text, headerColor);
+        ImGui.PushStyleColor(ImGuiCol.Header, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui.PushStyleColor(ImGuiCol.HeaderHovered, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui.PushStyleColor(ImGuiCol.HeaderActive, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
+        ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
+        ImGui.SetNextItemOpen(expanded, ImGuiCond.Always);
+        var isOpen = ImGui.CollapsingHeader($"{header}##{section}");
+        ImGui.PopStyleVar(2);
+        ImGui.PopStyleColor(5);
+        if (isOpen != expanded)
+            SetMenuSectionExpanded(section, isOpen);
+        if (!isOpen)
+            return;
+
         foreach (var (task, label) in items)
         {
             if (!TryGetVisibleTaskLabel(label, out var visibleLabel))
                 continue;
 
-            var isActivePriority = IsPriorityTask(task) && IsTaskActive(task);
-            if (isActivePriority)
+            var shouldPulse = ShouldPulseMenuTaskItem(task);
+            if (shouldPulse)
                 ImGui.PushStyleColor(ImGuiCol.Text, GetPriorityTaskPulseColor());
 
             var isSelected = selectedExternalTask == null && selectedTask == task;
             if (ImGui.Selectable(visibleLabel, isSelected))
             {
-                selectedTask = task;
-                selectedExternalTask = null;
+                SelectBuiltInTask(task);
             }
 
-            if (isActivePriority)
+            if (shouldPulse)
                 ImGui.PopStyleColor();
         }
+    }
+
+    private bool ShouldPulseMenuTaskItem(SlaveTask task)
+    {
+        return task switch
+        {
+            SlaveTask.SaveToXaDatabase => IsSaveToXaDatabaseActive(),
+            SlaveTask.AutoRetainerTasks => IsAutoRetainerHelperActive(),
+            _ => IsPriorityTask(task) && IsTaskActive(task),
+        };
+    }
+
+    private bool GetMenuSectionExpanded(MenuSection section)
+    {
+        return section switch
+        {
+            MenuSection.AutomatedTasks => plugin.Configuration.MenuAutomatedTasksExpanded,
+            MenuSection.CityShenanigans => plugin.Configuration.MenuCityShenanigansExpanded,
+            MenuSection.FcRelations => plugin.Configuration.MenuFcRelationsExpanded,
+            MenuSection.Utility => plugin.Configuration.MenuUtilityExpanded,
+            MenuSection.Reference => plugin.Configuration.MenuReferenceExpanded,
+            _ => true,
+        };
+    }
+
+    private void SetMenuSectionExpanded(MenuSection section, bool expanded)
+    {
+        switch (section)
+        {
+            case MenuSection.AutomatedTasks:
+                if (plugin.Configuration.MenuAutomatedTasksExpanded == expanded) return;
+                plugin.Configuration.MenuAutomatedTasksExpanded = expanded;
+                break;
+            case MenuSection.CityShenanigans:
+                if (plugin.Configuration.MenuCityShenanigansExpanded == expanded) return;
+                plugin.Configuration.MenuCityShenanigansExpanded = expanded;
+                break;
+            case MenuSection.FcRelations:
+                if (plugin.Configuration.MenuFcRelationsExpanded == expanded) return;
+                plugin.Configuration.MenuFcRelationsExpanded = expanded;
+                break;
+            case MenuSection.Utility:
+                if (plugin.Configuration.MenuUtilityExpanded == expanded) return;
+                plugin.Configuration.MenuUtilityExpanded = expanded;
+                break;
+            case MenuSection.Reference:
+                if (plugin.Configuration.MenuReferenceExpanded == expanded) return;
+                plugin.Configuration.MenuReferenceExpanded = expanded;
+                break;
+            default:
+                return;
+        }
+
+        plugin.Configuration.Save();
+    }
+
+    private bool IsSaveToXaDatabaseActive()
+    {
+        return plugin.Configuration.AutoCollectOnLogin || autoCollectScheduledAt.HasValue || plugin.AutoCollector.IsRunning;
+    }
+
+    private bool IsAutoRetainerHelperActive()
+    {
+        return plugin.Configuration.ArShipExplorationBailoutEnabled
+            || plugin.Configuration.ArPreProcessEnabled
+            || plugin.Configuration.ArPostProcessEnabled
+            || plugin.ArPostProcessor.IsRegistered
+            || plugin.ArPostProcessor.IsRunning;
     }
 
     private void DrawStatusBar()

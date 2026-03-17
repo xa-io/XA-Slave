@@ -23,18 +23,40 @@ public partial class SlaveWindow
     // ── Auto-Glam state ──
     private bool glamWeatherRunning;
     private bool glamWeatherShowLog;
-    private string glamLastWeatherGroup = "";
+    private int glamLastWeatherId = -1;
     private DateTime glamLastCheck = DateTime.MinValue;
     private string glamClassJobInput = string.Empty;
-    private string glamSunnyPlateInput = string.Empty;
-    private string glamRainPlateInput = string.Empty;
-    private string glamFreezePlateInput = string.Empty;
+    private readonly Dictionary<int, string> glamWeatherPlateInputs = new();
     private bool glamWeatherInputsInitialized;
 
+    private const float AutoGlamClassJobInputWidth = 180f;
+    private const float AutoGlamWeatherPlateInputWidth = 90f;
+    private const int AutoGlamWeatherColumnCount = 3;
+    private const float AutoGlamWeatherColumnWidth = 95f;
+
     // Weather ID → group mapping
-    private static readonly HashSet<int> SunnyWeatherIds = new() { 1, 2, 3, 5, 11, 14, 17, 49, 50, 148, 149 };
-    private static readonly HashSet<int> RainWeatherIds = new() { 4, 6, 7, 8, 9, 10 };
-    private static readonly HashSet<int> FreezeWeatherIds = new() { 15, 16 };
+    private static readonly (int Id, string Label)[] AutoGlamWeatherDefinitions =
+    {
+        (1, "Clear Skies"),
+        (2, "Fair Skies"),
+        (3, "Clouds"),
+        (4, "Fog"),
+        (5, "Wind"),
+        (6, "Gales"),
+        (7, "Rain"),
+        (8, "Showers"),
+        (9, "Thunder"),
+        (10, "Thunderstorms"),
+        (11, "Dust Storms"),
+        (14, "Heat Waves"),
+        (15, "Snow"),
+        (16, "Blizzards"),
+        (17, "Gloom"),
+        (49, "Umbral Wind"),
+        (50, "Umbral Static"),
+        (148, "Moon Dust"),
+        (149, "Astro Storm"),
+    };
 
     private static readonly Dictionary<int, string> WeatherNames = new()
     {
@@ -62,7 +84,7 @@ public partial class SlaveWindow
 
         var glamConfigChanged = false;
 
-        ImGui.SetNextItemWidth(160);
+        ImGui.SetNextItemWidth(AutoGlamClassJobInputWidth);
         if (ImGui.InputText("Class/Job(s) to Assign##glamClass", ref glamClassJobInput, 128))
         {
             glamClassJobInput = SanitizeAutoGlamInput(glamClassJobInput, 1, null, true);
@@ -79,56 +101,9 @@ public partial class SlaveWindow
         ImGui.SameLine();
         ImGui.TextDisabled("(Comma-separated numbers, no spaces)");
 
-        ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("Sunny Plate(s)##glamSunny", ref glamSunnyPlateInput, 128))
-        {
-            glamSunnyPlateInput = SanitizeAutoGlamInput(glamSunnyPlateInput, 1, 20, true);
-            var committedSunnyPlates = CommitAutoGlamInput(glamSunnyPlateInput, 1, 20);
-            if (!string.Equals(cfg.AutoGlamWeatherSunnyPlateOptions, committedSunnyPlates, StringComparison.Ordinal))
-            {
-                cfg.AutoGlamWeatherSunnyPlateOptions = committedSunnyPlates;
-                cfg.Save();
-                glamConfigChanged = true;
-            }
-        }
-        if (ImGui.IsItemDeactivatedAfterEdit())
-            glamSunnyPlateInput = CommitAutoGlamInput(glamSunnyPlateInput, 1, 20);
-        ImGui.SameLine();
-        ImGui.TextDisabled("(1-20, comma-separated; Clear, Fair, Clouds, Wind, Dust, Heat, Gloom, etc.)");
-
-        ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("Rain Plate(s)##glamRain", ref glamRainPlateInput, 128))
-        {
-            glamRainPlateInput = SanitizeAutoGlamInput(glamRainPlateInput, 1, 20, true);
-            var committedRainPlates = CommitAutoGlamInput(glamRainPlateInput, 1, 20);
-            if (!string.Equals(cfg.AutoGlamWeatherRainPlateOptions, committedRainPlates, StringComparison.Ordinal))
-            {
-                cfg.AutoGlamWeatherRainPlateOptions = committedRainPlates;
-                cfg.Save();
-                glamConfigChanged = true;
-            }
-        }
-        if (ImGui.IsItemDeactivatedAfterEdit())
-            glamRainPlateInput = CommitAutoGlamInput(glamRainPlateInput, 1, 20);
-        ImGui.SameLine();
-        ImGui.TextDisabled("(1-20, comma-separated; Fog, Gales, Rain, Showers, Thunder, Thunderstorms)");
-
-        ImGui.SetNextItemWidth(160);
-        if (ImGui.InputText("Freeze Plate(s)##glamFreeze", ref glamFreezePlateInput, 128))
-        {
-            glamFreezePlateInput = SanitizeAutoGlamInput(glamFreezePlateInput, 1, 20, true);
-            var committedFreezePlates = CommitAutoGlamInput(glamFreezePlateInput, 1, 20);
-            if (!string.Equals(cfg.AutoGlamWeatherFreezePlateOptions, committedFreezePlates, StringComparison.Ordinal))
-            {
-                cfg.AutoGlamWeatherFreezePlateOptions = committedFreezePlates;
-                cfg.Save();
-                glamConfigChanged = true;
-            }
-        }
-        if (ImGui.IsItemDeactivatedAfterEdit())
-            glamFreezePlateInput = CommitAutoGlamInput(glamFreezePlateInput, 1, 20);
-        ImGui.SameLine();
-        ImGui.TextDisabled("(1-20, comma-separated; Snow, Blizzards)");
+        ImGui.TextDisabled("Each weather box accepts comma-separated glamour plate values from 1-20.");
+        if (DrawAutoGlamWeatherPlateGrid(cfg))
+            glamConfigChanged = true;
 
         ImGui.Spacing();
         ImGui.SetNextItemWidth(80);
@@ -142,12 +117,10 @@ public partial class SlaveWindow
         }
 
         if (glamConfigChanged && glamWeatherRunning)
-            glamLastWeatherGroup = string.Empty;
+            glamLastWeatherId = -1;
 
         var classJobOptions = ParseAutoGlamInput(glamClassJobInput, 1, null);
-        var sunnyPlateOptions = ParseAutoGlamInput(glamSunnyPlateInput, 1, 20);
-        var rainPlateOptions = ParseAutoGlamInput(glamRainPlateInput, 1, 20);
-        var freezePlateOptions = ParseAutoGlamInput(glamFreezePlateInput, 1, 20);
+        var firstMissingWeatherLabel = GetFirstMissingAutoGlamWeatherLabel(cfg);
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -156,20 +129,14 @@ public partial class SlaveWindow
         // Start/Stop
         var canStart = Plugin.PlayerState.IsLoaded
             && classJobOptions.Count > 0
-            && sunnyPlateOptions.Count > 0
-            && rainPlateOptions.Count > 0
-            && freezePlateOptions.Count > 0;
+            && string.IsNullOrEmpty(firstMissingWeatherLabel);
         var startDisabledReason = !Plugin.PlayerState.IsLoaded
             ? "Player must be loaded to start Auto-Glam Weather."
             : classJobOptions.Count == 0
                 ? "Enter at least one valid class/job number."
-                : sunnyPlateOptions.Count == 0
-                    ? "Enter at least one valid sunny plate number between 1 and 20."
-                    : rainPlateOptions.Count == 0
-                        ? "Enter at least one valid rain plate number between 1 and 20."
-                        : freezePlateOptions.Count == 0
-                            ? "Enter at least one valid freeze plate number between 1 and 20."
-                            : string.Empty;
+                : !string.IsNullOrEmpty(firstMissingWeatherLabel)
+                    ? $"Enter at least one valid plate number between 1 and 20 for {firstMissingWeatherLabel}."
+                    : string.Empty;
         var started = DrawPriorityTaskActionButton(
             SlaveTask.AutoGlamWeather,
             "Start Monitoring##glamStart",
@@ -186,10 +153,10 @@ public partial class SlaveWindow
         }
 
         // Current weather info
-        if (glamWeatherRunning || !string.IsNullOrEmpty(glamLastWeatherGroup))
+        if (glamWeatherRunning || glamLastWeatherId >= 0)
         {
             ImGui.Spacing();
-            ImGui.TextDisabled($"Last weather group: {(string.IsNullOrEmpty(glamLastWeatherGroup) ? "(none yet)" : glamLastWeatherGroup)}");
+            ImGui.TextDisabled($"Last weather: {GetLastAutoGlamWeatherLabel()}");
         }
 
         DrawTaskLog("glamWeather", ref glamWeatherShowLog, plugin.TaskRunner);
@@ -201,9 +168,6 @@ public partial class SlaveWindow
             return;
 
         glamClassJobInput = CommitAutoGlamInput(cfg.AutoGlamWeatherClassJobOptions, 1, null);
-        glamSunnyPlateInput = CommitAutoGlamInput(cfg.AutoGlamWeatherSunnyPlateOptions, 1, 20);
-        glamRainPlateInput = CommitAutoGlamInput(cfg.AutoGlamWeatherRainPlateOptions, 1, 20);
-        glamFreezePlateInput = CommitAutoGlamInput(cfg.AutoGlamWeatherFreezePlateOptions, 1, 20);
 
         var changed = false;
         if (!string.Equals(cfg.AutoGlamWeatherClassJobOptions, glamClassJobInput, StringComparison.Ordinal))
@@ -211,25 +175,150 @@ public partial class SlaveWindow
             cfg.AutoGlamWeatherClassJobOptions = glamClassJobInput;
             changed = true;
         }
-        if (!string.Equals(cfg.AutoGlamWeatherSunnyPlateOptions, glamSunnyPlateInput, StringComparison.Ordinal))
+        foreach (var definition in AutoGlamWeatherDefinitions)
         {
-            cfg.AutoGlamWeatherSunnyPlateOptions = glamSunnyPlateInput;
-            changed = true;
-        }
-        if (!string.Equals(cfg.AutoGlamWeatherRainPlateOptions, glamRainPlateInput, StringComparison.Ordinal))
-        {
-            cfg.AutoGlamWeatherRainPlateOptions = glamRainPlateInput;
-            changed = true;
-        }
-        if (!string.Equals(cfg.AutoGlamWeatherFreezePlateOptions, glamFreezePlateInput, StringComparison.Ordinal))
-        {
-            cfg.AutoGlamWeatherFreezePlateOptions = glamFreezePlateInput;
-            changed = true;
+            var committed = CommitAutoGlamInput(GetAutoGlamWeatherPlateOptions(cfg, definition.Id), 1, 20);
+            glamWeatherPlateInputs[definition.Id] = committed;
+            if (!string.Equals(GetAutoGlamWeatherPlateOptions(cfg, definition.Id), committed, StringComparison.Ordinal))
+            {
+                cfg.AutoGlamWeatherPlateOptionsByWeatherId[definition.Id] = committed;
+                changed = true;
+            }
         }
         if (changed)
             cfg.Save();
 
         glamWeatherInputsInitialized = true;
+    }
+
+    private bool DrawAutoGlamWeatherPlateGrid(XASlave.Configuration cfg)
+    {
+        var changed = false;
+        var style = ImGui.GetStyle();
+        var startPos = ImGui.GetCursorPos();
+        var startX = MathF.Ceiling(startPos.X);
+        var startY = MathF.Ceiling(startPos.Y);
+        var columnWidth = GetAutoGlamWeatherGridColumnWidth();
+        var columnStride = MathF.Ceiling(columnWidth + style.ItemSpacing.X);
+        var maxHeight = 0f;
+
+        for (var columnIndex = 0; columnIndex < AutoGlamWeatherColumnCount; columnIndex++)
+        {
+            ImGui.SetCursorPos(new Vector2(startX + (columnIndex * columnStride), startY));
+            ImGui.BeginGroup();
+            if (DrawAutoGlamWeatherPlateColumn(cfg, columnIndex))
+                changed = true;
+            ImGui.EndGroup();
+
+            var columnHeight = MathF.Ceiling(ImGui.GetCursorPosY() - startY);
+            if (columnHeight > maxHeight)
+                maxHeight = columnHeight;
+        }
+
+        ImGui.SetCursorPos(new Vector2(startX, startY + maxHeight));
+        return changed;
+    }
+
+    private float GetAutoGlamWeatherGridColumnWidth()
+    {
+        var width = MathF.Max(AutoGlamWeatherColumnWidth, AutoGlamWeatherPlateInputWidth);
+        foreach (var definition in AutoGlamWeatherDefinitions)
+        {
+            var labelWidth = MathF.Ceiling(ImGui.CalcTextSize(definition.Label).X);
+            if (labelWidth > width)
+                width = labelWidth;
+        }
+
+        return width;
+    }
+
+    private bool DrawAutoGlamWeatherPlateColumn(XASlave.Configuration cfg, int columnIndex)
+    {
+        var changed = false;
+        for (var i = columnIndex; i < AutoGlamWeatherDefinitions.Length; i += AutoGlamWeatherColumnCount)
+        {
+            var definition = AutoGlamWeatherDefinitions[i];
+            if (DrawAutoGlamWeatherPlateInput(cfg, definition.Id, definition.Label))
+                changed = true;
+        }
+
+        return changed;
+    }
+
+    private bool DrawAutoGlamWeatherPlateInput(XASlave.Configuration cfg, int weatherId, string label)
+    {
+        glamWeatherPlateInputs.TryGetValue(weatherId, out var input);
+        input ??= CommitAutoGlamInput(GetAutoGlamWeatherPlateOptions(cfg, weatherId), 1, 20);
+
+        var changed = false;
+        var startY = MathF.Ceiling(ImGui.GetCursorPosY());
+        ImGui.SetCursorPosY(startY);
+        ImGui.TextUnformatted(label);
+        ImGui.SetNextItemWidth(AutoGlamWeatherPlateInputWidth);
+        if (ImGui.InputText($"##glamWeather{weatherId}", ref input, 128))
+        {
+            input = SanitizeAutoGlamInput(input, 1, 20, true);
+            glamWeatherPlateInputs[weatherId] = input;
+            var committed = CommitAutoGlamInput(input, 1, 20);
+            if (!string.Equals(GetAutoGlamWeatherPlateOptions(cfg, weatherId), committed, StringComparison.Ordinal))
+            {
+                cfg.AutoGlamWeatherPlateOptionsByWeatherId[weatherId] = committed;
+                cfg.Save();
+                changed = true;
+            }
+        }
+
+        if (ImGui.IsItemDeactivatedAfterEdit())
+        {
+            input = CommitAutoGlamInput(input, 1, 20);
+            glamWeatherPlateInputs[weatherId] = input;
+            if (!string.Equals(GetAutoGlamWeatherPlateOptions(cfg, weatherId), input, StringComparison.Ordinal))
+            {
+                cfg.AutoGlamWeatherPlateOptionsByWeatherId[weatherId] = input;
+                cfg.Save();
+                changed = true;
+            }
+        }
+
+        if (ImGui.IsItemHovered() && WeatherNames.TryGetValue(weatherId, out var weatherName))
+            ImGui.SetTooltip($"{weatherName} plate options (1-20, comma-separated).");
+
+        var style = ImGui.GetStyle();
+        var entryHeight = MathF.Ceiling(ImGui.CalcTextSize("Ag").Y + style.ItemSpacing.Y + ImGui.GetFrameHeight() + style.ItemSpacing.Y);
+        var nextY = MathF.Ceiling(startY + entryHeight);
+        if (ImGui.GetCursorPosY() < nextY)
+            ImGui.SetCursorPosY(nextY);
+
+        return changed;
+    }
+
+    private string GetFirstMissingAutoGlamWeatherLabel(XASlave.Configuration cfg)
+    {
+        foreach (var definition in AutoGlamWeatherDefinitions)
+        {
+            if (ParseAutoGlamInput(GetAutoGlamWeatherPlateOptions(cfg, definition.Id), 1, 20).Count == 0)
+                return definition.Label;
+        }
+
+        return string.Empty;
+    }
+
+    private static string GetAutoGlamWeatherPlateOptions(XASlave.Configuration cfg, int weatherId)
+    {
+        if (cfg.AutoGlamWeatherPlateOptionsByWeatherId.TryGetValue(weatherId, out var options))
+            return options ?? string.Empty;
+
+        return string.Empty;
+    }
+
+    private string GetLastAutoGlamWeatherLabel()
+    {
+        if (glamLastWeatherId < 0)
+            return "(none yet)";
+
+        return WeatherNames.TryGetValue(glamLastWeatherId, out var weatherName)
+            ? weatherName
+            : $"Unknown({glamLastWeatherId})";
     }
 
     private static string SanitizeAutoGlamInput(string input, int minValue, int? maxValue, bool preserveTrailingComma)
@@ -314,44 +403,24 @@ public partial class SlaveWindow
 
             var weatherId = (int)weatherManager->GetCurrentWeather();
 
-            string group;
-            List<int> plateOptions;
-            if (SunnyWeatherIds.Contains(weatherId))
-            {
-                group = "sunny";
-                plateOptions = ParseAutoGlamInput(cfg.AutoGlamWeatherSunnyPlateOptions, 1, 20);
-            }
-            else if (RainWeatherIds.Contains(weatherId))
-            {
-                group = "rain";
-                plateOptions = ParseAutoGlamInput(cfg.AutoGlamWeatherRainPlateOptions, 1, 20);
-            }
-            else if (FreezeWeatherIds.Contains(weatherId))
-            {
-                group = "freeze";
-                plateOptions = ParseAutoGlamInput(cfg.AutoGlamWeatherFreezePlateOptions, 1, 20);
-            }
-            else
-            {
-                group = "sunny"; // default
-                plateOptions = ParseAutoGlamInput(cfg.AutoGlamWeatherSunnyPlateOptions, 1, 20);
-            }
+            var weatherOptionsId = cfg.AutoGlamWeatherPlateOptionsByWeatherId.ContainsKey(weatherId) ? weatherId : 1;
+            var plateOptions = ParseAutoGlamInput(GetAutoGlamWeatherPlateOptions(cfg, weatherOptionsId), 1, 20);
 
-            if (group != glamLastWeatherGroup)
+            if (weatherId != glamLastWeatherId)
             {
                 var weatherName = WeatherNames.TryGetValue(weatherId, out var wn) ? wn : $"Unknown({weatherId})";
                 var classJob = ChooseAutoGlamRandomValue(classJobOptions);
                 var plate = ChooseAutoGlamRandomValue(plateOptions);
                 if (!classJob.HasValue || !plate.HasValue)
                 {
-                    plugin.TaskRunner.AddLog($"[Auto-Glam] Weather changed to {weatherName} ({group}) but no valid class/job or plate options are configured.");
-                    glamLastWeatherGroup = group;
+                    plugin.TaskRunner.AddLog($"[Auto-Glam] Weather changed to {weatherName} but no valid class/job or plate options are configured.");
+                    glamLastWeatherId = weatherId;
                     return;
                 }
 
-                plugin.TaskRunner.AddLog($"[Auto-Glam] Weather changed to {weatherName} ({group}) — applying class/job {classJob.Value}, plate {plate.Value}");
+                plugin.TaskRunner.AddLog($"[Auto-Glam] Weather changed to {weatherName} — applying class/job {classJob.Value}, plate {plate.Value}");
                 ChatHelper.SendMessage($"/gs change {classJob.Value} {plate.Value}");
-                glamLastWeatherGroup = group;
+                glamLastWeatherId = weatherId;
             }
         }
         catch (Exception ex)
@@ -366,7 +435,7 @@ public partial class SlaveWindow
             return;
 
         glamWeatherRunning = true;
-        glamLastWeatherGroup = string.Empty;
+        glamLastWeatherId = -1;
         glamLastCheck = DateTime.MinValue;
         plugin.TaskRunner.AddLog("[Auto-Glam] Weather monitoring started.");
         UpdatePriorityTaskExternalStatus();

@@ -193,7 +193,7 @@ public partial class SlaveWindow
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##refreshSubsAll"))
-                for (int i = 0; i < chars.Count; i++) refreshSubsSelectedIndices.Add(i);
+                SelectVisibleRefreshSubsCharacters();
             ImGui.SameLine();
             if (ImGui.Button("Clear All##refreshSubsNone"))
                 refreshSubsSelectedIndices.Clear();
@@ -209,6 +209,14 @@ public partial class SlaveWindow
         ImGui.TextDisabled($"({chars.Count} total)");
         ImGui.Spacing();
 
+        var refreshSubsRegionFilter = cfg.RefreshSubsRegionFilter;
+        if (DrawRegionFilterCombo("Region##refreshSubsRegion", ref refreshSubsRegionFilter))
+        {
+            cfg.RefreshSubsRegionFilter = refreshSubsRegionFilter;
+            cfg.Save();
+        }
+
+        ImGui.SameLine();
         // Search filter
         ImGui.SetNextItemWidth(200);
         ImGui.InputTextWithHint("##refreshSubsSearch", "Search name or world...", ref refreshSubsSearchFilter, 128);
@@ -237,9 +245,15 @@ public partial class SlaveWindow
                 var charName = chars[idx];
                 var nameParts = charName.Split('@');
                 var world = nameParts.Length > 1 ? nameParts[1] : "";
+                var regionDc = WorldData.GetRegionDcLabel(world);
+
+                if (!MatchesRegionFilter(world, cfg.RefreshSubsRegionFilter))
+                    continue;
 
                 if (!string.IsNullOrEmpty(refreshSubsSearchFilter) &&
-                    !charName.Contains(refreshSubsSearchFilter, StringComparison.OrdinalIgnoreCase))
+                    !charName.Contains(refreshSubsSearchFilter, StringComparison.OrdinalIgnoreCase) &&
+                    !world.Contains(refreshSubsSearchFilter, StringComparison.OrdinalIgnoreCase) &&
+                    !regionDc.Contains(refreshSubsSearchFilter, StringComparison.OrdinalIgnoreCase))
                     continue;
 
                 charInfo.TryGetValue(charName, out var info);
@@ -379,6 +393,27 @@ public partial class SlaveWindow
             .OrderBy(i => i)
             .Select(i => chars[i])
             .ToList();
+    }
+
+    private void SelectVisibleRefreshSubsCharacters()
+    {
+        var cfg = plugin.Configuration;
+        var chars = cfg.RefreshSubsCharacters;
+        for (var i = 0; i < chars.Count; i++)
+        {
+            var charName = chars[i];
+            var world = GetWorldFromKey(charName);
+            var regionDc = WorldData.GetRegionDcLabel(world);
+            if (!MatchesRegionFilter(world, cfg.RefreshSubsRegionFilter))
+                continue;
+            if (!string.IsNullOrEmpty(refreshSubsSearchFilter)
+                && !charName.Contains(refreshSubsSearchFilter, StringComparison.OrdinalIgnoreCase)
+                && !world.Contains(refreshSubsSearchFilter, StringComparison.OrdinalIgnoreCase)
+                && !regionDc.Contains(refreshSubsSearchFilter, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            refreshSubsSelectedIndices.Add(i);
+        }
     }
 
     private void StartRefreshArSubsBell()

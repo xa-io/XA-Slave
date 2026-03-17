@@ -6,14 +6,15 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 
 - **Save to XA Database** — Push data to XA Database with optional cadence-gated login collection and a built-in task log for collection/save debugging.
 - **AutoRetainer Tasks** — Run pre-processing, post-processing, bailout handling, sync cadence gates, and optional collection steps from one panel.
-- **Auto-Glam Weather** — Persist validated class/job and weather plate lists, randomly choose from valid entries on weather changes, and show `XA: Auto-Glam` in DTR while monitoring.
+- **Auto-Glam Weather** — Configure per-weather glamour plate lists, then randomly apply valid class/job and plate choices when the active weather changes.
 - **City Chat Flooder** — Send announcements across selected worlds and cities with looping and delay controls.
-- **Monthly Relogger** — Cycle through characters with AutoRetainer integration, retries, failure highlighting, and optional per-character actions.
+- **Monthly Relogger** — Cycle through characters with AutoRetainer integration, XA Database-backed rank and personal-plot visibility, failure highlighting, and optional per-character actions.
 - **Check Duplicate Plots** — Scan characters for duplicate housing plots and optionally rerun follow-up actions.
 - **Return Alts To Homeworlds** — Send characters back to their home worlds with the shared action flow.
-- **Prep Logistics** — Relog selected characters, move them to a target world or location, and optionally enable AR multi or logout after the run.
-- **Refresh AR Subs/Bell** — Refresh workshop and bell interactions with optional prep actions, a bell-only mode, and safer menu recovery.
-- **Utility Controls** — Manage plugin startup behavior, task logging, and window renaming.
+- **Prep Logistics** — Relog selected characters, see available main-inventory space, move them to a target world or location, and optionally enable AR multi or logout after the run.
+- **Refresh AR Subs/Bell** — Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, and safer menu recovery.
+- **FC Permissions Updater** — Review region-filtered FC rosters with member-rank and FC-rank visibility before running shared permissions updates.
+- **Utility Controls** — Manage plugin startup behavior, task logging, window renaming, collapsible menu groups, and a resizable task-menu pane.
 - **Priority Tasks** — Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
 
 ## Commands
