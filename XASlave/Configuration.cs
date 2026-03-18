@@ -161,6 +161,12 @@ public class Configuration : IPluginConfiguration
     public float FloorderLoopDelayMinutes { get; set; } = 5.0f;
     public bool FloorderInitialized { get; set; } = false;
 
+    // ── Export Data ──
+    public bool ExportDataAlwaysOn { get; set; } = false;
+    public int ExportDataRunEveryHours { get; set; } = 24;
+    public string ExportDataOutputPath { get; set; } = string.Empty;
+    public string ExportDataLastSuccessfulRunUtc { get; set; } = string.Empty;
+
     public bool MenuAutomatedTasksExpanded { get; set; } = true;
     public bool MenuCityShenanigansExpanded { get; set; } = true;
     public bool MenuFcRelationsExpanded { get; set; } = true;

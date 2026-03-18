@@ -15,6 +15,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Refresh AR Subs/Bell** — Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, and safer menu recovery.
 - **FC Permissions Updater** — Review region-filtered FC rosters with member-rank and FC-rank visibility before running shared permissions updates.
 - **Utility Controls** — Manage plugin startup behavior, task logging, window renaming, collapsible menu groups, and a resizable task-menu pane.
+- **Export Data** — Export multi-character tables from AutoRetainer, Lifestream, and XA Database into timestamped TSV or CSV snapshots.
 - **Priority Tasks** — Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
 
 ## Commands

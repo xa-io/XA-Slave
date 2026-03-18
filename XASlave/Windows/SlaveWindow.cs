@@ -54,6 +54,7 @@ public partial class SlaveWindow : Window, IDisposable
 #if XA_SLAVE_TESTING_BUILD
         DebugCommands,
 #endif
+        ExportData,
         IpcCallsAvailable,
     }
 
@@ -100,6 +101,7 @@ public partial class SlaveWindow : Window, IDisposable
 #if XA_SLAVE_TESTING_BUILD
         (SlaveTask.DebugCommands, "Debug / Test"),
 #endif
+        (SlaveTask.ExportData, "Export Data"),
         (SlaveTask.IpcCallsAvailable, "IPC Calls Available"),
     };
 
@@ -112,13 +114,15 @@ public partial class SlaveWindow : Window, IDisposable
     {
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(550, 350),
+            MinimumSize = new Vector2(400, 240),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
 
         this.plugin = plugin;
         RestoreLastSelectedTaskSelection();
         Plugin.Framework.Update += OnFrameworkUpdate;
+        Plugin.ClientState.Login += OnExportDataLogin;
+        Plugin.ClientState.Logout += OnExportDataLogoutHandler;
     }
 
     public void Dispose()
@@ -126,6 +130,8 @@ public partial class SlaveWindow : Window, IDisposable
         CancelScheduledAutoCollection(true);
         ReleaseRefreshSubsArSuppression();
         Plugin.Framework.Update -= OnFrameworkUpdate;
+        Plugin.ClientState.Login -= OnExportDataLogin;
+        Plugin.ClientState.Logout -= OnExportDataLogoutHandler;
     }
 
     private void RestoreLastSelectedTaskSelection()
@@ -298,6 +304,7 @@ public partial class SlaveWindow : Window, IDisposable
     {
         UpdatePriorityTaskMonitors();
         UpdatePriorityTaskExternalStatus();
+        OnExportDataFrameworkTick();
 
         if (!autoCollectScheduledAt.HasValue || !Plugin.PlayerState.IsLoaded || plugin.AutoCollector.IsRunning)
             return;
@@ -383,8 +390,8 @@ public partial class SlaveWindow : Window, IDisposable
 
             ImGui.TableNextColumn();
             DrawTaskMenuPanel(panelHeight);
-
             var currentWidth = ClampTaskMenuWidth(ImGui.GetColumnWidth(0));
+
             if (Math.Abs(plugin.Configuration.TaskMenuWidth - currentWidth) > 1f)
             {
                 plugin.Configuration.TaskMenuWidth = currentWidth;
@@ -493,6 +500,9 @@ public partial class SlaveWindow : Window, IDisposable
                             DrawDebugCommands();
                             break;
 #endif
+                        case SlaveTask.ExportData:
+                            DrawExportData();
+                            break;
                         case SlaveTask.IpcCallsAvailable:
                             DrawIpcCallsAvailable();
                             break;
