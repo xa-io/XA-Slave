@@ -1338,7 +1338,7 @@ public partial class SlaveWindow
             SetDebugResult("Sent: VK_END key press (ResetCameraXA) via KeyInputHelper");
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Presses END key via Win32 keybd_event — native replacement for SND /send END");
+            ImGui.SetTooltip("Presses END key to the current FFXIV game window — native replacement for SND /send END");
 
         ImGui.Spacing();
         } // end Player Commands
@@ -1942,7 +1942,7 @@ public partial class SlaveWindow
         // ╚══════════════════════════════════════════════╝
         if (ImGui.CollapsingHeader("Key Inputs"))
         {
-        ImGui.TextDisabled("Win32 keybd_event key simulation for FFXIV input");
+        ImGui.TextDisabled("Win32 game-window key simulation for FFXIV input");
         ImGui.Spacing();
 
         ImGui.TextDisabled("Methods:");

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Threading.Tasks;
 
@@ -28,10 +29,18 @@ namespace XASlave.Services;
 /// </summary>
 public static class KeyInputHelper
 {
-    [DllImport("user32.dll")]
-    private static extern void keybd_event(byte bVk, byte bScan, uint dwFlags, UIntPtr dwExtraInfo);
+    [DllImport("user32.dll", SetLastError = true, CharSet = CharSet.Unicode)]
+    private static extern IntPtr FindWindowEx(IntPtr hwndParent, IntPtr hwndChildAfter, string? lpszClass, string? lpszWindow);
 
-    private const uint KEYEVENTF_KEYUP = 0x0002;
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    private static extern IntPtr SendMessage(IntPtr hWnd, uint msg, UIntPtr wParam, IntPtr lParam);
+
+    private const uint WM_KEYDOWN = 0x0100;
+    private const uint WM_KEYUP = 0x0101;
+    private const string GameWindowClass = "FFXIVGAME";
 
     // ── Movement Keys ──
     public const byte VK_W = 0x57;
@@ -86,6 +95,47 @@ public static class KeyInputHelper
     public const byte VK_F11 = 0x7A;
     public const byte VK_F12 = 0x7B;
 
+    private static bool TryGetGameWindow(out IntPtr hwnd)
+    {
+        try
+        {
+            hwnd = Process.GetCurrentProcess().MainWindowHandle;
+            if (hwnd != IntPtr.Zero)
+                return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning($"[XASlave] KeyInput: Process.MainWindowHandle failed: {ex.Message}");
+        }
+
+        try
+        {
+            var currentProcessId = (uint)Environment.ProcessId;
+            var previous = IntPtr.Zero;
+
+            while (true)
+            {
+                previous = FindWindowEx(IntPtr.Zero, previous, GameWindowClass, null);
+                if (previous == IntPtr.Zero)
+                    break;
+
+                _ = GetWindowThreadProcessId(previous, out var windowProcessId);
+                if (windowProcessId == currentProcessId)
+                {
+                    hwnd = previous;
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning($"[XASlave] KeyInput: FindWindowEx fallback failed: {ex.Message}");
+        }
+
+        hwnd = IntPtr.Zero;
+        return false;
+    }
+
     /// <summary>
     /// Presses and immediately releases a key (tap).
     /// Equivalent to SND's: /send KEY
@@ -94,8 +144,14 @@ public static class KeyInputHelper
     {
         try
         {
-            keybd_event(virtualKeyCode, 0, 0, UIntPtr.Zero);
-            keybd_event(virtualKeyCode, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            if (!TryGetGameWindow(out var hwnd))
+            {
+                Plugin.Log.Error("[XASlave] KeyInput.PressKey failed: Couldn't find game window!");
+                return;
+            }
+
+            _ = SendMessage(hwnd, WM_KEYDOWN, new UIntPtr(virtualKeyCode), IntPtr.Zero);
+            _ = SendMessage(hwnd, WM_KEYUP, new UIntPtr(virtualKeyCode), IntPtr.Zero);
             Plugin.Log.Information($"[XASlave] KeyInput: PressKey 0x{virtualKeyCode:X2}");
         }
         catch (Exception ex)
@@ -113,7 +169,13 @@ public static class KeyInputHelper
     {
         try
         {
-            keybd_event(virtualKeyCode, 0, 0, UIntPtr.Zero);
+            if (!TryGetGameWindow(out var hwnd))
+            {
+                Plugin.Log.Error("[XASlave] KeyInput.HoldKey failed: Couldn't find game window!");
+                return;
+            }
+
+            _ = SendMessage(hwnd, WM_KEYDOWN, new UIntPtr(virtualKeyCode), IntPtr.Zero);
             Plugin.Log.Information($"[XASlave] KeyInput: HoldKey 0x{virtualKeyCode:X2}");
         }
         catch (Exception ex)
@@ -130,7 +192,13 @@ public static class KeyInputHelper
     {
         try
         {
-            keybd_event(virtualKeyCode, 0, KEYEVENTF_KEYUP, UIntPtr.Zero);
+            if (!TryGetGameWindow(out var hwnd))
+            {
+                Plugin.Log.Error("[XASlave] KeyInput.ReleaseKey failed: Couldn't find game window!");
+                return;
+            }
+
+            _ = SendMessage(hwnd, WM_KEYUP, new UIntPtr(virtualKeyCode), IntPtr.Zero);
             Plugin.Log.Information($"[XASlave] KeyInput: ReleaseKey 0x{virtualKeyCode:X2}");
         }
         catch (Exception ex)

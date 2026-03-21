@@ -1,6 +1,7 @@
 using Dalamud.Configuration;
 using System;
 using System.Collections.Generic;
+using XASlave.Data;
 
 namespace XASlave;
 
@@ -109,6 +110,23 @@ public class Configuration : IPluginConfiguration
     public bool PrepLogisticsEnableArMultiOnComplete { get; set; } = true;
     public bool PrepLogisticsLogoutOnComplete { get; set; } = false;
     public string PrepLogisticsRegionFilter { get; set; } = "All";
+
+    public XagmanRole XagmanRole { get; set; } = XagmanRole.Tony;
+    public List<XagmanTonyCharacterEntry> XagmanTonyCharacters { get; set; } = new();
+    public List<string> XagmanFranchiseCharacters { get; set; } = new();
+    public List<XagmanItemEntry> XagmanItems { get; set; } = new();
+    public List<XagmanNamedItemList> XagmanSavedItemLists { get; set; } = new();
+    public List<XagmanItemEntry> XagmanTonyItems { get; set; } = new();
+    public List<XagmanItemEntry> XagmanFranchiseItems { get; set; } = new();
+    public bool XagmanSharedItemsMigrationComplete { get; set; }
+    public string XagmanTargetWorld { get; set; } = string.Empty;
+    public string XagmanTargetAetheryte { get; set; } = string.Empty;
+    public bool XagmanEnableArMultiOnComplete { get; set; } = true;
+    public bool XagmanLogoutOnComplete { get; set; } = false;
+    public bool XagmanUsePreflightOnFirstCharacter { get; set; } = true;
+    public bool XagmanAutoReturnToFc { get; set; } = true;
+    public string XagmanRegionFilter { get; set; } = "All";
+    public int XagmanHubPort { get; set; } = 45215;
 
     // ── FC Permissions Updater ──
     public List<string> FcPermsCharacters { get; set; } = new();

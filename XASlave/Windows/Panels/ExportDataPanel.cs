@@ -564,7 +564,7 @@ public partial class SlaveWindow
                 continue;
 
             var highestJobLevel = reader.IsDBNull(1) ? 0 : reader.GetInt32(1);
-            var retainerGil = reader.IsDBNull(2) ? 0 : reader.GetInt32(2);
+            var retainerGil = reader.IsDBNull(2) ? 0L : reader.GetInt64(2);
             var fcTag = reader.IsDBNull(3) ? string.Empty : reader.GetString(3);
             var fcName = reader.IsDBNull(4) ? string.Empty : reader.GetString(4);
             var fcPoints = reader.IsDBNull(5) ? 0 : reader.GetInt32(5);
@@ -1192,15 +1192,15 @@ public partial class SlaveWindow
         };
     }
 
-    private static int ExportGetRetainerGil(JsonElement entry)
+    private static long ExportGetRetainerGil(JsonElement entry)
     {
-        var retainerGil = 0;
+        var retainerGil = 0L;
 
         if (entry.TryGetProperty("RetainerData", out var retainerData) && retainerData.ValueKind == JsonValueKind.Array)
         {
             foreach (var retainer in retainerData.EnumerateArray())
             {
-                var gil = ExportGetInt(retainer, "Gil");
+                var gil = ExportGetLong(retainer, "Gil");
                 retainerGil += gil;
             }
         }
@@ -1226,7 +1226,7 @@ public partial class SlaveWindow
         public int Ceruleum { get; init; }
         public int RepairKits { get; init; }
         public int? LeveAllowances { get; init; }
-        public int RetainerGil { get; init; }
+        public long RetainerGil { get; init; }
     }
 
     private sealed record ExportFcLookup(long FcId, string Name, int Points);
@@ -1257,7 +1257,7 @@ public partial class SlaveWindow
     private sealed class ExportSnapshotSupplement
     {
         public int HighestJobLevel { get; init; }
-        public int RetainerGil { get; init; }
+        public long RetainerGil { get; init; }
         public int Mgp { get; init; }
         public int TreasureValue { get; init; }
         public int VentureCoffers { get; init; }
@@ -1315,7 +1315,7 @@ public partial class SlaveWindow
         public string World { get; init; } = string.Empty;
         public string Region { get; init; } = string.Empty;
         public int Gil { get; init; }
-        public int Rgil { get; init; }
+        public long Rgil { get; init; }
         public int Trs { get; init; }
         public int Fcp { get; init; }
         public int Mgp { get; init; }

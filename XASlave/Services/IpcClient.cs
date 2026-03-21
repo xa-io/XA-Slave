@@ -39,7 +39,7 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<string> xaGetVersionSubscriber;
     private readonly ICallGateSubscriber<string> xaGetCharacterNameSubscriber;
     private readonly ICallGateSubscriber<int> xaGetGilSubscriber;
-    private readonly ICallGateSubscriber<int> xaGetRetainerGilSubscriber;
+    private readonly ICallGateSubscriber<long> xaGetRetainerGilSubscriber;
     private readonly ICallGateSubscriber<string> xaGetFcInfoSubscriber;
     private readonly ICallGateSubscriber<string> xaGetPlotInfoSubscriber;
     private readonly ICallGateSubscriber<string> xaGetPersonalPlotInfoSubscriber;
@@ -141,7 +141,7 @@ public sealed class IpcClient
         xaGetVersionSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetVersion");
         xaGetCharacterNameSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetCharacterName");
         xaGetGilSubscriber = pluginInterface.GetIpcSubscriber<int>("XA.Database.GetGil");
-        xaGetRetainerGilSubscriber = pluginInterface.GetIpcSubscriber<int>("XA.Database.GetRetainerGil");
+        xaGetRetainerGilSubscriber = pluginInterface.GetIpcSubscriber<long>("XA.Database.GetRetainerGil");
         xaGetFcInfoSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetFcInfo");
         xaGetPlotInfoSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetPlotInfo");
         xaGetPersonalPlotInfoSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetPersonalPlotInfo");
@@ -299,6 +299,24 @@ public sealed class IpcClient
         catch { return false; }
     }
 
+    public bool IsViwiAvailable()
+    {
+        try
+        {
+            foreach (var installedPlugin in Plugin.PluginInterface.InstalledPlugins)
+            {
+                if (!installedPlugin.IsLoaded)
+                    continue;
+                if (installedPlugin.InternalName.Equals("VIWI", StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+        }
+        catch
+        {
+        }
+        return false;
+    }
+
     public bool IsSplatoonAvailable()
     {
         try { splatIsLoadedSubscriber.InvokeFunc(); return true; }
@@ -351,7 +369,7 @@ public sealed class IpcClient
         catch { return 0; }
     }
 
-    public int GetRetainerGil()
+    public long GetRetainerGil()
     {
         try { return xaGetRetainerGilSubscriber.InvokeFunc(); }
         catch { return 0; }

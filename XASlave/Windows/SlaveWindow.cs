@@ -43,6 +43,7 @@ public partial class SlaveWindow : Window, IDisposable
         MonthlyRelogger,
         CheckDuplicatePlots,
         PrepLogistics,
+        Xagman,
         ReturnAltsToHomeworlds,
         RefreshArSubsBell,
         MultiFcPermissions,
@@ -83,6 +84,9 @@ public partial class SlaveWindow : Window, IDisposable
     {
         (SlaveTask.MonthlyRelogger, "Monthly Relogger"),
         (SlaveTask.CheckDuplicatePlots, "Check Duplicate Plots"),
+#if XA_SLAVE_TESTING_BUILD
+        (SlaveTask.Xagman, "Xagman"),
+#endif
         (SlaveTask.ReturnAltsToHomeworlds, "Return Alts To Homeworlds"),
         (SlaveTask.PrepLogistics, "Prep Logistics"),
         (SlaveTask.RefreshArSubsBell, "Refresh AR Subs/Bell"),
@@ -114,7 +118,7 @@ public partial class SlaveWindow : Window, IDisposable
     {
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(400, 240),
+            MinimumSize = new Vector2(300, 240),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
         };
 
@@ -129,6 +133,7 @@ public partial class SlaveWindow : Window, IDisposable
     {
         CancelScheduledAutoCollection(true);
         ReleaseRefreshSubsArSuppression();
+        StopXagmanTask();
         Plugin.Framework.Update -= OnFrameworkUpdate;
         Plugin.ClientState.Login -= OnExportDataLogin;
         Plugin.ClientState.Logout -= OnExportDataLogoutHandler;
@@ -305,6 +310,7 @@ public partial class SlaveWindow : Window, IDisposable
         UpdatePriorityTaskMonitors();
         UpdatePriorityTaskExternalStatus();
         OnExportDataFrameworkTick();
+        UpdateXagmanFrameworkTick();
 
         if (!autoCollectScheduledAt.HasValue || !Plugin.PlayerState.IsLoaded || plugin.AutoCollector.IsRunning)
             return;
@@ -465,6 +471,11 @@ public partial class SlaveWindow : Window, IDisposable
                         case SlaveTask.CheckDuplicatePlots:
                             DrawCheckDuplicatePlotsTask();
                             break;
+#if XA_SLAVE_TESTING_BUILD
+                        case SlaveTask.Xagman:
+                            DrawXagmanTask();
+                            break;
+#endif
                         case SlaveTask.ReturnAltsToHomeworlds:
                             DrawReturnAltsToHomeworldsTask();
                             break;
@@ -540,6 +551,7 @@ public partial class SlaveWindow : Window, IDisposable
             or SlaveTask.AutoGlamWeather
             or SlaveTask.MonthlyRelogger
             or SlaveTask.CheckDuplicatePlots
+            or SlaveTask.Xagman
             or SlaveTask.ReturnAltsToHomeworlds
             or SlaveTask.PrepLogistics
             or SlaveTask.RefreshArSubsBell
@@ -551,6 +563,7 @@ public partial class SlaveWindow : Window, IDisposable
     {
         return task is SlaveTask.MonthlyRelogger
             or SlaveTask.CheckDuplicatePlots
+            or SlaveTask.Xagman
             or SlaveTask.ReturnAltsToHomeworlds
             or SlaveTask.PrepLogistics
             or SlaveTask.RefreshArSubsBell
@@ -573,6 +586,9 @@ public partial class SlaveWindow : Window, IDisposable
                 return true;
             case "Check Duplicate Plots":
                 task = SlaveTask.CheckDuplicatePlots;
+                return true;
+            case "Xagman":
+                task = SlaveTask.Xagman;
                 return true;
             case "Return Alts To Homeworlds":
                 task = SlaveTask.ReturnAltsToHomeworlds;
@@ -600,6 +616,7 @@ public partial class SlaveWindow : Window, IDisposable
             SlaveTask.AutoGlamWeather => "Auto-Glam Weather",
             SlaveTask.MonthlyRelogger => "Monthly Relogger",
             SlaveTask.CheckDuplicatePlots => "Check Duplicate Plots",
+            SlaveTask.Xagman => "Xagman",
             SlaveTask.ReturnAltsToHomeworlds => "Return Alts To Homeworlds",
             SlaveTask.PrepLogistics => "Prep Logistics",
             SlaveTask.RefreshArSubsBell => "Refresh AR Subs/Bell",
@@ -622,6 +639,13 @@ public partial class SlaveWindow : Window, IDisposable
     {
         if (plugin.TaskRunner.IsRunning && TryMapPriorityTaskName(plugin.TaskRunner.CurrentTaskName, out task))
         {
+            label = GetPriorityTaskLabel(task);
+            return true;
+        }
+
+        if (xagmanRunning)
+        {
+            task = SlaveTask.Xagman;
             label = GetPriorityTaskLabel(task);
             return true;
         }
@@ -669,6 +693,12 @@ public partial class SlaveWindow : Window, IDisposable
         if (task == SlaveTask.AutoGlamWeather)
         {
             StopAutoGlamWeatherTask();
+            return;
+        }
+
+        if (task == SlaveTask.Xagman)
+        {
+            StopXagmanTask();
             return;
         }
 

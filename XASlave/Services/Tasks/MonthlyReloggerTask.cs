@@ -1700,6 +1700,11 @@ public sealed class MonthlyReloggerTask
         };
     }
 
+    public List<TaskStep> BuildPreFlightOnlySteps(List<string> characters, TaskRunner runner)
+    {
+        return BuildPreFlightSteps(characters, runner);
+    }
+
     public static void AddLogoutOnCompleteSteps(List<TaskStep> steps, TaskRunner runner)
     {
         var logoutConfirmStart = DateTime.MinValue;

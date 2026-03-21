@@ -75,6 +75,37 @@ public partial class SlaveWindow
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Auto-Glam Against Weather");
         ImGui.TextDisabled("Automatically changes glamour plate based on current weather conditions.");
         ImGui.Spacing();
+
+        // Start/Stop button moved to top
+        var classJobOptions = ParseAutoGlamInput(glamClassJobInput, 1, null);
+        var firstMissingWeatherLabel = GetFirstMissingAutoGlamWeatherLabel(cfg);
+
+        var canStart = Plugin.PlayerState.IsLoaded
+            && classJobOptions.Count > 0
+            && string.IsNullOrEmpty(firstMissingWeatherLabel);
+        var startDisabledReason = !Plugin.PlayerState.IsLoaded
+            ? "Player must be loaded to start Auto-Glam Weather."
+            : classJobOptions.Count == 0
+                ? "Enter at least one valid class/job number."
+                : !string.IsNullOrEmpty(firstMissingWeatherLabel)
+                    ? $"Enter at least one valid plate number between 1 and 20 for {firstMissingWeatherLabel}."
+                    : string.Empty;
+        var started = DrawPriorityTaskActionButton(
+            SlaveTask.AutoGlamWeather,
+            "Start Monitoring##glamStart",
+            canStart,
+            StartAutoGlamWeatherTask,
+            startDisabledReason);
+        if (started)
+            glamWeatherShowLog = true;
+
+        if (glamWeatherRunning)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Monitoring active...");
+        }
+
+        ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
@@ -118,39 +149,6 @@ public partial class SlaveWindow
 
         if (glamConfigChanged && glamWeatherRunning)
             glamLastWeatherId = -1;
-
-        var classJobOptions = ParseAutoGlamInput(glamClassJobInput, 1, null);
-        var firstMissingWeatherLabel = GetFirstMissingAutoGlamWeatherLabel(cfg);
-
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
-
-        // Start/Stop
-        var canStart = Plugin.PlayerState.IsLoaded
-            && classJobOptions.Count > 0
-            && string.IsNullOrEmpty(firstMissingWeatherLabel);
-        var startDisabledReason = !Plugin.PlayerState.IsLoaded
-            ? "Player must be loaded to start Auto-Glam Weather."
-            : classJobOptions.Count == 0
-                ? "Enter at least one valid class/job number."
-                : !string.IsNullOrEmpty(firstMissingWeatherLabel)
-                    ? $"Enter at least one valid plate number between 1 and 20 for {firstMissingWeatherLabel}."
-                    : string.Empty;
-        var started = DrawPriorityTaskActionButton(
-            SlaveTask.AutoGlamWeather,
-            "Start Monitoring##glamStart",
-            canStart,
-            StartAutoGlamWeatherTask,
-            startDisabledReason);
-        if (started)
-            glamWeatherShowLog = true;
-
-        if (glamWeatherRunning)
-        {
-            ImGui.SameLine();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Monitoring active...");
-        }
 
         // Current weather info
         if (glamWeatherRunning || glamLastWeatherId >= 0)

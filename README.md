@@ -12,6 +12,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Check Duplicate Plots** — Scan characters for duplicate housing plots and optionally rerun follow-up actions.
 - **Return Alts To Homeworlds** — Send characters back to their home worlds with the shared action flow.
 - **Prep Logistics** — Relog selected characters, see available main-inventory space, move them to a target world or location, and optionally enable AR multi or logout after the run.
+- **Xagman** — Coordinate Tony / Franchise Owner meetups and Dropbox trades with owner-driven `Give` / `Take` / `Balance` routing, live shortage requests, and peer-aware queue logging.
 - **Refresh AR Subs/Bell** — Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, and safer menu recovery.
 - **FC Permissions Updater** — Review region-filtered FC rosters with member-rank and FC-rank visibility before running shared permissions updates.
 - **Utility Controls** — Manage plugin startup behavior, task logging, window renaming, collapsible menu groups, and a resizable task-menu pane.

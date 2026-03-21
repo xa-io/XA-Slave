@@ -1,9 +1,13 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using Dalamud.Game.Command;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
+using XASlave.Data;
 using XASlave.Services;
 using XASlave.Windows;
 
@@ -27,6 +31,8 @@ public sealed class Plugin : IDalamudPlugin
     private const string CommandName = "/xa";
 
     public static Plugin Instance { get; private set; } = null!;
+    public string InstanceId { get; }
+    public int ProcessId { get; }
 
     public Configuration Configuration { get; init; }
 
@@ -43,17 +49,41 @@ public sealed class Plugin : IDalamudPlugin
     public WindowRenamerService WindowRenamer { get; init; }
     public ArPostProcessService ArPostProcessor { get; init; }
     public SlaveDatabaseService SlaveDatabase { get; init; }
+    public XagmanPeerService XagmanPeers { get; private set; }
 
     public Plugin()
     {
         Instance = this;
+        ProcessId = Process.GetCurrentProcess().Id;
+        InstanceId = Guid.NewGuid().ToString("N");
 
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         var livePullsWereEnabled = Configuration.IpcLivePullsEnabled;
         Configuration.IpcLivePullsEnabled = false;
         Configuration.InitializeFloorderDefaults();
         var autoGlamDefaultsInitialized = Configuration.InitializeAutoGlamWeatherDefaults();
-        if (livePullsWereEnabled || autoGlamDefaultsInitialized)
+        var xagmanPreflightChanged = !Configuration.XagmanUsePreflightOnFirstCharacter;
+        Configuration.XagmanUsePreflightOnFirstCharacter = true;
+        var xagmanItemsChanged = false;
+        var xagmanItemsMigrationChanged = false;
+        if (!Configuration.XagmanSharedItemsMigrationComplete)
+        {
+            if (Configuration.XagmanItems.Count == 0 && (Configuration.XagmanTonyItems.Count > 0 || Configuration.XagmanFranchiseItems.Count > 0))
+            {
+                Configuration.XagmanItems = MergeXagmanItems(Configuration.XagmanTonyItems, Configuration.XagmanFranchiseItems);
+                xagmanItemsChanged = true;
+            }
+            Configuration.XagmanTonyItems.Clear();
+            Configuration.XagmanFranchiseItems.Clear();
+            Configuration.XagmanSharedItemsMigrationComplete = true;
+            xagmanItemsMigrationChanged = true;
+        }
+        var normalizedXagmanHubPort = Configuration.XagmanHubPort == 47786
+            ? XagmanPeerService.DefaultHubPort
+            : XagmanPeerService.NormalizePort(Configuration.XagmanHubPort);
+        var xagmanHubPortChanged = Configuration.XagmanHubPort != normalizedXagmanHubPort;
+        Configuration.XagmanHubPort = normalizedXagmanHubPort;
+        if (livePullsWereEnabled || autoGlamDefaultsInitialized || xagmanPreflightChanged || xagmanItemsChanged || xagmanItemsMigrationChanged || xagmanHubPortChanged)
             Configuration.Save();
 
         IpcClient = new IpcClient(PluginInterface, Log);
@@ -65,6 +95,8 @@ public sealed class Plugin : IDalamudPlugin
         ExternalTaskLoader = new ExternalTaskLoader(this, PluginInterface, Log);
         WindowRenamer = new WindowRenamerService(Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
+        XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubPort, _ => { });
+        XagmanPeers.Start();
 
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
@@ -97,8 +129,6 @@ public sealed class Plugin : IDalamudPlugin
         WindowRenamer.Dispose();
         IpcProvider.Dispose();
         ExternalTaskLoader.Dispose();
-        TaskRunner.Dispose();
-        AutoCollector.Dispose();
 
         ClientState.Login -= OnLogin;
         ClientState.Logout -= OnLogout;
@@ -109,6 +139,9 @@ public sealed class Plugin : IDalamudPlugin
 
         WindowSystem.RemoveAllWindows();
         SlaveWindow.Dispose();
+        TaskRunner.Dispose();
+        AutoCollector.Dispose();
+        XagmanPeers.Dispose();
 
         CommandManager.RemoveHandler(CommandName);
     }
@@ -223,9 +256,46 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     public void ToggleMainUi() => SlaveWindow.Toggle();
+
+    public int ApplyXagmanHubPort(int value)
+    {
+        var normalized = XagmanPeerService.NormalizePort(value);
+        if (Configuration.XagmanHubPort == normalized && XagmanPeers.HubPort == normalized)
+            return normalized;
+
+        Configuration.XagmanHubPort = normalized;
+        Configuration.Save();
+        RestartXagmanPeerService();
+        return normalized;
+    }
+
+    private void RestartXagmanPeerService()
+    {
+        XagmanPeers.Dispose();
+        XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubPort, _ => { });
+        XagmanPeers.Start();
+    }
+
+    private static List<XagmanItemEntry> MergeXagmanItems(params IEnumerable<XagmanItemEntry>[] sources)
+    {
+        return sources
+            .SelectMany(source => source)
+            .Where(item => item.ItemId > 0 && !string.IsNullOrWhiteSpace(item.ItemName))
+            .GroupBy(item => new { item.ItemId, item.IsHq })
+            .Select(group => new XagmanItemEntry
+            {
+                ItemId = group.Key.ItemId,
+                ItemName = group.First().ItemName,
+                IsHq = group.Key.IsHq,
+                Mode = group.First().Mode,
+                Quantity = Math.Max(0, group.First().Quantity),
+            })
+            .OrderBy(item => item.ItemId)
+            .ToList();
+    }
 }
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.14";
+    public const string Version = "0.0.0.15";
 }

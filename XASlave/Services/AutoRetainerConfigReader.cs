@@ -32,7 +32,7 @@ public sealed class AutoRetainerConfigReader
         int HighestLevel,
         int RetainerCount,
         int SubmarineCount,
-        int TotalRetainerGil,
+        long TotalRetainerGil,
         int Ventures,
         int InventorySpace,
         bool Enabled,
@@ -181,13 +181,13 @@ public sealed class AutoRetainerConfigReader
 
         // Retainer data
         var retainerCount = 0;
-        var totalRetainerGil = 0;
+        var totalRetainerGil = 0L;
         if (entry.TryGetProperty("RetainerData", out var retArr) && retArr.ValueKind == JsonValueKind.Array)
         {
             foreach (var ret in retArr.EnumerateArray())
             {
                 retainerCount++;
-                if (ret.TryGetProperty("Gil", out var retGilProp) && retGilProp.ValueKind == JsonValueKind.Number && retGilProp.TryGetInt32(out var retGil))
+                if (ret.TryGetProperty("Gil", out var retGilProp) && retGilProp.ValueKind == JsonValueKind.Number && retGilProp.TryGetInt64(out var retGil))
                     totalRetainerGil += retGil;
             }
         }

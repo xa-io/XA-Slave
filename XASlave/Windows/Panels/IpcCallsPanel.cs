@@ -175,7 +175,7 @@ public partial class SlaveWindow
             DrawIpcRow("XA.Database.GetDbPath", "string", "Path to xa.db", livePulls);
             DrawIpcRow("XA.Database.GetCharacterName", "string", "Current character name", livePulls);
             DrawIpcRow("XA.Database.GetGil", "int", "Character gil", livePulls);
-            DrawIpcRow("XA.Database.GetRetainerGil", "int", "Total retainer gil", livePulls);
+            DrawIpcRow("XA.Database.GetRetainerGil", "long", "Total retainer gil", livePulls);
             DrawIpcRow("XA.Database.GetFcInfo", "string", "FC Name|Tag|Points|Rank", livePulls);
             DrawIpcRow("XA.Database.GetFcName", "string", "FC name only", livePulls);
             DrawIpcRow("XA.Database.GetFcTag", "string", "FC tag only", livePulls);
