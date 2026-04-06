@@ -121,12 +121,16 @@ public class Configuration : IPluginConfiguration
     public bool XagmanSharedItemsMigrationComplete { get; set; }
     public string XagmanTargetWorld { get; set; } = string.Empty;
     public string XagmanTargetAetheryte { get; set; } = string.Empty;
+    public int XagmanTonyGilMinimum { get; set; } = 10000;
     public bool XagmanEnableArMultiOnComplete { get; set; } = true;
     public bool XagmanLogoutOnComplete { get; set; } = false;
     public bool XagmanUsePreflightOnFirstCharacter { get; set; } = true;
     public bool XagmanAutoReturnToFc { get; set; } = true;
+    public bool XagmanWarningDetailsExpanded { get; set; } = true;
+    public bool XagmanRoleInstructionsExpanded { get; set; } = true;
     public string XagmanRegionFilter { get; set; } = "All";
     public int XagmanHubPort { get; set; } = 45215;
+    public bool XagmanPeerConnectionsEnabled { get; set; } = false;
 
     // ── FC Permissions Updater ──
     public List<string> FcPermsCharacters { get; set; } = new();
@@ -166,6 +170,7 @@ public class Configuration : IPluginConfiguration
     public bool WindowRenamerEnabled { get; set; } = false;
     public string WindowRenamerTitle { get; set; } = "";
     public bool WindowRenamerUseProcessId { get; set; } = false;
+    public bool WindowRenamerShowCurrentCharacter { get; set; } = false;
 
     // ── City Chat Flooder ──
     public List<string> FloorderSelectedWorlds { get; set; } = new();
@@ -191,7 +196,7 @@ public class Configuration : IPluginConfiguration
     public bool MenuUtilityExpanded { get; set; } = true;
     public bool MenuReferenceExpanded { get; set; } = true;
     public float TaskMenuWidth { get; set; } = 180f;
-    public string LastSelectedBuiltInTask { get; set; } = "SaveToXaDatabase";
+    public string LastSelectedBuiltInTask { get; set; } = "";
     public string LastSelectedExternalTaskName { get; set; } = "";
 
     public void InitializeFloorderDefaults()

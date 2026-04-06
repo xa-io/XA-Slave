@@ -3,10 +3,15 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.Gui.NamePlate;
+using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Plugin;
 using Lumina.Excel.Sheets;
 using XASlave.Services;
 using XASlave.Services.Tasks;
+using XASlave.Data;
 
 #if XA_SLAVE_TESTING_BUILD
 namespace XASlave.Windows;
@@ -24,6 +29,21 @@ public partial class SlaveWindow
     // ───────────────────────────────────────────────
     private string debugResult = string.Empty;
     private DateTime debugResultExpiry = DateTime.MinValue;
+    private const string XaAbuseDisplayName = "I Love XA!";
+    private const string XaAbuseDefaultOverlayText = "♥";
+    private const string XaAbuseDefaultTexturePath = "ui/icon/084000/084209_hr1.tex";
+    private static readonly Vector4 XaAbuseDefaultOverlayShadowColor = new Vector4(0.32f, 0.02f, 0.14f, 0.88f);
+    private static readonly Vector4 XaAbuseDefaultOverlayFillColor = new Vector4(1.0f, 0.92f, 0.96f, 1.0f);
+    private bool xaAbuseEnabled;
+    private bool xaAbuseAllVisiblePlayers;
+    private bool xaAbuseOverlayEnabled;
+    private bool xaAbuseOverlayAllVisiblePlayers;
+    private bool xaAbuseOverlayUseTexture;
+    private string xaAbuseOverlayText = XaAbuseDefaultOverlayText;
+    private string xaAbuseOverlayTexturePath = XaAbuseDefaultTexturePath;
+    private Vector4 xaAbuseOverlayShadowColor = XaAbuseDefaultOverlayShadowColor;
+    private Vector4 xaAbuseOverlayFillColor = XaAbuseDefaultOverlayFillColor;
+    private DateTime xaAbuseOverlayEnabledAtUtc = DateTime.MinValue;
 
     private void DrawDebugCommands()
     {
@@ -679,7 +699,170 @@ public partial class SlaveWindow
         ImGui.TreePop();
         } // end Movement Functions
 
-        ImGui.Separator();
+        ImGui.Spacing();
+
+        // ╔══════════════════════════════════════════════╗
+        // ║  [Aetheryte Functions]                        ║
+        // ╚══════════════════════════════════════════════╝
+        if (ImGui.TreeNode("Aetheryte Functions"))
+        {
+            if (ImGui.Button("GetAetherytesCount"))
+            {
+                var count = AetheryteData.GetAetherytesWithZoneIds().Count;
+                SetDebugResult($"Total aetherytes: {count}");
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("GetZoneAetherytes"))
+            {
+                var zoneId = Plugin.ClientState.TerritoryType;
+                var aetherytes = AetheryteData.GetAetherytesInZone(zoneId);
+                var zoneName = aetherytes.Any() ? AetheryteData.GetAetherytesWithZoneIds()
+                    .FirstOrDefault(x => x.ZoneId == zoneId)?.ZoneName ?? "Unknown" : "Unknown";
+                SetDebugResult($"Zone [{zoneId}] {zoneName}: {aetherytes.Count} aetherytes");
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Gets all aetherytes in the current zone using ZoneID lookup");
+
+            ImGui.Spacing();
+
+            if (ImGui.Button("ListCurrentZoneAetherytes"))
+            {
+                var zoneId = Plugin.ClientState.TerritoryType;
+                var aetherytes = AetheryteData.GetAetherytesInZone(zoneId);
+                var zoneName = aetherytes.Any() ? AetheryteData.GetAetherytesWithZoneIds()
+                    .FirstOrDefault(x => x.ZoneId == zoneId)?.ZoneName ?? "Unknown" : "Unknown";
+                
+                if (aetherytes.Any())
+                {
+                    var aetheryteList = string.Join(", ", aetherytes.Take(10));
+                    var more = aetherytes.Count > 10 ? $" (+{aetherytes.Count - 10} more)" : "";
+                    SetDebugResult($"Zone [{zoneId}] {zoneName}: {aetheryteList}{more}");
+                }
+                else
+                {
+                    SetDebugResult($"Zone [{zoneId}] {zoneName}: No aetherytes found");
+                }
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Lists up to 10 aetherytes in the current zone");
+
+            ImGui.SameLine();
+            if (ImGui.Button("GetAetheryteZoneId"))
+            {
+                // Example: Get ZoneID for a specific aetheryte
+                var testAetheryte = "Limsa Lominsa Aetheryte Plaza";
+                var zoneId = AetheryteData.GetZoneIdForAetheryte(testAetheryte);
+                var zoneName = AetheryteData.GetZoneNameForAetheryte(testAetheryte);
+                SetDebugResult($"{testAetheryte} -> Zone [{zoneId}] {zoneName}");
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Example: Gets ZoneID for 'Limsa Lominsa Aetheryte Plaza'");
+
+            ImGui.Spacing();
+
+            if (ImGui.Button("ShowAetheryteZoneMapping"))
+            {
+                var mappings = AetheryteData.GetAetherytesByZoneId()
+                    .Take(5) // Show first 5 zones to avoid spam
+                    .Select(kvp => {
+                        var zoneName = AetheryteData.GetAetherytesWithZoneIds()
+                            .FirstOrDefault(x => x.ZoneId == kvp.Key)?.ZoneName ?? "Unknown";
+                        var aetheryteCount = kvp.Value.Count;
+                        var firstFew = string.Join(", ", kvp.Value.Take(3));
+                        var more = kvp.Value.Count > 3 ? $" (+{kvp.Value.Count - 3})" : "";
+                        return $"Zone [{kvp.Key}] {zoneName}: {aetheryteCount} aetherytes - {firstFew}{more}";
+                    });
+                
+                var result = string.Join("\n", mappings);
+                SetDebugResult($"Aetheryte-Zone mapping (first 5 zones):\n{result}");
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Shows ZoneID -> aetheryte mapping for first 5 zones");
+
+            ImGui.SameLine();
+            if (ImGui.Button("DebugTerritoryLookup"))
+            {
+                var results = new List<string>();
+                var testAetherytes = new[] { "Limsa Lominsa Aetheryte Plaza", "New Gridania", "Summerford Farms" };
+                
+                try
+                {
+                    var aetheryteSheet = Plugin.DataManager.GetExcelSheet<Aetheryte>();
+                    var territorySheet = Plugin.DataManager.GetExcelSheet<TerritoryType>();
+                    
+                    if (aetheryteSheet == null || territorySheet == null)
+                    {
+                        SetDebugResult("Error: Could not load aetheryte or territory sheets");
+                        return;
+                    }
+                    
+                    foreach (var testName in testAetherytes)
+                    {
+                        Aetheryte? foundAetheryte = null;
+                        foreach (var aetheryte in aetheryteSheet)
+                        {
+                            if (!aetheryte.IsAetheryte) continue;
+                            var name = aetheryte.PlaceName.ValueNullable?.Name.ToString();
+                            if (name?.Equals(testName, StringComparison.OrdinalIgnoreCase) == true)
+                            {
+                                foundAetheryte = aetheryte;
+                                break;
+                            }
+                        }
+                        
+                        if (foundAetheryte.HasValue)
+                        {
+                            var row = foundAetheryte.Value;
+                            var zoneId = row.Territory.RowId;
+                            var territoryRow = territorySheet.GetRowOrDefault(zoneId);
+                            var zoneName = territoryRow?.PlaceName.ValueNullable?.Name.ToString() ?? "Unknown";
+                            var territoryExists = territoryRow.HasValue;
+                            
+                            results.Add($"{testName}:");
+                            results.Add($"  Aetheryte RowId: {row.RowId}");
+                            results.Add($"  Territory RowId: {zoneId}");
+                            results.Add($"  Territory exists: {territoryExists}");
+                            results.Add($"  Zone name: {zoneName}");
+                            results.Add("");
+                        }
+                        else
+                        {
+                            results.Add($"{testName}: Aetheryte not found");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    SetDebugResult($"Debug error: {ex.Message}");
+                    return;
+                }
+                
+                SetDebugResult("Territory lookup details:\n\n" + string.Join("\n", results));
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Debug territory lookup for specific aetherytes");
+
+            ImGui.Spacing();
+
+            if (ImGui.Button("ExportAllAetherytes"))
+            {
+                var aetherytes = AetheryteData.GetAetherytesWithZoneIds();
+                var exportLines = aetherytes
+                    .OrderBy(x => x.ZoneId)
+                    .ThenBy(x => x.Name)
+                    .Select(x => $"{x.ZoneId}\t{x.Name}\t{x.ZoneName}");
+                
+                var header = "ZoneId\tAetheryteName\tZoneName";
+                var exportContent = string.Join("\n", new[] { header }.Concat(exportLines));
+                
+                SetDebugResult($"Exported {aetherytes.Count} aetherytes:\n\n{exportContent}");
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Exports all aetherytes with ZoneID, name, and zone name for analysis");
+
+            ImGui.TreePop();
+        }
+
         ImGui.Spacing();
 
         // ╔══════════════════════════════════════════════╗
@@ -1489,6 +1672,86 @@ public partial class SlaveWindow
         ImGui.TreePop();
         } // end Player Checkers
 
+        if (ImGui.TreeNode("XA Abuse"))
+        {
+
+        if (ImGui.CollapsingHeader("PlayerNames##xaAbuse"))
+        {
+            ImGui.TextDisabled("Testing-build nameplate override + optional floating overlay.");
+            ImGui.TextDisabled($"Status: {GetXaAbuseStatusText()}");
+            ImGui.Spacing();
+            
+            if (ImGui.Button("Set Name: I Love XA!"))
+            {
+                EnableXaAbuse(false);
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Set ALL Visible Player Names"))
+            {
+                EnableXaAbuse(true);
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Reset Name / Overlay"))
+            {
+                ResetXaAbuse();
+            }
+
+            if (ImGui.Button("Overlay: Me"))
+            {
+                EnableXaAbuseOverlay(false);
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Overlay: ALL Visible Heads"))
+            {
+                EnableXaAbuseOverlay(true);
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Overlay Off"))
+            {
+                DisableXaAbuseOverlay();
+            }
+
+            var useTextureOverlay = xaAbuseOverlayUseTexture;
+            if (ImGui.Checkbox("Use .tex Overlay##xaAbuseUseTex", ref useTextureOverlay))
+                xaAbuseOverlayUseTexture = useTextureOverlay;
+            ImGui.SameLine();
+            if (ImGui.Button("Use Orb .tex Test"))
+            {
+                xaAbuseOverlayUseTexture = true;
+                xaAbuseOverlayTexturePath = XaAbuseDefaultTexturePath;
+                SetDebugResult($"XA Abuse: overlay path set to {XaAbuseDefaultTexturePath}");
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Use Default ♥"))
+            {
+                xaAbuseOverlayUseTexture = false;
+                xaAbuseOverlayText = XaAbuseDefaultOverlayText;
+                SetDebugResult("XA Abuse: overlay text reset to ♥");
+            }
+
+            ImGui.SetNextItemWidth(220f);
+            ImGui.InputText("Overlay Text##xaAbuseOverlayText", ref xaAbuseOverlayText, 64);
+            ImGui.SetNextItemWidth(-1f);
+            ImGui.InputText("Overlay .tex Path##xaAbuseOverlayPath", ref xaAbuseOverlayTexturePath, 260);
+            ImGui.SetNextItemWidth(240f);
+            ImGui.ColorEdit4("Text Fill Color##xaAbuseOverlayFillColor", ref xaAbuseOverlayFillColor, ImGuiColorEditFlags.AlphaBar);
+            ImGui.SetNextItemWidth(240f);
+            ImGui.ColorEdit4("Text Shadow Color##xaAbuseOverlayShadowColor", ref xaAbuseOverlayShadowColor, ImGuiColorEditFlags.AlphaBar);
+            if (ImGui.Button("Reset Text Colors##xaAbuseResetTextColors"))
+            {
+                xaAbuseOverlayFillColor = XaAbuseDefaultOverlayFillColor;
+                xaAbuseOverlayShadowColor = XaAbuseDefaultOverlayShadowColor;
+            }
+
+            ImGui.Spacing();
+        }
+
+        ImGui.Spacing();
+        ImGui.TreePop();
+        }
+
+        ImGui.Spacing();
+
         // ╔══════════════════════════════════════════════╗
         // ║  [Punish]                                    ║
         // ╚══════════════════════════════════════════════╝
@@ -1800,6 +2063,194 @@ public partial class SlaveWindow
         }
 
         ImGui.Spacing();
+        if (ImGui.Button("Enable Auto-Accept Trades"))
+        {
+            try
+            {
+                var dropboxPlugin = GetDropboxPlugin();
+                if (dropboxPlugin != null)
+                {
+                    var config = GetPluginConfig(dropboxPlugin);
+                    if (config != null)
+                    {
+                        SetConfigProperty(config, "Active", true);
+                        SetDebugResult("Dropbox: Auto-Accept Trades ENABLED");
+                    }
+                    else
+                    {
+                        SetDebugResult("Dropbox: Could not access configuration");
+                    }
+                }
+                else
+                {
+                    SetDebugResult("Dropbox: Plugin not found or not loaded");
+                }
+            }
+            catch (Exception ex)
+            {
+                SetDebugResult($"Dropbox: Error enabling auto-accept - {ex.Message}");
+            }
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Disable Auto-Accept Trades"))
+        {
+            try
+            {
+                var dropboxPlugin = GetDropboxPlugin();
+                if (dropboxPlugin != null)
+                {
+                    var config = GetPluginConfig(dropboxPlugin);
+                    if (config != null)
+                    {
+                        SetConfigProperty(config, "Active", false);
+                        SetDebugResult("Dropbox: Auto-Accept Trades DISABLED");
+                    }
+                    else
+                    {
+                        SetDebugResult("Dropbox: Could not access configuration");
+                    }
+                }
+                else
+                {
+                    SetDebugResult("Dropbox: Plugin not found or not loaded");
+                }
+            }
+            catch (Exception ex)
+            {
+                SetDebugResult($"Dropbox: Error disabling auto-accept - {ex.Message}");
+            }
+        }
+
+        if (ImGui.Button("Stop Item Trade Queue"))
+        {
+            try
+            {
+                var dropboxPlugin = GetDropboxPlugin();
+                if (dropboxPlugin != null)
+                {
+                    var taskManager = GetDropboxTaskManager(dropboxPlugin);
+                    if (taskManager != null)
+                    {
+                        AbortTaskManager(taskManager);
+                        SetDebugResult("Dropbox: Item Trade Queue STOPPED");
+                    }
+                    else
+                    {
+                        SetDebugResult("Dropbox: Could not access item trade queue task manager");
+                    }
+                }
+                else
+                {
+                    SetDebugResult("Dropbox: Plugin not found or not loaded");
+                }
+            }
+            catch (Exception ex)
+            {
+                SetDebugResult($"Dropbox: Error stopping item trade queue - {ex.Message}");
+            }
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("_TextError Monitor"))
+        {
+            SetDebugResult(GetTextErrorMonitorResult());
+        }
+
+        if (ImGui.Button("Open Item Trade Queue Tab"))
+        {
+            try
+            {
+                var dropboxPlugin = GetDropboxPlugin();
+                if (dropboxPlugin != null)
+                {
+                    var uiOpened = TryOpenDropboxUi(dropboxPlugin);
+                    var tabRequested = RequestDropboxOpenTabOnce(dropboxPlugin, "Item Trade Queue");
+                    if (tabRequested)
+                    {
+                        SetDebugResult("Dropbox: Item Trade Queue tab OPEN requested once");
+                    }
+                    else if (uiOpened)
+                    {
+                        SetDebugResult("Dropbox: Opened UI but could not request Item Trade Queue tab");
+                    }
+                    else
+                    {
+                        SetDebugResult("Dropbox: Could not open Item Trade Queue tab");
+                    }
+                }
+                else
+                {
+                    SetDebugResult("Dropbox: Plugin not found or not loaded");
+                }
+            }
+            catch (Exception ex)
+            {
+                SetDebugResult($"Dropbox: Error opening Item Trade Queue tab - {ex.Message}");
+            }
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Open Whitelist Tab"))
+        {
+            try
+            {
+                var dropboxPlugin = GetDropboxPlugin();
+                if (dropboxPlugin != null)
+                {
+                    var uiOpened = TryOpenDropboxUi(dropboxPlugin);
+                    var tabRequested = RequestDropboxOpenTabOnce(dropboxPlugin, "Whitelist");
+                    if (tabRequested)
+                    {
+                        SetDebugResult("Dropbox: Whitelist tab OPEN requested once");
+                    }
+                    else if (uiOpened)
+                    {
+                        SetDebugResult("Dropbox: Opened UI but could not request Whitelist tab");
+                    }
+                    else
+                    {
+                        SetDebugResult("Dropbox: Could not open Whitelist tab");
+                    }
+                }
+                else
+                {
+                    SetDebugResult("Dropbox: Plugin not found or not loaded");
+                }
+            }
+            catch (Exception ex)
+            {
+                SetDebugResult($"Dropbox: Error opening Whitelist tab - {ex.Message}");
+            }
+        }
+
+        if (ImGui.Button("Accept Trades Only From Whitelisted Characters"))
+        {
+            try
+            {
+                var dropboxPlugin = GetDropboxPlugin();
+                if (dropboxPlugin != null)
+                {
+                    var config = GetPluginConfig(dropboxPlugin);
+                    if (config != null)
+                    {
+                        SetConfigProperty(config, "WhitelistMode", true);
+                        SetDebugResult("Dropbox: Whitelist-only trade acceptance ENABLED");
+                    }
+                    else
+                    {
+                        SetDebugResult("Dropbox: Could not access configuration");
+                    }
+                }
+                else
+                {
+                    SetDebugResult("Dropbox: Plugin not found or not loaded");
+                }
+            }
+            catch (Exception ex)
+            {
+                SetDebugResult($"Dropbox: Error enabling whitelist-only trade acceptance - {ex.Message}");
+            }
+        }
+
+        ImGui.Spacing();
         } // end Dropbox
 
         // ══════════════════════════════════════════════
@@ -2035,6 +2486,181 @@ public partial class SlaveWindow
         } // end Braindead Functions
     }
 
+    private string GetXaAbuseStatusText()
+    {
+        var nameStatus = !xaAbuseEnabled
+            ? "names off"
+            : xaAbuseAllVisiblePlayers ? "names: all visible" : "names: local";
+        var overlayStatus = !xaAbuseOverlayEnabled
+            ? "overlay off"
+            : xaAbuseOverlayAllVisiblePlayers ? "overlay: all visible" : "overlay: local";
+
+        if (xaAbuseOverlayEnabled)
+            overlayStatus += xaAbuseOverlayUseTexture ? " (.tex)" : " (text)";
+
+        return $"{nameStatus} | {overlayStatus}";
+    }
+
+    private void EnableXaAbuse(bool allVisiblePlayers)
+    {
+        if (!Plugin.PlayerState.IsLoaded || Plugin.ObjectTable.LocalPlayer == null)
+        {
+            SetDebugResult("XA Abuse: local player not available");
+            return;
+        }
+
+        xaAbuseEnabled = true;
+        xaAbuseAllVisiblePlayers = allVisiblePlayers;
+        Plugin.NamePlateGui.RequestRedraw();
+        SetDebugResult(allVisiblePlayers
+            ? "XA Abuse enabled — all visible player nameplates now say I Love XA!"
+            : "XA Abuse enabled — local nameplate now says I Love XA!");
+    }
+
+    private void EnableXaAbuseOverlay(bool allVisiblePlayers)
+    {
+        if (!Plugin.PlayerState.IsLoaded || Plugin.ObjectTable.LocalPlayer == null)
+        {
+            SetDebugResult("XA Abuse overlay: local player not available");
+            return;
+        }
+
+        xaAbuseOverlayEnabled = true;
+        xaAbuseOverlayAllVisiblePlayers = allVisiblePlayers;
+        xaAbuseOverlayEnabledAtUtc = DateTime.UtcNow;
+
+        if (string.IsNullOrWhiteSpace(xaAbuseOverlayText))
+            xaAbuseOverlayText = XaAbuseDefaultOverlayText;
+        if (string.IsNullOrWhiteSpace(xaAbuseOverlayTexturePath))
+            xaAbuseOverlayTexturePath = XaAbuseDefaultTexturePath;
+
+        SetDebugResult(allVisiblePlayers
+            ? $"XA Abuse overlay enabled — all visible player heads now show {(xaAbuseOverlayUseTexture ? ".tex" : "text")} overlay"
+            : $"XA Abuse overlay enabled — local player now shows {(xaAbuseOverlayUseTexture ? ".tex" : "text")} overlay");
+    }
+
+    private void DisableXaAbuseOverlay()
+    {
+        var wasEnabled = xaAbuseOverlayEnabled;
+        xaAbuseOverlayEnabled = false;
+        xaAbuseOverlayAllVisiblePlayers = false;
+        xaAbuseOverlayEnabledAtUtc = DateTime.MinValue;
+        SetDebugResult(wasEnabled ? "XA Abuse overlay disabled" : "XA Abuse overlay already off");
+    }
+
+    private void ResetXaAbuse()
+    {
+        var wasEnabled = xaAbuseEnabled || xaAbuseOverlayEnabled;
+        xaAbuseEnabled = false;
+        xaAbuseAllVisiblePlayers = false;
+        xaAbuseOverlayEnabled = false;
+        xaAbuseOverlayAllVisiblePlayers = false;
+        xaAbuseOverlayEnabledAtUtc = DateTime.MinValue;
+        Plugin.NamePlateGui.RequestRedraw();
+        SetDebugResult(wasEnabled ? "XA Abuse reset — restored normal nameplate / overlay" : "XA Abuse already reset");
+    }
+
+    private void OnXaAbuseNamePlateUpdate(INamePlateUpdateContext context, IReadOnlyList<INamePlateUpdateHandler> handlers)
+    {
+        if (!xaAbuseEnabled)
+            return;
+
+        var localPlayer = Plugin.ObjectTable.LocalPlayer;
+        if (localPlayer == null)
+            return;
+
+        foreach (var handler in handlers)
+        {
+            if (xaAbuseAllVisiblePlayers)
+            {
+                if (handler.PlayerCharacter == null)
+                    continue;
+            }
+            else if (handler.GameObjectId != localPlayer.GameObjectId)
+                continue;
+
+            handler.Name = new SeStringBuilder()
+                .AddText(XaAbuseDisplayName)
+                .Build();
+
+            if (!xaAbuseAllVisiblePlayers)
+                break;
+        }
+    }
+
+    private void DrawXaAbuseOverlay()
+    {
+        if (!xaAbuseOverlayEnabled || !Plugin.PlayerState.IsLoaded)
+            return;
+
+        var localPlayer = Plugin.ObjectTable.LocalPlayer;
+        if (localPlayer == null)
+            return;
+
+        var elapsed = xaAbuseOverlayEnabledAtUtc == DateTime.MinValue
+            ? 0f
+            : (float)(DateTime.UtcNow - xaAbuseOverlayEnabledAtUtc).TotalSeconds;
+        var drawList = ImGui.GetForegroundDrawList();
+
+        if (xaAbuseOverlayAllVisiblePlayers)
+        {
+            foreach (var player in Plugin.ObjectTable.OfType<IPlayerCharacter>())
+                DrawXaAbuseOverlayForPlayer(drawList, player, elapsed);
+            return;
+        }
+
+        DrawXaAbuseOverlayForPlayer(drawList, localPlayer, elapsed);
+    }
+
+    private void DrawXaAbuseOverlayForPlayer(ImDrawListPtr drawList, IPlayerCharacter player, float elapsed)
+    {
+        var phase = (float)((player.GameObjectId & 255UL) * 0.04f);
+        if (!Plugin.GameGui.WorldToScreen(player.Position + new Vector3(0f, 2.3f, 0f), out var screenPos))
+            return;
+
+        var sway = MathF.Sin((elapsed * 2.2f) + phase) * 10f;
+        var bob = MathF.Sin((elapsed * 3.4f) + phase) * 6f;
+        var pulse = 1f + (MathF.Sin((elapsed * 5.0f) + phase) * 0.1f);
+        var center = new Vector2(screenPos.X + sway, screenPos.Y - 72f + bob);
+
+        if (xaAbuseOverlayUseTexture && DrawXaAbuseTextureOverlay(drawList, center, pulse))
+            return;
+
+        DrawXaAbuseTextOverlay(drawList, center, pulse);
+    }
+
+    private void DrawXaAbuseTextOverlay(ImDrawListPtr drawList, Vector2 center, float pulse)
+    {
+        var overlayText = string.IsNullOrWhiteSpace(xaAbuseOverlayText) ? XaAbuseDefaultOverlayText : xaAbuseOverlayText;
+        var font = ImGui.GetFont();
+        var baseFontSize = font.FontSize <= 0f ? 13f : font.FontSize;
+        var overlayFontSize = (overlayText.Length <= 2 ? 62f : overlayText.Length <= 4 ? 48f : 36f) * pulse;
+        var textScale = overlayFontSize / baseFontSize;
+        var textSize = ImGui.CalcTextSize(overlayText) * textScale;
+        var textPos = center - (textSize * 0.5f);
+        var shadowColor = ImGui.GetColorU32(xaAbuseOverlayShadowColor);
+        var fillColor = ImGui.GetColorU32(xaAbuseOverlayFillColor);
+
+        ImGui.AddText(drawList, font, overlayFontSize, textPos + new Vector2(2f, 2f), shadowColor, overlayText);
+        ImGui.AddText(drawList, font, overlayFontSize, textPos, fillColor, overlayText);
+    }
+
+    private bool DrawXaAbuseTextureOverlay(ImDrawListPtr drawList, Vector2 center, float pulse)
+    {
+        var texturePath = string.IsNullOrWhiteSpace(xaAbuseOverlayTexturePath) ? XaAbuseDefaultTexturePath : xaAbuseOverlayTexturePath.Trim();
+        var sharedTexture = Plugin.TextureProvider.GetFromGame(texturePath);
+        if (!sharedTexture.TryGetWrap(out var wrap, out _))
+            return false;
+
+        var height = 76f * pulse;
+        var scale = height / MathF.Max(1f, (float)wrap.Height);
+        var size = new Vector2(wrap.Width * scale, wrap.Height * scale);
+        var min = center - (size * 0.5f);
+        var max = min + size;
+        drawList.AddImage(wrap.Handle, min, max);
+        return true;
+    }
+
     private void SetDebugResult(string msg)
     {
         debugResult = $"[{DateTime.Now:HH:mm:ss}] {msg}";
@@ -2149,6 +2775,423 @@ public partial class SlaveWindow
             if (idle) return true;
         }
         return false;
+    }
+
+    private unsafe string GetTextErrorMonitorResult()
+    {
+        const string addonName = "_TextError";
+        var trackedSummary = string.Join(" | ", xagmanTradeFailureTexts.Select(entry => entry.Text));
+
+        var addon = AddonHelper.GetAddon(addonName);
+        if (addon == null)
+        {
+            return $"{addonName}: visible=False, ready=False, tracked=\"{trackedSummary}\", matches=0";
+        }
+
+        var textEntries = AddonHelper.GetAddonTextEntries(addonName)
+            .Where(text => !string.IsNullOrWhiteSpace(text))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        var matches = GetXagmanTradeFailureMatches(textEntries);
+        var matchSummary = matches.Count == 0
+            ? "<none>"
+            : string.Join(" | ", matches.Select(entry => $"{entry.Kind}: {entry.Text}"));
+
+        if (matchSummary.Length > 220)
+            matchSummary = matchSummary.Substring(0, 217) + "...";
+
+        return $"{addonName}: visible={addon->IsVisible}, ready={addon->IsReady}, nodeCount={addon->UldManager.NodeListCount}, textEntries={textEntries.Count}, tracked=\"{trackedSummary}\", matches={matches.Count}, text=\"{matchSummary}\"";
+    }
+
+    private static object? GetDropboxPlugin()
+    {
+        try
+        {
+            var pluginManagerServiceType = typeof(IDalamudPluginInterface).Assembly
+                .GetType("Dalamud.Service`1");
+            var pluginManagerType = typeof(IDalamudPluginInterface).Assembly.GetType("Dalamud.Plugin.Internal.PluginManager");
+            
+            if (pluginManagerServiceType == null || pluginManagerType == null) return null;
+            
+            var pluginManager = pluginManagerServiceType
+                .MakeGenericType(pluginManagerType)
+                .GetMethod("Get")
+                ?.Invoke(null, null);
+
+            if (pluginManager == null) return null;
+
+            var installedPlugins = pluginManager.GetType()
+                .GetProperty("InstalledPlugins")
+                ?.GetValue(pluginManager) as System.Collections.IList;
+
+            if (installedPlugins == null) return null;
+
+            foreach (var plugin in installedPlugins)
+            {
+                if (plugin == null) continue;
+                
+                var internalNameProperty = plugin.GetType()
+                    .GetProperty("InternalName");
+                
+                if (internalNameProperty == null) continue;
+                
+                var internalName = internalNameProperty
+                    .GetValue(plugin)?.ToString();
+
+                if (internalName == "Dropbox")
+                {
+                    var pluginType = plugin.GetType().Name == "LocalDevPlugin" 
+                        ? plugin.GetType().BaseType 
+                        : plugin.GetType();
+
+                    if (pluginType == null) continue;
+
+                    var instanceField = pluginType.GetField("instance", 
+                        System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance);
+                    
+                    return instanceField?.GetValue(plugin);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error getting Dropbox plugin: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    private static object? GetPluginConfig(object pluginInstance)
+    {
+        try
+        {
+            if (pluginInstance == null) return null;
+            
+            var configFieldNames = new[] { "C", "Config", "configuration", "Configuration" };
+            var pluginType = pluginInstance.GetType();
+            var bindingFlags = System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Static;
+            
+            foreach (var fieldName in configFieldNames)
+            {
+                var field = pluginType.GetField(fieldName, 
+                    bindingFlags);
+
+                if (field != null)
+                {
+                    var config = field.GetValue(field.IsStatic ? null : pluginInstance);
+                    if (config != null) return config;
+                }
+            }
+
+            foreach (var propName in configFieldNames)
+            {
+                var property = pluginType.GetProperty(propName, 
+                    bindingFlags);
+
+                if (property != null)
+                {
+                    var getter = property.GetGetMethod(true);
+                    var config = property.GetValue(getter != null && getter.IsStatic ? null : pluginInstance);
+                    if (config != null) return config;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error getting plugin config: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    private static bool TryOpenDropboxUi(object pluginInstance)
+    {
+        try
+        {
+            if (pluginInstance == null) return false;
+
+            if (TryInvokeParameterlessMethod(pluginInstance, "OpenUI"))
+            {
+                return true;
+            }
+
+            return OpenDropboxConfigWindow(pluginInstance);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error opening Dropbox UI: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static bool OpenDropboxConfigWindow(object pluginInstance)
+    {
+        try
+        {
+            if (pluginInstance == null) return false;
+
+            var loadContext = System.Runtime.Loader.AssemblyLoadContext.GetLoadContext(pluginInstance.GetType().Assembly);
+            if (loadContext == null) return false;
+
+            var bindingFlags = System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Static;
+
+            foreach (var assembly in loadContext.Assemblies)
+            {
+                var ezConfigGuiType = assembly.GetType("ECommons.SimpleGui.EzConfigGui");
+                if (ezConfigGuiType == null) continue;
+
+                var openMethod = ezConfigGuiType.GetMethod("Open",
+                    bindingFlags,
+                    null,
+                    System.Type.EmptyTypes,
+                    null);
+
+                if (openMethod != null)
+                {
+                    openMethod.Invoke(null, null);
+                    return true;
+                }
+
+                var openWithArgsMethod = ezConfigGuiType.GetMethod("Open",
+                    bindingFlags,
+                    null,
+                    new[] { typeof(string), typeof(string) },
+                    null);
+
+                if (openWithArgsMethod != null)
+                {
+                    openWithArgsMethod.Invoke(null, new object?[] { null, null });
+                    return true;
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error opening Dropbox config window: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static bool RequestDropboxOpenTabOnce(object pluginInstance, string tabName)
+    {
+        try
+        {
+            if (pluginInstance == null || string.IsNullOrWhiteSpace(tabName)) return false;
+
+            var requested = TrySetObjectMemberValue(pluginInstance, "OpenTabName", tabName);
+            if (!requested)
+            {
+                return false;
+            }
+
+            QueueDropboxOpenTabReset(pluginInstance);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error requesting Dropbox tab '{tabName}': {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static void QueueDropboxOpenTabReset(object pluginInstance, int delayMs = 250)
+    {
+        _ = ClearDropboxOpenTabRequestAsync(pluginInstance, delayMs);
+    }
+
+    private static async System.Threading.Tasks.Task ClearDropboxOpenTabRequestAsync(object pluginInstance, int delayMs)
+    {
+        try
+        {
+            if (pluginInstance == null) return;
+
+            await System.Threading.Tasks.Task.Delay(delayMs);
+            await Plugin.Framework.RunOnFrameworkThread(() =>
+                TrySetObjectMemberValue(pluginInstance, "OpenTabName", string.Empty));
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error clearing Dropbox tab request: {ex.Message}");
+        }
+    }
+
+    private static bool TrySetObjectMemberValue(object target, string memberName, object value)
+    {
+        try
+        {
+            if (target == null) return false;
+
+            var targetType = target.GetType();
+            var bindingFlags = System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Static;
+
+            var field = targetType.GetField(memberName, bindingFlags);
+            if (field != null)
+            {
+                field.SetValue(field.IsStatic ? null : target, value);
+                return true;
+            }
+
+            var property = targetType.GetProperty(memberName, bindingFlags);
+            if (property != null && property.CanWrite)
+            {
+                var setter = property.GetSetMethod(true);
+                property.SetValue(setter != null && setter.IsStatic ? null : target, value);
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error setting object member {memberName}: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static bool TryInvokeParameterlessMethod(object target, string methodName)
+    {
+        try
+        {
+            if (target == null) return false;
+
+            var bindingFlags = System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Static;
+
+            var method = target.GetType().GetMethod(
+                methodName,
+                bindingFlags,
+                null,
+                System.Type.EmptyTypes,
+                null);
+
+            if (method == null)
+            {
+                return false;
+            }
+
+            method.Invoke(method.IsStatic ? null : target, null);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error invoking method {methodName}: {ex.Message}");
+        }
+
+        return false;
+    }
+
+    private static object? GetDropboxTaskManager(object pluginInstance)
+    {
+        try
+        {
+            if (pluginInstance == null) return null;
+
+            var pluginType = pluginInstance.GetType();
+            var bindingFlags = System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Static;
+
+            var field = pluginType.GetField("TaskManager", bindingFlags);
+            if (field != null)
+            {
+                var taskManager = field.GetValue(field.IsStatic ? null : pluginInstance);
+                if (taskManager != null) return taskManager;
+            }
+
+            var property = pluginType.GetProperty("TaskManager", bindingFlags);
+            if (property != null)
+            {
+                var getter = property.GetGetMethod(true);
+                var taskManager = property.GetValue(getter != null && getter.IsStatic ? null : pluginInstance);
+                if (taskManager != null) return taskManager;
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error getting Dropbox task manager: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    private static void AbortTaskManager(object taskManager)
+    {
+        try
+        {
+            var abortMethod = taskManager.GetType().GetMethod(
+                "Abort",
+                System.Reflection.BindingFlags.Public |
+                System.Reflection.BindingFlags.NonPublic |
+                System.Reflection.BindingFlags.Instance |
+                System.Reflection.BindingFlags.Static,
+                null,
+                System.Type.EmptyTypes,
+                null);
+
+            if (abortMethod == null)
+            {
+                throw new InvalidOperationException("Method 'Abort' not found on task manager");
+            }
+
+            abortMethod.Invoke(abortMethod.IsStatic ? null : taskManager, null);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error aborting task manager: {ex.Message}");
+            throw;
+        }
+    }
+
+    private static void SetConfigProperty(object config, string propertyName, object value)
+    {
+        try
+        {
+            var configType = config.GetType();
+
+            // Try to set as a field first
+            var field = configType.GetField(propertyName, 
+                System.Reflection.BindingFlags.Public | 
+                System.Reflection.BindingFlags.NonPublic | 
+                System.Reflection.BindingFlags.Instance);
+
+            if (field != null)
+            {
+                field.SetValue(config, value);
+                return;
+            }
+
+            // Try to set as a property
+            var property = configType.GetProperty(propertyName, 
+                System.Reflection.BindingFlags.Public | 
+                System.Reflection.BindingFlags.NonPublic | 
+                System.Reflection.BindingFlags.Instance);
+
+            if (property != null && property.CanWrite)
+            {
+                property.SetValue(config, value);
+                return;
+            }
+
+            throw new InvalidOperationException($"Property '{propertyName}' not found on config object");
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[Reflection] Error setting config property {propertyName}: {ex.Message}");
+            throw;
+        }
     }
 }
 #endif

@@ -139,7 +139,7 @@ public partial class SlaveWindow
         ImGui.EndGroup();
         if (ImGui.IsItemClicked())
             refreshSubsGoWorkshop = !refreshSubsGoWorkshop;
-        
+
         ImGui.SetNextItemWidth(80);
         var wait = refreshSubsExtraWait;
         if (ImGui.InputFloat("Extra Wait (sec)##refreshSubsWait", ref wait, 0.5f, 1.0f, "%.1f"))
@@ -189,7 +189,7 @@ public partial class SlaveWindow
                     ? "Missing required plugins. Check the plugin status above."
                     : "Select at least one character to start.");
             if (started)
-                refreshSubsShowLog = true;
+                AutoOpenTaskLogIfVerbose(ref refreshSubsShowLog);
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##refreshSubsAll"))
@@ -519,7 +519,7 @@ public partial class SlaveWindow
                     }
                     catch { return false; }
                 },
-                TimeoutSec = 120f,
+                TimeoutSec = 600f,
             });
 
             // SafeWait 3-pass
@@ -760,10 +760,29 @@ public partial class SlaveWindow
                     runner.AddLog("Opening Journal...");
                     ChatHelper.SendMessage("/journal");
                 },
-                IsComplete = () => true,
-                TimeoutSec = 2f,
+                IsComplete = () => AddonHelper.IsAddonVisible("Journal"),
+                TimeoutSec = 3f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Journal Delay: {charName}", 0.5f));
+            steps.Add(MonthlyReloggerTask.MakeDelay($"Journal Read Delay: {charName}", 0.5f));
+            if (plugin.IpcClient.IsXaDatabaseAvailable())
+            {
+                steps.Add(new TaskStep
+                {
+                    Name = $"Journal Save: {charName}",
+                    ShouldSkip = () => !AddonHelper.IsAddonVisible("Journal"),
+                    OnEnter = () =>
+                    {
+                        runner.AddLog("Saving Journal data to XA Database...");
+                        if (plugin.SaveToXaDatabaseAndRecordSync())
+                            runner.AddLog("Saved Journal data to XA Database.");
+                        else
+                            runner.AddLog("XA Database Journal save failed.");
+                    },
+                    IsComplete = () => true,
+                    TimeoutSec = 3f,
+                });
+                steps.Add(MonthlyReloggerTask.MakeDelay($"Journal Save Delay: {charName}", 0.5f, () => !AddonHelper.IsAddonVisible("Journal")));
+            }
         }
 
         var needsHomeLeg = refreshSubsDoReturnToHome || refreshSubsDoCollectPersonalPlotInfo;

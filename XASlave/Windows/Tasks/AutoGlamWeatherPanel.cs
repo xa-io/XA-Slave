@@ -97,7 +97,7 @@ public partial class SlaveWindow
             StartAutoGlamWeatherTask,
             startDisabledReason);
         if (started)
-            glamWeatherShowLog = true;
+            AutoOpenTaskLogIfVerbose(ref glamWeatherShowLog);
 
         if (glamWeatherRunning)
         {

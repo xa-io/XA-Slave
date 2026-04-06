@@ -123,7 +123,7 @@ public partial class SlaveWindow
                         ? "Select a target world first."
                         : "Select at least one character to start.");
             if (started)
-                prepLogisticsShowLog = true;
+                AutoOpenTaskLogIfVerbose(ref prepLogisticsShowLog);
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##prepLogisticsAll"))
@@ -543,7 +543,7 @@ public partial class SlaveWindow
             cfg.PrepLogisticsLogoutOnComplete,
             plugin.TaskRunner);
         reloggerRunList = new List<string>(selected);
-        prepLogisticsShowLog = true;
+        AutoOpenTaskLogIfVerbose(ref prepLogisticsShowLog);
 
         plugin.TaskRunner.Start("Prep Logistics", steps, onLog: msg =>
         {
@@ -610,7 +610,7 @@ public partial class SlaveWindow
                 },
                 IsComplete = () => MonthlyReloggerTask.GetCurrentCharacterNameWorld().Equals(charName, StringComparison.OrdinalIgnoreCase)
                     && CharacterSafetyHelper.IsCharacterSafeWaitReady(),
-                TimeoutSec = 120f,
+                TimeoutSec = 600f,
                 MaxRetries = 2,
                 OnTimeout = () =>
                 {

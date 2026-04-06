@@ -174,7 +174,7 @@ public partial class SlaveWindow
                     dupDoReturnToFc, dupDoParseForXaDatabase, dupDoLogoutOnComplete, dupDoEnableArMulti),
                 "Select at least one character and ensure required plugins are loaded.");
             if (started)
-                dupPlotsShowLog = true;
+                AutoOpenTaskLogIfVerbose(ref dupPlotsShowLog);
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##dup"))

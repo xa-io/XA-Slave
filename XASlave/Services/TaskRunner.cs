@@ -28,6 +28,7 @@ public sealed class TaskRunner : IDisposable
     private bool running;
     private Action? onFinished;
     private Action<string>? onLog;
+    private bool suppressCompletionReport;
 
     public bool IsRunning => running;
 
@@ -67,12 +68,13 @@ public sealed class TaskRunner : IDisposable
     }
 
     /// <summary>Start executing a list of steps as a named task.</summary>
-    public void Start(string taskName, List<TaskStep> taskSteps, Action? onFinished = null, Action<string>? onLog = null)
+    public void Start(string taskName, List<TaskStep> taskSteps, Action? onFinished = null, Action<string>? onLog = null, bool suppressCompletionReport = false)
     {
         if (running) return;
 
         this.onFinished = onFinished;
         this.onLog = onLog;
+        this.suppressCompletionReport = suppressCompletionReport;
         CurrentTaskName = taskName;
         CompletedItems = 0;
         TotalItems = 0;
@@ -117,6 +119,7 @@ public sealed class TaskRunner : IDisposable
         stepIndex = -1;
         StatusText = "Cancelled";
         SuppressLogoutCancel = false;
+        suppressCompletionReport = false;
         AddLog($"[{CurrentTaskName}] Cancelled.");
         log.Information($"[XASlave] TaskRunner: '{CurrentTaskName}' cancelled.");
         SetDtrIdle();
@@ -295,7 +298,8 @@ public sealed class TaskRunner : IDisposable
         stepIndex = -1;
         StatusText = "Complete";
         SuppressLogoutCancel = false;
-        AddLog($"[{CurrentTaskName}] Finished.");
+        if (!suppressCompletionReport)
+            AddLog($"[{CurrentTaskName}] Finished.");
         log.Information($"[XASlave] TaskRunner: '{CurrentTaskName}' finished.");
 
         // Reset DTR bar to idle
@@ -304,22 +308,26 @@ public sealed class TaskRunner : IDisposable
         // Toast notification — must run on framework thread
         try
         {
-            var taskName = CurrentTaskName;
-            var completed = CompletedItems;
-            var total = TotalItems;
-            var failCount = FailedCharacters.Count;
-            framework.RunOnFrameworkThread(() =>
+            if (!suppressCompletionReport)
             {
-                var msg = failCount > 0
-                    ? $"XA Slave: {taskName} complete ({completed}/{total}, {failCount} failed)"
-                    : $"XA Slave: {taskName} complete ({completed}/{total})";
-                toastGui.ShowNormal(msg);
-            });
+                var taskName = CurrentTaskName;
+                var completed = CompletedItems;
+                var total = TotalItems;
+                var failCount = FailedCharacters.Count;
+                framework.RunOnFrameworkThread(() =>
+                {
+                    var msg = failCount > 0
+                        ? $"XA Slave: {taskName} complete ({completed}/{total}, {failCount} failed)"
+                        : $"XA Slave: {taskName} complete ({completed}/{total})";
+                    toastGui.ShowNormal(msg);
+                });
+            }
         }
         catch { /* toast may fail silently */ }
 
         try { onFinished?.Invoke(); }
         catch (Exception ex) { log.Error($"[XASlave] TaskRunner onFinished error: {ex.Message}"); }
+        finally { suppressCompletionReport = false; }
     }
 
     /// <summary>Initialize DTR bar entry — always visible, shows "Idle" by default.</summary>

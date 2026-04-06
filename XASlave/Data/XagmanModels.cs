@@ -30,9 +30,11 @@ public enum XagmanStatus
     Traveling,
     AtMeetSpot,
     ReadyForQueue,
+    WaitingRoom,
     Queued,
     Called,
     Trading,
+    Standby,
     ReturningHome,
     Completed,
     Paused,
@@ -97,11 +99,15 @@ public sealed class XagmanPeerPresence
     public string MeetAetheryte { get; set; } = string.Empty;
     public DateTime QueueRequestedAtUtc { get; set; } = DateTime.MinValue;
     public DateTime TonyCompletionRequestedAtUtc { get; set; } = DateTime.MinValue;
+    public int TotalCharacters { get; set; }
+    public int CompletedCharacters { get; set; }
     public int QueueNumber { get; set; }
     public string ActiveTradePartner { get; set; } = string.Empty;
     public string ActiveTradePartnerInstanceId { get; set; } = string.Empty;
+    public bool TonyRotationReady { get; set; }
     public int MainInventoryFreeSlots { get; set; }
     public int Gil { get; set; }
+    public int TonyGilMinimum { get; set; } = -1;
     public List<uint> ItemIds { get; set; } = new();
     public List<XagmanTradeRequestEntry> RequestedItems { get; set; } = new();
 }
@@ -120,4 +126,8 @@ public static class XagmanPeerMessageTypes
 {
     public const string Register = "register";
     public const string PeerList = "peer-list";
+    public const string StartTask = "start-task";
+    public const string StopTask = "stop-task";
+    public const string RecallTask = "recall-task";
+    public const string CompleteTask = "complete-task";
 }

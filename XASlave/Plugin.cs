@@ -27,6 +27,9 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] public static IPluginLog Log { get; private set; } = null!;
     [PluginService] public static IDtrBar DtrBar { get; private set; } = null!;
     [PluginService] public static IToastGui ToastGui { get; private set; } = null!;
+    [PluginService] public static IGameGui GameGui { get; private set; } = null!;
+    [PluginService] public static INamePlateGui NamePlateGui { get; private set; } = null!;
+    [PluginService] public static ITextureProvider TextureProvider { get; private set; } = null!;
 
     private const string CommandName = "/xa";
 
@@ -96,7 +99,8 @@ public sealed class Plugin : IDalamudPlugin
         WindowRenamer = new WindowRenamerService(Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
         XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubPort, _ => { });
-        XagmanPeers.Start();
+        if (Configuration.XagmanPeerConnectionsEnabled)
+            XagmanPeers.Start();
 
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
@@ -190,6 +194,9 @@ public sealed class Plugin : IDalamudPlugin
         if (TaskRunner.IsRunning)
             TaskRunner.AddLog("EVENT: Character logged in.");
 
+        if (Configuration.WindowRenamerEnabled && Configuration.WindowRenamerShowCurrentCharacter)
+            WindowRenamer.ApplyFromConfig(Configuration, PlayerState.CharacterName.ToString());
+
         if (Configuration.OpenPluginOnLoad)
             SlaveWindow.IsOpen = true;
 
@@ -205,6 +212,9 @@ public sealed class Plugin : IDalamudPlugin
         SlaveWindow.CancelScheduledAutoCollection(true);
         var contentId = PlayerState.ContentId;
         var characterName = PlayerState.CharacterName.ToString();
+
+        if (Configuration.WindowRenamerEnabled && Configuration.WindowRenamerShowCurrentCharacter)
+            WindowRenamer.ApplyFromConfig(Configuration, string.Empty);
 
         // Cancel any running task on logout — BUT skip if relogger suppresses it
         // (logout is expected during /ays relog character switches)
@@ -269,11 +279,25 @@ public sealed class Plugin : IDalamudPlugin
         return normalized;
     }
 
+    public bool SetXagmanPeerConnectionsEnabled(bool enabled)
+    {
+        if (Configuration.XagmanPeerConnectionsEnabled == enabled && XagmanPeers.IsStarted == enabled)
+            return enabled;
+
+        Configuration.XagmanPeerConnectionsEnabled = enabled;
+        Configuration.Save();
+        RestartXagmanPeerService();
+        return enabled;
+    }
+
     private void RestartXagmanPeerService()
     {
         XagmanPeers.Dispose();
         XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubPort, _ => { });
-        XagmanPeers.Start();
+        if (Configuration.XagmanPeerConnectionsEnabled)
+            XagmanPeers.Start();
+
+        SlaveWindow?.RebindXagmanPeerEventHandlers();
     }
 
     private static List<XagmanItemEntry> MergeXagmanItems(params IEnumerable<XagmanItemEntry>[] sources)
@@ -297,5 +321,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.15";
+    public const string Version = "0.0.0.16";
 }

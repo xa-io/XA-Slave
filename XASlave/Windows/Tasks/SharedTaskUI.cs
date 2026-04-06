@@ -121,6 +121,12 @@ public partial class SlaveWindow
         }
     }
 
+    private void AutoOpenTaskLogIfVerbose(ref bool showLog)
+    {
+        if (plugin.Configuration.VerboseTaskLogging)
+            showLog = true;
+    }
+
     private void DrawSharedCompletionAndLogFooter(string optionId, string logId,
         ref bool logoutOnComplete, ref bool enableArMultiOnComplete, ref bool showLog,
         Services.TaskRunner runner)

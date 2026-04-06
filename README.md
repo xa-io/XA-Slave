@@ -1,22 +1,29 @@
-# XA Slave
+﻿# XA Slave
 
 A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character workflows — relogging, world travel, chat announcements, housing checks, and more. Works alongside **XA Database** to collect and push character data hands-free.
 
+- View all our utilities & plugins here: https://aethertek.io/
+
 ## Key Features
 
-- **Save to XA Database** — Push data to XA Database with optional cadence-gated login collection and a built-in task log for collection/save debugging.
 - **AutoRetainer Tasks** — Run pre-processing, post-processing, bailout handling, sync cadence gates, and optional collection steps from one panel.
+- **Save to XA Database** — Push data to XA Database with optional cadence-gated login collection and a built-in task log for collection/save debugging.
 - **Auto-Glam Weather** — Configure per-weather glamour plate lists, then randomly apply valid class/job and plate choices when the active weather changes.
 - **City Chat Flooder** — Send announcements across selected worlds and cities with looping and delay controls.
+- **Xagman** — Coordinate cross-client Tony / Franchise Owner FC trading over TCP peer connections with peer-aware startup, stationary meetups, `Give` / `Take` / `Balance` routing, Tony supplier search matching, standby / waiting-room queue control, safer Dropbox / targeting / timeout recovery, automatic Tony rotation and warning-based completion cleanup, plus run-order/progress UI and relog/travel safeguards. Available in normal Release builds.
 - **Monthly Relogger** — Cycle through characters with AutoRetainer integration, XA Database-backed rank and personal-plot visibility, failure highlighting, and optional per-character actions.
+- **Prep Logistics** — Relog selected characters, see available main-inventory space, move them to a target world or location, and optionally enable AR multi or logout after the run.
+- **Auto-Accept FC Invites** — Monitor for FC invitations, automatically accept them, wait for a configurable period, and optionally leave again through the built-in floater-assist flow.
+- **FC Permissions Updater** — Review FC rosters with member-rank and FC-rank visibility before running shared permissions updates.
 - **Check Duplicate Plots** — Scan characters for duplicate housing plots and optionally rerun follow-up actions.
 - **Return Alts To Homeworlds** — Send characters back to their home worlds with the shared action flow.
-- **Prep Logistics** — Relog selected characters, see available main-inventory space, move them to a target world or location, and optionally enable AR multi or logout after the run.
-- **Xagman** — Coordinate Tony / Franchise Owner meetups and Dropbox trades with owner-driven `Give` / `Take` / `Balance` routing, live shortage requests, and peer-aware queue logging.
 - **Refresh AR Subs/Bell** — Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, and safer menu recovery.
-- **FC Permissions Updater** — Review region-filtered FC rosters with member-rank and FC-rank visibility before running shared permissions updates.
-- **Utility Controls** — Manage plugin startup behavior, task logging, window renaming, collapsible menu groups, and a resizable task-menu pane.
+- **Window Renamer** — Rename the FFXIV game window with an optional custom title, process-ID prefix, and current-character suffix.
+- **Plugin Operations** — Manage plugin startup behavior, verbose task logging, task-menu section state, and other shared XA Slave behavior/settings.
 - **Export Data** — Export multi-character tables from AutoRetainer, Lifestream, and XA Database into timestamped TSV or CSV snapshots.
+- **Repo List** — Review commonly required custom plugin repositories with installer/settings shortcuts, plugin presence checks, and copy-to-clipboard repo URLs.
+- **IPC Calls Available** — Review the IPC integrations XA Slave can talk to, along with cached/live availability checks for supported plugins.
+- **Splash Screen** — Return to the default XA Slave landing page with the website, Discord, and first-time guidance without needing the ctrl-click unselect shortcut.
 - **Priority Tasks** — Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
 
 ## Commands
@@ -41,7 +48,7 @@ This means that there are still features being implemented and enhanced. Suggest
 4. In the "Custom Plugin Repositories" section, paste the following URL:
 
    ```text
-   https://raw.githubusercontent.com/xa-io/MyDalamudPlugins/master/pluginmaster.json
+   https://aethertek.io/x.json
    ```
 
 5. Click "Save".

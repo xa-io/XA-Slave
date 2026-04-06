@@ -62,6 +62,18 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
+        var showCurrentCharacter = plugin.Configuration.WindowRenamerShowCurrentCharacter;
+        if (ImGui.Checkbox("Show Current Character", ref showCurrentCharacter))
+        {
+            plugin.Configuration.WindowRenamerShowCurrentCharacter = showCurrentCharacter;
+            plugin.Configuration.Save();
+            if (enabled)
+                plugin.WindowRenamer.ApplyFromConfig(plugin.Configuration);
+        }
+        ImGui.TextDisabled("Appends the currently logged-in character name after the title and refreshes on login/logout.");
+
+        ImGui.Spacing();
+
         // Custom title text box
         ImGui.Text("Window Title:");
         ImGui.SetNextItemWidth(300);
@@ -105,8 +117,7 @@ public partial class SlaveWindow
         var previewTitle = string.IsNullOrWhiteSpace(windowRenamerTitleInput)
             ? "FINAL FANTASY XIV"
             : windowRenamerTitleInput;
-        if (usePid)
-            previewTitle = $"{Environment.ProcessId} - {previewTitle}";
+        previewTitle = plugin.WindowRenamer.BuildPreviewTitle(previewTitle, usePid, showCurrentCharacter);
 
         ImGui.TextColored(
             enabled ? new Vector4(0.4f, 1.0f, 0.4f, 1.0f) : new Vector4(0.6f, 0.6f, 0.6f, 1.0f),

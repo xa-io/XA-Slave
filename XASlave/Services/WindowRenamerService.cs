@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Dalamud.Plugin.Services;
@@ -65,13 +66,11 @@ public sealed class WindowRenamerService : IDisposable
 
     /// <summary>
     /// Renames the game window to the specified title.
-    /// If useProcessId is true, prepends the process ID to the title.
+    /// If enabled, prepends the process ID and/or appends the current character name.
     /// </summary>
-    public bool Rename(string title, bool useProcessId)
+    public bool Rename(string title, bool useProcessId, bool showCurrentCharacter, string? currentCharacterNameOverride = null)
     {
-        var finalTitle = useProcessId
-            ? $"{Environment.ProcessId} - {title}"
-            : title;
+        var finalTitle = BuildFinalTitle(title, useProcessId, showCurrentCharacter, currentCharacterNameOverride);
 
         if (!TryGetGameWindow(out var hwnd))
         {
@@ -99,6 +98,11 @@ public sealed class WindowRenamerService : IDisposable
             log.Error($"[XASlave] WindowRenamer: Exception during rename: {ex.Message}");
             return false;
         }
+    }
+
+    public string BuildPreviewTitle(string title, bool useProcessId, bool showCurrentCharacter, string? currentCharacterNameOverride = null)
+    {
+        return BuildFinalTitle(title, useProcessId, showCurrentCharacter, currentCharacterNameOverride);
     }
 
     /// <summary>
@@ -130,17 +134,55 @@ public sealed class WindowRenamerService : IDisposable
     /// </summary>
     public void ApplyFromConfig(Configuration config)
     {
+        ApplyFromConfig(config, null);
+    }
+
+    public void ApplyFromConfig(Configuration config, string? currentCharacterNameOverride)
+    {
         if (config.WindowRenamerEnabled)
         {
             var title = string.IsNullOrWhiteSpace(config.WindowRenamerTitle)
                 ? DefaultTitle
                 : config.WindowRenamerTitle;
-            Rename(title, config.WindowRenamerUseProcessId);
+            Rename(title, config.WindowRenamerUseProcessId, config.WindowRenamerShowCurrentCharacter, currentCharacterNameOverride);
         }
         else
         {
             Restore();
         }
+    }
+
+    private static string BuildFinalTitle(string title, bool useProcessId, bool showCurrentCharacter, string? currentCharacterNameOverride)
+    {
+        var parts = new List<string>();
+        if (useProcessId)
+            parts.Add(Environment.ProcessId.ToString());
+
+        parts.Add(title);
+
+        if (showCurrentCharacter)
+        {
+            var currentCharacterName = ResolveCurrentCharacterName(currentCharacterNameOverride);
+            if (!string.IsNullOrWhiteSpace(currentCharacterName))
+                parts.Add(currentCharacterName);
+        }
+
+        return string.Join(" - ", parts);
+    }
+
+    private static string ResolveCurrentCharacterName(string? currentCharacterNameOverride)
+    {
+        if (currentCharacterNameOverride != null)
+            return currentCharacterNameOverride.Trim();
+
+        var playerState = Plugin.PlayerState;
+        if (!playerState.IsLoaded)
+            return string.Empty;
+
+        var currentCharacterName = playerState.CharacterName.ToString();
+        return string.IsNullOrWhiteSpace(currentCharacterName)
+            ? string.Empty
+            : currentCharacterName;
     }
 
     public void Dispose()

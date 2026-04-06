@@ -463,7 +463,7 @@ public partial class SlaveWindow
                     floorderErrorExpiry = DateTime.UtcNow.AddSeconds(30);
                     runner.AddLog(msg);
                     Plugin.Log.Warning($"[XASlave] City Chat Flooder: {msg}");
-                    floorderShowLog = true;
+                    AutoOpenTaskLogIfVerbose(ref floorderShowLog);
                     return;
                 }
             }
@@ -653,6 +653,6 @@ public partial class SlaveWindow
             Plugin.Log.Information($"[TaskLogs] {msg}");
         });
 
-        floorderShowLog = true;
+        AutoOpenTaskLogIfVerbose(ref floorderShowLog);
     }
 }

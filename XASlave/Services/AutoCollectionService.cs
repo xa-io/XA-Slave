@@ -123,11 +123,34 @@ public sealed class AutoCollectionService : IDisposable
             steps.Add(new TaskStep
             {
                 Name = "Open Journal",
-                OnEnter = () => ChatHelper.SendMessage("/journal"),
+                OnEnter = () =>
+                {
+                    AddLog("Opening Journal...");
+                    ChatHelper.SendMessage("/journal");
+                },
+                IsComplete = () => IsAddonReady("Journal") || DelayComplete(2.0f),
+                TimeoutSec = 3f,
+            });
+            steps.Add(new TaskStep { Name = "Journal Read Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new TaskStep
+            {
+                Name = "Journal Save",
+                ShouldSkip = () => onSave == null || !IsAddonReady("Journal"),
+                OnEnter = () =>
+                {
+                    AddLog("Saving Journal data to XA Database...");
+                    onSave?.Invoke();
+                },
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(new TaskStep { Name = "Journal Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new TaskStep
+            {
+                Name = "Journal Save Delay",
+                ShouldSkip = () => onSave == null || !IsAddonReady("Journal"),
+                IsComplete = () => DelayComplete(0.5f),
+                TimeoutSec = 1f,
+            });
         }
 
         if (doPersonalPlotInfo)

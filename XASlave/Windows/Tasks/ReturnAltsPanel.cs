@@ -125,7 +125,7 @@ public partial class SlaveWindow
                     raDoReturnToFc, raDoParseForXaDatabase, raDoLogoutOnComplete, raDoEnableArMulti),
                 "Select at least one character and ensure required plugins are loaded.");
             if (started)
-                returnAltsShowLog = true;
+                AutoOpenTaskLogIfVerbose(ref returnAltsShowLog);
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##ra"))

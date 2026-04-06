@@ -140,7 +140,7 @@ public partial class SlaveWindow
                     ? "Missing required plugins. Check the Plugin Status section above."
                     : "Select at least one character to start.");
             if (started)
-                reloggerShowLog = true;
+                AutoOpenTaskLogIfVerbose(ref reloggerShowLog);
 
             ImGui.SameLine();
             if (ImGui.Button("Check All"))
@@ -667,7 +667,7 @@ public partial class SlaveWindow
                 reloggerSelectedIndices.Remove(idx);
         });
         plugin.TaskRunner.Start("Monthly Relogger", steps);
-        reloggerShowLog = true;
+        AutoOpenTaskLogIfVerbose(ref reloggerShowLog);
     }
 
     /// <summary>

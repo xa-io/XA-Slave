@@ -131,7 +131,7 @@ public partial class SlaveWindow
                 StartFcPermissionsUpdater,
                 "Select at least one character to start.");
             if (started)
-                fcPermsShowLog = true;
+                AutoOpenTaskLogIfVerbose(ref fcPermsShowLog);
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##fcPermsAll"))
@@ -457,7 +457,7 @@ public partial class SlaveWindow
                     }
                     catch { return false; }
                 },
-                TimeoutSec = 120f,
+                TimeoutSec = 600f,
             });
 
             // SafeWait 3-pass

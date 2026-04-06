@@ -186,6 +186,7 @@ public partial class SlaveWindow
             DrawIpcRow("XA.Database.GetCharacterSummaryJson", "string", "Structured current-character summary JSON", livePulls);
             DrawIpcRow("XA.Database.GetLastSnapshotResultJson", "string", "Structured last save result JSON", livePulls);
             DrawIpcRow("XA.Database.SearchItems", "string", "Item search (takes query)", livePulls);
+            DrawIpcRow("XA.Database.GetMatchingCharactersForItems", "string", "Exact item-key match (takes itemId:isHq payload)", livePulls);
 
             ImGui.EndTable();
         }

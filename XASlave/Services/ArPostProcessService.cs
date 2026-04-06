@@ -511,10 +511,29 @@ public sealed class ArPostProcessService : IDisposable
                     AddLog("Opening Journal...");
                     ChatHelper.SendMessage("/journal");
                 },
-                IsComplete = () => true,
-                TimeoutSec = 2f,
+                IsComplete = () => IsAddonReady("Journal") || DelayComplete(2.0f),
+                TimeoutSec = 3f,
             });
             steps.Add(new PostProcessStep { Name = "Pre: Journal Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            if (config.ArPreProcessSaveToXaDatabase)
+            {
+                steps.Add(new PostProcessStep
+                {
+                    Name = "Pre: Save Journal to XA Database",
+                    ShouldSkip = () => !IsAddonReady("Journal"),
+                    OnEnter = () =>
+                    {
+                        AddLog("Saving Journal data to XA Database...");
+                        if (plugin.SaveToXaDatabaseAndRecordSync())
+                            AddLog("Saved Journal data to XA Database.");
+                        else
+                            AddLog("XA Database Journal save failed (plugin may not be loaded).");
+                    },
+                    IsComplete = () => true,
+                    TimeoutSec = 3f,
+                });
+                steps.Add(new PostProcessStep { Name = "Pre: Journal Save Delay", ShouldSkip = () => !IsAddonReady("Journal"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            }
         }
 
         if (config.ArPreProcessCollectPersonalPlotInfo)
@@ -820,10 +839,29 @@ public sealed class ArPostProcessService : IDisposable
                     AddLog("Opening Journal...");
                     ChatHelper.SendMessage("/journal");
                 },
-                IsComplete = () => true,
-                TimeoutSec = 2f,
+                IsComplete = () => IsAddonReady("Journal") || DelayComplete(2.0f),
+                TimeoutSec = 3f,
             });
             steps.Add(new PostProcessStep { Name = "Journal Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            if (config.ArPostProcessSaveToXaDatabase)
+            {
+                steps.Add(new PostProcessStep
+                {
+                    Name = "Save Journal to XA Database",
+                    ShouldSkip = () => !IsAddonReady("Journal"),
+                    OnEnter = () =>
+                    {
+                        AddLog("Saving Journal data to XA Database...");
+                        if (plugin.SaveToXaDatabaseAndRecordSync())
+                            AddLog("Saved Journal data to XA Database.");
+                        else
+                            AddLog("XA Database Journal save failed (plugin may not be loaded).");
+                    },
+                    IsComplete = () => true,
+                    TimeoutSec = 3f,
+                });
+                steps.Add(new PostProcessStep { Name = "Journal Save Delay", ShouldSkip = () => !IsAddonReady("Journal"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            }
         }
 
         if (config.ArPostProcessCollectPersonalPlotInfo)

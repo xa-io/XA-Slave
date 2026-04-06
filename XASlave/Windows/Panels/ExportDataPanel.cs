@@ -309,7 +309,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled(cfg.ExportDataRunEveryHours == 0
             ? "Interval 0 behaves as an always-on login/session export instead of a repeating per-frame write."
             : $"Automatic writes trigger when the last successful {ExportTaskName} export is older than {ExportFormatIntervalLabel(cfg.ExportDataRunEveryHours)}.");
-        ImGui.TextDisabled("leveA fills only when a persisted source exposes a leve-allowance field.");
+        ImGui.TextDisabled("leveA prefers XA Database Journal data from currencies_json and falls back to persisted AutoRetainer fields.");
 
         if (!string.IsNullOrEmpty(exportStatusMessage) && DateTime.UtcNow < exportStatusExpiryUtc)
         {
@@ -401,7 +401,7 @@ public partial class SlaveWindow
                     Fcr = snapshot?.FcRank ?? 0,
                     Fcs = snapshot?.FcTag ?? string.Empty,
                     Fcl = !string.IsNullOrWhiteSpace(snapshot?.FcName) ? snapshot!.FcName : character.FcName,
-                    LeveA = character.LeveAllowances,
+                    LeveA = snapshot?.LeveAllowances ?? character.LeveAllowances,
                     S1 = submarines.Length > 0 ? submarines[0] : string.Empty,
                     S2 = submarines.Length > 1 ? submarines[1] : string.Empty,
                     S3 = submarines.Length > 2 ? submarines[2] : string.Empty,
@@ -585,6 +585,7 @@ public partial class SlaveWindow
                 HighestJobLevel = highestJobLevel,
                 RetainerGil = retainerGil,
                 Mgp = ExportCalculateMgp(currenciesJson, itemsJson),
+                LeveAllowances = ExportGetCurrencyAmount(currenciesJson, "Leve Allowances", "Leve Allowance"),
                 TreasureValue = ExportCalculateTreasureValue(itemsJson, listingsJson, retainerItemsJson),
                 VentureCoffers = ExportCalculateVentureCoffers(itemsJson, retainerItemsJson),
                 FcRank = freeCompany?.Rank ?? 0,
@@ -758,14 +759,34 @@ public partial class SlaveWindow
     // ───────────────────────────────────────────────
     private int ExportCalculateMgp(string currenciesJson, string itemsJson)
     {
-        var currencyEntries = ExportDeserializeOrDefault<List<ExportCurrencySnapshot>>(currenciesJson) ?? new List<ExportCurrencySnapshot>();
         var itemEntries = ExportDeserializeOrDefault<List<ExportItemSnapshot>>(itemsJson) ?? new List<ExportItemSnapshot>();
 
-        var mgp = currencyEntries.FirstOrDefault(entry => string.Equals(entry.Name, "MGP", StringComparison.OrdinalIgnoreCase))?.Amount ?? 0;
+        var mgp = ExportGetCurrencyAmount(currenciesJson, "MGP") ?? 0;
         var platinumCards = itemEntries.Where(entry => entry.ItemId == 16784).Sum(entry => entry.Quantity);
 
         var total = (long)mgp + (long)platinumCards * 50000L;
         return total > int.MaxValue ? int.MaxValue : (int)total;
+    }
+
+    private int? ExportGetCurrencyAmount(string currenciesJson, params string[] names)
+    {
+        if (string.IsNullOrWhiteSpace(currenciesJson) || names == null || names.Length == 0)
+            return null;
+
+        var currencyEntries = ExportDeserializeOrDefault<List<ExportCurrencySnapshot>>(currenciesJson) ?? new List<ExportCurrencySnapshot>();
+        foreach (var entry in currencyEntries)
+        {
+            if (entry == null || string.IsNullOrWhiteSpace(entry.Name))
+                continue;
+
+            foreach (var name in names)
+            {
+                if (string.Equals(entry.Name, name, StringComparison.OrdinalIgnoreCase))
+                    return entry.Amount;
+            }
+        }
+
+        return null;
     }
 
     private int ExportCalculateVentureCoffers(string itemsJson, string retainerItemsJson)
@@ -1259,6 +1280,7 @@ public partial class SlaveWindow
         public int HighestJobLevel { get; init; }
         public long RetainerGil { get; init; }
         public int Mgp { get; init; }
+        public int? LeveAllowances { get; init; }
         public int TreasureValue { get; init; }
         public int VentureCoffers { get; init; }
         public int FcRank { get; init; }

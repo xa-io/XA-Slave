@@ -105,7 +105,7 @@ public partial class SlaveWindow
             StartAutoAcceptFcInviteTask,
             "Another XA Slave task is already using the task runner.");
         if (started)
-            fcFloaterShowLog = true;
+            AutoOpenTaskLogIfVerbose(ref fcFloaterShowLog);
 
         if (fcFloaterRunning)
         {

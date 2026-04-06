@@ -61,7 +61,7 @@ public partial class SlaveWindow
         {
             if (ImGui.Button("Collect Now"))
             {
-                saveToXaDatabaseShowLog = true;
+                AutoOpenTaskLogIfVerbose(ref saveToXaDatabaseShowLog);
                 RunAutoCollection();
             }
             if (ImGui.IsItemHovered())
@@ -70,7 +70,7 @@ public partial class SlaveWindow
             ImGui.SameLine();
             if (ImGui.Button("IPC Save"))
             {
-                saveToXaDatabaseShowLog = true;
+                AutoOpenTaskLogIfVerbose(ref saveToXaDatabaseShowLog);
                 plugin.AutoCollector.AddLog("Manual IPC save requested.");
                 if (plugin.SaveToXaDatabaseAndRecordSync())
                     SetIpcResult("Save sent to XA Database");
@@ -212,7 +212,7 @@ public partial class SlaveWindow
 
         var saveAttempted = false;
         var lastSaveOk = false;
-        saveToXaDatabaseShowLog = true;
+        AutoOpenTaskLogIfVerbose(ref saveToXaDatabaseShowLog);
         plugin.AutoCollector.StartCollection(
             plugin.Configuration.AutoCollectArmouryChest,
             plugin.Configuration.AutoCollectSaddlebag,

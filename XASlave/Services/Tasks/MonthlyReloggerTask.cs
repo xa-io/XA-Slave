@@ -349,7 +349,7 @@ public sealed class MonthlyReloggerTask
                         return relogState.SawTransition;
                     }
                 },
-                TimeoutSec = 180f,
+                TimeoutSec = 600f,
                 OnTimeout = () =>
                 {
                     if (!relogState.Failed && !(relogState.Confirmed && relogState.Attempt != capturedAttempt))
@@ -522,10 +522,29 @@ public sealed class MonthlyReloggerTask
                     runner.AddLog("Opening Journal...");
                     ChatHelper.SendMessage("/journal");
                 },
-                IsComplete = () => true,
-                TimeoutSec = 2f,
+                IsComplete = () => AddonHelper.IsAddonVisible("Journal"),
+                TimeoutSec = 3f,
             });
-            steps.Add(MakeDelay("Journal Delay", 0.5f));
+            steps.Add(MakeDelay("Journal Read Delay", 0.5f));
+            if (plugin.IpcClient.IsXaDatabaseAvailable())
+            {
+                steps.Add(new TaskStep
+                {
+                    Name = "Journal Save",
+                    ShouldSkip = () => !AddonHelper.IsAddonVisible("Journal"),
+                    OnEnter = () =>
+                    {
+                        runner.AddLog("Saving Journal data to XA Database...");
+                        if (plugin.SaveToXaDatabaseAndRecordSync())
+                            runner.AddLog("Saved Journal data to XA Database.");
+                        else
+                            runner.AddLog("XA Database Journal save failed.");
+                    },
+                    IsComplete = () => true,
+                    TimeoutSec = 3f,
+                });
+                steps.Add(MakeDelay("Journal Save Delay", 0.5f, () => !AddonHelper.IsAddonVisible("Journal")));
+            }
         }
 
         // return_to_homeXA() → Lifestream: /li home

@@ -50,6 +50,7 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<string> xaGetCharacterSummaryJsonSubscriber;
     private readonly ICallGateSubscriber<string> xaGetLastSnapshotResultJsonSubscriber;
     private readonly ICallGateSubscriber<string, string> xaSearchItemsSubscriber;
+    private readonly ICallGateSubscriber<string, string> xaGetMatchingCharactersForItemsSubscriber;
 
     // ── vnavmesh (source: vnavmesh/IPCProvider.cs — prefixes "vnavmesh." + name) ──
     private readonly ICallGateSubscriber<bool> vnavIsReadySubscriber;
@@ -152,6 +153,7 @@ public sealed class IpcClient
         xaGetCharacterSummaryJsonSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetCharacterSummaryJson");
         xaGetLastSnapshotResultJsonSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetLastSnapshotResultJson");
         xaSearchItemsSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.SearchItems");
+        xaGetMatchingCharactersForItemsSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.GetMatchingCharactersForItems");
 
         // vnavmesh — channel names from RegisterFunc/RegisterAction("X") → "vnavmesh.X"
         vnavIsReadySubscriber = pluginInterface.GetIpcSubscriber<bool>("vnavmesh.Nav.IsReady");
@@ -433,6 +435,20 @@ public sealed class IpcClient
     {
         try { return xaSearchItemsSubscriber.InvokeFunc(query); }
         catch { return string.Empty; }
+    }
+
+    public bool TryGetMatchingCharactersForItems(string itemKeysPayload, out string result)
+    {
+        try
+        {
+            result = xaGetMatchingCharactersForItemsSubscriber.InvokeFunc(itemKeysPayload);
+            return true;
+        }
+        catch
+        {
+            result = string.Empty;
+            return false;
+        }
     }
 
     // ═══════════════════════════════════════════════════
