@@ -56,6 +56,7 @@ public partial class SlaveWindow : Window, IDisposable
         // Utility
         WindowRenamer,
         PluginOperations,
+        XAMods,
         // Reference
 #if XA_SLAVE_TESTING_BUILD
         DebugCommands,
@@ -63,6 +64,7 @@ public partial class SlaveWindow : Window, IDisposable
         ExportData,
         RepoList,
         IpcCallsAvailable,
+        CommandsReference,
         SplashScreen,
     }
 
@@ -101,6 +103,7 @@ public partial class SlaveWindow : Window, IDisposable
 
     private static readonly (SlaveTask Task, string Label)[] UtilityItems =
     {
+        (SlaveTask.XAMods, "XA Mods"),
         (SlaveTask.WindowRenamer, "Window Renamer"),
         (SlaveTask.PluginOperations, "Plugin Operations"),
     };
@@ -113,6 +116,7 @@ public partial class SlaveWindow : Window, IDisposable
         (SlaveTask.ExportData, "Export Data"),
         (SlaveTask.RepoList, "Repo List"),
         (SlaveTask.IpcCallsAvailable, "IPC Calls Available"),
+        (SlaveTask.CommandsReference, "Commands"),
         (SlaveTask.SplashScreen, "Splash Screen"),
     };
 
@@ -146,6 +150,18 @@ public partial class SlaveWindow : Window, IDisposable
     public void RebindXagmanPeerEventHandlers()
     {
         InitializeXagmanPeerEventHandlers();
+    }
+
+    public void OpenXAModsTask()
+    {
+        IsOpen = true;
+        SelectBuiltInTask(SlaveTask.XAMods);
+    }
+
+    public void OpenCommandsReferenceTask()
+    {
+        IsOpen = true;
+        SelectBuiltInTask(SlaveTask.CommandsReference);
     }
 
     public void Dispose()
@@ -524,6 +540,9 @@ public partial class SlaveWindow : Window, IDisposable
                         case SlaveTask.PluginOperations:
                             DrawPluginOperationsTask();
                             break;
+                        case SlaveTask.XAMods:
+                            DrawXAModsTask();
+                            break;
 #if XA_SLAVE_TESTING_BUILD
                         case SlaveTask.DebugCommands:
                             DrawDebugCommands();
@@ -537,6 +556,9 @@ public partial class SlaveWindow : Window, IDisposable
                             break;
                         case SlaveTask.IpcCallsAvailable:
                             DrawIpcCallsAvailable();
+                            break;
+                        case SlaveTask.CommandsReference:
+                            DrawCommandsReference();
                             break;
                     }
                 }

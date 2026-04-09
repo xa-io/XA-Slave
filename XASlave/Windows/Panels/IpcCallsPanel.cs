@@ -128,7 +128,7 @@ public partial class SlaveWindow
             }
             RefreshLiveIpcValues();
         }
-        ImGui.TextDisabled("Shows all IPC integrations available to XA Slave (11 plugins, 58 calls) + XA Slave provider channels.");
+        ImGui.TextDisabled("Shows XA Slave's outbound IPC integrations plus the XA Slave provider channels exposed to other plugins.");
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -146,6 +146,7 @@ public partial class SlaveWindow
             ImGui.TableHeadersRow();
 
             DrawIpcRow("XASlave.IsBusy", "bool", "True when any task is running", livePulls);
+            DrawIpcRow("XASlave.ExecuteCommand", "string", "Run the same subcommands accepted by `/xa` and return an `OK:`/`ERROR:` status string. Accepts either `logout`, `killgame`, or `/xa logout` style input.", livePulls);
             DrawIpcRow("XASlave.RunTask", "Action", "Start a named task (string taskName)", livePulls);
 
             ImGui.EndTable();
@@ -154,6 +155,15 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // ── XA Database ──
+        ImGui.TextDisabled("Example IPC usage:");
+        ImGui.BulletText("XASlave.IsBusy()");
+        ImGui.BulletText("XASlave.ExecuteCommand(\"xamods\")");
+        ImGui.BulletText("XASlave.ExecuteCommand(\"sprint on\")");
+        ImGui.BulletText("XASlave.ExecuteCommand(\"killgame\")");
+        ImGui.BulletText("XASlave.ExecuteCommand(\"/xa logout\")");
+        ImGui.BulletText("XASlave.RunTask(\"save\")");
+        ImGui.Spacing();
+
         var dbReady = plugin.IpcClient.IsReady();
         var dbVersion = plugin.IpcClient.GetVersion();
         DrawIpcPluginStatus("XA Database", dbReady, dbReady ? $"v{dbVersion}" : null);

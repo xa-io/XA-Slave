@@ -17,20 +17,20 @@ using XASlave.Data;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Debug / Test Commands panel — partial class split from SlaveWindow.cs.
+/// Debug / Test Commands panel â€” partial class split from SlaveWindow.cs.
 /// Contains DrawDebugCommands(), SetDebugResult(), HasFlightUnlocked(), CanMount(), InSanctuary().
 /// </summary>
 public partial class SlaveWindow
 {
-    // ───────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     //  Debug / Test Commands
     //  Test buttons for all xafunc-referenced commands
     //  These functions will be used as templates for future tasks
-    // ───────────────────────────────────────────────
+    // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private string debugResult = string.Empty;
     private DateTime debugResultExpiry = DateTime.MinValue;
     private const string XaAbuseDisplayName = "I Love XA!";
-    private const string XaAbuseDefaultOverlayText = "♥";
+    private const string XaAbuseDefaultOverlayText = "â™¥";
     private const string XaAbuseDefaultTexturePath = "ui/icon/084000/084209_hr1.tex";
     private static readonly Vector4 XaAbuseDefaultOverlayShadowColor = new Vector4(0.32f, 0.02f, 0.14f, 0.88f);
     private static readonly Vector4 XaAbuseDefaultOverlayFillColor = new Vector4(1.0f, 0.92f, 0.96f, 1.0f);
@@ -58,27 +58,27 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
-        // ── Plugin Status (same checker as Monthly Relogger) ──
+        // â”€â”€ Plugin Status (same checker as Monthly Relogger) â”€â”€
         DrawPluginStatusChecker();
 
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Scrollable test buttons region ──
+        // â”€â”€ Scrollable test buttons region â”€â”€
         // Top section (title, results, plugin status) stays pinned.
         // Everything below scrolls independently.
         using var scrollChild = Dalamud.Interface.Utility.Raii.ImRaii.Child("DebugScrollRegion", new Vector2(0, 0), false);
         if (!scrollChild.Success) return;
 
-        // ╔══════════════════════════════════════════════╗
-        // ║  [Movement Functions]                        ║
-        // ╚══════════════════════════════════════════════╝
+        // â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+        // â•‘  [Movement Functions]                        â•‘
+        // â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.TreeNode("Movement Functions"))
         {
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  XA Lazy Movements
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("XA Lazy Movements"))
         {
         ImGui.Spacing();
@@ -140,7 +140,7 @@ public partial class SlaveWindow
                                 return (rd, active);
                             });
 
-                            if (ringDist == float.MinValue) { SetDebugResult("Lost target — aborting"); break; }
+                            if (ringDist == float.MinValue) { SetDebugResult("Lost target â€” aborting"); break; }
 
                             // Negative ring = overlapping hitboxes = very close, treat as arrived
                             if (ringDist <= 0)
@@ -169,13 +169,13 @@ public partial class SlaveWindow
                             else if (stalled && ringDist <= closeEnough)
                             {
                                 plugin.IpcClient.VnavStop();
-                                SetDebugResult($"Arrived near {targetName} (ring={ringDist:F1}y, stalled — stopped)");
-                                Plugin.Log.Information($"[XASlave] PathToTarget: stalled within {ringDist:F1}y of {targetName} — stopping");
+                                SetDebugResult($"Arrived near {targetName} (ring={ringDist:F1}y, stalled â€” stopped)");
+                                Plugin.Log.Information($"[XASlave] PathToTarget: stalled within {ringDist:F1}y of {targetName} â€” stopping");
                                 break;
                             }
                             else if (stalled && jumpAttempts < 5)
                             {
-                                Plugin.Log.Information($"[XASlave] PathToTarget: stalled at ring={ringDist:F1}y — jump attempt {jumpAttempts + 1}");
+                                Plugin.Log.Information($"[XASlave] PathToTarget: stalled at ring={ringDist:F1}y â€” jump attempt {jumpAttempts + 1}");
                                 KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE);
                                 jumpAttempts++;
                                 distSamples.Clear();
@@ -256,12 +256,12 @@ public partial class SlaveWindow
                                 return (rd, cd, plugin.IpcClient.VnavPathIsRunning(), plugin.IpcClient.VnavSimpleMovePathfindInProgress());
                             });
 
-                            if (ringDist == float.MinValue) { SetDebugResult("Lost target — aborting"); break; }
+                            if (ringDist == float.MinValue) { SetDebugResult("Lost target â€” aborting"); break; }
 
                             // Negative ring = overlapping hitboxes = very close, interact immediately
                             if (ringDist <= 0)
                             {
-                                SetDebugResult($"Overlapping {targetName}: ring={ringDist:F1}y — interacting");
+                                SetDebugResult($"Overlapping {targetName}: ring={ringDist:F1}y â€” interacting");
                                 await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.InteractWithTarget());
                                 plugin.IpcClient.VnavStop();
                                 Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: overlapping interact with {targetName} (ring={ringDist:F1}y)");
@@ -284,7 +284,7 @@ public partial class SlaveWindow
 
                             if (ringDist <= interactRange)
                             {
-                                SetDebugResult($"In range of {targetName}: ring={ringDist:F1}y — interacting");
+                                SetDebugResult($"In range of {targetName}: ring={ringDist:F1}y â€” interacting");
                                 await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.InteractWithTarget());
                                 plugin.IpcClient.VnavStop();
                                 Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: interacted with {targetName} (ring={ringDist:F1}y center={centerDist:F1}y)");
@@ -293,8 +293,8 @@ public partial class SlaveWindow
                             }
                             else if (stalled && ringDist < 20.0f)
                             {
-                                SetDebugResult($"Stalled near {targetName}: ring={ringDist:F1}y — jumping to unstuck");
-                                Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: stalled at ring={ringDist:F1}y — jump attempt {jumpAttempts + 1}");
+                                SetDebugResult($"Stalled near {targetName}: ring={ringDist:F1}y â€” jumping to unstuck");
+                                Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: stalled at ring={ringDist:F1}y â€” jump attempt {jumpAttempts + 1}");
                                 if (jumpAttempts < 5)
                                 {
                                     KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE);
@@ -306,12 +306,12 @@ public partial class SlaveWindow
                             }
                             else if (!pathActive)
                             {
-                                SetDebugResult($"Path ended at ring={ringDist:F1}y — vnav routing done");
+                                SetDebugResult($"Path ended at ring={ringDist:F1}y â€” vnav routing done");
                                 Plugin.Log.Warning($"[XASlave] PathToTargetThenInteract: path ended for {targetName} (ring={ringDist:F1}y center={centerDist:F1}y)");
                                 if (ringDist <= interactRange * 3)
                                 {
                                     await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.InteractWithTarget());
-                                    SetDebugResult($"Path ended — attempted interact at ring={ringDist:F1}y");
+                                    SetDebugResult($"Path ended â€” attempted interact at ring={ringDist:F1}y");
                                     interacted = true;
                                 }
                                 break;
@@ -330,7 +330,7 @@ public partial class SlaveWindow
                         }
                     });
                 }
-                else SetDebugResult("Pathfind failed — vnav could not start route");
+                else SetDebugResult("Pathfind failed â€” vnav could not start route");
             }
             else if (target == null)
                 SetDebugResult("No target selected");
@@ -369,7 +369,7 @@ public partial class SlaveWindow
 
                 System.Threading.Tasks.Task.Run(async () =>
                 {
-                    // Mount + path simultaneously — mount cast works while running, no need to wait
+                    // Mount + path simultaneously â€” mount cast works while running, no need to wait
                     if (shouldMount)
                         await Plugin.Framework.RunOnFrameworkThread(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
 
@@ -407,13 +407,13 @@ public partial class SlaveWindow
                             return (r, c, plugin.IpcClient.VnavPathIsRunning(), plugin.IpcClient.VnavSimpleMovePathfindInProgress());
                         });
 
-                        if (rd == float.MinValue) { SetDebugResult("Lost target — aborting"); break; }
+                        if (rd == float.MinValue) { SetDebugResult("Lost target â€” aborting"); break; }
 
                         // Negative ring = overlapping hitboxes = very close, interact immediately
                         if (rd <= 0)
                         {
                             plugin.IpcClient.VnavStop();
-                            SetDebugResult($"Overlapping {targetName}: ring={rd:F1}y — interacting");
+                            SetDebugResult($"Overlapping {targetName}: ring={rd:F1}y â€” interacting");
                             await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.InteractWithTarget());
                             Plugin.Log.Information($"[XASlave] PathSmartThenInteract: overlapping interact with {targetName} (ring={rd:F1}y)");
                             interacted = true;
@@ -440,7 +440,7 @@ public partial class SlaveWindow
                                 Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                             if (isMounted)
                             {
-                                SetDebugResult($"In range of {targetName}: ring={rd:F1}y — dismounting...");
+                                SetDebugResult($"In range of {targetName}: ring={rd:F1}y â€” dismounting...");
                                 await Plugin.Framework.RunOnFrameworkThread(() => ChatHelper.SendMessage("/mount"));
                                 for (int w = 0; w < 30; w++)
                                 {
@@ -451,10 +451,10 @@ public partial class SlaveWindow
                                 }
                             }
 
-                            // Hard 2s delay after dismount — prevents "Unable to execute command while jumping" error
+                            // Hard 2s delay after dismount â€” prevents "Unable to execute command while jumping" error
                             await System.Threading.Tasks.Task.Delay(2000);
 
-                            // Brief ready check — wait up to 1.5s for character to be actionable after dismount
+                            // Brief ready check â€” wait up to 1.5s for character to be actionable after dismount
                             for (int sw = 0; sw < 15; sw++)
                             {
                                 await System.Threading.Tasks.Task.Delay(100);
@@ -464,7 +464,7 @@ public partial class SlaveWindow
                                 if (charReady) break;
                             }
 
-                            // Re-check distance after dismount — large mounts expand player hitbox
+                            // Re-check distance after dismount â€” large mounts expand player hitbox
                             // and dismounting may leave us further away than expected
                             var postDismountRd = await Plugin.Framework.RunOnFrameworkThread(() =>
                             {
@@ -478,9 +478,9 @@ public partial class SlaveWindow
 
                             if (postDismountRd != float.MinValue && postDismountRd > interactRange)
                             {
-                                // Too far after dismount — re-path on foot to close the gap
-                                SetDebugResult($"Post-dismount too far: ring={postDismountRd:F1}y — re-pathing on foot");
-                                Plugin.Log.Information($"[XASlave] PathSmartThenInteract: post-dismount ring={postDismountRd:F1}y > {interactRange:F1}y — re-pathing");
+                                // Too far after dismount â€” re-path on foot to close the gap
+                                SetDebugResult($"Post-dismount too far: ring={postDismountRd:F1}y â€” re-pathing on foot");
+                                Plugin.Log.Information($"[XASlave] PathSmartThenInteract: post-dismount ring={postDismountRd:F1}y > {interactRange:F1}y â€” re-pathing");
                                 await Plugin.Framework.RunOnFrameworkThread(() =>
                                     plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, false, stopDist));
                                 // Wait for re-path to complete
@@ -502,7 +502,7 @@ public partial class SlaveWindow
                                 }
                             }
 
-                            SetDebugResult($"In range of {targetName}: ring={postDismountRd:F1}y — interacting");
+                            SetDebugResult($"In range of {targetName}: ring={postDismountRd:F1}y â€” interacting");
                             await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.InteractWithTarget());
                             plugin.IpcClient.VnavStop();
                             Plugin.Log.Information($"[XASlave] PathSmartThenInteract: interacted with {targetName} (ring={postDismountRd:F1}y)");
@@ -532,7 +532,7 @@ public partial class SlaveWindow
                             }
                             else
                             {
-                                SetDebugResult($"Stalled near {targetName}: ring={rd:F1}y — jumping");
+                                SetDebugResult($"Stalled near {targetName}: ring={rd:F1}y â€” jumping");
                                 if (jumpAttempts < 5)
                                 {
                                     KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE);
@@ -545,7 +545,7 @@ public partial class SlaveWindow
                         }
                         else if (!pathActive)
                         {
-                            SetDebugResult($"Path ended at ring={rd:F1}y — routing done");
+                            SetDebugResult($"Path ended at ring={rd:F1}y â€” routing done");
                             Plugin.Log.Warning($"[XASlave] PathSmartThenInteract: path ended for {targetName} (ring={rd:F1}y)");
                             if (rd <= interactRange * 3)
                             {
@@ -563,7 +563,7 @@ public partial class SlaveWindow
                                     }
                                 }
                                 await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.InteractWithTarget());
-                                SetDebugResult($"Path ended — attempted interact at ring={rd:F1}y");
+                                SetDebugResult($"Path ended â€” attempted interact at ring={rd:F1}y");
                                 interacted = true;
                             }
                             break;
@@ -599,7 +599,7 @@ public partial class SlaveWindow
             SetDebugResult("KeyInput: END (reset camera) + Hold W for 2s then auto-release (WalkThroughDottedWallXA)");
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Resets camera (VK_END) + holds W forward for 2 seconds, then auto-releases.\nFully automated — no manual release needed.");
+            ImGui.SetTooltip("Resets camera (VK_END) + holds W forward for 2 seconds, then auto-releases.\nFully automated â€” no manual release needed.");
 
         ImGui.SameLine();
         if (ImGui.Button("Release W (Emergency)"))
@@ -628,10 +628,10 @@ public partial class SlaveWindow
                     else
                     {
                         ChatHelper.SendMessage("/vnav moveflag");
-                        SetDebugResult("Smart: Mount + /vnav moveflag (flying NOT unlocked — ground pathfind)");
+                        SetDebugResult("Smart: Mount + /vnav moveflag (flying NOT unlocked â€” ground pathfind)");
                     }
                 }
-                else SetDebugResult("vnavmesh not ready — cannot navigate");
+                else SetDebugResult("vnavmesh not ready â€” cannot navigate");
             }
             catch (Exception ex) { SetDebugResult($"MovingCheater error: {ex.Message}"); }
         }
@@ -655,10 +655,10 @@ public partial class SlaveWindow
                     else
                     {
                         ChatHelper.SendMessage("/vnav moveflag");
-                        SetDebugResult("Sent: Mount + /vnav moveflag (flight NOT unlocked — fallback to ground)");
+                        SetDebugResult("Sent: Mount + /vnav moveflag (flight NOT unlocked â€” fallback to ground)");
                     }
                 }
-                else SetDebugResult("vnavmesh not ready — cannot navigate");
+                else SetDebugResult("vnavmesh not ready â€” cannot navigate");
             }
             catch (Exception ex) { SetDebugResult($"MovingCheater error: {ex.Message}"); }
         }
@@ -676,7 +676,7 @@ public partial class SlaveWindow
                     ChatHelper.SendMessage("/vnav moveflag");
                     SetDebugResult("Sent: Mount + /vnav moveflag (force ground)");
                 }
-                else SetDebugResult("vnavmesh not ready — cannot navigate");
+                else SetDebugResult("vnavmesh not ready â€” cannot navigate");
             }
             catch (Exception ex) { SetDebugResult($"MovingCheater error: {ex.Message}"); }
         }
@@ -688,7 +688,7 @@ public partial class SlaveWindow
         if (ImGui.Button("PvpMoveTo (Flag)"))
         {
             ChatHelper.SendMessage("/vnav moveflag");
-            SetDebugResult("Sent: /vnav moveflag (PvpMoveToXA — no mount, ground pathfind)");
+            SetDebugResult("Sent: /vnav moveflag (PvpMoveToXA â€” no mount, ground pathfind)");
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Ground pathfinds to map flag without mounting (PvpMoveToXA).\nIn full implementation, waits for casting to finish first.");
@@ -701,9 +701,9 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ╔══════════════════════════════════════════════╗
-        // ║  [Aetheryte Functions]                        ║
-        // ╚══════════════════════════════════════════════╝
+        // â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+        // â•‘  [Aetheryte Functions]                        â•‘
+        // â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.TreeNode("Aetheryte Functions"))
         {
             if (ImGui.Button("GetAetherytesCount"))
@@ -865,15 +865,15 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ╔══════════════════════════════════════════════╗
-        // ║  [Player Checkers]                           ║
-        // ╚══════════════════════════════════════════════╝
+        // â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+        // â•‘  [Player Checkers]                           â•‘
+        // â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.TreeNode("Player Checkers"))
         {
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Game State Checks (XA)
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Game State Checks (XA)"))
         {
         ImGui.Spacing();
@@ -901,18 +901,18 @@ public partial class SlaveWindow
                     if (ready)
                     {
                         consecutivePasses++;
-                        SetDebugResult($"[{consecutivePasses}/3] OK — {charName} (attempt #{totalAttempts})");
+                        SetDebugResult($"[{consecutivePasses}/3] OK â€” {charName} (attempt #{totalAttempts})");
                     }
                     else
                     {
                         if (consecutivePasses > 0)
-                            Plugin.Log.Information($"[XASlave] CharacterSafeWait: reset at {consecutivePasses}/3 — NP={np} PA={pa} Cast={casting} Combat={combat}");
+                            Plugin.Log.Information($"[XASlave] CharacterSafeWait: reset at {consecutivePasses}/3 â€” NP={np} PA={pa} Cast={casting} Combat={combat}");
                         consecutivePasses = 0;
                         SetDebugResult($"[0/3] waiting... NP={np} PA={pa} Cast={casting} Combat={combat} (attempt #{totalAttempts})");
                     }
                 }
                 var finalName = await Plugin.Framework.RunOnFrameworkThread(() => MonthlyReloggerTask.GetCurrentCharacterNameWorld());
-                SetDebugResult($"[3/3] CONFIRMED READY — {finalName}");
+                SetDebugResult($"[3/3] CONFIRMED READY â€” {finalName}");
             });
         }
         if (ImGui.IsItemHovered())
@@ -1052,9 +1052,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Game State Checks
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Target Game State Checks
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Target Checks"))
         {
         ImGui.Spacing();
@@ -1123,9 +1123,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Target Checks
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Player State Checks (d)
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Player State Checks (d)"))
         {
         ImGui.Spacing();
@@ -1170,18 +1170,18 @@ public partial class SlaveWindow
             var inDuty = Plugin.Condition[ConditionFlag.BoundByDuty];
             if (!inDuty)
             {
-                SetDebugResult("Not in a duty — nothing to leave.");
+                SetDebugResult("Not in a duty â€” nothing to leave.");
             }
             else
             {
-                SetDebugResult("In duty — attempting to leave...");
+                SetDebugResult("In duty â€” attempting to leave...");
                 System.Threading.Tasks.Task.Run(async () =>
                 {
                     // Wait up to 30s if in combat (might be finishing monsters)
                     var inCombat = await Plugin.Framework.RunOnFrameworkThread(() => Plugin.Condition[ConditionFlag.InCombat]);
                     if (inCombat)
                     {
-                        SetDebugResult("In combat — waiting up to 30s for combat to end...");
+                        SetDebugResult("In combat â€” waiting up to 30s for combat to end...");
                         for (int w = 0; w < 60; w++)
                         {
                             await System.Threading.Tasks.Task.Delay(500);
@@ -1190,31 +1190,31 @@ public partial class SlaveWindow
                         }
                         if (inCombat)
                         {
-                            SetDebugResult("Still in combat after 30s — cannot leave duty.");
+                            SetDebugResult("Still in combat after 30s â€” cannot leave duty.");
                             return;
                         }
-                        SetDebugResult("Combat ended — leaving duty...");
+                        SetDebugResult("Combat ended â€” leaving duty...");
                     }
 
                     // Press U to open the Duty Finder menu (ContentsFinderMenu)
                     await Plugin.Framework.RunOnFrameworkThread(() => KeyInputHelper.PressKey(0x55)); // VK_U = 0x55
                     await System.Threading.Tasks.Task.Delay(1000);
 
-                    // Click the Leave button — ContentsFinderMenu NodeList[43]
+                    // Click the Leave button â€” ContentsFinderMenu NodeList[43]
                     var leaveClicked = await Plugin.Framework.RunOnFrameworkThread(() =>
                         AddonHelper.ClickAddonButton("ContentsFinderMenu", 43));
 
                     if (leaveClicked)
                     {
-                        SetDebugResult("Leave Duty: clicked Leave button — waiting for confirmation...");
+                        SetDebugResult("Leave Duty: clicked Leave button â€” waiting for confirmation...");
                         await System.Threading.Tasks.Task.Delay(500);
 
                         // Click Yes on the confirmation dialog
                         var yesClicked = await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.ClickYesNo(true));
                         if (yesClicked)
-                            SetDebugResult("Leave Duty: confirmed Yes — leaving instance.");
+                            SetDebugResult("Leave Duty: confirmed Yes â€” leaving instance.");
                         else
-                            SetDebugResult("Leave Duty: Leave clicked but SelectYesno not visible — may need manual confirm.");
+                            SetDebugResult("Leave Duty: Leave clicked but SelectYesno not visible â€” may need manual confirm.");
                     }
                     else
                     {
@@ -1384,11 +1384,11 @@ public partial class SlaveWindow
             if (visible)
             {
                 var ok = AddonHelper.ClickAddonButton("_CharaSelectReturn", 1);
-                SetDebugResult(ok ? "Clicked _CharaSelectReturn NodeList[1] — exiting to main menu" : "Click failed on _CharaSelectReturn");
+                SetDebugResult(ok ? "Clicked _CharaSelectReturn NodeList[1] â€” exiting to main menu" : "Click failed on _CharaSelectReturn");
             }
             else
             {
-                SetDebugResult("_CharaSelectReturn not visible — not on character select screen.");
+                SetDebugResult("_CharaSelectReturn not visible â€” not on character select screen.");
             }
         }
         if (ImGui.IsItemHovered())
@@ -1397,9 +1397,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Player State Checks
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Character Actions (xafunc equivalents)
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Character Actions"))
         {
         ImGui.Spacing();
@@ -1457,9 +1457,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Character Actions
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Player Commands
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Player Commands"))
         {
         ImGui.Spacing();
@@ -1470,7 +1470,7 @@ public partial class SlaveWindow
             SetDebugResult(ok ? "InteractWithTarget: OK (InteractXA)" : "InteractWithTarget: No target or failed");
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Uses TargetSystem.InteractWithObject — native replacement for SND /interact");
+            ImGui.SetTooltip("Uses TargetSystem.InteractWithObject â€” native replacement for SND /interact");
 
         ImGui.SameLine();
         if (ImGui.Button("EquipGear (SimpleTweaks)"))
@@ -1485,13 +1485,13 @@ public partial class SlaveWindow
         if (ImGui.Button("EquipGear Step1: Open"))
         {
             ChatHelper.SendMessage("/character");
-            SetDebugResult("Opened Character window — next: Step2 to fire callback");
+            SetDebugResult("Opened Character window â€” next: Step2 to fire callback");
         }
         ImGui.SameLine();
         if (ImGui.Button("EquipGear Step2: Recommend"))
         {
             var ok = AddonHelper.ClickAddonButton("Character", 74);
-            SetDebugResult(ok ? "Clicked Character NodeList[74] (Button #12) → RecommendEquip should open" : "Character addon not visible — open it first with Step1");
+            SetDebugResult(ok ? "Clicked Character NodeList[74] (Button #12) â†’ RecommendEquip should open" : "Character addon not visible â€” open it first with Step1");
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Clicks Button Component Node #12 at NodeList[74] in Character addon.\nOpens Recommended Gear window (RecommendEquip).\nConfirmed via /xldata Addon Inspector.");
@@ -1501,7 +1501,7 @@ public partial class SlaveWindow
         if (ImGui.Button("EquipGear Step3: Equip"))
         {
             var ok = AddonHelper.ClickAddonButton("RecommendEquip", 3);
-            SetDebugResult(ok ? "Clicked RecommendEquip NodeList[3] (Button #11) → gear equipped" : "RecommendEquip addon not visible — run Step2 first");
+            SetDebugResult(ok ? "Clicked RecommendEquip NodeList[3] (Button #11) â†’ gear equipped" : "RecommendEquip addon not visible â€” run Step2 first");
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Clicks Button Component Node #11 at NodeList[3] in RecommendEquip addon.\nEquips recommended gear.\nConfirmed via /xldata Addon Inspector.");
@@ -1521,14 +1521,14 @@ public partial class SlaveWindow
             SetDebugResult("Sent: VK_END key press (ResetCameraXA) via KeyInputHelper");
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Presses END key to the current FFXIV game window — native replacement for SND /send END");
+            ImGui.SetTooltip("Presses END key to the current FFXIV game window â€” native replacement for SND /send END");
 
         ImGui.Spacing();
         } // end Player Commands
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  XA Database
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("XA Database##playerCheckers"))
         {
         ImGui.Spacing();
@@ -1722,11 +1722,11 @@ public partial class SlaveWindow
                 SetDebugResult($"XA Abuse: overlay path set to {XaAbuseDefaultTexturePath}");
             }
             ImGui.SameLine();
-            if (ImGui.Button("Use Default ♥"))
+            if (ImGui.Button("Use Default â™¥"))
             {
                 xaAbuseOverlayUseTexture = false;
                 xaAbuseOverlayText = XaAbuseDefaultOverlayText;
-                SetDebugResult("XA Abuse: overlay text reset to ♥");
+                SetDebugResult("XA Abuse: overlay text reset to â™¥");
             }
 
             ImGui.SetNextItemWidth(220f);
@@ -1752,15 +1752,15 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ╔══════════════════════════════════════════════╗
-        // ║  [Punish]                                    ║
-        // ╚══════════════════════════════════════════════╝
+        // â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+        // â•‘  [Punish]                                    â•‘
+        // â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.TreeNode("Punish"))
         {
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  AutoRetainer
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("AutoRetainer##punish"))
         {
         ImGui.Spacing();
@@ -1800,9 +1800,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end AutoRetainer
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Lifestream
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Lifestream"))
         {
         ImGui.Spacing();
@@ -1865,9 +1865,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Lifestream
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  TextAdvance
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("TextAdvance##punish"))
         {
         ImGui.Spacing();
@@ -1893,9 +1893,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end TextAdvance
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  YesAlready
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("YesAlready##punish"))
         {
         ImGui.Spacing();
@@ -1934,9 +1934,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end YesAlready
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Artisan
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Artisan##punish"))
         {
         ImGui.Spacing();
@@ -2035,9 +2035,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Artisan
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Dropbox
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Dropbox"))
         {
         ImGui.Spacing();
@@ -2253,9 +2253,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Dropbox
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Pandoras Box
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Pandoras Box"))
         {
         ImGui.Spacing();
@@ -2281,9 +2281,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Pandoras Box
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Deliveroo
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Deliveroo"))
         {
         ImGui.Spacing();
@@ -2309,9 +2309,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Deliveroo
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  Splatoon
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Splatoon"))
         {
         ImGui.Spacing();
@@ -2325,9 +2325,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Splatoon
 
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         //  vnavmesh
-        // ══════════════════════════════════════════════
+        // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("vnavmesh##punish"))
         {
         ImGui.Spacing();
@@ -2373,7 +2373,7 @@ public partial class SlaveWindow
             SetDebugResult($"InSanctuary: {inSanc} (CanMount: {!inSanc})");
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Checks if player cannot mount → sanctuary.\nEquivalent to dfunc InSanctuary() / !Player.CanMount");
+            ImGui.SetTooltip("Checks if player cannot mount â†’ sanctuary.\nEquivalent to dfunc InSanctuary() / !Player.CanMount");
 
         ImGui.SameLine();
         if (ImGui.Button("vnav Available?"))
@@ -2388,19 +2388,19 @@ public partial class SlaveWindow
         ImGui.TreePop();
         } // end Punish
 
-        // ╔══════════════════════════════════════════════╗
-        // ║  [Key Inputs]                                ║
-        // ╚══════════════════════════════════════════════╝
+        // â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+        // â•‘  [Key Inputs]                                â•‘
+        // â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Key Inputs"))
         {
         ImGui.TextDisabled("Win32 game-window key simulation for FFXIV input");
         ImGui.Spacing();
 
         ImGui.TextDisabled("Methods:");
-        ImGui.TextDisabled("  PressKey(vk)                — tap key (down+up)");
-        ImGui.TextDisabled("  HoldKey(vk)                 — key down only");
-        ImGui.TextDisabled("  ReleaseKey(vk)              — key up only");
-        ImGui.TextDisabled("  HoldKeyForDuration(vk, ms)  — hold + auto-release");
+        ImGui.TextDisabled("  PressKey(vk)                â€” tap key (down+up)");
+        ImGui.TextDisabled("  HoldKey(vk)                 â€” key down only");
+        ImGui.TextDisabled("  ReleaseKey(vk)              â€” key up only");
+        ImGui.TextDisabled("  HoldKeyForDuration(vk, ms)  â€” hold + auto-release");
         ImGui.Spacing();
 
         ImGui.TextDisabled("Available VK Constants:");
@@ -2409,9 +2409,9 @@ public partial class SlaveWindow
         ImGui.TextDisabled("             VK_SPACE (0x20)  VK_TAB (0x09)  VK_DELETE (0x2E)  VK_INSERT (0x2D)");
         ImGui.TextDisabled("  Arrow:     VK_LEFT (0x25)  VK_UP (0x26)  VK_RIGHT (0x27)  VK_DOWN (0x28)");
         ImGui.TextDisabled("  Modifier:  VK_SHIFT (0x10)  VK_CONTROL (0x11)  VK_ALT (0x12)");
-        ImGui.TextDisabled("  Numpad:    VK_NUMPAD0–9 (0x60–0x69)");
-        ImGui.TextDisabled("  Function:  VK_F1–F12 (0x70–0x7B)");
-        ImGui.TextDisabled("  Letters:   0x41–0x5A (A–Z)    Numbers: 0x30–0x39 (0–9)");
+        ImGui.TextDisabled("  Numpad:    VK_NUMPAD0â€“9 (0x60â€“0x69)");
+        ImGui.TextDisabled("  Function:  VK_F1â€“F12 (0x70â€“0x7B)");
+        ImGui.TextDisabled("  Letters:   0x41â€“0x5A (Aâ€“Z)    Numbers: 0x30â€“0x39 (0â€“9)");
 
         ImGui.Spacing();
         ImGui.TextDisabled("Tap Tests:");
@@ -2467,22 +2467,22 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end Key Inputs
 
-        // ╔══════════════════════════════════════════════╗
-        // ║  [Braindead Functions]                        ║
-        // ╚══════════════════════════════════════════════╝
+        // â•”â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•—
+        // â•‘  [Braindead Functions]                        â•‘
+        // â•šâ•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
         if (ImGui.CollapsingHeader("Braindead Functions"))
         {
         ImGui.TextDisabled("Multi-step scripted sequences. These will be implemented as full task chains in future updates.");
         ImGui.Spacing();
 
-        ImGui.TextDisabled("• FreshLimsaToSummer — Complete Limsa intro → Summerford Farms");
-        ImGui.TextDisabled("• FreshLimsaToMist — Limsa intro → Summerford → Mist housing");
-        ImGui.TextDisabled("• FreshUldahToHorizon — Ul'dah intro → Horizon");
-        ImGui.TextDisabled("• FreshUldahToGoblet — Ul'dah intro → Horizon → Goblet housing");
-        ImGui.TextDisabled("• FreshGridaniaToBentbranch — Gridania intro → Bentbranch Meadows");
-        ImGui.TextDisabled("• FreshGridaniaToBeds — Gridania intro → Bentbranch → Lavender Beds");
-        ImGui.TextDisabled("• ImNotNewbStopWatching — Remove sprout + enable TA + set camera");
-        ImGui.TextDisabled("• EnterHousingWardFromMenu — Navigate housing ward selection");
+        ImGui.TextDisabled("â€¢ FreshLimsaToSummer â€” Complete Limsa intro â†’ Summerford Farms");
+        ImGui.TextDisabled("â€¢ FreshLimsaToMist â€” Limsa intro â†’ Summerford â†’ Mist housing");
+        ImGui.TextDisabled("â€¢ FreshUldahToHorizon â€” Ul'dah intro â†’ Horizon");
+        ImGui.TextDisabled("â€¢ FreshUldahToGoblet â€” Ul'dah intro â†’ Horizon â†’ Goblet housing");
+        ImGui.TextDisabled("â€¢ FreshGridaniaToBentbranch â€” Gridania intro â†’ Bentbranch Meadows");
+        ImGui.TextDisabled("â€¢ FreshGridaniaToBeds â€” Gridania intro â†’ Bentbranch â†’ Lavender Beds");
+        ImGui.TextDisabled("â€¢ ImNotNewbStopWatching â€” Remove sprout + enable TA + set camera");
+        ImGui.TextDisabled("â€¢ EnterHousingWardFromMenu â€” Navigate housing ward selection");
         } // end Braindead Functions
     }
 
@@ -2513,8 +2513,8 @@ public partial class SlaveWindow
         xaAbuseAllVisiblePlayers = allVisiblePlayers;
         Plugin.NamePlateGui.RequestRedraw();
         SetDebugResult(allVisiblePlayers
-            ? "XA Abuse enabled — all visible player nameplates now say I Love XA!"
-            : "XA Abuse enabled — local nameplate now says I Love XA!");
+            ? "XA Abuse enabled â€” all visible player nameplates now say I Love XA!"
+            : "XA Abuse enabled â€” local nameplate now says I Love XA!");
     }
 
     private void EnableXaAbuseOverlay(bool allVisiblePlayers)
@@ -2535,8 +2535,8 @@ public partial class SlaveWindow
             xaAbuseOverlayTexturePath = XaAbuseDefaultTexturePath;
 
         SetDebugResult(allVisiblePlayers
-            ? $"XA Abuse overlay enabled — all visible player heads now show {(xaAbuseOverlayUseTexture ? ".tex" : "text")} overlay"
-            : $"XA Abuse overlay enabled — local player now shows {(xaAbuseOverlayUseTexture ? ".tex" : "text")} overlay");
+            ? $"XA Abuse overlay enabled â€” all visible player heads now show {(xaAbuseOverlayUseTexture ? ".tex" : "text")} overlay"
+            : $"XA Abuse overlay enabled â€” local player now shows {(xaAbuseOverlayUseTexture ? ".tex" : "text")} overlay");
     }
 
     private void DisableXaAbuseOverlay()
@@ -2557,7 +2557,7 @@ public partial class SlaveWindow
         xaAbuseOverlayAllVisiblePlayers = false;
         xaAbuseOverlayEnabledAtUtc = DateTime.MinValue;
         Plugin.NamePlateGui.RequestRedraw();
-        SetDebugResult(wasEnabled ? "XA Abuse reset — restored normal nameplate / overlay" : "XA Abuse already reset");
+        SetDebugResult(wasEnabled ? "XA Abuse reset â€” restored normal nameplate / overlay" : "XA Abuse already reset");
     }
 
     private void OnXaAbuseNamePlateUpdate(INamePlateUpdateContext context, IReadOnlyList<INamePlateUpdateHandler> handlers)
@@ -2670,7 +2670,7 @@ public partial class SlaveWindow
 
     /// <summary>
     /// Checks if flying is unlocked in the current zone.
-    /// Uses PlayerState.CanFly field (offset 0x601) — set during zone loading.
+    /// Uses PlayerState.CanFly field (offset 0x601) â€” set during zone loading.
     /// This is the direct equivalent of SND's Player.CanFly / dfunc HasFlightUnlocked().
     /// </summary>
     private static unsafe bool HasFlightUnlocked()
@@ -2710,7 +2710,7 @@ public partial class SlaveWindow
     }
 
     /// <summary>
-    /// Checks if the player is in a sanctuary — equivalent to dfunc InSanctuary().
+    /// Checks if the player is in a sanctuary â€” equivalent to dfunc InSanctuary().
     /// Returns true when the player CANNOT mount (inverse of CanMount).
     /// Matches SND's Player.CanMount logic: if CanMount == false then InSanctuary.
     /// </summary>
@@ -2719,11 +2719,11 @@ public partial class SlaveWindow
         return !CanMount();
     }
 
-    // ═══════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
     //  Movement State Helpers (vnavmesh IPC)
     //  Used to ensure movement is complete before sending new commands.
     //  Mirrors xafunc MoveTo Completed pattern.
-    // ═══════════════════════════════════════════════════════
+    // â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
 
     /// <summary>
     /// Checks if the navmesh is built and ready for pathfinding.
@@ -2735,7 +2735,7 @@ public partial class SlaveWindow
         if (plugin.IpcClient.VnavIsReady())
             return true;
 
-        Plugin.Log.Debug("[XASlave] Nav not ready — triggering rebuild");
+        Plugin.Log.Debug("[XASlave] Nav not ready â€” triggering rebuild");
         plugin.IpcClient.VnavRebuild();
         return false;
     }
@@ -2745,10 +2745,10 @@ public partial class SlaveWindow
     /// Use before sending a new movement command to avoid overlapping paths.
     ///
     /// States:
-    ///   Nav.IsReady == false             → navmesh not built, need rebuild
-    ///   PathfindInProgress == true       → calculating path, not yet moving
-    ///   Path.IsRunning == true           → actively moving along path
-    ///   Both false + IsReady == true     → idle, safe to send new movement
+    ///   Nav.IsReady == false             â†’ navmesh not built, need rebuild
+    ///   PathfindInProgress == true       â†’ calculating path, not yet moving
+    ///   Path.IsRunning == true           â†’ actively moving along path
+    ///   Both false + IsReady == true     â†’ idle, safe to send new movement
     /// </summary>
     private bool IsMovementIdle()
     {

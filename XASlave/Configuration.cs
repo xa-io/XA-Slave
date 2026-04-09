@@ -40,7 +40,7 @@ public class Configuration : IPluginConfiguration
     public bool OpenPluginOnLoad { get; set; } = false;
     public bool VerboseTaskLogging { get; set; } = false;
 
-    // Auto-collection on login — opens saddlebag/FC windows to collect data
+    // Auto-collection on login â€” opens saddlebag/FC windows to collect data
     public bool AutoCollectOnLogin { get; set; } = false;
     public bool AutoCollectArmouryChest { get; set; } = true;
     public bool AutoCollectSaddlebag { get; set; } = true;
@@ -53,15 +53,15 @@ public class Configuration : IPluginConfiguration
     // Delay before auto-collection starts after login (seconds)
     public float AutoCollectDelaySeconds { get; set; } = 8f;
 
-    // IPC panel — live value polling
+    // IPC panel â€” live value polling
     public bool IpcLivePullsEnabled { get; set; } = false;
     public int IpcLivePullIntervalSeconds { get; set; } = 10;
 
-    // ── Monthly Relogger ──
-    // Character list in "Name@World" format — persisted across sessions
+    // â”€â”€ Monthly Relogger â”€â”€
+    // Character list in "Name@World" format â€” persisted across sessions
     public List<string> ReloggerCharacters { get; set; } = new();
 
-    // ── Auto-Glam Weather ──
+    // â”€â”€ Auto-Glam Weather â”€â”€
     public int AutoGlamWeatherClassJob { get; set; } = 1;
     public int AutoGlamWeatherSunnyPlate { get; set; } = 2;
     public int AutoGlamWeatherRainPlate { get; set; } = 3;
@@ -96,14 +96,14 @@ public class Configuration : IPluginConfiguration
     // Keyed by "Name@World". Updated from AutoRetainer imports and relogger runs.
     public Dictionary<string, ReloggerCharacterData> ReloggerCharacterInfo { get; set; } = new();
 
-    // Legacy CID → last login timestamp. Migrated to ReloggerCharacterInfo on load.
+    // Legacy CID â†’ last login timestamp. Migrated to ReloggerCharacterInfo on load.
     public Dictionary<long, DateTime> ReloggerLastSeen { get; set; } = new();
 
-    // ── Refresh AR Subs/Bell ──
+    // â”€â”€ Refresh AR Subs/Bell â”€â”€
     public List<string> RefreshSubsCharacters { get; set; } = new();
     public string RefreshSubsRegionFilter { get; set; } = "All";
 
-    // ── Prep Logistics ──
+    // â”€â”€ Prep Logistics â”€â”€
     public List<string> PrepLogisticsCharacters { get; set; } = new();
     public string PrepLogisticsTargetWorld { get; set; } = string.Empty;
     public string PrepLogisticsTargetAetheryte { get; set; } = string.Empty;
@@ -132,19 +132,19 @@ public class Configuration : IPluginConfiguration
     public int XagmanHubPort { get; set; } = 45215;
     public bool XagmanPeerConnectionsEnabled { get; set; } = false;
 
-    // ── FC Permissions Updater ──
+    // â”€â”€ FC Permissions Updater â”€â”€
     public List<string> FcPermsCharacters { get; set; } = new();
     public string FcPermsRegionFilter { get; set; } = "All";
 
-    // ── AR Pre-Processing ──
-    // Master toggle — when enabled, runs collection steps on login BEFORE AR starts retainer processing
-    // Uses AR Suppressed pattern: suppress AR → run steps → un-suppress AR
+    // â”€â”€ AR Pre-Processing â”€â”€
+    // Master toggle â€” when enabled, runs collection steps on login BEFORE AR starts retainer processing
+    // Uses AR Suppressed pattern: suppress AR â†’ run steps â†’ un-suppress AR
     public bool ArPreProcessEnabled { get; set; } = false;
     public float ArPreProcessLoginDelay { get; set; } = 5f;
     public int ArPrePostCheckEveryHours { get; set; } = 0;
     public bool ArShipExplorationBailoutEnabled { get; set; } = false;
     public int ArShipExplorationBailoutSeconds { get; set; } = 30;
-    // Per-step toggles — what to do before AR processes retainers
+    // Per-step toggles â€” what to do before AR processes retainers
     public bool ArPreProcessOpenInventory { get; set; } = true;
     public bool ArPreProcessOpenArmouryChest { get; set; } = true;
     public bool ArPreProcessOpenSaddlebags { get; set; } = true;
@@ -153,10 +153,10 @@ public class Configuration : IPluginConfiguration
     public bool ArPreProcessFcWindow { get; set; } = true;
     public bool ArPreProcessSaveToXaDatabase { get; set; } = true;
 
-    // ── AR Post-Processing ──
-    // Master toggle — when enabled, registers with AR for character post-processing in multi-mode
+    // â”€â”€ AR Post-Processing â”€â”€
+    // Master toggle â€” when enabled, registers with AR for character post-processing in multi-mode
     public bool ArPostProcessEnabled { get; set; } = false;
-    // Per-step toggles — what to do after AR finishes each character
+    // Per-step toggles â€” what to do after AR finishes each character
     public bool ArPostProcessOpenInventory { get; set; } = true;
     public bool ArPostProcessOpenArmouryChest { get; set; } = true;
     public bool ArPostProcessOpenSaddlebags { get; set; } = true;
@@ -166,13 +166,86 @@ public class Configuration : IPluginConfiguration
     public bool ArPostProcessSaveToXaDatabase { get; set; } = true;
     public bool ArProcessLogEnabled { get; set; } = false;
 
-    // ── Window Renamer ──
+    // â”€â”€ Window Renamer â”€â”€
     public bool WindowRenamerEnabled { get; set; } = false;
     public string WindowRenamerTitle { get; set; } = "";
     public bool WindowRenamerUseProcessId { get; set; } = false;
     public bool WindowRenamerShowCurrentCharacter { get; set; } = false;
 
-    // ── City Chat Flooder ──
+    // Toon Mods
+    public bool AutoSkipCutscenesEnabled { get; set; } = false;
+    public bool AutoSkipCutscenesUseZoneWhitelist { get; set; } = false;
+    public List<uint> AutoSkipCutscenesWhitelistTerritories { get; set; } = new();
+    public List<uint> AutoSkipCutscenesBlacklistTerritories { get; set; } = new();
+    public bool AutoAllowMultipleGameInstancesEnabled { get; set; } = false;
+    public bool AutoCancelLoginCooldownEnabled { get; set; } = false;
+    public bool AutoDisplayMsqProgressEnabled { get; set; } = false;
+    public bool CopyItemNameForAllEnabled { get; set; } = false;
+    public bool AutoSkipCutscenesFeedingChocoboEnabled { get; set; } = false;
+    public bool AutoIgnoreMinimumWindowSizeEnabled { get; set; } = false;
+    public bool AutoHideUnnecessaryPopupsEnabled { get; set; } = false;
+    public bool AutoPreventGameExitingFromLobbyErrorsEnabled { get; set; } = false;
+    public bool AutoCloseLobbyErrorsEnabled { get; set; } = false;
+    public bool DisplayActualQueuePositionEnabled { get; set; } = false;
+    public bool DisableBackgroundGameRenderingEnabled { get; set; } = false;
+    public bool DisableBackgroundGameRenderingOnlyWhenMinimized { get; set; } = false;
+    public bool DisableBackgroundGameRenderingDisableWhenArMultiIsOn { get; set; } = false;
+    public bool AutoHideGameObjectsEnabled { get; set; } = false;
+    public bool AutoHideGameObjectsHidePlayer { get; set; } = true;
+    public bool AutoHideGameObjectsHideUnimportantEnpc { get; set; } = true;
+    public bool AutoHideGameObjectsHidePet { get; set; } = true;
+    public bool AutoHideGameObjectsHideChocobo { get; set; } = true;
+    public bool AutoHideGameObjectsDisableInDuties { get; set; } = true;
+    public bool AutoHideGameObjectsDisableInIslandSanctuary { get; set; } = true;
+    public bool AutoHideGameObjectsUseOccultCrescentRules { get; set; } = true;
+    public bool AutoSkipDialogueEnabled { get; set; } = false;
+    public bool CustomResolutionsEnabled { get; set; } = false;
+    public List<XAModResolutionPreset> CustomResolutionPresets { get; set; } = new();
+    public bool SpecialRenderModesEnabled { get; set; } = false;
+    public bool LowResolutionEnabled { get; set; } = false;
+    public float LowResolutionScale { get; set; } = 0.25f;
+    public bool CustomSightDistanceEnabled { get; set; } = false;
+    public float CustomSightDistanceMaxDistance { get; set; } = 80f;
+    public float CustomSightDistanceMinDistance { get; set; } = 1.5f;
+    public float CustomSightDistanceMaxRotation { get; set; } = 1.569f;
+    public float CustomSightDistanceMinRotation { get; set; } = -1.569f;
+    public float CustomSightDistanceMaxFoV { get; set; } = 0.78f;
+    public float CustomSightDistanceMinFoV { get; set; } = 0.69f;
+    public float CustomSightDistanceFoV { get; set; } = 0.78f;
+    public bool CustomSightDistanceIgnoreCollision { get; set; } = true;
+    public float SpecialRenderModeBackgroundColorR { get; set; } = 0.53f;
+    public float SpecialRenderModeBackgroundColorG { get; set; } = 0.81f;
+    public float SpecialRenderModeBackgroundColorB { get; set; } = 0.98f;
+    public float SpecialRenderModeBackgroundColorA { get; set; } = 1.0f;
+    public bool ExpandedPlayerRightClickMenuSearchEnabled { get; set; } = false;
+    public bool ExpandedPlayerRightClickMenuSearchFflogsEnabled { get; set; } = true;
+    public bool ExpandedPlayerRightClickMenuSearchLodestoneEnabled { get; set; } = true;
+    public bool ExpandedPlayerRightClickMenuSearchLalachievementsEnabled { get; set; } = true;
+    public bool ExpandedPlayerRightClickMenuSearchOpenAllEnabled { get; set; } = true;
+    public bool LiveAnonymousModeEnabled { get; set; } = false;
+    public bool AutoUnlockExpertDeliveryEnabled { get; set; } = false;
+    public bool AutoUnlockExpertDeliveryAutoSwitchWhenOpen { get; set; } = true;
+    public int AutoUnlockExpertDeliveryDefaultPage { get; set; } = 2;
+    public bool AutoUnlockExpertDeliverySkipHq { get; set; } = true;
+    public bool AutoUnlockExpertDeliverySkipMateria { get; set; } = true;
+    public bool AutoUnlockExpertDeliveryIgnoreSealCap { get; set; } = false;
+    public bool UnlockExpertDeliveryEnabled { get; set; } = false;
+    public bool AutoRefuseTradeRequestEnabled { get; set; } = false;
+    public bool AutoRefuseTradeShowNotification { get; set; } = true;
+    public bool AutoRefuseTradeSendEcho { get; set; } = false;
+    public string AutoRefuseTradeExtraCommands { get; set; } = string.Empty;
+    public bool AutoRevealUndiscoveredAreasEnabled { get; set; } = false;
+    public bool AutoClearTeleportationLockEnabled { get; set; } = false;
+    public bool DozeSitAnywhereEnabled { get; set; } = false;
+    public bool InfiniteSprintEnabled { get; set; } = false;
+    public float InfiniteSprintDelaySeconds { get; set; } = 2.0f;
+    public bool InstantLogoutEnabled { get; set; } = false;
+    public bool MoveableAfterDeathEnabled { get; set; } = false;
+    public List<ToonModSavedList> ToonModsSavedLists { get; set; } = new();
+    public bool ForcePeepingTomEnabled { get; set; } = false;
+    public bool ForcePeepingTomPreserveHistoryOnLogoutEnabled { get; set; } = false;
+
+    // â”€â”€ City Chat Flooder â”€â”€
     public List<string> FloorderSelectedWorlds { get; set; } = new();
     public List<string> FloorderSelectedCities { get; set; } = new();
     public List<string> FloorderCustomCities { get; set; } = new();
@@ -184,7 +257,7 @@ public class Configuration : IPluginConfiguration
     public float FloorderLoopDelayMinutes { get; set; } = 5.0f;
     public bool FloorderInitialized { get; set; } = false;
 
-    // ── Export Data ──
+    // â”€â”€ Export Data â”€â”€
     public bool ExportDataAlwaysOn { get; set; } = false;
     public int ExportDataRunEveryHours { get; set; } = 24;
     public string ExportDataOutputPath { get; set; } = string.Empty;
@@ -195,6 +268,11 @@ public class Configuration : IPluginConfiguration
     public bool MenuFcRelationsExpanded { get; set; } = true;
     public bool MenuUtilityExpanded { get; set; } = true;
     public bool MenuReferenceExpanded { get; set; } = true;
+    public bool ToonModsGameModsExpanded { get; set; } = true;
+    public bool ToonModsGraphicModsExpanded { get; set; } = true;
+    public bool ToonModsPlayerModsExpanded { get; set; } = true;
+    public bool ToonModsIllegalModsExpanded { get; set; } = true;
+    public bool ToonModsPluginModsExpanded { get; set; } = true;
     public float TaskMenuWidth { get; set; } = 180f;
     public string LastSelectedBuiltInTask { get; set; } = "";
     public string LastSelectedExternalTaskName { get; set; } = "";

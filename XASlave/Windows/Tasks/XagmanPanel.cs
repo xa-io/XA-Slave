@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using SysAction = System.Action;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Plugin;
@@ -76,7 +77,11 @@ public partial class SlaveWindow
     private List<string> xagmanTonyRunList = new();
     private List<string>? xagmanAetheryteNames;
     private List<XagmanItemSearchEntry> xagmanItemResults = new();
+    private Dictionary<string, XagmanItemSearchEntry>? xagmanItemNameLookupCache;
     private static readonly string[] xagmanItemModeLabels = { "Give", "Take", "Balance" };
+    private static readonly Regex xagmanTeamcraftItemLineRegex = new(
+        @"^\s*(?<quantity>[0-9][0-9,]*)\s*x\s+(?<itemName>.+?)\s*$",
+        RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
     private static readonly JsonSerializerOptions xagmanItemListJsonOptions = new()
     {
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
@@ -754,18 +759,23 @@ public partial class SlaveWindow
         if (ImGui.Button($"Import##{id}Import"))
         {
             xagmanItemImportJson = ImGui.GetClipboardText();
-            if (TryImportXagmanItemList(title, xagmanItemImportJson, items, out var importMessage, searchOnly))
+            var imported = TryImportXagmanItemList(title, xagmanItemImportJson, items, out var importMessage, searchOnly);
+            arImportStatus = importMessage;
+            arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+            if (imported)
             {
-                arImportStatus = importMessage;
-                arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 xagmanItemImportJson = string.Empty;
                 ClearXagmanItemSearch();
             }
         }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Import from XA Slave JSON, Artisan JSON, or Teamcraft quantity/name clipboard text.");
 
         ImGui.SameLine();
         if (ImGui.Button($"Export##{id}Export"))
-            ExportXagmanItemList(title, items, searchOnly);
+            ImGui.OpenPopup($"{id}ExportPopup");
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Export as XA Slave JSON or Teamcraft quantity/name clipboard text.");
 
         if (!searchOnly)
         {
@@ -781,8 +791,14 @@ public partial class SlaveWindow
             SaveXagmanSharedItemsState();
             ClearXagmanItemSearch();
         }
+        if (!string.IsNullOrEmpty(arImportStatus) && DateTime.UtcNow < arImportStatusExpiry)
+        {
+            ImGui.SameLine();
+            ImGui.TextColored(GetXagmanStatusColor(arImportStatus), arImportStatus);
+        }
 
         DrawXagmanSavedListsPopup(title, items, id, searchOnly);
+        DrawXagmanExportPopup(title, items, id, searchOnly);
         if (!searchOnly)
             DrawXagmanMassModePopup(items, id);
 
@@ -852,6 +868,14 @@ public partial class SlaveWindow
     {
         return ImGui.CalcTextSize(label).X + (ImGui.GetStyle().FramePadding.X * 2f);
     }
+    private static Vector4 GetXagmanStatusColor(string status)
+    {
+        return status.Contains("failed", StringComparison.OrdinalIgnoreCase)
+            || status.Contains("unsupported", StringComparison.OrdinalIgnoreCase)
+            || status.Contains("0 matching", StringComparison.OrdinalIgnoreCase)
+            ? new Vector4(1.0f, 0.4f, 0.4f, 1.0f)
+            : new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
+    }
     private void ExportXagmanItemList(string title, IReadOnlyList<XagmanItemEntry> items, bool searchOnly = false)
     {
         var package = new XagmanItemListPackage
@@ -863,29 +887,139 @@ public partial class SlaveWindow
         };
         var json = JsonSerializer.Serialize(package, xagmanItemListJsonOptions);
         ImGui.SetClipboardText(json);
-        arImportStatus = $"Xagman: copied {title} JSON ({package.ListId}) to clipboard";
+        arImportStatus = $"Xagman: copied {title} Slave JSON ({package.ListId}) to clipboard";
         arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
     }
-    private bool TryImportXagmanItemList(string title, string json, List<XagmanItemEntry> items, out string message, bool searchOnly = false)
+
+    private void ExportXagmanTeamcraftItemList(string title, IReadOnlyList<XagmanItemEntry> items, bool searchOnly = false)
     {
-        if (string.IsNullOrWhiteSpace(json))
+        var exportedItems = CloneXagmanItemsForTeamcraftExport(items, searchOnly);
+        var text = BuildXagmanTeamcraftItemListText(title, exportedItems, searchOnly);
+        ImGui.SetClipboardText(text);
+        arImportStatus = $"Xagman: copied {title} Teamcraft text ({exportedItems.Count} item(s)) to clipboard";
+        arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+    }
+
+    private void DrawXagmanExportPopup(string title, IReadOnlyList<XagmanItemEntry> items, string id, bool searchOnly = false)
+    {
+        if (!ImGui.BeginPopup($"{id}ExportPopup"))
+            return;
+        if (ImGui.Selectable($"Xagman Export##{id}XagmanExport"))
+            ExportXagmanItemList(title, items, searchOnly);
+        if (ImGui.Selectable($"Teamcraft Export##{id}TeamcraftExport"))
+            ExportXagmanTeamcraftItemList(title, items, searchOnly);
+        ImGui.EndPopup();
+    }
+
+    private static List<XagmanItemEntry> CloneXagmanItemsForTeamcraftExport(IEnumerable<XagmanItemEntry> items, bool searchOnly = false)
+    {
+        return items
+            .Where(item => item.ItemId > 0 && !string.IsNullOrWhiteSpace(item.ItemName))
+            .GroupBy(item => new { item.ItemId, item.IsHq })
+            .Select(group =>
+            {
+                var first = group.First();
+                return new XagmanItemEntry
+                {
+                    ItemId = group.Key.ItemId,
+                    ItemName = first.ItemName,
+                    IsHq = group.Key.IsHq,
+                    Mode = searchOnly ? XagmanItemMode.Give : first.Mode,
+                    Quantity = Math.Max(1, searchOnly ? 1 : group.Sum(item => Math.Max(0, item.Quantity))),
+                };
+            })
+            .OrderBy(item => item.Mode)
+            .ThenBy(item => item.ItemName, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(item => item.ItemId)
+            .ToList();
+    }
+
+    private static string BuildXagmanTeamcraftItemListText(string title, IReadOnlyList<XagmanItemEntry> items, bool searchOnly = false)
+    {
+        var lines = new List<string>();
+        if (searchOnly)
         {
-            message = $"Xagman: paste {title} JSON before importing.";
+            lines.Add($"{title} :");
+            foreach (var item in items)
+                lines.Add(GetXagmanTeamcraftItemLine(item));
+            return string.Join(Environment.NewLine, lines);
+        }
+
+        foreach (var mode in new[] { XagmanItemMode.Give, XagmanItemMode.Take, XagmanItemMode.Balance })
+        {
+            var modeItems = items.Where(item => item.Mode == mode).ToList();
+            if (modeItems.Count == 0)
+                continue;
+            if (lines.Count > 0)
+                lines.Add(string.Empty);
+            lines.Add($"{mode} :");
+            foreach (var item in modeItems)
+                lines.Add(GetXagmanTeamcraftItemLine(item));
+        }
+        if (lines.Count == 0)
+            lines.Add($"{title} :");
+        return string.Join(Environment.NewLine, lines);
+    }
+
+    private static string GetXagmanTeamcraftItemLine(XagmanItemEntry item)
+    {
+        var itemName = item.IsHq ? $"{item.ItemName} (HQ)" : item.ItemName;
+        return $"{Math.Max(1, item.Quantity).ToString(CultureInfo.InvariantCulture)}x {itemName}";
+    }
+
+    private bool TryImportXagmanItemList(string title, string clipboardText, List<XagmanItemEntry> items, out string message, bool searchOnly = false)
+    {
+        if (string.IsNullOrWhiteSpace(clipboardText))
+        {
+            message = "Xagman: clipboard data not supported.";
             return false;
         }
+        return clipboardText.TrimStart().StartsWith("{", StringComparison.Ordinal)
+            ? TryImportXagmanJsonItemList(title, clipboardText, items, out message, searchOnly)
+            : TryImportXagmanTeamcraftItemList(title, clipboardText, items, out message, searchOnly);
+    }
+
+    private bool TryImportXagmanJsonItemList(string title, string json, List<XagmanItemEntry> items, out string message, bool searchOnly = false)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+            {
+                message = "Xagman: clipboard data not supported.";
+                return false;
+            }
+            if (TryGetXagmanJsonProperty(root, "items", out var xagmanItems) && xagmanItems.ValueKind == JsonValueKind.Array)
+                return TryImportXagmanSlaveItemList(title, json, items, out message, searchOnly);
+            if (TryGetXagmanJsonProperty(root, "recipes", out var artisanRecipes) && artisanRecipes.ValueKind == JsonValueKind.Array)
+                return TryImportXagmanArtisanItemList(title, root, items, out message, searchOnly);
+        }
+        catch
+        {
+            message = "Xagman: clipboard data not supported.";
+            return false;
+        }
+
+        message = "Xagman: clipboard data not supported.";
+        return false;
+    }
+
+    private bool TryImportXagmanSlaveItemList(string title, string json, List<XagmanItemEntry> items, out string message, bool searchOnly = false)
+    {
         XagmanItemListPackage? package;
         try
         {
             package = JsonSerializer.Deserialize<XagmanItemListPackage>(json, xagmanItemListJsonOptions);
         }
-        catch (Exception ex)
+        catch
         {
-            message = $"Xagman: import failed: {ex.Message}";
+            message = "Xagman: clipboard data not supported.";
             return false;
         }
         if (package == null || package.Items == null)
         {
-            message = "Xagman: import JSON did not contain a valid item list.";
+            message = "Xagman: clipboard data not supported.";
             return false;
         }
         var importedItems = package.Items
@@ -905,8 +1039,265 @@ public partial class SlaveWindow
         items.AddRange(importedItems);
         SaveXagmanSharedItemsState();
         var listId = string.IsNullOrWhiteSpace(package.ListId) ? "no-list-id" : package.ListId;
-        message = $"Xagman: imported {importedItems.Count} item(s) into {title} from {listId}";
+        message = $"Xagman: imported {importedItems.Count} item(s) into {title} from Slave JSON {listId}";
         return true;
+    }
+
+    private bool TryImportXagmanArtisanItemList(string title, JsonElement root, List<XagmanItemEntry> items, out string message, bool searchOnly = false)
+    {
+        if (!TryGetXagmanJsonProperty(root, "recipes", out var recipesElement) || recipesElement.ValueKind != JsonValueKind.Array)
+        {
+            message = "Xagman: clipboard data not supported.";
+            return false;
+        }
+
+        var unresolvedIds = new HashSet<uint>();
+        var resolvedItems = new List<XagmanItemEntry>();
+        foreach (var recipeElement in recipesElement.EnumerateArray())
+        {
+            if (recipeElement.ValueKind != JsonValueKind.Object)
+                continue;
+            if (!TryGetXagmanJsonProperty(recipeElement, "id", out var itemIdElement)
+                || !TryGetXagmanJsonUInt(itemIdElement, out var itemId)
+                || itemId == 0)
+                continue;
+            if (!TryGetXagmanJsonProperty(recipeElement, "quantity", out var quantityElement)
+                || !TryGetXagmanJsonInt(quantityElement, out var quantity)
+                || quantity <= 0)
+                continue;
+            if (!TryResolveXagmanItemById(itemId, out var resolvedItem))
+            {
+                unresolvedIds.Add(itemId);
+                continue;
+            }
+            resolvedItems.Add(new XagmanItemEntry
+            {
+                ItemId = resolvedItem.ItemId,
+                ItemName = resolvedItem.ItemName,
+                IsHq = false,
+                Mode = searchOnly ? XagmanItemMode.Give : XagmanItemMode.Balance,
+                Quantity = searchOnly ? 0 : quantity,
+            });
+        }
+
+        var importedItems = resolvedItems
+            .GroupBy(item => item.ItemId)
+            .Select(group => new XagmanItemEntry
+            {
+                ItemId = group.Key,
+                ItemName = group.First().ItemName,
+                IsHq = false,
+                Mode = searchOnly ? XagmanItemMode.Give : XagmanItemMode.Balance,
+                Quantity = searchOnly ? 0 : Math.Max(0, group.Sum(item => item.Quantity)),
+            })
+            .OrderBy(item => item.ItemId)
+            .ToList();
+        if (importedItems.Count == 0)
+        {
+            message = "Xagman: Artisan import found 0 matching item ID(s).";
+            return false;
+        }
+
+        items.Clear();
+        items.AddRange(importedItems);
+        SaveXagmanSharedItemsState();
+        var listName = TryGetXagmanJsonProperty(root, "name", out var nameElement) && nameElement.ValueKind == JsonValueKind.String
+            ? nameElement.GetString()
+            : string.Empty;
+        var sourceLabel = string.IsNullOrWhiteSpace(listName)
+            ? "Artisan"
+            : $"Artisan '{listName}'";
+        message = unresolvedIds.Count == 0
+            ? $"Xagman: imported {importedItems.Count} item(s) into {title} from {sourceLabel}."
+            : $"Xagman: imported {importedItems.Count} item(s) into {title} from {sourceLabel}; skipped {unresolvedIds.Count} unknown ID(s).";
+        return true;
+    }
+
+    private bool TryImportXagmanTeamcraftItemList(string title, string text, List<XagmanItemEntry> items, out string message, bool searchOnly = false)
+    {
+        var parsedLines = ParseXagmanTeamcraftItemLines(text);
+        if (parsedLines.Count == 0)
+        {
+            message = "Xagman: clipboard data not supported.";
+            return false;
+        }
+
+        var unresolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var resolvedItems = new List<XagmanItemEntry>();
+        foreach (var hqGroup in parsedLines.GroupBy(line => line.IsHq))
+        {
+            foreach (var group in hqGroup.GroupBy(line => line.ItemName, StringComparer.OrdinalIgnoreCase))
+            {
+                if (!TryResolveXagmanItemByName(group.Key, out var resolvedItem))
+                {
+                    unresolvedNames.Add(group.Key);
+                    continue;
+                }
+                var quantity = group.Sum(line => line.Quantity);
+                resolvedItems.Add(new XagmanItemEntry
+                {
+                    ItemId = resolvedItem.ItemId,
+                    ItemName = resolvedItem.ItemName,
+                    IsHq = hqGroup.Key,
+                    Mode = searchOnly ? XagmanItemMode.Give : XagmanItemMode.Balance,
+                    Quantity = searchOnly ? 0 : Math.Max(0, quantity),
+                });
+            }
+        }
+
+        var importedItems = resolvedItems
+            .GroupBy(item => new { item.ItemId, item.IsHq })
+            .Select(group => new XagmanItemEntry
+            {
+                ItemId = group.Key.ItemId,
+                ItemName = group.First().ItemName,
+                IsHq = group.Key.IsHq,
+                Mode = searchOnly ? XagmanItemMode.Give : XagmanItemMode.Balance,
+                Quantity = searchOnly ? 0 : Math.Max(0, group.Sum(item => item.Quantity)),
+            })
+            .OrderBy(item => item.ItemId)
+            .ToList();
+        if (importedItems.Count == 0)
+        {
+            message = "Xagman: Teamcraft import found 0 matching item name(s).";
+            return false;
+        }
+
+        items.Clear();
+        items.AddRange(importedItems);
+        SaveXagmanSharedItemsState();
+        message = unresolvedNames.Count == 0
+            ? $"Xagman: imported {importedItems.Count} item(s) into {title} from Teamcraft."
+            : $"Xagman: imported {importedItems.Count} item(s) into {title} from Teamcraft; skipped {unresolvedNames.Count} unknown name(s).";
+        return true;
+    }
+
+    private static List<(int Quantity, string ItemName, bool IsHq)> ParseXagmanTeamcraftItemLines(string text)
+    {
+        var items = new List<(int Quantity, string ItemName, bool IsHq)>();
+        var lines = text.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var line in lines)
+        {
+            var match = xagmanTeamcraftItemLineRegex.Match(line);
+            if (!match.Success)
+                continue;
+            if (!int.TryParse(match.Groups["quantity"].Value, NumberStyles.AllowThousands, CultureInfo.InvariantCulture, out var quantity) || quantity <= 0)
+                continue;
+            var itemName = match.Groups["itemName"].Value.Trim();
+            if (itemName.EndsWith(" (HQ)", StringComparison.OrdinalIgnoreCase))
+            {
+                itemName = itemName.Substring(0, itemName.Length - 5).Trim();
+                if (!string.IsNullOrWhiteSpace(itemName))
+                    items.Add((quantity, itemName, true));
+                continue;
+            }
+            if (!string.IsNullOrWhiteSpace(itemName))
+                items.Add((quantity, itemName, false));
+        }
+        return items;
+    }
+
+    private bool TryResolveXagmanItemByName(string itemName, out XagmanItemSearchEntry item)
+    {
+        var lookup = GetXagmanItemNameLookup();
+        if (lookup.TryGetValue(itemName.Trim(), out var resolvedItem))
+        {
+            item = resolvedItem;
+            return true;
+        }
+        item = new XagmanItemSearchEntry();
+        return false;
+    }
+
+    private bool TryResolveXagmanItemById(uint itemId, out XagmanItemSearchEntry item)
+    {
+        var itemSheet = Plugin.DataManager.GetExcelSheet<Item>();
+        if (itemSheet.TryGetRow(itemId, out var row))
+        {
+            var itemName = row.Name.ToString().Trim();
+            if (!string.IsNullOrWhiteSpace(itemName))
+            {
+                item = new XagmanItemSearchEntry
+                {
+                    ItemId = itemId,
+                    ItemName = itemName,
+                    IsHq = false,
+                };
+                return true;
+            }
+        }
+
+        item = new XagmanItemSearchEntry();
+        return false;
+    }
+
+    private static bool TryGetXagmanJsonProperty(JsonElement element, string propertyName, out JsonElement property)
+    {
+        if (element.ValueKind == JsonValueKind.Object)
+        {
+            foreach (var candidate in element.EnumerateObject())
+            {
+                if (candidate.Name.Equals(propertyName, StringComparison.OrdinalIgnoreCase))
+                {
+                    property = candidate.Value;
+                    return true;
+                }
+            }
+        }
+
+        property = default;
+        return false;
+    }
+
+    private static bool TryGetXagmanJsonUInt(JsonElement element, out uint value)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Number:
+                return element.TryGetUInt32(out value);
+            case JsonValueKind.String:
+                return uint.TryParse(element.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+            default:
+                value = 0;
+                return false;
+        }
+    }
+
+    private static bool TryGetXagmanJsonInt(JsonElement element, out int value)
+    {
+        switch (element.ValueKind)
+        {
+            case JsonValueKind.Number:
+                return element.TryGetInt32(out value);
+            case JsonValueKind.String:
+                return int.TryParse(element.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+            default:
+                value = 0;
+                return false;
+        }
+    }
+
+    private Dictionary<string, XagmanItemSearchEntry> GetXagmanItemNameLookup()
+    {
+        if (xagmanItemNameLookupCache != null)
+            return xagmanItemNameLookupCache;
+
+        var lookup = new Dictionary<string, XagmanItemSearchEntry>(StringComparer.OrdinalIgnoreCase);
+        var itemSheet = Plugin.DataManager.GetExcelSheet<Item>();
+        foreach (var row in itemSheet)
+        {
+            var itemName = row.Name.ToString().Trim();
+            if (row.RowId == 0 || string.IsNullOrWhiteSpace(itemName) || lookup.ContainsKey(itemName))
+                continue;
+            lookup[itemName] = new XagmanItemSearchEntry
+            {
+                ItemId = row.RowId,
+                ItemName = itemName,
+                IsHq = false,
+            };
+        }
+        xagmanItemNameLookupCache = lookup;
+        return lookup;
     }
     private void ClearXagmanItemSearch()
     {

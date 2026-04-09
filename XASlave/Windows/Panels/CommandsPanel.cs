@@ -1,0 +1,198 @@
+using System;
+using System.Collections.Generic;
+using System.Numerics;
+using Dalamud.Bindings.ImGui;
+
+namespace XASlave.Windows;
+
+/// <summary>
+/// Commands reference panel for the current XA Slave slash-command surface.
+/// </summary>
+public partial class SlaveWindow
+{
+    private readonly record struct CommandReferenceEntry(string Command, string Purpose, string Notes);
+    private string commandsSearchText = string.Empty;
+
+    private static readonly CommandReferenceEntry[] GeneralCommandEntries =
+    {
+        new("/xa", "Toggle the XA Slave window.", "This is the root command when entered without a subcommand."),
+        new("/xa allrestore", "Disable every top-level XA Mod toggle.", "Chat equivalent of the `Disable All Mods` button."),
+        new("/xa commands", "Open the window directly to `References > Commands`.", "Useful when you want the command inventory instead of just toggling the main window."),
+        new("/xa preset list", "List the currently saved XA Mods presets.", "Prints each saved preset name to chat."),
+        new("/xa preset load <name>", "Load a saved XA Mods preset by name.", "Applies the saved mod-key set after clearing the current top-level toggles."),
+        new("/xa preset save <name>", "Save the current XA Mods selection as a preset.", "Creates or overwrites a saved list without opening the panel."),
+        new("/xa xamods", "Open the window directly to `Utility > XA Mods`.", "Useful when you want the real XA Mods panel instead of just toggling the main window."),
+    };
+
+    private static readonly CommandReferenceEntry[] GameModsCommandEntries =
+    {
+        new("/xa anonymous on|off", "Toggle `Live Anonymous Mode`.", "Masks visible player nameplates locally."),
+        new("/xa chocobocutscene on|off", "Toggle `Skip Cutscenes Feeding Chocobo`.", "Only affects the companion-feeding cutscene surface."),
+        new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "Auto-confirms supported disconnect and lobby Dialogue popups."),
+        new("/xa copyitemname on|off", "Toggle `Copy Item Name For All`.", "Adds XA-owned item-name copy actions to supported context menus."),
+        new("/xa gamerestore", "Disable the current top-level Game Mods toggles.", "Turns off the current Game Mods section in one command."),
+        new("/xa hidepopups on|off", "Toggle `Hide Unnecessary Popups`.", "Closes supported tutorial and recommendation popups."),
+        new("/xa logincooldown on|off", "Toggle `Cancel Login Cooldown`.", "Clears the local temporary character-select cooldown."),
+        new("/xa msqprogress on|off", "Toggle `Display MSQ Progress`.", "Expands Scenario Tree with remaining-count and completion details."),
+        new("/xa multiinstance on|off", "Toggle `Allow Multiple Game Instances`.", "Also accepts `/xa multibox on|off` as an alias."),
+        new("/xa playersearch on|off", "Toggle `Expanded Player Right-Click Menu Search`.", "Adds XA search-provider shortcuts to supported player context menus."),
+        new("/xa preventlobbyexit on|off", "Toggle `Prevent Game Exiting From Lobby Errors`.", "Overrides the local forced-shutdown countdown for the supported lobby dialog."),
+        new("/xa queueposition on|off", "Toggle `Display Actual Queue Position`.", "Shows queue position and ETA details when available."),
+        new("/xa skipcutscenes on|off", "Toggle `Skip Cutscenes`.", "Controls XA's main cutscene-skip surface."),
+        new("/xa skipdialogue on|off", "Toggle `Skip Dialogue`.", "Auto-advances the `Talk` addon and the broader native talk surfaces when available."),
+    };
+
+    private static readonly CommandReferenceEntry[] GraphicModsCommandEntries =
+    {
+        new("/xa bgpause on|off", "Toggle `Disable Background Rendering`.", "Arms or disarms the DX11 and nameplate background-render pause hooks."),
+        new("/xa customres on|off", "Toggle `Custom Resolutions`.", "Enables or disables XA's custom-resolution control surface."),
+        new("/xa hideobjects on|off", "Toggle `Hide Game Objects`.", "Uses the XA object-hide seam with the current category filters plus the duty, island, and Occult Crescent options."),
+        new("/xa lowres <scale>", "Set and enable `Low Resolution` from chat.", "Accepts values from `0.01` to `1.00`, including inputs such as `1` and `0.01`."),
+        new("/xa lowres off", "Disable `Low Resolution`.", "Turns off the forced low-resolution scale without using a restore command."),
+        new("/xa minwindow on|off", "Toggle `Ignore Minimum Window Size`.", "Arms or restores XA's guarded local minimum-size seam."),
+        new("/xa res <width>x<height>", "Apply a custom client resolution such as `/xa res 500x345`.", "Requires `Custom Resolutions` to be enabled in XA Mods."),
+        new("/xa res add <width>x<height>", "Add a saved custom-resolution button.", "Stores a panel preset without needing to use the UI add-button flow."),
+        new("/xa res remove <width>x<height>", "Remove a saved custom-resolution button.", "Deletes the matching saved preset when present."),
+        new("/xa resrestore", "Disable the current top-level Graphic Mods toggles.", "Also runs the normal Special Rendering Modes world/UI restore behavior."),
+        new("/xa specialrender on|off", "Toggle `Special Rendering Modes`.", "Shows or hides the Special Render tools, and off also restores XA-touched world/UI state."),
+    };
+
+    private static readonly CommandReferenceEntry[] PlayerModsCommandEntries =
+    {
+        new("/xa doze", "Trigger Doze Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
+        new("/xa expertdelivery on|off", "Toggle `Automate Expert Delivery`.", "Controls the hand-in automation feature, not the unlock bypass."),
+        new("/xa instantlogout on|off", "Toggle `Instant Logout`.", "Arms or disarms XA's hard logout seam and the `/xa logout` command."),
+        new("/xa killgame", "Hard logout, then close the client.", "Requires `Instant Logout` to be enabled. XA waits for logout to complete before sending `/xlkill`."),
+        new("/xa sit", "Trigger Sit Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
+        new("/xa logout", "Trigger XA's hard logout seam.", "Requires `Instant Logout` to be enabled."),
+        new("/xa playerrestore", "Disable the current top-level Player Mods toggles.", "Useful for dropping movement, sprint, sit/doze, sight-distance, and logout-related XA Mods back to off."),
+        new("/xa refusetrade on|off", "Toggle `Refuse Trade Request`.", "Uses the trade-window and status-update refusal surfaces plus the current local feedback and extra-command options."),
+        new("/xa revealmap on|off", "Toggle `Reveal Undiscovered Areas`.", "Clears local map-discovery flags when the map agent refreshes."),
+        new("/xa sightdistance on|off", "Toggle `Custom Sight Distance`.", "Turns the current camera override profile on or off."),
+        new("/xa sitdoze on|off", "Toggle `Doze & Sit Anywhere`.", "Controls whether the `/xa sit` and `/xa doze` action commands are armed."),
+        new("/xa sprint on|off", "Toggle `Infinite Sprint`.", "Controls XA's movement-gated Sprint recast surface."),
+        new("/xa sprintdelay <seconds>", "Set the `Infinite Sprint` movement-start delay.", "Accepts values from `0.0` to `30.0` seconds."),
+        new("/xa teleportlock on|off", "Toggle `Clear Teleportation Lock`.", "Uses XA's teleport-stuck recovery seam."),
+    };
+
+    private static readonly CommandReferenceEntry[] PluginModsCommandEntries =
+    {
+        new("/xa peepingtom on|off", "Toggle `Force PeepingTom`.", "Controls XA's runtime PvP forcing path for PeepingTom."),
+        new("/xa pluginrestore", "Disable the current top-level Plugin Mods toggles.", "At the moment this mainly covers XA's PeepingTom runtime integration toggle."),
+    };
+
+    private static readonly CommandReferenceEntry[] IllegalModsCommandEntries =
+    {
+        new("/xa imlegit", "Disable the current `Illegal Shit You Shouldn't Use` toggles.", "Quickly turns off the risky local unlock/spoof surfaces in that section."),
+        new("/xa moveafterdeath on|off", "Toggle `Moveable After Death`.", "Controls XA's local movement-permission hook after death."),
+        new("/xa unlockexpert on|off", "Toggle `Unlock Expert Delivery`.", "Controls the local Grand Company rank spoof used to expose Expert Delivery."),
+    };
+
+    private void DrawCommandsReference()
+    {
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Commands");
+        ImGui.TextDisabled("Current XA Slave command inventory in a compact grouped table layout.");
+
+        ImGui.Spacing();
+        ImGui.SetNextItemWidth(Math.Max(220f, ImGui.GetContentRegionAvail().X));
+        ImGui.InputTextWithHint(
+            "##CommandsSearch",
+            "Search commands, settings, descriptions, and notes",
+            ref commandsSearchText,
+            256);
+
+        var visibleSectionCount = 0;
+        DrawFilteredCommandSection("General", GeneralCommandEntries, ref visibleSectionCount);
+        DrawFilteredCommandSection("Game Mods", GameModsCommandEntries, ref visibleSectionCount);
+        DrawFilteredCommandSection("Graphic Mods", GraphicModsCommandEntries, ref visibleSectionCount);
+        DrawFilteredCommandSection("Player Mods", PlayerModsCommandEntries, ref visibleSectionCount);
+        DrawFilteredCommandSection("Plugin Mods", PluginModsCommandEntries, ref visibleSectionCount);
+        DrawFilteredCommandSection("Illegal Shit You Shouldn't Use", IllegalModsCommandEntries, ref visibleSectionCount);
+
+        if (visibleSectionCount == 0)
+        {
+            ImGui.TextDisabled("No commands matched the current search.");
+            ImGui.TextDisabled("Search matches command text, setting names, descriptions, and notes.");
+        }
+    }
+
+    private void DrawFilteredCommandSection(string title, CommandReferenceEntry[] entries, ref int visibleSectionCount)
+    {
+        var filteredEntries = FilterCommandEntries(entries);
+        if (filteredEntries.Length == 0)
+            return;
+
+        visibleSectionCount++;
+        DrawCommandSection(title, filteredEntries);
+    }
+
+    private CommandReferenceEntry[] FilterCommandEntries(CommandReferenceEntry[] entries)
+    {
+        if (string.IsNullOrWhiteSpace(commandsSearchText))
+            return entries;
+
+        var queryTerms = commandsSearchText.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (queryTerms.Length == 0)
+            return entries;
+
+        var matches = new List<CommandReferenceEntry>();
+        foreach (var entry in entries)
+        {
+            if (MatchesCommandSearch(entry, queryTerms))
+                matches.Add(entry);
+        }
+
+        return matches.ToArray();
+    }
+
+    private static bool MatchesCommandSearch(CommandReferenceEntry entry, string[] queryTerms)
+    {
+        var haystack = $"{entry.Command}\n{entry.Purpose}\n{entry.Notes}";
+        foreach (var term in queryTerms)
+        {
+            if (!haystack.Contains(term, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
+    }
+
+    private static void DrawCommandSection(string title, CommandReferenceEntry[] entries)
+    {
+        DrawWrappedDisabledText(title);
+
+        if (ImGui.BeginTable(
+                $"CommandsReferenceTable##{title}",
+                2,
+                ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings | ImGuiTableFlags.PadOuterX))
+        {
+            ImGui.TableSetupColumn("Command", ImGuiTableColumnFlags.WidthFixed, 210f);
+            ImGui.TableSetupColumn("Description", ImGuiTableColumnFlags.WidthStretch);
+
+            for (var i = 0; i < entries.Length; i++)
+            {
+                var entry = entries[i];
+                ImGui.TableNextRow();
+                ImGui.TableSetBgColor(
+                    ImGuiTableBgTarget.RowBg0,
+                    ImGui.GetColorU32(i % 2 == 0
+                        ? new Vector4(0.28f, 0.28f, 0.28f, 0.24f)
+                        : new Vector4(0.03f, 0.03f, 0.03f, 0.24f)));
+
+                ImGui.TableNextColumn();
+                ImGui.PushTextWrapPos(0f);
+                ImGui.TextColored(new Vector4(0.88f, 0.92f, 0.98f, 1.0f), entry.Command);
+                ImGui.PopTextWrapPos();
+
+                ImGui.TableNextColumn();
+                ImGui.PushTextWrapPos(0f);
+                ImGui.TextUnformatted($"{entry.Purpose} {entry.Notes}");
+                ImGui.PopTextWrapPos();
+            }
+
+            ImGui.EndTable();
+        }
+
+        ImGui.Spacing();
+    }
+}

@@ -10,7 +10,16 @@ namespace XASlave.Services;
 ///
 /// Channels:
 ///   XASlave.IsBusy  (Func→bool) — returns true when any task is running
+///   XASlave.ExecuteCommand (Func, string→string) — run the same subcommands accepted by /xa and return an OK/ERROR status string
 ///   XASlave.RunTask (Action, string) — start a named task from external plugins
+///
+/// ExecuteCommand examples:
+///   "xamods"
+///   "sprint on"
+///   "killgame"
+///   "res 500x345"
+///   "preset load Favorites"
+///   "/xa logout"
 /// </summary>
 public sealed class IpcProvider : IDisposable
 {
@@ -18,6 +27,7 @@ public sealed class IpcProvider : IDisposable
     private readonly IPluginLog log;
 
     private readonly ICallGateProvider<bool> isBusyProvider;
+    private readonly ICallGateProvider<string, string> executeCommandProvider;
     private readonly ICallGateProvider<string, object> runTaskProvider;
 
     public IpcProvider(IDalamudPluginInterface pluginInterface, Plugin plugin, IPluginLog log)
@@ -29,11 +39,15 @@ public sealed class IpcProvider : IDisposable
         isBusyProvider = pluginInterface.GetIpcProvider<bool>("XASlave.IsBusy");
         isBusyProvider.RegisterFunc(IsBusy);
 
+        // XASlave.ExecuteCommand — mirrors the /xa command surface over IPC
+        executeCommandProvider = pluginInterface.GetIpcProvider<string, string>("XASlave.ExecuteCommand");
+        executeCommandProvider.RegisterFunc(ExecuteCommand);
+
         // XASlave.RunTask — start a named task (currently supports: "SaveToXaDatabase")
         runTaskProvider = pluginInterface.GetIpcProvider<string, object>("XASlave.RunTask");
         runTaskProvider.RegisterAction(RunTask);
 
-        log.Information("[XASlave] IPC provider initialized (2 channels).");
+        log.Information("[XASlave] IPC provider initialized (3 channels).");
     }
 
     private bool IsBusy()
@@ -65,14 +79,29 @@ public sealed class IpcProvider : IDisposable
         }
     }
 
-    /// <summary>Public entry point for /xa run command to invoke RunTask locally.</summary>
-    public void InvokeRunTask(string taskName) => RunTask(taskName);
+    private string ExecuteCommand(string commandText)
+    {
+        log.Information($"[XASlave] IPC: ExecuteCommand('{commandText}') called.");
+
+        var success = plugin.TryExecuteXaCommandFromIpc(commandText, out var message);
+        var response = string.IsNullOrWhiteSpace(message)
+            ? (success ? "OK" : "ERROR")
+            : $"{(success ? "OK" : "ERROR")}: {message}";
+
+        if (success)
+            log.Information($"[XASlave] IPC: ExecuteCommand('{commandText}') succeeded. {message}");
+        else
+            log.Warning($"[XASlave] IPC: ExecuteCommand('{commandText}') failed. {message}");
+
+        return response;
+    }
 
     public void Dispose()
     {
         try
         {
             isBusyProvider.UnregisterFunc();
+            executeCommandProvider.UnregisterFunc();
             runTaskProvider.UnregisterAction();
         }
         catch { }

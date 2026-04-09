@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
 namespace XASlave.Services;
@@ -656,12 +657,37 @@ public static class AddonHelper
 
     /// <summary>
     /// Fires SelectYesno callback to click Yes (index 0) or No (index 1).
-    /// Equivalent to SND's callbackXA("SelectYesno true 0") for Yes.
-    /// In SND, "true" means close/update addon after callback; the actual
-    /// value sent to SelectYesno is just Int:0 (Yes) or Int:1 (No).
+    /// When closeAfter is true, also closes the addon after firing to match the older XA helper behavior.
+    /// Some flows such as Expert Delivery need the raw callback without a forced close.
+    /// </summary>
+    public static unsafe bool ClickYesNo(bool clickYes, bool closeAfter)
+    {
+        var addon = (AddonSelectYesno*)GetAddon("SelectYesno");
+        if (addon == null || !addon->AtkUnitBase.IsVisible)
+            return false;
+
+        try
+        {
+            addon->AtkUnitBase.FireCallbackInt(clickYes ? 0 : 1);
+            if (closeAfter)
+                addon->AtkUnitBase.Close(true);
+
+            Plugin.Log.Information($"[XASlave] AddonHelper.ClickYesNo: fired on 'SelectYesno' with [{(clickYes ? 0 : 1)}]{(closeAfter ? " + Close" : string.Empty)}");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[XASlave] AddonHelper.ClickYesNo error: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Fires SelectYesno callback to click Yes (index 0) or No (index 1) and closes the addon afterward.
+    /// Kept for existing XA flows that still expect the old helper behavior.
     /// </summary>
     public static bool ClickYesNo(bool clickYes)
     {
-        return FireCallbackAndClose("SelectYesno", clickYes ? 0 : 1);
+        return ClickYesNo(clickYes, true);
     }
 }
