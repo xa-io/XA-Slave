@@ -179,6 +179,12 @@ public partial class SlaveWindow
             if (ImGui.Checkbox("Collect Personal Plot Info##post", ref postPlot)) { plugin.Configuration.ArPostProcessCollectPersonalPlotInfo = postPlot; postChanged = true; }
             var postFc = plugin.Configuration.ArPostProcessFcWindow;
             if (ImGui.Checkbox("Full FC Window Processing##post", ref postFc)) { plugin.Configuration.ArPostProcessFcWindow = postFc; postChanged = true; }
+            var postFcChest = plugin.Configuration.ArPostProcessCheckFcChestForGil;
+            if (ImGui.Checkbox("Check FC Chest For Gil##post", ref postFcChest)) { plugin.Configuration.ArPostProcessCheckFcChestForGil = postFcChest; postChanged = true; }
+            ImGui.SameLine();
+            ImGui.TextDisabled("(i)");
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("This will only work inside the company workshop.");
             var postSave = plugin.Configuration.ArPostProcessSaveToXaDatabase;
             if (ImGui.Checkbox("Save to XA Database##post", ref postSave)) { plugin.Configuration.ArPostProcessSaveToXaDatabase = postSave; postChanged = true; }
 

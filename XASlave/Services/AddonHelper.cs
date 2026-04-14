@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
@@ -17,6 +18,9 @@ namespace XASlave.Services;
 /// </summary>
 public static class AddonHelper
 {
+    public const string TextErrorAddonName = "_TextError";
+    public const string CannotSeeTargetText = "Cannot see target";
+
     // ═══════════════════════════════════════════════════
     //  Target Interaction (replaces /interact from SND)
     // ═══════════════════════════════════════════════════
@@ -56,8 +60,159 @@ public static class AddonHelper
     }
 
     // ═══════════════════════════════════════════════════
-    //  Addon Visibility / Readiness
+    //  Targeting / Pathing / Addon Visibility
     // ═══════════════════════════════════════════════════
+
+    /// <summary>
+    /// Targets the named object through the native game command path.
+    /// </summary>
+    public static void TargetByName(string targetName)
+    {
+        if (string.IsNullOrWhiteSpace(targetName))
+            return;
+
+        ChatHelper.SendMessage($"/target \"{targetName}\"");
+    }
+
+    /// <summary>
+    /// Returns true when the current target name matches the requested value.
+    /// </summary>
+    public static bool CurrentTargetMatches(string targetName)
+    {
+        if (string.IsNullOrWhiteSpace(targetName))
+            return false;
+
+        var target = Plugin.ObjectTable.LocalPlayer?.TargetObject;
+        return target != null && target.Name.ToString().Equals(targetName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Returns the current territory place-name shown by the game's zone lookup.
+    /// Mirrors the debug GetZoneName path that resolves ClientState.TerritoryType via TerritoryType.PlaceName.
+    /// </summary>
+    public static string GetCurrentZoneName()
+    {
+        try
+        {
+            var zoneId = Plugin.ClientState.TerritoryType;
+            var sheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.TerritoryType>();
+            var row = sheet?.GetRowOrDefault(zoneId);
+            return row?.PlaceName.ValueNullable?.Name.ToString() ?? "Unknown";
+        }
+        catch
+        {
+            return "Unknown";
+        }
+    }
+
+    /// <summary>
+    /// Returns true when the provided zone name, or the current zone name when omitted,
+    /// matches the visible Company Workshop territory naming used by GetZoneName.
+    /// </summary>
+    public static bool ZoneNameLooksLikeWorkshop(string? zoneName = null)
+    {
+        zoneName ??= GetCurrentZoneName();
+        return !string.IsNullOrWhiteSpace(zoneName)
+            && !zoneName.Equals("Unknown", StringComparison.OrdinalIgnoreCase)
+            && zoneName.Contains("Company Workshop", StringComparison.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// Returns the raw HousingManager workshop flag without the zone-name shortcut.
+    /// </summary>
+    public static unsafe bool IsInWorkshopByHousingManager()
+    {
+        try
+        {
+            var housingManager = HousingManager.Instance();
+            return housingManager != null && housingManager->IsInWorkshop();
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Returns true when the local player is currently inside the FC workshop.
+    /// Prefers the visible zone-name check because the workshop territories resolve as
+    /// "Company Workshop - <district>" in TerritoryType.PlaceName.
+    /// </summary>
+    public static unsafe bool IsInWorkshop()
+    {
+        if (ZoneNameLooksLikeWorkshop())
+            return true;
+
+        return IsInWorkshopByHousingManager();
+    }
+
+    /// <summary>
+    /// Starts a vnav path to the current target, stopping within the requested ring distance.
+    /// </summary>
+    public static bool TryPathToCurrentTarget(float stopDistance = 0.5f)
+    {
+        var plugin = Plugin.Instance;
+        var local = Plugin.ObjectTable.LocalPlayer;
+        var target = local?.TargetObject;
+        if (plugin == null || local == null || target == null || !plugin.IpcClient.VnavIsReady())
+            return false;
+
+        return plugin.IpcClient.VnavPathfindAndMoveCloseTo(target.Position, false, stopDistance);
+    }
+
+    /// <summary>
+    /// Returns true while any vnav pathing or movement operation is still active.
+    /// </summary>
+    public static bool IsVnavMovementActive()
+    {
+        var plugin = Plugin.Instance;
+        return plugin != null
+            && (plugin.IpcClient.VnavPathIsRunning()
+                || plugin.IpcClient.VnavNavPathfindInProgress()
+                || plugin.IpcClient.VnavSimpleMovePathfindInProgress());
+    }
+
+    /// <summary>
+    /// Keeps the named target selected, paths into range if needed, and returns true once
+    /// the player is inside the requested stop distance and vnav has stopped moving.
+    /// </summary>
+    public static bool IsCurrentTargetWithinStopDistanceAndStopped(string targetName, float stopDistance)
+    {
+        if (!CurrentTargetMatches(targetName))
+        {
+            TargetByName(targetName);
+            return false;
+        }
+
+        var plugin = Plugin.Instance;
+        var local = Plugin.ObjectTable.LocalPlayer;
+        var target = local?.TargetObject;
+        if (plugin == null || local == null || target == null)
+            return false;
+
+        var dx = target.Position.X - local.Position.X;
+        var dy = target.Position.Y - local.Position.Y;
+        var dz = target.Position.Z - local.Position.Z;
+        var centerDistance = MathF.Sqrt((dx * dx) + (dy * dy) + (dz * dz));
+        var ringDistance = centerDistance - local.HitboxRadius - target.HitboxRadius;
+        var movementActive = IsVnavMovementActive();
+
+        if (ringDistance <= stopDistance)
+        {
+            if (movementActive)
+            {
+                plugin.IpcClient.VnavStop();
+                return false;
+            }
+
+            return true;
+        }
+
+        if (!movementActive)
+            TryPathToCurrentTarget(stopDistance);
+
+        return false;
+    }
 
     /// <summary>
     /// Gets a pointer to the named addon, or null if not found.
@@ -99,6 +254,14 @@ public static class AddonHelper
             try { addon->Close(true); }
             catch (Exception ex) { Plugin.Log.Warning($"[XASlave] AddonHelper.CloseAddon '{name}' error: {ex.Message}"); }
         }
+    }
+
+    /// <summary>
+    /// Sends the game's reset-camera input (END) to re-center the current view.
+    /// </summary>
+    public static void ResetCamera()
+    {
+        KeyInputHelper.PressKey(KeyInputHelper.VK_END);
     }
 
     public static unsafe List<string> GetAddonTextEntries(string addonName)
@@ -149,6 +312,31 @@ public static class AddonHelper
         }
 
         return string.Empty;
+    }
+
+    /// <summary>
+    /// Returns true when the visible _TextError addon contains the requested text.
+    /// </summary>
+    public static bool TryGetTextErrorText(string text, out string matchedText, bool contains = true)
+    {
+        matchedText = GetFirstAddonText(TextErrorAddonName, text, contains);
+        return !string.IsNullOrWhiteSpace(matchedText);
+    }
+
+    /// <summary>
+    /// Returns true when the visible _TextError addon contains "Cannot see target".
+    /// </summary>
+    public static bool TryGetCannotSeeTargetTextError(out string matchedText)
+    {
+        return TryGetTextErrorText(CannotSeeTargetText, out matchedText, true);
+    }
+
+    /// <summary>
+    /// Dismisses the visible _TextError addon when it is open.
+    /// </summary>
+    public static void DismissTextError()
+    {
+        CloseAddon(TextErrorAddonName);
     }
 
     public static unsafe bool ClickAddonText(string addonName, string text, bool contains = false)

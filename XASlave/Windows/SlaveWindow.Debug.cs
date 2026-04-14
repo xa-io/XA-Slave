@@ -29,6 +29,7 @@ public partial class SlaveWindow
     // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     private string debugResult = string.Empty;
     private DateTime debugResultExpiry = DateTime.MinValue;
+    private bool debugXaFcChestCheckRunning;
     private const string XaAbuseDisplayName = "I Love XA!";
     private const string XaAbuseDefaultOverlayText = "â™¥";
     private const string XaAbuseDefaultTexturePath = "ui/icon/084000/084209_hr1.tex";
@@ -961,6 +962,22 @@ public partial class SlaveWindow
             catch (Exception ex) { SetDebugResult($"Zone lookup error: {ex.Message}"); }
         }
         ImGui.SameLine();
+        if (ImGui.Button("IsInWorkshop"))
+        {
+            try
+            {
+                var zoneId = Plugin.ClientState.TerritoryType;
+                var zoneName = AddonHelper.GetCurrentZoneName();
+                var zoneMatch = AddonHelper.ZoneNameLooksLikeWorkshop(zoneName);
+                var housingWorkshop = AddonHelper.IsInWorkshopByHousingManager();
+                var finalWorkshop = AddonHelper.IsInWorkshop();
+                SetDebugResult($"Workshop: final={finalWorkshop}, zoneMatch={zoneMatch}, housingManager={housingWorkshop}, zone=\"{zoneName}\" [{zoneId}]");
+            }
+            catch (Exception ex) { SetDebugResult($"Workshop check error: {ex.Message}"); }
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Shows the current zone name, whether it matches Company Workshop, the raw HousingManager workshop flag, and the final combined workshop result used by FC chest checks.");
+        ImGui.SameLine();
         if (ImGui.Button("GetWorldName"))
         {
             var lp = Plugin.ObjectTable.LocalPlayer;
@@ -1550,6 +1567,15 @@ public partial class SlaveWindow
             var ready = plugin.IpcClient.IsReady();
             SetDebugResult($"XA.Database.IsReady: {ready}");
         }
+
+        ImGui.Spacing();
+
+        if (ImGui.Button("XA: Check FC Chest"))
+        {
+            RunXaDatabaseFcChestDebugCheck();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Workshop-only debug pass for FC chest gil capture.\nChecks zone name, targets Company Chest, paths to 1.5y, interacts, saves to XA Database, and sends ESC until FreeCompanyChest closes.");
 
         ImGui.Spacing();
 
@@ -2666,6 +2692,271 @@ public partial class SlaveWindow
         debugResult = $"[{DateTime.Now:HH:mm:ss}] {msg}";
         debugResultExpiry = DateTime.UtcNow.AddSeconds(15);
         Plugin.Log.Information($"[XASlave] Debug: {msg}");
+    }
+
+    private void RunXaDatabaseFcChestDebugCheck()
+    {
+        if (debugXaFcChestCheckRunning)
+        {
+            SetDebugResult("XA FC Chest check already running.");
+            return;
+        }
+
+        debugXaFcChestCheckRunning = true;
+        SetDebugResult("XA FC Chest: starting debug run...");
+
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                var (zoneName, zoneMatch, xaDbReady, vnavReady) = await Plugin.Framework.RunOnFrameworkThread(() =>
+                {
+                    var currentZoneName = AddonHelper.GetCurrentZoneName();
+                    return (
+                        currentZoneName,
+                        AddonHelper.ZoneNameLooksLikeWorkshop(currentZoneName),
+                        plugin.IpcClient.IsXaDatabaseAvailable(),
+                        plugin.IpcClient.VnavIsReady());
+                });
+
+                if (!xaDbReady)
+                {
+                    SetDebugResult("XA FC Chest: XA Database not available.");
+                    return;
+                }
+
+                if (!zoneMatch)
+                {
+                    SetDebugResult($"XA FC Chest: zone '{zoneName}' is not a Company Workshop.");
+                    return;
+                }
+
+                if (!vnavReady)
+                {
+                    SetDebugResult("XA FC Chest: vnavmesh not ready.");
+                    return;
+                }
+
+                SetDebugResult($"XA FC Chest: zone '{zoneName}' OK - targeting Company Chest...");
+                await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.TargetByName("Company Chest"));
+
+                if (!await WaitForDebugTargetMatchAsync("Company Chest", 3000))
+                {
+                    SetDebugResult("XA FC Chest: failed to target Company Chest.");
+                    return;
+                }
+
+                SetDebugResult("XA FC Chest: pathing to Company Chest (1.5y stop)...");
+                var pathStarted = await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.TryPathToCurrentTarget(1.5f));
+                if (!pathStarted)
+                {
+                    SetDebugResult("XA FC Chest: could not start path to Company Chest.");
+                    return;
+                }
+
+                if (!await WaitForDebugTargetInRangeAsync("Company Chest", 1.5f, 20000))
+                {
+                    plugin.IpcClient.VnavStop();
+                    SetDebugResult("XA FC Chest: path to Company Chest timed out.");
+                    return;
+                }
+
+                if (!await TryOpenFcChestWithRecoveryAsync())
+                {
+                    return;
+                }
+
+                await System.Threading.Tasks.Task.Delay(500);
+                SetDebugResult("XA FC Chest: saving to XA Database...");
+                var saveOk = await Plugin.Framework.RunOnFrameworkThread(() => plugin.SaveToXaDatabaseAndRecordSync());
+
+                if (await CloseDebugAddonWithEscAsync("FreeCompanyChest", 12000))
+                {
+                    SetDebugResult(saveOk
+                        ? "XA FC Chest: complete - saved to XA Database and closed FreeCompanyChest."
+                        : "XA FC Chest: complete - XA Database save failed, but FreeCompanyChest closed.");
+                }
+                else
+                {
+                    SetDebugResult(saveOk
+                        ? "XA FC Chest: saved to XA Database, but FreeCompanyChest stayed open after ESC retries."
+                        : "XA FC Chest: XA Database save failed and FreeCompanyChest stayed open after ESC retries.");
+                }
+            }
+            catch (Exception ex)
+            {
+                plugin.IpcClient.VnavStop();
+                SetDebugResult($"XA FC Chest: error - {ex.Message}");
+            }
+            finally
+            {
+                debugXaFcChestCheckRunning = false;
+            }
+        });
+    }
+
+    private async System.Threading.Tasks.Task<bool> WaitForDebugTargetMatchAsync(string targetName, int timeoutMs, int pollMs = 100)
+    {
+        int elapsed = 0;
+        while (elapsed < timeoutMs)
+        {
+            await System.Threading.Tasks.Task.Delay(pollMs);
+            elapsed += pollMs;
+
+            var matched = await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.CurrentTargetMatches(targetName));
+            if (matched)
+                return true;
+        }
+
+        return false;
+    }
+
+    private async System.Threading.Tasks.Task<bool> WaitForDebugTargetInRangeAsync(string targetName, float stopDistance, int timeoutMs, int pollMs = 200)
+    {
+        int elapsed = 0;
+        while (elapsed < timeoutMs)
+        {
+            await System.Threading.Tasks.Task.Delay(pollMs);
+            elapsed += pollMs;
+
+            var inRange = await Plugin.Framework.RunOnFrameworkThread(() =>
+                AddonHelper.IsCurrentTargetWithinStopDistanceAndStopped(targetName, stopDistance));
+            if (inRange)
+                return true;
+        }
+
+        return false;
+    }
+
+    private async System.Threading.Tasks.Task<bool> TryOpenFcChestWithRecoveryAsync()
+    {
+        const string targetName = "Company Chest";
+        const string addonName = "FreeCompanyChest";
+        const int maxRecoveryAttempts = 2;
+
+        for (var recoveryAttempt = 0; recoveryAttempt <= maxRecoveryAttempts; recoveryAttempt++)
+        {
+            SetDebugResult($"XA FC Chest: interacting with {targetName}...");
+            var interactOk = await Plugin.Framework.RunOnFrameworkThread(() =>
+            {
+                AddonHelper.DismissTextError();
+                return AddonHelper.InteractWithTarget();
+            });
+            if (!interactOk)
+            {
+                SetDebugResult("XA FC Chest: interaction failed.");
+                return false;
+            }
+
+            var elapsed = 0;
+            const int pollMs = 100;
+            const int interactTimeoutMs = 5000;
+
+            while (elapsed < interactTimeoutMs)
+            {
+                await System.Threading.Tasks.Task.Delay(pollMs);
+                elapsed += pollMs;
+
+                var (addonVisible, matchedText) = await Plugin.Framework.RunOnFrameworkThread(() =>
+                {
+                    var opened = AddonHelper.IsAddonVisible(addonName);
+                    var text = AddonHelper.TryGetCannotSeeTargetTextError(out var matched)
+                        ? matched
+                        : string.Empty;
+                    return (opened, text);
+                });
+
+                if (addonVisible)
+                    return true;
+
+                if (!string.IsNullOrWhiteSpace(matchedText))
+                {
+                    if (recoveryAttempt >= maxRecoveryAttempts)
+                    {
+                        await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.DismissTextError());
+                        SetDebugResult($"XA FC Chest: _TextError '{matchedText}' persisted after {maxRecoveryAttempts} recovery attempts.");
+                        return false;
+                    }
+
+                    SetDebugResult($"XA FC Chest: _TextError '{matchedText}' - re-pathing for 0.5s, stopping vnav, and resetting camera ({recoveryAttempt + 1}/{maxRecoveryAttempts})...");
+                    await Plugin.Framework.RunOnFrameworkThread(() =>
+                    {
+                        AddonHelper.DismissTextError();
+                        AddonHelper.TryPathToCurrentTarget(1.5f);
+                    });
+
+                    await System.Threading.Tasks.Task.Delay(500);
+                    plugin.IpcClient.VnavStop();
+                    await Plugin.Framework.RunOnFrameworkThread(() =>
+                    {
+                        AddonHelper.ResetCamera();
+                        AddonHelper.DismissTextError();
+                        AddonHelper.TargetByName(targetName);
+                    });
+                    await System.Threading.Tasks.Task.Delay(250);
+                    break;
+                }
+            }
+
+            if (elapsed >= interactTimeoutMs)
+            {
+                SetDebugResult("XA FC Chest: FreeCompanyChest did not open.");
+                return false;
+            }
+        }
+
+        SetDebugResult("XA FC Chest: FreeCompanyChest did not open after visibility recovery.");
+        return false;
+    }
+
+    private async System.Threading.Tasks.Task<bool> WaitForDebugAddonVisibleAsync(string addonName, int timeoutMs, int pollMs = 100)
+    {
+        int elapsed = 0;
+        while (elapsed < timeoutMs)
+        {
+            await System.Threading.Tasks.Task.Delay(pollMs);
+            elapsed += pollMs;
+
+            var visible = await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.IsAddonVisible(addonName));
+            if (visible)
+                return true;
+        }
+
+        return false;
+    }
+
+    private async System.Threading.Tasks.Task<bool> CloseDebugAddonWithEscAsync(string addonName, int timeoutMs, int pollMs = 100, int escIntervalMs = 1000)
+    {
+        int elapsed = 0;
+        int closedChecks = 0;
+        int lastEscAtMs = -escIntervalMs;
+
+        SetDebugResult($"XA FC Chest: closing {addonName} with ESC...");
+
+        while (elapsed < timeoutMs)
+        {
+            var visible = await Plugin.Framework.RunOnFrameworkThread(() => AddonHelper.IsAddonVisible(addonName));
+            if (!visible)
+            {
+                closedChecks++;
+                if (closedChecks >= 2)
+                    return true;
+            }
+            else
+            {
+                closedChecks = 0;
+                if (elapsed - lastEscAtMs >= escIntervalMs)
+                {
+                    lastEscAtMs = elapsed;
+                    await Plugin.Framework.RunOnFrameworkThread(() => KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE));
+                }
+            }
+
+            await System.Threading.Tasks.Task.Delay(pollMs);
+            elapsed += pollMs;
+        }
+
+        return false;
     }
 
     /// <summary>

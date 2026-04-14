@@ -162,7 +162,7 @@ public unsafe sealed class DialogueSkipService : IDisposable
         subscribed = targetEnabled;
     }
 
-    private nint TryScanBaseAddress(string signature, string label)
+    private nint TryScanBaseAddress(ProtectedSig signature, string label)
     {
         try
         {

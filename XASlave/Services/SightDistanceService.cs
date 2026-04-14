@@ -124,7 +124,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         ScanPatchAddress(Sigs.CameraCollisionPatchSig, ref cameraCollisionPatchAddress, "CameraCollisionPatch");
     }
 
-    private Hook<T>? TryCreateHook<T>(string signature, T detour, string label)
+    private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
         where T : Delegate
     {
         try
@@ -146,7 +146,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         }
     }
 
-    private void ScanPatchAddress(string signature, ref nint address, string label)
+    private void ScanPatchAddress(ProtectedSig signature, ref nint address, string label)
     {
         if (address != nint.Zero)
             return;

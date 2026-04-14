@@ -150,7 +150,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature.");
     }
 
-    private Hook<T>? TryCreateHook<T>(string signature, T detour, string label)
+    private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
         where T : Delegate
     {
         try

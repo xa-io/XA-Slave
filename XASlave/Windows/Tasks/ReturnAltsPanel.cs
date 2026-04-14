@@ -31,6 +31,7 @@ public partial class SlaveWindow
     private bool raDoReturnToFc = true;
     private bool raDoParseForXaDatabase = true;
     private bool raDoLogoutOnComplete;
+    private bool raDoKillGameOnComplete;
     private bool raDoEnableArMulti = true;
 
     // ───────────────────────────────────────────────
@@ -122,7 +123,7 @@ public partial class SlaveWindow
                 () => StartTaskWithConfig("Return Alts To Homeworlds", selectedChars, returnAltsSelectedIndices,
                     raDoTextAdvance, raDoRemoveSprout, raDoOpenInventory, raDoOpenArmoury,
                     raDoOpenSaddlebags, raDoOpenJournal, raDoReturnToHome, raDoCollectPersonalPlotInfo,
-                    raDoReturnToFc, raDoParseForXaDatabase, raDoLogoutOnComplete, raDoEnableArMulti),
+                    raDoReturnToFc, raDoParseForXaDatabase, raDoLogoutOnComplete, raDoKillGameOnComplete, raDoEnableArMulti),
                 "Select at least one character and ensure required plugins are loaded.");
             if (started)
                 AutoOpenTaskLogIfVerbose(ref returnAltsShowLog);
@@ -235,7 +236,7 @@ public partial class SlaveWindow
         ImGui.Checkbox("Parse for XA Database (FC window + save)##ra", ref raDoParseForXaDatabase);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Opens FC window, navigates Members/Info/Housing tabs to collect\nall FC data, then saves to XA Database.");
-        DrawSharedCompletionAndLogFooter("ra", "ralog", ref raDoLogoutOnComplete, ref raDoEnableArMulti, ref returnAltsShowLog, runner);
+        DrawSharedCompletionAndLogFooter("ra", "ralog", ref raDoLogoutOnComplete, ref raDoKillGameOnComplete, ref raDoEnableArMulti, ref returnAltsShowLog, runner);
     }
 
     private void RefreshReturnAltsList()

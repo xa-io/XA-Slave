@@ -98,7 +98,7 @@ public partial class SlaveWindow : Window, IDisposable
         (SlaveTask.MultiFcPermissions, "FC Permissions Updater"),
         (SlaveTask.CheckDuplicatePlots, "Check Duplicate Plots"),
         (SlaveTask.ReturnAltsToHomeworlds, "Return Alts To Homeworlds"),
-        (SlaveTask.RefreshArSubsBell, "Refresh AR Subs/Bell"),
+        (SlaveTask.RefreshArSubsBell, "Refresh Sub/Bell/Chest"),
     };
 
     private static readonly (SlaveTask Task, string Label)[] UtilityItems =
@@ -640,6 +640,7 @@ public partial class SlaveWindow : Window, IDisposable
                 task = SlaveTask.PrepLogistics;
                 return true;
             case "Refresh AR Subs/Bell":
+            case "Refresh Sub/Bell/Chest":
                 task = SlaveTask.RefreshArSubsBell;
                 return true;
             case "FC Permissions Updater":
@@ -662,7 +663,7 @@ public partial class SlaveWindow : Window, IDisposable
             SlaveTask.Xagman => "Xagman",
             SlaveTask.ReturnAltsToHomeworlds => "Return Alts To Homeworlds",
             SlaveTask.PrepLogistics => "Prep Logistics",
-            SlaveTask.RefreshArSubsBell => "Refresh AR Subs/Bell",
+            SlaveTask.RefreshArSubsBell => "Refresh Sub/Bell/Chest",
             SlaveTask.MultiFcPermissions => "FC Permissions Updater",
             SlaveTask.AutoAcceptFcInvite => "Auto-Accept FC Invites",
             _ => string.Empty,

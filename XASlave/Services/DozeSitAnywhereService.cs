@@ -201,7 +201,7 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
         savedSitRotation = null;
     }
 
-    private Hook<ShouldSnapDelegate>? TryCreateHook(string signature, ShouldSnapDelegate detour, string label)
+    private Hook<ShouldSnapDelegate>? TryCreateHook(ProtectedSig signature, ShouldSnapDelegate detour, string label)
     {
         try
         {

@@ -128,7 +128,7 @@ public unsafe sealed class PlayerModsService : IDisposable
         movePermissionHook = TryCreateHook<MovePermissionDelegate>(Sigs.MovePermissionSig, MovePermissionDetour, "MovePermission");
     }
 
-    private Hook<T>? TryCreateHook<T>(string signature, T detour, string label)
+    private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
         where T : Delegate
     {
         try

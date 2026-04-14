@@ -116,7 +116,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         tradeStatusUpdateHook = TryCreateHook<TradeStatusUpdateDelegate>(Sigs.TradeStatusUpdateSig, TradeStatusUpdateDetour, "TradeStatusUpdate");
     }
 
-    private Hook<T>? TryCreateHook<T>(string signature, T detour, string label)
+    private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
         where T : Delegate
     {
         try

@@ -506,7 +506,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         }
     }
 
-    private Hook<T>? TryCreateHook<T>(string signature, T detour, string label)
+    private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
         where T : Delegate
     {
         try

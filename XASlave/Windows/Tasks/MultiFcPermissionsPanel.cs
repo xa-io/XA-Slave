@@ -328,7 +328,16 @@ public partial class SlaveWindow
         ImGui.SameLine();
         ImGui.TextDisabled("Format: FirstName LastName@World");
 
-        DrawTaskLog("fcPerms", ref fcPermsShowLog, plugin.TaskRunner);
+        var logoutOnComplete = cfg.FcPermsLogoutOnComplete;
+        var killGameOnComplete = cfg.FcPermsKillGameOnComplete;
+        var enableArMultiOnComplete = cfg.FcPermsEnableArMultiOnComplete;
+        if (DrawSharedCompletionAndLogFooter("fcPerms", "fcPerms", ref logoutOnComplete, ref killGameOnComplete, ref enableArMultiOnComplete, ref fcPermsShowLog, plugin.TaskRunner))
+        {
+            cfg.FcPermsLogoutOnComplete = logoutOnComplete;
+            cfg.FcPermsKillGameOnComplete = killGameOnComplete;
+            cfg.FcPermsEnableArMultiOnComplete = enableArMultiOnComplete;
+            cfg.Save();
+        }
     }
 
     private List<string> GetSelectedFcPermsCharacters()
@@ -382,6 +391,7 @@ public partial class SlaveWindow
 
     private List<TaskStep> BuildFcPermissionsSteps(List<string> characters, TaskRunner runner)
     {
+        var cfg = plugin.Configuration;
         var steps = new List<TaskStep>();
 
         runner.TotalItems = characters.Count;
@@ -618,12 +628,20 @@ public partial class SlaveWindow
             Name = "FC Permissions Summary",
             OnEnter = () =>
             {
-                runner.SuppressLogoutCancel = false;
+                if (!MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(cfg.FcPermsLogoutOnComplete, cfg.FcPermsKillGameOnComplete))
+                    runner.SuppressLogoutCancel = false;
                 runner.AddLog($"══ SUMMARY: All {characters.Count} character(s) permissions updated ══");
             },
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
+
+        MonthlyReloggerTask.AddSharedCompletionSteps(
+            steps,
+            runner,
+            cfg.FcPermsLogoutOnComplete,
+            cfg.FcPermsKillGameOnComplete,
+            cfg.FcPermsEnableArMultiOnComplete);
 
         return steps;
     }

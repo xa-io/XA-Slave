@@ -87,6 +87,7 @@ public class Configuration : IPluginConfiguration
     public bool ReloggerDoReturnToFc { get; set; } = true;
     public bool ReloggerDoParseForXaDatabase { get; set; } = true;
     public bool ReloggerDoLogoutOnComplete { get; set; } = false;
+    public bool ReloggerDoKillGameOnComplete { get; set; } = false;
     public bool ReloggerDoEnableArMultiOnComplete { get; set; } = false;
 
     // Region filter for character list display
@@ -110,6 +111,7 @@ public class Configuration : IPluginConfiguration
     public string PrepLogisticsTargetAetheryte { get; set; } = string.Empty;
     public bool PrepLogisticsEnableArMultiOnComplete { get; set; } = true;
     public bool PrepLogisticsLogoutOnComplete { get; set; } = false;
+    public bool PrepLogisticsKillGameOnComplete { get; set; } = false;
     public string PrepLogisticsRegionFilter { get; set; } = "All";
 
     public XagmanRole XagmanRole { get; set; } = XagmanRole.Tony;
@@ -125,6 +127,7 @@ public class Configuration : IPluginConfiguration
     public int XagmanTonyGilMinimum { get; set; } = 10000;
     public bool XagmanEnableArMultiOnComplete { get; set; } = true;
     public bool XagmanLogoutOnComplete { get; set; } = false;
+    public bool XagmanKillGameOnComplete { get; set; } = false;
     public bool XagmanUsePreflightOnFirstCharacter { get; set; } = true;
     public bool XagmanAutoReturnToFc { get; set; } = true;
     public bool XagmanIgnoreGilInMatchingSelection { get; set; } = true;
@@ -138,6 +141,9 @@ public class Configuration : IPluginConfiguration
     // â”€â”€ FC Permissions Updater â”€â”€
     public List<string> FcPermsCharacters { get; set; } = new();
     public string FcPermsRegionFilter { get; set; } = "All";
+    public bool FcPermsLogoutOnComplete { get; set; } = false;
+    public bool FcPermsKillGameOnComplete { get; set; } = false;
+    public bool FcPermsEnableArMultiOnComplete { get; set; } = true;
 
     // â”€â”€ AR Pre-Processing â”€â”€
     // Master toggle â€” when enabled, runs collection steps on login BEFORE AR starts retainer processing
@@ -166,6 +172,7 @@ public class Configuration : IPluginConfiguration
     public bool ArPostProcessOpenJournal { get; set; } = true;
     public bool ArPostProcessCollectPersonalPlotInfo { get; set; } = true;
     public bool ArPostProcessFcWindow { get; set; } = true;
+    public bool ArPostProcessCheckFcChestForGil { get; set; } = false;
     public bool ArPostProcessSaveToXaDatabase { get; set; } = true;
     public bool ArProcessLogEnabled { get; set; } = false;
 

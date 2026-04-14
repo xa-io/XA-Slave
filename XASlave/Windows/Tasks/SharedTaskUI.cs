@@ -127,18 +127,45 @@ public partial class SlaveWindow
             showLog = true;
     }
 
-    private void DrawSharedCompletionAndLogFooter(string optionId, string logId,
-        ref bool logoutOnComplete, ref bool enableArMultiOnComplete, ref bool showLog,
+    private bool DrawSharedCompletionAndLogFooter(string optionId, string logId,
+        ref bool logoutOnComplete, ref bool killGameOnComplete, ref bool enableArMultiOnComplete, ref bool showLog,
         Services.TaskRunner runner)
     {
+        var changed = false;
+
         ImGui.Separator();
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Task Options on Complete");
-        ImGui.Checkbox($"Logout on completion##{optionId}", ref logoutOnComplete);
-        ImGui.Checkbox($"Enable AR Multi Mode on completion##{optionId}", ref enableArMultiOnComplete);
+        if (ImGui.Checkbox($"Logout on completion##{optionId}", ref logoutOnComplete))
+        {
+            if (logoutOnComplete)
+                killGameOnComplete = false;
+            changed = true;
+        }
+
+        if (ImGui.Checkbox($"Kill Game on completion##{optionId}", ref killGameOnComplete))
+        {
+            if (killGameOnComplete)
+            {
+                logoutOnComplete = false;
+                enableArMultiOnComplete = false;
+            }
+
+            changed = true;
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Forces XA's hard logout + close-client flow even if Instant Logout is disabled in XA Mods.");
+
+        if (ImGui.Checkbox($"Enable AR Multi Mode on completion##{optionId}", ref enableArMultiOnComplete))
+        {
+            if (enableArMultiOnComplete)
+                killGameOnComplete = false;
+            changed = true;
+        }
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
         DrawTaskLog(logId, ref showLog, runner);
+        return changed;
     }
 
     private bool DrawPriorityTaskActionButton(SlaveTask task, string buttonLabel, bool canStart, Action startAction, string disabledTooltip = "")
@@ -192,7 +219,7 @@ public partial class SlaveWindow
     private void StartTaskWithConfig(string taskName, List<string> characters, HashSet<int> selectedIndices,
         bool doTextAdvance, bool doRemoveSprout, bool doOpenInventory, bool doOpenArmoury,
         bool doOpenSaddlebags, bool doOpenJournal, bool doReturnToHome, bool doCollectPersonalPlotInfo,
-        bool doReturnToFc, bool doParseForXaDatabase, bool doLogoutOnComplete, bool doEnableArMulti)
+        bool doReturnToFc, bool doParseForXaDatabase, bool doLogoutOnComplete, bool doKillGameOnComplete, bool doEnableArMulti)
     {
         HaltAutoCollectionForPriorityTask(taskName);
 
@@ -209,6 +236,7 @@ public partial class SlaveWindow
             DoReturnToFc = doReturnToFc,
             DoParseForXaDatabase = doParseForXaDatabase,
             DoLogoutOnComplete = doLogoutOnComplete,
+            DoKillGameOnComplete = doKillGameOnComplete,
             DoEnableArMultiOnComplete = doEnableArMulti,
         };
 

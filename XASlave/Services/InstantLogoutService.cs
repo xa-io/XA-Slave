@@ -57,10 +57,20 @@ public sealed class InstantLogoutService : IDisposable
         return true;
     }
 
-    public bool RequestLogout()
+    public bool RequestLogout(bool force = false)
     {
-        if (!enabled || requestContentsFinder == null || !clientState.IsLoggedIn)
+        if (!force && !enabled)
             return false;
+
+        if (!clientState.IsLoggedIn)
+            return false;
+
+        EnsureInitialized();
+        if (requestContentsFinder == null)
+        {
+            StatusText = "Unavailable - contents finder request signature missing.";
+            return false;
+        }
 
         try
         {
@@ -75,9 +85,9 @@ public sealed class InstantLogoutService : IDisposable
         }
     }
 
-    public bool RequestKillGame()
+    public bool RequestKillGame(bool force = false)
     {
-        if (!enabled)
+        if (!force && !enabled)
             return false;
 
         if (!clientState.IsLoggedIn)
@@ -86,7 +96,7 @@ public sealed class InstantLogoutService : IDisposable
             return true;
         }
 
-        if (!RequestLogout())
+        if (!RequestLogout(force))
             return false;
 
         killGamePending = true;

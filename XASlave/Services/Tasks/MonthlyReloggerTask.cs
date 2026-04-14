@@ -40,6 +40,7 @@ public sealed class MonthlyReloggerTask
     public bool DoReturnToFc { get; set; } = true;
     public bool DoParseForXaDatabase { get; set; } = true;
     public bool DoLogoutOnComplete { get; set; } = false;
+    public bool DoKillGameOnComplete { get; set; } = false;
     public bool DoEnableArMultiOnComplete { get; set; } = false;
 
     public MonthlyReloggerTask(Plugin plugin)
@@ -200,7 +201,7 @@ public sealed class MonthlyReloggerTask
             Name = "Relogger Summary",
             OnEnter = () =>
             {
-                if (!DoLogoutOnComplete)
+                if (!ShouldKeepLogoutCancelSuppressed(DoLogoutOnComplete, DoKillGameOnComplete))
                     runner.SuppressLogoutCancel = false;
 
                 if (runner.FailedCharacters.Count > 0)
@@ -218,26 +219,9 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 1f,
         });
 
-        if (DoLogoutOnComplete)
-            AddLogoutOnCompleteSteps(steps, runner);
+        AddSharedCompletionSteps(steps, runner, DoLogoutOnComplete, DoKillGameOnComplete, DoEnableArMultiOnComplete);
 
         // ── Optional: Re-enable AR Multi Mode after all characters processed ──
-        if (DoEnableArMultiOnComplete)
-        {
-            steps.Add(new TaskStep
-            {
-                Name = "Enable AR Multi Mode",
-                OnEnter = () =>
-                {
-                    runner.AddLog("Re-enabling AutoRetainer Multi Mode...");
-                    plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true);
-                },
-                IsComplete = () => true,
-                TimeoutSec = 3f,
-            });
-            steps.Add(MakeDelay("AR Enable Cooldown", 1.0f));
-        }
-
         steps.Add(MakeDelay("Final Cooldown", 1.0f));
 
         return steps;
@@ -1769,6 +1753,55 @@ public sealed class MonthlyReloggerTask
             },
             TimeoutSec = 6f,
         });
+    }
+
+    public static void AddKillGameOnCompleteSteps(List<TaskStep> steps, TaskRunner runner)
+    {
+        steps.Add(new TaskStep
+        {
+            Name = "Kill Game",
+            OnEnter = () =>
+            {
+                runner.AddLog("Triggering XA kill-game flow...");
+                if (Plugin.Instance!.InstantLogout.RequestKillGame(force: true))
+                    runner.AddLog("XA kill-game flow requested.");
+                else
+                    runner.AddLog("XA kill-game flow could not start.");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+
+        steps.Add(MakeDelay("Kill Game Request Cooldown", 1.0f));
+    }
+
+    public static void AddSharedCompletionSteps(List<TaskStep> steps, TaskRunner runner, bool logoutOnComplete, bool killGameOnComplete, bool enableArMultiOnComplete)
+    {
+        if (logoutOnComplete)
+            AddLogoutOnCompleteSteps(steps, runner);
+        else if (killGameOnComplete)
+            AddKillGameOnCompleteSteps(steps, runner);
+
+        if (!enableArMultiOnComplete)
+            return;
+
+        steps.Add(new TaskStep
+        {
+            Name = "Enable AR Multi Mode",
+            OnEnter = () =>
+            {
+                runner.AddLog("Re-enabling AutoRetainer Multi Mode...");
+                Plugin.Instance!.IpcClient.AutoRetainerSetMultiModeEnabled(true);
+            },
+            IsComplete = () => true,
+            TimeoutSec = 3f,
+        });
+        steps.Add(MakeDelay("AR Enable Cooldown", 1.0f));
+    }
+
+    public static bool ShouldKeepLogoutCancelSuppressed(bool logoutOnComplete, bool killGameOnComplete)
+    {
+        return logoutOnComplete || killGameOnComplete;
     }
 
     /// <summary>

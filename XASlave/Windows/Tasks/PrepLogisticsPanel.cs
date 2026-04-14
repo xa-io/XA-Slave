@@ -295,20 +295,9 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Task Options on Complete");
         var logoutOnComplete = cfg.PrepLogisticsLogoutOnComplete;
-        if (ImGui.Checkbox("Logout on completion##prepLogisticsLogout", ref logoutOnComplete))
-        {
-            cfg.PrepLogisticsLogoutOnComplete = logoutOnComplete;
-            cfg.Save();
-        }
-
+        var killGameOnComplete = cfg.PrepLogisticsKillGameOnComplete;
         var enableArMultiOnComplete = cfg.PrepLogisticsEnableArMultiOnComplete;
-        if (ImGui.Checkbox("Enable AR Multi Mode on completion##prepLogisticsArMulti", ref enableArMultiOnComplete))
-        {
-            cfg.PrepLogisticsEnableArMultiOnComplete = enableArMultiOnComplete;
-            cfg.Save();
-        }
 
         var targetDestination = GetPrepLogisticsDestinationLabel(cfg.PrepLogisticsTargetWorld, cfg.PrepLogisticsTargetAetheryte);
         if (!string.IsNullOrWhiteSpace(cfg.PrepLogisticsTargetWorld))
@@ -316,8 +305,13 @@ public partial class SlaveWindow
         else
             ImGui.TextDisabled("Target Destination: not selected");
         ImGui.TextDisabled("World is required. Location is optional.");
-
-        DrawTaskLog("prepLogistics", ref prepLogisticsShowLog, runner);
+        if (DrawSharedCompletionAndLogFooter("prepLogistics", "prepLogistics", ref logoutOnComplete, ref killGameOnComplete, ref enableArMultiOnComplete, ref prepLogisticsShowLog, runner))
+        {
+            cfg.PrepLogisticsLogoutOnComplete = logoutOnComplete;
+            cfg.PrepLogisticsKillGameOnComplete = killGameOnComplete;
+            cfg.PrepLogisticsEnableArMultiOnComplete = enableArMultiOnComplete;
+            cfg.Save();
+        }
     }
 
     private void DrawPrepLogisticsWorldSelector(XASlave.Configuration cfg)
@@ -541,6 +535,7 @@ public partial class SlaveWindow
             targetAetheryte,
             cfg.PrepLogisticsEnableArMultiOnComplete,
             cfg.PrepLogisticsLogoutOnComplete,
+            cfg.PrepLogisticsKillGameOnComplete,
             plugin.TaskRunner);
         reloggerRunList = new List<string>(selected);
         AutoOpenTaskLogIfVerbose(ref prepLogisticsShowLog);
@@ -551,7 +546,7 @@ public partial class SlaveWindow
         });
     }
 
-    private List<TaskStep> BuildPrepLogisticsSteps(List<string> characters, string targetWorld, string targetAetheryte, bool enableArMultiOnComplete, bool logoutOnComplete, TaskRunner runner)
+    private List<TaskStep> BuildPrepLogisticsSteps(List<string> characters, string targetWorld, string targetAetheryte, bool enableArMultiOnComplete, bool logoutOnComplete, bool killGameOnComplete, TaskRunner runner)
     {
         var steps = new List<TaskStep>();
         var targetDestination = GetPrepLogisticsDestinationLabel(targetWorld, targetAetheryte);
@@ -754,14 +749,14 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     runner.CompletedItems = Math.Min(runner.CompletedItems + 1, runner.TotalItems);
-                    var chars = plugin.Configuration.PrepLogisticsCharacters;
-                    for (var idx = 0; idx < chars.Count; idx++)
+
+                    if (relogFailed)
                     {
-                        if (!chars[idx].Equals(charName, StringComparison.OrdinalIgnoreCase))
-                            continue;
-                        prepLogisticsSelectedIndices.Remove(idx);
-                        break;
+                        runner.AddLog($"Prep Logistics: leaving {charName} checked because the relog failed.");
+                        return;
                     }
+
+                    UncheckPrepLogisticsCharacter(charName, runner);
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -773,7 +768,7 @@ public partial class SlaveWindow
             Name = "Prep Logistics Summary",
             OnEnter = () =>
             {
-                if (!logoutOnComplete)
+                if (!MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(logoutOnComplete, killGameOnComplete))
                     runner.SuppressLogoutCancel = false;
                 if (runner.FailedCharacters.Count > 0)
                     runner.AddLog($"══ SUMMARY: {characters.Count - runner.FailedCharacters.Count}/{characters.Count} character(s) processed for {targetDestination}, {runner.FailedCharacters.Count} failed ══");
@@ -784,24 +779,7 @@ public partial class SlaveWindow
             TimeoutSec = 1f,
         });
 
-        if (logoutOnComplete)
-            MonthlyReloggerTask.AddLogoutOnCompleteSteps(steps, runner);
-
-        if (enableArMultiOnComplete)
-        {
-            steps.Add(new TaskStep
-            {
-                Name = "Enable AR Multi Mode",
-                OnEnter = () =>
-                {
-                    runner.AddLog("Re-enabling AutoRetainer Multi Mode...");
-                    plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true);
-                },
-                IsComplete = () => true,
-                TimeoutSec = 3f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay("AR Enable Cooldown", 1.0f));
-        }
+        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, logoutOnComplete, killGameOnComplete, enableArMultiOnComplete);
 
         return steps;
     }
@@ -863,5 +841,20 @@ public partial class SlaveWindow
         return string.IsNullOrWhiteSpace(currentLocation)
             ? currentWorld
             : $"{currentWorld}, {currentLocation}";
+    }
+
+    private void UncheckPrepLogisticsCharacter(string characterName, TaskRunner runner)
+    {
+        var chars = plugin.Configuration.PrepLogisticsCharacters;
+        for (var idx = 0; idx < chars.Count; idx++)
+        {
+            if (!chars[idx].Equals(characterName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (prepLogisticsSelectedIndices.Remove(idx))
+                runner.AddLog($"Prep Logistics: unchecked {characterName} from the character list.");
+
+            break;
+        }
     }
 }

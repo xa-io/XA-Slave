@@ -396,19 +396,15 @@ public partial class SlaveWindow
             DrawXagmanPeersTable();
         ImGui.Spacing();
         var logoutOnComplete = cfg.XagmanLogoutOnComplete;
-        if (ImGui.Checkbox("Logout on completion##xagmanLogout", ref logoutOnComplete))
+        var killGameOnComplete = cfg.XagmanKillGameOnComplete;
+        var enableArMultiOnComplete = cfg.XagmanEnableArMultiOnComplete;
+        if (DrawSharedCompletionAndLogFooter("xagman", "xagman", ref logoutOnComplete, ref killGameOnComplete, ref enableArMultiOnComplete, ref xagmanShowLog, runner))
         {
             cfg.XagmanLogoutOnComplete = logoutOnComplete;
-            cfg.Save();
-        }
-        ImGui.SameLine();
-        var enableArMultiOnComplete = cfg.XagmanEnableArMultiOnComplete;
-        if (ImGui.Checkbox("Enable AR Multi Mode on completion##xagmanArMulti", ref enableArMultiOnComplete))
-        {
+            cfg.XagmanKillGameOnComplete = killGameOnComplete;
             cfg.XagmanEnableArMultiOnComplete = enableArMultiOnComplete;
             cfg.Save();
         }
-        DrawTaskLog("xagman", ref xagmanShowLog, runner);
     }
 
     private void DrawXagmanBetaWarningBlock()
@@ -418,7 +414,7 @@ public partial class SlaveWindow
 
         ImGui.TextColored(warningColor, "WARNING: Xagman is in beta release. Do not leave it unmonitored.");
         ImGui.TextWrapped("Recommended: enable Show Log while running Xagman. For best debugging and reporting, use Plugin Operations > Verbose Task Logging so issue reports include deeper task details.");
-        ImGui.TextWrapped("Recommended: enable Logout on completion or Enable AR Multi Mode on completion so characters are not left idle in game.");
+        ImGui.TextWrapped("Recommended: enable Logout on completion, Kill Game on completion, or Enable AR Multi Mode on completion so characters are not left idle in game.");
         ImGui.Spacing();
         ImGui.TextColored(infoColor, "First-time setup");
         ImGui.TextWrapped("1. Click Import from AutoRetainer to build the initial character list. AutoRetainer can only import characters it already knows how to log into, so each character must have been logged in at least once for AutoRetainer to register it.");
@@ -3365,19 +3361,7 @@ public partial class SlaveWindow
                 xagmanStatusText = $"Xagman failure recall return did not complete cleanly for {localCharacter}.";
                 runner.AddLog($"Xagman: failure recall could not confirm /li fc return for {localCharacter}.");
             });
-        if (cfg.XagmanLogoutOnComplete)
-            MonthlyReloggerTask.AddLogoutOnCompleteSteps(steps, runner);
-        if (cfg.XagmanEnableArMultiOnComplete)
-        {
-            steps.Add(new TaskStep
-            {
-                Name = "Xagman Enable AR Multi",
-                OnEnter = () => plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true),
-                IsComplete = () => true,
-                TimeoutSec = 2f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay("Xagman AR Enable Cooldown", 1.0f));
-        }
+        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete);
         plugin.TaskRunner.Start("Xagman", steps, onFinished: () => FinalizeXagmanLocalShutdown("failure recall"), onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"));
     }
 
@@ -3472,19 +3456,7 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
-        if (cfg.XagmanLogoutOnComplete)
-            MonthlyReloggerTask.AddLogoutOnCompleteSteps(steps, runner);
-        if (cfg.XagmanEnableArMultiOnComplete)
-        {
-            steps.Add(new TaskStep
-            {
-                Name = "Xagman Enable AR Multi",
-                OnEnter = () => plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true),
-                IsComplete = () => true,
-                TimeoutSec = 2f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay("Xagman AR Enable Cooldown", 1.0f));
-        }
+        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete);
         plugin.TaskRunner.Start("Xagman", steps, onFinished: () => FinalizeXagmanLocalShutdown("Franchise Owner peer completion"), onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"));
     }
 
@@ -4618,7 +4590,7 @@ public partial class SlaveWindow
                 xagmanStatusText = runner.FailedCharacters.Count == 0
                     ? "Franchise Owner run completed."
                     : $"Franchise Owner run finished with {runner.FailedCharacters.Count} failures.";
-                runner.SuppressLogoutCancel = !cfg.XagmanLogoutOnComplete;
+                runner.SuppressLogoutCancel = !MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete);
             },
             IsComplete = () => true,
             TimeoutSec = 1f,
@@ -4655,19 +4627,7 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
-        if (cfg.XagmanLogoutOnComplete)
-            MonthlyReloggerTask.AddLogoutOnCompleteSteps(steps, runner);
-        if (cfg.XagmanEnableArMultiOnComplete)
-        {
-            steps.Add(new TaskStep
-            {
-                Name = "Xagman Enable AR Multi",
-                OnEnter = () => plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true),
-                IsComplete = () => true,
-                TimeoutSec = 2f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay("Xagman AR Enable Cooldown", 1.0f));
-        }
+        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete);
         return steps;
     }
 
@@ -5261,7 +5221,7 @@ public partial class SlaveWindow
                             runner.AddLog($"Xagman: completion warning: {line}");
                     }
                 }
-                runner.SuppressLogoutCancel = !cfg.XagmanLogoutOnComplete;
+                runner.SuppressLogoutCancel = !MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete);
                 UpdateXagmanTonyTaskRunnerProgress();
             },
             IsComplete = () => true,
@@ -5293,19 +5253,7 @@ public partial class SlaveWindow
                     xagmanStatusText = $"Tony {tonyCharacter} return-to-FC attempt failed to start cleanly.";
                 });
         }
-        if (cfg.XagmanLogoutOnComplete)
-            MonthlyReloggerTask.AddLogoutOnCompleteSteps(steps, runner);
-        if (cfg.XagmanEnableArMultiOnComplete)
-        {
-            steps.Add(new TaskStep
-            {
-                Name = "Xagman Enable AR Multi",
-                OnEnter = () => plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true),
-                IsComplete = () => true,
-                TimeoutSec = 2f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay("Xagman AR Enable Cooldown", 1.0f));
-        }
+        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete);
         plugin.TaskRunner.Start("Xagman", steps, onFinished: () => FinalizeXagmanLocalShutdown("Tony completion", disconnectBeforeStop: true), onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"));
     }
 

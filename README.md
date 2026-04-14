@@ -6,18 +6,19 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 
 ## Key Features
 
-- **AutoRetainer Tasks** - Run pre-processing, post-processing, bailout handling, sync cadence gates, and optional collection steps from one panel.
+- **AutoRetainer Tasks** - Run pre-processing, post-processing, bailout handling, sync cadence gates, and optional collection steps from one panel, including a workshop-only `Check FC Chest For Gil` pass that syncs Company Chest gil into XA Database before AutoRetainer continues.
 - **Save to XA Database** - Push data to XA Database with optional cadence-gated login collection and a built-in task log for collection/save debugging.
 - **Auto-Glam Weather** - Configure per-weather glamour plate lists, then randomly apply valid class/job and plate choices when the active weather changes.
 - **City Chat Flooder** - Send announcements across selected worlds and cities with looping and delay controls.
-- **Xagman** - Coordinate cross-client Tony / Franchise Owner FC trading with configurable same-PC or LAN hub support, XA-owned `/xa db ...` Dropbox queueing, `Give` / `Take` / `Balance` routing, item-list imports and exports, supplier matching with an optional `Ignore Gil in Select Matching Items` filter, standby queue control, optional FC-return cleanup, and safer trade recovery. Available in normal Release builds.
-- **Monthly Relogger** - Cycle through characters with AutoRetainer integration, XA Database-backed rank and personal-plot visibility, failure highlighting, and optional per-character actions.
-- **Prep Logistics** - Relog selected characters, see available main-inventory space, move them to a target world or location, and optionally enable AR multi or logout after the run.
+- **Xagman** - Coordinate cross-client Tony / Franchise Owner FC trading with configurable same-PC or LAN hub support, `/xa db ...` Dropbox queueing, `Give` / `Take` / `Balance` routing, item-list imports and exports, supplier matching with an optional `Ignore Gil in Select Matching Items` filter, standby queue control, optional FC-return cleanup, safer trade recovery, and shared task completion actions. Available in normal Release builds.
+- **Monthly Relogger** - Cycle through characters with AutoRetainer integration, XA Database-backed rank and personal-plot visibility, failure highlighting, optional per-character actions, and shared task completion actions.
+- **Shared Task Completion Options** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` all share the same `Task Options on Complete` footer with `Logout`, `Kill Game`, and `Enable AR Multi Mode`. `Kill Game` always uses XA's hard logout + close-client flow even if `Instant Logout` is disabled in XA Mods.
+- **Prep Logistics** - Relog selected characters, see available main-inventory space, move them to a target world or location, and finish through the shared task completion actions.
 - **Auto-Accept FC Invites** - Monitor for FC invitations, automatically accept them, wait for a configurable period, and optionally leave again through the built-in floater-assist flow.
-- **FC Permissions Updater** - Review FC rosters with member-rank and FC-rank visibility before running shared permissions updates.
-- **Check Duplicate Plots** - Scan characters for duplicate housing plots and optionally rerun follow-up actions.
-- **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared action flow.
-- **Refresh AR Subs/Bell** - Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, and safer menu recovery.
+- **FC Permissions Updater** - Review FC rosters with member-rank and FC-rank visibility before running shared permissions updates and the shared completion actions.
+- **Check Duplicate Plots** - Scan characters for duplicate housing plots and optionally rerun follow-up actions with the shared completion actions.
+- **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared action flow and shared completion actions.
+- **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, safer menu recovery, a workshop-side Company Chest gil sync into XA Database after the bell path finishes, and shared completion actions.
 - **Window Renamer** - Rename the FFXIV game window with an optional custom title, process-ID prefix, and current-character suffix.
 - **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, a live enabled counter, `Show Only Enabled`, `Disable All Mods`, preset save/load, clipboard `Export` / `Import`, inline help, and direct `/xa xamods` navigation.
 
@@ -42,7 +43,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Export Data** - Export multi-character tables from AutoRetainer, Lifestream, and XA Database into timestamped TSV or CSV snapshots.
 - **Repo List** - Review commonly required custom plugin repositories with installer/settings shortcuts, plugin presence checks, and copy-to-clipboard repo URLs.
 - **IPC Calls Available** - Review the IPC integrations XA Slave can talk to, along with cached/live availability checks for supported plugins and the XA Slave provider channels other plugins can call, including `XASlave.ExecuteCommand` for the shipped `/xa` command surface plus simple direct-call examples such as `XASlave.ExecuteCommand("xamods")` shown directly in the XA Slave provider block.
-- **Commands** - Review the current XA-owned slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, and `Plugin Mods`, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
+- **Commands** - Review the current XA slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, and `Plugin Mods`, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
 - **Splash Screen** - Return to the default XA Slave landing page with the website, Discord, and first-time guidance without needing the ctrl-click unselect shortcut.
 - **Priority Tasks** - Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
 
@@ -50,7 +51,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 
 ## Commands
 
-The in-plugin `References > Commands` page is the full source of truth for descriptions and notes. The same XA-owned command surface can also be driven over IPC through `XASlave.ExecuteCommand` by passing the text you would normally enter after `/xa`. The main shipped `/xa` surface includes:
+The in-plugin `References > Commands` page is the full source of truth for descriptions and notes. The same XA command surface can also be driven over IPC through `XASlave.ExecuteCommand` by passing the text you would normally enter after `/xa`. The main shipped `/xa` surface includes:
 
 ### General
 

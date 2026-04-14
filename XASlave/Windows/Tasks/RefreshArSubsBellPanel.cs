@@ -25,7 +25,8 @@ namespace XASlave.Windows;
 ///   5. Check if AutoRetainer is Busy, if not press ESC after 2s
 ///   6. Target and walk to Summoning Bell, interact
 ///   7. Check if AutoRetainer is Busy, if not press ESC after 2s
-///   8. CharacterSafeWait, next character
+///   8. If still inside the workshop, target Company Chest, path to 1.5y, save FC chest gil to XA Database, and close the window
+///   9. CharacterSafeWait, next character
 /// </summary>
 public partial class SlaveWindow
 {
@@ -38,6 +39,7 @@ public partial class SlaveWindow
     private float refreshSubsExtraWait = 3.0f;
     private bool refreshSubsArSuppressedByTask;
     private bool refreshSubsDoLogoutOnComplete;
+    private bool refreshSubsDoKillGameOnComplete;
     private bool refreshSubsDoEnableArMulti = true;
     private bool refreshSubsDoOpenArmoury;
     private bool refreshSubsDoOpenSaddlebags;
@@ -75,7 +77,7 @@ public partial class SlaveWindow
         var chars = cfg.RefreshSubsCharacters;
         EnsureRefreshSubsActionOptionsInitialized();
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Refresh AR Subs/Bell");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Refresh Sub/Bell/Chest");
         ImGui.TextDisabled("Rotate characters, teleport to FC house, interact with sub console & summoning bell.\n\nTHIS REQUIRES LIFESTREAM TO HAVE PATH TO THE DOOR\nAND TO ENTER THE HOUSE, IF NOT IT WILL FAIL!");
         ImGui.Spacing();
 
@@ -135,7 +137,9 @@ public partial class SlaveWindow
         ImGui.BeginGroup();
         ImGui.AlignTextToFramePadding();
         ImGui.TextUnformatted("Enter Workshop and tap the Voyage Console and Summoning bell to refresh AutoRetainer.");
+        ImGui.TextUnformatted("While inside the workshop, XA Slave also checks Company Chest gil for XA Database before resuming AR.");
         ImGui.TextUnformatted("If not selected it will only collect the summoning bell inside the plot.");
+        ImGui.Spacing();
         ImGui.EndGroup();
         if (ImGui.IsItemClicked())
             refreshSubsGoWorkshop = !refreshSubsGoWorkshop;
@@ -154,7 +158,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // ── Run controls ──
-        var isRunning = plugin.TaskRunner.IsRunning && plugin.TaskRunner.CurrentTaskName == "Refresh AR Subs/Bell";
+        var isRunning = plugin.TaskRunner.IsRunning
+            && (plugin.TaskRunner.CurrentTaskName == "Refresh Sub/Bell/Chest"
+                || plugin.TaskRunner.CurrentTaskName == "Refresh AR Subs/Bell");
         if (isRunning)
         {
             var progress = plugin.TaskRunner.TotalItems > 0 ? (float)plugin.TaskRunner.CompletedItems / plugin.TaskRunner.TotalItems : 0f;
@@ -382,7 +388,7 @@ public partial class SlaveWindow
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Opens /housing, checks Apartment, Private Estate, and Shared Estate signboards when available,\nand triggers XA Database saves after each housing pass.");
 
-        DrawSharedCompletionAndLogFooter("refreshSubs", "refreshSubs", ref refreshSubsDoLogoutOnComplete, ref refreshSubsDoEnableArMulti, ref refreshSubsShowLog, plugin.TaskRunner);
+        DrawSharedCompletionAndLogFooter("refreshSubs", "refreshSubs", ref refreshSubsDoLogoutOnComplete, ref refreshSubsDoKillGameOnComplete, ref refreshSubsDoEnableArMulti, ref refreshSubsShowLog, plugin.TaskRunner);
     }
 
     private List<string> GetSelectedRefreshSubsCharacters()
@@ -424,7 +430,7 @@ public partial class SlaveWindow
             .Select(i => chars[i])
             .ToList();
 
-        HaltAutoCollectionForPriorityTask("Refresh AR Subs/Bell");
+        HaltAutoCollectionForPriorityTask("Refresh Sub/Bell/Chest");
 
         refreshSubsArSuppressedByTask = false;
 
@@ -433,7 +439,7 @@ public partial class SlaveWindow
         // Set reloggerRunList for DrawProcessingList
         reloggerRunList = new List<string>(selected);
 
-        plugin.TaskRunner.Start("Refresh AR Subs/Bell", steps, onFinished: () =>
+        plugin.TaskRunner.Start("Refresh Sub/Bell/Chest", steps, onFinished: () =>
         {
             ReleaseRefreshSubsArSuppression();
         }, onLog: (msg) =>
@@ -520,6 +526,12 @@ public partial class SlaveWindow
                     catch { return false; }
                 },
                 TimeoutSec = 600f,
+                OnTimeout = () =>
+                {
+                    relogState.Failed = true;
+                    runner.FailedCharacters.Add(charName);
+                    runner.AddLog($"FAILED: Could not relog to {charName}. Leaving the character checked.");
+                },
             });
 
             // SafeWait 3-pass
@@ -611,6 +623,7 @@ public partial class SlaveWindow
                 AddRefreshSubsSuppressArSteps(steps, runner, charName, "Sub/Bell");
                 AddRefreshSubsSubConsoleSteps(steps, runner, charName);
                 AddRefreshSubsBellSteps(steps, runner, charName);
+                AddRefreshSubsFcChestSteps(steps, runner, charName);
                 AddRefreshSubsResumeArSteps(steps, runner, charName, "sub/bell");
             }
             else
@@ -635,7 +648,14 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     runner.CompletedItems = capturedIndex;
+                    if (relogState.Failed)
+                    {
+                        runner.AddLog($"Skipped {capturedName} ({capturedIndex}/{charTotal}) - relog failed");
+                        return;
+                    }
+
                     runner.AddLog($"Finished {capturedName} ({capturedIndex}/{charTotal})");
+                    UncheckRefreshSubsCharacter(capturedName, runner);
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -645,35 +665,23 @@ public partial class SlaveWindow
         // Summary
         steps.Add(new TaskStep
         {
-            Name = "Refresh Subs/Bell Summary",
+            Name = "Refresh Sub/Bell/Chest Summary",
             OnEnter = () =>
             {
-                if (!refreshSubsDoLogoutOnComplete)
+                if (!MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(refreshSubsDoLogoutOnComplete, refreshSubsDoKillGameOnComplete))
                     runner.SuppressLogoutCancel = false;
+                if (runner.FailedCharacters.Count > 0)
+                {
+                    runner.AddLog($"Refresh Sub/Bell/Chest summary: {characters.Count - runner.FailedCharacters.Count}/{characters.Count} character(s) processed, {runner.FailedCharacters.Count} failed.");
+                    return;
+                }
                 runner.AddLog($"══ SUMMARY: All {characters.Count} character(s) processed ══");
             },
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
 
-        if (refreshSubsDoLogoutOnComplete)
-            MonthlyReloggerTask.AddLogoutOnCompleteSteps(steps, runner);
-
-        if (refreshSubsDoEnableArMulti)
-        {
-            steps.Add(new TaskStep
-            {
-                Name = "Enable AR Multi Mode",
-                OnEnter = () =>
-                {
-                    runner.AddLog("Re-enabling AutoRetainer Multi Mode...");
-                    plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true);
-                },
-                IsComplete = () => true,
-                TimeoutSec = 3f,
-            });
-            steps.Add(MonthlyReloggerTask.MakeDelay("AR Enable Cooldown", 1.0f));
-        }
+        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, refreshSubsDoLogoutOnComplete, refreshSubsDoKillGameOnComplete, refreshSubsDoEnableArMulti);
 
         steps.Add(MonthlyReloggerTask.MakeDelay("Final Cooldown", 1.0f));
 
@@ -871,14 +879,14 @@ public partial class SlaveWindow
         steps.Add(MonthlyReloggerTask.MakeDelay($"Teleport {label} Settle: {charName}", 1.0f));
     }
 
-    private static void AddRefreshSubsAddonExitSequenceSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName)
+    private static void AddRefreshSubsAddonExitSequenceSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName, Func<bool>? shouldSkip = null)
     {
-        AddRefreshSubsAddonCloseSteps(steps, runner, charName, $"{label} Close", addonName);
-        AddRefreshSubsGuardedSafeWaitSteps(steps, runner, charName, $"{label} SafeWait", addonName);
-        AddRefreshSubsAddonCloseSteps(steps, runner, charName, $"{label} Final Close Check", addonName);
+        AddRefreshSubsAddonCloseSteps(steps, runner, charName, $"{label} Close", addonName, shouldSkip);
+        AddRefreshSubsGuardedSafeWaitSteps(steps, runner, charName, $"{label} SafeWait", addonName, shouldSkip);
+        AddRefreshSubsAddonCloseSteps(steps, runner, charName, $"{label} Final Close Check", addonName, shouldSkip);
     }
 
-    private static void AddRefreshSubsAddonCloseSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName)
+    private static void AddRefreshSubsAddonCloseSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName, Func<bool>? shouldSkip = null)
     {
         DateTime lastCheck = DateTime.MinValue;
         var clearChecks = 0;
@@ -887,6 +895,7 @@ public partial class SlaveWindow
         steps.Add(new TaskStep
         {
             Name = $"{label}: {charName}",
+            ShouldSkip = shouldSkip,
             OnEnter = () =>
             {
                 lastCheck = DateTime.UtcNow.AddSeconds(-1.0);
@@ -923,7 +932,7 @@ public partial class SlaveWindow
         });
     }
 
-    private static void AddRefreshSubsGuardedSafeWaitSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName)
+    private static void AddRefreshSubsGuardedSafeWaitSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName, Func<bool>? shouldSkip = null)
     {
         for (int pass = 1; pass <= 3; pass++)
         {
@@ -933,6 +942,7 @@ public partial class SlaveWindow
             steps.Add(new TaskStep
             {
                 Name = $"{label} [pass {capturedPass}/3]: {charName}",
+                ShouldSkip = shouldSkip,
                 OnEnter = () =>
                 {
                     lastEscAt = DateTime.UtcNow.AddSeconds(-1.0);
@@ -1070,6 +1080,203 @@ public partial class SlaveWindow
         AddRefreshSubsAddonExitSequenceSteps(steps, runner, charName, "Retainer List Recovery", "RetainerList");
     }
 
+    private static void AddRefreshSubsFcChestSteps(List<TaskStep> steps, TaskRunner runner, string charName)
+    {
+        var skipFcChest = false;
+        var fcChestRecoveryPhase = 0;
+        var fcChestRecoveryAttempts = 0;
+        var fcChestRecoveryPhaseStartedAt = DateTime.MinValue;
+        const int maxFcChestRecoveryAttempts = 2;
+        const float fcChestRecoveryMoveSeconds = 0.5f;
+        const float fcChestRecoveryResetDelaySeconds = 0.25f;
+        const float fcChestRecoveryRetrySettleSeconds = 0.35f;
+
+        steps.Add(new TaskStep
+        {
+            Name = $"FC Chest Check: {charName}",
+            OnEnter = () =>
+            {
+                var plugin = Plugin.Instance!;
+                var zoneName = AddonHelper.GetCurrentZoneName();
+                if (!plugin.IpcClient.IsXaDatabaseAvailable())
+                {
+                    runner.AddLog("XA Database not available - skipping FC chest gil capture.");
+                    skipFcChest = true;
+                }
+                else if (!AddonHelper.IsInWorkshop())
+                {
+                    runner.AddLog($"Current zone '{zoneName}' does not match Company Workshop - skipping FC chest gil capture.");
+                    skipFcChest = true;
+                }
+                else if (!plugin.IpcClient.VnavIsReady())
+                {
+                    runner.AddLog("vnav not available - skipping FC chest gil capture.");
+                    skipFcChest = true;
+                }
+                else
+                {
+                    runner.AddLog($"Current zone '{zoneName}' matches Company Workshop - checking FC chest for gil...");
+                }
+            },
+            IsComplete = () => true,
+            TimeoutSec = 2f,
+        });
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Target FC Chest: {charName}",
+            ShouldSkip = () => skipFcChest,
+            OnEnter = () =>
+            {
+                runner.AddLog("Targeting Company Chest...");
+                AddonHelper.TargetByName("Company Chest");
+            },
+            IsComplete = () => AddonHelper.CurrentTargetMatches("Company Chest"),
+            TimeoutSec = 3f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"FC Chest Target Delay: {charName}", 0.5f, () => skipFcChest));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Path to FC Chest: {charName}",
+            ShouldSkip = () => skipFcChest,
+            OnEnter = () =>
+            {
+                runner.AddLog("Pathing to Company Chest (1.5y stop)...");
+                AddonHelper.TryPathToCurrentTarget(1.5f);
+            },
+            IsComplete = () => AddonHelper.IsCurrentTargetWithinStopDistanceAndStopped("Company Chest", 1.5f),
+            TimeoutSec = 20f,
+            OnTimeout = () =>
+            {
+                runner.AddLog("FC chest pathing timed out; skipping FC chest gil capture.");
+                skipFcChest = true;
+                Plugin.Instance!.IpcClient.VnavStop();
+            },
+        });
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Interact FC Chest: {charName}",
+            ShouldSkip = () => skipFcChest,
+            OnEnter = () =>
+            {
+                fcChestRecoveryPhase = 0;
+                fcChestRecoveryAttempts = 0;
+                fcChestRecoveryPhaseStartedAt = DateTime.MinValue;
+                runner.AddLog("Interacting with Company Chest...");
+                AddonHelper.DismissTextError();
+                AddonHelper.InteractWithTarget();
+            },
+            IsComplete = () =>
+            {
+                if (AddonHelper.IsAddonVisible("FreeCompanyChest"))
+                    return true;
+
+                var now = DateTime.UtcNow;
+
+                if (fcChestRecoveryPhase == 1)
+                {
+                    if ((now - fcChestRecoveryPhaseStartedAt).TotalSeconds >= fcChestRecoveryMoveSeconds)
+                    {
+                        Plugin.Instance!.IpcClient.VnavStop();
+                        runner.AddLog("Company Chest recovery: stopping brief re-path and resetting camera.");
+                        AddonHelper.ResetCamera();
+                        AddonHelper.DismissTextError();
+                        fcChestRecoveryPhase = 2;
+                        fcChestRecoveryPhaseStartedAt = now;
+                    }
+
+                    return false;
+                }
+
+                if (fcChestRecoveryPhase == 2)
+                {
+                    if ((now - fcChestRecoveryPhaseStartedAt).TotalSeconds >= fcChestRecoveryResetDelaySeconds)
+                    {
+                        runner.AddLog("Retrying Company Chest interaction after reset camera...");
+                        AddonHelper.TargetByName("Company Chest");
+                        AddonHelper.DismissTextError();
+                        AddonHelper.InteractWithTarget();
+                        fcChestRecoveryPhase = 3;
+                        fcChestRecoveryPhaseStartedAt = now;
+                    }
+
+                    return false;
+                }
+
+                if (fcChestRecoveryPhase == 3)
+                {
+                    if ((now - fcChestRecoveryPhaseStartedAt).TotalSeconds < fcChestRecoveryRetrySettleSeconds)
+                        return false;
+
+                    fcChestRecoveryPhase = 0;
+                }
+
+                if (AddonHelper.TryGetCannotSeeTargetTextError(out var matchedText))
+                {
+                    if (fcChestRecoveryAttempts >= maxFcChestRecoveryAttempts)
+                    {
+                        runner.AddLog($"Company Chest interaction still reports _TextError '{matchedText}' after {maxFcChestRecoveryAttempts} recovery attempts - skipping FC chest gil capture.");
+                        AddonHelper.DismissTextError();
+                        skipFcChest = true;
+                        return true;
+                    }
+
+                    fcChestRecoveryAttempts++;
+                    runner.AddLog($"Company Chest interaction reported _TextError '{matchedText}' - re-pathing for 0.5s, stopping vnav, and resetting camera ({fcChestRecoveryAttempts}/{maxFcChestRecoveryAttempts}).");
+                    AddonHelper.DismissTextError();
+                    AddonHelper.TryPathToCurrentTarget(1.5f);
+                    fcChestRecoveryPhase = 1;
+                    fcChestRecoveryPhaseStartedAt = now;
+                    return false;
+                }
+
+                return false;
+            },
+            TimeoutSec = 12f,
+            OnTimeout = () =>
+            {
+                runner.AddLog("FreeCompanyChest did not open after Company Chest interaction/recovery; skipping FC chest gil capture.");
+                skipFcChest = true;
+            },
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"FC Chest Load Delay: {charName}", 0.5f, () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest")));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"FC Chest Save: {charName}",
+            ShouldSkip = () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest"),
+            OnEnter = () =>
+            {
+                runner.AddLog("Saving FC chest gil to XA Database...");
+                if (Plugin.Instance!.SaveToXaDatabaseAndRecordSync())
+                    runner.AddLog("Saved FC chest gil to XA Database.");
+                else
+                    runner.AddLog("XA Database FC chest save failed.");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 3f,
+        });
+        steps.Add(MonthlyReloggerTask.MakeDelay($"FC Chest Save Delay: {charName}", 0.5f, () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest")));
+
+        steps.Add(new TaskStep
+        {
+            Name = $"FC Chest Close: {charName}",
+            ShouldSkip = () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest"),
+            OnEnter = () => runner.AddLog("Closing FC chest window..."),
+            IsComplete = () => true,
+            TimeoutSec = 1f,
+        });
+        AddRefreshSubsAddonExitSequenceSteps(
+            steps,
+            runner,
+            charName,
+            "FC Chest Recovery",
+            "FreeCompanyChest",
+            () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest"));
+    }
+
     private void AddRefreshSubsResumeArSteps(List<TaskStep> steps, TaskRunner runner, string charName, string sequenceLabel)
     {
         steps.Add(new TaskStep
@@ -1079,7 +1286,7 @@ public partial class SlaveWindow
             {
                 if (!refreshSubsArSuppressedByTask)
                 {
-                    runner.AddVerboseLog($"Refresh AR Subs/Bell did not own AutoRetainer suppression for this {sequenceLabel} sequence; leaving it unchanged.");
+                    runner.AddVerboseLog($"Refresh Sub/Bell/Chest did not own AutoRetainer suppression for this {sequenceLabel} sequence; leaving it unchanged.");
                     return;
                 }
 
@@ -1093,8 +1300,24 @@ public partial class SlaveWindow
         steps.Add(MonthlyReloggerTask.MakeDelay($"Resume AR Wait: {charName}", 0.5f));
     }
 
+    private void UncheckRefreshSubsCharacter(string characterName, TaskRunner runner)
+    {
+        var chars = plugin.Configuration.RefreshSubsCharacters;
+        for (var idx = 0; idx < chars.Count; idx++)
+        {
+            if (!chars[idx].Equals(characterName, StringComparison.OrdinalIgnoreCase))
+                continue;
+
+            if (refreshSubsSelectedIndices.Remove(idx))
+                runner.AddLog($"Refresh Sub/Bell/Chest: unchecked {characterName} from the character list.");
+
+            break;
+        }
+    }
+
     private class RefreshSubsRelogState
     {
         public bool Ready;
+        public bool Failed;
     }
 }

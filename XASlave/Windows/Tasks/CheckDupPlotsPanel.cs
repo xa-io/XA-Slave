@@ -31,6 +31,7 @@ public partial class SlaveWindow
     private bool dupDoReturnToFc = true;
     private bool dupDoParseForXaDatabase = true;
     private bool dupDoLogoutOnComplete;
+    private bool dupDoKillGameOnComplete;
     private bool dupDoEnableArMulti = true;
 
     // ───────────────────────────────────────────────
@@ -171,7 +172,7 @@ public partial class SlaveWindow
                 () => StartTaskWithConfig("Check Duplicate Plots", selectedChars, dupPlotsSelectedIndices,
                     dupDoTextAdvance, dupDoRemoveSprout, dupDoOpenInventory, dupDoOpenArmoury,
                     dupDoOpenSaddlebags, dupDoOpenJournal, dupDoReturnToHome, dupDoCollectPersonalPlotInfo,
-                    dupDoReturnToFc, dupDoParseForXaDatabase, dupDoLogoutOnComplete, dupDoEnableArMulti),
+                    dupDoReturnToFc, dupDoParseForXaDatabase, dupDoLogoutOnComplete, dupDoKillGameOnComplete, dupDoEnableArMulti),
                 "Select at least one character and ensure required plugins are loaded.");
             if (started)
                 AutoOpenTaskLogIfVerbose(ref dupPlotsShowLog);
@@ -299,7 +300,7 @@ public partial class SlaveWindow
         ImGui.Checkbox("Parse for XA Database (FC window + save)##dup", ref dupDoParseForXaDatabase);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Opens FC window, navigates Members/Info/Housing tabs to collect\nall FC data, then saves to XA Database.");
-        DrawSharedCompletionAndLogFooter("dup", "duplog", ref dupDoLogoutOnComplete, ref dupDoEnableArMulti, ref dupPlotsShowLog, runner);
+        DrawSharedCompletionAndLogFooter("dup", "duplog", ref dupDoLogoutOnComplete, ref dupDoKillGameOnComplete, ref dupDoEnableArMulti, ref dupPlotsShowLog, runner);
     }
 
     private void RefreshDupPlotsList()

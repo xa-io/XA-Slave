@@ -61,6 +61,7 @@ public sealed class ArPostProcessService : IDisposable
     private bool preProcessFrameworkHooked;
     private bool preProcessLoginSubscribed;
     private bool postProcessIpcSubscribed;
+    private bool postProcessArSuppressedByTask;
     private bool shipBailoutFrameworkHooked;
     private readonly Dictionary<string, DateTime> shipBailoutAddonVisibleSince = new(StringComparer.Ordinal);
     private bool shipBailoutShouldUnsuppressAtEnd;
@@ -167,7 +168,10 @@ public sealed class ArPostProcessService : IDisposable
             else if (wasPreProcess)
                 plugin.IpcClient.AutoRetainerSetSuppressed(false);
             else
+            {
+                ReleasePostProcessArSuppression();
                 plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
+            }
         }
     }
 
@@ -754,6 +758,7 @@ public sealed class ArPostProcessService : IDisposable
             return;
         }
 
+        AcquirePostProcessArSuppression();
         StartStepMachine($"post-processing for {charName}");
     }
 
@@ -985,6 +990,237 @@ public sealed class ArPostProcessService : IDisposable
             steps.Add(new PostProcessStep { Name = "FC: Cooldown", IsComplete = () => skipFc || DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
+        if (config.ArPostProcessCheckFcChestForGil)
+        {
+            var skipFcChest = false;
+            var fcChestClosedChecks = 0;
+            var fcChestLastEscAt = DateTime.MinValue;
+            var fcChestRecoveryPhase = 0;
+            var fcChestRecoveryAttempts = 0;
+            var fcChestRecoveryPhaseStartedAt = DateTime.MinValue;
+            const int maxFcChestRecoveryAttempts = 2;
+            const float fcChestRecoveryMoveSeconds = 0.5f;
+            const float fcChestRecoveryResetDelaySeconds = 0.25f;
+            const float fcChestRecoveryRetrySettleSeconds = 0.35f;
+
+            steps.Add(new PostProcessStep
+            {
+                Name = "FC Chest: Check Eligibility",
+                OnEnter = () =>
+                {
+                    var zoneName = AddonHelper.GetCurrentZoneName();
+                    if (!plugin.IpcClient.IsXaDatabaseAvailable())
+                    {
+                        AddLog("XA Database not available - skipping FC chest gil capture.");
+                        skipFcChest = true;
+                    }
+                    else if (!AddonHelper.IsInWorkshop())
+                    {
+                        AddLog($"Current zone '{zoneName}' does not match Company Workshop - skipping FC chest gil capture.");
+                        skipFcChest = true;
+                    }
+                    else if (!plugin.IpcClient.VnavIsReady())
+                    {
+                        AddLog("vnav not available - skipping FC chest gil capture.");
+                        skipFcChest = true;
+                    }
+                    else
+                    {
+                        AddLog($"Current zone '{zoneName}' matches Company Workshop - checking FC chest for gil...");
+                    }
+                },
+                IsComplete = () => true,
+                TimeoutSec = 2f,
+            });
+
+            steps.Add(new PostProcessStep
+            {
+                Name = "FC Chest: Target",
+                ShouldSkip = () => skipFcChest,
+                OnEnter = () =>
+                {
+                    AddLog("Targeting Company Chest...");
+                    AddonHelper.TargetByName("Company Chest");
+                },
+                IsComplete = () => AddonHelper.CurrentTargetMatches("Company Chest"),
+                TimeoutSec = 3f,
+            });
+            steps.Add(new PostProcessStep
+            {
+                Name = "FC Chest: Target Delay",
+                ShouldSkip = () => skipFcChest,
+                IsComplete = () => DelayComplete(0.5f),
+                TimeoutSec = 1f,
+            });
+
+            steps.Add(new PostProcessStep
+            {
+                Name = "FC Chest: Path Into Range",
+                ShouldSkip = () => skipFcChest,
+                OnEnter = () =>
+                {
+                    AddLog("Pathing to Company Chest (1.5y stop)...");
+                    AddonHelper.TryPathToCurrentTarget(1.5f);
+                },
+                IsComplete = () => AddonHelper.IsCurrentTargetWithinStopDistanceAndStopped("Company Chest", 1.5f),
+                TimeoutSec = 20f,
+                OnTimeout = () =>
+                {
+                    AddLog("FC chest pathing timed out - skipping FC chest gil capture.");
+                    skipFcChest = true;
+                    plugin.IpcClient.VnavStop();
+                },
+            });
+
+            steps.Add(new PostProcessStep
+            {
+                Name = "FC Chest: Interact",
+                ShouldSkip = () => skipFcChest,
+                OnEnter = () =>
+                {
+                    fcChestRecoveryPhase = 0;
+                    fcChestRecoveryAttempts = 0;
+                    fcChestRecoveryPhaseStartedAt = DateTime.MinValue;
+                    AddLog("Interacting with Company Chest...");
+                    AddonHelper.DismissTextError();
+                    AddonHelper.InteractWithTarget();
+                },
+                IsComplete = () =>
+                {
+                    if (IsAddonReady("FreeCompanyChest"))
+                        return true;
+
+                    var now = DateTime.UtcNow;
+
+                    if (fcChestRecoveryPhase == 1)
+                    {
+                        if ((now - fcChestRecoveryPhaseStartedAt).TotalSeconds >= fcChestRecoveryMoveSeconds)
+                        {
+                            plugin.IpcClient.VnavStop();
+                            AddLog("Company Chest recovery: stopping brief re-path and resetting camera.");
+                            AddonHelper.ResetCamera();
+                            AddonHelper.DismissTextError();
+                            fcChestRecoveryPhase = 2;
+                            fcChestRecoveryPhaseStartedAt = now;
+                        }
+
+                        return false;
+                    }
+
+                    if (fcChestRecoveryPhase == 2)
+                    {
+                        if ((now - fcChestRecoveryPhaseStartedAt).TotalSeconds >= fcChestRecoveryResetDelaySeconds)
+                        {
+                            AddLog("Retrying Company Chest interaction after reset camera...");
+                            AddonHelper.TargetByName("Company Chest");
+                            AddonHelper.DismissTextError();
+                            AddonHelper.InteractWithTarget();
+                            fcChestRecoveryPhase = 3;
+                            fcChestRecoveryPhaseStartedAt = now;
+                        }
+
+                        return false;
+                    }
+
+                    if (fcChestRecoveryPhase == 3)
+                    {
+                        if ((now - fcChestRecoveryPhaseStartedAt).TotalSeconds < fcChestRecoveryRetrySettleSeconds)
+                            return false;
+
+                        fcChestRecoveryPhase = 0;
+                    }
+
+                    if (AddonHelper.TryGetCannotSeeTargetTextError(out var matchedText))
+                    {
+                        if (fcChestRecoveryAttempts >= maxFcChestRecoveryAttempts)
+                        {
+                            AddLog($"Company Chest interaction still reports _TextError '{matchedText}' after {maxFcChestRecoveryAttempts} recovery attempts - skipping FC chest gil capture.");
+                            AddonHelper.DismissTextError();
+                            skipFcChest = true;
+                            return true;
+                        }
+
+                        fcChestRecoveryAttempts++;
+                        AddLog($"Company Chest interaction reported _TextError '{matchedText}' - re-pathing for 0.5s, stopping vnav, and resetting camera ({fcChestRecoveryAttempts}/{maxFcChestRecoveryAttempts}).");
+                        AddonHelper.DismissTextError();
+                        AddonHelper.TryPathToCurrentTarget(1.5f);
+                        fcChestRecoveryPhase = 1;
+                        fcChestRecoveryPhaseStartedAt = now;
+                        return false;
+                    }
+
+                    return false;
+                },
+                TimeoutSec = 12f,
+                OnTimeout = () =>
+                {
+                    AddLog("FreeCompanyChest did not open after Company Chest interaction/recovery - skipping FC chest gil capture.");
+                    skipFcChest = true;
+                },
+            });
+            steps.Add(new PostProcessStep
+            {
+                Name = "FC Chest: Load Delay",
+                ShouldSkip = () => skipFcChest || !IsAddonReady("FreeCompanyChest"),
+                IsComplete = () => DelayComplete(0.5f),
+                TimeoutSec = 1f,
+            });
+
+            steps.Add(new PostProcessStep
+            {
+                Name = "FC Chest: Save to XA Database",
+                ShouldSkip = () => skipFcChest || !IsAddonReady("FreeCompanyChest"),
+                OnEnter = () =>
+                {
+                    AddLog("Saving FC chest gil to XA Database...");
+                    if (plugin.SaveToXaDatabaseAndRecordSync())
+                        AddLog("Saved FC chest gil to XA Database.");
+                    else
+                        AddLog("XA Database FC chest save failed (plugin may not be loaded).");
+                },
+                IsComplete = () => true,
+                TimeoutSec = 3f,
+            });
+            steps.Add(new PostProcessStep
+            {
+                Name = "FC Chest: Save Delay",
+                ShouldSkip = () => skipFcChest || !IsAddonReady("FreeCompanyChest"),
+                IsComplete = () => DelayComplete(0.5f),
+                TimeoutSec = 1f,
+            });
+
+            steps.Add(new PostProcessStep
+            {
+                Name = "FC Chest: Close Window",
+                ShouldSkip = () => skipFcChest || !IsAddonReady("FreeCompanyChest"),
+                OnEnter = () =>
+                {
+                    fcChestClosedChecks = 0;
+                    fcChestLastEscAt = DateTime.UtcNow.AddSeconds(-1.0);
+                    AddLog("Closing FC chest window...");
+                    KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
+                },
+                IsComplete = () =>
+                {
+                    if (!IsAddonReady("FreeCompanyChest"))
+                    {
+                        fcChestClosedChecks++;
+                        return fcChestClosedChecks >= 2;
+                    }
+
+                    if ((DateTime.UtcNow - fcChestLastEscAt).TotalSeconds < 1.0)
+                        return false;
+
+                    fcChestClosedChecks = 0;
+                    fcChestLastEscAt = DateTime.UtcNow;
+                    KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
+                    return false;
+                },
+                TimeoutSec = 12f,
+                OnTimeout = () => AddLog("FC chest window stayed open after ESC retries; continuing."),
+            });
+        }
+
         // Save to XA Database
         if (config.ArPostProcessSaveToXaDatabase)
         {
@@ -1050,6 +1286,8 @@ public sealed class ArPostProcessService : IDisposable
             var mode = isPreProcessing ? "Pre" : "Post";
             AddLog($"[AR {mode}-Process] Cancelled.");
             LogInfo($"[XASlave] Ar{mode}Process: Cancelled.");
+            if (!isPreProcessing)
+                ReleasePostProcessArSuppression();
         }
     }
 
@@ -1177,6 +1415,8 @@ public sealed class ArPostProcessService : IDisposable
             AddLog($"[AR Post-Process] Done - signaling AR to continue. (Total post-processed: {CharactersProcessed})");
             LogInfo("[XASlave] ArPostProcess: Finished - signaling AR to continue.");
 
+            ReleasePostProcessArSuppression();
+
             // CRITICAL: Tell AR we're done so it can relog to the next character
             plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
         }
@@ -1259,6 +1499,44 @@ public sealed class ArPostProcessService : IDisposable
     private static string DescribeCadence(int everyHours)
     {
         return everyHours <= 0 ? "Always" : $"{everyHours}hr";
+    }
+
+    private void AcquirePostProcessArSuppression()
+    {
+        postProcessArSuppressedByTask = false;
+
+        try
+        {
+            if (plugin.IpcClient.AutoRetainerGetSuppressed())
+            {
+                AddLog("[AR Post-Process] AutoRetainer was already suppressed before post-processing; leaving that state unchanged.");
+                return;
+            }
+        }
+        catch
+        {
+            // If the read fails, still try to acquire suppression explicitly.
+        }
+
+        if (plugin.IpcClient.AutoRetainerSetSuppressed(true))
+        {
+            postProcessArSuppressedByTask = true;
+            AddLog("[AR Post-Process] Suppressing AutoRetainer while XA Slave post-processing checkpoints run.");
+        }
+        else
+        {
+            AddLog("[AR Post-Process] Failed to set AutoRetainer suppression; continuing under the AR post-process pause.");
+        }
+    }
+
+    private void ReleasePostProcessArSuppression()
+    {
+        if (!postProcessArSuppressedByTask)
+            return;
+
+        AddLog("[AR Post-Process] Releasing AutoRetainer suppression.");
+        plugin.IpcClient.AutoRetainerSetSuppressed(false);
+        postProcessArSuppressedByTask = false;
     }
 
     private unsafe bool IsInFreeCompany()
@@ -1400,7 +1678,10 @@ public sealed class ArPostProcessService : IDisposable
                 else if (isPreProcessing)
                     plugin.IpcClient.AutoRetainerSetSuppressed(false);
                 else
+                {
+                    ReleasePostProcessArSuppression();
                     plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
+                }
             }
         }
     }

@@ -94,9 +94,6 @@ public partial class SlaveWindow
             ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), arImportStatus);
         }
 
-        ImGui.Spacing();
-        ImGui.Separator();
-        ImGui.Spacing();
 
         // ── Plugin Status ──
         DrawPluginStatusChecker();
@@ -148,13 +145,13 @@ public partial class SlaveWindow
             ImGui.SameLine();
             if (ImGui.Button("Clear All"))
                 reloggerSelectedIndices.Clear();
-            ImGui.SameLine();
+
             if (ImGui.Button("Check Masters"))
                 SelectVisibleReloggerCharacters(IsFcMasterRank);
             ImGui.SameLine();
             if (ImGui.Button("Check Personal"))
                 SelectVisibleReloggerCharacters(HasPersonalEstate);
-            ImGui.SameLine();
+
             var staleButtonLabel = $"Select Stale ({GetReloggerStaleButtonLabel(staleSelectDays)})";
             var staleButtonWidth = ImGui.CalcTextSize("Select Stale (>45d)").X + ImGui.GetStyle().FramePadding.X * 2f;
             if (ImGui.Button(staleButtonLabel, new Vector2(staleButtonWidth, 0f)))
@@ -469,7 +466,8 @@ public partial class SlaveWindow
         var v9 = cfg.ReloggerDoReturnToFc;
         var v10 = cfg.ReloggerDoParseForXaDatabase;
         var v11 = cfg.ReloggerDoLogoutOnComplete;
-        var v12 = cfg.ReloggerDoEnableArMultiOnComplete;
+        var v12 = cfg.ReloggerDoKillGameOnComplete;
+        var v13 = cfg.ReloggerDoEnableArMultiOnComplete;
 
         changed |= ImGui.Checkbox("Enable TextAdvance (/at y)", ref v1);
         changed |= ImGui.Checkbox("Remove Sprout (/nastatus off)", ref v2);
@@ -485,12 +483,7 @@ public partial class SlaveWindow
         changed |= ImGui.Checkbox("Parse for XA Database (FC window + save)", ref v10);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Opens FC window to collect FC data (name, members, points, plot),\nthen saves all collected data to XA Database.");
-        ImGui.Separator();
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Task Options on Complete");
-        changed |= ImGui.Checkbox("Logout on completion", ref v11);
-        changed |= ImGui.Checkbox("Enable AR Multi Mode on completion", ref v12);
-        if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Re-enables AutoRetainer Multi Mode after ALL characters have been processed.\nOnly fires after the summary step at the very end.");
+        changed |= DrawSharedCompletionAndLogFooter("relogger", "relogger", ref v11, ref v12, ref v13, ref reloggerShowLog, runner);
 
         if (changed)
         {
@@ -505,7 +498,8 @@ public partial class SlaveWindow
             cfg.ReloggerDoReturnToFc = v9;
             cfg.ReloggerDoParseForXaDatabase = v10;
             cfg.ReloggerDoLogoutOnComplete = v11;
-            cfg.ReloggerDoEnableArMultiOnComplete = v12;
+            cfg.ReloggerDoKillGameOnComplete = v12;
+            cfg.ReloggerDoEnableArMultiOnComplete = v13;
             cfg.Save();
         }
 
@@ -514,47 +508,6 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // ── Log output ──
-        if (ImGui.Checkbox("Show Log", ref reloggerShowLog)) { }
-        if (reloggerShowLog)
-        {
-            ImGui.SameLine();
-            if (ImGui.SmallButton("Copy Log"))
-            {
-                if (runner.LogMessages.Count > 0)
-                {
-                    var logText = string.Join("\n", runner.LogMessages);
-                    ImGui.SetClipboardText(logText);
-                    arImportStatus = $"Copied {runner.LogMessages.Count} log lines to clipboard";
-                    arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
-                }
-            }
-            if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Copy all log messages to clipboard for debugging/exporting.");
-
-            ImGui.SameLine();
-            if (ImGui.SmallButton("Clear Log"))
-            {
-                runner.ClearLog();
-            }
-
-            if (runner.LogMessages.Count > 0)
-            {
-                ImGui.Spacing();
-                using (var logChild = ImRaii.Child("ReloggerLog", new Vector2(0, 150), true))
-                {
-                    if (logChild.Success)
-                    {
-                        foreach (var msg in runner.LogMessages)
-                            ImGui.TextWrapped(msg);
-
-                        // Auto-scroll to bottom
-                        if (ImGui.GetScrollY() >= ImGui.GetScrollMaxY() - 20)
-                            ImGui.SetScrollHereY(1.0f);
-                    }
-                }
-            }
-        }
-
         // Status display
         if (runner.CurrentTaskName == "Monthly Relogger" && runner.StatusText == "Complete")
         {
@@ -652,6 +605,7 @@ public partial class SlaveWindow
             DoReturnToFc = plugin.Configuration.ReloggerDoReturnToFc,
             DoParseForXaDatabase = plugin.Configuration.ReloggerDoParseForXaDatabase,
             DoLogoutOnComplete = plugin.Configuration.ReloggerDoLogoutOnComplete,
+            DoKillGameOnComplete = plugin.Configuration.ReloggerDoKillGameOnComplete,
             DoEnableArMultiOnComplete = plugin.Configuration.ReloggerDoEnableArMultiOnComplete,
         };
 
