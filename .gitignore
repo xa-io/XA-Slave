@@ -34,6 +34,7 @@ docs/
 Plugin References/
 Previous Releases/
 *Sigs.cs
+*Sig.cs
 
 # Python cache
 __pycache__/
