@@ -11,14 +11,6 @@ namespace XASlave.Services;
 
 public unsafe sealed class AutoSkipCutsceneService : IDisposable
 {
-    private const string CutsceneHandleInputSig = "E8 ?? ?? ?? ?? 44 0F B6 E0 48 8B 4E 08";
-    private const string PlayCutsceneSig = "40 53 55 57 41 56 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 8B 59";
-    private const string PlayCutsceneLuaSig = "48 89 5C 24 ?? 57 48 83 EC 50 48 8B F9 48 8B D1";
-    private const string IsCutsceneSeenSig = "E8 ?? ?? ?? ?? 33 D2 0F B6 CB 3A C3";
-    private const string PlayStaffRollSig = "40 53 48 83 EC 20 48 8B D9 E8 ?? ?? ?? ?? 48 8B D3 48 8B 88 ?? ?? ?? ?? 48 8B 01 48 83 C4 20 5B 48 FF A0 30 04 00 00";
-    private const string PlayToBeContinuedSig = "40 53 48 83 EC 20 48 8B D9 E8 ?? ?? ?? ?? 48 8B D3 48 8B 88 ?? ?? ?? ?? 48 8B 01 48 83 C4 20 5B 48 FF A0 38 04 00 00";
-    private const string CutsceneUnskippablePatchSig = "75 ?? 48 8B 4B ?? 48 8B 01 FF 50 ?? 48 8B C8 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 80 7B";
-
     private readonly ICondition condition;
     private readonly IFramework framework;
     private readonly ISigScanner sigScanner;
@@ -145,14 +137,14 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             return;
 
         initialized = true;
-        cutsceneHandleInputHook = TryCreateHook<CutsceneHandleInputDelegate>(CutsceneHandleInputSig, CutsceneHandleInputDetour, "CutsceneHandleInput");
-        playCutsceneHook = TryCreateHook<PlayCutsceneDelegate>(PlayCutsceneSig, PlayCutsceneDetour, "PlayCutscene");
-        playCutsceneLuaHook = TryCreateHook<LuaFunctionDelegate>(PlayCutsceneLuaSig, PlayCutsceneLuaDetour, "PlayCutsceneLua");
-        isCutsceneSeenHook = TryCreateHook<IsCutsceneSeenDelegate>(IsCutsceneSeenSig, IsCutsceneSeenDetour, "IsCutsceneSeen");
-        playStaffRollHook = TryCreateHook<LuaFunctionDelegate>(PlayStaffRollSig, PlayStaffRollDetour, "PlayStaffRoll");
-        playToBeContinuedHook = TryCreateHook<LuaFunctionDelegate>(PlayToBeContinuedSig, PlayToBeContinuedDetour, "PlayToBeContinued");
+        cutsceneHandleInputHook = TryCreateHook<CutsceneHandleInputDelegate>(Sigs.CutsceneHandleInputSig, CutsceneHandleInputDetour, "CutsceneHandleInput");
+        playCutsceneHook = TryCreateHook<PlayCutsceneDelegate>(Sigs.PlayCutsceneSig, PlayCutsceneDetour, "PlayCutscene");
+        playCutsceneLuaHook = TryCreateHook<LuaFunctionDelegate>(Sigs.PlayCutsceneLuaSig, PlayCutsceneLuaDetour, "PlayCutsceneLua");
+        isCutsceneSeenHook = TryCreateHook<IsCutsceneSeenDelegate>(Sigs.IsCutsceneSeenSig, IsCutsceneSeenDetour, "IsCutsceneSeen");
+        playStaffRollHook = TryCreateHook<LuaFunctionDelegate>(Sigs.PlayStaffRollSig, PlayStaffRollDetour, "PlayStaffRoll");
+        playToBeContinuedHook = TryCreateHook<LuaFunctionDelegate>(Sigs.PlayToBeContinuedSig, PlayToBeContinuedDetour, "PlayToBeContinued");
 
-        if (sigScanner.TryScanText(CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress))
+        if (sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress))
             log.Information($"[XASlave] Auto Skip Cutscenes found unskippable cutscene patch address at 0x{cutsceneUnskippablePatchAddress:X}.");
         else
             log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature.");

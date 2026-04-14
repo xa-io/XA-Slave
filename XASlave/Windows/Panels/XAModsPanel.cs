@@ -946,7 +946,7 @@ public partial class SlaveWindow
                 SaveConfiguration();
             }
 
-            ImGui.TextDisabled("Uses the game's Standard / AMD FSR runtime scale path only. No sharpen override is applied.");
+            ImGui.TextDisabled("Uses the game's Standard / AMD FSR runtime scale path. If DLSS is active, XA temporarily switches to AMD FSR and restores the previous scaler when disabled. No sharpen override is applied.");
         }
 
         void DrawSightDistanceSlider(string label, string id, float currentValue, float minimumValue, float maximumValue, string format, Action<float> store)
@@ -1291,10 +1291,10 @@ public partial class SlaveWindow
             () => configuration.AutoCloseLobbyErrorsEnabled,
             plugin.LobbyErrorAutoClose.SetEnabled,
             applied => configuration.AutoCloseLobbyErrorsEnabled = applied,
-            "Confirms disconnect and lobby Dialogue popups by pressing `OK` automatically.",
-            "Monitors the `Dialogue` addon for disconnect/lobby error markers such as `90002` and `Connection with the server was lost.`, then clicks the live `OK` button automatically. `Instant Logout` also arms this same monitor for 10 seconds even when this toggle is off.",
+            "Confirms disconnect and supported stuck-logout lobby Dialogue popups by pressing `OK` automatically.",
+            "Monitors the `Dialogue` addon for disconnect/lobby error markers such as `90002`, `3102`, `Connection with the server was lost.`, and `You are still logged into the game.`, then clicks the live `OK` button automatically. `Instant Logout` also arms this same monitor for 10 seconds even when this toggle is off.",
             plugin.LobbyErrorAutoClose.StatusText,
-            searchTerms: ["90002", "Connection with the server was lost.", "Dialogue", "OK"]);
+            searchTerms: ["90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK"]);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
             "auto-hide-game-objects",
@@ -1361,9 +1361,9 @@ public partial class SlaveWindow
             plugin.SystemWindowMods.SetLowResolutionEnabled,
             applied => configuration.LowResolutionEnabled = applied,
             "Forces the live 3D resolution scale below the game's normal UI floor.",
-            "Forces the live 3D resolution scale to the slider value between 0.01 and 1.00 while a supported upscaler is active.",
+            "Forces the live 3D resolution scale to the slider value between 0.01 and 1.00. If the current runtime scaler is DLSS, XA temporarily switches to AMD FSR while the feature is active and restores the previous mode on disable.",
             plugin.SystemWindowMods.LowResolutionStatusText,
-            searchTerms: ["3D resolution scale", "0.01", "1.00", "FSR", "GraphicsRezoScale"],
+            searchTerms: ["3D resolution scale", "0.01", "1.00", "DLSS", "FSR", "GraphicsRezoScale", "GraphicsRezoUpscaleType"],
             drawOptions: DrawLowResolutionOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,

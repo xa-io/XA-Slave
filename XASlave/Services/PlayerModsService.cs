@@ -10,7 +10,6 @@ namespace XASlave.Services;
 
 public unsafe sealed class PlayerModsService : IDisposable
 {
-    private const string MovePermissionSig = "E8 ?? ?? ?? ?? 84 ?? 74 ?? 48 C7 05";
     private const int SprintActionId = 3;
     private const ushort SprintStatusId = 50;
     private const ushort CosmicSprintStatusId = 4398;
@@ -126,7 +125,7 @@ public unsafe sealed class PlayerModsService : IDisposable
             return;
 
         initialized = true;
-        movePermissionHook = TryCreateHook<MovePermissionDelegate>(MovePermissionSig, MovePermissionDetour, "MovePermission");
+        movePermissionHook = TryCreateHook<MovePermissionDelegate>(Sigs.MovePermissionSig, MovePermissionDetour, "MovePermission");
     }
 
     private Hook<T>? TryCreateHook<T>(string signature, T detour, string label)

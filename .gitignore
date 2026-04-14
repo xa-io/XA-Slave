@@ -33,6 +33,7 @@ docs/
 # Plugin references (local development)
 Plugin References/
 Previous Releases/
+*Sigs.cs
 
 # Python cache
 __pycache__/

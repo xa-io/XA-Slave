@@ -76,9 +76,8 @@ public partial class SlaveWindow
 
         DrawRepositoryBlock(
             "Vera",
-            "VIWI, Workshoppa, Deliveroo",
+            "Workshoppa, Deliveroo",
             "https://puni.sh/api/repository/vera",
-            ("VIWI", plugin.IpcClient.IsViwiAvailable()),
             ("Workshoppa", IsInstalledPluginLoaded("Workshoppa")),
             ("Deliveroo", plugin.IpcClient.IsDeliverooAvailable()));
     }

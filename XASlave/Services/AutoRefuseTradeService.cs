@@ -10,10 +10,6 @@ namespace XASlave.Services;
 
 public unsafe sealed class AutoRefuseTradeService : IDisposable
 {
-    private const string TradeRequestSig =
-        "48 89 6C 24 ?? 56 57 41 56 48 83 EC ?? 48 8B E9 44 8B F2 48 8D 0D";
-    private const string TradeStatusUpdateSig =
-        "E9 ?? ?? ?? ?? CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC 4C 8B C2 8B D1 48 8D 0D ?? ?? ?? ?? E9 ?? ?? ?? ?? CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC 48 8D 0D";
     private const string RefusedTradeMessage = "XA Slave: Refused incoming trade request.";
 
     private readonly ISigScanner sigScanner;
@@ -116,8 +112,8 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         initialized = true;
 
         tradeAgentShowHook = TryCreateTradeAgentShowHook();
-        tradeRequestHook = TryCreateHook<TradeRequestDelegate>(TradeRequestSig, TradeRequestDetour, "TradeRequest");
-        tradeStatusUpdateHook = TryCreateHook<TradeStatusUpdateDelegate>(TradeStatusUpdateSig, TradeStatusUpdateDetour, "TradeStatusUpdate");
+        tradeRequestHook = TryCreateHook<TradeRequestDelegate>(Sigs.TradeRequestSig, TradeRequestDetour, "TradeRequest");
+        tradeStatusUpdateHook = TryCreateHook<TradeStatusUpdateDelegate>(Sigs.TradeStatusUpdateSig, TradeStatusUpdateDetour, "TradeStatusUpdate");
     }
 
     private Hook<T>? TryCreateHook<T>(string signature, T detour, string label)

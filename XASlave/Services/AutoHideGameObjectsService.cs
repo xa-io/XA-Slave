@@ -15,7 +15,6 @@ namespace XASlave.Services;
 
 public unsafe sealed class AutoHideGameObjectsService : IDisposable
 {
-    private const string UpdateObjectArraysSig = "40 57 48 83 EC ?? 48 89 5C 24 ?? 33 DB";
     private const int HiddenRenderFlag = 256;
 
     private readonly IFramework framework;
@@ -163,7 +162,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
 
         try
         {
-            if (!sigScanner.TryScanText(UpdateObjectArraysSig, out var address) || address == nint.Zero)
+            if (!sigScanner.TryScanText(Sigs.UpdateObjectArraysSig, out var address) || address == nint.Zero)
             {
                 log.Warning("[XASlave] Auto Hide Game Objects signature was not found.");
                 return;

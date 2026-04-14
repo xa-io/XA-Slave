@@ -2,6 +2,7 @@ using Dalamud.Configuration;
 using System;
 using System.Collections.Generic;
 using XASlave.Data;
+using XASlave.Services;
 
 namespace XASlave;
 
@@ -126,9 +127,11 @@ public class Configuration : IPluginConfiguration
     public bool XagmanLogoutOnComplete { get; set; } = false;
     public bool XagmanUsePreflightOnFirstCharacter { get; set; } = true;
     public bool XagmanAutoReturnToFc { get; set; } = true;
+    public bool XagmanIgnoreGilInMatchingSelection { get; set; } = true;
     public bool XagmanWarningDetailsExpanded { get; set; } = true;
     public bool XagmanRoleInstructionsExpanded { get; set; } = true;
     public string XagmanRegionFilter { get; set; } = "All";
+    public string XagmanHubAddress { get; set; } = XagmanPeerService.DefaultHubAddress;
     public int XagmanHubPort { get; set; } = 45215;
     public bool XagmanPeerConnectionsEnabled { get; set; } = false;
 

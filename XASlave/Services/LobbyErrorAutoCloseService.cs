@@ -16,7 +16,10 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
         "90002",
         "90006",
         "90007",
+        "3102",
         "Connection with the server was lost.",
+        "You are still logged into the game.",
+        "Please allow a few moments for the logout process to complete.",
     ];
 
     private readonly IAddonLifecycle addonLifecycle;
@@ -144,7 +147,8 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
 
         foreach (var marker in DialogueMarkers)
         {
-            if (AddonHelper.AddonHasText(DialogueAddonName, marker))
+            var contains = marker.Contains(' ');
+            if (AddonHelper.AddonHasText(DialogueAddonName, marker, contains))
                 return true;
         }
 

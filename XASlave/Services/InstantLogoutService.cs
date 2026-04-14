@@ -7,7 +7,6 @@ namespace XASlave.Services;
 
 public sealed class InstantLogoutService : IDisposable
 {
-    private const string RequestContentsFinderSig = "E8 ?? ?? ?? ?? 33 C0 E9 ?? ?? ?? ?? FE C8";
     private const uint LogoutContentsFinderRowId = 167;
     private const int KillGameTimeoutMs = 15000;
 
@@ -148,7 +147,7 @@ public sealed class InstantLogoutService : IDisposable
 
         initialized = true;
 
-        if (!sigScanner.TryScanText(RequestContentsFinderSig, out var address) || address == nint.Zero)
+        if (!sigScanner.TryScanText(Sigs.RequestContentsFinderSig, out var address) || address == nint.Zero)
         {
             log.Warning("[XASlave] Instant Logout request signature was not found.");
             return;

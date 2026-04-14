@@ -11,9 +11,6 @@ namespace XASlave.Services;
 
 public unsafe sealed class DozeSitAnywhereService : IDisposable
 {
-    private const string UseEmoteSig = "E8 ?? ?? ?? ?? 40 84 ED 74 ?? 48 8B 4B ?? 48 8B 01 FF 90";
-    private const string ShouldSnapSig = "E8 ?? ?? ?? ?? 84 C0 0F 84 ?? ?? ?? ?? 4C 8D 74 24";
-    private const string ShouldSnapUnsitSig = "48 83 EC 38 F3 0F 10 05 ?? ?? ?? ?? 45 33 C9";
     private const ushort DozeEmoteId = 88;
     private const ushort SitEmoteId = 96;
     private const float UnsitRestoreDistance = 3f;
@@ -166,7 +163,7 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
         initialized = true;
 
-        if (sigScanner.TryScanText(UseEmoteSig, out var useEmoteAddress) && useEmoteAddress != nint.Zero)
+        if (sigScanner.TryScanText(Sigs.UseEmoteSig, out var useEmoteAddress) && useEmoteAddress != nint.Zero)
         {
             useEmote = (delegate* unmanaged<nint, ushort, nint, byte, byte, void>)useEmoteAddress;
             log.Information($"[XASlave] Located Doze & Sit Anywhere emote function at 0x{useEmoteAddress:X}.");
@@ -176,8 +173,8 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
             log.Warning("[XASlave] Doze & Sit Anywhere emote signature was not found.");
         }
 
-        shouldSnapHook = TryCreateHook(ShouldSnapSig, ShouldSnapDetour, "DozeShouldSnap");
-        shouldSnapUnsitHook = TryCreateHook(ShouldSnapUnsitSig, ShouldSnapUnsitDetour, "SitShouldSnapUnsit");
+        shouldSnapHook = TryCreateHook(Sigs.ShouldSnapSig, ShouldSnapDetour, "DozeShouldSnap");
+        shouldSnapUnsitHook = TryCreateHook(Sigs.ShouldSnapUnsitSig, ShouldSnapUnsitDetour, "SitShouldSnapUnsit");
     }
 
     private bool TryGetEmoteAgent(out AgentInterface* agent)

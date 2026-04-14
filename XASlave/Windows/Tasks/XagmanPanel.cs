@@ -33,6 +33,8 @@ public partial class SlaveWindow
     private bool xagmanShowLog;
     private bool xagmanShowPeers = true;
     private bool xagmanShowQueue = true;
+    private bool xagmanPendingHubEndpointInitialized;
+    private string xagmanPendingHubAddress = string.Empty;
     private int xagmanPendingHubPort = XagmanPeerService.DefaultHubPort;
     private readonly Dictionary<string, List<XagmanDbSearchMatch>> xagmanCharacterMatchQueryCache = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, HashSet<string>> xagmanMatchingCharacterKeysCache = new(StringComparer.Ordinal);
@@ -62,6 +64,7 @@ public partial class SlaveWindow
     private DateTime xagmanTonyNoConnectedOwnerPeersSinceUtc = DateTime.MinValue;
     private DateTime xagmanLastPresencePublishUtc = DateTime.MinValue;
     private DateTime xagmanLastTonyActionAtUtc = DateTime.MinValue;
+    private DateTime xagmanRecentFcReturnAtUtc = DateTime.MinValue;
     private DateTime xagmanTonyRunStartedAtUtc = DateTime.MinValue;
     private DateTime xagmanTonyLastMeetRetryUtc = DateTime.MinValue;
     private int xagmanTonyCompletedCharacters;
@@ -76,6 +79,7 @@ public partial class SlaveWindow
     private List<string> xagmanOwnerRunList = new();
     private List<string> xagmanTonyRunList = new();
     private List<string>? xagmanAetheryteNames;
+    private string xagmanRecentFcReturnCharacter = string.Empty;
     private List<XagmanItemSearchEntry> xagmanItemResults = new();
     private Dictionary<string, XagmanItemSearchEntry>? xagmanItemNameLookupCache;
     private static readonly string[] xagmanItemModeLabels = { "Give", "Take", "Balance" };
@@ -147,7 +151,13 @@ public partial class SlaveWindow
     {
         var cfg = plugin.Configuration;
         var runner = plugin.TaskRunner;
-        xagmanPendingHubPort = XagmanPeerService.NormalizePort(xagmanPendingHubPort <= 0 ? cfg.XagmanHubPort : xagmanPendingHubPort);
+        if (!xagmanPendingHubEndpointInitialized)
+        {
+            xagmanPendingHubAddress = XagmanPeerService.NormalizeHubAddress(cfg.XagmanHubAddress);
+            xagmanPendingHubPort = XagmanPeerService.NormalizePort(cfg.XagmanHubPort);
+            xagmanPendingHubEndpointInitialized = true;
+        }
+        xagmanPendingHubPort = XagmanPeerService.NormalizePort(xagmanPendingHubPort);
         ImGui.TextColored(new Vector4(0.8f, 0.6f, 1.0f, 1.0f), "Xagman");
         ImGui.TextDisabled("Cross-client FC trade coordination with Tony and Franchise Owner roles using XA Slave peer presence.");
         if (ImGui.SmallButton($"{(cfg.XagmanWarningDetailsExpanded ? "Warning Details: Expanded" : "Warning Details: Collapsed")}##xagmanWarningDetailsToggle"))
@@ -163,14 +173,11 @@ public partial class SlaveWindow
         var xaDbOk = plugin.IpcClient.IsXaDatabaseAvailable();
         var dbxOk = plugin.IpcClient.IsDropboxAvailable();
         var vnavOk = plugin.IpcClient.VnavIsReady();
-        var viwiOk = plugin.IpcClient.IsViwiAvailable();
-        var allRequired = arOk && lsOk && xaDbOk && dbxOk && vnavOk && viwiOk;
+        var allRequired = arOk && lsOk && xaDbOk && dbxOk && vnavOk;
         DrawTaskPluginStatus(true);
         ImGui.Text("Task Extras: ");
         ImGui.SameLine();
         ImGui.TextColored(dbxOk ? new Vector4(0.4f, 1.0f, 0.4f, 1.0f) : new Vector4(1.0f, 0.4f, 0.4f, 1.0f), dbxOk ? "[Dropbox]" : "[Dropbox ✗]");
-        ImGui.SameLine();
-        ImGui.TextColored(viwiOk ? new Vector4(0.4f, 1.0f, 0.4f, 1.0f) : new Vector4(1.0f, 0.4f, 0.4f, 1.0f), viwiOk ? "[VIWI]" : "[VIWI ✗]");
         ImGui.Spacing();
         var role = cfg.XagmanRole;
         if (ImGui.RadioButton("Tony##xagmanRoleTony", role == XagmanRole.Tony))
@@ -193,18 +200,27 @@ public partial class SlaveWindow
         if (cfg.XagmanRoleInstructionsExpanded)
             DrawXagmanRoleInstructions(cfg.XagmanRole);
         ImGui.Spacing();
-        ImGui.TextDisabled($"Hub: 127.0.0.1:{plugin.XagmanPeers.HubPort}");
+        ImGui.TextDisabled($"Applied Hub: {plugin.XagmanPeers.HubEndpoint}");
+        ImGui.SetNextItemWidth(140f);
+        if (ImGui.InputText("Address##xagmanAddress", ref xagmanPendingHubAddress, 128))
+            xagmanPendingHubAddress = xagmanPendingHubAddress.Trim();
         ImGui.SameLine();
-        ImGui.SetNextItemWidth(100);
+        ImGui.SetNextItemWidth(72f);
         if (ImGui.InputInt("Port##xagmanPort", ref xagmanPendingHubPort))
             xagmanPendingHubPort = XagmanPeerService.NormalizePort(xagmanPendingHubPort);
         ImGui.SameLine();
-        if (ImGui.Button("Apply##xagmanPort"))
-            xagmanPendingHubPort = plugin.ApplyXagmanHubPort(xagmanPendingHubPort);
-        ImGui.SameLine();
+        if (ImGui.Button("Apply##xagmanHubEndpoint"))
+        {
+            var appliedEndpoint = plugin.ApplyXagmanHubEndpoint(xagmanPendingHubAddress, xagmanPendingHubPort);
+            xagmanPendingHubAddress = appliedEndpoint.Address;
+            xagmanPendingHubPort = appliedEndpoint.Port;
+        }
+        ImGui.TextDisabled("Use 127.0.0.1 for same-PC clients. Use the hub PC's LAN IP/host for multi-PC setups.");
         var xagmanPeerConnectionsEnabled = plugin.XagmanPeers.IsStarted;
         ImGui.Spacing();
-        var xagmanHasPendingHubPortChange = xagmanPendingHubPort != cfg.XagmanHubPort;
+        var normalizedPendingHubAddress = XagmanPeerService.NormalizeHubAddress(xagmanPendingHubAddress);
+        var xagmanHasPendingHubEndpointChange = xagmanPendingHubPort != cfg.XagmanHubPort
+            || !normalizedPendingHubAddress.Equals(XagmanPeerService.NormalizeHubAddress(cfg.XagmanHubAddress), StringComparison.OrdinalIgnoreCase);
         if (ImGui.Button(xagmanPeerConnectionsEnabled
                 ? "Disconnect##xagmanPeerConnectionToggle"
                 : "Connect##xagmanPeerConnectionToggle"))
@@ -215,8 +231,8 @@ public partial class SlaveWindow
         {
             ImGui.SetTooltip(xagmanPeerConnectionsEnabled
                 ? "Disconnect the local Xagman peer service."
-                : xagmanHasPendingHubPortChange
-                    ? "Connect the local Xagman peer service on the currently applied port. Click Apply first to use the pending port value shown in the field."
+                : xagmanHasPendingHubEndpointChange
+                    ? "Connect the local Xagman peer service on the currently applied address and port. Click Apply first to use the pending values shown in the fields."
                     : "Connect the local Xagman peer service.");
         }
         ImGui.SameLine();
@@ -273,6 +289,12 @@ public partial class SlaveWindow
         if (ImGui.Checkbox("Return to FC when finished##xagmanReturnFc", ref autoReturnToFc))
         {
             cfg.XagmanAutoReturnToFc = autoReturnToFc;
+            cfg.Save();
+        }
+        var ignoreGilInMatchSelection = cfg.XagmanIgnoreGilInMatchingSelection;
+        if (ImGui.Checkbox("Ignore Gil in Select Matching Items##xagmanIgnoreGilMatch", ref ignoreGilInMatchSelection))
+        {
+            cfg.XagmanIgnoreGilInMatchingSelection = ignoreGilInMatchSelection;
             cfg.Save();
         }
         ImGui.Spacing();
@@ -405,7 +427,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
         ImGui.TextColored(infoColor, "Required checks before running");
         ImGui.TextWrapped("1. Lifestream must have registered plot info, and Settings > General > Enter House must be enabled when teleporting to your FC house so returns land correctly.");
-        ImGui.TextWrapped("2. VIWI must have KitchenSink enabled or Dropbox queuing will not work.");
+        ImGui.TextWrapped("2. Dropbox must be installed and available. XA Slave now owns the `/xa db ...` queue commands directly.");
     }
 
     private void DrawXagmanRoleInstructions(XagmanRole role)
@@ -2218,6 +2240,7 @@ public partial class SlaveWindow
     {
         ClearXagmanMatchingSelectionCaches();
         var cfg = plugin.Configuration;
+        var ignoreGil = cfg.XagmanIgnoreGilInMatchingSelection;
         var visibleIndices = GetVisibleXagmanFranchiseCharacterIndices(cfg);
         if (visibleIndices.Count == 0)
         {
@@ -2228,12 +2251,14 @@ public partial class SlaveWindow
         }
 
         var items = cfg.XagmanItems
-            .Where(item => item.ItemId > 0)
+            .Where(item => ShouldIncludeXagmanMatchingSelectionItem(item, ignoreGil))
             .ToList();
         if (items.Count == 0)
         {
             xagmanFranchiseSelectedIndices.Clear();
-            arImportStatus = "Xagman: add at least one item before selecting matching Franchise Owners.";
+            arImportStatus = ignoreGil
+                ? "Xagman: add at least one non-gil item before selecting matching Franchise Owners."
+                : "Xagman: add at least one item before selecting matching Franchise Owners.";
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
             return;
         }
@@ -2244,7 +2269,7 @@ public partial class SlaveWindow
         foreach (var index in visibleIndices)
         {
             var characterNameWorld = cfg.XagmanFranchiseCharacters[index];
-            if (!selectAllVisible && !DoesXagmanFranchiseCharacterNeedItemChanges(characterNameWorld, items))
+            if (!selectAllVisible && !DoesXagmanFranchiseCharacterNeedItemChanges(characterNameWorld, items, ignoreGil))
                 continue;
 
             xagmanFranchiseSelectedIndices.Add(index);
@@ -2256,11 +2281,11 @@ public partial class SlaveWindow
             : $"Xagman: selected {selectedCount} visible Franchise Owner character{(selectedCount == 1 ? string.Empty : "s")} that actually need item changes.";
         arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
     }
-    private bool DoesXagmanFranchiseCharacterNeedItemChanges(string characterNameWorld, IReadOnlyList<XagmanItemEntry> items)
+    private bool DoesXagmanFranchiseCharacterNeedItemChanges(string characterNameWorld, IReadOnlyList<XagmanItemEntry> items, bool ignoreGil)
     {
         foreach (var item in items)
         {
-            if (item.ItemId == 0)
+            if (!ShouldIncludeXagmanMatchingSelectionItem(item, ignoreGil))
                 continue;
 
             var currentQuantity = GetXagmanCharacterItemQuantity(characterNameWorld, item.ItemId, item.IsHq, item.ItemName);
@@ -2285,11 +2310,15 @@ public partial class SlaveWindow
     {
         return $"{itemId}:{(isHq ? 1 : 0)}";
     }
-    private static string BuildXagmanMatchingItemsKey(IReadOnlyList<XagmanItemEntry> items)
+    private static bool ShouldIncludeXagmanMatchingSelectionItem(XagmanItemEntry item, bool ignoreGil)
+    {
+        return item.ItemId > 0 && (!ignoreGil || item.ItemId > 1);
+    }
+    private static string BuildXagmanMatchingItemsKey(IReadOnlyList<XagmanItemEntry> items, bool ignoreGil)
     {
         return string.Join(",",
             items
-                .Where(item => item.ItemId > 1)
+                .Where(item => ShouldIncludeXagmanMatchingSelectionItem(item, ignoreGil))
                 .Select(item => BuildXagmanMatchItemKey(item.ItemId, item.IsHq))
                 .Distinct()
                 .OrderBy(itemKey => itemKey, StringComparer.Ordinal));
@@ -2298,12 +2327,13 @@ public partial class SlaveWindow
     {
         ClearXagmanMatchingSelectionCaches();
         var cfg = plugin.Configuration;
+        var ignoreGil = cfg.XagmanIgnoreGilInMatchingSelection;
         var selectionLabel = target == XagmanMatchSelectionTarget.Tony ? "Tony" : "Franchise Owner";
         var sourceItems = target == XagmanMatchSelectionTarget.Tony
             ? cfg.XagmanTonyItems
             : cfg.XagmanItems;
         var matchingItems = sourceItems
-            .Where(item => item.ItemId > 1)
+            .Where(item => ShouldIncludeXagmanMatchingSelectionItem(item, ignoreGil))
             .GroupBy(item => new { item.ItemId, item.IsHq })
             .Select(group => group.First())
             .ToList();
@@ -2319,7 +2349,7 @@ public partial class SlaveWindow
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
             return;
         }
-        var itemsKey = BuildXagmanMatchingItemsKey(matchingItems);
+        var itemsKey = BuildXagmanMatchingItemsKey(matchingItems, ignoreGil);
         if (string.IsNullOrWhiteSpace(itemsKey))
         {
             if (target == XagmanMatchSelectionTarget.Tony)
@@ -2327,11 +2357,13 @@ public partial class SlaveWindow
             else
                 xagmanFranchiseSelectedIndices.Clear();
             xagmanPendingMatchSelection = null;
-            arImportStatus = "Xagman: add at least one non-gil item before selecting matching characters.";
+            arImportStatus = ignoreGil
+                ? "Xagman: add at least one non-gil item before selecting matching characters."
+                : "Xagman: add at least one item before selecting matching characters.";
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
             return;
         }
-        var matches = GetXagmanMatchingCharacterKeys(matchingItems);
+        var matches = GetXagmanMatchingCharacterKeys(matchingItems, ignoreGil);
         ApplyXagmanMatchingSelection(target, visibleCharacterKeys, matches);
     }
     private void ApplyXagmanMatchingSelection(XagmanMatchSelectionTarget target, IReadOnlyCollection<string> visibleCharacterKeys, HashSet<string> matches)
@@ -2391,10 +2423,10 @@ public partial class SlaveWindow
         ApplyXagmanMatchingSelection(request.Target, request.VisibleCharacterKeys, request.MatchKeys);
         xagmanPendingMatchSelection = null;
     }
-    private HashSet<string> GetXagmanMatchingCharacterKeys(IReadOnlyList<XagmanItemEntry> items)
+    private HashSet<string> GetXagmanMatchingCharacterKeys(IReadOnlyList<XagmanItemEntry> items, bool ignoreGil)
     {
         var itemKeys = items
-            .Where(item => item.ItemId > 1)
+            .Where(item => ShouldIncludeXagmanMatchingSelectionItem(item, ignoreGil))
             .Select(item => BuildXagmanMatchItemKey(item.ItemId, item.IsHq))
             .Distinct()
             .OrderBy(itemKey => itemKey, StringComparer.Ordinal)
@@ -2411,7 +2443,7 @@ public partial class SlaveWindow
         }
 
         var matches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var item in items.Where(item => item.ItemId > 1 && !string.IsNullOrWhiteSpace(item.ItemName)))
+        foreach (var item in items.Where(item => ShouldIncludeXagmanMatchingSelectionItem(item, ignoreGil) && !string.IsNullOrWhiteSpace(item.ItemName)))
         {
             foreach (var result in SearchXagmanCharacterMatches(item.ItemName))
             {
@@ -2671,6 +2703,7 @@ public partial class SlaveWindow
         xagmanTonyCompletionRequestedAtUtc = DateTime.MinValue;
         xagmanTonyAllOwnersCompletedObservedAtUtc = DateTime.MinValue;
         xagmanTonyNoConnectedOwnerPeersSinceUtc = DateTime.MinValue;
+        ResetXagmanRecentFcReturn();
         xagmanTonyRunStartedAtUtc = DateTime.UtcNow;
         SetXagmanActiveMeetDestination(string.Empty, string.Empty);
         xagmanOwnerRunPlan = Array.Empty<string>();
@@ -2748,6 +2781,8 @@ public partial class SlaveWindow
             xagmanOwnerRequestedItems.Clear();
         if (!resumeFromStandby)
             xagmanQueueRequestedAtUtc = DateTime.MinValue;
+        if (!resumeFromStandby)
+            ResetXagmanRecentFcReturn();
         xagmanTonyCompletionRequestedAtUtc = DateTime.MinValue;
         xagmanTonyRunStartedAtUtc = DateTime.MinValue;
         if (!resumeFromStandby)
@@ -2806,6 +2841,45 @@ public partial class SlaveWindow
     {
         xagmanTonyMeetRetryCount = 0;
         xagmanTonyLastMeetRetryUtc = DateTime.MinValue;
+    }
+
+    private void RememberXagmanRecentFcReturn(string characterNameWorld)
+    {
+        if (string.IsNullOrWhiteSpace(characterNameWorld))
+        {
+            ResetXagmanRecentFcReturn();
+            return;
+        }
+
+        xagmanRecentFcReturnCharacter = characterNameWorld;
+        xagmanRecentFcReturnAtUtc = DateTime.UtcNow;
+    }
+
+    private void ResetXagmanRecentFcReturn()
+    {
+        xagmanRecentFcReturnCharacter = string.Empty;
+        xagmanRecentFcReturnAtUtc = DateTime.MinValue;
+    }
+
+    private bool ConsumeXagmanRecentFcReturn(string characterNameWorld)
+    {
+        if (string.IsNullOrWhiteSpace(characterNameWorld))
+            return false;
+
+        if (string.IsNullOrWhiteSpace(xagmanRecentFcReturnCharacter)
+            || !xagmanRecentFcReturnCharacter.Equals(characterNameWorld, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        if ((DateTime.UtcNow - xagmanRecentFcReturnAtUtc).TotalSeconds > 120.0)
+        {
+            ResetXagmanRecentFcReturn();
+            return false;
+        }
+
+        ResetXagmanRecentFcReturn();
+        return true;
     }
 
     private List<TaskStep> BuildXagmanTonyStartupSteps(XagmanTonyCharacterEntry entry, bool includePreflight)
@@ -3379,6 +3453,7 @@ public partial class SlaveWindow
                 {
                     xagmanStatus = XagmanStatus.ReturningHome;
                     xagmanStatusText = $"Owner {localCharacter} return-to-FC attempt finished.";
+                    RememberXagmanRecentFcReturn(localCharacter);
                 },
                 () =>
                 {
@@ -4480,6 +4555,7 @@ public partial class SlaveWindow
                             return;
                         xagmanStatus = XagmanStatus.ReturningHome;
                         xagmanStatusText = $"Owner {charName} return-to-FC attempt finished.";
+                        RememberXagmanRecentFcReturn(charName);
                     },
                     () =>
                     {
@@ -4599,6 +4675,7 @@ public partial class SlaveWindow
     {
         var relogFailed = false;
         var skipRelog = false;
+        var recentlyReturnedToFc = false;
         var returnToFcBeforeRelog = false;
         var loggedInCharacter = string.Empty;
         steps.Add(new TaskStep
@@ -4617,7 +4694,13 @@ public partial class SlaveWindow
                     return;
                 }
 
-                returnToFcBeforeRelog = !string.IsNullOrWhiteSpace(loggedInCharacter);
+                recentlyReturnedToFc = plugin.Configuration.XagmanAutoReturnToFc
+                    && ConsumeXagmanRecentFcReturn(loggedInCharacter);
+                returnToFcBeforeRelog = plugin.Configuration.XagmanAutoReturnToFc
+                    && !recentlyReturnedToFc
+                    && !string.IsNullOrWhiteSpace(loggedInCharacter);
+                if (recentlyReturnedToFc)
+                    runner.AddLog($"Xagman: skipping duplicate /li fc for {loggedInCharacter} before relogging to {charName}.");
                 if (returnToFcBeforeRelog)
                     runner.AddLog($"Xagman: returning {loggedInCharacter} to FC before relogging to {charName}.");
             },
@@ -4639,7 +4722,10 @@ public partial class SlaveWindow
             () =>
             {
                 if (returnToFcBeforeRelog)
+                {
+                    RememberXagmanRecentFcReturn(loggedInCharacter);
                     runner.AddLog($"Xagman: /li fc completed for {loggedInCharacter}; continuing relog to {charName}.");
+                }
             },
             () =>
             {
@@ -5199,6 +5285,7 @@ public partial class SlaveWindow
                 {
                     xagmanStatus = XagmanStatus.ReturningHome;
                     xagmanStatusText = $"Tony {tonyCharacter} return-to-FC attempt finished.";
+                    RememberXagmanRecentFcReturn(tonyCharacter);
                 },
                 () =>
                 {
@@ -6073,7 +6160,10 @@ public partial class SlaveWindow
 
      private void ClearXagmanDropbox()
      {
-         ChatHelper.SendMessage("/dbq clear");
+         if (plugin.DropboxQueue.TryClearQueue(out var message))
+             return;
+
+         plugin.TaskRunner.AddLog($"Xagman: {message}");
      }
 
      private void StartXagmanDropboxTrade()

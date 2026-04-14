@@ -29,15 +29,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private const uint SetWindowPosNoActivate = 0x0010;
     private const float MinimumLowResolutionScale = 0.01f;
     private const float MaximumLowResolutionScale = 1.00f;
-    private const string AgentLobbyUpdateSig = "40 55 56 41 55 48 8D 6C 24 ?? 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 45 ?? 48 83 B9";
-    private const string AtkMessageBoxReceiveEventSig = "40 53 48 83 EC 30 48 8B D9 49 8B C8 E8 ?? ?? ?? ?? 8B D0";
-    private const string AgentMapUpdateSig = "48 89 5C 24 ?? 55 56 57 41 54 41 55 41 56 41 57 48 83 EC ?? 48 8B E9 E8";
-    private const string DeviceDx11PostTickSig =
-        "48 89 5C 24 ?? 48 89 6C 24 ?? 48 89 74 24 ?? 57 41 54 41 55 41 56 41 57 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 2B E0 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 8B 15";
-    private const string NamePlateDrawSig =
-        "0F B7 81 ?? ?? ?? ?? 81 A1 ?? ?? ?? ?? ?? ?? ?? ?? 81 A1 ?? ?? ?? ?? ?? ?? ?? ?? 66 C1 E0 06 0F B7 D0 66 89 91 ?? ?? ?? ?? C1 E2 0D 09 91 ?? ?? ?? ?? 09 91 ?? ?? ?? ?? E9 ?? ?? ?? ?? CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC CC 33 C0";
-    private const string ToggleFadeSig = "E8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8D 8F ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8D 4C 24";
-
+    private const byte MaximumSupportedLowResolutionUpscaleType = 1;
+    private const byte LowResolutionFallbackUpscaleType = 1;
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
     private readonly IPluginLog log;
@@ -58,6 +51,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private bool customResolutionsEnabled;
     private bool ignoreMinimumWindowSizeEnabled;
     private bool lowResolutionEnabled;
+    private bool capturedLowResolutionUpscaleType;
     private bool preventLobbyExitEnabled;
     private bool revealUndiscoveredAreasEnabled;
     private bool disableBackgroundRenderingEnabled;
@@ -79,6 +73,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private long lastWindowSizeChangeTick;
     private int lastAppliedCustomResolutionWidth;
     private int lastAppliedCustomResolutionHeight;
+    private byte originalLowResolutionUpscaleType;
     private float lowResolutionScale = 0.25f;
 
     public SystemWindowModsService(
@@ -264,7 +259,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (!value)
         {
             lowResolutionEnabled = false;
-            RestoreLowResolutionScale();
+            RestoreLowResolutionConfiguration();
             LowResolutionStatusText = "Disabled";
             return false;
         }
@@ -273,12 +268,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (graphicsConfig == null)
         {
             LowResolutionStatusText = "Unavailable - graphics configuration surface missing.";
-            return false;
-        }
-
-        if (graphicsConfig->GraphicsRezoUpscaleType > 1)
-        {
-            LowResolutionStatusText = "Unavailable - Low Resolution requires the game's Standard or AMD FSR upscaler.";
             return false;
         }
 
@@ -444,7 +433,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         disableBackgroundRenderingDisableWhenArMultiIsOn = false;
         ResetWindowSizeSynchronizationState();
 
-        RestoreLowResolutionScale();
+        RestoreLowResolutionConfiguration();
         RefreshWindowSizeLimits();
         UpdateAgentLobbyHookState();
         UpdateAtkMessageBoxHookState();
@@ -492,15 +481,15 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return;
 
         initialized = true;
-        agentLobbyUpdateHook = TryCreateHook<AgentLobbyUpdateDelegate>(AgentLobbyUpdateSig, AgentLobbyUpdateDetour, "AgentLobbyUpdate");
-        atkMessageBoxReceiveEventHook = TryCreateHook<AtkMessageBoxReceiveEventDelegate>(AtkMessageBoxReceiveEventSig, AtkMessageBoxReceiveEventDetour, "AtkMessageBoxReceiveEvent");
-        agentMapUpdateHook = TryCreateHook<AgentMapUpdateDelegate>(AgentMapUpdateSig, AgentMapUpdateDetour, "AgentMapUpdate");
-        deviceDx11PostTickHook = TryCreateHook<DeviceDx11PostTickDelegate>(DeviceDx11PostTickSig, DeviceDx11PostTickDetour, "DeviceDX11PostTick");
-        namePlateDrawHook = TryCreateHook<NamePlateDrawDelegate>(NamePlateDrawSig, NamePlateDrawDetour, "NamePlateDraw");
+        agentLobbyUpdateHook = TryCreateHook<AgentLobbyUpdateDelegate>(Sigs.AgentLobbyUpdateSig, AgentLobbyUpdateDetour, "AgentLobbyUpdate");
+        atkMessageBoxReceiveEventHook = TryCreateHook<AtkMessageBoxReceiveEventDelegate>(Sigs.AtkMessageBoxReceiveEventSig, AtkMessageBoxReceiveEventDetour, "AtkMessageBoxReceiveEvent");
+        agentMapUpdateHook = TryCreateHook<AgentMapUpdateDelegate>(Sigs.AgentMapUpdateSig, AgentMapUpdateDetour, "AgentMapUpdate");
+        deviceDx11PostTickHook = TryCreateHook<DeviceDx11PostTickDelegate>(Sigs.DeviceDx11PostTickSig, DeviceDx11PostTickDetour, "DeviceDX11PostTick");
+        namePlateDrawHook = TryCreateHook<NamePlateDrawDelegate>(Sigs.NamePlateDrawSig, NamePlateDrawDetour, "NamePlateDraw");
 
         try
         {
-            if (sigScanner.TryScanText(ToggleFadeSig, out var toggleFadeAddress) && toggleFadeAddress != nint.Zero)
+            if (sigScanner.TryScanText(Sigs.ToggleFadeSig, out var toggleFadeAddress) && toggleFadeAddress != nint.Zero)
             {
                 toggleFadeDelegate = Marshal.GetDelegateForFunctionPointer<ToggleFadeDelegate>(toggleFadeAddress);
                 log.Information($"[XASlave] Resolved SpecialRenderMode toggle delegate at 0x{toggleFadeAddress:X}.");
@@ -787,27 +776,49 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return;
         }
 
-        if (graphicsConfig->GraphicsRezoUpscaleType > 1)
-        {
-            LowResolutionStatusText = "Enabled - waiting for the game's Standard or AMD FSR upscaler.";
-            return;
-        }
-
+        var forcedFallbackUpscaler = EnsureLowResolutionUpscaleType(graphicsConfig);
         var normalizedScale = ClampLowResolutionScale(lowResolutionScale);
         if (Math.Abs(graphicsConfig->GraphicsRezoScale - normalizedScale) > 0.0001f)
             graphicsConfig->GraphicsRezoScale = normalizedScale;
 
-        LowResolutionStatusText = $"Enabled - 3D resolution scale is forced to {normalizedScale:0.00}.";
+        LowResolutionStatusText = forcedFallbackUpscaler
+            ? $"Enabled - 3D resolution scale is forced to {normalizedScale:0.00}, and DLSS is temporarily switched to AMD FSR while Low Resolution is active."
+            : $"Enabled - 3D resolution scale is forced to {normalizedScale:0.00}.";
     }
 
-    private void RestoreLowResolutionScale()
+    private void RestoreLowResolutionConfiguration()
     {
         var graphicsConfig = GraphicsConfig.Instance();
         if (graphicsConfig == null)
+        {
+            capturedLowResolutionUpscaleType = false;
+            originalLowResolutionUpscaleType = 0;
             return;
+        }
 
         var configuredScale = ClampLowResolutionScale(gameConfig.System.GetUInt("GraphicsRezoScale") / 100f);
         graphicsConfig->GraphicsRezoScale = configuredScale;
+
+        if (capturedLowResolutionUpscaleType)
+            graphicsConfig->GraphicsRezoUpscaleType = originalLowResolutionUpscaleType;
+
+        capturedLowResolutionUpscaleType = false;
+        originalLowResolutionUpscaleType = 0;
+    }
+
+    private bool EnsureLowResolutionUpscaleType(GraphicsConfig* graphicsConfig)
+    {
+        if (!capturedLowResolutionUpscaleType)
+        {
+            capturedLowResolutionUpscaleType = true;
+            originalLowResolutionUpscaleType = graphicsConfig->GraphicsRezoUpscaleType;
+        }
+
+        if (graphicsConfig->GraphicsRezoUpscaleType <= MaximumSupportedLowResolutionUpscaleType)
+            return false;
+
+        graphicsConfig->GraphicsRezoUpscaleType = LowResolutionFallbackUpscaleType;
+        return true;
     }
 
     private static bool TryGetClientSize(nint windowHandle, out int width, out int height)

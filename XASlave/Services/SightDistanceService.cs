@@ -10,10 +10,6 @@ namespace XASlave.Services;
 
 public unsafe sealed class SightDistanceService : IDisposable
 {
-    private const string CameraUpdateSig = "8B 81 ?? ?? ?? ?? 33 D2 F3 0F 10 05";
-    private const string CameraCurrentSightDistanceSig = "48 83 EC ?? 48 8B 15 ?? ?? ?? ?? 0F 29 74 24";
-    private const string CameraCollisionPatchSig = "84 C0 0F 84 ?? ?? ?? ?? F3 0F 10 44 24 ?? 41 B7";
-
     private readonly IFramework framework;
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
@@ -123,9 +119,9 @@ public unsafe sealed class SightDistanceService : IDisposable
             return;
 
         initialized = true;
-        cameraUpdateHook = TryCreateHook<CameraUpdateDelegate>(CameraUpdateSig, CameraUpdateDetour, "CameraUpdate");
-        cameraCurrentSightDistanceHook = TryCreateHook<CameraCurrentSightDistanceDelegate>(CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
-        ScanPatchAddress(CameraCollisionPatchSig, ref cameraCollisionPatchAddress, "CameraCollisionPatch");
+        cameraUpdateHook = TryCreateHook<CameraUpdateDelegate>(Sigs.CameraUpdateSig, CameraUpdateDetour, "CameraUpdate");
+        cameraCurrentSightDistanceHook = TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
+        ScanPatchAddress(Sigs.CameraCollisionPatchSig, ref cameraCollisionPatchAddress, "CameraCollisionPatch");
     }
 
     private Hook<T>? TryCreateHook<T>(string signature, T detour, string label)

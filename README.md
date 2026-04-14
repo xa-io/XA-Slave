@@ -10,7 +10,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Save to XA Database** - Push data to XA Database with optional cadence-gated login collection and a built-in task log for collection/save debugging.
 - **Auto-Glam Weather** - Configure per-weather glamour plate lists, then randomly apply valid class/job and plate choices when the active weather changes.
 - **City Chat Flooder** - Send announcements across selected worlds and cities with looping and delay controls.
-- **Xagman** - Coordinate cross-client Tony / Franchise Owner FC trading over TCP peer connections with peer-aware startup, stationary meetups, `Give` / `Take` / `Balance` routing, Slave JSON / Teamcraft item-list clipboard imports and exports, Artisan JSON imports, Tony supplier search matching, standby / waiting-room queue control, safer Dropbox / targeting / timeout recovery, automatic Tony rotation and warning-based completion cleanup, plus run-order/progress UI and relog/travel safeguards. Available in normal Release builds.
+- **Xagman** - Coordinate cross-client Tony / Franchise Owner FC trading with configurable same-PC or LAN hub support, XA-owned `/xa db ...` Dropbox queueing, `Give` / `Take` / `Balance` routing, item-list imports and exports, supplier matching with an optional `Ignore Gil in Select Matching Items` filter, standby queue control, optional FC-return cleanup, and safer trade recovery. Available in normal Release builds.
 - **Monthly Relogger** - Cycle through characters with AutoRetainer integration, XA Database-backed rank and personal-plot visibility, failure highlighting, and optional per-character actions.
 - **Prep Logistics** - Relog selected characters, see available main-inventory space, move them to a target world or location, and optionally enable AR multi or logout after the run.
 - **Auto-Accept FC Invites** - Monitor for FC invitations, automatically accept them, wait for a configurable period, and optionally leave again through the built-in floater-assist flow.
@@ -37,12 +37,12 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
   | Skip Cutscenes Feeding Chocobo |  |  |  |
   | Skip Dialogue |  |  |  |
 
-  Extra controls include section restore commands like `/xa allrestore`, `/xa gamerestore`, `/xa resrestore`, `/xa playerrestore`, and `/xa pluginrestore`, plus slash-command coverage for the shipped top-level XA Mods, custom-resolution shortcuts, and `Infinite Sprint` delay control.
+  Extra controls include section restore commands like `/xa allrestore`, `/xa gamerestore`, `/xa resrestore`, `/xa playerrestore`, and `/xa pluginrestore`, plus slash-command coverage for the shipped top-level XA Mods, custom-resolution shortcuts, and `Infinite Sprint` delay control. `Close Lobby Errors` also covers the stuck-logout `3102` dialog, and `Low Resolution` now temporarily switches unsupported DLSS runtime scaling to AMD FSR while the feature is active so the forced scale continues to apply.
 - **Plugin Operations** - Manage plugin startup behavior, verbose task logging, task-menu section state, and other shared XA Slave behavior/settings.
 - **Export Data** - Export multi-character tables from AutoRetainer, Lifestream, and XA Database into timestamped TSV or CSV snapshots.
 - **Repo List** - Review commonly required custom plugin repositories with installer/settings shortcuts, plugin presence checks, and copy-to-clipboard repo URLs.
 - **IPC Calls Available** - Review the IPC integrations XA Slave can talk to, along with cached/live availability checks for supported plugins and the XA Slave provider channels other plugins can call, including `XASlave.ExecuteCommand` for the shipped `/xa` command surface plus simple direct-call examples such as `XASlave.ExecuteCommand("xamods")` shown directly in the XA Slave provider block.
-- **Commands** - Review the current XA-owned slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, and `Plugin Mods`, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, and a direct `/xa commands` navigation path into that page.
+- **Commands** - Review the current XA-owned slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, and `Plugin Mods`, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
 - **Splash Screen** - Return to the default XA Slave landing page with the website, Discord, and first-time guidance without needing the ctrl-click unselect shortcut.
 - **Priority Tasks** - Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
 
@@ -59,6 +59,11 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 | `/xa` | Toggle the XA Slave window. |
 | `/xa allrestore` | Disable every top-level XA Mod toggle. |
 | `/xa commands` | Open `References > Commands`. |
+| `/xa db <itemId:qty ...>` | Queue Dropbox trade items from local inventory and start trading. |
+| `/xa db inv` | Queue all eligible items from `Inventory1` through `Inventory4` and start trading. |
+| `/xa db clear` | Clear the current Dropbox item queue. |
+| `/xa db request <itemId:qty ...>` | Print the missing quantities still needed locally as a ready-to-run `/xa db ...` command. |
+| `/xa db <shortcut>` | Build missing crystal-fill commands with `shards`, `crystals`, `clusters`, `shards+crystals`, `crystals+clusters`, or `shards+crystals+clusters`. |
 | `/xa preset list` | List saved XA Mods presets. |
 | `/xa preset load <name>` | Load a saved XA Mods preset. |
 | `/xa preset save <name>` | Save the current XA Mods selection as a preset. |
@@ -128,6 +133,10 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 ## Dependencies
 
 - **Optional:** [XA Database](https://github.com/xa-io/XA-Database) - For Save to XA Database task and IPC data collection
+
+## Development Note
+
+Native XA Mod signature strings are centralized in the local-only file `XASlave/Services/Sigs.cs`, which is intentionally gitignored from the shared repo. Restore or recreate that file before running local builds that depend on the native hook-backed XA Mods surfaces. The release helpers also now treat wildcard-matched local signature files such as `*Sigs.cs` as ignored inputs, so `3. Push_release.py` will not copy them into the local `Previous Releases` source snapshot.
 
 ## This Plugin is in Development
 

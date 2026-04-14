@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.Json;
 using System.Threading;
@@ -14,6 +15,7 @@ namespace XASlave.Services;
 
 public sealed class XagmanPeerService : IDisposable
 {
+    public const string DefaultHubAddress = "127.0.0.1";
     public const int DefaultHubPort = 45215;
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -24,6 +26,7 @@ public sealed class XagmanPeerService : IDisposable
 
     private readonly IPluginLog log;
     private readonly string localInstanceId;
+    private readonly string hubAddress;
     private readonly int hubPort;
     private readonly Action<IReadOnlyList<XagmanPeerPresence>> peersUpdated;
     private readonly object syncRoot = new();
@@ -72,11 +75,13 @@ public sealed class XagmanPeerService : IDisposable
     public XagmanPeerService(
         IPluginLog log,
         string localInstanceId,
+        string hubAddress,
         int hubPort,
         Action<IReadOnlyList<XagmanPeerPresence>> peersUpdated)
     {
         this.log = log;
         this.localInstanceId = localInstanceId;
+        this.hubAddress = NormalizeHubAddress(hubAddress);
         this.hubPort = NormalizePort(hubPort);
         this.peersUpdated = peersUpdated;
     }
@@ -100,6 +105,26 @@ public sealed class XagmanPeerService : IDisposable
     }
 
     public int HubPort => hubPort;
+    public string HubAddress => hubAddress;
+    public string HubEndpoint => $"{FormatEndpointHost(hubAddress)}:{hubPort}";
+
+    public static string NormalizeHubAddress(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return DefaultHubAddress;
+
+        var normalized = value.Trim();
+        if (normalized.StartsWith("[", StringComparison.Ordinal)
+            && normalized.EndsWith("]", StringComparison.Ordinal)
+            && normalized.Length > 2)
+        {
+            normalized = normalized[1..^1];
+        }
+
+        return normalized.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+            ? DefaultHubAddress
+            : normalized;
+    }
 
     public static int NormalizePort(int value)
     {
@@ -115,8 +140,8 @@ public sealed class XagmanPeerService : IDisposable
         TryStartHubListener();
         outboundClientTask ??= Task.Run(() => RunOutboundClientLoopAsync(cancellationTokenSource.Token));
         SetStatus(isHub
-            ? $"Starting Xagman hub on 127.0.0.1:{hubPort}..."
-            : $"Connecting to Xagman hub 127.0.0.1:{hubPort}...");
+            ? $"Starting Xagman hub on {HubEndpoint}..."
+            : $"Connecting to Xagman hub {HubEndpoint}...");
     }
 
     public void PublishPresence(XagmanPeerPresence record)
@@ -233,7 +258,14 @@ public sealed class XagmanPeerService : IDisposable
     {
         try
         {
-            hubListener = new TcpListener(IPAddress.Loopback, hubPort);
+            var listenerAddress = GetHubListenerAddress();
+            if (listenerAddress == null)
+            {
+                isHub = false;
+                return;
+            }
+
+            hubListener = new TcpListener(listenerAddress, hubPort);
             hubListener.Start();
             isHub = true;
             hubAcceptTask = Task.Run(() => AcceptHubClientsAsync(cancellationTokenSource.Token));
@@ -505,7 +537,11 @@ public sealed class XagmanPeerService : IDisposable
             try
             {
                 tcpClient = new TcpClient();
-                await tcpClient.ConnectAsync(IPAddress.Loopback, hubPort, cancellationToken).ConfigureAwait(false);
+                var connectAddress = GetPreferredHubConnectAddress();
+                if (connectAddress != null)
+                    await tcpClient.ConnectAsync(connectAddress, hubPort, cancellationToken).ConfigureAwait(false);
+                else
+                    await tcpClient.ConnectAsync(hubAddress, hubPort, cancellationToken).ConfigureAwait(false);
 
                 using (tcpClient)
                 {
@@ -520,8 +556,8 @@ public sealed class XagmanPeerService : IDisposable
                         }
 
                         SetStatus(isHub
-                            ? $"Xagman hub active on 127.0.0.1:{hubPort}"
-                            : $"Connected to Xagman hub 127.0.0.1:{hubPort}");
+                            ? $"Xagman hub active on {HubEndpoint}"
+                            : $"Connected to Xagman hub {HubEndpoint}");
 
                         await SendRegisterAsync().ConfigureAwait(false);
 
@@ -546,11 +582,11 @@ public sealed class XagmanPeerService : IDisposable
             }
             catch (SocketException)
             {
-                SetStatus($"Waiting for Xagman hub on 127.0.0.1:{hubPort}...");
+                SetStatus($"Waiting for Xagman hub on {HubEndpoint}...");
             }
             catch (IOException)
             {
-                SetStatus($"Disconnected from Xagman hub 127.0.0.1:{hubPort}.");
+                SetStatus($"Disconnected from Xagman hub {HubEndpoint}.");
             }
             catch (ObjectDisposedException)
             {
@@ -670,7 +706,7 @@ public sealed class XagmanPeerService : IDisposable
             return false;
         if (!IsConnected && !await WaitForConnectionAsync(TimeSpan.FromSeconds(2), cancellationTokenSource.Token).ConfigureAwait(false))
         {
-            SetStatus($"Xagman hub connection unavailable on 127.0.0.1:{hubPort}.");
+            SetStatus($"Xagman hub connection unavailable on {HubEndpoint}.");
             return false;
         }
 
@@ -684,7 +720,7 @@ public sealed class XagmanPeerService : IDisposable
 
         if (writer == null)
         {
-            SetStatus($"Xagman hub connection unavailable on 127.0.0.1:{hubPort}.");
+            SetStatus($"Xagman hub connection unavailable on {HubEndpoint}.");
             return false;
         }
 
@@ -854,6 +890,90 @@ public sealed class XagmanPeerService : IDisposable
                     })
                     .ToList(),
         };
+    }
+
+    private IPAddress? GetHubListenerAddress()
+    {
+        return ResolveHubAddresses(hubAddress)
+            .Where(address => !IPAddress.Any.Equals(address) && !IPAddress.IPv6Any.Equals(address))
+            .FirstOrDefault(IsLocalAddress);
+    }
+
+    private IPAddress? GetPreferredHubConnectAddress()
+    {
+        return ResolveHubAddresses(hubAddress)
+            .Where(address => !IPAddress.Any.Equals(address) && !IPAddress.IPv6Any.Equals(address))
+            .FirstOrDefault();
+    }
+
+    private static IReadOnlyList<IPAddress> ResolveHubAddresses(string address)
+    {
+        if (IPAddress.TryParse(address, out var parsedAddress))
+            return OrderResolvedAddresses(new[] { parsedAddress });
+
+        try
+        {
+            return OrderResolvedAddresses(Dns.GetHostAddresses(address));
+        }
+        catch
+        {
+            return Array.Empty<IPAddress>();
+        }
+    }
+
+    private static IReadOnlyList<IPAddress> OrderResolvedAddresses(IEnumerable<IPAddress> addresses)
+    {
+        return addresses
+            .Where(address => address.AddressFamily is AddressFamily.InterNetwork or AddressFamily.InterNetworkV6)
+            .OrderByDescending(address => address.AddressFamily == AddressFamily.InterNetwork)
+            .ToArray();
+    }
+
+    private static bool IsLocalAddress(IPAddress address)
+    {
+        if (IPAddress.IsLoopback(address))
+            return true;
+
+        try
+        {
+            foreach (var networkInterface in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (networkInterface.OperationalStatus != OperationalStatus.Up)
+                    continue;
+
+                var properties = networkInterface.GetIPProperties();
+                foreach (var unicastAddress in properties.UnicastAddresses)
+                {
+                    if (AreEquivalentAddresses(unicastAddress.Address, address))
+                        return true;
+                }
+            }
+        }
+        catch
+        {
+        }
+
+        return false;
+    }
+
+    private static bool AreEquivalentAddresses(IPAddress left, IPAddress right)
+    {
+        if (left.Equals(right))
+            return true;
+
+        if (left.IsIPv4MappedToIPv6)
+            left = left.MapToIPv4();
+        if (right.IsIPv4MappedToIPv6)
+            right = right.MapToIPv4();
+
+        return left.Equals(right);
+    }
+
+    private static string FormatEndpointHost(string address)
+    {
+        return address.Contains(':') && !address.StartsWith("[", StringComparison.Ordinal)
+            ? $"[{address}]"
+            : address;
     }
 
     private sealed class HubClientSession

@@ -22,7 +22,7 @@ namespace XASlave.Services;
 ///   YesAlready     — IsEnabled, SetEnabled, PausePlugin
 ///   Deliveroo      — GC turn-in running check
 ///   PandorasBox    — Feature get/set enabled, pause feature
-///   Dropbox        — Item trading queue management (unverified channel names)
+///   Dropbox        — Item trading queue management
 ///   TextAdvance    — IsEnabled, IsBusy, IsPaused, Stop
 ///   Artisan        — IsBusy, endurance, crafting lists, stop request
 ///   Splatoon       — IsLoaded check
@@ -105,7 +105,8 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<string, bool, object> pandoraSetFeatureSubscriber;
     private readonly ICallGateSubscriber<string, int, object> pandoraPauseFeatureSubscriber;
 
-    // ── Dropbox (channel names from SND Lua usage — not verified from source) ──
+    // ── Dropbox (verified against current Dropbox queue usage) ──
+    private readonly ICallGateSubscriber<uint, bool, int> dropboxGetItemQuantitySubscriber;
     private readonly ICallGateSubscriber<uint, bool, int, object> dropboxSetItemQuantitySubscriber;
     private readonly ICallGateSubscriber<bool> dropboxIsBusySubscriber;
     private readonly ICallGateSubscriber<object> dropboxBeginTradingSubscriber;
@@ -208,7 +209,8 @@ public sealed class IpcClient
         pandoraSetFeatureSubscriber = pluginInterface.GetIpcSubscriber<string, bool, object>("PandorasBox.SetFeatureEnabled");
         pandoraPauseFeatureSubscriber = pluginInterface.GetIpcSubscriber<string, int, object>("PandorasBox.PauseFeature");
 
-        // Dropbox — channel names from SND Lua IPC usage (not verified from plugin source)
+        // Dropbox — verified against current Dropbox queue usage
+        dropboxGetItemQuantitySubscriber = pluginInterface.GetIpcSubscriber<uint, bool, int>("Dropbox.GetItemQuantity");
         dropboxSetItemQuantitySubscriber = pluginInterface.GetIpcSubscriber<uint, bool, int, object>("Dropbox.SetItemQuantity");
         dropboxIsBusySubscriber = pluginInterface.GetIpcSubscriber<bool>("Dropbox.IsBusy");
         dropboxBeginTradingSubscriber = pluginInterface.GetIpcSubscriber<object>("Dropbox.BeginTradingQueue");
@@ -299,24 +301,6 @@ public sealed class IpcClient
     {
         try { xaIsReadySubscriber.InvokeFunc(); return true; }
         catch { return false; }
-    }
-
-    public bool IsViwiAvailable()
-    {
-        try
-        {
-            foreach (var installedPlugin in Plugin.PluginInterface.InstalledPlugins)
-            {
-                if (!installedPlugin.IsLoaded)
-                    continue;
-                if (installedPlugin.InternalName.Equals("VIWI", StringComparison.OrdinalIgnoreCase))
-                    return true;
-            }
-        }
-        catch
-        {
-        }
-        return false;
     }
 
     public bool IsSplatoonAvailable()
@@ -752,6 +736,20 @@ public sealed class IpcClient
     {
         try { dropboxSetItemQuantitySubscriber.InvokeAction(itemId, isHq, quantity); return true; }
         catch { return false; }
+    }
+
+    public bool DropboxTryGetItemQuantity(uint itemId, bool isHq, out int quantity)
+    {
+        try
+        {
+            quantity = dropboxGetItemQuantitySubscriber.InvokeFunc(itemId, isHq);
+            return true;
+        }
+        catch
+        {
+            quantity = 0;
+            return false;
+        }
     }
 
     public bool DropboxIsBusy()

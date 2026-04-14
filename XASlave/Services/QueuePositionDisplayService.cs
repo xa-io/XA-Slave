@@ -10,10 +10,6 @@ namespace XASlave.Services;
 
 public unsafe sealed class QueuePositionDisplayService : IDisposable
 {
-    private const string UpdateWorldTravelDataSig = "48 89 5C 24 ?? 57 48 83 EC 20 48 8B D9 48 8B FA 0F B6 4A 10";
-    private const string AgentWorldTravelUpdateSig = "E8 ?? ?? ?? ?? 40 0A F8 B9 ?? ?? ?? ??";
-    private const string ContentFinderQueuePositionDataSig = "40 ?? 57 41 ?? 48 ?? ?? ?? 0F ?? ?? ?? 49";
-
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
     private readonly IPluginLog log;
@@ -84,9 +80,9 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             return;
 
         initialized = true;
-        updateWorldTravelDataHook = TryCreateHook<UpdateWorldTravelDataDelegate>(UpdateWorldTravelDataSig, UpdateWorldTravelDataDetour, "UpdateWorldTravelData");
-        agentWorldTravelUpdateHook = TryCreateHook<AgentWorldTravelUpdateDelegate>(AgentWorldTravelUpdateSig, AgentWorldTravelUpdateDetour, "AgentWorldTravelUpdate");
-        contentFinderQueuePositionDataHook = TryCreateHook<ContentFinderQueuePositionDataDelegate>(ContentFinderQueuePositionDataSig, ContentFinderQueuePositionDataDetour, "ContentFinderQueuePositionData");
+        updateWorldTravelDataHook = TryCreateHook<UpdateWorldTravelDataDelegate>(Sigs.UpdateWorldTravelDataSig, UpdateWorldTravelDataDetour, "UpdateWorldTravelData");
+        agentWorldTravelUpdateHook = TryCreateHook<AgentWorldTravelUpdateDelegate>(Sigs.AgentWorldTravelUpdateSig, AgentWorldTravelUpdateDetour, "AgentWorldTravelUpdate");
+        contentFinderQueuePositionDataHook = TryCreateHook<ContentFinderQueuePositionDataDelegate>(Sigs.ContentFinderQueuePositionDataSig, ContentFinderQueuePositionDataDetour, "ContentFinderQueuePositionData");
     }
 
     private Hook<T>? TryCreateHook<T>(string signature, T detour, string label)

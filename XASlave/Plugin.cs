@@ -78,6 +78,7 @@ public sealed class Plugin : IDalamudPlugin
 
     // Services
     public IpcClient IpcClient { get; init; }
+    public DropboxQueueService DropboxQueue { get; init; }
     public IpcProvider IpcProvider { get; init; }
     public AutoCollectionService AutoCollector { get; init; }
     public TaskRunner TaskRunner { get; init; }
@@ -139,15 +140,19 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.XagmanSharedItemsMigrationComplete = true;
             xagmanItemsMigrationChanged = true;
         }
+        var normalizedXagmanHubAddress = XagmanPeerService.NormalizeHubAddress(Configuration.XagmanHubAddress);
+        var xagmanHubAddressChanged = !string.Equals(Configuration.XagmanHubAddress, normalizedXagmanHubAddress, StringComparison.Ordinal);
+        Configuration.XagmanHubAddress = normalizedXagmanHubAddress;
         var normalizedXagmanHubPort = Configuration.XagmanHubPort == 47786
             ? XagmanPeerService.DefaultHubPort
             : XagmanPeerService.NormalizePort(Configuration.XagmanHubPort);
         var xagmanHubPortChanged = Configuration.XagmanHubPort != normalizedXagmanHubPort;
         Configuration.XagmanHubPort = normalizedXagmanHubPort;
-        if (livePullsWereEnabled || protectedRiskyToonModsReset || autoGlamDefaultsInitialized || xagmanPreflightChanged || xagmanItemsChanged || xagmanItemsMigrationChanged || xagmanHubPortChanged)
+        if (livePullsWereEnabled || protectedRiskyToonModsReset || autoGlamDefaultsInitialized || xagmanPreflightChanged || xagmanItemsChanged || xagmanItemsMigrationChanged || xagmanHubAddressChanged || xagmanHubPortChanged)
             Configuration.Save();
 
         IpcClient = new IpcClient(PluginInterface, Log);
+        DropboxQueue = new DropboxQueueService(PluginInterface, IpcClient, Log);
         SlaveDatabase = new SlaveDatabaseService(PluginInterface, Log);
         AutoCollector = new AutoCollectionService(this, Condition, Framework, ObjectTable, Log);
         TaskRunner = new TaskRunner(Condition, Framework, Log, DtrBar, ToastGui);
@@ -177,7 +182,7 @@ public sealed class Plugin : IDalamudPlugin
         TeleportLockClear = new TeleportLockClearService(ChatGui, Log);
         PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, ClientState, Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
-        XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubPort, _ => { });
+        XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubAddress, Configuration.XagmanHubPort, _ => { });
         if (Configuration.XagmanPeerConnectionsEnabled)
             XagmanPeers.Start();
 
@@ -417,7 +422,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
+            HelpMessage = "Open XA Slave. Subcommands include xamods, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
         });
 
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
@@ -601,6 +606,12 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("db", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(DropboxQueue.TryExecute(subcommandArgs, out var message), message);
+            return;
+        }
+
         if (subcommand.Equals("sit", StringComparison.OrdinalIgnoreCase))
         {
             DozeSitAnywhere.RequestSit();
@@ -697,7 +708,7 @@ public sealed class Plugin : IDalamudPlugin
         var trimmed = NormalizeXaCommandInput(rawCommand);
         if (string.IsNullOrEmpty(trimmed))
         {
-            message = "Usage: pass the same text you would enter after /xa, for example `commands`, `xamods`, `logout`, `killgame`, `sprint on`, or `res 500x345`.";
+            message = "Usage: pass the same text you would enter after /xa, for example `commands`, `xamods`, `db clear`, `logout`, `killgame`, `sprint on`, or `res 500x345`.";
             return false;
         }
 
@@ -718,6 +729,9 @@ public sealed class Plugin : IDalamudPlugin
             message = "Opened Commands reference.";
             return true;
         }
+
+        if (subcommand.Equals("db", StringComparison.OrdinalIgnoreCase))
+            return DropboxQueue.TryExecute(subcommandArgs, out message);
 
         if (subcommand.Equals("sit", StringComparison.OrdinalIgnoreCase))
         {
@@ -1479,16 +1493,21 @@ public sealed class Plugin : IDalamudPlugin
 
     public void ToggleMainUi() => SlaveWindow.Toggle();
 
-    public int ApplyXagmanHubPort(int value)
+    public (string Address, int Port) ApplyXagmanHubEndpoint(string? address, int port)
     {
-        var normalized = XagmanPeerService.NormalizePort(value);
-        if (Configuration.XagmanHubPort == normalized && XagmanPeers.HubPort == normalized)
-            return normalized;
+        var normalizedAddress = XagmanPeerService.NormalizeHubAddress(address);
+        var normalizedPort = XagmanPeerService.NormalizePort(port);
+        if (Configuration.XagmanHubPort == normalizedPort
+            && string.Equals(Configuration.XagmanHubAddress, normalizedAddress, StringComparison.OrdinalIgnoreCase)
+            && XagmanPeers.HubPort == normalizedPort
+            && string.Equals(XagmanPeers.HubAddress, normalizedAddress, StringComparison.OrdinalIgnoreCase))
+            return (normalizedAddress, normalizedPort);
 
-        Configuration.XagmanHubPort = normalized;
+        Configuration.XagmanHubAddress = normalizedAddress;
+        Configuration.XagmanHubPort = normalizedPort;
         Configuration.Save();
         RestartXagmanPeerService();
-        return normalized;
+        return (normalizedAddress, normalizedPort);
     }
 
     public bool SetXagmanPeerConnectionsEnabled(bool enabled)
@@ -1505,7 +1524,7 @@ public sealed class Plugin : IDalamudPlugin
     private void RestartXagmanPeerService()
     {
         XagmanPeers.Dispose();
-        XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubPort, _ => { });
+        XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubAddress, Configuration.XagmanHubPort, _ => { });
         if (Configuration.XagmanPeerConnectionsEnabled)
             XagmanPeers.Start();
 
@@ -1533,5 +1552,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.17";
+    public const string Version = "0.0.0.18";
 }

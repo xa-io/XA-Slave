@@ -7,9 +7,6 @@ namespace XASlave.Services;
 
 public unsafe sealed class BuddyFeedCutsceneSkipService : IDisposable
 {
-    private const string PlayFeedBuddySceneSig =
-        "E8 ?? ?? ?? ?? 48 8B 5C 24 ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 33 C0 48 83 C4 ?? C3 CC CC CC CC CC CC CC CC CC CC CC 48 83 EC";
-
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
     private readonly IPluginLog log;
@@ -78,7 +75,7 @@ public unsafe sealed class BuddyFeedCutsceneSkipService : IDisposable
 
         try
         {
-            if (!sigScanner.TryScanText(PlayFeedBuddySceneSig, out var address) || address == nint.Zero)
+            if (!sigScanner.TryScanText(Sigs.PlayFeedBuddySceneSig, out var address) || address == nint.Zero)
             {
                 log.Warning("[XASlave] Buddy Feed Cutscene Skip could not find the feed cutscene signature.");
                 return;

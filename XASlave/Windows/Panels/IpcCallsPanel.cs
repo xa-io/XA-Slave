@@ -343,6 +343,7 @@ public partial class SlaveWindow
             if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
             ImGui.TableHeadersRow();
 
+            DrawIpcRow("Dropbox.GetItemQuantity", "int", "Read queued quantity for an item (id, hq)", livePulls);
             DrawIpcRow("Dropbox.SetItemQuantity", "Action", "Queue item (id, hq, qty)", livePulls);
             DrawIpcRow("Dropbox.IsBusy", "bool", "True when trading", livePulls);
             DrawIpcRow("Dropbox.BeginTradingQueue", "Action", "Start trading queued items", livePulls);
