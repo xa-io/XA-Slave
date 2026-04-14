@@ -134,10 +134,6 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 
 - **Optional:** [XA Database](https://github.com/xa-io/XA-Database) - For Save to XA Database task and IPC data collection
 
-## Development Note
-
-Native XA Mod signature strings are centralized in the local-only file `XASlave/Services/Sigs.cs`, which is intentionally gitignored from the shared repo. Restore or recreate that file before running local builds that depend on the native hook-backed XA Mods surfaces. The release helpers also now treat wildcard-matched local signature files such as `*Sigs.cs` as ignored inputs, so `3. Push_release.py` will not copy them into the local `Previous Releases` source snapshot.
-
 ## This Plugin is in Development
 
 This means that there are still features being implemented and enhanced. Suggestions and feature requests are welcome via GitHub issues or by visiting the Discord server for direct support.
