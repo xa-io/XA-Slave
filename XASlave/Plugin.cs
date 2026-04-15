@@ -1200,6 +1200,18 @@ public sealed class Plugin : IDalamudPlugin
             ChatGui.PrintError($"[XASlave] {message}");
     }
 
+    public void DisableAllXAMods()
+    {
+        DisableXAModDefinitions(GetAllXAModDefinitions());
+        Configuration.Save();
+    }
+
+    public bool LoadModListPreset(string name, out string message)
+        => LoadSavedXAModsPreset(name, out message);
+
+    public IReadOnlyList<string> GetSavedModListNames()
+        => Configuration.ToonModsSavedLists.Select(entry => entry.Name).ToList();
+
     private bool RestoreAllXAMods(out string message)
     {
         var disabledCount = DisableXAModDefinitions(GetAllXAModDefinitions());
@@ -1552,5 +1564,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.19";
+    public const string Version = "0.0.0.20";
 }

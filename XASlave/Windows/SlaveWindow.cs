@@ -6,6 +6,7 @@ using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Interface;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
@@ -142,9 +143,317 @@ public partial class SlaveWindow : Window, IDisposable
         Plugin.NamePlateGui.OnDataUpdate += OnXaAbuseNamePlateUpdate;
         Plugin.PluginInterface.UiBuilder.Draw += DrawXaAbuseOverlay;
 #endif
-        
+
         // Initialize Xagman peer event handlers for TCP task control
         InitializeXagmanPeerEventHandlers();
+
+        RebuildTitleBarFavButtons();
+    }
+
+    private static readonly Vector4 FavIconColorOn  = new(1.00f, 1.00f, 1.00f, 1.0f);
+    private static readonly Vector4 FavIconColorOff = new(0.45f, 0.45f, 0.45f, 1.0f);
+
+    // indices into TitleBarButtons for buttons whose icon color must update each frame
+    private int titleBarFavArPreIdx  = -1;
+    private int titleBarFavArPostIdx = -1;
+    private int titleBarFavGlamIdx   = -1;
+    private int titleBarFavKillIdx   = -1;
+
+    private void RefreshTitleBarFavIconColors()
+    {
+        if (titleBarFavGlamIdx >= 0 && titleBarFavGlamIdx < TitleBarButtons.Count)
+        {
+            var btn = TitleBarButtons[titleBarFavGlamIdx];
+            btn.IconColor = glamWeatherRunning ? FavIconColorOn : FavIconColorOff;
+            TitleBarButtons[titleBarFavGlamIdx] = btn;
+        }
+
+        if (titleBarFavArPreIdx >= 0 && titleBarFavArPreIdx < TitleBarButtons.Count)
+        {
+            var btn = TitleBarButtons[titleBarFavArPreIdx];
+            btn.IconColor = plugin.Configuration.ArPreProcessEnabled ? FavIconColorOn : FavIconColorOff;
+            TitleBarButtons[titleBarFavArPreIdx] = btn;
+        }
+
+        if (titleBarFavArPostIdx >= 0 && titleBarFavArPostIdx < TitleBarButtons.Count)
+        {
+            var btn = TitleBarButtons[titleBarFavArPostIdx];
+            btn.IconColor = plugin.Configuration.ArPostProcessEnabled ? FavIconColorOn : FavIconColorOff;
+            TitleBarButtons[titleBarFavArPostIdx] = btn;
+        }
+
+        if (titleBarFavKillIdx >= 0 && titleBarFavKillIdx < TitleBarButtons.Count)
+        {
+            var btn = TitleBarButtons[titleBarFavKillIdx];
+            btn.IconColor = (ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift) ? FavIconColorOn : FavIconColorOff;
+            TitleBarButtons[titleBarFavKillIdx] = btn;
+        }
+    }
+
+
+    private static readonly FontAwesomeIcon[] CustomFavSlotIcons =
+    {
+        FontAwesomeIcon.Bookmark,
+        FontAwesomeIcon.Hashtag,
+        FontAwesomeIcon.ThumbsUp,
+        FontAwesomeIcon.Star,
+    };
+
+    private void UpdateMinWidthForTitleBarButtons()
+    {
+        // Base covers the window title + native collapse/close buttons.
+        // Each custom button adds ~22px (font size + inner spacing).
+        const float basePx      = 160f;
+        const float perButtonPx = 22f;
+        var minWidth = Math.Max(300f, basePx + TitleBarButtons.Count * perButtonPx);
+
+        var currentMin = SizeConstraints?.MinimumSize ?? new Vector2(300, 240);
+        SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(minWidth, currentMin.Y),
+            MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
+        };
+    }
+
+    internal void RebuildTitleBarFavButtons()
+    {
+        TitleBarButtons.Clear();
+        titleBarFavArPreIdx  = -1;
+        titleBarFavArPostIdx = -1;
+        titleBarFavGlamIdx   = -1;
+        titleBarFavKillIdx   = -1;
+
+        var cfg = plugin.Configuration;
+
+        // ── Resolution shortcuts (rightmost = added first) ──
+        for (var ri = cfg.TitleBarFavResolutionItems.Count - 1; ri >= 0; ri--)
+        {
+            var item = cfg.TitleBarFavResolutionItems[ri];
+            if (!item.Enabled) continue;
+            var w = item.Width;
+            var h = item.Height;
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = FontAwesomeIcon.Desktop,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    ImGui.TextUnformatted($"Resolution: {w}x{h}");
+                },
+                Click = _ => { plugin.SystemWindowMods.TryApplyCustomResolution(w, h, out var resMsg); },
+            });
+        }
+
+        // ── Custom favourites ──
+        for (var ci = cfg.TitleBarFavCustomItems.Count - 1; ci >= 0; ci--)
+        {
+            var item = cfg.TitleBarFavCustomItems[ci];
+            if (!item.Enabled || string.IsNullOrWhiteSpace(item.MenuTarget)) continue;
+            var menuTarget = item.MenuTarget;
+            var slotIcon = ci < CustomFavSlotIcons.Length ? CustomFavSlotIcons[ci] : FontAwesomeIcon.Star;
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = slotIcon,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    ImGui.TextUnformatted(menuTarget);
+                },
+                Click = _ => NavigateToMenuLabel(menuTarget),
+            });
+        }
+
+        // ── AR Post-Process toggle ──
+        if (cfg.TitleBarFavArPostProcessEnabled)
+        {
+            titleBarFavArPostIdx = TitleBarButtons.Count;
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = FontAwesomeIcon.FlagCheckered,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    ImGui.TextUnformatted(plugin.Configuration.ArPostProcessEnabled
+                        ? "AR Post-Process: On — click to disable"
+                        : "AR Post-Process: Off — click to enable");
+                },
+                Click = _ =>
+                {
+                    plugin.Configuration.ArPostProcessEnabled = !plugin.Configuration.ArPostProcessEnabled;
+                    plugin.Configuration.Save();
+                },
+            });
+        }
+
+        // ── AR Pre-Process toggle ──
+        if (cfg.TitleBarFavArPreProcessEnabled)
+        {
+            titleBarFavArPreIdx = TitleBarButtons.Count;
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = FontAwesomeIcon.GasPump,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    ImGui.TextUnformatted(plugin.Configuration.ArPreProcessEnabled
+                        ? "AR Pre-Process: On — click to disable"
+                        : "AR Pre-Process: Off — click to enable");
+                },
+                Click = _ =>
+                {
+                    plugin.Configuration.ArPreProcessEnabled = !plugin.Configuration.ArPreProcessEnabled;
+                    plugin.Configuration.Save();
+                },
+            });
+        }
+
+        // ── Auto-Glam Weather toggle ──
+        if (cfg.TitleBarFavGlamWeatherEnabled)
+        {
+            titleBarFavGlamIdx = TitleBarButtons.Count;
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = FontAwesomeIcon.CloudSun,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    ImGui.TextUnformatted(glamWeatherRunning
+                        ? "Auto-Glam Weather: Running — click to stop"
+                        : "Auto-Glam Weather: Stopped — click to start");
+                },
+                Click = _ =>
+                {
+                    if (glamWeatherRunning)
+                        StopAutoGlamWeatherTask();
+                    else
+                        StartAutoGlamWeatherTask();
+                },
+            });
+        }
+
+        // ── Fav Mod List ──
+        if (cfg.TitleBarFavModListEnabled && !string.IsNullOrWhiteSpace(cfg.TitleBarFavModListName))
+        {
+            var listName = cfg.TitleBarFavModListName;
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = FontAwesomeIcon.List,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    ImGui.TextUnformatted($"Load XA Mod List: {listName}");
+                },
+                Click = _ => { plugin.LoadModListPreset(listName, out var loadMsg); },
+            });
+        }
+
+        // ── Disable All XA Mods ──
+        if (cfg.TitleBarFavDisableAllModsEnabled)
+        {
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = FontAwesomeIcon.Recycle,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    ImGui.TextUnformatted("Disable All XA Mods");
+                },
+                Click = _ => plugin.DisableAllXAMods(),
+            });
+        }
+
+        // ── Kill Game (requires Ctrl+Shift) ──
+        if (cfg.TitleBarFavKillGameEnabled)
+        {
+            titleBarFavKillIdx = TitleBarButtons.Count;
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = FontAwesomeIcon.Skull,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    var held = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
+                    if (held)
+                        ImGui.TextUnformatted("/xa killgame — release Ctrl+Shift to cancel");
+                    else
+                        ImGui.TextUnformatted("/xa killgame — hold Ctrl+Shift to unlock");
+                },
+                Click = _ =>
+                {
+                    if (ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift)
+                        plugin.InstantLogout.RequestKillGame();
+                },
+            });
+        }
+
+        UpdateMinWidthForTitleBarButtons();
+    }
+
+    private void NavigateToMenuLabel(string menuLabel)
+    {
+        if (string.IsNullOrWhiteSpace(menuLabel)) return;
+
+        // Search all built-in section arrays for matching label
+        foreach (var (task, label) in TaskItems)
+        {
+            if (string.Equals(label, menuLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                IsOpen = true;
+                SelectBuiltInTask(task);
+                return;
+            }
+        }
+
+        foreach (var (task, label) in CityShenanigansItems)
+        {
+            if (string.Equals(label, menuLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                IsOpen = true;
+                SelectBuiltInTask(task);
+                return;
+            }
+        }
+
+        foreach (var (task, label) in FcItems)
+        {
+            if (string.Equals(label, menuLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                IsOpen = true;
+                SelectBuiltInTask(task);
+                return;
+            }
+        }
+
+        foreach (var (task, label) in UtilityItems)
+        {
+            if (string.Equals(label, menuLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                IsOpen = true;
+                SelectBuiltInTask(task);
+                return;
+            }
+        }
+
+        foreach (var (task, label) in ReferenceItems)
+        {
+            if (string.Equals(label, menuLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                IsOpen = true;
+                if (task == SlaveTask.SplashScreen)
+                    ClearTaskSelection();
+                else
+                    SelectBuiltInTask(task);
+                return;
+            }
+        }
     }
 
     public void RebindXagmanPeerEventHandlers()
@@ -403,6 +712,8 @@ public partial class SlaveWindow : Window, IDisposable
 
     public override void Draw()
     {
+        RefreshTitleBarFavIconColors();
+
         // ── Left panel: Task menu ──
         var leftWidth = ClampTaskMenuWidth(plugin.Configuration.TaskMenuWidth);
         if (Math.Abs(leftWidth - plugin.Configuration.TaskMenuWidth) > 0.01f)
@@ -930,6 +1241,20 @@ public partial class SlaveWindow : Window, IDisposable
             ImGui.SameLine();
         if (ImGui.Button("Join Discord"))
             OpenExternalLink(DiscordUrl);
+
+        ImGui.Separator();
+        ImGui.PushTextWrapPos(0f);
+        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.95f, 0.85f, 0.50f, 1.0f));
+        ImGui.TextUnformatted($"What's New in v{PluginVersion}");
+        ImGui.PopStyleColor();
+        ImGui.Spacing();
+        DrawWrappedBulletText("Plugin Operations: new Titlebar Favourite Buttons — pin quick-action buttons directly onto the window title bar.");
+        DrawWrappedBulletText("Fixed buttons: Kill Game (hold Ctrl+Shift), Disable All Mods, Load Mod List, AR Pre-Process toggle, AR Post-Process toggle, Auto-Glam Weather toggle.");
+        DrawWrappedBulletText("Custom slots (×4): each slot navigates to any menu panel by name. Resolution slots (×4): each slot applies a saved WxH resolution in one click.");
+        DrawWrappedBulletText("Configure all buttons under Plugin Operations → Titlebar Favourite Buttons.");
+        DrawWrappedBulletText("Lobby error auto-close now covers additional error codes: 90000, 90003, 90004, 90005, 2002, 3050.");
+        DrawWrappedBulletText("Xagman: new TopUp item mode — top a character's quantity up to a threshold rather than giving a fixed amount.");
+        ImGui.PopTextWrapPos();
 
         ImGui.Separator();
         ImGui.PushTextWrapPos(0f);

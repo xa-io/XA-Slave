@@ -35,6 +35,21 @@ public class ReloggerCharacterData
 }
 
 [Serializable]
+public class TitleBarFavCustomItem
+{
+    public bool Enabled { get; set; } = true;
+    public string MenuTarget { get; set; } = string.Empty;
+}
+
+[Serializable]
+public class TitleBarFavResolutionItem
+{
+    public bool Enabled { get; set; } = true;
+    public int Width { get; set; } = 500;
+    public int Height { get; set; } = 345;
+}
+
+[Serializable]
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 0;
@@ -286,6 +301,17 @@ public class Configuration : IPluginConfiguration
     public float TaskMenuWidth { get; set; } = 180f;
     public string LastSelectedBuiltInTask { get; set; } = "";
     public string LastSelectedExternalTaskName { get; set; } = "";
+
+    // ── Titlebar Favourite Buttons ──
+    public bool TitleBarFavKillGameEnabled { get; set; } = false;
+    public bool TitleBarFavDisableAllModsEnabled { get; set; } = false;
+    public bool TitleBarFavModListEnabled { get; set; } = false;
+    public string TitleBarFavModListName { get; set; } = string.Empty;
+    public bool TitleBarFavGlamWeatherEnabled { get; set; } = false;
+    public bool TitleBarFavArPreProcessEnabled { get; set; } = false;
+    public bool TitleBarFavArPostProcessEnabled { get; set; } = false;
+    public List<TitleBarFavCustomItem> TitleBarFavCustomItems { get; set; } = new();
+    public List<TitleBarFavResolutionItem> TitleBarFavResolutionItems { get; set; } = new();
 
     public void InitializeFloorderDefaults()
     {

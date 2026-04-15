@@ -12,10 +12,16 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
     private const int ClickThrottleMilliseconds = 400;
     private static readonly string[] DialogueMarkers =
     [
+        "90000",
         "90001",
         "90002",
+        "90003",
+        "90004",
+        "90005",
         "90006",
         "90007",
+        "2002",
+        "3050",
         "3102",
         "Connection with the server was lost.",
         "You are still logged into the game.",

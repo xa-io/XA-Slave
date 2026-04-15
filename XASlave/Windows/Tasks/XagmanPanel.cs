@@ -82,7 +82,7 @@ public partial class SlaveWindow
     private string xagmanRecentFcReturnCharacter = string.Empty;
     private List<XagmanItemSearchEntry> xagmanItemResults = new();
     private Dictionary<string, XagmanItemSearchEntry>? xagmanItemNameLookupCache;
-    private static readonly string[] xagmanItemModeLabels = { "Give", "Take", "Balance" };
+    private static readonly string[] xagmanItemModeLabels = { "Give", "Take", "Balance", "TopUp" };
     private static readonly Regex xagmanTeamcraftItemLineRegex = new(
         @"^\s*(?<quantity>[0-9][0-9,]*)\s*x\s+(?<itemName>.+?)\s*$",
         RegexOptions.Compiled | RegexOptions.CultureInvariant | RegexOptions.IgnoreCase);
@@ -444,9 +444,10 @@ public partial class SlaveWindow
         ImGui.TextColored(sectionColor, "Franchise Owner Setup");
         ImGui.TextWrapped("1. Create a list of items in Shared Item List.");
         ImGui.Indent();
-        ImGui.TextWrapped("- Balance: balance up to the selected amount.");
+        ImGui.TextWrapped("- Balance: keep the owner at the selected amount by giving missing units and taking extras.");
         ImGui.TextWrapped("- Give: give a fixed amount or 0 for all.");
         ImGui.TextWrapped("- Take: take a fixed amount.");
+        ImGui.TextWrapped("- TopUp: give the owner up to the selected amount and leave any extra untouched.");
         ImGui.Unindent();
         ImGui.TextWrapped("2. Filter region if needed or use the search bar. Select characters manually, or use Select Matching Items to select visible characters with matching items from the Shared Item List.");
         ImGui.TextWrapped("3. Click Connect.");
@@ -963,7 +964,7 @@ public partial class SlaveWindow
             return string.Join(Environment.NewLine, lines);
         }
 
-        foreach (var mode in new[] { XagmanItemMode.Give, XagmanItemMode.Take, XagmanItemMode.Balance })
+        foreach (var mode in new[] { XagmanItemMode.Give, XagmanItemMode.Take, XagmanItemMode.Balance, XagmanItemMode.TopUp })
         {
             var modeItems = items.Where(item => item.Mode == mode).ToList();
             if (modeItems.Count == 0)
@@ -2295,6 +2296,10 @@ public partial class SlaveWindow
                     if (currentQuantity != Math.Max(0, item.Quantity))
                         return true;
                     break;
+                case XagmanItemMode.TopUp:
+                    if (currentQuantity < Math.Max(0, item.Quantity))
+                        return true;
+                    break;
                 case XagmanItemMode.Take:
                     return true;
             }
@@ -2577,6 +2582,8 @@ public partial class SlaveWindow
             SetAllXagmanItemModes(items, XagmanItemMode.Take);
         if (ImGui.Selectable("Balance", false))
             SetAllXagmanItemModes(items, XagmanItemMode.Balance);
+        if (ImGui.Selectable("TopUp", false))
+            SetAllXagmanItemModes(items, XagmanItemMode.TopUp);
         ImGui.EndPopup();
     }
 
@@ -6695,7 +6702,9 @@ public partial class SlaveWindow
             var currentQuantity = GetXagmanCharacterItemQuantity(ownerCharacter, request.ItemId, request.IsHq, request.ItemName);
             if (currentQuantity > request.CurrentQuantity)
                 return true;
-            if (request.Mode == XagmanItemMode.Balance && request.TargetQuantity > 0 && currentQuantity >= request.TargetQuantity)
+            if (request.Mode is XagmanItemMode.Balance or XagmanItemMode.TopUp
+                && request.TargetQuantity > 0
+                && currentQuantity >= request.TargetQuantity)
                 return true;
         }
         return false;
@@ -6817,6 +6826,7 @@ public partial class SlaveWindow
         {
             XagmanItemMode.Give => item.Quantity <= 0 ? localTradableQuantity : Math.Min(localTradableQuantity, item.Quantity),
             XagmanItemMode.Balance => Math.Min(localTradableQuantity, Math.Max(0, item.Quantity - partnerAvailable)),
+            XagmanItemMode.TopUp => Math.Min(localTradableQuantity, Math.Max(0, item.Quantity - partnerAvailable)),
             _ => 0,
         };
     }

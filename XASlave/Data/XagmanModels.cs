@@ -17,9 +17,10 @@ public enum XagmanTonyMode
 
 public enum XagmanItemMode
 {
-    Give,
-    Take,
-    Balance,
+    Give = 0,
+    Take = 1,
+    Balance = 2,
+    TopUp = 3,
 }
 
 public enum XagmanStatus
