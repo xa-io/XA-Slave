@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 
@@ -32,13 +33,12 @@ public partial class SlaveWindow
     };
 
     private static readonly string[] CustomFavSlotLabels = { "Bookmark", "Hashtag", "ThumbsUp", "Star" };
-
-    private const int MaxCustomFavItems = 4;
     private const int MaxResolutionFavItems = 4;
 
-    // custom fav slot state (parallel arrays, index-stable)
-    private bool[] pluginOpsFavCustomEnabled = new bool[MaxCustomFavItems];
-    private string[] pluginOpsFavCustomMenuInputs = new string[MaxCustomFavItems];
+    // custom fav slot state (parallel lists, index-stable)
+    private readonly List<bool> pluginOpsFavCustomEnabled = new();
+    private readonly List<string> pluginOpsFavCustomMenuInputs = new();
+    private readonly List<string> pluginOpsFavCustomSearchInputs = new();
 
     // resolution slot state
     private bool[] pluginOpsFavResEnabled = new bool[MaxResolutionFavItems];
@@ -54,11 +54,14 @@ public partial class SlaveWindow
 
         var cfg = plugin.Configuration;
 
-        for (var i = 0; i < MaxCustomFavItems; i++)
+        pluginOpsFavCustomEnabled.Clear();
+        pluginOpsFavCustomMenuInputs.Clear();
+        pluginOpsFavCustomSearchInputs.Clear();
+        foreach (var item in cfg.TitleBarFavCustomItems)
         {
-            var item = i < cfg.TitleBarFavCustomItems.Count ? cfg.TitleBarFavCustomItems[i] : null;
-            pluginOpsFavCustomEnabled[i] = item?.Enabled ?? false;
-            pluginOpsFavCustomMenuInputs[i] = item?.MenuTarget ?? string.Empty;
+            pluginOpsFavCustomEnabled.Add(item.Enabled);
+            pluginOpsFavCustomMenuInputs.Add(TitleBarFavSelectionKeys.Normalize(item.SelectionKey, item.MenuTarget));
+            pluginOpsFavCustomSearchInputs.Add(string.Empty);
         }
 
         for (var i = 0; i < MaxResolutionFavItems; i++)
@@ -73,6 +76,50 @@ public partial class SlaveWindow
     private static void FavRowLabel(string text)
     {
         ImGui.TextUnformatted(text);
+    }
+
+    private static string GetCustomFavSlotLabel(int slotIndex)
+    {
+        return slotIndex < CustomFavSlotLabels.Length
+            ? CustomFavSlotLabels[slotIndex]
+            : $"Star {slotIndex + 1}";
+    }
+
+    private void AddPluginOpsCustomFavRow()
+    {
+        pluginOpsFavCustomEnabled.Add(false);
+        pluginOpsFavCustomMenuInputs.Add(string.Empty);
+        pluginOpsFavCustomSearchInputs.Add(string.Empty);
+    }
+
+    private void RemovePluginOpsCustomFavRowAt(int slotIndex)
+    {
+        if (slotIndex < 0 || slotIndex >= pluginOpsFavCustomEnabled.Count)
+            return;
+
+        pluginOpsFavCustomEnabled.RemoveAt(slotIndex);
+        pluginOpsFavCustomMenuInputs.RemoveAt(slotIndex);
+        pluginOpsFavCustomSearchInputs.RemoveAt(slotIndex);
+    }
+
+    private static bool MatchesTitleBarFavSelectionSearch(TitleBarFavSelectionOption option, string query)
+    {
+        if (string.IsNullOrWhiteSpace(query))
+            return true;
+
+        foreach (var term in query.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+        {
+            if (option.Label.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || option.Category.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || option.Key.Contains(term, StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            return false;
+        }
+
+        return true;
     }
 
     private void DrawPluginOperationsTask()
@@ -96,6 +143,16 @@ public partial class SlaveWindow
 
         ImGui.TextDisabled("Opens XA Slave when the plugin loads and when the character logs in.");
 
+        var showVersionInTitle = cfg.ShowVersionInUpdatesTitle;
+        if (ImGui.Checkbox("Show Version in Window Title", ref showVersionInTitle))
+        {
+            cfg.ShowVersionInUpdatesTitle = showVersionInTitle;
+            cfg.ShowVersionInWindowTitleDefaultApplied = true;
+            cfg.Save();
+        }
+
+        ImGui.TextDisabled("Appends the current version number to the main XA Slave window title bar. The Updates window stays XA Slave - Updates.");
+
         ImGui.Spacing();
 
         var verboseTaskLogging = cfg.VerboseTaskLogging;
@@ -106,6 +163,14 @@ public partial class SlaveWindow
         }
 
         ImGui.TextDisabled("Off: normal user-facing task logs. On: detailed step timing, relog wait state, and CharacterSafeWait diagnostics.");
+
+        ImGui.Spacing();
+
+        if (ImGui.Button("⬆  Show Updates"))
+        {
+            Plugin.Instance.UpdatesWindow.Toggle();
+        }
+        ImGui.TextDisabled("Open the version history window.  Also available via /xa updates.");
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -124,6 +189,8 @@ public partial class SlaveWindow
 
     private void DrawPluginOpsFavFixedButtons(Configuration cfg)
     {
+        EnsureKillGameTitleBarDependency();
+
         ImGui.TextDisabled("Fixed Actions");
         ImGui.Spacing();
 
@@ -131,13 +198,23 @@ public partial class SlaveWindow
         var killGame = cfg.TitleBarFavKillGameEnabled;
         if (ImGui.Checkbox("##favKillGame", ref killGame))
         {
-            cfg.TitleBarFavKillGameEnabled = killGame;
+            if (killGame && !cfg.InstantLogoutEnabled)
+            {
+                var instantLogoutApplied = plugin.SetXAModEnabledByKey("instant-logout", true, out _);
+                cfg.TitleBarFavKillGameEnabled = instantLogoutApplied;
+            }
+            else
+            {
+                cfg.TitleBarFavKillGameEnabled = killGame;
+            }
+
             cfg.Save();
             RebuildTitleBarFavButtons();
         }
         ImGui.SameLine();
         FavRowLabel("Kill Game  [skull]  — hold Ctrl+Shift to fire");
 
+        ImGui.TextDisabled("Enabling this also turns on XA Mods > Instant Logout. Disabling this titlebar icon does not disable the XA Mod.");
         ImGui.Spacing();
 
         // Disable All XA Mods
@@ -229,13 +306,31 @@ public partial class SlaveWindow
 
     private void DrawPluginOpsFavCustomItems(Configuration cfg)
     {
-        ImGui.TextDisabled("Custom Favourites  (up to 4)");
-        ImGui.TextDisabled("  Check to show button. Icon: slot 1=bookmark, 2=hashtag, 3=thumbsup, 4=star.");
+        ImGui.TextDisabled("Custom Favourites");
+        ImGui.TextDisabled("  Add or remove rows as needed. The first four rows use bookmark, hashtag, thumbsup, and star; extra rows use star.");
+        ImGui.TextDisabled("  Rows can open panels, toggle any XA Mod, drive Special Rendering Modes tools, fire Sit / Doze, run All XA Mods Off, or trigger Stop All Automated Tasks.");
+        ImGui.TextDisabled("  Use the search box inside the picker to filter large panel and XA Mod lists.");
         ImGui.Spacing();
 
         var changed = false;
+        var removedIndex = -1;
+        var selectionOptions = GetTitleBarFavSelectionOptions();
 
-        for (var i = 0; i < MaxCustomFavItems; i++)
+        if (ImGui.Button("Add Favourite"))
+        {
+            AddPluginOpsCustomFavRow();
+            SaveCustomFavItems(cfg);
+        }
+
+        if (pluginOpsFavCustomEnabled.Count == 0)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled("No custom favourites configured.");
+        }
+
+        ImGui.Spacing();
+
+        for (var i = 0; i < pluginOpsFavCustomEnabled.Count; i++)
         {
             ImGui.PushID($"favCustom{i}");
 
@@ -249,34 +344,80 @@ public partial class SlaveWindow
 
             ImGui.SetNextItemWidth(220f);
             var comboLabel = pluginOpsFavCustomMenuInputs[i].Length > 0
-                ? pluginOpsFavCustomMenuInputs[i]
+                ? GetTitleBarFavSelectionLabel(pluginOpsFavCustomMenuInputs[i])
                 : "(none — click to pick)";
             if (ImGui.BeginCombo($"##menu{i}", comboLabel))
             {
+                var searchInput = pluginOpsFavCustomSearchInputs[i];
+                if (ImGui.IsWindowAppearing())
+                {
+                    searchInput = string.Empty;
+                    ImGui.SetKeyboardFocusHere();
+                }
+
+                ImGui.SetNextItemWidth(-1f);
+                ImGui.InputTextWithHint($"##menuSearch{i}", "Search panels, mods, actions", ref searchInput, 128);
+                pluginOpsFavCustomSearchInputs[i] = searchInput;
+
+                ImGui.Separator();
+
                 if (ImGui.Selectable("(none)", string.IsNullOrEmpty(pluginOpsFavCustomMenuInputs[i])))
                 {
                     pluginOpsFavCustomMenuInputs[i] = string.Empty;
+                    pluginOpsFavCustomSearchInputs[i] = string.Empty;
                     changed = true;
                 }
 
-                foreach (var menuLabel in AllBuiltInMenuLabels)
+                var lastCategory = string.Empty;
+                var matchesFound = false;
+                foreach (var option in selectionOptions)
                 {
-                    var selected = pluginOpsFavCustomMenuInputs[i] == menuLabel;
-                    if (ImGui.Selectable(menuLabel, selected))
+                    if (!MatchesTitleBarFavSelectionSearch(option, searchInput))
+                        continue;
+
+                    matchesFound = true;
+                    if (!option.Category.Equals(lastCategory, StringComparison.Ordinal))
                     {
-                        pluginOpsFavCustomMenuInputs[i] = menuLabel;
+                        if (lastCategory.Length > 0)
+                            ImGui.Spacing();
+
+                        ImGui.TextDisabled(option.Category);
+                        lastCategory = option.Category;
+                    }
+
+                    var selected = pluginOpsFavCustomMenuInputs[i].Equals(option.Key, StringComparison.OrdinalIgnoreCase);
+                    if (ImGui.Selectable(option.Label, selected))
+                    {
+                        pluginOpsFavCustomMenuInputs[i] = option.Key;
+                        pluginOpsFavCustomSearchInputs[i] = string.Empty;
                         changed = true;
                     }
                     if (selected) ImGui.SetItemDefaultFocus();
                 }
 
+                if (!matchesFound)
+                    ImGui.TextDisabled("No matches.");
+
                 ImGui.EndCombo();
             }
 
             ImGui.SameLine();
-            FavRowLabel($"[{CustomFavSlotLabels[i]}]");
+            if (ImGui.SmallButton($"x##remove{i}"))
+            {
+                removedIndex = i;
+            }
+
+            ImGui.SameLine();
+            FavRowLabel($"[{GetCustomFavSlotLabel(i)}]");
 
             ImGui.PopID();
+        }
+
+        if (removedIndex >= 0)
+        {
+            RemovePluginOpsCustomFavRowAt(removedIndex);
+            SaveCustomFavItems(cfg);
+            return;
         }
 
         if (changed)
@@ -336,12 +477,15 @@ public partial class SlaveWindow
     private void SaveCustomFavItems(Configuration cfg)
     {
         cfg.TitleBarFavCustomItems.Clear();
-        for (var i = 0; i < MaxCustomFavItems; i++)
+        for (var i = 0; i < pluginOpsFavCustomEnabled.Count; i++)
         {
             cfg.TitleBarFavCustomItems.Add(new TitleBarFavCustomItem
             {
                 Enabled = pluginOpsFavCustomEnabled[i],
-                MenuTarget = pluginOpsFavCustomMenuInputs[i],
+                SelectionKey = pluginOpsFavCustomMenuInputs[i],
+                MenuTarget = TitleBarFavSelectionKeys.TryGetMenuTarget(pluginOpsFavCustomMenuInputs[i], out var menuTarget)
+                    ? menuTarget
+                    : string.Empty,
             });
         }
 

@@ -62,6 +62,10 @@ public sealed class ArPostProcessService : IDisposable
     private bool preProcessLoginSubscribed;
     private bool postProcessIpcSubscribed;
     private bool postProcessArSuppressedByTask;
+    private bool startupRecoveryFrameworkHooked;
+    private bool startupRecoveryCompleted;
+    private bool startupRecoveryResetPending;
+    private DateTime startupRecoveryNextCheckAt = DateTime.MinValue;
     private bool shipBailoutFrameworkHooked;
     private readonly Dictionary<string, DateTime> shipBailoutAddonVisibleSince = new(StringComparer.Ordinal);
     private bool shipBailoutShouldUnsuppressAtEnd;
@@ -88,6 +92,8 @@ public sealed class ArPostProcessService : IDisposable
         this.objectTable = objectTable;
         this.log = log;
         this.dtrBar = dtrBar;
+
+        RefreshStartupRecoveryCheck();
 
         // If either pre or post processing is enabled, register on construction
         if (plugin.Configuration.ArPostProcessEnabled || plugin.Configuration.ArPreProcessEnabled || plugin.Configuration.ArShipExplorationBailoutEnabled)
@@ -255,6 +261,103 @@ public sealed class ArPostProcessService : IDisposable
             framework.Update -= OnPreProcessCheck;
             preProcessFrameworkHooked = false;
         }
+    }
+
+    public void RefreshStartupRecoveryCheck()
+    {
+        if (startupRecoveryCompleted)
+            return;
+
+        if (plugin.Configuration.ArStartupRecoveryEnabled)
+            ArmStartupRecoveryCheck();
+        else
+            DisarmStartupRecoveryCheck();
+    }
+
+    private void ArmStartupRecoveryCheck()
+    {
+        if (startupRecoveryCompleted || startupRecoveryFrameworkHooked || !plugin.Configuration.ArStartupRecoveryEnabled)
+            return;
+
+        startupRecoveryNextCheckAt = DateTime.MinValue;
+        framework.Update += OnStartupRecoveryCheck;
+        startupRecoveryFrameworkHooked = true;
+    }
+
+    private void DisarmStartupRecoveryCheck()
+    {
+        if (startupRecoveryFrameworkHooked)
+        {
+            framework.Update -= OnStartupRecoveryCheck;
+            startupRecoveryFrameworkHooked = false;
+        }
+
+        startupRecoveryResetPending = false;
+        startupRecoveryNextCheckAt = DateTime.MinValue;
+    }
+
+    private void CompleteStartupRecoveryCheck()
+    {
+        startupRecoveryCompleted = true;
+        DisarmStartupRecoveryCheck();
+    }
+
+    private void OnStartupRecoveryCheck(IFramework fw)
+    {
+        if (!plugin.Configuration.ArStartupRecoveryEnabled)
+        {
+            DisarmStartupRecoveryCheck();
+            return;
+        }
+
+        if (running || preProcessScheduledAt.HasValue)
+            return;
+
+        var now = DateTime.UtcNow;
+        if (now < startupRecoveryNextCheckAt)
+            return;
+
+        startupRecoveryNextCheckAt = now.AddSeconds(1);
+
+        if (startupRecoveryResetPending)
+        {
+            if (!Plugin.PlayerState.IsLoaded)
+                return;
+
+            AddLog("[AR Startup Recovery] Sending /ays reset now that the player has loaded.");
+            LogWarning("[XASlave] ArStartupRecovery: Player loaded after release; sending /ays reset.");
+            ChatHelper.SendMessage("/ays reset");
+            CompleteStartupRecoveryCheck();
+            return;
+        }
+
+        if (!plugin.IpcClient.IsAutoRetainerAvailable())
+            return;
+
+        if (!plugin.IpcClient.AutoRetainerGetSuppressed())
+        {
+            CompleteStartupRecoveryCheck();
+            return;
+        }
+
+        AddLog("[AR Startup Recovery] AutoRetainer reported suppressed on plugin load. Releasing suppression and resetting task state.");
+        LogWarning("[XASlave] ArStartupRecovery: AutoRetainer was suppressed on plugin load; performing one-time recovery.");
+
+        if (plugin.IpcClient.AutoRetainerSetSuppressed(false))
+            AddLog("[AR Startup Recovery] Released AutoRetainer suppression left behind by a reload or update.");
+        else
+            AddLog("[AR Startup Recovery] Failed to release AutoRetainer suppression through IPC; continuing with /ays reset.");
+
+        if (Plugin.PlayerState.IsLoaded)
+        {
+            AddLog("[AR Startup Recovery] Sending /ays reset to clear AutoRetainer task state.");
+            ChatHelper.SendMessage("/ays reset");
+            CompleteStartupRecoveryCheck();
+            return;
+        }
+
+        AddLog("[AR Startup Recovery] Waiting for player load before sending /ays reset.");
+        startupRecoveryResetPending = true;
     }
 
     /// <summary>Called by AR per-character BEFORE checking the postprocess list.
@@ -1639,6 +1742,8 @@ public sealed class ArPostProcessService : IDisposable
 
     public void Dispose()
     {
+        DisarmStartupRecoveryCheck();
+
         if (registered)
         {
             // Unsubscribe from all events

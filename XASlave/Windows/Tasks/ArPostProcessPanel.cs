@@ -88,6 +88,8 @@ public partial class SlaveWindow
         // ═══════════════════════════════════════════════════
         //  PRE-PROCESSING SECTION
         // ═══════════════════════════════════════════════════
+        //  STARTUP RECOVERY SECTION
+        // ═══════════════════════════════════════════════════
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -189,6 +191,45 @@ public partial class SlaveWindow
             if (ImGui.Checkbox("Save to XA Database##post", ref postSave)) { plugin.Configuration.ArPostProcessSaveToXaDatabase = postSave; postChanged = true; }
 
             if (postChanged) plugin.Configuration.Save();
+        }
+
+        // ═══════════════════════════════════════════════════
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
+
+        ImGui.TextColored(new Vector4(0.9f, 0.75f, 0.35f, 1.0f), "Startup Recovery On Load");
+        ImGui.TextDisabled("If XA Slave reloads while AutoRetainer is still suppressed, clear that stale state once.");
+        ImGui.Spacing();
+
+        var startupRecoveryEnabled = plugin.Configuration.ArStartupRecoveryEnabled;
+        var requireCtrlShiftToDisable = startupRecoveryEnabled && !(ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift);
+        var startupRecoveryToggled = false;
+
+        if (requireCtrlShiftToDisable)
+        {
+            using (ImRaii.Disabled())
+            {
+                ImGui.Checkbox("Recover AutoRetainer on Plugin Load", ref startupRecoveryEnabled);
+            }
+        }
+        else
+        {
+            startupRecoveryToggled = ImGui.Checkbox("Recover AutoRetainer on Plugin Load", ref startupRecoveryEnabled);
+        }
+
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+        {
+            ImGui.SetTooltip(
+                "On plugin load, XA Slave will check AutoRetainer once, release stale suppression, and send /ays reset.\n" +
+                "Hold CTRL + SHIFT while clicking to disable this safeguard. Re-enabling does not require modifiers.");
+        }
+
+        if (startupRecoveryToggled)
+        {
+            plugin.Configuration.ArStartupRecoveryEnabled = startupRecoveryEnabled;
+            plugin.Configuration.Save();
+            plugin.ArPostProcessor.RefreshStartupRecoveryCheck();
         }
 
         // ═══════════════════════════════════════════════════

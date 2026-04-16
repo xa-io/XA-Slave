@@ -144,9 +144,8 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Character List");
-        ImGui.SameLine();
-        ImGui.TextDisabled($"({chars.Count} total)");
+        DrawCharacterListHeader("Character List", $"({chars.Count} total)", "prepLogisticsAnonymize");
+        var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
         var prepRegionFilter = cfg.PrepLogisticsRegionFilter;
@@ -237,10 +236,10 @@ public partial class SlaveWindow
                 ImGui.Text(displayIndex.ToString());
 
                 ImGui.TableNextColumn();
-                ImGui.Text(charName);
+                ImGui.Text(GetDisplayCharacterKey(charName, anonymizeCharacters));
 
                 ImGui.TableNextColumn();
-                ImGui.TextDisabled(world);
+                ImGui.TextDisabled(GetDisplayWorldFromKey(charName, anonymizeCharacters));
 
                 ImGui.TableNextColumn();
                 ImGui.TextDisabled(regionDc);

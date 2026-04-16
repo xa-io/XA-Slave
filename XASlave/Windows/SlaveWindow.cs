@@ -126,7 +126,7 @@ public partial class SlaveWindow : Window, IDisposable
     private ITaskPanel? selectedExternalTask;
 
     public SlaveWindow(Plugin plugin)
-        : base("XA Slave##SlaveWindow", ImGuiWindowFlags.None)
+        : base("XA Slave###SlaveWindow", ImGuiWindowFlags.None)
     {
         SizeConstraints = new WindowSizeConstraints
         {
@@ -150,6 +150,13 @@ public partial class SlaveWindow : Window, IDisposable
         RebuildTitleBarFavButtons();
     }
 
+    public override void PreDraw()
+    {
+        WindowName = plugin.Configuration.ShowVersionInUpdatesTitle
+            ? $"XA Slave v{PluginVersion}###SlaveWindow"
+            : "XA Slave###SlaveWindow";
+    }
+
     private static readonly Vector4 FavIconColorOn  = new(1.00f, 1.00f, 1.00f, 1.0f);
     private static readonly Vector4 FavIconColorOff = new(0.45f, 0.45f, 0.45f, 1.0f);
 
@@ -158,6 +165,7 @@ public partial class SlaveWindow : Window, IDisposable
     private int titleBarFavArPostIdx = -1;
     private int titleBarFavGlamIdx   = -1;
     private int titleBarFavKillIdx   = -1;
+    private readonly Dictionary<int, Func<Vector4>> titleBarFavCustomColorResolvers = new();
 
     private void RefreshTitleBarFavIconColors()
     {
@@ -188,6 +196,16 @@ public partial class SlaveWindow : Window, IDisposable
             btn.IconColor = (ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift) ? FavIconColorOn : FavIconColorOff;
             TitleBarButtons[titleBarFavKillIdx] = btn;
         }
+
+        foreach (var (buttonIndex, colorResolver) in titleBarFavCustomColorResolvers)
+        {
+            if (buttonIndex < 0 || buttonIndex >= TitleBarButtons.Count)
+                continue;
+
+            var btn = TitleBarButtons[buttonIndex];
+            btn.IconColor = colorResolver();
+            TitleBarButtons[buttonIndex] = btn;
+        }
     }
 
 
@@ -198,6 +216,22 @@ public partial class SlaveWindow : Window, IDisposable
         FontAwesomeIcon.ThumbsUp,
         FontAwesomeIcon.Star,
     };
+
+    private static FontAwesomeIcon GetCustomFavButtonIcon(int slotIndex, string selectionKey)
+    {
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.SitNowKey, StringComparison.OrdinalIgnoreCase))
+            return FontAwesomeIcon.Chair;
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.DozeNowKey, StringComparison.OrdinalIgnoreCase))
+            return FontAwesomeIcon.Moon;
+
+        return slotIndex < CustomFavSlotIcons.Length ? CustomFavSlotIcons[slotIndex] : FontAwesomeIcon.Star;
+    }
+
+    private readonly record struct TitleBarFavSelectionOption(
+        string Key,
+        string Label,
+        string Category);
 
     private void UpdateMinWidthForTitleBarButtons()
     {
@@ -222,6 +256,7 @@ public partial class SlaveWindow : Window, IDisposable
         titleBarFavArPostIdx = -1;
         titleBarFavGlamIdx   = -1;
         titleBarFavKillIdx   = -1;
+        titleBarFavCustomColorResolvers.Clear();
 
         var cfg = plugin.Configuration;
 
@@ -249,20 +284,14 @@ public partial class SlaveWindow : Window, IDisposable
         for (var ci = cfg.TitleBarFavCustomItems.Count - 1; ci >= 0; ci--)
         {
             var item = cfg.TitleBarFavCustomItems[ci];
-            if (!item.Enabled || string.IsNullOrWhiteSpace(item.MenuTarget)) continue;
-            var menuTarget = item.MenuTarget;
-            var slotIcon = ci < CustomFavSlotIcons.Length ? CustomFavSlotIcons[ci] : FontAwesomeIcon.Star;
-            TitleBarButtons.Add(new TitleBarButton
-            {
-                Icon = slotIcon,
-                IconOffset = new Vector2(0, 1),
-                ShowTooltip = () =>
-                {
-                    using var tt = ImRaii.Tooltip();
-                    ImGui.TextUnformatted(menuTarget);
-                },
-                Click = _ => NavigateToMenuLabel(menuTarget),
-            });
+            if (!item.Enabled)
+                continue;
+
+            var selectionKey = TitleBarFavSelectionKeys.Normalize(item.SelectionKey, item.MenuTarget);
+            if (string.IsNullOrWhiteSpace(selectionKey))
+                continue;
+
+            TryAddTitleBarFavCustomButton(ci, selectionKey);
         }
 
         // ── AR Post-Process toggle ──
@@ -370,7 +399,7 @@ public partial class SlaveWindow : Window, IDisposable
         }
 
         // ── Kill Game (requires Ctrl+Shift) ──
-        if (cfg.TitleBarFavKillGameEnabled)
+        if (cfg.TitleBarFavKillGameEnabled && cfg.InstantLogoutEnabled)
         {
             titleBarFavKillIdx = TitleBarButtons.Count;
             TitleBarButtons.Add(new TitleBarButton
@@ -380,6 +409,12 @@ public partial class SlaveWindow : Window, IDisposable
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
+                    if (!plugin.CanTriggerLogoutActions(out var blockedMessage))
+                    {
+                        ImGui.TextUnformatted(blockedMessage);
+                        return;
+                    }
+
                     var held = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
                     if (held)
                         ImGui.TextUnformatted("/xa killgame — release Ctrl+Shift to cancel");
@@ -389,12 +424,339 @@ public partial class SlaveWindow : Window, IDisposable
                 Click = _ =>
                 {
                     if (ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift)
-                        plugin.InstantLogout.RequestKillGame();
+                    {
+                        if (!plugin.TryRequestKillGameAction(out var message))
+                            Plugin.ChatGui.PrintError($"[XASlave] {message}");
+                    }
                 },
             });
         }
 
         UpdateMinWidthForTitleBarButtons();
+    }
+
+    private IReadOnlyList<TitleBarFavSelectionOption> GetTitleBarFavSelectionOptions()
+    {
+        var options = new List<TitleBarFavSelectionOption>(AllBuiltInMenuLabels.Length + 48);
+
+        foreach (var menuLabel in AllBuiltInMenuLabels)
+            options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.FromMenuTarget(menuLabel), menuLabel, "Open Panel"));
+
+        foreach (var modInfo in plugin.GetTitleBarFavXAModInfos())
+            options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.FromXAModKey(modInfo.Key), $"XA Mod: {modInfo.DisplayName}", "XA Mods"));
+
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepNameplatesKey, "Hide addons / keep nameplates", "Special Rendering Modes"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepChatKey, "Hide addons / keep chat", "Special Rendering Modes"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideChatKey, "Hide chat", "Special Rendering Modes"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideActionBarsKey, "Hide action bars", "Special Rendering Modes"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideTargetInfoKey, "Hide target info", "Special Rendering Modes"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideNameplatesKey, "Hide nameplates", "Special Rendering Modes"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderRestoreAllKey, "Restore all", "Special Rendering Modes"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SitNowKey, "Sit now", "Doze & Sit Anywhere"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.DozeNowKey, "Doze now", "Doze & Sit Anywhere"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.DisableAllXAModsKey, "All XA Mods Off", "Quick Actions"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.StopAllKey, "Stop All Automated Tasks", "Quick Actions"));
+        return options;
+    }
+
+    private string GetTitleBarFavSelectionLabel(string? selectionKey, string? legacyMenuTarget = null)
+    {
+        var normalizedSelectionKey = TitleBarFavSelectionKeys.Normalize(selectionKey, legacyMenuTarget);
+        if (string.IsNullOrWhiteSpace(normalizedSelectionKey))
+            return "(none)";
+
+        foreach (var option in GetTitleBarFavSelectionOptions())
+        {
+            if (option.Key.Equals(normalizedSelectionKey, StringComparison.OrdinalIgnoreCase))
+                return option.Label;
+        }
+
+        return normalizedSelectionKey;
+    }
+
+    private bool HasAnySpecialRenderStoredUiToggles()
+    {
+        var cfg = plugin.Configuration;
+        return cfg.SpecialRenderHideAddonsKeepNameplatesEnabled
+            || cfg.SpecialRenderHideAddonsKeepChatEnabled
+            || cfg.SpecialRenderHideChatEnabled
+            || cfg.SpecialRenderHideActionBarsEnabled
+            || cfg.SpecialRenderHideTargetInfoEnabled
+            || cfg.SpecialRenderHideNameplatesEnabled;
+    }
+
+    private bool IsSpecialRenderTitleBarToggleActive(Func<Configuration, bool> selector)
+    {
+        return plugin.Configuration.SpecialRenderModesEnabled && selector(plugin.Configuration);
+    }
+
+    private void ToggleSpecialRenderTitleBarSetting(Func<Configuration, bool> selector, Action<Configuration, bool> store)
+    {
+        var cfg = plugin.Configuration;
+        var shouldEnable = !cfg.SpecialRenderModesEnabled || !selector(cfg);
+        store(cfg, shouldEnable);
+
+        if (!cfg.SpecialRenderModesEnabled)
+            cfg.SpecialRenderModesEnabled = plugin.SetSpecialRenderModesEnabled(true);
+        else
+            plugin.ApplySpecialRenderModesConfiguration();
+
+        cfg.Save();
+    }
+
+    private void RestoreAllSpecialRenderTitleBarSettings()
+    {
+        plugin.RestoreSpecialRenderModes(clearStoredUiToggles: true);
+        plugin.Configuration.Save();
+    }
+
+    private bool TryAddTitleBarFavCustomButton(int slotIndex, string selectionKey)
+    {
+        var slotIcon = GetCustomFavButtonIcon(slotIndex, selectionKey);
+        bool AddQuickActionButton(string title, string subtitle, System.Action click, Func<Vector4>? colorResolver = null)
+        {
+            var buttonIndex = TitleBarButtons.Count;
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = slotIcon,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    ImGui.TextUnformatted(title);
+                    if (subtitle.Length > 0)
+                        ImGui.TextDisabled(subtitle);
+                },
+                Click = _ => click(),
+            });
+
+            if (colorResolver != null)
+                titleBarFavCustomColorResolvers[buttonIndex] = colorResolver;
+
+            return true;
+        }
+
+        if (TitleBarFavSelectionKeys.TryGetMenuTarget(selectionKey, out var menuTarget))
+        {
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = slotIcon,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    ImGui.TextUnformatted(menuTarget);
+                },
+                Click = _ => NavigateToMenuLabel(menuTarget),
+            });
+            return true;
+        }
+
+        if (TitleBarFavSelectionKeys.TryGetXAModKey(selectionKey, out var xamodKey)
+            && plugin.TryGetTitleBarFavXAModInfo(xamodKey, out var modInfo))
+        {
+            var buttonIndex = TitleBarButtons.Count;
+            TitleBarButtons.Add(new TitleBarButton
+            {
+                Icon = slotIcon,
+                IconOffset = new Vector2(0, 1),
+                ShowTooltip = () =>
+                {
+                    using var tt = ImRaii.Tooltip();
+                    var enabled = plugin.IsXAModEnabled(xamodKey);
+                    ImGui.TextUnformatted($"{modInfo.DisplayName} [{modInfo.ScopeLabel}]");
+                    ImGui.TextUnformatted(enabled ? "On - click to disable" : "Off - click to enable");
+                },
+                Click = _button =>
+                {
+                    plugin.ToggleXAModByKey(xamodKey, out var _, out var _);
+                    EnsureKillGameTitleBarDependency();
+                },
+            });
+            titleBarFavCustomColorResolvers[buttonIndex] = () => plugin.IsXAModEnabled(xamodKey) ? FavIconColorOn : FavIconColorOff;
+            return true;
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepNameplatesKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Special Rendering Modes: Hide addons / keep nameplates",
+                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                () => ToggleSpecialRenderTitleBarSetting(
+                    cfg => cfg.SpecialRenderHideAddonsKeepNameplatesEnabled,
+                    (cfg, value) => cfg.SpecialRenderHideAddonsKeepNameplatesEnabled = value),
+                () => IsSpecialRenderTitleBarToggleActive(cfg => cfg.SpecialRenderHideAddonsKeepNameplatesEnabled) ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepChatKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Special Rendering Modes: Hide addons / keep chat",
+                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                () => ToggleSpecialRenderTitleBarSetting(
+                    cfg => cfg.SpecialRenderHideAddonsKeepChatEnabled,
+                    (cfg, value) => cfg.SpecialRenderHideAddonsKeepChatEnabled = value),
+                () => IsSpecialRenderTitleBarToggleActive(cfg => cfg.SpecialRenderHideAddonsKeepChatEnabled) ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideChatKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Special Rendering Modes: Hide chat",
+                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                () =>
+                {
+                    var shouldEnable = !plugin.Configuration.SpecialRenderModesEnabled || !plugin.Configuration.SpecialRenderHideChatEnabled;
+                    if (shouldEnable && !plugin.CanEnableSpecialRenderHideChat(out var message))
+                    {
+                        Plugin.ChatGui.PrintError($"[XASlave] {message}");
+                        return;
+                    }
+
+                    ToggleSpecialRenderTitleBarSetting(
+                        cfg => cfg.SpecialRenderHideChatEnabled,
+                        (cfg, value) => cfg.SpecialRenderHideChatEnabled = value);
+                },
+                () => IsSpecialRenderTitleBarToggleActive(cfg => cfg.SpecialRenderHideChatEnabled) ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideActionBarsKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Special Rendering Modes: Hide action bars",
+                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                () => ToggleSpecialRenderTitleBarSetting(
+                    cfg => cfg.SpecialRenderHideActionBarsEnabled,
+                    (cfg, value) => cfg.SpecialRenderHideActionBarsEnabled = value),
+                () => IsSpecialRenderTitleBarToggleActive(cfg => cfg.SpecialRenderHideActionBarsEnabled) ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideTargetInfoKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Special Rendering Modes: Hide target info",
+                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                () => ToggleSpecialRenderTitleBarSetting(
+                    cfg => cfg.SpecialRenderHideTargetInfoEnabled,
+                    (cfg, value) => cfg.SpecialRenderHideTargetInfoEnabled = value),
+                () => IsSpecialRenderTitleBarToggleActive(cfg => cfg.SpecialRenderHideTargetInfoEnabled) ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideNameplatesKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Special Rendering Modes: Hide nameplates",
+                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                () => ToggleSpecialRenderTitleBarSetting(
+                    cfg => cfg.SpecialRenderHideNameplatesEnabled,
+                    (cfg, value) => cfg.SpecialRenderHideNameplatesEnabled = value),
+                () => IsSpecialRenderTitleBarToggleActive(cfg => cfg.SpecialRenderHideNameplatesEnabled) ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderRestoreAllKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Special Rendering Modes: Restore all",
+                "Restores world and UI visibility, then clears the stored Special Rendering Modes UI toggles.",
+                RestoreAllSpecialRenderTitleBarSettings,
+                () => plugin.Configuration.SpecialRenderModesEnabled || HasAnySpecialRenderStoredUiToggles() ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.SitNowKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Sit now",
+                "Requires XA Mods > Doze & Sit Anywhere to be enabled.",
+                () => plugin.DozeSitAnywhere.RequestSit(),
+                () => plugin.Configuration.DozeSitAnywhereEnabled ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.DozeNowKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Doze now",
+                "Requires XA Mods > Doze & Sit Anywhere to be enabled.",
+                () => plugin.DozeSitAnywhere.RequestDoze(),
+                () => plugin.Configuration.DozeSitAnywhereEnabled ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.DisableAllXAModsKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "All XA Mods Off",
+                "Disable every XA Mod toggle.",
+                () =>
+                {
+                    plugin.DisableAllXAMods();
+                    EnsureKillGameTitleBarDependency();
+                },
+                () => plugin.HasAnyEnabledXAMods() ? FavIconColorOn : FavIconColorOff);
+        }
+
+        if (selectionKey.Equals(TitleBarFavSelectionKeys.StopAllKey, StringComparison.OrdinalIgnoreCase))
+        {
+            return AddQuickActionButton(
+                "Stop All Automated Tasks",
+                "Stop active XA task flows and disconnect Xagman.",
+                StopAllTitleBarOperations,
+                () => HasStopAllTitleBarTargets() ? FavIconColorOn : FavIconColorOff);
+        }
+
+        return false;
+    }
+
+    private void EnsureKillGameTitleBarDependency()
+    {
+        if (!plugin.Configuration.TitleBarFavKillGameEnabled || plugin.Configuration.InstantLogoutEnabled)
+            return;
+
+        plugin.Configuration.TitleBarFavKillGameEnabled = false;
+        plugin.Configuration.Save();
+        RebuildTitleBarFavButtons();
+    }
+
+    private bool HasStopAllTitleBarTargets()
+    {
+        return plugin.TaskRunner.IsRunning
+            || plugin.AutoCollector.IsRunning
+            || plugin.ArPostProcessor.IsRunning
+            || glamWeatherRunning
+            || fcFloaterRunning
+            || xagmanRunning
+            || plugin.XagmanPeers.IsStarted;
+    }
+
+    private void StopAllTitleBarOperations()
+    {
+        if (glamWeatherRunning)
+            StopAutoGlamWeatherTask();
+
+        if (fcFloaterRunning)
+            StopAutoAcceptFcInviteTask();
+
+        if (plugin.TaskRunner.IsRunning)
+        {
+            if (TryMapPriorityTaskName(plugin.TaskRunner.CurrentTaskName, out var activeTask))
+                StopPriorityTask(activeTask);
+            else
+                plugin.TaskRunner.Cancel();
+        }
+
+        if (plugin.AutoCollector.IsRunning)
+            plugin.AutoCollector.Cancel();
+
+        if (plugin.ArPostProcessor.IsRunning)
+            plugin.ArPostProcessor.Cancel();
+
+        ReleaseRefreshSubsArSuppression();
+
+        if (xagmanRunning)
+            StopXagmanTask();
+
+        if (plugin.XagmanPeers.IsStarted)
+            plugin.SetXagmanPeerConnectionsEnabled(false);
+
+        UpdatePriorityTaskExternalStatus();
     }
 
     private void NavigateToMenuLabel(string menuLabel)
@@ -644,6 +1006,7 @@ public partial class SlaveWindow : Window, IDisposable
 
     private void OnFrameworkUpdate(IFramework framework)
     {
+        plugin.EnforceSpecialRenderSafetyOnFrameworkTick();
         UpdatePriorityTaskMonitors();
         UpdatePriorityTaskExternalStatus();
         OnExportDataFrameworkTick();
@@ -1228,7 +1591,6 @@ public partial class SlaveWindow : Window, IDisposable
         ImGui.TextWrapped($"XA Slave v{PluginVersion}");
         ImGui.PopStyleColor();
         ImGui.Text("General information, support links, and setup guidance for XA Slave.");
-        ImGui.TextDisabled("Select a task from the left menu to open its panel. Ctrl-click the selected task to return here.");
         ImGui.PopTextWrapPos();
 
         ImGui.Spacing();
@@ -1242,18 +1604,24 @@ public partial class SlaveWindow : Window, IDisposable
         if (ImGui.Button("Join Discord"))
             OpenExternalLink(DiscordUrl);
 
+        var updatesButtonWidth = ImGui.CalcTextSize("Update History").X + (ImGui.GetStyle().FramePadding.X * 2f);
+        if (ImGui.GetContentRegionAvail().X >= updatesButtonWidth + ImGui.GetStyle().ItemSpacing.X)
+            ImGui.SameLine();
+        if (ImGui.Button("Update History"))
+            plugin.UpdatesWindow.Toggle();
+
         ImGui.Separator();
         ImGui.PushTextWrapPos(0f);
         ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.95f, 0.85f, 0.50f, 1.0f));
         ImGui.TextUnformatted($"What's New in v{PluginVersion}");
         ImGui.PopStyleColor();
         ImGui.Spacing();
-        DrawWrappedBulletText("Plugin Operations: new Titlebar Favourite Buttons — pin quick-action buttons directly onto the window title bar.");
-        DrawWrappedBulletText("Fixed buttons: Kill Game (hold Ctrl+Shift), Disable All Mods, Load Mod List, AR Pre-Process toggle, AR Post-Process toggle, Auto-Glam Weather toggle.");
-        DrawWrappedBulletText("Custom slots (×4): each slot navigates to any menu panel by name. Resolution slots (×4): each slot applies a saved WxH resolution in one click.");
-        DrawWrappedBulletText("Configure all buttons under Plugin Operations → Titlebar Favourite Buttons.");
-        DrawWrappedBulletText("Lobby error auto-close now covers additional error codes: 90000, 90003, 90004, 90005, 2002, 3050.");
-        DrawWrappedBulletText("Xagman: new TopUp item mode — top a character's quantity up to a threshold rather than giving a fixed amount.");
+        DrawWrappedBulletText("XA Peep adds a compact target tracker with a separate history window, cumulative per-player counts, logout-safe cached history, and local persistence through slave.db.");
+        DrawWrappedBulletText("XA Peep live rows now support hover focus preview, left/right click actions, Ctrl+Left Click examine, Ctrl+Right Click adventurer plate, mute-proof alert sounds, and configurable targeter cards/lines/dots.");
+        DrawWrappedBulletText("XA Peep also now supports party/alliance/in-combat filters, auto-open on plugin load, a compact resize lock, and reload-safe startup when enabled in config.");
+        DrawWrappedBulletText("Plugin Operations: Show Version in Window Title now defaults on until you turn it off, and Kill Game titlebar selection now auto-enables XA Mods > Instant Logout.");
+        DrawWrappedBulletText("Custom titlebar favourites can open panels, toggle any XA Mod, drive Special Rendering Modes UI presets, fire Sit / Doze actions, run Stop All Automated Tasks, and be added or removed as needed.");
+        DrawWrappedBulletText("Special Rendering Modes now uses stored toggle switches, Doze & Sit Anywhere keeps the simple master toggle flow, fixed Export Data paths can overwrite the same TSV/CSV file, and anonymize-character flows now use shared deterministic aliases across XA Slave.");
         ImGui.PopTextWrapPos();
 
         ImGui.Separator();

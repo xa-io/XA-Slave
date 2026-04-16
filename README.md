@@ -6,7 +6,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 
 ## Key Features
 
-- **AutoRetainer Tasks** - Run pre-processing, post-processing, bailout handling, sync cadence gates, and optional collection steps from one panel, including a workshop-only `Check FC Chest For Gil` pass that syncs Company Chest gil into XA Database before AutoRetainer continues.
+- **AutoRetainer Tasks** - Run pre-processing, post-processing, bailout handling, sync cadence gates, one-time startup recovery after plugin reloads/updates, and optional collection steps from one panel, including a workshop-only `Check FC Chest For Gil` pass that syncs Company Chest gil into XA Database before AutoRetainer continues.
 - **Save to XA Database** - Push data to XA Database with optional cadence-gated login collection and a built-in task log for collection/save debugging.
 - **Auto-Glam Weather** - Configure per-weather glamour plate lists, then randomly apply valid class/job and plate choices when the active weather changes.
 - **City Chat Flooder** - Send announcements across selected worlds and cities with looping and delay controls.
@@ -17,6 +17,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Auto-Accept FC Invites** - Monitor for FC invitations, automatically accept them, wait for a configurable period, and optionally leave again through the built-in floater-assist flow.
 - **FC Permissions Updater** - Review FC rosters with member-rank and FC-rank visibility before running shared permissions updates and the shared completion actions.
 - **Check Duplicate Plots** - Scan characters for duplicate housing plots and optionally rerun follow-up actions with the shared completion actions.
+- **Screenshot-Safe Character Lists** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` can anonymize visible character and world labels with one shared `Anonymize` toggle. Changing that checkbox in any task list immediately carries across the others, and the same setting is exposed as the `Anonymize Character Lists` XA Mod.
 - **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared action flow and shared completion actions.
 - **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, safer menu recovery, a workshop-side Company Chest gil sync into XA Database after the bell path finishes, and shared completion actions.
 - **Window Renamer** - Rename the FFXIV game window with an optional custom title, process-ID prefix, and current-character suffix.
@@ -24,23 +25,23 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 
   | Game Mods | Graphic Mods | Player Mods | Plugin Mods |
   | --- | --- | --- | --- |
-  | Allow Multiple Game Instances | Disable Background Rendering | Automate Expert Delivery | Force PeepingTom |
-  | Cancel Login Cooldown | Custom Resolutions | Clear Teleportation Lock |  |
+  | Allow Multiple Game Instances | Disable Background Rendering | Automate Expert Delivery | Anonymize Character Lists |
+  | Cancel Login Cooldown | Custom Resolutions | Clear Teleportation Lock | Force PeepingTom |
   | Close Lobby Errors | Hide Game Objects | Custom Sight Distance |  |
   | Copy Item Name For All | Ignore Minimum Window Size | Doze & Sit Anywhere |  |
   | Display Actual Queue Position | Low Resolution | Infinite Sprint |  |
   | Display MSQ Progress | Special Rendering Modes | Instant Logout |  |
-  | Expanded Player Right-Click Menu Search |  | Refuse Trade Request |  |
-  | Hide Unnecessary Popups |  | Reveal Undiscovered Areas |  |
-  | Live Anonymous Mode |  |  |  |
+  | Expanded Player Right-Click Menu Search |  | XA Peep |  |
+  | Hide Unnecessary Popups |  | Refuse Trade Request |  |
+  | Live Anonymous Mode |  | Reveal Undiscovered Areas |  |
   | Prevent Game Exiting From Lobby Errors |  |  |  |
   | Skip Cutscenes |  |  |  |
   | Skip Cutscenes Feeding Chocobo |  |  |  |
   | Skip Dialogue |  |  |  |
 
-  Extra controls include section restore commands like `/xa allrestore`, `/xa gamerestore`, `/xa resrestore`, `/xa playerrestore`, and `/xa pluginrestore`, plus slash-command coverage for the shipped top-level XA Mods, custom-resolution shortcuts, and `Infinite Sprint` delay control. `Close Lobby Errors` also covers the stuck-logout `3102` dialog, and `Low Resolution` now temporarily switches unsupported DLSS runtime scaling to AMD FSR while the feature is active so the forced scale continues to apply.
-- **Plugin Operations** - Manage plugin startup behavior, verbose task logging, task-menu section state, and other shared XA Slave behavior/settings.
-- **Export Data** - Export multi-character tables from AutoRetainer, Lifestream, and XA Database into timestamped TSV or CSV snapshots.
+Extra controls include section restore commands like `/xa allrestore`, `/xa gamerestore`, `/xa resrestore`, `/xa playerrestore`, and `/xa pluginrestore`, plus slash-command coverage for the shipped top-level XA Mods, custom-resolution shortcuts, and `Infinite Sprint` delay control. `Special Rendering Modes` now stores its hide-chat, action-bar, target-info, nameplate, and keep-chat/keep-nameplate visibility toggles while the feature is enabled, but `Hide Chat` cannot be enabled while AutoRetainer Multi Mode is active and XA blocks logout / kill-game actions whenever the active Special Rendering setup is currently hiding chat. `Doze & Sit Anywhere` keeps its direct `Sit now` / `Doze now` buttons under the master hook, `XA Peep` adds XA target tracking with a small compact list, a `(?)` help marker for the click controls, hover focus-target preview on live rows, left-click name echo plus right-click targeting in that compact list, `Ctrl+Left Click` examine, `Ctrl+Right Click` adventurer plate, a separate full history window, cumulative per-player counts, selectable direct alert sounds that still play when the game's own sound channel is muted, adjustable alert volume, configurable targeter line color, configurable targeter dot color and size, optional purple card/line/center-screen alerts, party/alliance/in-combat logging filters, automatic compact-window opening on plugin load, a titlebar lock button that toggles XA Peep resizing without affecting normal movement or close behavior, and `Ctrl+Shift` safety gating on all clear-history buttons. `Live Anonymous Mode` rewrites visible player nameplates to deterministic CLI/programming aliases such as `CLI Programming`, and `Anonymize Character Lists` applies deterministic CLI/programming/world aliases to XA Slave character tables and duplicate summaries through one shared global task-list toggle. `Close Lobby Errors` also covers the stuck-logout `3102` dialog, and `Low Resolution` now temporarily switches unsupported DLSS runtime scaling to AMD FSR while the feature is active so the forced scale continues to apply.
+- **Plugin Operations** - Manage plugin startup behavior, the default-on version display in the main XA Slave window title, verbose task logging, and titlebar favourites. Custom titlebar favourites can be added or removed as needed, can load XA Mod presets, toggle any XA Mod, drive the `Special Rendering Modes` UI presets, fire `Sit now` / `Doze now`, run `All XA Mods Off`, or trigger `Stop All Automated Tasks` to stop active XA task flows and disconnect Xagman. The custom-favourite picker now includes a search box so long panel and XA Mod lists are easier to filter while adding buttons. Sit and Doze titlebar favourites use dedicated chair and moon icons because the titlebar API is icon-based. The fixed `Kill Game` titlebar icon auto-enables `Instant Logout` when selected, but turning the icon back off leaves the XA Mod alone and the click action is blocked whenever Special Rendering is actively hiding chat. Includes a `Show Updates` button that opens the standalone version-history window with the current published release notes highlighted.
+- **Export Data** - Export multi-character tables from AutoRetainer, Lifestream, and XA Database into timestamped TSV or CSV snapshots, or overwrite the same fixed file path when `Overwrite fixed file path` is enabled.
 - **Repo List** - Review commonly required custom plugin repositories with installer/settings shortcuts, plugin presence checks, and copy-to-clipboard repo URLs.
 - **IPC Calls Available** - Review the IPC integrations XA Slave can talk to, along with cached/live availability checks for supported plugins and the XA Slave provider channels other plugins can call, including `XASlave.ExecuteCommand` for the shipped `/xa` command surface plus simple direct-call examples such as `XASlave.ExecuteCommand("xamods")` shown directly in the XA Slave provider block.
 - **Commands** - Review the current XA slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, and `Plugin Mods`, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
@@ -68,6 +69,7 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 | `/xa preset list` | List saved XA Mods presets. |
 | `/xa preset load <name>` | Load a saved XA Mods preset. |
 | `/xa preset save <name>` | Save the current XA Mods selection as a preset. |
+| `/xa updates` | Open the version history window. |
 | `/xa xamods` | Open `Utility > XA Mods`. |
 
 ### Game Mods
@@ -103,23 +105,24 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 | `/xa res add <width>x<height>` | Add a saved custom-resolution button. |
 | `/xa res remove <width>x<height>` | Remove a saved custom-resolution button. |
 | `/xa resrestore` | Disable the current Graphic Mods toggles. |
-| `/xa specialrender on/off` | Toggle `Special Rendering Modes`. |
+| `/xa specialrender on/off` | Toggle `Special Rendering Modes` (`Hide Chat` is blocked while AutoRetainer Multi Mode is active). |
 
 ### Player Mods
 
 | Command | Purpose |
 | --- | --- |
-| `/xa doze` | Trigger Doze Anywhere. |
+| `/xa doze` | Trigger Doze Anywhere while `Doze & Sit Anywhere` is enabled. |
 | `/xa expertdelivery on/off` | Toggle `Automate Expert Delivery`. |
 | `/xa instantlogout on/off` | Toggle `Instant Logout`. |
-| `/xa killgame` | Hard logout, then close the client. |
-| `/xa logout` | Trigger XA's hard logout seam. |
+| `/xa killgame` | Hard logout, then close the client while chat is visible. |
+| `/xa logout` | Trigger XA's hard logout seam while chat is visible. |
+| `/xa peep [on/off/clear]` | Open XA Peep's small list, toggle its tracker, or clear its stored history. |
 | `/xa playerrestore` | Disable the current Player Mods toggles. |
 | `/xa refusetrade on/off` | Toggle `Refuse Trade Request`. |
 | `/xa revealmap on/off` | Toggle `Reveal Undiscovered Areas`. |
 | `/xa sightdistance on/off` | Toggle `Custom Sight Distance`. |
-| `/xa sit` | Trigger Sit Anywhere. |
-| `/xa sitdoze on/off` | Toggle `Doze & Sit Anywhere`. |
+| `/xa sit` | Trigger Sit Anywhere while `Doze & Sit Anywhere` is enabled. |
+| `/xa sitdoze on/off` | Toggle the master `Doze & Sit Anywhere` hook. |
 | `/xa sprint on/off` | Toggle `Infinite Sprint`. |
 | `/xa sprintdelay <seconds>` | Set the `Infinite Sprint` movement-start delay. |
 | `/xa teleportlock on/off` | Toggle `Clear Teleportation Lock`. |
@@ -129,6 +132,7 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 | Command | Purpose |
 | --- | --- |
 | `/xa peepingtom on/off` | Toggle `Force PeepingTom`. |
+| `/xa anonchars on/off` | Toggle `Anonymize Character Lists`. |
 | `/xa pluginrestore` | Disable the current Plugin Mods toggles. |
 
 ## Dependencies

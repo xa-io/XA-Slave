@@ -158,25 +158,19 @@ public partial class SlaveWindow
                 configuration.SpecialRenderModeBackgroundColorA);
         }
 
-        void RestoreSpecialRenderModes()
+        void RestoreSpecialRenderModes(bool clearStoredUiToggles = false)
         {
-            var allUiFlags = UIModule.UiFlags.ActionBars
-                | UIModule.UiFlags.Chat
-                | UIModule.UiFlags.Hud
-                | UIModule.UiFlags.Nameplates
-                | UIModule.UiFlags.TargetInfo
-                | UIModule.UiFlags.Shortcuts;
+            plugin.RestoreSpecialRenderModes(clearStoredUiToggles);
+        }
 
-            plugin.SystemWindowMods.SetSpecialRenderWorldHidden(false, GetSpecialRenderBackgroundColor());
-            plugin.SystemWindowMods.SetSpecialRenderUiVisibility(allUiFlags, true);
+        void ApplySpecialRenderModesConfiguration()
+        {
+            plugin.ApplySpecialRenderModesConfiguration();
         }
 
         bool SetSpecialRenderModesEnabled(bool value)
         {
-            if (!value)
-                RestoreSpecialRenderModes();
-
-            return value;
+            return plugin.SetSpecialRenderModesEnabled(value);
         }
 
         void ApplyBackgroundRenderingConfiguration()
@@ -253,7 +247,8 @@ public partial class SlaveWindow
             string status,
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
-            System.Action? drawOptions = null)
+            System.Action? drawOptions = null,
+            bool showOptionsWhenDisabled = false)
         {
             var value = currentValue;
             var modifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
@@ -294,7 +289,7 @@ public partial class SlaveWindow
             ImGui.TextDisabled($"Status: {status}");
             DrawWarningText(warningText ?? string.Empty);
 
-            if (value && drawOptions != null)
+            if ((value || showOptionsWhenDisabled) && drawOptions != null)
             {
                 ImGui.Indent();
                 drawOptions();
@@ -338,7 +333,8 @@ public partial class SlaveWindow
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
             string[]? searchTerms = null,
-            Action? drawOptions = null)
+            Action? drawOptions = null,
+            bool showOptionsWhenDisabled = false)
         {
             if (toonModsShowOnlyEnabled && !currentValue)
                 return;
@@ -346,7 +342,7 @@ public partial class SlaveWindow
             if (!MatchesToonModsSearch(label, description, helpText, searchTerms))
                 return;
 
-            featureEntries.Add((section, label, () => DrawFeatureToggle(label, currentValue, apply, store, description, helpText, status, warningText, requireCtrlShiftToEnable, drawOptions)));
+            featureEntries.Add((section, label, () => DrawFeatureToggle(label, currentValue, apply, store, description, helpText, status, warningText, requireCtrlShiftToEnable, drawOptions, showOptionsWhenDisabled)));
         }
 
         void AddSavedFeatureEntry(
@@ -362,10 +358,11 @@ public partial class SlaveWindow
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
             string[]? searchTerms = null,
-            Action? drawOptions = null)
+            Action? drawOptions = null,
+            bool showOptionsWhenDisabled = false)
         {
             toonModDefinitions.Add((key, getCurrent, apply, store));
-            AddFeatureEntry(section, label, getCurrent(), apply, store, description, helpText, status, warningText, requireCtrlShiftToEnable, searchTerms, drawOptions);
+            AddFeatureEntry(section, label, getCurrent(), apply, store, description, helpText, status, warningText, requireCtrlShiftToEnable, searchTerms, drawOptions, showOptionsWhenDisabled);
         }
 
         List<string> GetCurrentToonModKeys()
@@ -797,14 +794,27 @@ public partial class SlaveWindow
             ImGui.TextDisabled("At least one provider must stay enabled for the search submenu to appear.");
         }
 
-        void DrawUiVisibilityButtons(string id, string hideLabel, string showLabel, UIModule.UiFlags flags)
+        void DrawSpecialRenderToggle(string label, string id, bool currentValue, Action<bool> store, string blockedEnableMessage = "")
         {
-            if (ImGui.Button($"{hideLabel}##{id}"))
-                plugin.SystemWindowMods.SetSpecialRenderUiVisibility(flags, false);
+            var value = currentValue;
+            var disableEnablePath = !currentValue && !string.IsNullOrWhiteSpace(blockedEnableMessage);
+            if (disableEnablePath)
+                ImGui.BeginDisabled();
 
-            ImGui.SameLine();
-            if (ImGui.Button($"{showLabel}##{id}"))
-                plugin.SystemWindowMods.SetSpecialRenderUiVisibility(flags, true);
+            var changed = ImGui.Checkbox($"{label}##{id}", ref value);
+
+            if (disableEnablePath)
+                ImGui.EndDisabled();
+
+            if (disableEnablePath && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                ImGui.SetTooltip(blockedEnableMessage);
+
+            if (!changed)
+                return;
+
+            store(value);
+            ApplySpecialRenderModesConfiguration();
+            SaveConfiguration();
         }
 
         void DrawSpecialRenderModeTools()
@@ -829,26 +839,49 @@ public partial class SlaveWindow
 
             ImGui.SameLine();
             if (ImGui.Button("Restore all##SpecialRenderModes"))
-                RestoreSpecialRenderModes();
+            {
+                RestoreSpecialRenderModes(clearStoredUiToggles: true);
+                SaveConfiguration();
+            }
 
             ImGui.TextDisabled("The background color is used when the world-render fade is forced on.");
+            ImGui.TextDisabled("These UI toggles are stored while Special Rendering Modes is enabled. Restore all clears them.");
+            if (!plugin.CanEnableSpecialRenderHideChat(out var hideChatBlockedMessage))
+                ImGui.TextDisabled(hideChatBlockedMessage);
 
-            DrawUiVisibilityButtons(
-                "SpecialRenderHideAddonsKeepNameplates",
+            DrawSpecialRenderToggle(
                 "Hide addons / keep nameplates",
-                "Restore",
-                UIModule.UiFlags.ActionBars | UIModule.UiFlags.Chat | UIModule.UiFlags.Hud | UIModule.UiFlags.TargetInfo | UIModule.UiFlags.Shortcuts);
+                "SpecialRenderHideAddonsKeepNameplates",
+                configuration.SpecialRenderHideAddonsKeepNameplatesEnabled,
+                value => configuration.SpecialRenderHideAddonsKeepNameplatesEnabled = value);
 
-            DrawUiVisibilityButtons(
-                "SpecialRenderHideAddonsKeepChat",
+            DrawSpecialRenderToggle(
                 "Hide addons / keep chat",
-                "Restore",
-                UIModule.UiFlags.ActionBars | UIModule.UiFlags.Nameplates | UIModule.UiFlags.Hud | UIModule.UiFlags.TargetInfo | UIModule.UiFlags.Shortcuts);
+                "SpecialRenderHideAddonsKeepChat",
+                configuration.SpecialRenderHideAddonsKeepChatEnabled,
+                value => configuration.SpecialRenderHideAddonsKeepChatEnabled = value);
 
-            DrawUiVisibilityButtons("SpecialRenderHideChat", "Hide chat log", "Restore", UIModule.UiFlags.Chat);
-            DrawUiVisibilityButtons("SpecialRenderHideActionBars", "Hide action bars", "Restore", UIModule.UiFlags.ActionBars);
-            DrawUiVisibilityButtons("SpecialRenderHideTargetInfo", "Hide target info", "Restore", UIModule.UiFlags.TargetInfo);
-            DrawUiVisibilityButtons("SpecialRenderHideNameplates", "Hide nameplates", "Restore", UIModule.UiFlags.Nameplates);
+            DrawSpecialRenderToggle(
+                "Hide chat",
+                "SpecialRenderHideChat",
+                configuration.SpecialRenderHideChatEnabled,
+                value => configuration.SpecialRenderHideChatEnabled = value,
+                hideChatBlockedMessage);
+            DrawSpecialRenderToggle(
+                "Hide action bars",
+                "SpecialRenderHideActionBars",
+                configuration.SpecialRenderHideActionBarsEnabled,
+                value => configuration.SpecialRenderHideActionBarsEnabled = value);
+            DrawSpecialRenderToggle(
+                "Hide target info",
+                "SpecialRenderHideTargetInfo",
+                configuration.SpecialRenderHideTargetInfoEnabled,
+                value => configuration.SpecialRenderHideTargetInfoEnabled = value);
+            DrawSpecialRenderToggle(
+                "Hide nameplates",
+                "SpecialRenderHideNameplates",
+                configuration.SpecialRenderHideNameplatesEnabled,
+                value => configuration.SpecialRenderHideNameplatesEnabled = value);
         }
 
         void AddCustomResolutionPreset()
@@ -1049,15 +1082,34 @@ public partial class SlaveWindow
 
         void DrawInstantLogoutTool()
         {
-            if (ImGui.Button("Log out now##InstantLogout") && !plugin.InstantLogout.RequestLogout())
-                SetToonModsStatus("XA Mods: Instant Logout did not fire a logout request.", true);
+            var logoutActionsAllowed = plugin.CanTriggerLogoutActions(out var blockedMessage);
+            if (!logoutActionsAllowed)
+                ImGui.BeginDisabled();
+
+            if (ImGui.Button("Log out now##InstantLogout"))
+            {
+                if (!plugin.TryRequestLogoutAction(out var message))
+                    SetToonModsStatus($"XA Mods: {message}", true);
+                else
+                    SetToonModsStatus("XA Mods: Triggered XA hard logout.");
+            }
 
             ImGui.SameLine();
-            if (ImGui.Button("Kill game now##InstantLogout") && !plugin.InstantLogout.RequestKillGame())
-                SetToonModsStatus("XA Mods: Instant Logout could not start the kill-game flow.", true);
+            if (ImGui.Button("Kill game now##InstantLogout"))
+            {
+                if (!plugin.TryRequestKillGameAction(out var message))
+                    SetToonModsStatus($"XA Mods: {message}", true);
+                else
+                    SetToonModsStatus("XA Mods: Triggered XA kill-game flow.");
+            }
+
+            if (!logoutActionsAllowed)
+                ImGui.EndDisabled();
 
             ImGui.TextDisabled("Commands: /xa logout | /xa killgame");
             ImGui.TextDisabled("Kill game waits for logout to complete, then sends /xlkill.");
+            if (!logoutActionsAllowed)
+                ImGui.TextDisabled(blockedMessage);
         }
 
         void DrawDozeSitAnywhereTools()
@@ -1071,6 +1123,7 @@ public partial class SlaveWindow
 
             ImGui.TextDisabled("Commands: /xa sit, /xa doze");
             ImGui.TextDisabled("Uses the emote-agent seam with the local sit/doze snap overrides instead of chat commands.");
+            ImGui.TextDisabled("Turn on the master toggle first, then use the panel buttons or add Sit / Doze titlebar favourites from Plugin Operations.");
         }
 
         void DrawInfiniteSprintOptions()
@@ -1190,17 +1243,145 @@ public partial class SlaveWindow
             ImGui.TextDisabled("Extra commands run locally after XA refuses an incoming trade. Use one command per line.");
         }
 
-        void DrawPeepingTomOptions()
+        void DrawXAPeepOptions()
         {
-            var preserveHistory = configuration.ForcePeepingTomPreserveHistoryOnLogoutEnabled;
-            if (ImGui.Checkbox("Preserve player list on logout##ForcePeepingTom", ref preserveHistory))
+            if (ImGui.Button(plugin.XAPeepWindow.IsOpen ? "Hide XA Peep Window" : "Show XA Peep Window"))
+                plugin.ToggleXAPeepUi();
+
+            ImGui.SameLine();
+            if (ImGui.Button(plugin.XAPeepHistoryWindow.IsOpen ? "Hide History" : "Show History"))
+                plugin.ToggleXAPeepHistoryUi();
+
+            ImGui.SameLine();
+            var clearXaPeepHistoryModifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
+            if (!clearXaPeepHistoryModifierHeld)
+                ImGui.BeginDisabled();
+            if (ImGui.Button("Clear XA Peep History"))
+                plugin.XAPeep.ClearHistory();
+            if (!clearXaPeepHistoryModifierHeld)
             {
-                var applied = plugin.PeepingTomIntegration.SetPreserveHistoryOnLogoutEnabled(preserveHistory);
-                configuration.ForcePeepingTomPreserveHistoryOnLogoutEnabled = applied;
+                ImGui.EndDisabled();
+                if (ImGui.IsItemHovered())
+                    ImGui.SetTooltip("Press and hold CTRL + SHIFT to allow clearing.");
+            }
+
+            var autoOpenWindow = configuration.XAPeepAutoOpenWindowOnPluginLoad;
+            if (ImGui.Checkbox("Auto open XA Peep on plugin load##XAPeep", ref autoOpenWindow))
+            {
+                configuration.XAPeepAutoOpenWindowOnPluginLoad = autoOpenWindow;
                 SaveConfiguration();
             }
 
-            ImGui.TextDisabled("Keeps an in-memory snapshot of Peeping Tom's visible target list and restores it after the next character login. The snapshot respects Peeping Tom's own history limit and is lost if either plugin unloads.");
+            var logParty = configuration.XAPeepLogParty;
+            if (ImGui.Checkbox("Log party members##XAPeep", ref logParty))
+            {
+                configuration.XAPeepLogParty = logParty;
+                SaveConfiguration();
+            }
+
+            var logAlliance = configuration.XAPeepLogAlliance;
+            if (ImGui.Checkbox("Log alliance members##XAPeep", ref logAlliance))
+            {
+                configuration.XAPeepLogAlliance = logAlliance;
+                SaveConfiguration();
+            }
+
+            var logPlayersInCombat = configuration.XAPeepLogInCombat;
+            if (ImGui.Checkbox("Log players in combat##XAPeep", ref logPlayersInCombat))
+            {
+                configuration.XAPeepLogInCombat = logPlayersInCombat;
+                SaveConfiguration();
+            }
+
+            var showCardWhenTargeted = configuration.XAPeepDisplayLineWhenTargetingMe;
+            if (ImGui.Checkbox("Show card when targeted##XAPeep", ref showCardWhenTargeted))
+            {
+                configuration.XAPeepDisplayLineWhenTargetingMe = showCardWhenTargeted;
+                SaveConfiguration();
+            }
+
+            var showTargeterLine = configuration.XAPeepShowTargeterLine;
+            if (ImGui.Checkbox("Show Targeter's Line##XAPeep", ref showTargeterLine))
+            {
+                configuration.XAPeepShowTargeterLine = showTargeterLine;
+                SaveConfiguration();
+            }
+
+            var targeterLineColor = configuration.XAPeepTargeterLineColor;
+            if (ImGui.ColorEdit4("Targeter line color##XAPeep", ref targeterLineColor))
+            {
+                configuration.XAPeepTargeterLineColor = targeterLineColor;
+                SaveConfiguration();
+            }
+
+            var showTargeterDot = configuration.XAPeepShowTargeterDot;
+            if (ImGui.Checkbox("Show targeter's dot##XAPeep", ref showTargeterDot))
+            {
+                configuration.XAPeepShowTargeterDot = showTargeterDot;
+                SaveConfiguration();
+            }
+
+            var targeterDotColor = configuration.XAPeepTargeterDotColor;
+            if (ImGui.ColorEdit4("Targeter dot color##XAPeep", ref targeterDotColor))
+            {
+                configuration.XAPeepTargeterDotColor = targeterDotColor;
+                SaveConfiguration();
+            }
+
+            var targeterDotSize = Math.Clamp(configuration.XAPeepTargeterDotSize, 1f, 15f);
+            if (ImGui.SliderFloat("Targeter dot size##XAPeep", ref targeterDotSize, 1f, 15f, "%.1f"))
+            {
+                configuration.XAPeepTargeterDotSize = Math.Clamp(targeterDotSize, 1f, 15f);
+                SaveConfiguration();
+            }
+
+            var showTargetersCard = configuration.XAPeepShowTargetersCard;
+            if (ImGui.Checkbox("Show targeters card##XAPeep", ref showTargetersCard))
+            {
+                configuration.XAPeepShowTargetersCard = showTargetersCard;
+                SaveConfiguration();
+            }
+
+            var showCenterNotification = configuration.XAPeepShowCenterNotification;
+            if (ImGui.Checkbox("Show center-screen notification##XAPeep", ref showCenterNotification))
+            {
+                configuration.XAPeepShowCenterNotification = showCenterNotification;
+                SaveConfiguration();
+            }
+
+            var soundEffectId = XAPeepData.ClampSoundEffectId(configuration.XAPeepSoundEffectId);
+            if (ImGui.BeginCombo("Sound##XAPeep", XAPeepData.GetSoundEffectLabel(soundEffectId)))
+            {
+                for (var i = 0; i <= XAPeepData.MaxSoundEffectId; i++)
+                {
+                    var selected = soundEffectId == i;
+                    if (ImGui.Selectable(XAPeepData.GetSoundEffectLabel(i), selected))
+                    {
+                        configuration.XAPeepSoundEffectId = i;
+                        configuration.XAPeepPlaySound = i > 0;
+                        SaveConfiguration();
+                        if (i > 0)
+                            plugin.XAPeep.PlayConfiguredSoundPreview();
+
+                        soundEffectId = i;
+                    }
+
+                    if (selected)
+                        ImGui.SetItemDefaultFocus();
+                }
+
+                ImGui.EndCombo();
+            }
+
+            var soundVolumePercent = Math.Clamp(configuration.XAPeepSoundVolume, 0f, 1f) * 100f;
+            if (ImGui.SliderFloat("Alert volume##XAPeep", ref soundVolumePercent, 0f, 100f, "%.0f%%"))
+            {
+                configuration.XAPeepSoundVolume = Math.Clamp(soundVolumePercent / 100f, 0f, 1f);
+                SaveConfiguration();
+            }
+
+            if (ImGui.IsItemDeactivatedAfterEdit() && XAPeepData.ClampSoundEffectId(configuration.XAPeepSoundEffectId) > 0)
+                plugin.XAPeep.PlayConfiguredSoundPreview();
         }
 
         AddSavedFeatureEntry(
@@ -1383,7 +1564,7 @@ public partial class SlaveWindow
             SetSpecialRenderModesEnabled,
             applied => configuration.SpecialRenderModesEnabled = applied,
             "Reveals world fade and UI visibility tools. Turning this off restores all world/UI surfaces.",
-            "Shows the world fade and UI visibility tools while enabled. Turning it off restores the world and any hidden UI groups.",
+            "Shows the world fade and UI visibility tools while enabled. Turning it off restores the world and any hidden UI groups. `Hide Chat` is blocked while AutoRetainer Multi Mode is active so chat does not disappear during AR multi sessions.",
             configuration.SpecialRenderModesEnabled
                 ? plugin.SystemWindowMods.SpecialRenderModesStatusText
                 : "Disabled",
@@ -1393,7 +1574,7 @@ public partial class SlaveWindow
                 "Restore all",
                 "Hide addons / keep nameplates",
                 "Hide addons / keep chat",
-                "Hide chat log",
+                "Hide chat",
                 "Hide action bars",
                 "Hide target info",
                 "Hide nameplates"],
@@ -1417,8 +1598,8 @@ public partial class SlaveWindow
             () => configuration.LiveAnonymousModeEnabled,
             plugin.NameplatePrivacy.SetAnonymousModeEnabled,
             applied => configuration.LiveAnonymousModeEnabled = applied,
-            "Masks visible player nameplates locally.",
-            "Masks visible player nameplates locally with generated traveler aliases and removes titles or FC tags from the rewritten plates. This only changes local presentation and does not change server data.",
+            "Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases.",
+            "Masks visible player nameplates locally with deterministic CLI/programming aliases such as `CLI Programming`, and removes titles or FC tags from the rewritten plates. The alias choice is keyed from the original character name and world so it stays stable across redraws. This only changes local presentation and does not change server data.",
             plugin.NameplatePrivacy.AnonymousModeStatusText);
 
         AddSavedFeatureEntry(
@@ -1498,9 +1679,9 @@ public partial class SlaveWindow
             plugin.DozeSitAnywhere.SetEnabled,
             applied => configuration.DozeSitAnywhereEnabled = applied,
             "Lets you trigger Sit and Doze from the panel or `/xa sit` / `/xa doze` without nearby furniture.",
-            "Allows Sit and Doze to fire without a nearby bed or chair. The panel buttons and `/xa sit` / `/xa doze` only work while this toggle is enabled.",
+            "Allows Sit and Doze to fire without a nearby bed or chair. The panel buttons and `/xa sit` / `/xa doze` only work while this toggle is enabled, and the same actions can also be added as titlebar favourites in Plugin Operations.",
             plugin.DozeSitAnywhere.StatusText,
-            searchTerms: ["/xa sit", "/xa doze", "sit now", "doze now", "emote", "bed", "chair"],
+            searchTerms: ["/xa sit", "/xa doze", "sit now", "doze now", "titlebar favourite", "emote", "bed", "chair"],
             drawOptions: DrawDozeSitAnywhereTools);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -1522,10 +1703,23 @@ public partial class SlaveWindow
             plugin.InstantLogout.SetEnabled,
             applied => configuration.InstantLogoutEnabled = applied,
             "Arms hard logout and enables `/xa logout` and `/xa killgame`.",
-            "Uses the native contents-finder request path for hard logout. `/xa killgame` waits for the logout to complete, then sends `/xlkill`. When this toggle is off, the panel buttons are hidden and those commands do nothing.",
+            "Uses the native contents-finder request path for hard logout. `/xa killgame` waits for the logout to complete, then sends `/xlkill`. When this toggle is off, the panel buttons are hidden and those commands do nothing. Logout and kill-game actions are also blocked while Special Rendering Modes is actively hiding chat.",
             plugin.InstantLogout.StatusText,
             searchTerms: ["logout", "/xa logout", "/xa killgame", "Log out now", "Kill game now"],
             drawOptions: DrawInstantLogoutTool);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "xa-peep",
+            "XA Peep",
+            () => configuration.XAPeepEnabled,
+            plugin.XAPeep.SetEnabled,
+            applied => configuration.XAPeepEnabled = applied,
+            "XA target tracker with a small cached list and full history window.",
+            "Tracks players targeting you in all areas, including PvP, keeps the small XA Peep list and the separate history window available through logout, records cumulative per-player counts in XA Slave's local database, and can show purple cards, lines, dots, center-screen notifications, and selectable XA alert sounds that still play even if the game's own sound channel is muted. XA Peep can be filtered to skip party, alliance, or in-combat players, can auto-open its compact window on plugin load, and lets you lock or unlock window resizing from the title bar. Use `/xa peep` to open the small window or `/xa peep on|off` to toggle tracking from chat.",
+            plugin.XAPeep.StatusText,
+            searchTerms: ["Show card when targeted", "Show Targeter's Line", "Show targeter's dot", "targeter line color", "targeter dot color", "targeter dot size", "Show targeters card", "Show center-screen notification", "Log party members", "Log alliance members", "Log players in combat", "Auto open XA Peep on plugin load", "lock", "resize", "/xa peep", "history", "PvP", "sound", "window"],
+            drawOptions: DrawXAPeepOptions,
+            showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
             ToonModsSection.IllegalMods,
             "moveable-after-death",
@@ -1541,6 +1735,23 @@ public partial class SlaveWindow
 
         AddSavedFeatureEntry(
             ToonModsSection.PluginMods,
+            "anonymize-character-lists",
+            "Anonymize Character Lists",
+            () => configuration.GlobalCharacterListAnonymizeEnabled,
+            enabled =>
+            {
+                configuration.GlobalCharacterListAnonymizeEnabled = enabled;
+                return true;
+            },
+            applied => configuration.GlobalCharacterListAnonymizeEnabled = applied,
+            "Forces screenshot-safe aliases in XA Slave character-list tables.",
+            "Applies deterministic CLI/programming/world aliases to XA Slave character-list tables and duplicate summaries. Every task-list `Anonymize` checkbox writes to this same shared global setting, so turning it on in one list carries across the others. Because it is a normal XA Mod, it can also be added as a titlebar favourite.",
+            configuration.GlobalCharacterListAnonymizeEnabled
+                ? "Enabled - character-list tables and duplicate summaries use deterministic aliases for screenshot-safe local views."
+                : "Disabled",
+            searchTerms: ["screenshot", "character list", "character lists", "anonymize", "privacy", "titlebar favourite"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.PluginMods,
             "force-peepingtom",
             "Force PeepingTom",
             () => configuration.ForcePeepingTomEnabled,
@@ -1549,8 +1760,7 @@ public partial class SlaveWindow
             "Keeps Peeping Tom target tracking active in PvP matches.",
             "Keeps Peeping Tom target tracking active in PvP by bypassing its local PvP runtime gate. Peeping Tom still controls what markers or windows it shows.",
             plugin.PeepingTomIntegration.StatusText,
-            searchTerms: ["Preserve player list on logout", "history"],
-            drawOptions: DrawPeepingTomOptions);
+            searchTerms: ["PvP", "Peeping Tom"]);
 
         var enabledXAModsCount = toonModDefinitions.Count(entry => entry.GetCurrent());
         ImGui.TextColored(

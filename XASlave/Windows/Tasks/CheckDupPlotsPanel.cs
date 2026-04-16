@@ -42,6 +42,7 @@ public partial class SlaveWindow
         var cfg = plugin.Configuration;
         var runner = plugin.TaskRunner;
         var charInfo = cfg.ReloggerCharacterInfo;
+        var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
 
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Check Duplicate Plots");
         ImGui.TextDisabled("Detects characters sharing the same personal estate or apartment in the XA Database.");
@@ -105,24 +106,24 @@ public partial class SlaveWindow
             ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), "Duplicates detected:");
             foreach (var g in estateGroups)
             {
-                var world = g.First().Key.Split('@').LastOrDefault() ?? "";
+                var world = GetDisplayWorldFromKey(g.First().Key, anonymizeCharacters);
                 var addr = g.First().Value.PersonalEstate;
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                    $"  Estate ({world}): {addr} \u2192 {string.Join(", ", g.Select(kv => kv.Key.Split('@')[0]))}");
+                    $"  Estate ({world}): {addr} \u2192 {string.Join(", ", g.Select(kv => GetDisplayCharacterName(kv.Key, anonymizeCharacters)))}");
             }
             foreach (var g in aptGroups)
             {
-                var world = g.First().Key.Split('@').LastOrDefault() ?? "";
+                var world = GetDisplayWorldFromKey(g.First().Key, anonymizeCharacters);
                 var addr = g.First().Value.Apartment;
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                    $"  Apartment ({world}): {addr} \u2192 {string.Join(", ", g.Select(kv => kv.Key.Split('@')[0]))}");
+                    $"  Apartment ({world}): {addr} \u2192 {string.Join(", ", g.Select(kv => GetDisplayCharacterName(kv.Key, anonymizeCharacters)))}");
             }
             foreach (var g in fcEstateGroups)
             {
-                var world = g.First().Key.Split('@').LastOrDefault() ?? "";
+                var world = GetDisplayWorldFromKey(g.First().Key, anonymizeCharacters);
                 var addr = g.First().Value.FcEstate;
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                    $"  FC Estate ({world}): {addr} \u2192 {string.Join(", ", g.Select(kv => kv.Key.Split('@')[0]))}");
+                    $"  FC Estate ({world}): {addr} \u2192 {string.Join(", ", g.Select(kv => GetDisplayCharacterName(kv.Key, anonymizeCharacters)))}");
             }
         }
         else if (allWithHousing.Count > 0)
@@ -210,7 +211,8 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // ── Character table with housing columns ──
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Characters with Housing Data");
+        DrawCharacterListHeader("Characters with Housing Data", $"({dupPlotsCharList.Count} shown)", "dupPlotsAnonymize");
+        anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
         if (ImGui.BeginTable("DupPlotsTable", 7,
@@ -259,9 +261,8 @@ public partial class SlaveWindow
             foreach (var i in sortedDup)
             {
                 var (charName, info) = dupPlotsCharList[i];
-                var nameParts = charName.Split('@');
-                var displayName = nameParts[0];
-                var world = nameParts.Length > 1 ? nameParts[1] : "";
+                var displayName = GetDisplayCharacterName(charName, anonymizeCharacters);
+                var world = GetDisplayWorldFromKey(charName, anonymizeCharacters);
 
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();

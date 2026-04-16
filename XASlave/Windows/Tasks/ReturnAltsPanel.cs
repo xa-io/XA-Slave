@@ -141,9 +141,8 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // ── Character table — only shows non-homeworld characters ──
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Characters Not On Homeworld");
-        ImGui.SameLine();
-        ImGui.TextDisabled($"({returnAltsCharList.Count} shown)");
+        DrawCharacterListHeader("Characters Not On Homeworld", $"({returnAltsCharList.Count} shown)", "returnAltsAnonymize");
+        var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
         if (ImGui.BeginTable("ReturnAltsTable", 5,
@@ -192,10 +191,11 @@ public partial class SlaveWindow
             foreach (var i in sortedRa)
             {
                 var (charName, info) = returnAltsCharList[i];
-                var nameParts = charName.Split('@');
-                var displayName = nameParts[0];
-                var homeworld = nameParts.Length > 1 ? nameParts[1] : "";
+                var homeworld = GetWorldFromKey(charName);
                 var currentWorld = !string.IsNullOrEmpty(info.CurrentWorld) ? info.CurrentWorld : homeworld;
+                var displayName = GetDisplayCharacterName(charName, anonymizeCharacters);
+                var displayHomeworld = GetDisplayWorld(homeworld, anonymizeCharacters);
+                var displayCurrentWorld = GetDisplayWorld(currentWorld, anonymizeCharacters);
 
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
@@ -204,12 +204,12 @@ public partial class SlaveWindow
                 { if (selected) returnAltsSelectedIndices.Add(i); else returnAltsSelectedIndices.Remove(i); }
                 ImGui.TableNextColumn(); ImGui.Text((i + 1).ToString());
                 ImGui.TableNextColumn(); ImGui.Text(displayName);
-                ImGui.TableNextColumn(); ImGui.TextDisabled(homeworld);
+                ImGui.TableNextColumn(); ImGui.TextDisabled(displayHomeworld);
                 ImGui.TableNextColumn();
                 if (currentWorld != homeworld)
-                    ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), currentWorld);
+                    ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), displayCurrentWorld);
                 else
-                    ImGui.TextDisabled(currentWorld);
+                    ImGui.TextDisabled(displayCurrentWorld);
             }
             ImGui.EndTable();
         }

@@ -1,6 +1,7 @@
 using Dalamud.Configuration;
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 using XASlave.Data;
 using XASlave.Services;
 
@@ -38,6 +39,7 @@ public class ReloggerCharacterData
 public class TitleBarFavCustomItem
 {
     public bool Enabled { get; set; } = true;
+    public string SelectionKey { get; set; } = string.Empty;
     public string MenuTarget { get; set; } = string.Empty;
 }
 
@@ -49,12 +51,78 @@ public class TitleBarFavResolutionItem
     public int Height { get; set; } = 345;
 }
 
+public static class TitleBarFavSelectionKeys
+{
+    public const string MenuPrefix = "menu:";
+    public const string XAModPrefix = "xamod:";
+    public const string DisableAllXAModsKey = "action:disable-all-xa-mods";
+    public const string StopAllKey = "action:stop-all";
+    public const string SpecialRenderHideAddonsKeepNameplatesKey = "action:special-render:hide-addons-keep-nameplates";
+    public const string SpecialRenderHideAddonsKeepChatKey = "action:special-render:hide-addons-keep-chat";
+    public const string SpecialRenderHideChatKey = "action:special-render:hide-chat";
+    public const string SpecialRenderHideActionBarsKey = "action:special-render:hide-action-bars";
+    public const string SpecialRenderHideTargetInfoKey = "action:special-render:hide-target-info";
+    public const string SpecialRenderHideNameplatesKey = "action:special-render:hide-nameplates";
+    public const string SpecialRenderRestoreAllKey = "action:special-render:restore-all";
+    public const string SitNowKey = "action:doze-sit:sit";
+    public const string DozeNowKey = "action:doze-sit:doze";
+
+    public static string FromMenuTarget(string? menuTarget)
+    {
+        return string.IsNullOrWhiteSpace(menuTarget)
+            ? string.Empty
+            : $"{MenuPrefix}{menuTarget.Trim()}";
+    }
+
+    public static string FromXAModKey(string? xamodKey)
+    {
+        return string.IsNullOrWhiteSpace(xamodKey)
+            ? string.Empty
+            : $"{XAModPrefix}{xamodKey.Trim()}";
+    }
+
+    public static string Normalize(string? selectionKey, string? legacyMenuTarget = null)
+    {
+        var trimmed = selectionKey?.Trim() ?? string.Empty;
+        return trimmed.Length > 0 ? trimmed : FromMenuTarget(legacyMenuTarget);
+    }
+
+    public static bool TryGetMenuTarget(string? selectionKey, out string menuTarget)
+    {
+        var trimmed = selectionKey?.Trim() ?? string.Empty;
+        if (trimmed.StartsWith(MenuPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            menuTarget = trimmed[MenuPrefix.Length..].Trim();
+            return menuTarget.Length > 0;
+        }
+
+        menuTarget = string.Empty;
+        return false;
+    }
+
+    public static bool TryGetXAModKey(string? selectionKey, out string xamodKey)
+    {
+        var trimmed = selectionKey?.Trim() ?? string.Empty;
+        if (trimmed.StartsWith(XAModPrefix, StringComparison.OrdinalIgnoreCase))
+        {
+            xamodKey = trimmed[XAModPrefix.Length..].Trim();
+            return xamodKey.Length > 0;
+        }
+
+        xamodKey = string.Empty;
+        return false;
+    }
+}
+
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 0;
     public bool OpenPluginOnLoad { get; set; } = false;
     public bool VerboseTaskLogging { get; set; } = false;
+    public bool ShowVersionInUpdatesTitle { get; set; } = true;
+    public bool ShowVersionInWindowTitleDefaultApplied { get; set; } = false;
+    public bool GlobalCharacterListAnonymizeEnabled { get; set; } = false;
 
     // Auto-collection on login â€” opens saddlebag/FC windows to collect data
     public bool AutoCollectOnLogin { get; set; } = false;
@@ -108,6 +176,7 @@ public class Configuration : IPluginConfiguration
     // Region filter for character list display
     public string ReloggerRegionFilter { get; set; } = "All";
     public int ReloggerStaleSelectDays { get; set; } = 20;
+    public bool ReloggerAnonymizeCharacters { get; set; } = false;
 
     // Per-character persistent data for table columns (Lv, Gil, FC, In FC, Last Logged In).
     // Keyed by "Name@World". Updated from AutoRetainer imports and relogger runs.
@@ -119,6 +188,7 @@ public class Configuration : IPluginConfiguration
     // â”€â”€ Refresh AR Subs/Bell â”€â”€
     public List<string> RefreshSubsCharacters { get; set; } = new();
     public string RefreshSubsRegionFilter { get; set; } = "All";
+    public bool RefreshSubsAnonymizeCharacters { get; set; } = false;
 
     // â”€â”€ Prep Logistics â”€â”€
     public List<string> PrepLogisticsCharacters { get; set; } = new();
@@ -128,6 +198,7 @@ public class Configuration : IPluginConfiguration
     public bool PrepLogisticsLogoutOnComplete { get; set; } = false;
     public bool PrepLogisticsKillGameOnComplete { get; set; } = false;
     public string PrepLogisticsRegionFilter { get; set; } = "All";
+    public bool PrepLogisticsAnonymizeCharacters { get; set; } = false;
 
     public XagmanRole XagmanRole { get; set; } = XagmanRole.Tony;
     public List<XagmanTonyCharacterEntry> XagmanTonyCharacters { get; set; } = new();
@@ -149,6 +220,8 @@ public class Configuration : IPluginConfiguration
     public bool XagmanWarningDetailsExpanded { get; set; } = true;
     public bool XagmanRoleInstructionsExpanded { get; set; } = true;
     public string XagmanRegionFilter { get; set; } = "All";
+    public bool XagmanTonyAnonymizeCharacters { get; set; } = false;
+    public bool XagmanFranchiseAnonymizeCharacters { get; set; } = false;
     public string XagmanHubAddress { get; set; } = XagmanPeerService.DefaultHubAddress;
     public int XagmanHubPort { get; set; } = 45215;
     public bool XagmanPeerConnectionsEnabled { get; set; } = false;
@@ -159,6 +232,9 @@ public class Configuration : IPluginConfiguration
     public bool FcPermsLogoutOnComplete { get; set; } = false;
     public bool FcPermsKillGameOnComplete { get; set; } = false;
     public bool FcPermsEnableArMultiOnComplete { get; set; } = true;
+    public bool FcPermsAnonymizeCharacters { get; set; } = false;
+    public bool DupPlotsAnonymizeCharacters { get; set; } = false;
+    public bool ReturnAltsAnonymizeCharacters { get; set; } = false;
 
     // â”€â”€ AR Pre-Processing â”€â”€
     // Master toggle â€” when enabled, runs collection steps on login BEFORE AR starts retainer processing
@@ -180,6 +256,7 @@ public class Configuration : IPluginConfiguration
     // â”€â”€ AR Post-Processing â”€â”€
     // Master toggle â€” when enabled, registers with AR for character post-processing in multi-mode
     public bool ArPostProcessEnabled { get; set; } = false;
+    public bool ArStartupRecoveryEnabled { get; set; } = true;
     // Per-step toggles â€” what to do after AR finishes each character
     public bool ArPostProcessOpenInventory { get; set; } = true;
     public bool ArPostProcessOpenArmouryChest { get; set; } = true;
@@ -242,6 +319,12 @@ public class Configuration : IPluginConfiguration
     public float SpecialRenderModeBackgroundColorG { get; set; } = 0.81f;
     public float SpecialRenderModeBackgroundColorB { get; set; } = 0.98f;
     public float SpecialRenderModeBackgroundColorA { get; set; } = 1.0f;
+    public bool SpecialRenderHideAddonsKeepNameplatesEnabled { get; set; } = false;
+    public bool SpecialRenderHideAddonsKeepChatEnabled { get; set; } = false;
+    public bool SpecialRenderHideChatEnabled { get; set; } = false;
+    public bool SpecialRenderHideActionBarsEnabled { get; set; } = false;
+    public bool SpecialRenderHideTargetInfoEnabled { get; set; } = false;
+    public bool SpecialRenderHideNameplatesEnabled { get; set; } = false;
     public bool ExpandedPlayerRightClickMenuSearchEnabled { get; set; } = false;
     public bool ExpandedPlayerRightClickMenuSearchFflogsEnabled { get; set; } = true;
     public bool ExpandedPlayerRightClickMenuSearchLodestoneEnabled { get; set; } = true;
@@ -262,13 +345,33 @@ public class Configuration : IPluginConfiguration
     public bool AutoRevealUndiscoveredAreasEnabled { get; set; } = false;
     public bool AutoClearTeleportationLockEnabled { get; set; } = false;
     public bool DozeSitAnywhereEnabled { get; set; } = false;
+    public bool DozeSitAnywhereAllowDoze { get; set; } = true;
+    public bool DozeSitAnywhereAllowSit { get; set; } = true;
     public bool InfiniteSprintEnabled { get; set; } = false;
     public float InfiniteSprintDelaySeconds { get; set; } = 2.0f;
     public bool InstantLogoutEnabled { get; set; } = false;
+    public bool XAPeepEnabled { get; set; } = false;
+    public bool XAPeepWindowOpen { get; set; } = false;
+    public bool XAPeepHistoryWindowOpen { get; set; } = false;
+    public bool XAPeepAutoOpenWindowOnPluginLoad { get; set; } = false;
+    public bool XAPeepWindowLocked { get; set; } = false;
+    public bool XAPeepLogParty { get; set; } = true;
+    public bool XAPeepLogAlliance { get; set; } = false;
+    public bool XAPeepLogInCombat { get; set; } = false;
+    public bool XAPeepDisplayLineWhenTargetingMe { get; set; } = true;
+    public bool XAPeepShowTargeterLine { get; set; } = true;
+    public bool XAPeepShowTargeterDot { get; set; } = true;
+    public bool XAPeepShowTargetersCard { get; set; } = true;
+    public bool XAPeepShowCenterNotification { get; set; } = false;
+    public bool XAPeepPlaySound { get; set; } = false;
+    public int XAPeepSoundEffectId { get; set; } = 0;
+    public float XAPeepSoundVolume { get; set; } = 0.45f;
+    public Vector4 XAPeepTargeterLineColor { get; set; } = new(0.68f, 0.35f, 0.94f, 0.95f);
+    public Vector4 XAPeepTargeterDotColor { get; set; } = new(0.68f, 0.35f, 0.94f, 0.95f);
+    public float XAPeepTargeterDotSize { get; set; } = 4f;
     public bool MoveableAfterDeathEnabled { get; set; } = false;
     public List<ToonModSavedList> ToonModsSavedLists { get; set; } = new();
     public bool ForcePeepingTomEnabled { get; set; } = false;
-    public bool ForcePeepingTomPreserveHistoryOnLogoutEnabled { get; set; } = false;
 
     // â”€â”€ City Chat Flooder â”€â”€
     public List<string> FloorderSelectedWorlds { get; set; } = new();
@@ -286,6 +389,7 @@ public class Configuration : IPluginConfiguration
     public bool ExportDataAlwaysOn { get; set; } = false;
     public int ExportDataRunEveryHours { get; set; } = 24;
     public string ExportDataOutputPath { get; set; } = string.Empty;
+    public bool ExportDataOverwriteFile { get; set; } = false;
     public string ExportDataLastSuccessfulRunUtc { get; set; } = string.Empty;
 
     public bool MenuAutomatedTasksExpanded { get; set; } = true;

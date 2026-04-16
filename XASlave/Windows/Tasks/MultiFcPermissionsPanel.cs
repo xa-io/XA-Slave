@@ -146,9 +146,8 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // ── Character List ──
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Character List");
-        ImGui.SameLine();
-        ImGui.TextDisabled($"({chars.Count} total)");
+        DrawCharacterListHeader("Character List", $"({chars.Count} total)", "fcPermsAnonymize");
+        var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
         var fcPermsRegionFilter = cfg.FcPermsRegionFilter;
@@ -251,11 +250,11 @@ public partial class SlaveWindow
 
                 // Character
                 ImGui.TableNextColumn();
-                ImGui.Text(charName);
+                ImGui.Text(GetDisplayCharacterKey(charName, anonymizeCharacters));
 
                 // World
                 ImGui.TableNextColumn();
-                ImGui.TextDisabled(world);
+                ImGui.TextDisabled(GetDisplayWorldFromKey(charName, anonymizeCharacters));
 
                 // FC Name
                 ImGui.TableNextColumn();

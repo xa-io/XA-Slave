@@ -5,6 +5,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility.Raii;
 using XASlave.Data;
+using XASlave.Services;
 using XASlave.Services.Tasks;
 
 namespace XASlave.Windows;
@@ -264,8 +265,59 @@ public partial class SlaveWindow
     /// <summary>Helper: extract world from "Name@World" key.</summary>
     private static string GetWorldFromKey(string key)
     {
-        var parts = key.Split('@');
-        return parts.Length > 1 ? parts[1] : "";
+        return CharacterAliasHelper.GetWorldFromKey(key);
+    }
+
+    private bool IsCharacterListAnonymizationEnabled()
+    {
+        return plugin.Configuration.GlobalCharacterListAnonymizeEnabled;
+    }
+
+    private void DrawCharacterListHeader(string title, string countLabel, string checkboxId)
+    {
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), title);
+        ImGui.SameLine();
+        ImGui.TextDisabled(countLabel);
+        ImGui.SameLine();
+        var anonymize = plugin.Configuration.GlobalCharacterListAnonymizeEnabled;
+        if (ImGui.Checkbox($"Anonymize##{checkboxId}", ref anonymize))
+        {
+            plugin.Configuration.GlobalCharacterListAnonymizeEnabled = anonymize;
+            plugin.Configuration.Save();
+        }
+
+        if (ImGui.IsItemHovered())
+        {
+            ImGui.SetTooltip("Hide character names and worlds locally with deterministic aliases for screenshot-safe tables. This checkbox is shared across every XA Slave task list.");
+        }
+    }
+
+    private static string GetDisplayCharacterKey(string characterNameWorld, bool anonymize)
+    {
+        return anonymize
+            ? CharacterAliasHelper.Resolve(characterNameWorld).NameWorld
+            : CharacterAliasHelper.NormalizeNameWorldKey(characterNameWorld);
+    }
+
+    private static string GetDisplayCharacterName(string characterNameWorld, bool anonymize)
+    {
+        return anonymize
+            ? CharacterAliasHelper.Resolve(characterNameWorld).Name
+            : CharacterAliasHelper.GetNameFromKey(characterNameWorld);
+    }
+
+    private static string GetDisplayWorld(string world, bool anonymize)
+    {
+        return anonymize
+            ? CharacterAliasHelper.ResolveWorldAlias(world)
+            : CharacterAliasHelper.NormalizeIdentityPart(world);
+    }
+
+    private static string GetDisplayWorldFromKey(string characterNameWorld, bool anonymize)
+    {
+        return anonymize
+            ? CharacterAliasHelper.Resolve(characterNameWorld).World
+            : CharacterAliasHelper.GetWorldFromKey(characterNameWorld);
     }
 
     private static readonly string[] RegionFilterOptions = { "All", "NA", "EU", "JP", "OCE" };

@@ -177,9 +177,8 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // ── Character List ──
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Character List");
-        ImGui.SameLine();
-        ImGui.TextDisabled($"({chars.Count} total)");
+        DrawCharacterListHeader("Character List", $"({chars.Count} total)", "reloggerAnonymize");
+        var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
         // Region filter
@@ -313,11 +312,12 @@ public partial class SlaveWindow
 
                 // Name
                 ImGui.TableNextColumn();
-                ImGui.Text(charName);
+                var displayCharName = GetDisplayCharacterKey(charName, anonymizeCharacters);
+                ImGui.Text(displayCharName);
                 if (info != null && ImGui.IsItemHovered())
                 {
                     ImGui.BeginTooltip();
-                    ImGui.Text(charName);
+                    ImGui.Text(displayCharName);
                     ImGui.Separator();
                     ImGui.Text($"Level: {info.HighestLevel}");
                     ImGui.Text($"Gil: {info.Gil:N0}");

@@ -458,9 +458,9 @@ public partial class SlaveWindow
     {
         var chars = cfg.XagmanTonyCharacters;
         var charInfo = cfg.ReloggerCharacterInfo;
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Tonys");
-        ImGui.TextDisabled($"({chars.Count} total)");
-        ImGui.SameLine();
+        DrawCharacterListHeader("Tonys", $"({chars.Count} total)", "xagmanTonyAnonymize");
+        var anonymizeTonyCharacters = IsCharacterListAnonymizationEnabled();
+        ImGui.Spacing();
         if (ImGui.Button("Check Visible##xagmanTonyAll"))
             SelectVisibleXagmanTonyCharacters();
         ImGui.SameLine();
@@ -546,7 +546,7 @@ public partial class SlaveWindow
                     else xagmanTonySelectedIndices.Remove(i);
                 }
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted(charName);
+                ImGui.TextUnformatted(GetDisplayCharacterKey(charName, anonymizeTonyCharacters));
                 ImGui.TableNextColumn();
                 ImGui.TextDisabled(regionDc);
                 ImGui.TableNextColumn();
@@ -596,9 +596,9 @@ public partial class SlaveWindow
     {
         var chars = cfg.XagmanFranchiseCharacters;
         var charInfo = cfg.ReloggerCharacterInfo;
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Franchise Owners");
-        ImGui.TextDisabled($"({chars.Count} total)");
-        ImGui.SameLine();
+        DrawCharacterListHeader("Franchise Owners", $"({chars.Count} total)", "xagmanOwnerAnonymize");
+        var anonymizeFranchiseCharacters = IsCharacterListAnonymizationEnabled();
+        ImGui.Spacing();
         if (ImGui.Button("Check Visible##xagmanOwnerAll"))
             SelectVisibleXagmanFranchiseCharacters();
         ImGui.SameLine();
@@ -683,7 +683,7 @@ public partial class SlaveWindow
                     else xagmanFranchiseSelectedIndices.Remove(i);
                 }
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted(charName);
+                ImGui.TextUnformatted(GetDisplayCharacterKey(charName, anonymizeFranchiseCharacters));
                 ImGui.TableNextColumn();
                 ImGui.TextDisabled(regionDc);
                 ImGui.TableNextColumn();

@@ -256,15 +256,25 @@ public partial class SlaveWindow
             ExportResetSchedulingState();
         }
 
+        var overwriteFile = cfg.ExportDataOverwriteFile;
+        if (ImGui.Checkbox("Overwrite fixed file path when no {timestamp} token is used", ref overwriteFile))
+        {
+            cfg.ExportDataOverwriteFile = overwriteFile;
+            cfg.Save();
+            ExportResetSchedulingState();
+        }
+
         ImGui.TextDisabled($"Folder path: creates ExportData_{ExportTimestampToken}.tsv.");
-        ImGui.TextDisabled($"File path: use {ExportTimestampToken} inside the file name for pre/post tags.");
+        ImGui.TextDisabled($"File path with {ExportTimestampToken}: writes the exact token-resolved file name.");
+        ImGui.TextDisabled("File path without {timestamp}: appends a timestamp unless Overwrite fixed file path is enabled.");
         ImGui.TextDisabled(@"Example: E:\gil\pre_{timestamp}_post.tsv");
+        ImGui.TextDisabled("Overwrite only applies to fixed file paths. Folder targets and tokenized names still create a new file.");
 
         var canWriteNow = arConfigExists && !string.IsNullOrWhiteSpace(cfg.ExportDataOutputPath);
         if (!canWriteNow)
             ImGui.BeginDisabled();
 
-        if (ImGui.Button("Write New File Now"))
+        if (ImGui.Button("Write Export Now"))
             ExportTryWriteSnapshot("Manual");
 
         if (!canWriteNow)
@@ -339,7 +349,7 @@ public partial class SlaveWindow
                 return false;
             }
 
-            var outputFilePath = ExportBuildOutputFilePath(cfg.ExportDataOutputPath, DateTime.UtcNow);
+            var outputFilePath = ExportBuildOutputFilePath(cfg.ExportDataOutputPath, DateTime.UtcNow, cfg.ExportDataOverwriteFile);
             var delimiter = string.Equals(Path.GetExtension(outputFilePath), ".csv", StringComparison.OrdinalIgnoreCase) ? "," : "\t";
             var payload = ExportBuildDelimitedOutput(rows, delimiter);
 
@@ -655,7 +665,7 @@ public partial class SlaveWindow
         return Path.GetDirectoryName(trimmed);
     }
 
-    private string ExportBuildOutputFilePath(string configuredPath, DateTime nowUtc)
+    private string ExportBuildOutputFilePath(string configuredPath, DateTime nowUtc, bool overwriteFixedFile)
     {
         var trimmed = configuredPath.Trim();
         var timestamp = nowUtc.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture);
@@ -684,6 +694,13 @@ public partial class SlaveWindow
             directory = Plugin.PluginInterface.GetPluginConfigDirectory();
 
         Directory.CreateDirectory(directory);
+
+        if (overwriteFixedFile)
+        {
+            return Path.IsPathRooted(trimmed)
+                ? trimmed
+                : Path.Combine(directory, Path.GetFileName(trimmed));
+        }
 
         var fileName = Path.GetFileNameWithoutExtension(trimmed);
         var extension = Path.GetExtension(trimmed);

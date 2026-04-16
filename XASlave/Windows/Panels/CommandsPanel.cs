@@ -18,6 +18,7 @@ public partial class SlaveWindow
         new("/xa", "Toggle the XA Slave window.", "This is the root command when entered without a subcommand."),
         new("/xa allrestore", "Disable every top-level XA Mod toggle.", "Chat equivalent of the `Disable All Mods` button."),
         new("/xa commands", "Open the window directly to `References > Commands`.", "Useful when you want the command inventory instead of just toggling the main window."),
+        new("/xa updates", "Open the version history window.", "Shows the plugin changelog as collapsible version entries. Also accessible from Plugin Operations > Show Updates."),
         new("/xa db <itemId:qty ...>", "Queue Dropbox trade items from local inventory and start trading.", "Accepts the same `itemId:qty` syntax as the older external queue flow, but XA now owns the command surface directly."),
         new("/xa db inv", "Queue all eligible items from `Inventory1` through `Inventory4` and start trading.", "Scans the four main inventory bags only, preserves NQ/HQ quantities, skips bound/collectable/untradable entries, and adds the results to the current Dropbox queue."),
         new("/xa db clear", "Clear the current Dropbox item queue.", "Used by Xagman cleanup and for manual queue resets without any extra wrapper command."),
@@ -31,10 +32,10 @@ public partial class SlaveWindow
 
     private static readonly CommandReferenceEntry[] GameModsCommandEntries =
     {
-        new("/xa anonymous on|off", "Toggle `Live Anonymous Mode`.", "Masks visible player nameplates locally."),
+        new("/xa anonymous on|off", "Toggle `Live Anonymous Mode`.", "Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases."),
         new("/xa chocobocutscene on|off", "Toggle `Skip Cutscenes Feeding Chocobo`.", "Only affects the companion-feeding cutscene surface."),
         new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "Auto-confirms supported disconnect and stuck-logout lobby Dialogue popups, including `3102`."),
-        new("/xa copyitemname on|off", "Toggle `Copy Item Name For All`.", "Adds XA-owned item-name copy actions to supported context menus."),
+        new("/xa copyitemname on|off", "Toggle `Copy Item Name For All`.", "Adds XA item-name copy actions to supported context menus."),
         new("/xa gamerestore", "Disable the current top-level Game Mods toggles.", "Turns off the current Game Mods section in one command."),
         new("/xa hidepopups on|off", "Toggle `Hide Unnecessary Popups`.", "Closes supported tutorial and recommendation popups."),
         new("/xa logincooldown on|off", "Toggle `Cancel Login Cooldown`.", "Clears the local temporary character-select cooldown."),
@@ -59,7 +60,7 @@ public partial class SlaveWindow
         new("/xa res add <width>x<height>", "Add a saved custom-resolution button.", "Stores a panel preset without needing to use the UI add-button flow."),
         new("/xa res remove <width>x<height>", "Remove a saved custom-resolution button.", "Deletes the matching saved preset when present."),
         new("/xa resrestore", "Disable the current top-level Graphic Mods toggles.", "Also runs the normal Special Rendering Modes world/UI restore behavior."),
-        new("/xa specialrender on|off", "Toggle `Special Rendering Modes`.", "Shows or hides the Special Render tools, and off also restores XA-touched world/UI state."),
+        new("/xa specialrender on|off", "Toggle `Special Rendering Modes`.", "Shows or hides the Special Render tools, reapplies the stored UI-visibility toggles when turned on, and off restores XA-touched world/UI state. `Hide Chat` cannot be enabled while AutoRetainer Multi Mode is active."),
     };
 
     private static readonly CommandReferenceEntry[] PlayerModsCommandEntries =
@@ -67,14 +68,15 @@ public partial class SlaveWindow
         new("/xa doze", "Trigger Doze Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
         new("/xa expertdelivery on|off", "Toggle `Automate Expert Delivery`.", "Controls the hand-in automation feature, not the unlock bypass."),
         new("/xa instantlogout on|off", "Toggle `Instant Logout`.", "Arms or disarms XA's hard logout seam and the `/xa logout` command."),
-        new("/xa killgame", "Hard logout, then close the client.", "Requires `Instant Logout` to be enabled. XA waits for logout to complete before sending `/xlkill`."),
+        new("/xa killgame", "Hard logout, then close the client.", "Requires `Instant Logout` to be enabled. XA waits for logout to complete before sending `/xlkill`, and the action is blocked while Special Rendering Modes is hiding chat."),
         new("/xa sit", "Trigger Sit Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
-        new("/xa logout", "Trigger XA's hard logout seam.", "Requires `Instant Logout` to be enabled."),
+        new("/xa logout", "Trigger XA's hard logout seam.", "Requires `Instant Logout` to be enabled, and the action is blocked while Special Rendering Modes is hiding chat."),
+        new("/xa peep [on|off|clear]", "Open XA Peep or control its XA target tracker.", "Without arguments it toggles the XA Peep window. `on/off` enables or disables tracking, and `clear` wipes the stored XA Peep history."),
         new("/xa playerrestore", "Disable the current top-level Player Mods toggles.", "Useful for dropping movement, sprint, sit/doze, sight-distance, and logout-related XA Mods back to off."),
         new("/xa refusetrade on|off", "Toggle `Refuse Trade Request`.", "Uses the trade-window and status-update refusal surfaces plus the current local feedback and extra-command options."),
         new("/xa revealmap on|off", "Toggle `Reveal Undiscovered Areas`.", "Clears local map-discovery flags when the map agent refreshes."),
         new("/xa sightdistance on|off", "Toggle `Custom Sight Distance`.", "Turns the current camera override profile on or off."),
-        new("/xa sitdoze on|off", "Toggle `Doze & Sit Anywhere`.", "Controls whether the `/xa sit` and `/xa doze` action commands are armed."),
+        new("/xa sitdoze on|off", "Toggle `Doze & Sit Anywhere`.", "Controls the master emote hook used by `/xa sit`, `/xa doze`, and the panel/titlebar quick actions."),
         new("/xa sprint on|off", "Toggle `Infinite Sprint`.", "Controls XA's movement-gated Sprint recast surface."),
         new("/xa sprintdelay <seconds>", "Set the `Infinite Sprint` movement-start delay.", "Accepts values from `0.0` to `30.0` seconds."),
         new("/xa teleportlock on|off", "Toggle `Clear Teleportation Lock`.", "Uses XA's teleport-stuck recovery seam."),
@@ -82,8 +84,9 @@ public partial class SlaveWindow
 
     private static readonly CommandReferenceEntry[] PluginModsCommandEntries =
     {
+        new("/xa anonchars on|off", "Toggle `Anonymize Character Lists`.", "Forces screenshot-safe aliases in XA Slave character-list tables and duplicate summaries. Every task-list `Anonymize` checkbox writes to this same shared global setting, and it can also be exposed through titlebar favourites because it is a normal XA Mod."),
         new("/xa peepingtom on|off", "Toggle `Force PeepingTom`.", "Controls XA's runtime PvP forcing path for PeepingTom."),
-        new("/xa pluginrestore", "Disable the current top-level Plugin Mods toggles.", "At the moment this mainly covers XA's PeepingTom runtime integration toggle."),
+        new("/xa pluginrestore", "Disable the current top-level Plugin Mods toggles.", "Covers XA's plugin-scoped toggles such as `Anonymize Character Lists` and `Force PeepingTom`."),
     };
 
     private static readonly CommandReferenceEntry[] IllegalModsCommandEntries =

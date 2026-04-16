@@ -67,6 +67,11 @@ public sealed class Plugin : IDalamudPlugin
         string Usage,
         XAModCommandDefinition Definition);
 
+    public readonly record struct TitleBarFavXAModInfo(
+        string Key,
+        string DisplayName,
+        string ScopeLabel);
+
     public static Plugin Instance { get; private set; } = null!;
     public string InstanceId { get; }
     public int ProcessId { get; }
@@ -75,6 +80,9 @@ public sealed class Plugin : IDalamudPlugin
 
     public readonly WindowSystem WindowSystem = new("XASlave");
     private SlaveWindow SlaveWindow { get; init; }
+    public UpdatesWindow UpdatesWindow { get; init; }
+    public XAPeepWindow XAPeepWindow { get; init; }
+    public XAPeepHistoryWindow XAPeepHistoryWindow { get; init; }
 
     // Services
     public IpcClient IpcClient { get; init; }
@@ -105,10 +113,14 @@ public sealed class Plugin : IDalamudPlugin
     public DozeSitAnywhereService DozeSitAnywhere { get; init; }
     public InstantLogoutService InstantLogout { get; init; }
     public TeleportLockClearService TeleportLockClear { get; init; }
+    public XAPeepService XAPeep { get; init; }
     public PeepingTomIntegrationService PeepingTomIntegration { get; init; }
     public ArPostProcessService ArPostProcessor { get; init; }
     public SlaveDatabaseService SlaveDatabase { get; init; }
     public XagmanPeerService XagmanPeers { get; private set; }
+
+    private UIModule.UiFlags appliedSpecialRenderUiFlags;
+    private bool hasAppliedSpecialRenderUiFlags;
 
     public Plugin()
     {
@@ -124,10 +136,42 @@ public sealed class Plugin : IDalamudPlugin
         Configuration.MoveableAfterDeathEnabled = false;
         Configuration.InitializeFloorderDefaults();
         var autoGlamDefaultsInitialized = Configuration.InitializeAutoGlamWeatherDefaults();
+        var showVersionInWindowTitleDefaultChanged = false;
+        if (!Configuration.ShowVersionInWindowTitleDefaultApplied)
+        {
+            Configuration.ShowVersionInUpdatesTitle = true;
+            Configuration.ShowVersionInWindowTitleDefaultApplied = true;
+            showVersionInWindowTitleDefaultChanged = true;
+        }
         var xagmanPreflightChanged = !Configuration.XagmanUsePreflightOnFirstCharacter;
         Configuration.XagmanUsePreflightOnFirstCharacter = true;
         var xagmanItemsChanged = false;
         var xagmanItemsMigrationChanged = false;
+        var characterListAnonymizeMigrationChanged = MigrateLegacyCharacterListAnonymizeState(Configuration);
+        var xaPeepSoundMigrationChanged = false;
+        var normalizedXAPeepSoundEffectId = XAPeepData.ClampSoundEffectId(Configuration.XAPeepSoundEffectId);
+        if (Configuration.XAPeepPlaySound && normalizedXAPeepSoundEffectId == 0)
+        {
+            normalizedXAPeepSoundEffectId = 2;
+            xaPeepSoundMigrationChanged = true;
+        }
+
+        if (Configuration.XAPeepSoundEffectId != normalizedXAPeepSoundEffectId)
+        {
+            Configuration.XAPeepSoundEffectId = normalizedXAPeepSoundEffectId;
+            xaPeepSoundMigrationChanged = true;
+        }
+
+        var titleBarFavCustomItemsMigrationChanged = false;
+        foreach (var item in Configuration.TitleBarFavCustomItems)
+        {
+            var normalizedSelectionKey = TitleBarFavSelectionKeys.Normalize(item.SelectionKey, item.MenuTarget);
+            if (string.Equals(item.SelectionKey, normalizedSelectionKey, StringComparison.Ordinal))
+                continue;
+
+            item.SelectionKey = normalizedSelectionKey;
+            titleBarFavCustomItemsMigrationChanged = true;
+        }
         if (!Configuration.XagmanSharedItemsMigrationComplete)
         {
             if (Configuration.XagmanItems.Count == 0 && (Configuration.XagmanTonyItems.Count > 0 || Configuration.XagmanFranchiseItems.Count > 0))
@@ -148,7 +192,18 @@ public sealed class Plugin : IDalamudPlugin
             : XagmanPeerService.NormalizePort(Configuration.XagmanHubPort);
         var xagmanHubPortChanged = Configuration.XagmanHubPort != normalizedXagmanHubPort;
         Configuration.XagmanHubPort = normalizedXagmanHubPort;
-        if (livePullsWereEnabled || protectedRiskyToonModsReset || autoGlamDefaultsInitialized || xagmanPreflightChanged || xagmanItemsChanged || xagmanItemsMigrationChanged || xagmanHubAddressChanged || xagmanHubPortChanged)
+        if (livePullsWereEnabled
+            || protectedRiskyToonModsReset
+            || autoGlamDefaultsInitialized
+            || showVersionInWindowTitleDefaultChanged
+            || xagmanPreflightChanged
+            || xagmanItemsChanged
+            || xagmanItemsMigrationChanged
+            || characterListAnonymizeMigrationChanged
+            || xaPeepSoundMigrationChanged
+            || titleBarFavCustomItemsMigrationChanged
+            || xagmanHubAddressChanged
+            || xagmanHubPortChanged)
             Configuration.Save();
 
         IpcClient = new IpcClient(PluginInterface, Log);
@@ -180,7 +235,8 @@ public sealed class Plugin : IDalamudPlugin
         DozeSitAnywhere = new DozeSitAnywhereService(ClientState, ObjectTable, SigScanner, GameInterop, Log);
         InstantLogout = new InstantLogoutService(ClientState, Framework, SigScanner, Log, LobbyErrorAutoClose);
         TeleportLockClear = new TeleportLockClearService(ChatGui, Log);
-        PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, ClientState, Log);
+        XAPeep = new XAPeepService(Framework, ClientState, ObjectTable, GameGui, Log, SlaveDatabase, Configuration);
+        PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
         XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubAddress, Configuration.XagmanHubPort, _ => { });
         if (Configuration.XagmanPeerConnectionsEnabled)
@@ -234,7 +290,6 @@ public sealed class Plugin : IDalamudPlugin
         }
         PlayerMods.ApplyInfiniteSprintConfiguration(Configuration.InfiniteSprintDelaySeconds);
         SystemWindowMods.ApplyLowResolutionConfiguration(Configuration.LowResolutionScale);
-        PeepingTomIntegration.SetPreserveHistoryOnLogoutEnabled(Configuration.ForcePeepingTomPreserveHistoryOnLogoutEnabled);
 
         if (Configuration.AutoAllowMultipleGameInstancesEnabled && !SystemWindowMods.SetAllowMultipleGameInstancesEnabled(true))
         {
@@ -380,6 +435,13 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
         }
 
+        if (Configuration.SpecialRenderModesEnabled)
+            ApplySpecialRenderModesConfiguration();
+
+        DozeSitAnywhere.ApplyConfiguration(
+            Configuration.DozeSitAnywhereAllowDoze,
+            Configuration.DozeSitAnywhereAllowSit);
+
         if (Configuration.DozeSitAnywhereEnabled && !DozeSitAnywhere.SetEnabled(true))
         {
             Configuration.DozeSitAnywhereEnabled = false;
@@ -398,6 +460,36 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
         }
 
+        if (Configuration.XAPeepEnabled)
+        {
+            Framework.RunOnTick(() =>
+            {
+                if (!Configuration.XAPeepEnabled)
+                    return;
+
+                if (XAPeep.SetEnabled(true))
+                    return;
+
+                Configuration.XAPeepEnabled = false;
+                Configuration.Save();
+            });
+        }
+
+        if (Configuration.TitleBarFavKillGameEnabled && !Configuration.InstantLogoutEnabled)
+        {
+            var instantLogoutApplied = InstantLogout.SetEnabled(true);
+            if (instantLogoutApplied)
+            {
+                Configuration.InstantLogoutEnabled = true;
+            }
+            else
+            {
+                Configuration.TitleBarFavKillGameEnabled = false;
+            }
+
+            Configuration.Save();
+        }
+
         if (Configuration.MoveableAfterDeathEnabled && !PlayerMods.SetMoveableAfterDeathEnabled(true))
         {
             Configuration.MoveableAfterDeathEnabled = false;
@@ -413,8 +505,19 @@ public sealed class Plugin : IDalamudPlugin
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
 
+        XAPeepWindow = new XAPeepWindow(this);
+        WindowSystem.AddWindow(XAPeepWindow);
+        XAPeepHistoryWindow = new XAPeepHistoryWindow(this);
+        WindowSystem.AddWindow(XAPeepHistoryWindow);
+
+        UpdatesWindow = new UpdatesWindow();
+        WindowSystem.AddWindow(UpdatesWindow);
+
         if (Configuration.OpenPluginOnLoad)
             SlaveWindow.IsOpen = true;
+
+        XAPeepWindow.IsOpen = Configuration.XAPeepAutoOpenWindowOnPluginLoad || Configuration.XAPeepWindowOpen;
+        XAPeepHistoryWindow.IsOpen = Configuration.XAPeepHistoryWindowOpen;
 
         // Apply window rename on plugin load if enabled
         if (Configuration.WindowRenamerEnabled)
@@ -422,10 +525,11 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
+            HelpMessage = "Open XA Slave. Subcommands include xamods, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
         });
 
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
+        PluginInterface.UiBuilder.Draw += XAPeep.DrawOverlay;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleMainUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
@@ -457,6 +561,7 @@ public sealed class Plugin : IDalamudPlugin
         DozeSitAnywhere.Dispose();
         InstantLogout.Dispose();
         TeleportLockClear.Dispose();
+        XAPeep.Dispose();
         PeepingTomIntegration.Dispose();
         ArPostProcessor.Dispose();
         WindowRenamer.Dispose();
@@ -467,6 +572,7 @@ public sealed class Plugin : IDalamudPlugin
         ClientState.Logout -= OnLogout;
 
         PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
+        PluginInterface.UiBuilder.Draw -= XAPeep.DrawOverlay;
         PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainUi;
         PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
 
@@ -606,6 +712,18 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("updates", StringComparison.OrdinalIgnoreCase))
+        {
+            UpdatesWindow.Toggle();
+            return;
+        }
+
+        if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(TryHandleXAPeepCommand(subcommandArgs, out var message), message);
+            return;
+        }
+
         if (subcommand.Equals("db", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(DropboxQueue.TryExecute(subcommandArgs, out var message), message);
@@ -626,13 +744,13 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("logout", StringComparison.OrdinalIgnoreCase))
         {
-            InstantLogout.RequestLogout();
+            PrintCommandResult(TryRequestLogoutAction(out var message), message);
             return;
         }
 
         if (subcommand.Equals("killgame", StringComparison.OrdinalIgnoreCase))
         {
-            InstantLogout.RequestKillGame();
+            PrintCommandResult(TryRequestKillGameAction(out var message), message);
             return;
         }
 
@@ -730,6 +848,9 @@ public sealed class Plugin : IDalamudPlugin
             return true;
         }
 
+        if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
+            return TryHandleXAPeepCommand(subcommandArgs, out message);
+
         if (subcommand.Equals("db", StringComparison.OrdinalIgnoreCase))
             return DropboxQueue.TryExecute(subcommandArgs, out message);
 
@@ -749,15 +870,17 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("logout", StringComparison.OrdinalIgnoreCase))
         {
-            var success = InstantLogout.RequestLogout();
-            message = success ? "Triggered XA hard logout." : InstantLogout.StatusText;
+            var success = TryRequestLogoutAction(out message);
+            if (success)
+                message = "Triggered XA hard logout.";
             return success;
         }
 
         if (subcommand.Equals("killgame", StringComparison.OrdinalIgnoreCase))
         {
-            var success = InstantLogout.RequestKillGame();
-            message = success ? "Triggered XA kill-game flow." : InstantLogout.StatusText;
+            var success = TryRequestKillGameAction(out message);
+            if (success)
+                message = "Triggered XA kill-game flow.";
             return success;
         }
 
@@ -1200,6 +1323,134 @@ public sealed class Plugin : IDalamudPlugin
             ChatGui.PrintError($"[XASlave] {message}");
     }
 
+    private static bool MigrateLegacyCharacterListAnonymizeState(Configuration configuration)
+    {
+        var hasLegacyFlagsEnabled = configuration.ReloggerAnonymizeCharacters
+            || configuration.RefreshSubsAnonymizeCharacters
+            || configuration.PrepLogisticsAnonymizeCharacters
+            || configuration.XagmanTonyAnonymizeCharacters
+            || configuration.XagmanFranchiseAnonymizeCharacters
+            || configuration.FcPermsAnonymizeCharacters
+            || configuration.DupPlotsAnonymizeCharacters
+            || configuration.ReturnAltsAnonymizeCharacters;
+
+        if (!hasLegacyFlagsEnabled)
+            return false;
+
+        var changed = false;
+        if (!configuration.GlobalCharacterListAnonymizeEnabled)
+        {
+            configuration.GlobalCharacterListAnonymizeEnabled = true;
+            changed = true;
+        }
+
+        if (configuration.ReloggerAnonymizeCharacters)
+        {
+            configuration.ReloggerAnonymizeCharacters = false;
+            changed = true;
+        }
+
+        if (configuration.RefreshSubsAnonymizeCharacters)
+        {
+            configuration.RefreshSubsAnonymizeCharacters = false;
+            changed = true;
+        }
+
+        if (configuration.PrepLogisticsAnonymizeCharacters)
+        {
+            configuration.PrepLogisticsAnonymizeCharacters = false;
+            changed = true;
+        }
+
+        if (configuration.XagmanTonyAnonymizeCharacters)
+        {
+            configuration.XagmanTonyAnonymizeCharacters = false;
+            changed = true;
+        }
+
+        if (configuration.XagmanFranchiseAnonymizeCharacters)
+        {
+            configuration.XagmanFranchiseAnonymizeCharacters = false;
+            changed = true;
+        }
+
+        if (configuration.FcPermsAnonymizeCharacters)
+        {
+            configuration.FcPermsAnonymizeCharacters = false;
+            changed = true;
+        }
+
+        if (configuration.DupPlotsAnonymizeCharacters)
+        {
+            configuration.DupPlotsAnonymizeCharacters = false;
+            changed = true;
+        }
+
+        if (configuration.ReturnAltsAnonymizeCharacters)
+        {
+            configuration.ReturnAltsAnonymizeCharacters = false;
+            changed = true;
+        }
+
+        return changed;
+    }
+
+    internal bool IsAutoRetainerMultiModeEnabled()
+        => IpcClient.AutoRetainerGetMultiModeEnabled();
+
+    internal bool CanEnableSpecialRenderHideChat(out string message)
+    {
+        if (IsAutoRetainerMultiModeEnabled())
+        {
+            message = "Hide Chat is blocked while AutoRetainer Multi Mode is enabled.";
+            return false;
+        }
+
+        message = string.Empty;
+        return true;
+    }
+
+    internal bool IsSpecialRenderChatCurrentlyHidden()
+    {
+        if (!Configuration.SpecialRenderModesEnabled)
+            return false;
+
+        return Configuration.SpecialRenderHideChatEnabled
+            || Configuration.SpecialRenderHideAddonsKeepNameplatesEnabled;
+    }
+
+    internal bool CanTriggerLogoutActions(out string message)
+    {
+        if (IsSpecialRenderChatCurrentlyHidden())
+        {
+            message = "Logout and kill-game actions are blocked while Special Rendering Modes is hiding chat. Restore chat first.";
+            return false;
+        }
+
+        message = string.Empty;
+        return true;
+    }
+
+    internal bool TryRequestLogoutAction(out string message)
+    {
+        if (!CanTriggerLogoutActions(out message))
+            return false;
+
+        var success = InstantLogout.RequestLogout();
+        message = success ? string.Empty : InstantLogout.StatusText;
+        return success;
+    }
+
+    internal bool TryRequestKillGameAction(out string message)
+    {
+        if (!CanTriggerLogoutActions(out message))
+            return false;
+
+        var success = InstantLogout.RequestKillGame();
+        message = success ? string.Empty : InstantLogout.StatusText;
+        return success;
+    }
+
     public void DisableAllXAMods()
     {
         DisableXAModDefinitions(GetAllXAModDefinitions());
@@ -1211,6 +1462,52 @@ public sealed class Plugin : IDalamudPlugin
 
     public IReadOnlyList<string> GetSavedModListNames()
         => Configuration.ToonModsSavedLists.Select(entry => entry.Name).ToList();
+
+    public IReadOnlyList<TitleBarFavXAModInfo> GetTitleBarFavXAModInfos()
+    {
+        return GetAllXAModDefinitions()
+            .Select(definition => new TitleBarFavXAModInfo(
+                definition.Key,
+                definition.DisplayName,
+                GetXAModsRestoreScopeLabel(definition.Scope)))
+            .ToList();
+    }
+
+    public bool TryGetTitleBarFavXAModInfo(string key, out TitleBarFavXAModInfo info)
+    {
+        var definition = GetAllXAModDefinitions()
+            .FirstOrDefault(entry => entry.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+
+        if (definition.Key == null)
+        {
+            info = default;
+            return false;
+        }
+
+        info = new TitleBarFavXAModInfo(
+            definition.Key,
+            definition.DisplayName,
+            GetXAModsRestoreScopeLabel(definition.Scope));
+        return true;
+    }
+
+    public bool IsXAModEnabled(string key)
+        => GetXAModDefinition(key).GetCurrent();
+
+    public bool HasAnyEnabledXAMods()
+        => GetAllXAModDefinitions().Any(definition => definition.GetCurrent());
+
+    public bool SetXAModEnabledByKey(string key, bool enabled, out string message)
+        => SetXAModEnabled(GetXAModDefinition(key), enabled, out message);
+
+    public bool ToggleXAModByKey(string key, out bool enabled, out string message)
+    {
+        var definition = GetXAModDefinition(key);
+        var targetState = !definition.GetCurrent();
+        var success = SetXAModEnabled(definition, targetState, out message);
+        enabled = definition.GetCurrent();
+        return success;
+    }
 
     private bool RestoreAllXAMods(out string message)
     {
@@ -1245,6 +1542,42 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         return disabledCount;
+    }
+
+    private bool TryHandleXAPeepCommand(string args, out string message)
+    {
+        var trimmed = args.Trim();
+        if (string.IsNullOrWhiteSpace(trimmed)
+            || trimmed.Equals("open", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("toggle", StringComparison.OrdinalIgnoreCase))
+        {
+            ToggleXAPeepUi();
+            message = XAPeepWindow.IsOpen ? "Opened XA Peep." : "Closed XA Peep.";
+            return true;
+        }
+
+        if (trimmed.Equals("close", StringComparison.OrdinalIgnoreCase))
+        {
+            XAPeepWindow.IsOpen = false;
+            message = "Closed XA Peep.";
+            return true;
+        }
+
+        if (trimmed.Equals("clear", StringComparison.OrdinalIgnoreCase)
+            || trimmed.Equals("clearhistory", StringComparison.OrdinalIgnoreCase))
+        {
+            XAPeep.ClearHistory();
+            message = "Cleared XA Peep history.";
+            return true;
+        }
+
+        if (!TryParseToggleCommandState(trimmed, out var enabled, out var parseMessage))
+        {
+            message = $"{parseMessage} Usage: /xa peep [on|off|open|close|clear]";
+            return false;
+        }
+
+        return SetXAModEnabled(GetXAModDefinition("xa-peep"), enabled, out message);
     }
 
     private XAModCommandDefinition GetXAModDefinition(string key)
@@ -1284,7 +1617,22 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("doze-sit-anywhere", "Doze & Sit Anywhere", XAModsRestoreScope.Player, () => Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.SetEnabled, applied => Configuration.DozeSitAnywhereEnabled = applied, () => DozeSitAnywhere.StatusText);
         yield return new("infinite-sprint", "Infinite Sprint", XAModsRestoreScope.Player, () => Configuration.InfiniteSprintEnabled, PlayerMods.SetInfiniteSprintEnabled, applied => Configuration.InfiniteSprintEnabled = applied, () => PlayerMods.InfiniteSprintStatusText);
         yield return new("instant-logout", "Instant Logout", XAModsRestoreScope.Player, () => Configuration.InstantLogoutEnabled, InstantLogout.SetEnabled, applied => Configuration.InstantLogoutEnabled = applied, () => InstantLogout.StatusText);
+        yield return new("xa-peep", "XA Peep", XAModsRestoreScope.Player, () => Configuration.XAPeepEnabled, XAPeep.SetEnabled, applied => Configuration.XAPeepEnabled = applied, () => XAPeep.StatusText);
 
+        yield return new(
+            "anonymize-character-lists",
+            "Anonymize Character Lists",
+            XAModsRestoreScope.Plugin,
+            () => Configuration.GlobalCharacterListAnonymizeEnabled,
+            enabled =>
+            {
+                Configuration.GlobalCharacterListAnonymizeEnabled = enabled;
+                return true;
+            },
+            applied => Configuration.GlobalCharacterListAnonymizeEnabled = applied,
+            () => Configuration.GlobalCharacterListAnonymizeEnabled
+                ? "Enabled - character-list tables and duplicate summaries use deterministic aliases for screenshot-safe local views."
+                : "Disabled");
         yield return new("force-peepingtom", "Force PeepingTom", XAModsRestoreScope.Plugin, () => Configuration.ForcePeepingTomEnabled, PeepingTomIntegration.SetForceEnabled, applied => Configuration.ForcePeepingTomEnabled = applied, () => PeepingTomIntegration.StatusText);
 
         yield return new("auto-unlock-expert-delivery", "Unlock Expert Delivery", XAModsRestoreScope.Illegal, () => Configuration.UnlockExpertDeliveryEnabled, ExpertDeliveryUnlock.SetEnabled, applied => Configuration.UnlockExpertDeliveryEnabled = applied, () => ExpertDeliveryUnlock.StatusText);
@@ -1448,6 +1796,9 @@ public sealed class Plugin : IDalamudPlugin
             case "peepingtom":
                 definition = new("peepingtom", "/xa peepingtom on|off", GetXAModDefinition("force-peepingtom"));
                 return true;
+            case "anonchars":
+                definition = new("anonchars", "/xa anonchars on|off", GetXAModDefinition("anonymize-character-lists"));
+                return true;
             case "unlockexpert":
                 definition = new("unlockexpert", "/xa unlockexpert on|off", GetXAModDefinition("auto-unlock-expert-delivery"));
                 return true;
@@ -1482,28 +1833,152 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.SpecialRenderModeBackgroundColorA);
     }
 
-    private void RestoreSpecialRenderModes()
+    private static UIModule.UiFlags GetAllSpecialRenderUiFlags()
     {
-        var allUiFlags = UIModule.UiFlags.ActionBars
+        return UIModule.UiFlags.ActionBars
             | UIModule.UiFlags.Chat
             | UIModule.UiFlags.Hud
             | UIModule.UiFlags.Nameplates
             | UIModule.UiFlags.TargetInfo
             | UIModule.UiFlags.Shortcuts;
-
-        SystemWindowMods.SetSpecialRenderWorldHidden(false, GetSpecialRenderBackgroundColor());
-        SystemWindowMods.SetSpecialRenderUiVisibility(allUiFlags, true);
     }
 
-    private bool SetSpecialRenderModesEnabled(bool value)
+    private bool ClearUnsafeSpecialRenderHideChatSetting(bool notifyUser)
+    {
+        if (!IsAutoRetainerMultiModeEnabled() || !Configuration.SpecialRenderHideChatEnabled)
+            return false;
+
+        Configuration.SpecialRenderHideChatEnabled = false;
+        if (notifyUser)
+            ChatGui.PrintError("[XASlave] Hide Chat was turned off because AutoRetainer Multi Mode is enabled.");
+
+        return true;
+    }
+
+    private UIModule.UiFlags GetSpecialRenderHiddenUiFlags()
+    {
+        var hiddenUiFlags = (UIModule.UiFlags)0;
+
+        if (Configuration.SpecialRenderHideAddonsKeepNameplatesEnabled)
+        {
+            hiddenUiFlags |= UIModule.UiFlags.ActionBars
+                | UIModule.UiFlags.Chat
+                | UIModule.UiFlags.Hud
+                | UIModule.UiFlags.TargetInfo
+                | UIModule.UiFlags.Shortcuts;
+        }
+
+        if (Configuration.SpecialRenderHideAddonsKeepChatEnabled)
+        {
+            hiddenUiFlags |= UIModule.UiFlags.ActionBars
+                | UIModule.UiFlags.Hud
+                | UIModule.UiFlags.Nameplates
+                | UIModule.UiFlags.TargetInfo
+                | UIModule.UiFlags.Shortcuts;
+        }
+
+        if (Configuration.SpecialRenderHideChatEnabled)
+            hiddenUiFlags |= UIModule.UiFlags.Chat;
+
+        if (Configuration.SpecialRenderHideActionBarsEnabled)
+            hiddenUiFlags |= UIModule.UiFlags.ActionBars;
+
+        if (Configuration.SpecialRenderHideTargetInfoEnabled)
+            hiddenUiFlags |= UIModule.UiFlags.TargetInfo;
+
+        if (Configuration.SpecialRenderHideNameplatesEnabled)
+            hiddenUiFlags |= UIModule.UiFlags.Nameplates;
+
+        return hiddenUiFlags;
+    }
+
+    internal void ApplySpecialRenderModesConfiguration()
+    {
+        var clearedHideChatForSafety = ClearUnsafeSpecialRenderHideChatSetting(notifyUser: true);
+        if (hasAppliedSpecialRenderUiFlags && appliedSpecialRenderUiFlags != 0)
+            SystemWindowMods.SetSpecialRenderUiVisibility(appliedSpecialRenderUiFlags, true);
+
+        var hiddenUiFlags = GetSpecialRenderHiddenUiFlags();
+        if (hiddenUiFlags != 0)
+            SystemWindowMods.SetSpecialRenderUiVisibility(hiddenUiFlags, false);
+
+        appliedSpecialRenderUiFlags = hiddenUiFlags;
+        hasAppliedSpecialRenderUiFlags = true;
+
+        if (clearedHideChatForSafety)
+            Configuration.Save();
+    }
+
+    internal void EnforceSpecialRenderSafetyOnFrameworkTick()
+    {
+        if (!ClearUnsafeSpecialRenderHideChatSetting(notifyUser: true))
+            return;
+
+        if (Configuration.SpecialRenderModesEnabled)
+            ApplySpecialRenderModesConfiguration();
+
+        Configuration.Save();
+    }
+
+    internal void RestoreSpecialRenderModes(bool clearStoredUiToggles = false)
+    {
+        if (clearStoredUiToggles)
+        {
+            Configuration.SpecialRenderHideAddonsKeepNameplatesEnabled = false;
+            Configuration.SpecialRenderHideAddonsKeepChatEnabled = false;
+            Configuration.SpecialRenderHideChatEnabled = false;
+            Configuration.SpecialRenderHideActionBarsEnabled = false;
+            Configuration.SpecialRenderHideTargetInfoEnabled = false;
+            Configuration.SpecialRenderHideNameplatesEnabled = false;
+        }
+
+        appliedSpecialRenderUiFlags = 0;
+        hasAppliedSpecialRenderUiFlags = false;
+        SystemWindowMods.SetSpecialRenderWorldHidden(false, GetSpecialRenderBackgroundColor());
+        SystemWindowMods.SetSpecialRenderUiVisibility(GetAllSpecialRenderUiFlags(), true);
+    }
+
+    internal bool SetSpecialRenderModesEnabled(bool value)
     {
         if (!value)
+        {
             RestoreSpecialRenderModes();
+        }
+        else
+        {
+            ApplySpecialRenderModesConfiguration();
+        }
 
         return value;
     }
 
     public void ToggleMainUi() => SlaveWindow.Toggle();
+
+    public void OpenXAModsUi()
+    {
+        SlaveWindow.OpenXAModsTask();
+        SlaveWindow.BringToFront();
+    }
+
+    public void ToggleXAPeepUi()
+    {
+        XAPeepWindow.IsOpen = !XAPeepWindow.IsOpen;
+        if (XAPeepWindow.IsOpen)
+            XAPeepWindow.BringToFront();
+    }
+
+    public void ToggleXAPeepHistoryUi()
+    {
+        XAPeepHistoryWindow.IsOpen = !XAPeepHistoryWindow.IsOpen;
+        if (XAPeepHistoryWindow.IsOpen)
+            XAPeepHistoryWindow.BringToFront();
+    }
+
+    public void OpenXAPeepHistoryUi()
+    {
+        XAPeepHistoryWindow.IsOpen = true;
+        XAPeepHistoryWindow.BringToFront();
+    }
 
     public (string Address, int Port) ApplyXagmanHubEndpoint(string? address, int port)
     {
@@ -1564,5 +2039,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.20";
+    public const string Version = "0.0.0.21";
 }

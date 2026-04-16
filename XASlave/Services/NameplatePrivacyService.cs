@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Gui.NamePlate;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Plugin.Services;
@@ -10,8 +11,6 @@ public sealed class NameplatePrivacyService : IDisposable
 {
     private readonly INamePlateGui namePlateGui;
     private readonly IPluginLog log;
-
-    private readonly Dictionary<ulong, string> aliasCache = new();
 
     private bool anonymousModeEnabled;
     private bool subscribed;
@@ -26,7 +25,7 @@ public sealed class NameplatePrivacyService : IDisposable
 
     public string AnonymousModeStatusText =>
         anonymousModeEnabled
-            ? "Enabled - visible player nameplates are masked locally."
+            ? "Enabled - visible player nameplates are masked locally with deterministic Firstname Lastname aliases."
             : "Disabled";
 
     public bool SetAnonymousModeEnabled(bool value)
@@ -79,26 +78,39 @@ public sealed class NameplatePrivacyService : IDisposable
 
         foreach (var handler in handlers)
         {
-            if (handler.PlayerCharacter == null)
+            var playerCharacter = handler.PlayerCharacter;
+            if (playerCharacter == null)
                 continue;
 
-            var alias = ResolveAlias(handler.GameObjectId);
+            var originalName = NormalizeIdentityPart(playerCharacter.Name.ToString());
+            var originalWorld = ResolveOriginalWorld(playerCharacter);
+            var alias = ResolveAlias(originalName, originalWorld, handler.GameObjectId);
             handler.Name = new SeStringBuilder().AddText(alias).Build();
             handler.RemoveTitle();
             handler.RemoveFreeCompanyTag();
         }
     }
 
-    private string ResolveAlias(ulong stableId)
+    private string ResolveAlias(string originalName, string originalWorld, ulong stableId)
     {
-        if (stableId == 0)
-            return "Traveler";
+        return CharacterAliasHelper.Resolve(originalName, originalWorld, stableId).Name;
+    }
 
-        if (aliasCache.TryGetValue(stableId, out var alias))
-            return alias;
+    private static string ResolveOriginalWorld(IPlayerCharacter playerCharacter)
+    {
+        var homeWorld = playerCharacter.HomeWorld.ValueNullable?.Name.ToString();
+        if (!string.IsNullOrWhiteSpace(homeWorld))
+            return NormalizeIdentityPart(homeWorld);
 
-        alias = $"Traveler {stableId % 10000:0000}";
-        aliasCache[stableId] = alias;
-        return alias;
+        var currentWorld = playerCharacter.CurrentWorld.ValueNullable?.Name.ToString();
+        if (!string.IsNullOrWhiteSpace(currentWorld))
+            return NormalizeIdentityPart(currentWorld);
+
+        return string.Empty;
+    }
+
+    private static string NormalizeIdentityPart(string value)
+    {
+        return CharacterAliasHelper.NormalizeIdentityPart(value);
     }
 }

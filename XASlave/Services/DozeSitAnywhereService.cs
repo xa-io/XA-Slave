@@ -47,6 +47,11 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
     public string StatusText { get; private set; } = "Disabled";
 
+    public void ApplyConfiguration(bool allowDoze, bool allowSit)
+    {
+        RefreshStatusText();
+    }
+
     public bool SetEnabled(bool value)
     {
         if (value == enabled)
@@ -59,8 +64,7 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
         {
             enabled = false;
             ResetTemporaryState();
-            ToggleHook(shouldSnapHook, false, "DozeShouldSnap");
-            ToggleHook(shouldSnapUnsitHook, false, "SitShouldSnapUnsit");
+            UpdateHookStates();
             StatusText = "Disabled";
             return false;
         }
@@ -74,9 +78,8 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
         try
         {
-            ToggleHook(shouldSnapHook, true, "DozeShouldSnap");
-            ToggleHook(shouldSnapUnsitHook, true, "SitShouldSnapUnsit");
             enabled = true;
+            UpdateHookStates();
             RefreshStatusText();
             return true;
         }
@@ -84,8 +87,7 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
         {
             enabled = false;
             ResetTemporaryState();
-            ToggleHook(shouldSnapHook, false, "DozeShouldSnap");
-            ToggleHook(shouldSnapUnsitHook, false, "SitShouldSnapUnsit");
+            UpdateHookStates();
             StatusText = "Unavailable - failed to enable Doze & Sit Anywhere.";
             log.Warning(ex, "[XASlave] Failed to enable Doze & Sit Anywhere.");
             return false;
@@ -148,8 +150,7 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
     {
         enabled = false;
         ResetTemporaryState();
-        ToggleHook(shouldSnapHook, false, "DozeShouldSnap");
-        ToggleHook(shouldSnapUnsitHook, false, "SitShouldSnapUnsit");
+        UpdateHookStates();
         DisposeHook(ref shouldSnapHook);
         DisposeHook(ref shouldSnapUnsitHook);
         useEmote = null;
@@ -189,9 +190,13 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
     private void RefreshStatusText()
     {
-        StatusText = enabled
-            ? "Enabled - `/xa sit`, `/xa doze`, and the panel buttons now trigger unsnapped Sit/Doze emotes."
-            : "Disabled";
+        if (!enabled)
+        {
+            StatusText = "Disabled";
+            return;
+        }
+
+        StatusText = "Enabled - `/xa sit`, `/xa doze`, panel buttons, and titlebar favourites can trigger unsnapped Sit/Doze emotes.";
     }
 
     private void ResetTemporaryState()
@@ -199,6 +204,12 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
         suppressedSnap = false;
         savedSitPosition = null;
         savedSitRotation = null;
+    }
+
+    private void UpdateHookStates()
+    {
+        ToggleHook(shouldSnapHook, enabled, "DozeShouldSnap");
+        ToggleHook(shouldSnapUnsitHook, enabled, "SitShouldSnapUnsit");
     }
 
     private Hook<ShouldSnapDelegate>? TryCreateHook(ProtectedSig signature, ShouldSnapDelegate detour, string label)
