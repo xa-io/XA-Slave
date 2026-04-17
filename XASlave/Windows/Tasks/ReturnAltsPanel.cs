@@ -146,14 +146,14 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         if (ImGui.BeginTable("ReturnAltsTable", 5,
-            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
-            new Vector2(0, 250)))
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
+            ScaledVector(0f, 250f)))
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 30);
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, 25);
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(25f));
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Homeworld", ImGuiTableColumnFlags.WidthFixed, 90);
-            ImGui.TableSetupColumn("Current World", ImGuiTableColumnFlags.WidthFixed, 90);
+            ImGui.TableSetupColumn("Homeworld", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            ImGui.TableSetupColumn("Current World", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
             ImGui.TableHeadersRow();
 
             // Sort

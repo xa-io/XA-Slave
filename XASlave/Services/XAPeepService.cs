@@ -7,6 +7,7 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
+using Dalamud.Interface.Utility;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using XASlave.Data;
@@ -18,6 +19,7 @@ public sealed class XAPeepService : IDisposable
     private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(250);
     private static readonly TimeSpan SoundCooldown = TimeSpan.FromSeconds(1.5);
     private static readonly TimeSpan CenterNotificationDuration = TimeSpan.FromSeconds(3);
+    private static float UiScale => ImGuiHelpers.GlobalScale;
     private static readonly Vector4 HeaderPurple = new(0.82f, 0.49f, 0.96f, 1.0f);
     private static readonly Vector4 BoxPurple = new(0.19f, 0.06f, 0.24f, 0.88f);
 
@@ -224,14 +226,14 @@ public sealed class XAPeepService : IDisposable
 
         var lineColor = ImGui.GetColorU32(configuration.XAPeepTargeterLineColor);
         var dotColor = ImGui.GetColorU32(configuration.XAPeepTargeterDotColor);
-        var dotSize = Math.Clamp(configuration.XAPeepTargeterDotSize, 1f, 15f);
+        var dotSize = Scale(Math.Clamp(configuration.XAPeepTargeterDotSize, 1f, 15f));
 
         if (showLocalCard)
         {
             var summaryText = liveTargeters.Count == 1
                 ? "1 player is targeting you"
                 : $"{liveTargeters.Count} players are targeting you";
-            DrawOverlayTag(drawList, localScreenPos + new Vector2(18f, -42f), summaryText, headerColor, boxColor, outlineColor);
+            DrawOverlayTag(drawList, localScreenPos + ScaledVector(18f, -42f), summaryText, headerColor, boxColor, outlineColor);
         }
 
         var actorsById = new Dictionary<ulong, IPlayerCharacter>();
@@ -250,7 +252,7 @@ public sealed class XAPeepService : IDisposable
                 continue;
 
             if (showTargeterLine)
-                drawList.AddLine(localScreenPos, targetScreenPos, lineColor, 3f);
+                drawList.AddLine(localScreenPos, targetScreenPos, lineColor, Scale(3f));
 
             if (showTargeterDot)
                 drawList.AddCircleFilled(targetScreenPos, dotSize, dotColor, 18);
@@ -258,7 +260,7 @@ public sealed class XAPeepService : IDisposable
             if (showTargetersCard)
             {
                 var label = $"{view.CompactName} x{view.TotalTargetCount}";
-                DrawOverlayTag(drawList, targetScreenPos + new Vector2(12f, -10f), label, headerColor, boxColor, outlineColor);
+                DrawOverlayTag(drawList, targetScreenPos + ScaledVector(12f, -10f), label, headerColor, boxColor, outlineColor);
             }
         }
     }
@@ -562,24 +564,30 @@ public sealed class XAPeepService : IDisposable
     private static void DrawOverlayTag(ImDrawListPtr drawList, Vector2 position, string text, uint textColor, uint backgroundColor, uint outlineColor)
     {
         var textSize = ImGui.CalcTextSize(text);
-        var padding = new Vector2(6f, 4f);
+        var padding = ScaledVector(6f, 4f);
         var min = position;
         var max = position + textSize + (padding * 2f);
-        drawList.AddRectFilled(min, max, backgroundColor, 6f);
-        drawList.AddRect(min, max, outlineColor, 6f);
+        drawList.AddRectFilled(min, max, backgroundColor, Scale(6f));
+        drawList.AddRect(min, max, outlineColor, Scale(6f), ImDrawFlags.None, Scale(1f));
         drawList.AddText(position + padding, textColor, text);
     }
 
     private static void DrawCenteredOverlayTag(ImDrawListPtr drawList, Vector2 center, string text, uint textColor, uint backgroundColor, uint outlineColor)
     {
         var textSize = ImGui.CalcTextSize(text);
-        var padding = new Vector2(12f, 8f);
+        var padding = ScaledVector(12f, 8f);
         var min = center - (textSize * 0.5f) - padding;
         var max = center + (textSize * 0.5f) + padding;
-        drawList.AddRectFilled(min, max, backgroundColor, 8f);
-        drawList.AddRect(min, max, outlineColor, 8f);
+        drawList.AddRectFilled(min, max, backgroundColor, Scale(8f));
+        drawList.AddRect(min, max, outlineColor, Scale(8f), ImDrawFlags.None, Scale(1f));
         drawList.AddText(center - (textSize * 0.5f), textColor, text);
     }
+
+    private static float Scale(float value)
+        => value * UiScale;
+
+    private static Vector2 ScaledVector(float x, float y)
+        => ImGuiHelpers.ScaledVector2(x, y);
 
     private sealed class ActiveTargeterState
     {

@@ -168,7 +168,7 @@ public partial class SlaveWindow
             }
 
             var cadenceIndex = GetCheckEveryIndex(plugin.Configuration.AutoCollectCheckEveryHours);
-            ImGui.SetNextItemWidth(180);
+            ImGui.SetNextItemWidth(Scale(180f));
             if (ImGui.SliderInt("Check Every##autoCollectEvery", ref cadenceIndex, 0, CheckEveryHourOptions.Length - 1,
                     FormatCheckEveryHours(CheckEveryHourOptions[cadenceIndex])))
             {
@@ -178,7 +178,7 @@ public partial class SlaveWindow
 
             ImGui.Spacing();
             var delay = plugin.Configuration.AutoCollectDelaySeconds;
-            ImGui.SetNextItemWidth(100);
+            ImGui.SetNextItemWidth(Scale(100f));
             if (ImGui.InputFloat("Login Delay (seconds)", ref delay, 1f, 5f, "%.0f"))
             {
                 if (delay < 3f) delay = 3f;

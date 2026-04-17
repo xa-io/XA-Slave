@@ -159,7 +159,7 @@ public partial class SlaveWindow
 
         ImGui.SameLine();
         // Search filter
-        ImGui.SetNextItemWidth(200);
+        ImGui.SetNextItemWidth(Scale(200f));
         ImGui.InputTextWithHint("##fcPermsSearch", "Search name or world...", ref fcPermsSearchFilter, 128);
         ImGui.Spacing();
 
@@ -167,18 +167,18 @@ public partial class SlaveWindow
         var charInfo = cfg.ReloggerCharacterInfo;
 
         if (ImGui.BeginTable("FcPermsCharTable", 9,
-            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
-            new Vector2(0, 250)))
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
+            ScaledVector(0f, 250f)))
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 30);
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, 30);
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 90);
-            ImGui.TableSetupColumn("FC Name", ImGuiTableColumnFlags.WidthFixed, 120);
-            ImGui.TableSetupColumn("Member Rank", ImGuiTableColumnFlags.WidthFixed, 95);
-            ImGui.TableSetupColumn("FC Rank", ImGuiTableColumnFlags.WidthFixed, 60);
-            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, 45);
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 25);
+            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            ImGui.TableSetupColumn("FC Name", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+            ImGui.TableSetupColumn("Member Rank", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
+            ImGui.TableSetupColumn("FC Rank", ImGuiTableColumnFlags.WidthFixed, Scale(60f));
+            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, Scale(45f));
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
             ImGui.TableHeadersRow();
 
             // Build filtered list
@@ -311,7 +311,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // Add character input
-        ImGui.SetNextItemWidth(250);
+        ImGui.SetNextItemWidth(Scale(250f));
         var enterPressed = ImGui.InputTextWithHint("##fcPermsAdd", "Name Surname@World", ref fcPermsNewChar, 128, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         if ((ImGui.Button("Add##fcPermsAddBtn") || enterPressed) && !string.IsNullOrWhiteSpace(fcPermsNewChar))

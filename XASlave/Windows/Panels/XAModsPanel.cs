@@ -30,21 +30,7 @@ public partial class SlaveWindow
     private bool toonModsStatusIsError;
     private int xaModsCustomResolutionWidth = 500;
     private int xaModsCustomResolutionHeight = 345;
-    private static readonly JsonSerializerOptions toonModsListJsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        PropertyNameCaseInsensitive = true,
-        WriteIndented = true,
-    };
-
-    private sealed class ToonModsListPackage
-    {
-        public int SchemaVersion { get; set; } = 1;
-        public string ListId { get; set; } = string.Empty;
-        public string Title { get; set; } = string.Empty;
-        public DateTime ExportedAtUtc { get; set; }
-        public List<string> ModKeys { get; set; } = new();
-    }
+    private static readonly JsonSerializerOptions toonModsListJsonOptions = ToonModsPresetSerialization.JsonOptions;
 
     private bool GetToonModsSectionExpanded(ToonModsSection section)
     {
@@ -133,7 +119,7 @@ public partial class SlaveWindow
                 return;
 
             ImGui.BeginTooltip();
-            ImGui.PushTextWrapPos(460f);
+            ImGui.PushTextWrapPos(Scale(460f));
             ImGui.TextUnformatted(helpText);
             ImGui.PopTextWrapPos();
             ImGui.EndTooltip();
@@ -144,7 +130,7 @@ public partial class SlaveWindow
             if (string.IsNullOrWhiteSpace(warningText))
                 return;
 
-            ImGui.PushTextWrapPos(460f);
+            ImGui.PushTextWrapPos(Scale(460f));
             ImGui.TextColored(new Vector4(1.0f, 0.7f, 0.25f, 1.0f), warningText);
             ImGui.PopTextWrapPos();
         }
@@ -263,7 +249,7 @@ public partial class SlaveWindow
                 if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                 {
                     ImGui.BeginTooltip();
-                    ImGui.PushTextWrapPos(320f);
+                    ImGui.PushTextWrapPos(Scale(320f));
                     ImGui.TextUnformatted("Hold CTRL + SHIFT to allow changing.");
                     ImGui.PopTextWrapPos();
                     ImGui.EndTooltip();
@@ -384,6 +370,7 @@ public partial class SlaveWindow
             }
 
             var modKeys = GetCurrentToonModKeys();
+            var modSettings = plugin.CaptureXAModSettingsForKeys(modKeys);
             var saved = configuration.ToonModsSavedLists.FirstOrDefault(entry => entry.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
             if (saved == null)
             {
@@ -391,12 +378,14 @@ public partial class SlaveWindow
                 {
                     Name = name,
                     ModKeys = modKeys,
+                    ModSettings = modSettings,
                 });
             }
             else
             {
                 saved.Name = name;
                 saved.ModKeys = modKeys;
+                saved.ModSettings = modSettings;
             }
 
             SaveConfiguration();
@@ -404,61 +393,24 @@ public partial class SlaveWindow
             SetToonModsStatus($"XA Mods: saved list '{name}' ({modKeys.Count} mods).");
         }
 
-        void ApplyToonModsList(string title, IEnumerable<string> modKeys)
+        void ApplyToonModsList(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings = null)
         {
             var safeTitle = string.IsNullOrWhiteSpace(title) ? "XA Mods Selection" : title.Trim();
-            var requestedKeys = modKeys
-                .Where(key => !string.IsNullOrWhiteSpace(key))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            var definitionsByKey = toonModDefinitions.ToDictionary(entry => entry.Key, StringComparer.OrdinalIgnoreCase);
-
-            DisableAllMods();
-
-            if (requestedKeys.Count == 0)
-            {
-                toonModsSavedListName = safeTitle;
-                SetToonModsStatus($"XA Mods: loaded '{safeTitle}' with all mods disabled.");
-                return;
-            }
-
-            var appliedCount = 0;
-            var unavailableCount = 0;
-            var unknownCount = 0;
-
-            foreach (var key in requestedKeys)
-            {
-                if (!definitionsByKey.TryGetValue(key, out var definition))
-                {
-                    unknownCount++;
-                    continue;
-                }
-
-                var applied = definition.Apply(true);
-                definition.Store(applied);
-                if (applied)
-                    appliedCount++;
-                else
-                    unavailableCount++;
-            }
-
-            SaveConfiguration();
             toonModsSavedListName = safeTitle;
-            SetToonModsStatus(
-                unknownCount > 0 || unavailableCount > 0
-                    ? $"XA Mods: loaded '{safeTitle}' ({appliedCount} applied, {unavailableCount} unavailable, {unknownCount} unknown)."
-                    : $"XA Mods: loaded '{safeTitle}' ({appliedCount} mods).",
-                unknownCount > 0 || unavailableCount > 0);
+            var success = plugin.ApplySavedXAModsPreset(safeTitle, modKeys, modSettings, out var message);
+            SetToonModsStatus($"XA Mods: {message}", !success);
         }
 
         void ExportCurrentToonModsList()
         {
+            var modKeys = GetCurrentToonModKeys();
             var package = new ToonModsListPackage
             {
                 ListId = Guid.NewGuid().ToString("N"),
                 Title = string.IsNullOrWhiteSpace(toonModsSavedListName) ? "XA Mods Selection" : toonModsSavedListName.Trim(),
                 ExportedAtUtc = DateTime.UtcNow,
-                ModKeys = GetCurrentToonModKeys(),
+                ModKeys = modKeys,
+                ModSettings = plugin.CaptureXAModSettingsForKeys(modKeys),
             };
 
             ImGui.SetClipboardText(JsonSerializer.Serialize(package, toonModsListJsonOptions));
@@ -473,7 +425,7 @@ public partial class SlaveWindow
                 return;
             }
 
-            ApplyToonModsList(package.Title, package.ModKeys);
+            ApplyToonModsList(package.Title, package.ModKeys, package.ModSettings);
         }
 
         bool TryImportToonModsList(string clipboardText, out ToonModsListPackage package, out string message)
@@ -529,6 +481,18 @@ public partial class SlaveWindow
                     .Where(key => !string.IsNullOrWhiteSpace(key))
                     .ToList();
 
+                if (TryGetToonModsJsonProperty(root, "modSettings", out var modSettingsElement)
+                    && modSettingsElement.ValueKind == JsonValueKind.Object)
+                {
+                    foreach (var property in modSettingsElement.EnumerateObject())
+                    {
+                        if (string.IsNullOrWhiteSpace(property.Name))
+                            continue;
+
+                        package.ModSettings[property.Name] = property.Value.Clone();
+                    }
+                }
+
                 if (string.IsNullOrWhiteSpace(package.Title))
                     package.Title = "Imported XA Mods";
 
@@ -562,7 +526,7 @@ public partial class SlaveWindow
             if (!ImGui.BeginPopup("ToonModsSaveListPopup"))
                 return;
 
-            ImGui.SetNextItemWidth(220f);
+            ImGui.SetNextItemWidth(Scale(220f));
             ImGui.InputTextWithHint("##ToonModsSaveListName", "List name...", ref toonModsSavedListName, 128);
             ImGui.SameLine();
             if (ImGui.Button("Save Current##ToonModsSaveCurrent"))
@@ -588,7 +552,7 @@ public partial class SlaveWindow
                 ImGui.TextUnformatted(saved.Name);
                 ImGui.SameLine();
                 if (ImGui.SmallButton($"Load##ToonModsLoad{saved.Name}"))
-                    ApplyToonModsList(saved.Name, saved.ModKeys);
+                    ApplyToonModsList(saved.Name, saved.ModKeys, saved.ModSettings);
 
                 ImGui.SameLine();
                 ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
@@ -1741,7 +1705,7 @@ public partial class SlaveWindow
             enabled =>
             {
                 configuration.GlobalCharacterListAnonymizeEnabled = enabled;
-                return true;
+                return enabled;
             },
             applied => configuration.GlobalCharacterListAnonymizeEnabled = applied,
             "Forces screenshot-safe aliases in XA Slave character-list tables.",
@@ -1798,7 +1762,7 @@ public partial class SlaveWindow
         if (ImGui.Button("Import##ToonModsImport"))
             ImportCurrentToonModsList();
 
-        ImGui.SetNextItemWidth(Math.Max(220f, ImGui.GetContentRegionAvail().X));
+        ImGui.SetNextItemWidth(Math.Max(Scale(220f), ImGui.GetContentRegionAvail().X));
         ImGui.InputTextWithHint("##ToonModsSearch", "Search mod titles, descriptions, and sub-options", ref toonModsSearchText, 256);
 
         DrawToonModsSaveListPopup();

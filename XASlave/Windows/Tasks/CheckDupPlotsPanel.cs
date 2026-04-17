@@ -216,13 +216,13 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         if (ImGui.BeginTable("DupPlotsTable", 7,
-            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
-            new Vector2(0, 250)))
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
+            ScaledVector(0f, 250f)))
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 30);
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, 25);
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(25f));
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 85);
+            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, Scale(85f));
             ImGui.TableSetupColumn("Personal Estate", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Apartment", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("FC Estate", ImGuiTableColumnFlags.WidthStretch);

@@ -236,7 +236,7 @@ public partial class SlaveWindow
         }
 
         var intervalIndex = ExportGetIntervalIndex(cfg.ExportDataRunEveryHours);
-        ImGui.SetNextItemWidth(220f);
+        ImGui.SetNextItemWidth(Scale(220f));
         if (ImGui.Combo("Run Every", ref intervalIndex, ExportIntervalLabels, ExportIntervalLabels.Length))
         {
             cfg.ExportDataRunEveryHours = ExportIntervalOptions[intervalIndex];

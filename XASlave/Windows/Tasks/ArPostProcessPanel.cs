@@ -43,7 +43,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
         var cadenceIndex = GetCheckEveryIndex(plugin.Configuration.ArPrePostCheckEveryHours);
-        ImGui.SetNextItemWidth(180);
+        ImGui.SetNextItemWidth(Scale(180f));
         if (ImGui.SliderInt("Check Every##arPrePostEvery", ref cadenceIndex, 0, CheckEveryHourOptions.Length - 1,
                 FormatCheckEveryHours(CheckEveryHourOptions[cadenceIndex])))
         {
@@ -75,7 +75,7 @@ public partial class SlaveWindow
             var bailoutOptions = new[] { 30, 60, 90 };
             var bailoutIndex = Array.IndexOf(bailoutOptions, plugin.Configuration.ArShipExplorationBailoutSeconds);
             if (bailoutIndex < 0) bailoutIndex = 0;
-            ImGui.SetNextItemWidth(180);
+            ImGui.SetNextItemWidth(Scale(180f));
             if (ImGui.SliderInt("Bailout Timer##shipBailout", ref bailoutIndex, 0, bailoutOptions.Length - 1,
                     $"{bailoutOptions[bailoutIndex]} sec"))
             {
@@ -114,7 +114,7 @@ public partial class SlaveWindow
             var preChanged = false;
 
             var preDelay = plugin.Configuration.ArPreProcessLoginDelay;
-            ImGui.SetNextItemWidth(100);
+            ImGui.SetNextItemWidth(Scale(100f));
             if (ImGui.InputFloat("Login Delay (seconds)##pre", ref preDelay, 1f, 5f, "%.0f"))
             {
                 if (preDelay < 3f) preDelay = 3f;
@@ -295,7 +295,7 @@ public partial class SlaveWindow
         }
         else
         {
-            using (var child = ImRaii.Child("ArProcessLog", new Vector2(0, 150), true))
+            using (var child = ImRaii.Child("ArProcessLog", ScaledVector(0f, 150f), true))
             {
                 if (child.Success)
                 {

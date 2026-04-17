@@ -27,7 +27,7 @@ public partial class SlaveWindow
         new("/xa preset list", "List the currently saved XA Mods presets.", "Prints each saved preset name to chat."),
         new("/xa preset load <name>", "Load a saved XA Mods preset by name.", "Applies the saved mod-key set after clearing the current top-level toggles."),
         new("/xa preset save <name>", "Save the current XA Mods selection as a preset.", "Creates or overwrites a saved list without opening the panel."),
-        new("/xa xamods", "Open the window directly to `Utility > XA Mods`.", "Useful when you want the real XA Mods panel instead of just toggling the main window."),
+        new("/xa xamods | /xa mods", "Open the window directly to `Utility > XA Mods`.", "Both commands resolve to the same XA Mods panel open action."),
     };
 
     private static readonly CommandReferenceEntry[] GameModsCommandEntries =
@@ -102,7 +102,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Current XA Slave command inventory in a compact grouped table layout.");
 
         ImGui.Spacing();
-        ImGui.SetNextItemWidth(Math.Max(220f, ImGui.GetContentRegionAvail().X));
+        ImGui.SetNextItemWidth(Math.Max(Scale(220f), ImGui.GetContentRegionAvail().X));
         ImGui.InputTextWithHint(
             "##CommandsSearch",
             "Search commands, settings, descriptions, and notes",
@@ -174,7 +174,7 @@ public partial class SlaveWindow
                 2,
                 ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings | ImGuiTableFlags.PadOuterX))
         {
-            ImGui.TableSetupColumn("Command", ImGuiTableColumnFlags.WidthFixed, 210f);
+            ImGui.TableSetupColumn("Command", ImGuiTableColumnFlags.WidthFixed, Scale(210f));
             ImGui.TableSetupColumn("Description", ImGuiTableColumnFlags.WidthStretch);
 
             for (var i = 0; i < entries.Length; i++)

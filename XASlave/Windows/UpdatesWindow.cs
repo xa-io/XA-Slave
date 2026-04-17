@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 
 namespace XASlave.Windows;
@@ -12,6 +13,8 @@ namespace XASlave.Windows;
 public sealed class UpdatesWindow : Window
 {
     private const string UpdatesWindowTitle = "XA Slave - Updates";
+    private static float UiScale => ImGuiHelpers.GlobalScale;
+    private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
 
     private bool firstDraw = true;
 
@@ -19,8 +22,27 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
-            Header = "v0.0.0.21 - 2026-04-16",
+            Header = "v0.0.0.22 - 2026-04-17",
             HighlightAsCurrentRelease = true,
+            Lines =
+            [
+                "Fixes",
+                "- Minimum window size enforcement now restores and keeps the normal game floor correctly when the XA override is turned off",
+                "- Plugin unload now tears down more safely so update-time cleanup is less likely to freeze the client",
+                "- `Anonymize Character Lists` now stays in sync between XA Mods and the shared task-list checkbox flow",
+                "",
+                "UI / Quality Of Life",
+                "- XA Slave now follows Dalamud interface zoom across the main UI, update history, task tables, and XA Peep overlays",
+                "- Mass-character task tables now support resizable columns with widths preserved through saved ImGui table settings",
+                "- The splash screen no longer duplicates a `What's New` section; use `Update History` for release notes instead",
+                "",
+                "XA Mods",
+                "- XA Mods preset save/load and export/import now restore supported per-mod subsettings, not just the top-level toggle list",
+            ],
+        },
+        new VersionEntry
+        {
+            Header = "v0.0.0.21 - 2026-04-16",
             Lines =
             [
                 "XA Peep",
@@ -223,11 +245,12 @@ public sealed class UpdatesWindow : Window
     public UpdatesWindow()
         : base(UpdatesWindowTitle, ImGuiWindowFlags.None)
     {
-        SizeConstraints = new WindowSizeConstraints
-        {
-            MinimumSize = new Vector2(480, 320),
-            MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
-        };
+        UpdateSizeConstraints(UiScaleSafe);
+    }
+
+    public override void PreDraw()
+    {
+        UpdateSizeConstraints(UiScale);
     }
 
     public override void Draw()
@@ -269,8 +292,8 @@ public sealed class UpdatesWindow : Window
 
             if (open)
             {
-                ImGui.Indent(12f);
-                ImGui.PushTextWrapPos(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - 12f);
+                ImGui.Indent(Scale(12f));
+                ImGui.PushTextWrapPos(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - Scale(12f));
 
                 foreach (var line in entry.Lines)
                 {
@@ -295,7 +318,7 @@ public sealed class UpdatesWindow : Window
                 }
 
                 ImGui.PopTextWrapPos();
-                ImGui.Unindent(12f);
+                ImGui.Unindent(Scale(12f));
                 ImGui.Spacing();
             }
 
@@ -309,6 +332,18 @@ public sealed class UpdatesWindow : Window
     {
         firstDraw = true;
     }
+
+    private void UpdateSizeConstraints(float scale)
+    {
+        SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(480f * scale, 320f * scale),
+            MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
+        };
+    }
+
+    private static float Scale(float value)
+        => value * UiScale;
 
     private sealed class VersionEntry
     {

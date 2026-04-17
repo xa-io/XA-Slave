@@ -201,11 +201,11 @@ public partial class SlaveWindow
             DrawXagmanRoleInstructions(cfg.XagmanRole);
         ImGui.Spacing();
         ImGui.TextDisabled($"Applied Hub: {plugin.XagmanPeers.HubEndpoint}");
-        ImGui.SetNextItemWidth(140f);
+        ImGui.SetNextItemWidth(Scale(140f));
         if (ImGui.InputText("Address##xagmanAddress", ref xagmanPendingHubAddress, 128))
             xagmanPendingHubAddress = xagmanPendingHubAddress.Trim();
         ImGui.SameLine();
-        ImGui.SetNextItemWidth(72f);
+        ImGui.SetNextItemWidth(Scale(72f));
         if (ImGui.InputInt("Port##xagmanPort", ref xagmanPendingHubPort))
             xagmanPendingHubPort = XagmanPeerService.NormalizePort(xagmanPendingHubPort);
         ImGui.SameLine();
@@ -261,7 +261,7 @@ public partial class SlaveWindow
             DrawXagmanWorldSelector(cfg);
             DrawXagmanAetheryteSelector(cfg);
             var tonyGilMinimum = Math.Max(0, cfg.XagmanTonyGilMinimum);
-            ImGui.SetNextItemWidth(140f);
+            ImGui.SetNextItemWidth(Scale(140f));
             if (ImGui.InputInt("Tony Gil Minimum##xagmanTonyGilMinimum", ref tonyGilMinimum))
             {
                 cfg.XagmanTonyGilMinimum = Math.Max(0, tonyGilMinimum);
@@ -471,18 +471,18 @@ public partial class SlaveWindow
             SelectXagmanTonyCharactersWithMatchingItems();
         ImGui.SameLine();
         ImGui.Checkbox("Selected Only##xagmanTonySelOnly", ref xagmanTonyShowOnlySelected);
-        ImGui.SetNextItemWidth(240);
+        ImGui.SetNextItemWidth(Scale(240f));
         ImGui.InputTextWithHint("##xagmanTonySearch", "Search Tony name or world...", ref xagmanTonySearchFilter, 128);
         if (ImGui.BeginTable("XagmanTonyTable", 6,
-            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
-            new Vector2(0, 175)))
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
+            ScaledVector(0f, 175f)))
         {
-            ImGui.TableSetupColumn("Use", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 42f);
+            ImGui.TableSetupColumn("Use", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(42f));
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Region/DC", ImGuiTableColumnFlags.WidthFixed, 120f);
-            ImGui.TableSetupColumn("Inv", ImGuiTableColumnFlags.WidthFixed, 70f);
-            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, 95f);
-            ImGui.TableSetupColumn("Remove", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 60f);
+            ImGui.TableSetupColumn("Region/DC", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+            ImGui.TableSetupColumn("Inv", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
+            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
+            ImGui.TableSetupColumn("Remove", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(60f));
             ImGui.TableHeadersRow();
 
             var filtered = new List<(int OrigIdx, string CharacterName, string World, string RegionDc, ReloggerCharacterData? Info)>();
@@ -574,7 +574,7 @@ public partial class SlaveWindow
             }
             ImGui.EndTable();
         }
-        ImGui.SetNextItemWidth(260);
+        ImGui.SetNextItemWidth(Scale(260f));
         var enterPressed = ImGui.InputTextWithHint("##xagmanTonyAdd", "Name Surname@World", ref xagmanTonyNewChar, 128, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         if ((ImGui.Button("Add Tony##xagmanTonyAddBtn") || enterPressed) && !string.IsNullOrWhiteSpace(xagmanTonyNewChar))
@@ -609,18 +609,18 @@ public partial class SlaveWindow
             SelectXagmanFranchiseCharactersWithMatchingItems();
         ImGui.SameLine();
         ImGui.Checkbox("Selected Only##xagmanOwnerSelOnly", ref xagmanFranchiseShowOnlySelected);
-        ImGui.SetNextItemWidth(240);
+        ImGui.SetNextItemWidth(Scale(240f));
         ImGui.InputTextWithHint("##xagmanOwnerSearch", "Search owner name or world...", ref xagmanFranchiseSearchFilter, 128);
         if (ImGui.BeginTable("XagmanOwnerTable", 6,
-            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
-            new Vector2(0, 175)))
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
+            ScaledVector(0f, 175f)))
         {
-            ImGui.TableSetupColumn("Use", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 42f);
+            ImGui.TableSetupColumn("Use", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(42f));
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Region/DC", ImGuiTableColumnFlags.WidthFixed, 120f);
-            ImGui.TableSetupColumn("Inv", ImGuiTableColumnFlags.WidthFixed, 70f);
-            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, 95f);
-            ImGui.TableSetupColumn("Remove", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 60f);
+            ImGui.TableSetupColumn("Region/DC", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+            ImGui.TableSetupColumn("Inv", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
+            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
+            ImGui.TableSetupColumn("Remove", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(60f));
             ImGui.TableHeadersRow();
 
             var filtered = new List<(int OrigIdx, string CharacterName, string World, string RegionDc, ReloggerCharacterData? Info)>();
@@ -711,7 +711,7 @@ public partial class SlaveWindow
             }
             ImGui.EndTable();
         }
-        ImGui.SetNextItemWidth(260);
+        ImGui.SetNextItemWidth(Scale(260f));
         var enterPressed = ImGui.InputTextWithHint("##xagmanOwnerAdd", "Name Surname@World", ref xagmanFranchiseNewChar, 128, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         if ((ImGui.Button("Add Owner##xagmanOwnerAddBtn") || enterPressed) && !string.IsNullOrWhiteSpace(xagmanFranchiseNewChar))
@@ -737,7 +737,7 @@ public partial class SlaveWindow
         if (!xaDbAvailable) ImGui.EndDisabled();
         if (ImGui.BeginPopup($"{id}AddItemPopup"))
         {
-            ImGui.SetNextItemWidth(280f);
+            ImGui.SetNextItemWidth(Scale(280f));
             var searchChanged = ImGui.InputTextWithHint($"##{id}Search", "Search items...", ref xagmanItemSearch, 128);
             if (searchChanged || !string.Equals(xagmanItemQueryCache, xagmanItemSearch, StringComparison.Ordinal))
             {
@@ -822,17 +822,17 @@ public partial class SlaveWindow
             DrawXagmanMassModePopup(items, id);
 
         var tableColumnCount = searchOnly ? 4 : 6;
-        if (ImGui.BeginTable($"{id}Table", tableColumnCount, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, new Vector2(0, 150f)))
+        if (ImGui.BeginTable($"{id}Table", tableColumnCount, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, ScaledVector(0f, 150f)))
         {
             ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("ID", ImGuiTableColumnFlags.WidthFixed, 70f);
-            ImGui.TableSetupColumn("HQ", ImGuiTableColumnFlags.WidthFixed, 50f);
+            ImGui.TableSetupColumn("ID", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
+            ImGui.TableSetupColumn("HQ", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             if (!searchOnly)
             {
-                ImGui.TableSetupColumn("Mode", ImGuiTableColumnFlags.WidthFixed, 90f);
-                ImGui.TableSetupColumn("Amt", ImGuiTableColumnFlags.WidthFixed, 80f);
+                ImGui.TableSetupColumn("Mode", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+                ImGui.TableSetupColumn("Amt", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             }
-            ImGui.TableSetupColumn("Remove", ImGuiTableColumnFlags.WidthFixed, 60f);
+            ImGui.TableSetupColumn("Remove", ImGuiTableColumnFlags.WidthFixed, Scale(60f));
             ImGui.TableHeadersRow();
             for (var i = 0; i < items.Count; i++)
             {
@@ -853,7 +853,7 @@ public partial class SlaveWindow
                 {
                     ImGui.TableNextColumn();
                     var modeIndex = (int)item.Mode;
-                    ImGui.SetNextItemWidth(80f);
+                    ImGui.SetNextItemWidth(Scale(80f));
                     if (ImGui.Combo($"##{id}Mode{i}", ref modeIndex, xagmanItemModeLabels, xagmanItemModeLabels.Length))
                     {
                         item.Mode = (XagmanItemMode)Math.Clamp(modeIndex, 0, xagmanItemModeLabels.Length - 1);
@@ -861,7 +861,7 @@ public partial class SlaveWindow
                     }
                     ImGui.TableNextColumn();
                     var qty = item.Quantity;
-                    ImGui.SetNextItemWidth(60f);
+                    ImGui.SetNextItemWidth(Scale(60f));
                     if (ImGui.InputInt($"##{id}Qty{i}", ref qty))
                     {
                         item.Quantity = Math.Max(0, qty);
@@ -1331,12 +1331,12 @@ public partial class SlaveWindow
         var queue = GetXagmanQueueForTony(focusTony);
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Queue");
         ImGui.TextDisabled(string.IsNullOrWhiteSpace(focusTony) ? "No Tony focus selected." : $"Tony Focus: {focusTony}");
-        if (ImGui.BeginTable("XagmanQueueTable", 5, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg, new Vector2(0, 100f)))
+        if (ImGui.BeginTable("XagmanQueueTable", 5, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg, ScaledVector(0f, 100f)))
         {
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, 35f);
+            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, Scale(35f));
             ImGui.TableSetupColumn("Owner", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, 120f);
-            ImGui.TableSetupColumn("Requested", ImGuiTableColumnFlags.WidthFixed, 150f);
+            ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+            ImGui.TableSetupColumn("Requested", ImGuiTableColumnFlags.WidthFixed, Scale(150f));
             ImGui.TableSetupColumn("Partner", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableHeadersRow();
             for (var i = 0; i < queue.Count; i++)
@@ -1574,17 +1574,17 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
-        if (ImGui.BeginTable("XagmanPeersTable", 9, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg, new Vector2(0, 100f)))
+        if (ImGui.BeginTable("XagmanPeersTable", 9, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg, ScaledVector(0f, 100f)))
         {
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, 55f);
-            ImGui.TableSetupColumn("Role", ImGuiTableColumnFlags.WidthFixed, 90f);
-            ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, 110f);
-            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 90f);
+            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
+            ImGui.TableSetupColumn("Role", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
+            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
             ImGui.TableSetupColumn("Location", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Queue", ImGuiTableColumnFlags.WidthFixed, 50f);
+            ImGui.TableSetupColumn("Queue", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableSetupColumn("Partner", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Seen", ImGuiTableColumnFlags.WidthFixed, 90f);
+            ImGui.TableSetupColumn("Seen", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
             ImGui.TableHeadersRow();
             foreach (var peer in peers.OrderBy(peer => peer.CharacterName, StringComparer.OrdinalIgnoreCase).ThenBy(peer => peer.ProcessId))
             {
@@ -1989,7 +1989,7 @@ public partial class SlaveWindow
             ImGui.OpenPopup("XagmanWorldPopup");
         if (!ImGui.BeginPopup("XagmanWorldPopup"))
             return;
-        ImGui.SetNextItemWidth(240f);
+        ImGui.SetNextItemWidth(Scale(240f));
         ImGui.InputTextWithHint("##xagmanWorldFilter", "Type a world name...", ref xagmanWorldFilter, 128);
         ImGui.Separator();
         foreach (var region in WorldData.RegionOrder)
@@ -2048,7 +2048,7 @@ public partial class SlaveWindow
             ImGui.OpenPopup("XagmanAetherytePopup");
         if (!ImGui.BeginPopup("XagmanAetherytePopup"))
             return;
-        ImGui.SetNextItemWidth(240f);
+        ImGui.SetNextItemWidth(Scale(240f));
         ImGui.InputTextWithHint("##xagmanAetheryteFilter", "Type a location...", ref xagmanAetheryteFilter, 128);
         ImGui.Separator();
         foreach (var aetheryte in GetXagmanAetheryteNames())
@@ -2539,7 +2539,7 @@ public partial class SlaveWindow
     {
         if (!ImGui.BeginPopup($"{id}ListsPopup"))
             return;
-        ImGui.SetNextItemWidth(220f);
+        ImGui.SetNextItemWidth(Scale(220f));
         ImGui.InputTextWithHint($"##{id}SaveListName", "List name...", ref xagmanSavedItemListName, 128);
         ImGui.SameLine();
         if (ImGui.Button($"Save Current##{id}SaveCurrent"))

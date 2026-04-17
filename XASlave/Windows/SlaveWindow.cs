@@ -7,6 +7,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Utility.Raii;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
@@ -34,6 +35,9 @@ public partial class SlaveWindow : Window, IDisposable
     private const float MinTaskMenuWidth = 30f;
     private const float MaxTaskMenuWidth = DefaultTaskMenuWidth * 2f;
     private const float TaskLayoutColumnGap = 3f;
+    private static float UiScale => ImGuiHelpers.GlobalScale;
+    private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
+    private static Vector2 TitleBarIconOffset => ScaledVector(0f, 1f);
     private static readonly int[] CheckEveryHourOptions = { 0, 6, 12, 24, 48, 72, 168, 336, 720, 1440, 2160 };
 
     // Task menu
@@ -128,13 +132,8 @@ public partial class SlaveWindow : Window, IDisposable
     public SlaveWindow(Plugin plugin)
         : base("XA Slave###SlaveWindow", ImGuiWindowFlags.None)
     {
-        SizeConstraints = new WindowSizeConstraints
-        {
-            MinimumSize = new Vector2(300, 240),
-            MaximumSize = new Vector2(float.MaxValue, float.MaxValue)
-        };
-
         this.plugin = plugin;
+        UpdateSizeConstraints(UiScaleSafe);
         RestoreLastSelectedTaskSelection();
         Plugin.Framework.Update += OnFrameworkUpdate;
         Plugin.ClientState.Login += OnExportDataLogin;
@@ -152,6 +151,7 @@ public partial class SlaveWindow : Window, IDisposable
 
     public override void PreDraw()
     {
+        UpdateSizeConstraints(UiScale);
         WindowName = plugin.Configuration.ShowVersionInUpdatesTitle
             ? $"XA Slave v{PluginVersion}###SlaveWindow"
             : "XA Slave###SlaveWindow";
@@ -233,21 +233,32 @@ public partial class SlaveWindow : Window, IDisposable
         string Label,
         string Category);
 
-    private void UpdateMinWidthForTitleBarButtons()
+    private void UpdateSizeConstraints(float scale)
     {
-        // Base covers the window title + native collapse/close buttons.
-        // Each custom button adds ~22px (font size + inner spacing).
-        const float basePx      = 160f;
-        const float perButtonPx = 22f;
-        var minWidth = Math.Max(300f, basePx + TitleBarButtons.Count * perButtonPx);
+        const float baseMinWidth = 300f;
+        const float baseMinHeight = 240f;
+        const float baseTitleWidth = 160f;
+        const float perButtonWidth = 22f;
 
-        var currentMin = SizeConstraints?.MinimumSize ?? new Vector2(300, 240);
+        var minWidth = Math.Max(baseMinWidth, baseTitleWidth + TitleBarButtons.Count * perButtonWidth) * scale;
         SizeConstraints = new WindowSizeConstraints
         {
-            MinimumSize = new Vector2(minWidth, currentMin.Y),
+            MinimumSize = new Vector2(minWidth, baseMinHeight * scale),
             MaximumSize = new Vector2(float.MaxValue, float.MaxValue),
         };
     }
+
+    private static float Scale(float value)
+        => value * UiScale;
+
+    private static Vector2 ScaledVector(float x, float y)
+        => ImGuiHelpers.ScaledVector2(x, y);
+
+    private static float Unscale(float value)
+        => value / Math.Max(UiScaleSafe, 0.01f);
+
+    private void UpdateMinWidthForTitleBarButtons()
+        => UpdateSizeConstraints(UiScaleSafe);
 
     internal void RebuildTitleBarFavButtons()
     {
@@ -270,7 +281,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = FontAwesomeIcon.Desktop,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -301,7 +312,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = FontAwesomeIcon.FlagCheckered,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -324,7 +335,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = FontAwesomeIcon.GasPump,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -347,7 +358,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = FontAwesomeIcon.CloudSun,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -372,7 +383,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = FontAwesomeIcon.List,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -388,7 +399,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = FontAwesomeIcon.Recycle,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -405,7 +416,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = FontAwesomeIcon.Skull,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -519,7 +530,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = slotIcon,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -541,7 +552,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = slotIcon,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -559,7 +570,7 @@ public partial class SlaveWindow : Window, IDisposable
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = slotIcon,
-                IconOffset = new Vector2(0, 1),
+                IconOffset = TitleBarIconOffset,
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
@@ -1078,15 +1089,16 @@ public partial class SlaveWindow : Window, IDisposable
         RefreshTitleBarFavIconColors();
 
         // ── Left panel: Task menu ──
-        var leftWidth = ClampTaskMenuWidth(plugin.Configuration.TaskMenuWidth);
-        if (Math.Abs(leftWidth - plugin.Configuration.TaskMenuWidth) > 0.01f)
+        var storedLeftWidth = ClampTaskMenuWidth(plugin.Configuration.TaskMenuWidth);
+        if (Math.Abs(storedLeftWidth - plugin.Configuration.TaskMenuWidth) > 0.01f)
         {
-            plugin.Configuration.TaskMenuWidth = leftWidth;
+            plugin.Configuration.TaskMenuWidth = storedLeftWidth;
             plugin.Configuration.Save();
         }
+        var leftWidth = Scale(storedLeftWidth);
 
-        var panelHeight = Math.Max(120f, ImGui.GetContentRegionAvail().Y - 30f);
-        ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(TaskLayoutColumnGap, 0f));
+        var panelHeight = Math.Max(Scale(120f), ImGui.GetContentRegionAvail().Y - Scale(30f));
+        ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, ScaledVector(TaskLayoutColumnGap, 0f));
         ImGui.PushStyleColor(ImGuiCol.Separator, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
         ImGui.PushStyleColor(ImGuiCol.SeparatorHovered, new Vector4(0.40f, 0.40f, 0.40f, 1.0f));
         ImGui.PushStyleColor(ImGuiCol.SeparatorActive, new Vector4(0.55f, 0.55f, 0.55f, 1.0f));
@@ -1098,9 +1110,9 @@ public partial class SlaveWindow : Window, IDisposable
 
             ImGui.TableNextColumn();
             DrawTaskMenuPanel(panelHeight);
-            var currentWidth = ClampTaskMenuWidth(ImGui.GetColumnWidth(0));
+            var currentWidth = ClampTaskMenuWidth(Unscale(ImGui.GetColumnWidth(0)));
 
-            if (Math.Abs(plugin.Configuration.TaskMenuWidth - currentWidth) > 1f)
+            if (Math.Abs(plugin.Configuration.TaskMenuWidth - currentWidth) > 0.5f)
             {
                 plugin.Configuration.TaskMenuWidth = currentWidth;
                 plugin.Configuration.Save();
@@ -1475,8 +1487,8 @@ public partial class SlaveWindow : Window, IDisposable
         ImGui.PushStyleColor(ImGuiCol.HeaderHovered, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
         ImGui.PushStyleColor(ImGuiCol.HeaderActive, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
         ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, 1f);
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, 4f);
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, Scale(1f));
+        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, Scale(4f));
         ImGui.SetNextItemOpen(expanded, ImGuiCond.Always);
         var isOpen = ImGui.CollapsingHeader($"{header}##{section}");
         ImGui.PopStyleVar(2);
@@ -1612,20 +1624,6 @@ public partial class SlaveWindow : Window, IDisposable
 
         ImGui.Separator();
         ImGui.PushTextWrapPos(0f);
-        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.95f, 0.85f, 0.50f, 1.0f));
-        ImGui.TextUnformatted($"What's New in v{PluginVersion}");
-        ImGui.PopStyleColor();
-        ImGui.Spacing();
-        DrawWrappedBulletText("XA Peep adds a compact target tracker with a separate history window, cumulative per-player counts, logout-safe cached history, and local persistence through slave.db.");
-        DrawWrappedBulletText("XA Peep live rows now support hover focus preview, left/right click actions, Ctrl+Left Click examine, Ctrl+Right Click adventurer plate, mute-proof alert sounds, and configurable targeter cards/lines/dots.");
-        DrawWrappedBulletText("XA Peep also now supports party/alliance/in-combat filters, auto-open on plugin load, a compact resize lock, and reload-safe startup when enabled in config.");
-        DrawWrappedBulletText("Plugin Operations: Show Version in Window Title now defaults on until you turn it off, and Kill Game titlebar selection now auto-enables XA Mods > Instant Logout.");
-        DrawWrappedBulletText("Custom titlebar favourites can open panels, toggle any XA Mod, drive Special Rendering Modes UI presets, fire Sit / Doze actions, run Stop All Automated Tasks, and be added or removed as needed.");
-        DrawWrappedBulletText("Special Rendering Modes now uses stored toggle switches, Doze & Sit Anywhere keeps the simple master toggle flow, fixed Export Data paths can overwrite the same TSV/CSV file, and anonymize-character flows now use shared deterministic aliases across XA Slave.");
-        ImGui.PopTextWrapPos();
-
-        ImGui.Separator();
-        ImGui.PushTextWrapPos(0f);
         ImGui.Text("XA Slave is still in a very early phase. Expect ongoing changes, new automation surfaces, and many months of additional features.");
         ImGui.Spacing();
         DrawWrappedDisabledText("General Terms");
@@ -1679,13 +1677,9 @@ public partial class SlaveWindow : Window, IDisposable
         if (!sharedTexture.TryGetWrap(out var wrap, out _))
             return;
 
-        const float targetHeight = 110f;
+        var targetHeight = Scale(110f);
         var scale = targetHeight / MathF.Max(1f, (float)wrap.Height);
         var size = new Vector2(wrap.Width * scale, wrap.Height * scale);
-        var offset = MathF.Max(0f, (ImGui.GetContentRegionAvail().X - size.X) * 0.5f);
-        if (offset > 0f)
-            ImGui.SetCursorPosX(ImGui.GetCursorPosX() + offset);
-
         ImGui.Image(wrap.Handle, size);
         ImGui.Spacing();
     }

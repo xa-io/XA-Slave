@@ -17,11 +17,11 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Auto-Accept FC Invites** - Monitor for FC invitations, automatically accept them, wait for a configurable period, and optionally leave again through the built-in floater-assist flow.
 - **FC Permissions Updater** - Review FC rosters with member-rank and FC-rank visibility before running shared permissions updates and the shared completion actions.
 - **Check Duplicate Plots** - Scan characters for duplicate housing plots and optionally rerun follow-up actions with the shared completion actions.
-- **Screenshot-Safe Character Lists** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` can anonymize visible character and world labels with one shared `Anonymize` toggle. Changing that checkbox in any task list immediately carries across the others, and the same setting is exposed as the `Anonymize Character Lists` XA Mod.
+- **Screenshot-Safe Character Lists** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` can anonymize visible character and world labels with one shared `Anonymize` toggle. Changing that checkbox in any task list immediately carries across the others, the same setting is exposed as the `Anonymize Character Lists` XA Mod, and the mass-character table columns can now be resized with the widths preserved through saved table settings.
 - **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared action flow and shared completion actions.
 - **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, safer menu recovery, a workshop-side Company Chest gil sync into XA Database after the bell path finishes, and shared completion actions.
 - **Window Renamer** - Rename the FFXIV game window with an optional custom title, process-ID prefix, and current-character suffix.
-- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, a live enabled counter, `Show Only Enabled`, `Disable All Mods`, preset save/load, clipboard `Export` / `Import`, inline help, and direct `/xa xamods` navigation.
+- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, a live enabled counter, `Show Only Enabled`, `Disable All Mods`, preset save/load, clipboard `Export` / `Import`, inline help, and direct `/xa xamods` navigation. Saved presets and exported XA Mods packages now restore the supported subsettings for the enabled mods as well, including the shipped option groups behind background rendering, object hiding, custom resolutions, low-resolution scale, Special Rendering Modes, expanded right-click providers, Expert Delivery, trade refusal, custom sight distance, Infinite Sprint delay, and XA Peep.
 
   | Game Mods | Graphic Mods | Player Mods | Plugin Mods |
   | --- | --- | --- | --- |
@@ -44,10 +44,8 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Repo List** - Review commonly required custom plugin repositories with installer/settings shortcuts, plugin presence checks, and copy-to-clipboard repo URLs.
 - **IPC Calls Available** - Review the IPC integrations XA Slave can talk to, along with cached/live availability checks for supported plugins and the XA Slave provider channels other plugins can call, including `XASlave.ExecuteCommand` for the shipped `/xa` command surface plus simple direct-call examples such as `XASlave.ExecuteCommand("xamods")` shown directly in the XA Slave provider block.
 - **Commands** - Review the current XA slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, and `Plugin Mods`, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
-- **Splash Screen** - Return to the default XA Slave landing page with the website, Discord, and first-time guidance without needing the ctrl-click unselect shortcut.
 - **Priority Tasks** - Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
-
-- **XA Mods Native Hooks** - Adds multi-instance launch-lock cleanup, character-select login cooldown clearing, Scenario Tree MSQ progress display, actual queue-position ETA hooks, object-hide controls, inventory item-name copy actions, Special Rendering Modes controls, custom sight-distance sliders, teleport-lock recovery, and a checkbox-gated hard logout seam built on the native contents-finder request path.
+- **XA Mods Native Hooks** - Adds multi-instance launch-lock cleanup, character-select login cooldown clearing, Scenario Tree MSQ progress display, actual queue-position ETA hooks, object-hide controls, inventory item-name copy actions, Special Rendering Modes controls, custom sight-distance sliders, guarded custom window-size controls that clamp the live client back up to the safe `250x200` floor, teleport-lock recovery, and a checkbox-gated hard logout seam built on the native contents-finder request path.
 
 ## Commands
 
@@ -66,10 +64,10 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 | `/xa db request <itemId:qty ...>` | Print the missing quantities still needed locally as a ready-to-run `/xa db ...` command. |
 | `/xa db <shortcut>` | Build missing crystal-fill commands with `shards`, `crystals`, `clusters`, `shards+crystals`, `crystals+clusters`, or `shards+crystals+clusters`. |
 | `/xa preset list` | List saved XA Mods presets. |
-| `/xa preset load <name>` | Load a saved XA Mods preset. |
-| `/xa preset save <name>` | Save the current XA Mods selection as a preset. |
+| `/xa preset load <name>` | Load a saved XA Mods preset, including the supported subsettings captured for the enabled mods. |
+| `/xa preset save <name>` | Save the current XA Mods selection and the supported subsettings for the enabled mods as a preset. |
 | `/xa updates` | Open the version history window. |
-| `/xa xamods` | Open `Utility > XA Mods`. |
+| `/xa xamods` or `/xa mods` | Open `Utility > XA Mods`. |
 
 ### Game Mods
 
@@ -99,8 +97,8 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 | `/xa hideobjects on/off` | Toggle `Hide Game Objects`. |
 | `/xa lowres <scale>` | Set and enable `Low Resolution`. |
 | `/xa lowres off` | Disable `Low Resolution`. |
-| `/xa minwindow on/off` | Toggle `Ignore Minimum Window Size`. |
-| `/xa res <width>x<height>` | Apply a custom client resolution. |
+| `/xa minwindow on/off` | Toggle `Ignore Minimum Window Size`; when enabled XA lowers the live minimum to `250x200`, and when disabled XA restores the normal game minimum floor even if `Custom Resolutions` remains enabled. |
+| `/xa res <width>x<height>` | Apply a custom client resolution at or above the guarded `250x200` floor. |
 | `/xa res add <width>x<height>` | Add a saved custom-resolution button. |
 | `/xa res remove <width>x<height>` | Remove a saved custom-resolution button. |
 | `/xa resrestore` | Disable the current Graphic Mods toggles. |

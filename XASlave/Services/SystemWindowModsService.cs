@@ -17,6 +17,8 @@ namespace XASlave.Services;
 
 public unsafe sealed class SystemWindowModsService : IDisposable
 {
+    private const int DefaultGameMinimumWindowWidth = 1024;
+    private const int DefaultGameMinimumWindowHeight = 720;
     private const int SafeMinimumWindowWidth = 250;
     private const int SafeMinimumWindowHeight = 200;
     private const int MaximumCustomWindowWidth = 16384;
@@ -25,6 +27,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private const int AutoRetainerMultiModeCacheMilliseconds = 1000;
     private const int WindowStyleIndex = -16;
     private const int WindowExStyleIndex = -20;
+    private const int WindowProcIndex = -4;
+    private const uint WmGetMinMaxInfo = 0x0024;
     private const uint SetWindowPosNoZOrder = 0x0004;
     private const uint SetWindowPosNoActivate = 0x0010;
     private const float MinimumLowResolutionScale = 0.01f;
@@ -45,6 +49,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private Hook<DeviceDx11PostTickDelegate>? deviceDx11PostTickHook;
     private Hook<NamePlateDrawDelegate>? namePlateDrawHook;
     private ToggleFadeDelegate? toggleFadeDelegate;
+    private readonly WindowProcDelegate windowProcDelegate;
 
     private bool initialized;
     private bool cancelLoginCooldownEnabled;
@@ -75,6 +80,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private int lastAppliedCustomResolutionHeight;
     private byte originalLowResolutionUpscaleType;
     private float lowResolutionScale = 0.25f;
+    private nint subclassedWindowHandle;
+    private nint originalWindowProc;
 
     public SystemWindowModsService(
         ISigScanner sigScanner,
@@ -92,6 +99,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         this.gameConfig = gameConfig;
         this.clientState = clientState;
         this.isAutoRetainerMultiModeEnabled = isAutoRetainerMultiModeEnabled;
+        this.windowProcDelegate = WindowProcDetour;
 
         this.framework.Update += OnFrameworkUpdate;
     }
@@ -228,7 +236,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
                 ResetWindowSizeSynchronizationState();
 
             RefreshWindowSizeLimits();
-            IgnoreMinimumWindowSizeStatusText = "Disabled";
+
+            IgnoreMinimumWindowSizeStatusText = GetIgnoreMinimumWindowSizeDisabledStatusText();
             return false;
         }
 
@@ -435,6 +444,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
         RestoreLowResolutionConfiguration();
         RefreshWindowSizeLimits();
+        RestoreWindowProcSubclass();
         UpdateAgentLobbyHookState();
         UpdateAtkMessageBoxHookState();
         UpdateAgentMapHookState();
@@ -449,7 +459,17 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private string GetIgnoreMinimumWindowSizeStatusText()
     {
-        return $"Enabled - minimum size forced to {SafeMinimumWindowWidth}x{SafeMinimumWindowHeight}. Resize sync is armed for restore and maximize operations.";
+        return $"Enabled - minimum size is clamped to {SafeMinimumWindowWidth}x{SafeMinimumWindowHeight}. Resize sync is armed for restore and maximize operations.";
+    }
+
+    private string GetIgnoreMinimumWindowSizeDisabledStatusText()
+    {
+        var restoredMinimumWidth = GetRestoredMinimumWindowWidth();
+        var restoredMinimumHeight = GetRestoredMinimumWindowHeight();
+        if (restoredMinimumWidth > 0 && restoredMinimumHeight > 0)
+            return $"Disabled - restored the normal minimum size floor of {restoredMinimumWidth}x{restoredMinimumHeight}.";
+
+        return "Disabled";
     }
 
     private string GetCustomResolutionsStatusText()
@@ -606,6 +626,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private void OnFrameworkUpdate(IFramework _)
     {
+        EnsureWindowProcSubclass();
+
         if (ShouldSynchronizeWindowSize())
             UpdateWindowSizeSynchronization();
 
@@ -644,6 +666,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private bool ShouldSynchronizeWindowSize()
     {
         return ignoreMinimumWindowSizeEnabled || customResolutionsEnabled;
+    }
+
+    private bool ShouldUseLoweredMinimumWindowSize()
+    {
+        return ignoreMinimumWindowSizeEnabled;
     }
 
     private void PrimeWindowSizeSynchronization(GameWindow* gameWindow)
@@ -686,10 +713,17 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (gameWindow == null)
             return;
 
-        if (ShouldSynchronizeWindowSize())
+        if (ShouldUseLoweredMinimumWindowSize())
         {
             gameWindow->MinWidth = SafeMinimumWindowWidth;
             gameWindow->MinHeight = SafeMinimumWindowHeight;
+
+            if (gameWindow->WindowHandle != nint.Zero
+                && TryGetClientSize(gameWindow->WindowHandle, out var clientWidth, out var clientHeight))
+            {
+                TryClampClientSizeToSafeMinimum(gameWindow, clientWidth, clientHeight);
+            }
+
             return;
         }
 
@@ -712,6 +746,10 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             lastObservedClientWidth = clientWidth;
             lastObservedClientHeight = clientHeight;
             lastWindowSizeChangeTick = currentTick;
+
+            if (ShouldUseLoweredMinimumWindowSize() && !IsIconic(gameWindow->WindowHandle))
+                TryClampClientSizeToSafeMinimum(gameWindow, clientWidth, clientHeight);
+
             return;
         }
 
@@ -721,18 +759,26 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             lastObservedClientHeight = clientHeight;
             lastWindowSizeChangeTick = currentTick;
             pendingWindowSizeSynchronization = true;
+
+            if (ShouldUseLoweredMinimumWindowSize()
+                && !IsIconic(gameWindow->WindowHandle)
+                && TryClampClientSizeToSafeMinimum(gameWindow, clientWidth, clientHeight))
+                return;
+
             return;
         }
 
         if (!pendingWindowSizeSynchronization || currentTick - lastWindowSizeChangeTick < WindowSizeSyncDebounceMilliseconds)
             return;
 
-        if (IsIconic(gameWindow->WindowHandle)
-            || clientWidth < SafeMinimumWindowWidth
-            || clientHeight < SafeMinimumWindowHeight)
-        {
+        if (IsIconic(gameWindow->WindowHandle))
             return;
-        }
+
+        if (ShouldUseLoweredMinimumWindowSize() && TryClampClientSizeToSafeMinimum(gameWindow, clientWidth, clientHeight))
+            return;
+
+        if (ShouldUseLoweredMinimumWindowSize() && (clientWidth < SafeMinimumWindowWidth || clientHeight < SafeMinimumWindowHeight))
+            return;
 
         if (clientWidth == lastSynchronizedClientWidth && clientHeight == lastSynchronizedClientHeight)
         {
@@ -765,6 +811,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             CustomResolutionsStatusText = GetCustomResolutionsStatusText();
 
         log.Information($"[XASlave] Re-synchronized game resolution to {clientWidth}x{clientHeight} after a window-size change.");
+    }
+
+    private bool TryClampClientSizeToSafeMinimum(GameWindow* gameWindow, int clientWidth, int clientHeight)
+    {
+        return TryClampClientSizeToMinimum(gameWindow, clientWidth, clientHeight, SafeMinimumWindowWidth, SafeMinimumWindowHeight, "clamp the undersized client window");
     }
 
     private void UpdateLowResolutionScale()
@@ -874,7 +925,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         originalMinHeight = gameWindow->MinHeight;
     }
 
-    private void RestoreWindowSizeLimits()
+    private void RestoreWindowSizeLimits(bool clampClientToMinimum = false)
     {
         if (!capturedWindowSize)
             return;
@@ -883,8 +934,161 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (gameWindow == null)
             return;
 
-        gameWindow->MinWidth = originalMinWidth;
-        gameWindow->MinHeight = originalMinHeight;
+        var restoredMinimumWidth = GetRestoredMinimumWindowWidth();
+        var restoredMinimumHeight = GetRestoredMinimumWindowHeight();
+        gameWindow->MinWidth = restoredMinimumWidth;
+        gameWindow->MinHeight = restoredMinimumHeight;
+
+        if (!clampClientToMinimum
+            || gameWindow->WindowHandle == nint.Zero
+            || restoredMinimumWidth <= 0
+            || restoredMinimumHeight <= 0
+            || IsIconic(gameWindow->WindowHandle)
+            || !TryGetClientSize(gameWindow->WindowHandle, out var clientWidth, out var clientHeight))
+            return;
+
+        TryClampClientSizeToMinimum(gameWindow, clientWidth, clientHeight, restoredMinimumWidth, restoredMinimumHeight, "restore the original minimum client window size");
+    }
+
+    private int GetRestoredMinimumWindowWidth()
+    {
+        return capturedWindowSize
+            ? Math.Max(originalMinWidth, DefaultGameMinimumWindowWidth)
+            : DefaultGameMinimumWindowWidth;
+    }
+
+    private int GetRestoredMinimumWindowHeight()
+    {
+        return capturedWindowSize
+            ? Math.Max(originalMinHeight, DefaultGameMinimumWindowHeight)
+            : DefaultGameMinimumWindowHeight;
+    }
+
+    private void EnsureWindowProcSubclass()
+    {
+        var gameWindow = GameWindow.Instance();
+        if (gameWindow == null || gameWindow->WindowHandle == nint.Zero)
+            return;
+
+        var windowHandle = gameWindow->WindowHandle;
+        if (subclassedWindowHandle == windowHandle && originalWindowProc != nint.Zero)
+            return;
+
+        RestoreWindowProcSubclass();
+
+        var newWindowProc = Marshal.GetFunctionPointerForDelegate(windowProcDelegate);
+        var previousWindowProc = SetWindowLongPtr(windowHandle, WindowProcIndex, newWindowProc);
+        if (previousWindowProc == nint.Zero && Marshal.GetLastWin32Error() != 0)
+        {
+            log.Warning($"[XASlave] Failed to subclass the game window for minimum-size enforcement. Win32 error: {Marshal.GetLastWin32Error()}.");
+            return;
+        }
+
+        subclassedWindowHandle = windowHandle;
+        originalWindowProc = previousWindowProc;
+    }
+
+    private void RestoreWindowProcSubclass()
+    {
+        if (subclassedWindowHandle == nint.Zero || originalWindowProc == nint.Zero)
+            return;
+
+        SetWindowLongPtr(subclassedWindowHandle, WindowProcIndex, originalWindowProc);
+        subclassedWindowHandle = nint.Zero;
+        originalWindowProc = nint.Zero;
+    }
+
+    private nint WindowProcDetour(nint windowHandle, uint message, nint wParam, nint lParam)
+    {
+        var result = originalWindowProc != nint.Zero
+            ? CallWindowProc(originalWindowProc, windowHandle, message, wParam, lParam)
+            : nint.Zero;
+
+        if (message == WmGetMinMaxInfo && lParam != nint.Zero && TryGetActiveMinimumClientSize(out var minimumClientWidth, out var minimumClientHeight))
+            ApplyMinimumTrackSize(windowHandle, lParam, minimumClientWidth, minimumClientHeight);
+
+        return result;
+    }
+
+    private bool TryGetActiveMinimumClientSize(out int minimumClientWidth, out int minimumClientHeight)
+    {
+        if (ShouldUseLoweredMinimumWindowSize())
+        {
+            minimumClientWidth = SafeMinimumWindowWidth;
+            minimumClientHeight = SafeMinimumWindowHeight;
+            return true;
+        }
+
+        var restoredMinimumWidth = GetRestoredMinimumWindowWidth();
+        var restoredMinimumHeight = GetRestoredMinimumWindowHeight();
+        if (restoredMinimumWidth > 0 && restoredMinimumHeight > 0)
+        {
+            minimumClientWidth = restoredMinimumWidth;
+            minimumClientHeight = restoredMinimumHeight;
+            return true;
+        }
+
+        minimumClientWidth = 0;
+        minimumClientHeight = 0;
+        return false;
+    }
+
+    private void ApplyMinimumTrackSize(nint windowHandle, nint minMaxInfoPtr, int minimumClientWidth, int minimumClientHeight)
+    {
+        if (!TryConvertClientSizeToWindowSize(windowHandle, minimumClientWidth, minimumClientHeight, out var minimumWindowWidth, out var minimumWindowHeight))
+            return;
+
+        var minMaxInfo = Marshal.PtrToStructure<MinMaxInfo>(minMaxInfoPtr);
+        minMaxInfo.PtMinTrackSize.X = Math.Max(minMaxInfo.PtMinTrackSize.X, minimumWindowWidth);
+        minMaxInfo.PtMinTrackSize.Y = Math.Max(minMaxInfo.PtMinTrackSize.Y, minimumWindowHeight);
+        Marshal.StructureToPtr(minMaxInfo, minMaxInfoPtr, false);
+    }
+
+    private static bool TryConvertClientSizeToWindowSize(nint windowHandle, int clientWidth, int clientHeight, out int windowWidth, out int windowHeight)
+    {
+        windowWidth = 0;
+        windowHeight = 0;
+
+        if (windowHandle == nint.Zero || clientWidth <= 0 || clientHeight <= 0)
+            return false;
+
+        var style = GetWindowLongPtr(windowHandle, WindowStyleIndex);
+        var exStyle = GetWindowLongPtr(windowHandle, WindowExStyleIndex);
+        var desiredRect = new WindowRect
+        {
+            Left = 0,
+            Top = 0,
+            Right = clientWidth,
+            Bottom = clientHeight,
+        };
+
+        if (!AdjustWindowRectEx(ref desiredRect, style.ToInt32(), false, exStyle.ToInt32()))
+            return false;
+
+        windowWidth = desiredRect.Right - desiredRect.Left;
+        windowHeight = desiredRect.Bottom - desiredRect.Top;
+        return windowWidth > 0 && windowHeight > 0;
+    }
+
+    private bool TryClampClientSizeToMinimum(GameWindow* gameWindow, int clientWidth, int clientHeight, int minimumWidth, int minimumHeight, string actionDescription)
+    {
+        if (gameWindow == null || gameWindow->WindowHandle == nint.Zero || minimumWidth <= 0 || minimumHeight <= 0)
+            return false;
+
+        var clampedWidth = Math.Max(clientWidth, minimumWidth);
+        var clampedHeight = Math.Max(clientHeight, minimumHeight);
+        if (clampedWidth == clientWidth && clampedHeight == clientHeight)
+            return false;
+
+        if (!TryResizeClientWindow(gameWindow->WindowHandle, clampedWidth, clampedHeight))
+        {
+            log.Warning($"[XASlave] Failed to {actionDescription} from {clientWidth}x{clientHeight} back to {clampedWidth}x{clampedHeight}.");
+            return false;
+        }
+
+        SynchronizeGameWindowSize(gameWindow, clampedWidth, clampedHeight);
+        UpdateObservedWindowSizeState(clampedWidth, clampedHeight);
+        return true;
     }
 
     private bool AtkMessageBoxReceiveEventDetour(AtkMessageBoxManager* manager, nint a2, AtkValue* values)
@@ -993,6 +1197,12 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern nint GetWindowLongPtr(nint windowHandle, int index);
+
+    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
+    private static extern nint SetWindowLongPtr(nint windowHandle, int index, nint newProc);
+
+    [DllImport("user32.dll", EntryPoint = "CallWindowProcW")]
+    private static extern nint CallWindowProc(nint previousProc, nint windowHandle, uint message, nint wParam, nint lParam);
 
     [DllImport("user32.dll")]
     private static extern bool AdjustWindowRectEx(ref WindowRect rect, int style, bool hasMenu, int exStyle);
@@ -1105,6 +1315,23 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     }
 
     [StructLayout(LayoutKind.Sequential)]
+    private struct MinMaxInfo
+    {
+        public Point PtReserved;
+        public Point PtMaxSize;
+        public Point PtMaxPosition;
+        public Point PtMinTrackSize;
+        public Point PtMaxTrackSize;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct Point
+    {
+        public int X;
+        public int Y;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
     private struct ProcessHandleTableEntryInfo
     {
         public ulong HandleValue;
@@ -1141,4 +1368,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private delegate void NamePlateDrawDelegate(AtkUnitBase* addon);
 
     private delegate void ToggleFadeDelegate(EnvironmentManager* manager, int a2, float fadeDuration, Vector4* fadeColor);
+
+    private delegate nint WindowProcDelegate(nint windowHandle, uint message, nint wParam, nint lParam);
 }

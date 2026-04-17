@@ -156,21 +156,21 @@ public partial class SlaveWindow
         }
 
         ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
+        ImGui.SetNextItemWidth(Scale(200f));
         ImGui.InputTextWithHint("##prepLogisticsSearch", "Search name or world...", ref prepLogisticsSearchFilter, 128);
         ImGui.Spacing();
 
         if (ImGui.BeginTable("PrepLogisticsCharTable", 7,
-            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
-            new Vector2(0, 250)))
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
+            ScaledVector(0f, 250f)))
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 30);
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, 30);
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 90);
-            ImGui.TableSetupColumn("Region / DC", ImGuiTableColumnFlags.WidthFixed, 120);
-            ImGui.TableSetupColumn("Inv Free", ImGuiTableColumnFlags.WidthFixed, 70);
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 25);
+            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            ImGui.TableSetupColumn("Region / DC", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+            ImGui.TableSetupColumn("Inv Free", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
             ImGui.TableHeadersRow();
 
             var charInfo = cfg.ReloggerCharacterInfo;
@@ -274,7 +274,7 @@ public partial class SlaveWindow
         }
 
         ImGui.Spacing();
-        ImGui.SetNextItemWidth(250);
+        ImGui.SetNextItemWidth(Scale(250f));
         var enterPressed = ImGui.InputTextWithHint("##prepLogisticsAdd", "Name Surname@World", ref prepLogisticsNewChar, 128, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         if ((ImGui.Button("Add##prepLogisticsAddBtn") || enterPressed) && !string.IsNullOrWhiteSpace(prepLogisticsNewChar))
@@ -325,7 +325,7 @@ public partial class SlaveWindow
         if (!ImGui.BeginPopup("PrepLogisticsWorldPopup"))
             return;
 
-        ImGui.SetNextItemWidth(240);
+        ImGui.SetNextItemWidth(Scale(240f));
         ImGui.InputTextWithHint("##prepLogisticsWorldFilter", "Type a world name...", ref prepLogisticsWorldFilter, 128);
         ImGui.Separator();
 
@@ -398,7 +398,7 @@ public partial class SlaveWindow
         if (!ImGui.BeginPopup("PrepLogisticsAetherytePopup"))
             return;
 
-        ImGui.SetNextItemWidth(240);
+        ImGui.SetNextItemWidth(Scale(240f));
         ImGui.InputTextWithHint("##prepLogisticsAetheryteFilter", "Type a location...", ref prepLogisticsAetheryteFilter, 128);
         ImGui.Separator();
 

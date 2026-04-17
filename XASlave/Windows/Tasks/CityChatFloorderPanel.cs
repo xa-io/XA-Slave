@@ -115,7 +115,7 @@ public partial class SlaveWindow
             if (looping)
             {
                 ImGui.SameLine();
-                ImGui.SetNextItemWidth(80);
+                ImGui.SetNextItemWidth(Scale(80f));
                 var loopDelay = cfg.FloorderLoopDelayMinutes;
                 if (ImGui.InputFloat("min##loop", ref loopDelay, 1f, 5f, "%.0f"))
                 {
@@ -138,7 +138,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
         var channelIdx = Array.IndexOf(FloorderChannelOptions, cfg.FloorderChatChannel);
         if (channelIdx < 0) channelIdx = 0;
-        ImGui.SetNextItemWidth(120);
+        ImGui.SetNextItemWidth(Scale(120f));
         if (ImGui.Combo("##FloorderChannel", ref channelIdx, FloorderChannelOptions, FloorderChannelOptions.Length))
         {
             cfg.FloorderChatChannel = FloorderChannelOptions[channelIdx];
@@ -148,7 +148,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Channel used for announcements");
 
         var waitCity = cfg.FloorderWaitBetweenCities;
-        ImGui.SetNextItemWidth(80);
+        ImGui.SetNextItemWidth(Scale(80f));
         if (ImGui.InputFloat("Wait between cities (sec)##fl", ref waitCity, 0.5f, 1.0f, "%.1f"))
         {
             if (waitCity < 1f) waitCity = 1f;
@@ -158,7 +158,7 @@ public partial class SlaveWindow
         }
 
         var waitAnn = cfg.FloorderWaitAfterAnnounce;
-        ImGui.SetNextItemWidth(80);
+        ImGui.SetNextItemWidth(Scale(80f));
         if (ImGui.InputFloat("Wait after announce (sec)##fl", ref waitAnn, 0.5f, 1.0f, "%.1f"))
         {
             if (waitAnn < 0.5f) waitAnn = 0.5f;
@@ -345,7 +345,7 @@ public partial class SlaveWindow
             }
         }
 
-        ImGui.SetNextItemWidth(200);
+        ImGui.SetNextItemWidth(Scale(200f));
         var cityEnter = ImGui.InputTextWithHint("##FlAddCity", "Add custom city...", ref floorderAddCityInput, 64, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         if ((ImGui.Button("Add City##fl") || cityEnter) && !string.IsNullOrWhiteSpace(floorderAddCityInput))

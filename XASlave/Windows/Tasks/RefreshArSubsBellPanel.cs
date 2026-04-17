@@ -144,7 +144,7 @@ public partial class SlaveWindow
         if (ImGui.IsItemClicked())
             refreshSubsGoWorkshop = !refreshSubsGoWorkshop;
 
-        ImGui.SetNextItemWidth(80);
+        ImGui.SetNextItemWidth(Scale(80f));
         var wait = refreshSubsExtraWait;
         if (ImGui.InputFloat("Extra Wait (sec)##refreshSubsWait", ref wait, 0.5f, 1.0f, "%.1f"))
         {
@@ -223,7 +223,7 @@ public partial class SlaveWindow
 
         ImGui.SameLine();
         // Search filter
-        ImGui.SetNextItemWidth(200);
+        ImGui.SetNextItemWidth(Scale(200f));
         ImGui.InputTextWithHint("##refreshSubsSearch", "Search name or world...", ref refreshSubsSearchFilter, 128);
         ImGui.Spacing();
 
@@ -231,16 +231,16 @@ public partial class SlaveWindow
         var charInfo = cfg.ReloggerCharacterInfo;
 
         if (ImGui.BeginTable("RefreshSubsCharTable", 7,
-            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
-            new Vector2(0, 250)))
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
+            ScaledVector(0f, 250f)))
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 30);
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, 30);
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, 90);
-            ImGui.TableSetupColumn("Retainers", ImGuiTableColumnFlags.WidthFixed, 65);
-            ImGui.TableSetupColumn("Submarines", ImGuiTableColumnFlags.WidthFixed, 75);
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 25);
+            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            ImGui.TableSetupColumn("Retainers", ImGuiTableColumnFlags.WidthFixed, Scale(65f));
+            ImGui.TableSetupColumn("Submarines", ImGuiTableColumnFlags.WidthFixed, Scale(75f));
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
             ImGui.TableHeadersRow();
 
             // Build filtered list
@@ -357,7 +357,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // Add character input
-        ImGui.SetNextItemWidth(250);
+        ImGui.SetNextItemWidth(Scale(250f));
         var enterPressed = ImGui.InputTextWithHint("##refreshSubsAdd", "Name Surname@World", ref refreshSubsNewChar, 128, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         if ((ImGui.Button("Add##refreshSubsAddBtn") || enterPressed) && !string.IsNullOrWhiteSpace(refreshSubsNewChar))

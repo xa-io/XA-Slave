@@ -246,7 +246,7 @@ public partial class SlaveWindow
             ImGui.SameLine();
             var savedNames = plugin.GetSavedModListNames();
             var currentName = cfg.TitleBarFavModListName;
-            ImGui.SetNextItemWidth(200f);
+            ImGui.SetNextItemWidth(Scale(200f));
             if (ImGui.BeginCombo("##favModListName", string.IsNullOrEmpty(currentName) ? "(pick list)" : currentName))
             {
                 foreach (var name in savedNames)
@@ -342,7 +342,7 @@ public partial class SlaveWindow
             }
             ImGui.SameLine();
 
-            ImGui.SetNextItemWidth(220f);
+            ImGui.SetNextItemWidth(Scale(220f));
             var comboLabel = pluginOpsFavCustomMenuInputs[i].Length > 0
                 ? GetTitleBarFavSelectionLabel(pluginOpsFavCustomMenuInputs[i])
                 : "(none — click to pick)";
@@ -444,14 +444,14 @@ public partial class SlaveWindow
             }
             ImGui.SameLine();
 
-            ImGui.SetNextItemWidth(60f);
+            ImGui.SetNextItemWidth(Scale(60f));
             if (ImGui.InputText($"##resW{i}", ref pluginOpsFavResWidthInputs[i], 6))
                 changed = true;
 
             ImGui.SameLine();
             ImGui.TextDisabled("x");
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(60f);
+            ImGui.SetNextItemWidth(Scale(60f));
             if (ImGui.InputText($"##resH{i}", ref pluginOpsFavResHeightInputs[i], 6))
                 changed = true;
 

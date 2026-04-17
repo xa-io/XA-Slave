@@ -5,6 +5,7 @@ using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.Types;
 using Dalamud.Interface;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using XASlave.Data;
@@ -17,6 +18,8 @@ public sealed class XAPeepWindow : Window
 {
     private readonly Plugin plugin;
     private readonly TitleBarButton lockButton;
+    private static float UiScale => ImGuiHelpers.GlobalScale;
+    private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
     private bool focusPreviewCaptured;
     private ulong cachedFocusTargetId = ulong.MaxValue;
 
@@ -24,13 +27,9 @@ public sealed class XAPeepWindow : Window
         : base("XA Peep###XAPeepWindow", ImGuiWindowFlags.None)
     {
         this.plugin = plugin;
-        Size = new Vector2(290f, 220f);
+        Size = ScaledVector(290f, 220f);
         SizeCondition = ImGuiCond.FirstUseEver;
-        SizeConstraints = new WindowSizeConstraints
-        {
-            MinimumSize = new Vector2(230f, 170f),
-            MaximumSize = new Vector2(420f, 480f),
-        };
+        UpdateSizeConstraints(UiScaleSafe);
 
         lockButton = new TitleBarButton
         {
@@ -44,6 +43,7 @@ public sealed class XAPeepWindow : Window
 
     public override void PreDraw()
     {
+        UpdateSizeConstraints(UiScale);
         Flags = plugin.Configuration.XAPeepWindowLocked
             ? ImGuiWindowFlags.NoResize
             : ImGuiWindowFlags.None;
@@ -322,11 +322,26 @@ public sealed class XAPeepWindow : Window
             return;
 
         ImGui.BeginTooltip();
-        ImGui.PushTextWrapPos(420f);
+        ImGui.PushTextWrapPos(Scale(420f));
         ImGui.TextUnformatted(helpText);
         ImGui.PopTextWrapPos();
         ImGui.EndTooltip();
     }
+
+    private void UpdateSizeConstraints(float scale)
+    {
+        SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(230f * scale, 170f * scale),
+            MaximumSize = new Vector2(420f * scale, 480f * scale),
+        };
+    }
+
+    private static float Scale(float value)
+        => value * UiScale;
+
+    private static Vector2 ScaledVector(float x, float y)
+        => ImGuiHelpers.ScaledVector2(x, y);
 
     private void ToggleResizeLock()
     {

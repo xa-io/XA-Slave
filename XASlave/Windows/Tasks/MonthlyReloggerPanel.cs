@@ -160,7 +160,7 @@ public partial class SlaveWindow
                 ImGui.SetTooltip($"Select all characters with Last Logged In {GetReloggerStaleTooltipText(staleSelectDays)} (or never logged in).");
 
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(170f);
+            ImGui.SetNextItemWidth(Scale(170f));
             if (ImGui.SliderInt("##ReloggerStaleDays", ref staleSelectDays, 1, ReloggerStaleSliderMaxValue, "%d"))
                 reloggerStaleSelectDaysInput = staleSelectDays;
             if (ImGui.IsItemDeactivatedAfterEdit() && cfg.ReloggerStaleSelectDays != reloggerStaleSelectDaysInput)
@@ -191,7 +191,7 @@ public partial class SlaveWindow
 
         // Search filter
         ImGui.SameLine();
-        ImGui.SetNextItemWidth(200);
+        ImGui.SetNextItemWidth(Scale(200f));
         ImGui.InputTextWithHint("##RelogSearch", "Search name or world...", ref reloggerSearchFilter, 128);
 
         ImGui.Spacing();
@@ -201,21 +201,21 @@ public partial class SlaveWindow
         var charInfo = cfg.ReloggerCharacterInfo;
 
         if (ImGui.BeginTable("ReloggerCharTable", 12,
-            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable,
-            new Vector2(0, 250)))
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
+            ScaledVector(0f, 250f)))
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 30); // checkbox
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, 30);
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f)); // checkbox
+            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Region / DC", ImGuiTableColumnFlags.WidthFixed, 110);
-            ImGui.TableSetupColumn("Lv", ImGuiTableColumnFlags.WidthFixed, 30);
-            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, 80);
-            ImGui.TableSetupColumn("Current Rank", ImGuiTableColumnFlags.WidthFixed, 90);
-            ImGui.TableSetupColumn("FC", ImGuiTableColumnFlags.WidthFixed, 110);
-            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, 45);
-            ImGui.TableSetupColumn("Personal", ImGuiTableColumnFlags.WidthFixed, 55);
-            ImGui.TableSetupColumn("Last Logged In", ImGuiTableColumnFlags.WidthFixed, 80);
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, 25); // remove
+            ImGui.TableSetupColumn("Region / DC", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
+            ImGui.TableSetupColumn("Lv", ImGuiTableColumnFlags.WidthFixed, Scale(30f));
+            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
+            ImGui.TableSetupColumn("Current Rank", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            ImGui.TableSetupColumn("FC", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
+            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, Scale(45f));
+            ImGui.TableSetupColumn("Personal", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
+            ImGui.TableSetupColumn("Last Logged In", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
+            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f)); // remove
             ImGui.TableHeadersRow();
 
             // Build filtered list using persistent data
@@ -429,7 +429,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // Add character input
-        ImGui.SetNextItemWidth(250);
+        ImGui.SetNextItemWidth(Scale(250f));
         var enterPressed = ImGui.InputTextWithHint("##RelogAdd", "Name Surname@World", ref reloggerAddInput, 128, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
         if ((ImGui.Button("Add") || enterPressed) && !string.IsNullOrWhiteSpace(reloggerAddInput))

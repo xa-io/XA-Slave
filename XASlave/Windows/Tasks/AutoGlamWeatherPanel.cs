@@ -115,7 +115,7 @@ public partial class SlaveWindow
 
         var glamConfigChanged = false;
 
-        ImGui.SetNextItemWidth(AutoGlamClassJobInputWidth);
+        ImGui.SetNextItemWidth(Scale(AutoGlamClassJobInputWidth));
         if (ImGui.InputText("Class/Job(s) to Assign##glamClass", ref glamClassJobInput, 128))
         {
             glamClassJobInput = SanitizeAutoGlamInput(glamClassJobInput, 1, null, true);
@@ -137,7 +137,7 @@ public partial class SlaveWindow
             glamConfigChanged = true;
 
         ImGui.Spacing();
-        ImGui.SetNextItemWidth(80);
+        ImGui.SetNextItemWidth(Scale(80f));
         var interval = cfg.AutoGlamWeatherCheckIntervalSeconds;
         if (ImGui.InputFloat("Check Interval (sec)##glamInterval", ref interval, 0.5f, 1.0f, "%.1f"))
         {
@@ -219,7 +219,7 @@ public partial class SlaveWindow
 
     private float GetAutoGlamWeatherGridColumnWidth()
     {
-        var width = MathF.Max(AutoGlamWeatherColumnWidth, AutoGlamWeatherPlateInputWidth);
+        var width = MathF.Max(Scale(AutoGlamWeatherColumnWidth), Scale(AutoGlamWeatherPlateInputWidth));
         foreach (var definition in AutoGlamWeatherDefinitions)
         {
             var labelWidth = MathF.Ceiling(ImGui.CalcTextSize(definition.Label).X);
@@ -252,7 +252,7 @@ public partial class SlaveWindow
         var startY = MathF.Ceiling(ImGui.GetCursorPosY());
         ImGui.SetCursorPosY(startY);
         ImGui.TextUnformatted(label);
-        ImGui.SetNextItemWidth(AutoGlamWeatherPlateInputWidth);
+        ImGui.SetNextItemWidth(Scale(AutoGlamWeatherPlateInputWidth));
         if (ImGui.InputText($"##glamWeather{weatherId}", ref input, 128))
         {
             input = SanitizeAutoGlamInput(input, 1, 20, true);

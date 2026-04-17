@@ -76,7 +76,7 @@ public partial class SlaveWindow
 
         // Custom title text box
         ImGui.Text("Window Title:");
-        ImGui.SetNextItemWidth(300);
+        ImGui.SetNextItemWidth(Scale(300f));
         if (ImGui.InputText("##WindowTitle", ref windowRenamerTitleInput, 256))
         {
             plugin.Configuration.WindowRenamerTitle = windowRenamerTitleInput;

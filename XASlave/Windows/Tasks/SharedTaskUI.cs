@@ -108,7 +108,7 @@ public partial class SlaveWindow
             if (logMessages.Count > 0)
             {
                 ImGui.Spacing();
-                using (var logChild = ImRaii.Child($"TaskLog{id}", new Vector2(0, 150), true))
+                using (var logChild = ImRaii.Child($"TaskLog{id}", ScaledVector(0f, 150f), true))
                 {
                     if (logChild.Success)
                     {
@@ -328,7 +328,7 @@ public partial class SlaveWindow
         if (regionIdx < 0)
             regionIdx = 0;
 
-        ImGui.SetNextItemWidth(width);
+        ImGui.SetNextItemWidth(Scale(width));
         if (!ImGui.Combo(label, ref regionIdx, RegionFilterOptions, RegionFilterOptions.Length))
             return false;
 

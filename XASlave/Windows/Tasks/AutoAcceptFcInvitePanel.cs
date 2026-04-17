@@ -57,7 +57,7 @@ public partial class SlaveWindow
         ImGui.Text("Configuration:");
         ImGui.Spacing();
 
-        ImGui.SetNextItemWidth(80);
+        ImGui.SetNextItemWidth(Scale(80f));
         var checkInt = fcFloaterCheckInterval;
         if (ImGui.InputFloat("Check Interval (sec)##fcFloaterCheck", ref checkInt, 0.5f, 1.0f, "%.1f"))
         {
@@ -66,7 +66,7 @@ public partial class SlaveWindow
             fcFloaterCheckInterval = checkInt;
         }
 
-        ImGui.SetNextItemWidth(80);
+        ImGui.SetNextItemWidth(Scale(80f));
         var dlgTimeout = fcFloaterDialogTimeout;
         if (ImGui.InputFloat("Dialog Timeout (sec)##fcFloaterDlg", ref dlgTimeout, 1f, 1f, "%.0f"))
         {
@@ -75,7 +75,7 @@ public partial class SlaveWindow
             fcFloaterDialogTimeout = dlgTimeout;
         }
 
-        ImGui.SetNextItemWidth(80);
+        ImGui.SetNextItemWidth(Scale(80f));
         var waitJoin = fcFloaterWaitAfterJoin;
         if (ImGui.InputFloat("Wait After Join (sec)##fcFloaterWait", ref waitJoin, 1f, 5f, "%.0f"))
         {
@@ -84,7 +84,7 @@ public partial class SlaveWindow
             fcFloaterWaitAfterJoin = waitJoin;
         }
 
-        ImGui.SetNextItemWidth(80);
+        ImGui.SetNextItemWidth(Scale(80f));
         var timeout = fcFloaterTimeoutMinutes;
         if (ImGui.InputFloat("Idle Timeout (min)##fcFloaterTimeout", ref timeout, 1f, 5f, "%.0f"))
         {

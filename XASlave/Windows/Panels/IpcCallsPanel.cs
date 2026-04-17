@@ -119,7 +119,7 @@ public partial class SlaveWindow
         if (livePulls)
         {
             ImGui.SameLine();
-            ImGui.SetNextItemWidth(120);
+            ImGui.SetNextItemWidth(Scale(120f));
             var interval = plugin.Configuration.IpcLivePullIntervalSeconds;
             if (ImGui.SliderInt("##IpcInterval", ref interval, 0, 30, interval == 0 ? "Live" : $"{interval}s"))
             {
@@ -139,10 +139,10 @@ public partial class SlaveWindow
         var cols0 = livePulls ? 4 : 3;
         if (ImGui.BeginTable("IpcXaSlave", cols0, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 260);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(260f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("XASlave.IsBusy", "bool", "True when any task is running", livePulls);
@@ -172,10 +172,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcXaDb", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 260);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(260f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("XA.Database.Save", "Action", "Refresh + save snapshot to DB", livePulls);
@@ -209,10 +209,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcVnav", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 340);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(340f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("vnavmesh.Nav.IsReady", "bool", "Nav mesh built and ready", livePulls);
@@ -233,10 +233,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcAR", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 300);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("AutoRetainer.GetSuppressed", "bool", "True when AR is suppressed/paused", livePulls);
@@ -254,10 +254,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcLS", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 300);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("Lifestream.IsBusy", "bool", "True during world/DC travel", livePulls);
@@ -279,10 +279,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcYA", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 300);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("YesAlready.IsPluginEnabled", "bool", "Check if YesAlready is enabled", livePulls);
@@ -299,10 +299,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcDel", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 260);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(260f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("Deliveroo.IsTurnInRunning", "bool", "True during GC turn-in", livePulls);
@@ -317,10 +317,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcPB", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 300);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("PandorasBox.GetFeatureEnabled", "bool?", "Get feature enabled state by name", livePulls);
@@ -337,10 +337,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcDB", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 260);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(260f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("Dropbox.GetItemQuantity", "int", "Read queued quantity for an item (id, hq)", livePulls);
@@ -358,10 +358,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcTA", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 300);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("TextAdvance.IsEnabled", "bool", "Check if TextAdvance is enabled", livePulls);
@@ -379,10 +379,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcArt", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 300);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("Artisan.IsBusy", "bool", "True when crafting/processing", livePulls);
@@ -405,10 +405,10 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcSplat", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, 300);
-            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, 80);
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
-            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, 50);
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("Splatoon.IsLoaded", "bool", "True when Splatoon is loaded", livePulls);

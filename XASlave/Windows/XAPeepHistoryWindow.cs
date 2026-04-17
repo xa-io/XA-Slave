@@ -1,6 +1,7 @@
 using System;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 
 namespace XASlave.Windows;
@@ -8,18 +9,21 @@ namespace XASlave.Windows;
 public sealed class XAPeepHistoryWindow : Window
 {
     private readonly Plugin plugin;
+    private static float UiScale => ImGuiHelpers.GlobalScale;
+    private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
 
     public XAPeepHistoryWindow(Plugin plugin)
         : base("XA Peep History###XAPeepHistoryWindow", ImGuiWindowFlags.None)
     {
         this.plugin = plugin;
-        Size = new Vector2(520f, 320f);
+        Size = ScaledVector(520f, 320f);
         SizeCondition = ImGuiCond.FirstUseEver;
-        SizeConstraints = new WindowSizeConstraints
-        {
-            MinimumSize = new Vector2(420f, 220f),
-            MaximumSize = new Vector2(960f, 720f),
-        };
+        UpdateSizeConstraints(UiScaleSafe);
+    }
+
+    public override void PreDraw()
+    {
+        UpdateSizeConstraints(UiScale);
     }
 
     public override void OnOpen()
@@ -71,10 +75,10 @@ public sealed class XAPeepHistoryWindow : Window
             return;
 
         ImGui.TableSetupScrollFreeze(0, 1);
-        ImGui.TableSetupColumn("Count", ImGuiTableColumnFlags.WidthFixed, 56f);
+        ImGui.TableSetupColumn("Count", ImGuiTableColumnFlags.WidthFixed, Scale(56f));
         ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.7f);
-        ImGui.TableSetupColumn("Last Seen", ImGuiTableColumnFlags.WidthFixed, 125f);
-        ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.WidthFixed, 80f);
+        ImGui.TableSetupColumn("Last Seen", ImGuiTableColumnFlags.WidthFixed, Scale(125f));
+        ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
         ImGui.TableHeadersRow();
 
         foreach (var player in trackedPlayers)
@@ -116,4 +120,19 @@ public sealed class XAPeepHistoryWindow : Window
             ? "-"
             : timestampUtc.ToLocalTime().ToString("yyyy-MM-dd HH:mm");
     }
+
+    private void UpdateSizeConstraints(float scale)
+    {
+        SizeConstraints = new WindowSizeConstraints
+        {
+            MinimumSize = new Vector2(420f * scale, 220f * scale),
+            MaximumSize = new Vector2(960f * scale, 720f * scale),
+        };
+    }
+
+    private static float Scale(float value)
+        => value * UiScale;
+
+    private static Vector2 ScaledVector(float x, float y)
+        => ImGuiHelpers.ScaledVector2(x, y);
 }

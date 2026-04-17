@@ -1755,13 +1755,13 @@ public partial class SlaveWindow
                 SetDebugResult("XA Abuse: overlay text reset to â™¥");
             }
 
-            ImGui.SetNextItemWidth(220f);
+            ImGui.SetNextItemWidth(Scale(220f));
             ImGui.InputText("Overlay Text##xaAbuseOverlayText", ref xaAbuseOverlayText, 64);
             ImGui.SetNextItemWidth(-1f);
             ImGui.InputText("Overlay .tex Path##xaAbuseOverlayPath", ref xaAbuseOverlayTexturePath, 260);
-            ImGui.SetNextItemWidth(240f);
+            ImGui.SetNextItemWidth(Scale(240f));
             ImGui.ColorEdit4("Text Fill Color##xaAbuseOverlayFillColor", ref xaAbuseOverlayFillColor, ImGuiColorEditFlags.AlphaBar);
-            ImGui.SetNextItemWidth(240f);
+            ImGui.SetNextItemWidth(Scale(240f));
             ImGui.ColorEdit4("Text Shadow Color##xaAbuseOverlayShadowColor", ref xaAbuseOverlayShadowColor, ImGuiColorEditFlags.AlphaBar);
             if (ImGui.Button("Reset Text Colors##xaAbuseResetTextColors"))
             {

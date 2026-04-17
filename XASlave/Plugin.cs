@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Text.Json;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Command;
 using Dalamud.Game.Gui.ContextMenu;
@@ -121,6 +122,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private UIModule.UiFlags appliedSpecialRenderUiFlags;
     private bool hasAppliedSpecialRenderUiFlags;
+    private bool isDisposed;
 
     public Plugin()
     {
@@ -525,7 +527,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
+            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
         });
 
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
@@ -541,48 +543,72 @@ public sealed class Plugin : IDalamudPlugin
 
     public void Dispose()
     {
-        AutoSkipCutscenes.Dispose();
-        BuddyFeedCutsceneSkip.Dispose();
-        PopupCleaner.Dispose();
-        SystemWindowMods.Dispose();
-        LobbyErrorAutoClose.Dispose();
-        QueuePositionDisplay.Dispose();
-        MsqProgressDisplay.Dispose();
-        AutoHideGameObjects.Dispose();
-        DialogueSkip.Dispose();
-        CopyItemNameContextMenu.Dispose();
-        SightDistance.Dispose();
-        PlayerSearchContextMenu.Dispose();
-        NameplatePrivacy.Dispose();
-        AutoUnlockExpertDelivery.Dispose();
-        ExpertDeliveryUnlock.Dispose();
-        AutoRefuseTrade.Dispose();
-        PlayerMods.Dispose();
-        DozeSitAnywhere.Dispose();
-        InstantLogout.Dispose();
-        TeleportLockClear.Dispose();
-        XAPeep.Dispose();
-        PeepingTomIntegration.Dispose();
-        ArPostProcessor.Dispose();
-        WindowRenamer.Dispose();
-        IpcProvider.Dispose();
-        ExternalTaskLoader.Dispose();
+        if (isDisposed)
+            return;
 
-        ClientState.Login -= OnLogin;
-        ClientState.Logout -= OnLogout;
+        isDisposed = true;
 
-        PluginInterface.UiBuilder.Draw -= WindowSystem.Draw;
-        PluginInterface.UiBuilder.Draw -= XAPeep.DrawOverlay;
-        PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainUi;
-        PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi;
+        // Detach public-facing callbacks first so a reload cannot re-enter partially disposed UI or services.
+        TryCleanup("UiBuilder.Draw -= WindowSystem.Draw", () => PluginInterface.UiBuilder.Draw -= WindowSystem.Draw);
+        TryCleanup("UiBuilder.Draw -= XAPeep.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= XAPeep.DrawOverlay);
+        TryCleanup("UiBuilder.OpenConfigUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainUi);
+        TryCleanup("UiBuilder.OpenMainUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi);
+        TryCleanup("ClientState.Login -= OnLogin", () => ClientState.Login -= OnLogin);
+        TryCleanup("ClientState.Logout -= OnLogout", () => ClientState.Logout -= OnLogout);
+        TryCleanup($"CommandManager.RemoveHandler({CommandName})", () => CommandManager.RemoveHandler(CommandName));
+        TryCleanup("WindowSystem.RemoveAllWindows", WindowSystem.RemoveAllWindows);
 
-        WindowSystem.RemoveAllWindows();
-        SlaveWindow.Dispose();
-        TaskRunner.Dispose();
-        AutoCollector.Dispose();
-        XagmanPeers.Dispose();
+        TryDispose("SlaveWindow", SlaveWindow);
+        TryDispose("TaskRunner", TaskRunner);
+        TryDispose("AutoCollector", AutoCollector);
 
-        CommandManager.RemoveHandler(CommandName);
+        TryDispose("AutoSkipCutscenes", AutoSkipCutscenes);
+        TryDispose("BuddyFeedCutsceneSkip", BuddyFeedCutsceneSkip);
+        TryDispose("PopupCleaner", PopupCleaner);
+        TryDispose("SystemWindowMods", SystemWindowMods);
+        TryDispose("LobbyErrorAutoClose", LobbyErrorAutoClose);
+        TryDispose("QueuePositionDisplay", QueuePositionDisplay);
+        TryDispose("MsqProgressDisplay", MsqProgressDisplay);
+        TryDispose("AutoHideGameObjects", AutoHideGameObjects);
+        TryDispose("DialogueSkip", DialogueSkip);
+        TryDispose("CopyItemNameContextMenu", CopyItemNameContextMenu);
+        TryDispose("SightDistance", SightDistance);
+        TryDispose("PlayerSearchContextMenu", PlayerSearchContextMenu);
+        TryDispose("NameplatePrivacy", NameplatePrivacy);
+        TryDispose("AutoUnlockExpertDelivery", AutoUnlockExpertDelivery);
+        TryDispose("ExpertDeliveryUnlock", ExpertDeliveryUnlock);
+        TryDispose("AutoRefuseTrade", AutoRefuseTrade);
+        TryDispose("PlayerMods", PlayerMods);
+        TryDispose("DozeSitAnywhere", DozeSitAnywhere);
+        TryDispose("InstantLogout", InstantLogout);
+        TryDispose("TeleportLockClear", TeleportLockClear);
+        TryDispose("XAPeep", XAPeep);
+        TryDispose("PeepingTomIntegration", PeepingTomIntegration);
+        TryDispose("ArPostProcessor", ArPostProcessor);
+        TryDispose("WindowRenamer", WindowRenamer);
+        TryDispose("IpcProvider", IpcProvider);
+        TryDispose("ExternalTaskLoader", ExternalTaskLoader);
+        TryDispose("XagmanPeers", XagmanPeers);
+    }
+
+    private void TryDispose(string label, IDisposable? disposable)
+    {
+        if (disposable == null)
+            return;
+
+        TryCleanup(label, disposable.Dispose);
+    }
+
+    private void TryCleanup(string label, Action cleanup)
+    {
+        try
+        {
+            cleanup();
+        }
+        catch (Exception ex)
+        {
+            Log.Warning($"[XASlave] Dispose cleanup failed for {label}: {ex}");
+        }
     }
 
     public bool SaveToXaDatabaseAndRecordSync()
@@ -700,7 +726,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 #endif
 
-        if (subcommand.Equals("xamods", StringComparison.OrdinalIgnoreCase))
+        if (IsXaModsSubcommand(subcommand))
         {
             SlaveWindow.OpenXAModsTask();
             return;
@@ -826,7 +852,7 @@ public sealed class Plugin : IDalamudPlugin
         var trimmed = NormalizeXaCommandInput(rawCommand);
         if (string.IsNullOrEmpty(trimmed))
         {
-            message = "Usage: pass the same text you would enter after /xa, for example `commands`, `xamods`, `db clear`, `logout`, `killgame`, `sprint on`, or `res 500x345`.";
+            message = "Usage: pass the same text you would enter after /xa, for example `commands`, `mods`, `db clear`, `logout`, `killgame`, `sprint on`, or `res 500x345`.";
             return false;
         }
 
@@ -834,7 +860,7 @@ public sealed class Plugin : IDalamudPlugin
         var subcommand = firstSpaceIndex >= 0 ? trimmed[..firstSpaceIndex].Trim() : trimmed;
         var subcommandArgs = firstSpaceIndex >= 0 ? trimmed[(firstSpaceIndex + 1)..].Trim() : string.Empty;
 
-        if (subcommand.Equals("xamods", StringComparison.OrdinalIgnoreCase))
+        if (IsXaModsSubcommand(subcommand))
         {
             SlaveWindow.OpenXAModsTask();
             message = "Opened XA Mods.";
@@ -1057,6 +1083,7 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         var modKeys = GetCurrentXAModKeys();
+        var modSettings = CaptureXAModSettingsForKeys(modKeys);
         var savedList = Configuration.ToonModsSavedLists.FirstOrDefault(entry => entry.Name.Equals(trimmedName, StringComparison.OrdinalIgnoreCase));
         if (savedList == null)
         {
@@ -1064,12 +1091,14 @@ public sealed class Plugin : IDalamudPlugin
             {
                 Name = trimmedName,
                 ModKeys = modKeys,
+                ModSettings = modSettings,
             });
         }
         else
         {
             savedList.Name = trimmedName;
             savedList.ModKeys = modKeys;
+            savedList.ModSettings = modSettings;
         }
 
         Configuration.Save();
@@ -1093,7 +1122,7 @@ public sealed class Plugin : IDalamudPlugin
             return false;
         }
 
-        return ApplyXAModsPreset(savedList.Name, savedList.ModKeys, out message);
+        return ApplyXAModsPreset(savedList.Name, savedList.ModKeys, savedList.ModSettings, out message);
     }
 
     private void PrintSavedXAModsPresetList()
@@ -1164,7 +1193,27 @@ public sealed class Plugin : IDalamudPlugin
             .ToList();
     }
 
+    internal Dictionary<string, JsonElement> CaptureXAModSettingsForKeys(IEnumerable<string> modKeys)
+    {
+        var snapshots = new Dictionary<string, JsonElement>(StringComparer.OrdinalIgnoreCase);
+        foreach (var key in modKeys
+                     .Where(key => !string.IsNullOrWhiteSpace(key))
+                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        {
+            if (TryCreateXAModSettingsSnapshot(key, out var snapshot))
+                snapshots[key] = snapshot;
+        }
+
+        return snapshots;
+    }
+
+    internal bool ApplySavedXAModsPreset(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
+        => ApplyXAModsPreset(title, modKeys, modSettings, out message);
+
     private bool ApplyXAModsPreset(string title, IEnumerable<string> modKeys, out string message)
+        => ApplyXAModsPreset(title, modKeys, null, out message);
+
+    private bool ApplyXAModsPreset(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
     {
         var requestedKeys = modKeys
             .Where(key => !string.IsNullOrWhiteSpace(key))
@@ -1201,12 +1250,403 @@ public sealed class Plugin : IDalamudPlugin
                 unavailableCount++;
         }
 
+        ApplyImportedXAModSettings(modSettings);
         Configuration.Save();
         message = unknownCount > 0 || unavailableCount > 0
             ? $"Loaded XA Mods preset '{title}' ({appliedCount} applied, {unavailableCount} unavailable, {unknownCount} unknown)."
             : $"Loaded XA Mods preset '{title}' ({appliedCount} mod(s)).";
         return unknownCount == 0 && unavailableCount == 0;
     }
+
+    private bool TryCreateXAModSettingsSnapshot(string key, out JsonElement snapshot)
+    {
+        switch (key)
+        {
+            case "disable-background-game-rendering":
+                snapshot = JsonSerializer.SerializeToElement(new XAModDisableBackgroundRenderingSettings
+                {
+                    OnlyWhenMinimized = Configuration.DisableBackgroundGameRenderingOnlyWhenMinimized,
+                    DisableWhenArMultiIsOn = Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "auto-hide-game-objects":
+                snapshot = JsonSerializer.SerializeToElement(new XAModAutoHideGameObjectsSettings
+                {
+                    HidePlayer = Configuration.AutoHideGameObjectsHidePlayer,
+                    HideUnimportantEnpc = Configuration.AutoHideGameObjectsHideUnimportantEnpc,
+                    HidePet = Configuration.AutoHideGameObjectsHidePet,
+                    HideChocobo = Configuration.AutoHideGameObjectsHideChocobo,
+                    DisableInDuties = Configuration.AutoHideGameObjectsDisableInDuties,
+                    DisableInIslandSanctuary = Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
+                    UseOccultCrescentRules = Configuration.AutoHideGameObjectsUseOccultCrescentRules,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "custom-resolutions":
+                snapshot = JsonSerializer.SerializeToElement(new XAModCustomResolutionsSettings
+                {
+                    Presets = Configuration.CustomResolutionPresets
+                        .Select(entry => new XAModResolutionPreset
+                        {
+                            Width = entry.Width,
+                            Height = entry.Height,
+                        })
+                        .ToList(),
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "low-resolution":
+                snapshot = JsonSerializer.SerializeToElement(new XAModLowResolutionSettings
+                {
+                    Scale = Configuration.LowResolutionScale,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "special-rendering-modes":
+                snapshot = JsonSerializer.SerializeToElement(new XAModSpecialRenderModesSettings
+                {
+                    BackgroundColorR = Configuration.SpecialRenderModeBackgroundColorR,
+                    BackgroundColorG = Configuration.SpecialRenderModeBackgroundColorG,
+                    BackgroundColorB = Configuration.SpecialRenderModeBackgroundColorB,
+                    BackgroundColorA = Configuration.SpecialRenderModeBackgroundColorA,
+                    HideAddonsKeepNameplates = Configuration.SpecialRenderHideAddonsKeepNameplatesEnabled,
+                    HideAddonsKeepChat = Configuration.SpecialRenderHideAddonsKeepChatEnabled,
+                    HideChat = Configuration.SpecialRenderHideChatEnabled,
+                    HideActionBars = Configuration.SpecialRenderHideActionBarsEnabled,
+                    HideTargetInfo = Configuration.SpecialRenderHideTargetInfoEnabled,
+                    HideNameplates = Configuration.SpecialRenderHideNameplatesEnabled,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "expanded-player-right-click-menu-search":
+                snapshot = JsonSerializer.SerializeToElement(new XAModPlayerSearchSettings
+                {
+                    FflogsEnabled = Configuration.ExpandedPlayerRightClickMenuSearchFflogsEnabled,
+                    LodestoneEnabled = Configuration.ExpandedPlayerRightClickMenuSearchLodestoneEnabled,
+                    LalachievementsEnabled = Configuration.ExpandedPlayerRightClickMenuSearchLalachievementsEnabled,
+                    OpenAllEnabled = Configuration.ExpandedPlayerRightClickMenuSearchOpenAllEnabled,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "auto-expert-delivery":
+                snapshot = JsonSerializer.SerializeToElement(new XAModExpertDeliverySettings
+                {
+                    AutoSwitchWhenOpen = Configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen,
+                    DefaultPage = Configuration.AutoUnlockExpertDeliveryDefaultPage,
+                    SkipHq = Configuration.AutoUnlockExpertDeliverySkipHq,
+                    SkipMateria = Configuration.AutoUnlockExpertDeliverySkipMateria,
+                    IgnoreSealCap = Configuration.AutoUnlockExpertDeliveryIgnoreSealCap,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "auto-refuse-trade-request":
+                snapshot = JsonSerializer.SerializeToElement(new XAModTradeRefusalSettings
+                {
+                    ShowNotification = Configuration.AutoRefuseTradeShowNotification,
+                    SendEcho = Configuration.AutoRefuseTradeSendEcho,
+                    ExtraCommands = Configuration.AutoRefuseTradeExtraCommands,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "custom-sight-distance":
+                snapshot = JsonSerializer.SerializeToElement(new XAModCustomSightDistanceSettings
+                {
+                    MaxDistance = Configuration.CustomSightDistanceMaxDistance,
+                    MinDistance = Configuration.CustomSightDistanceMinDistance,
+                    MaxRotation = Configuration.CustomSightDistanceMaxRotation,
+                    MinRotation = Configuration.CustomSightDistanceMinRotation,
+                    MaxFoV = Configuration.CustomSightDistanceMaxFoV,
+                    MinFoV = Configuration.CustomSightDistanceMinFoV,
+                    CurrentFoV = Configuration.CustomSightDistanceFoV,
+                    IgnoreCollision = Configuration.CustomSightDistanceIgnoreCollision,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "infinite-sprint":
+                snapshot = JsonSerializer.SerializeToElement(new XAModInfiniteSprintSettings
+                {
+                    DelaySeconds = Configuration.InfiniteSprintDelaySeconds,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "xa-peep":
+                snapshot = JsonSerializer.SerializeToElement(new XAModXAPeepSettings
+                {
+                    AutoOpenWindowOnPluginLoad = Configuration.XAPeepAutoOpenWindowOnPluginLoad,
+                    WindowLocked = Configuration.XAPeepWindowLocked,
+                    LogParty = Configuration.XAPeepLogParty,
+                    LogAlliance = Configuration.XAPeepLogAlliance,
+                    LogInCombat = Configuration.XAPeepLogInCombat,
+                    ShowCardWhenTargeted = Configuration.XAPeepDisplayLineWhenTargetingMe,
+                    ShowTargeterLine = Configuration.XAPeepShowTargeterLine,
+                    TargeterLineColor = CreateColorSettings(
+                        Configuration.XAPeepTargeterLineColor.X,
+                        Configuration.XAPeepTargeterLineColor.Y,
+                        Configuration.XAPeepTargeterLineColor.Z,
+                        Configuration.XAPeepTargeterLineColor.W),
+                    ShowTargeterDot = Configuration.XAPeepShowTargeterDot,
+                    TargeterDotColor = CreateColorSettings(
+                        Configuration.XAPeepTargeterDotColor.X,
+                        Configuration.XAPeepTargeterDotColor.Y,
+                        Configuration.XAPeepTargeterDotColor.Z,
+                        Configuration.XAPeepTargeterDotColor.W),
+                    TargeterDotSize = Configuration.XAPeepTargeterDotSize,
+                    ShowTargetersCard = Configuration.XAPeepShowTargetersCard,
+                    ShowCenterNotification = Configuration.XAPeepShowCenterNotification,
+                    PlaySound = Configuration.XAPeepPlaySound,
+                    SoundEffectId = Configuration.XAPeepSoundEffectId,
+                    SoundVolume = Configuration.XAPeepSoundVolume,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            default:
+                snapshot = default;
+                return false;
+        }
+    }
+
+    private void ApplyImportedXAModSettings(IReadOnlyDictionary<string, JsonElement>? modSettings)
+    {
+        if (modSettings == null || modSettings.Count == 0)
+            return;
+
+        if (TryDeserializeXAModSettings(modSettings, "disable-background-game-rendering", out XAModDisableBackgroundRenderingSettings? backgroundRenderingSettings)
+            && backgroundRenderingSettings != null)
+        {
+            Configuration.DisableBackgroundGameRenderingOnlyWhenMinimized = backgroundRenderingSettings.OnlyWhenMinimized;
+            Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn = backgroundRenderingSettings.DisableWhenArMultiIsOn;
+            SystemWindowMods.SetDisableBackgroundRenderingOnlyWhenMinimized(Configuration.DisableBackgroundGameRenderingOnlyWhenMinimized);
+            SystemWindowMods.SetDisableBackgroundRenderingDisableWhenArMultiIsOn(Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "auto-hide-game-objects", out XAModAutoHideGameObjectsSettings? autoHideSettings)
+            && autoHideSettings != null)
+        {
+            Configuration.AutoHideGameObjectsHidePlayer = autoHideSettings.HidePlayer;
+            Configuration.AutoHideGameObjectsHideUnimportantEnpc = autoHideSettings.HideUnimportantEnpc;
+            Configuration.AutoHideGameObjectsHidePet = autoHideSettings.HidePet;
+            Configuration.AutoHideGameObjectsHideChocobo = autoHideSettings.HideChocobo;
+            Configuration.AutoHideGameObjectsDisableInDuties = autoHideSettings.DisableInDuties;
+            Configuration.AutoHideGameObjectsDisableInIslandSanctuary = autoHideSettings.DisableInIslandSanctuary;
+            Configuration.AutoHideGameObjectsUseOccultCrescentRules = autoHideSettings.UseOccultCrescentRules;
+            AutoHideGameObjects.ApplyConfiguration(
+                Configuration.AutoHideGameObjectsHidePlayer,
+                Configuration.AutoHideGameObjectsHideUnimportantEnpc,
+                Configuration.AutoHideGameObjectsHidePet,
+                Configuration.AutoHideGameObjectsHideChocobo,
+                Configuration.AutoHideGameObjectsDisableInDuties,
+                Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
+                Configuration.AutoHideGameObjectsUseOccultCrescentRules);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "custom-resolutions", out XAModCustomResolutionsSettings? customResolutionSettings)
+            && customResolutionSettings != null)
+        {
+            Configuration.CustomResolutionPresets = NormalizeCustomResolutionPresets(customResolutionSettings.Presets);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "low-resolution", out XAModLowResolutionSettings? lowResolutionSettings)
+            && lowResolutionSettings != null)
+        {
+            Configuration.LowResolutionScale = SystemWindowModsService.ClampLowResolutionScale(lowResolutionSettings.Scale);
+            SystemWindowMods.ApplyLowResolutionConfiguration(Configuration.LowResolutionScale);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "special-rendering-modes", out XAModSpecialRenderModesSettings? specialRenderSettings)
+            && specialRenderSettings != null)
+        {
+            Configuration.SpecialRenderModeBackgroundColorR = ClampUnitFloat(specialRenderSettings.BackgroundColorR);
+            Configuration.SpecialRenderModeBackgroundColorG = ClampUnitFloat(specialRenderSettings.BackgroundColorG);
+            Configuration.SpecialRenderModeBackgroundColorB = ClampUnitFloat(specialRenderSettings.BackgroundColorB);
+            Configuration.SpecialRenderModeBackgroundColorA = ClampUnitFloat(specialRenderSettings.BackgroundColorA);
+            Configuration.SpecialRenderHideAddonsKeepNameplatesEnabled = specialRenderSettings.HideAddonsKeepNameplates;
+            Configuration.SpecialRenderHideAddonsKeepChatEnabled = specialRenderSettings.HideAddonsKeepChat;
+            Configuration.SpecialRenderHideChatEnabled = specialRenderSettings.HideChat;
+            Configuration.SpecialRenderHideActionBarsEnabled = specialRenderSettings.HideActionBars;
+            Configuration.SpecialRenderHideTargetInfoEnabled = specialRenderSettings.HideTargetInfo;
+            Configuration.SpecialRenderHideNameplatesEnabled = specialRenderSettings.HideNameplates;
+            if (Configuration.SpecialRenderModesEnabled)
+                ApplySpecialRenderModesConfiguration();
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "expanded-player-right-click-menu-search", out XAModPlayerSearchSettings? playerSearchSettings)
+            && playerSearchSettings != null)
+        {
+            Configuration.ExpandedPlayerRightClickMenuSearchFflogsEnabled = playerSearchSettings.FflogsEnabled;
+            Configuration.ExpandedPlayerRightClickMenuSearchLodestoneEnabled = playerSearchSettings.LodestoneEnabled;
+            Configuration.ExpandedPlayerRightClickMenuSearchLalachievementsEnabled = playerSearchSettings.LalachievementsEnabled;
+            Configuration.ExpandedPlayerRightClickMenuSearchOpenAllEnabled = playerSearchSettings.OpenAllEnabled;
+            PlayerSearchContextMenu.ApplyConfiguration(
+                Configuration.ExpandedPlayerRightClickMenuSearchFflogsEnabled,
+                Configuration.ExpandedPlayerRightClickMenuSearchLodestoneEnabled,
+                Configuration.ExpandedPlayerRightClickMenuSearchLalachievementsEnabled,
+                Configuration.ExpandedPlayerRightClickMenuSearchOpenAllEnabled);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "auto-expert-delivery", out XAModExpertDeliverySettings? expertDeliverySettings)
+            && expertDeliverySettings != null)
+        {
+            Configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen = expertDeliverySettings.AutoSwitchWhenOpen;
+            Configuration.AutoUnlockExpertDeliveryDefaultPage = Math.Clamp(expertDeliverySettings.DefaultPage, 0, 2);
+            Configuration.AutoUnlockExpertDeliverySkipHq = expertDeliverySettings.SkipHq;
+            Configuration.AutoUnlockExpertDeliverySkipMateria = expertDeliverySettings.SkipMateria;
+            Configuration.AutoUnlockExpertDeliveryIgnoreSealCap = expertDeliverySettings.IgnoreSealCap;
+            AutoUnlockExpertDelivery.ApplyConfiguration(
+                Configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen,
+                Configuration.AutoUnlockExpertDeliveryDefaultPage,
+                Configuration.AutoUnlockExpertDeliverySkipHq,
+                Configuration.AutoUnlockExpertDeliverySkipMateria,
+                Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "auto-refuse-trade-request", out XAModTradeRefusalSettings? tradeRefusalSettings)
+            && tradeRefusalSettings != null)
+        {
+            Configuration.AutoRefuseTradeShowNotification = tradeRefusalSettings.ShowNotification;
+            Configuration.AutoRefuseTradeSendEcho = tradeRefusalSettings.SendEcho;
+            Configuration.AutoRefuseTradeExtraCommands = tradeRefusalSettings.ExtraCommands ?? string.Empty;
+            AutoRefuseTrade.ApplyConfiguration(
+                Configuration.AutoRefuseTradeShowNotification,
+                Configuration.AutoRefuseTradeSendEcho,
+                Configuration.AutoRefuseTradeExtraCommands);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "custom-sight-distance", out XAModCustomSightDistanceSettings? sightDistanceSettings)
+            && sightDistanceSettings != null)
+        {
+            var maxDistance = Math.Clamp(sightDistanceSettings.MaxDistance, 1f, 80f);
+            var minDistance = Math.Clamp(sightDistanceSettings.MinDistance, 0f, maxDistance);
+            var minRotation = Math.Clamp(sightDistanceSettings.MinRotation, -1.569f, 1.569f);
+            var maxRotation = Math.Clamp(sightDistanceSettings.MaxRotation, minRotation, 1.569f);
+            var minFoV = Math.Clamp(sightDistanceSettings.MinFoV, 0.01f, 3f);
+            var maxFoV = Math.Clamp(sightDistanceSettings.MaxFoV, minFoV, 3f);
+            var currentFoV = Math.Clamp(sightDistanceSettings.CurrentFoV, minFoV, maxFoV);
+
+            Configuration.CustomSightDistanceMaxDistance = maxDistance;
+            Configuration.CustomSightDistanceMinDistance = minDistance;
+            Configuration.CustomSightDistanceMaxRotation = maxRotation;
+            Configuration.CustomSightDistanceMinRotation = minRotation;
+            Configuration.CustomSightDistanceMaxFoV = maxFoV;
+            Configuration.CustomSightDistanceMinFoV = minFoV;
+            Configuration.CustomSightDistanceFoV = currentFoV;
+            Configuration.CustomSightDistanceIgnoreCollision = sightDistanceSettings.IgnoreCollision;
+            SightDistance.ApplyConfiguration(
+                Configuration.CustomSightDistanceMaxDistance,
+                Configuration.CustomSightDistanceMinDistance,
+                Configuration.CustomSightDistanceMaxRotation,
+                Configuration.CustomSightDistanceMinRotation,
+                Configuration.CustomSightDistanceMaxFoV,
+                Configuration.CustomSightDistanceMinFoV,
+                Configuration.CustomSightDistanceFoV,
+                Configuration.CustomSightDistanceIgnoreCollision);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "infinite-sprint", out XAModInfiniteSprintSettings? infiniteSprintSettings)
+            && infiniteSprintSettings != null)
+        {
+            Configuration.InfiniteSprintDelaySeconds = PlayerModsService.ClampInfiniteSprintDelaySeconds(infiniteSprintSettings.DelaySeconds);
+            PlayerMods.ApplyInfiniteSprintConfiguration(Configuration.InfiniteSprintDelaySeconds);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "xa-peep", out XAModXAPeepSettings? xaPeepSettings)
+            && xaPeepSettings != null)
+        {
+            var soundEffectId = XAPeepData.ClampSoundEffectId(xaPeepSettings.SoundEffectId);
+            if (xaPeepSettings.PlaySound && soundEffectId == 0)
+                soundEffectId = 2;
+            var targeterLineColor = xaPeepSettings.TargeterLineColor ?? new XAModColorSettings();
+            var targeterDotColor = xaPeepSettings.TargeterDotColor ?? new XAModColorSettings();
+
+            Configuration.XAPeepAutoOpenWindowOnPluginLoad = xaPeepSettings.AutoOpenWindowOnPluginLoad;
+            Configuration.XAPeepWindowLocked = xaPeepSettings.WindowLocked;
+            Configuration.XAPeepLogParty = xaPeepSettings.LogParty;
+            Configuration.XAPeepLogAlliance = xaPeepSettings.LogAlliance;
+            Configuration.XAPeepLogInCombat = xaPeepSettings.LogInCombat;
+            Configuration.XAPeepDisplayLineWhenTargetingMe = xaPeepSettings.ShowCardWhenTargeted;
+            Configuration.XAPeepShowTargeterLine = xaPeepSettings.ShowTargeterLine;
+            Configuration.XAPeepTargeterLineColor = new Vector4(
+                ClampUnitFloat(targeterLineColor.R),
+                ClampUnitFloat(targeterLineColor.G),
+                ClampUnitFloat(targeterLineColor.B),
+                ClampUnitFloat(targeterLineColor.A));
+            Configuration.XAPeepShowTargeterDot = xaPeepSettings.ShowTargeterDot;
+            Configuration.XAPeepTargeterDotColor = new Vector4(
+                ClampUnitFloat(targeterDotColor.R),
+                ClampUnitFloat(targeterDotColor.G),
+                ClampUnitFloat(targeterDotColor.B),
+                ClampUnitFloat(targeterDotColor.A));
+            Configuration.XAPeepTargeterDotSize = Math.Clamp(xaPeepSettings.TargeterDotSize, 1f, 15f);
+            Configuration.XAPeepShowTargetersCard = xaPeepSettings.ShowTargetersCard;
+            Configuration.XAPeepShowCenterNotification = xaPeepSettings.ShowCenterNotification;
+            Configuration.XAPeepPlaySound = xaPeepSettings.PlaySound && soundEffectId > 0;
+            Configuration.XAPeepSoundEffectId = soundEffectId;
+            Configuration.XAPeepSoundVolume = Math.Clamp(xaPeepSettings.SoundVolume, 0f, 1f);
+        }
+    }
+
+    private static bool TryDeserializeXAModSettings<T>(IReadOnlyDictionary<string, JsonElement>? modSettings, string key, out T? settings)
+    {
+        settings = default;
+        if (!TryGetXAModSettingsElement(modSettings, key, out var element))
+            return false;
+
+        try
+        {
+            settings = element.Deserialize<T>(ToonModsPresetSerialization.JsonOptions);
+            return settings != null;
+        }
+        catch
+        {
+            settings = default;
+            return false;
+        }
+    }
+
+    private static bool TryGetXAModSettingsElement(IReadOnlyDictionary<string, JsonElement>? modSettings, string key, out JsonElement element)
+    {
+        if (modSettings != null)
+        {
+            foreach (var entry in modSettings)
+            {
+                if (entry.Key.Equals(key, StringComparison.OrdinalIgnoreCase))
+                {
+                    element = entry.Value;
+                    return true;
+                }
+            }
+        }
+
+        element = default;
+        return false;
+    }
+
+    private static List<XAModResolutionPreset> NormalizeCustomResolutionPresets(IEnumerable<XAModResolutionPreset>? presets)
+    {
+        var normalized = new List<XAModResolutionPreset>();
+        var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var preset in presets ?? Enumerable.Empty<XAModResolutionPreset>())
+        {
+            if (!SystemWindowModsService.TryNormalizeCustomResolution(preset.Width, preset.Height, out var width, out var height, out _))
+                continue;
+
+            var key = $"{width}x{height}";
+            if (!seen.Add(key))
+                continue;
+
+            normalized.Add(new XAModResolutionPreset
+            {
+                Width = width,
+                Height = height,
+            });
+        }
+
+        return normalized;
+    }
+
+    private static XAModColorSettings CreateColorSettings(float r, float g, float b, float a)
+    {
+        return new XAModColorSettings
+        {
+            R = ClampUnitFloat(r),
+            G = ClampUnitFloat(g),
+            B = ClampUnitFloat(b),
+            A = ClampUnitFloat(a),
+        };
+    }
+
+    private static float ClampUnitFloat(float value)
+        => Math.Clamp(value, 0f, 1f);
 
     private bool TryHandleResolutionCommand(string value, out string message)
     {
@@ -1627,7 +2067,7 @@ public sealed class Plugin : IDalamudPlugin
             enabled =>
             {
                 Configuration.GlobalCharacterListAnonymizeEnabled = enabled;
-                return true;
+                return enabled;
             },
             applied => Configuration.GlobalCharacterListAnonymizeEnabled = applied,
             () => Configuration.GlobalCharacterListAnonymizeEnabled
@@ -1809,6 +2249,12 @@ public sealed class Plugin : IDalamudPlugin
                 definition = default;
                 return false;
         }
+    }
+
+    private static bool IsXaModsSubcommand(string subcommand)
+    {
+        return subcommand.Equals("xamods", StringComparison.OrdinalIgnoreCase)
+            || subcommand.Equals("mods", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetXAModsRestoreScopeLabel(XAModsRestoreScope scope)
@@ -2039,5 +2485,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.21";
+    public const string Version = "0.0.0.22";
 }
