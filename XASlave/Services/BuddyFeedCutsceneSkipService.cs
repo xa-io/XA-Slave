@@ -82,7 +82,6 @@ public unsafe sealed class BuddyFeedCutsceneSkipService : IDisposable
             }
 
             playFeedBuddySceneHook = interopProvider.HookFromAddress<PlayFeedBuddySceneDelegate>(address, PlayFeedBuddySceneDetour);
-            log.Information($"[XASlave] Buddy Feed Cutscene Skip hook created at 0x{address:X}.");
         }
         catch (Exception ex)
         {

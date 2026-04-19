@@ -122,13 +122,9 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
-            {
-                log.Warning($"[XASlave] Auto Refuse Trade could not find {label}.");
                 return null;
-            }
 
             var hook = interopProvider.HookFromAddress<T>(address, detour);
-            log.Information($"[XASlave] Auto Refuse Trade created {label} hook at 0x{address:X}.");
             return hook;
         }
         catch (Exception ex)
@@ -144,20 +140,13 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         {
             var agent = AgentModule.Instance()->GetAgentByInternalId(AgentId.Trade);
             if (agent == null)
-            {
-                log.Warning("[XASlave] Auto Refuse Trade could not resolve AgentTrade.");
                 return null;
-            }
 
             var address = GetVirtualFunctionAddress(agent->VirtualTable, "Show");
             if (address == nint.Zero)
-            {
-                log.Warning("[XASlave] Auto Refuse Trade could not resolve AgentTrade.Show.");
                 return null;
-            }
 
             var hook = interopProvider.HookFromAddress<AgentShowDelegate>(address, TradeAgentShowDetour);
-            log.Information($"[XASlave] Auto Refuse Trade created AgentTradeShow hook at 0x{address:X}.");
             return hook;
         }
         catch (Exception ex)

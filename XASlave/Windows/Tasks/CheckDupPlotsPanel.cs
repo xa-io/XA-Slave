@@ -226,6 +226,7 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Personal Estate", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Apartment", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("FC Estate", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
             // Sort

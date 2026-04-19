@@ -154,6 +154,7 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn("Homeworld", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
             ImGui.TableSetupColumn("Current World", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
             // Sort

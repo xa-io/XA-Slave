@@ -244,6 +244,8 @@ public class Configuration : IPluginConfiguration
     public int ArPrePostCheckEveryHours { get; set; } = 0;
     public bool ArShipExplorationBailoutEnabled { get; set; } = false;
     public int ArShipExplorationBailoutSeconds { get; set; } = 30;
+    public bool BailoutEscMenuEnabled { get; set; } = false;
+    public int BailoutEscMenuSeconds { get; set; } = 5;
     // Per-step toggles â€” what to do before AR processes retainers
     public bool ArPreProcessOpenInventory { get; set; } = true;
     public bool ArPreProcessOpenArmouryChest { get; set; } = true;
@@ -337,6 +339,11 @@ public class Configuration : IPluginConfiguration
     public bool AutoUnlockExpertDeliverySkipHq { get; set; } = true;
     public bool AutoUnlockExpertDeliverySkipMateria { get; set; } = true;
     public bool AutoUnlockExpertDeliveryIgnoreSealCap { get; set; } = false;
+    public bool AntiAfkEnabled { get; set; } = false;
+    public bool AutoLeaveDutyEnabled { get; set; } = false;
+    public int AutoLeaveDutyDelaySeconds { get; set; } = AutoLeaveDutyService.DelaySecondsDefault;
+    public bool AutoMergeEnabled { get; set; } = false;
+    public bool QuickReturnEnabled { get; set; } = false;
     public bool UnlockExpertDeliveryEnabled { get; set; } = false;
     public bool AutoRefuseTradeRequestEnabled { get; set; } = false;
     public bool AutoRefuseTradeShowNotification { get; set; } = true;
@@ -350,6 +357,7 @@ public class Configuration : IPluginConfiguration
     public bool InfiniteSprintEnabled { get; set; } = false;
     public float InfiniteSprintDelaySeconds { get; set; } = 2.0f;
     public bool InstantLogoutEnabled { get; set; } = false;
+    public bool ItemCommandsEnabled { get; set; } = false;
     public bool XAPeepEnabled { get; set; } = false;
     public bool XAPeepWindowOpen { get; set; } = false;
     public bool XAPeepHistoryWindowOpen { get; set; } = false;

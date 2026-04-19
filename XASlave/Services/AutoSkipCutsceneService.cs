@@ -97,7 +97,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         enabled = true;
         SyncCutscenePatchState();
         StatusText = $"Enabled ({availableSurfaceCount} cutscene surfaces available).";
-        log.Information($"[XASlave] Auto Skip Cutscenes enabled ({availableSurfaceCount} surfaces available).");
         return true;
     }
 
@@ -144,9 +143,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         playStaffRollHook = TryCreateHook<LuaFunctionDelegate>(Sigs.PlayStaffRollSig, PlayStaffRollDetour, "PlayStaffRoll");
         playToBeContinuedHook = TryCreateHook<LuaFunctionDelegate>(Sigs.PlayToBeContinuedSig, PlayToBeContinuedDetour, "PlayToBeContinued");
 
-        if (sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress))
-            log.Information($"[XASlave] Auto Skip Cutscenes found unskippable cutscene patch address at 0x{cutsceneUnskippablePatchAddress:X}.");
-        else
+        if (!sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress))
             log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature.");
     }
 
@@ -156,13 +153,9 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
-            {
-                log.Warning($"[XASlave] Auto Skip Cutscenes could not find {label} signature.");
                 return null;
-            }
 
             var hook = interopProvider.HookFromAddress(address, detour);
-            log.Information($"[XASlave] Auto Skip Cutscenes created {label} hook at 0x{address:X}.");
             return hook;
         }
         catch (Exception ex)

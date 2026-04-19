@@ -83,7 +83,6 @@ public sealed class WindowRenamerService : IDisposable
             if (SetWindowText(hwnd, finalTitle))
             {
                 isRenamed = true;
-                log.Information($"[XASlave] WindowRenamer: Renamed to \"{finalTitle}\"");
                 return true;
             }
             else
@@ -117,7 +116,6 @@ public sealed class WindowRenamerService : IDisposable
             try
             {
                 SetWindowText(hwnd, DefaultTitle);
-                log.Information($"[XASlave] WindowRenamer: Restored to \"{DefaultTitle}\"");
             }
             catch (Exception ex)
             {

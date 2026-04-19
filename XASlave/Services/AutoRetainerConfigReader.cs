@@ -50,7 +50,6 @@ public sealed class AutoRetainerConfigReader
         var ownConfigDir = pluginInterface.GetPluginConfigDirectory();
         pluginConfigsBasePath = Path.GetDirectoryName(ownConfigDir) ?? ownConfigDir;
 
-        log.Information($"[XASlave] AR Config Reader: pluginConfigs base = {pluginConfigsBasePath}");
     }
 
     /// <summary>Path to AutoRetainer's DefaultConfig.json.</summary>
@@ -113,7 +112,6 @@ public sealed class AutoRetainerConfigReader
                 .ThenBy(c => c.Name)
                 .ToList();
 
-            log.Information($"[XASlave] AR Config Reader: loaded {characters.Count} characters from {configPath}");
             return characters;
         }
         catch (Exception ex)

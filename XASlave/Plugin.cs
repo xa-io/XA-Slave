@@ -29,6 +29,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] public static ICondition Condition { get; private set; } = null!;
     [PluginService] public static IFramework Framework { get; private set; } = null!;
     [PluginService] public static IDataManager DataManager { get; private set; } = null!;
+    [PluginService] public static IDutyState DutyState { get; private set; } = null!;
     [PluginService] public static ITargetManager TargetManager { get; private set; } = null!;
     [PluginService] public static IGameConfig GameConfig { get; private set; } = null!;
     [PluginService] public static IPartyList PartyList { get; private set; } = null!;
@@ -67,6 +68,12 @@ public sealed class Plugin : IDalamudPlugin
         string Subcommand,
         string Usage,
         XAModCommandDefinition Definition);
+
+    private readonly record struct StartupSurfaceStatus(
+        string Name,
+        bool Requested,
+        string StatusText,
+        bool IsReady);
 
     public readonly record struct TitleBarFavXAModInfo(
         string Key,
@@ -110,10 +117,16 @@ public sealed class Plugin : IDalamudPlugin
     public AutoUnlockExpertDeliveryService AutoUnlockExpertDelivery { get; init; }
     public ExpertDeliveryUnlockService ExpertDeliveryUnlock { get; init; }
     public AutoRefuseTradeService AutoRefuseTrade { get; init; }
+    public AntiAfkService AntiAfk { get; init; }
+    public AutoLeaveDutyService AutoLeaveDuty { get; init; }
+    public AutoMergeService AutoMerge { get; init; }
+    public ItemCommandsService ItemCommands { get; init; }
+    public QuickReturnService QuickReturn { get; init; }
     public PlayerModsService PlayerMods { get; init; }
     public DozeSitAnywhereService DozeSitAnywhere { get; init; }
     public InstantLogoutService InstantLogout { get; init; }
     public TeleportLockClearService TeleportLockClear { get; init; }
+    public EscMenuBailoutService EscMenuBailout { get; init; }
     public XAPeepService XAPeep { get; init; }
     public PeepingTomIntegrationService PeepingTomIntegration { get; init; }
     public ArPostProcessService ArPostProcessor { get; init; }
@@ -233,10 +246,16 @@ public sealed class Plugin : IDalamudPlugin
         AutoUnlockExpertDelivery = new AutoUnlockExpertDeliveryService(Framework, DataManager, Log);
         ExpertDeliveryUnlock = new ExpertDeliveryUnlockService(GameInterop, Log);
         AutoRefuseTrade = new AutoRefuseTradeService(SigScanner, GameInterop, Log);
+        AntiAfk = new AntiAfkService(Framework, ClientState, Log);
+        AutoLeaveDuty = new AutoLeaveDutyService(DutyState, ClientState, PlayerState, Condition, Framework, Log);
+        AutoMerge = new AutoMergeService(AddonLifecycle, Framework, ClientState, Condition, DataManager, Log);
+        ItemCommands = new ItemCommandsService(DataManager, PlayerState);
+        QuickReturn = new QuickReturnService(ClientState, GameInterop, Log);
         PlayerMods = new PlayerModsService(Framework, Condition, SigScanner, GameInterop, Log);
         DozeSitAnywhere = new DozeSitAnywhereService(ClientState, ObjectTable, SigScanner, GameInterop, Log);
         InstantLogout = new InstantLogoutService(ClientState, Framework, SigScanner, Log, LobbyErrorAutoClose);
         TeleportLockClear = new TeleportLockClearService(ChatGui, Log);
+        EscMenuBailout = new EscMenuBailoutService(Framework, Log);
         XAPeep = new XAPeepService(Framework, ClientState, ObjectTable, GameGui, Log, SlaveDatabase, Configuration);
         PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
@@ -274,10 +293,24 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.AutoUnlockExpertDeliverySkipHq,
             Configuration.AutoUnlockExpertDeliverySkipMateria,
             Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+        var normalizedAutoLeaveDutyDelay = AutoLeaveDutyService.ClampDelaySeconds(Configuration.AutoLeaveDutyDelaySeconds);
+        if (Configuration.AutoLeaveDutyDelaySeconds != normalizedAutoLeaveDutyDelay)
+        {
+            Configuration.AutoLeaveDutyDelaySeconds = normalizedAutoLeaveDutyDelay;
+            Configuration.Save();
+        }
+        AutoLeaveDuty.ApplyConfiguration(Configuration.AutoLeaveDutyDelaySeconds);
         AutoRefuseTrade.ApplyConfiguration(
             Configuration.AutoRefuseTradeShowNotification,
             Configuration.AutoRefuseTradeSendEcho,
             Configuration.AutoRefuseTradeExtraCommands);
+        var normalizedBailoutEscMenuSeconds = EscMenuBailoutService.NormalizeTimeoutSeconds(Configuration.BailoutEscMenuSeconds);
+        if (Configuration.BailoutEscMenuSeconds != normalizedBailoutEscMenuSeconds)
+        {
+            Configuration.BailoutEscMenuSeconds = normalizedBailoutEscMenuSeconds;
+            Configuration.Save();
+        }
+        EscMenuBailout.ApplyConfiguration(Configuration.BailoutEscMenuSeconds);
         var normalizedInfiniteSprintDelay = PlayerModsService.ClampInfiniteSprintDelaySeconds(Configuration.InfiniteSprintDelaySeconds);
         if (Math.Abs(Configuration.InfiniteSprintDelaySeconds - normalizedInfiniteSprintDelay) > 0.001f)
         {
@@ -413,6 +446,30 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
         }
 
+        if (Configuration.AntiAfkEnabled && !AntiAfk.SetEnabled(true))
+        {
+            Configuration.AntiAfkEnabled = false;
+            Configuration.Save();
+        }
+
+        if (Configuration.AutoLeaveDutyEnabled && !AutoLeaveDuty.SetEnabled(true))
+        {
+            Configuration.AutoLeaveDutyEnabled = false;
+            Configuration.Save();
+        }
+
+        if (Configuration.AutoMergeEnabled && !AutoMerge.SetEnabled(true))
+        {
+            Configuration.AutoMergeEnabled = false;
+            Configuration.Save();
+        }
+
+        if (Configuration.QuickReturnEnabled && !QuickReturn.SetEnabled(true))
+        {
+            Configuration.QuickReturnEnabled = false;
+            Configuration.Save();
+        }
+
         if (Configuration.UnlockExpertDeliveryEnabled && !ExpertDeliveryUnlock.SetEnabled(true))
         {
             Configuration.UnlockExpertDeliveryEnabled = false;
@@ -434,6 +491,12 @@ public sealed class Plugin : IDalamudPlugin
         if (Configuration.AutoClearTeleportationLockEnabled && !TeleportLockClear.SetEnabled(true))
         {
             Configuration.AutoClearTeleportationLockEnabled = false;
+            Configuration.Save();
+        }
+
+        if (Configuration.BailoutEscMenuEnabled && !EscMenuBailout.SetEnabled(true))
+        {
+            Configuration.BailoutEscMenuEnabled = false;
             Configuration.Save();
         }
 
@@ -459,6 +522,12 @@ public sealed class Plugin : IDalamudPlugin
         if (Configuration.InstantLogoutEnabled && !InstantLogout.SetEnabled(true))
         {
             Configuration.InstantLogoutEnabled = false;
+            Configuration.Save();
+        }
+
+        if (Configuration.ItemCommandsEnabled && !ItemCommands.SetEnabled(true))
+        {
+            Configuration.ItemCommandsEnabled = false;
             Configuration.Save();
         }
 
@@ -538,7 +607,65 @@ public sealed class Plugin : IDalamudPlugin
         ClientState.Login += OnLogin;
         ClientState.Logout += OnLogout;
 
-        Log.Information("[XASlave] Plugin loaded successfully.");
+        LogStartupSummary();
+    }
+
+    private void LogStartupSummary()
+    {
+        var requestedSurfaces = GetStartupSurfaceStatuses()
+            .Where(surface => surface.Requested)
+            .ToList();
+
+        if (requestedSurfaces.Count == 0)
+        {
+            Log.Information("[XASlave] Plugin loaded successfully. No hook-backed startup XA Mods were armed.");
+            return;
+        }
+
+        var armedCount = requestedSurfaces.Count(surface => surface.IsReady);
+        var unavailable = requestedSurfaces
+            .Where(surface => !surface.IsReady)
+            .ToList();
+
+        var summary = unavailable.Count == 0
+            ? $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed."
+            : $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed, {unavailable.Count} unavailable. Open XA Mods for current status.";
+        Log.Information(summary);
+
+        if (unavailable.Count > 0)
+            Log.Warning($"[XASlave] Startup unavailable: {string.Join("; ", unavailable.Select(surface => $"{surface.Name}: {surface.StatusText}"))}");
+    }
+
+    private IEnumerable<StartupSurfaceStatus> GetStartupSurfaceStatuses()
+    {
+        yield return CreateStartupSurfaceStatus("Cancel Login Cooldown", Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.CancelLoginCooldownStatusText);
+        yield return CreateStartupSurfaceStatus("Auto Skip Cutscenes", Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.StatusText);
+        yield return CreateStartupSurfaceStatus("Prevent Lobby Exit", Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.PreventLobbyExitStatusText);
+        yield return CreateStartupSurfaceStatus("Queue Position Display", Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.StatusText);
+        yield return CreateStartupSurfaceStatus("Auto Hide Game Objects", Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.StatusText);
+        yield return CreateStartupSurfaceStatus("Skip Dialogue", Configuration.AutoSkipDialogueEnabled, DialogueSkip.StatusText);
+        yield return CreateStartupSurfaceStatus("Background Rendering Pause", Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.DisableBackgroundRenderingStatusText);
+        yield return CreateStartupSurfaceStatus("Custom Sight Distance", Configuration.CustomSightDistanceEnabled, SightDistance.StatusText);
+        yield return CreateStartupSurfaceStatus("Instance Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText);
+        yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText);
+        yield return CreateStartupSurfaceStatus("Reveal Undiscovered Areas", Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.RevealUndiscoveredAreasStatusText);
+        yield return CreateStartupSurfaceStatus("Special Render Modes", Configuration.SpecialRenderModesEnabled, SystemWindowMods.SpecialRenderModesStatusText);
+        yield return CreateStartupSurfaceStatus("Doze & Sit Anywhere", Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.StatusText);
+        yield return CreateStartupSurfaceStatus("Infinite Sprint", Configuration.InfiniteSprintEnabled, PlayerMods.InfiniteSprintStatusText);
+        yield return CreateStartupSurfaceStatus("Instant Logout", Configuration.InstantLogoutEnabled, InstantLogout.StatusText);
+        yield return CreateStartupSurfaceStatus("Unlock Expert Delivery", Configuration.UnlockExpertDeliveryEnabled, ExpertDeliveryUnlock.StatusText);
+        yield return CreateStartupSurfaceStatus("Moveable After Death", Configuration.MoveableAfterDeathEnabled, PlayerMods.MoveableAfterDeathStatusText);
+    }
+
+    private static StartupSurfaceStatus CreateStartupSurfaceStatus(string name, bool requested, string statusText)
+    {
+        return new StartupSurfaceStatus(name, requested, statusText, IsStartupSurfaceReady(statusText));
+    }
+
+    private static bool IsStartupSurfaceReady(string statusText)
+    {
+        return statusText.StartsWith("Enabled", StringComparison.OrdinalIgnoreCase)
+            || statusText.StartsWith("Ready", StringComparison.OrdinalIgnoreCase);
     }
 
     public void Dispose()
@@ -578,10 +705,16 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoUnlockExpertDelivery", AutoUnlockExpertDelivery);
         TryDispose("ExpertDeliveryUnlock", ExpertDeliveryUnlock);
         TryDispose("AutoRefuseTrade", AutoRefuseTrade);
+        TryDispose("AntiAfk", AntiAfk);
+        TryDispose("AutoLeaveDuty", AutoLeaveDuty);
+        TryDispose("AutoMerge", AutoMerge);
+        TryDispose("ItemCommands", ItemCommands);
+        TryDispose("QuickReturn", QuickReturn);
         TryDispose("PlayerMods", PlayerMods);
         TryDispose("DozeSitAnywhere", DozeSitAnywhere);
         TryDispose("InstantLogout", InstantLogout);
         TryDispose("TeleportLockClear", TeleportLockClear);
+        TryDispose("EscMenuBailout", EscMenuBailout);
         TryDispose("XAPeep", XAPeep);
         TryDispose("PeepingTomIntegration", PeepingTomIntegration);
         TryDispose("ArPostProcessor", ArPostProcessor);
@@ -798,6 +931,12 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("equip", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(ItemCommands.TryExecuteEquipCommand(subcommandArgs, out var message), message);
+            return;
+        }
+
         if (subcommand.Equals("sprintdelay", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(TryApplySprintDelayCommand(subcommandArgs, out var message), message);
@@ -918,6 +1057,9 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("res", StringComparison.OrdinalIgnoreCase))
             return TryHandleResolutionCommand(subcommandArgs, out message);
+
+        if (subcommand.Equals("equip", StringComparison.OrdinalIgnoreCase))
+            return ItemCommands.TryExecuteEquipCommand(subcommandArgs, out message);
 
         if (subcommand.Equals("sprintdelay", StringComparison.OrdinalIgnoreCase))
             return TryApplySprintDelayCommand(subcommandArgs, out message);
@@ -1333,6 +1475,18 @@ public sealed class Plugin : IDalamudPlugin
                     IgnoreSealCap = Configuration.AutoUnlockExpertDeliveryIgnoreSealCap,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "bailout-esc-menu":
+                snapshot = JsonSerializer.SerializeToElement(new XAModBailoutEscMenuSettings
+                {
+                    TimeoutSeconds = Configuration.BailoutEscMenuSeconds,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "auto-leave-duty":
+                snapshot = JsonSerializer.SerializeToElement(new XAModAutoLeaveDutySettings
+                {
+                    DelaySeconds = Configuration.AutoLeaveDutyDelaySeconds,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "auto-refuse-trade-request":
                 snapshot = JsonSerializer.SerializeToElement(new XAModTradeRefusalSettings
                 {
@@ -1487,6 +1641,20 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.AutoUnlockExpertDeliverySkipHq,
                 Configuration.AutoUnlockExpertDeliverySkipMateria,
                 Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "bailout-esc-menu", out XAModBailoutEscMenuSettings? bailoutEscMenuSettings)
+            && bailoutEscMenuSettings != null)
+        {
+            Configuration.BailoutEscMenuSeconds = EscMenuBailoutService.NormalizeTimeoutSeconds(bailoutEscMenuSettings.TimeoutSeconds);
+            EscMenuBailout.ApplyConfiguration(Configuration.BailoutEscMenuSeconds);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "auto-leave-duty", out XAModAutoLeaveDutySettings? autoLeaveDutySettings)
+            && autoLeaveDutySettings != null)
+        {
+            Configuration.AutoLeaveDutyDelaySeconds = AutoLeaveDutyService.ClampDelaySeconds(autoLeaveDutySettings.DelaySeconds);
+            AutoLeaveDuty.ApplyConfiguration(Configuration.AutoLeaveDutyDelaySeconds);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "auto-refuse-trade-request", out XAModTradeRefusalSettings? tradeRefusalSettings)
@@ -2036,6 +2204,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("auto-hide-unnecessary-popups", "Hide Unnecessary Popups", XAModsRestoreScope.Game, () => Configuration.AutoHideUnnecessaryPopupsEnabled, PopupCleaner.SetEnabled, applied => Configuration.AutoHideUnnecessaryPopupsEnabled = applied, () => PopupCleaner.StatusText);
         yield return new("auto-prevent-game-exiting-from-lobby-errors", "Prevent Game Exiting From Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.SetPreventLobbyExitEnabled, applied => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled = applied, () => SystemWindowMods.PreventLobbyExitStatusText);
         yield return new("auto-close-lobby-errors", "Close Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoCloseLobbyErrorsEnabled, LobbyErrorAutoClose.SetEnabled, applied => Configuration.AutoCloseLobbyErrorsEnabled = applied, () => LobbyErrorAutoClose.StatusText);
+        yield return new("bailout-esc-menu", "Bailout ESC Menu", XAModsRestoreScope.Game, () => Configuration.BailoutEscMenuEnabled, EscMenuBailout.SetEnabled, applied => Configuration.BailoutEscMenuEnabled = applied, () => EscMenuBailout.StatusText);
         yield return new("auto-skip-dialogue", "Skip Dialogue", XAModsRestoreScope.Game, () => Configuration.AutoSkipDialogueEnabled, DialogueSkip.SetEnabled, applied => Configuration.AutoSkipDialogueEnabled = applied, () => DialogueSkip.StatusText);
         yield return new("display-actual-queue-position", "Display Actual Queue Position", XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusText);
         yield return new("copy-item-name-for-all", "Copy Item Name For All", XAModsRestoreScope.Game, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusText);
@@ -2049,7 +2218,11 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("low-resolution", "Low Resolution", XAModsRestoreScope.Graphic, () => Configuration.LowResolutionEnabled, SystemWindowMods.SetLowResolutionEnabled, applied => Configuration.LowResolutionEnabled = applied, () => SystemWindowMods.LowResolutionStatusText);
         yield return new("special-rendering-modes", "Special Rendering Modes", XAModsRestoreScope.Graphic, () => Configuration.SpecialRenderModesEnabled, SetSpecialRenderModesEnabled, applied => Configuration.SpecialRenderModesEnabled = applied, () => Configuration.SpecialRenderModesEnabled ? SystemWindowMods.SpecialRenderModesStatusText : "Disabled");
 
+        yield return new("anti-afk", "Anti-AFK", XAModsRestoreScope.Player, () => Configuration.AntiAfkEnabled, AntiAfk.SetEnabled, applied => Configuration.AntiAfkEnabled = applied, () => AntiAfk.StatusText);
         yield return new("auto-expert-delivery", "Automate Expert Delivery", XAModsRestoreScope.Player, () => Configuration.AutoUnlockExpertDeliveryEnabled, AutoUnlockExpertDelivery.SetEnabled, applied => Configuration.AutoUnlockExpertDeliveryEnabled = applied, () => AutoUnlockExpertDelivery.StatusText);
+        yield return new("auto-leave-duty", "Auto Leave Duty", XAModsRestoreScope.Player, () => Configuration.AutoLeaveDutyEnabled, AutoLeaveDuty.SetEnabled, applied => Configuration.AutoLeaveDutyEnabled = applied, () => AutoLeaveDuty.StatusText);
+        yield return new("auto-merge", "Auto Merge", XAModsRestoreScope.Player, () => Configuration.AutoMergeEnabled, AutoMerge.SetEnabled, applied => Configuration.AutoMergeEnabled = applied, () => AutoMerge.StatusText);
+        yield return new("quick-return", "Instance Return", XAModsRestoreScope.Player, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusText);
         yield return new("auto-refuse-trade-request", "Refuse Trade Request", XAModsRestoreScope.Player, () => Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.SetEnabled, applied => Configuration.AutoRefuseTradeRequestEnabled = applied, () => AutoRefuseTrade.StatusText);
         yield return new("auto-reveal-undiscovered-areas", "Reveal Undiscovered Areas", XAModsRestoreScope.Player, () => Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.SetRevealUndiscoveredAreasEnabled, applied => Configuration.AutoRevealUndiscoveredAreasEnabled = applied, () => SystemWindowMods.RevealUndiscoveredAreasStatusText);
         yield return new("auto-clear-teleportation-lock", "Clear Teleportation Lock", XAModsRestoreScope.Player, () => Configuration.AutoClearTeleportationLockEnabled, TeleportLockClear.SetEnabled, applied => Configuration.AutoClearTeleportationLockEnabled = applied, () => TeleportLockClear.StatusText);
@@ -2057,6 +2230,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("doze-sit-anywhere", "Doze & Sit Anywhere", XAModsRestoreScope.Player, () => Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.SetEnabled, applied => Configuration.DozeSitAnywhereEnabled = applied, () => DozeSitAnywhere.StatusText);
         yield return new("infinite-sprint", "Infinite Sprint", XAModsRestoreScope.Player, () => Configuration.InfiniteSprintEnabled, PlayerMods.SetInfiniteSprintEnabled, applied => Configuration.InfiniteSprintEnabled = applied, () => PlayerMods.InfiniteSprintStatusText);
         yield return new("instant-logout", "Instant Logout", XAModsRestoreScope.Player, () => Configuration.InstantLogoutEnabled, InstantLogout.SetEnabled, applied => Configuration.InstantLogoutEnabled = applied, () => InstantLogout.StatusText);
+        yield return new("item-commands", "Item Commands", XAModsRestoreScope.Player, () => Configuration.ItemCommandsEnabled, ItemCommands.SetEnabled, applied => Configuration.ItemCommandsEnabled = applied, () => ItemCommands.StatusText);
         yield return new("xa-peep", "XA Peep", XAModsRestoreScope.Player, () => Configuration.XAPeepEnabled, XAPeep.SetEnabled, applied => Configuration.XAPeepEnabled = applied, () => XAPeep.StatusText);
 
         yield return new(
@@ -2209,8 +2383,24 @@ public sealed class Plugin : IDalamudPlugin
             case "specialrender":
                 definition = new("specialrender", "/xa specialrender on|off", GetXAModDefinition("special-rendering-modes"));
                 return true;
+            case "antiafk":
+                definition = new("antiafk", "/xa antiafk on|off", GetXAModDefinition("anti-afk"));
+                return true;
             case "expertdelivery":
                 definition = new("expertdelivery", "/xa expertdelivery on|off", GetXAModDefinition("auto-expert-delivery"));
+                return true;
+            case "leaveduty":
+            case "autoleaveduty":
+                definition = new("leaveduty", "/xa leaveduty on|off", GetXAModDefinition("auto-leave-duty"));
+                return true;
+            case "automerge":
+            case "merge":
+                definition = new("automerge", "/xa automerge on|off", GetXAModDefinition("auto-merge"));
+                return true;
+            case "instancereturn":
+            case "quickreturn":
+            case "instantreturn":
+                definition = new("instancereturn", "/xa instancereturn on|off", GetXAModDefinition("quick-return"));
                 return true;
             case "refusetrade":
                 definition = new("refusetrade", "/xa refusetrade on|off", GetXAModDefinition("auto-refuse-trade-request"));
@@ -2232,6 +2422,10 @@ public sealed class Plugin : IDalamudPlugin
                 return true;
             case "instantlogout":
                 definition = new("instantlogout", "/xa instantlogout on|off", GetXAModDefinition("instant-logout"));
+                return true;
+            case "itemcommands":
+            case "itemcmds":
+                definition = new("itemcommands", "/xa itemcommands on|off", GetXAModDefinition("item-commands"));
                 return true;
             case "peepingtom":
                 definition = new("peepingtom", "/xa peepingtom on|off", GetXAModDefinition("force-peepingtom"));
@@ -2485,5 +2679,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.22";
+    public const string Version = "0.0.0.23";
 }

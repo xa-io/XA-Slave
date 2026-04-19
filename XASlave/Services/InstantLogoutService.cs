@@ -158,13 +158,9 @@ public sealed class InstantLogoutService : IDisposable
         initialized = true;
 
         if (!sigScanner.TryScanText(Sigs.RequestContentsFinderSig, out var address) || address == nint.Zero)
-        {
-            log.Warning("[XASlave] Instant Logout request signature was not found.");
             return;
-        }
 
         requestContentsFinder = Marshal.GetDelegateForFunctionPointer<RequestContentsFinderDelegate>(address);
-        log.Information($"[XASlave] Located Instant Logout contents finder request at 0x{address:X}.");
     }
 
     [StructLayout(LayoutKind.Explicit, Size = 10)]

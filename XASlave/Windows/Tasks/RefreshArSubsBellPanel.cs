@@ -241,6 +241,7 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Retainers", ImGuiTableColumnFlags.WidthFixed, Scale(65f));
             ImGui.TableSetupColumn("Submarines", ImGuiTableColumnFlags.WidthFixed, Scale(75f));
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
+            ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
             // Build filtered list

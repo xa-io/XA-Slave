@@ -171,6 +171,7 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Region / DC", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
             ImGui.TableSetupColumn("Inv Free", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
+            ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
             var charInfo = cfg.ReloggerCharacterInfo;

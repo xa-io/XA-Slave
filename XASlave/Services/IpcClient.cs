@@ -235,7 +235,6 @@ public sealed class IpcClient
         // Splatoon — explicit channel names
         splatIsLoadedSubscriber = pluginInterface.GetIpcSubscriber<bool>("Splatoon.IsLoaded");
 
-        log.Information("[XASlave] IPC client initialized (11 plugins).");
     }
 
     // ═══════════════════════════════════════════════════

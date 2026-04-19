@@ -77,13 +77,9 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
         {
             var address = (nint)PlayerState.Addresses.GetGrandCompanyRank.Value;
             if (address == nint.Zero)
-            {
-                log.Warning("[XASlave] Auto Unlock Expert Delivery could not resolve PlayerState.GetGrandCompanyRank.");
                 return;
-            }
 
             getGrandCompanyRankHook = interopProvider.HookFromAddress<GetGrandCompanyRankDelegate>(address, GetGrandCompanyRankDetour);
-            log.Information($"[XASlave] Auto Unlock Expert Delivery created PlayerState.GetGrandCompanyRank hook at 0x{address:X}.");
         }
         catch (Exception ex)
         {

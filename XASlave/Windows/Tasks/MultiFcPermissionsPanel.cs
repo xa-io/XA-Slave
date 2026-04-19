@@ -179,6 +179,7 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("FC Rank", ImGuiTableColumnFlags.WidthFixed, Scale(60f));
             ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, Scale(45f));
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
+            ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
             // Build filtered list

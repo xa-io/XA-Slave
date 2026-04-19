@@ -55,7 +55,7 @@ public partial class SlaveWindow
         new("/xa hideobjects on|off", "Toggle `Hide Game Objects`.", "Uses the XA object-hide seam with the current category filters plus the duty, island, and Occult Crescent options."),
         new("/xa lowres <scale>", "Set and enable `Low Resolution` from chat.", "Accepts values from `0.01` to `1.00`, including inputs such as `1` and `0.01`, and temporarily switches DLSS to AMD FSR while the feature is active."),
         new("/xa lowres off", "Disable `Low Resolution`.", "Turns off the forced low-resolution scale and restores the previous runtime upscale mode."),
-        new("/xa minwindow on|off", "Toggle `Ignore Minimum Window Size`.", "Arms or restores XA's guarded local minimum-size seam."),
+        new("/xa minwindow on|off", "Toggle `Ignore Minimum Window Size`.", "Lowers or restores XA's guarded local minimum-size floor and corrects undersized restore or maximize results after the window changes."),
         new("/xa res <width>x<height>", "Apply a custom client resolution such as `/xa res 500x345`.", "Requires `Custom Resolutions` to be enabled in XA Mods."),
         new("/xa res add <width>x<height>", "Add a saved custom-resolution button.", "Stores a panel preset without needing to use the UI add-button flow."),
         new("/xa res remove <width>x<height>", "Remove a saved custom-resolution button.", "Deletes the matching saved preset when present."),
@@ -65,10 +65,16 @@ public partial class SlaveWindow
 
     private static readonly CommandReferenceEntry[] PlayerModsCommandEntries =
     {
+        new("/xa antiafk on|off", "Toggle `Anti-AFK`.", "Resets the local AFK timer roughly every 9 minutes while the mod stays enabled so the client stays ahead of the game's 10-minute AFK kick."),
+        new("/xa equip <itemId>", "Equip an item by ID.", "XA scans the main inventory and armory chest, then queues the matching equip move to the correct slot."),
         new("/xa doze", "Trigger Doze Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
         new("/xa expertdelivery on|off", "Toggle `Automate Expert Delivery`.", "Controls the hand-in automation feature, not the unlock bypass."),
         new("/xa instantlogout on|off", "Toggle `Instant Logout`.", "Arms or disarms XA's hard logout seam and the `/xa logout` command."),
+        new("/xa itemcommands on|off", "Toggle `Item Commands`.", "Adds XA's `/xa equip <itemId>` command."),
         new("/xa killgame", "Hard logout, then close the client.", "Requires `Instant Logout` to be enabled. XA waits for logout to complete before sending `/xlkill`, and the action is blocked while Special Rendering Modes is hiding chat."),
+        new("/xa leaveduty on|off", "Toggle `Auto Leave Duty`.", "Also accepts `/xa autoleaveduty on|off`. XA watches for duty completion, waits the configured delay, then opens the duty menu and confirms Leave Duty once combat and blocking duty UI states are clear."),
+        new("/xa automerge on|off", "Toggle `Auto Merge`.", "Watches for the inventory window to open, then merges incomplete main-bag stacks together locally."),
+        new("/xa instancereturn on|off", "Toggle `Instance Return`.", "XA hooks the native Return action so it can skip the cast/cooldown path, leave the in-game confirmation prompt manual, and stay off in PvP. XA also leaves or disbands party first when the fast-return path needs party-state cleanup."),
         new("/xa sit", "Trigger Sit Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
         new("/xa logout", "Trigger XA's hard logout seam.", "Requires `Instant Logout` to be enabled, and the action is blocked while Special Rendering Modes is hiding chat."),
         new("/xa peep [on|off|clear]", "Open XA Peep or control its XA target tracker.", "Without arguments it toggles the XA Peep window. `on/off` enables or disables tracking, and `clear` wipes the stored XA Peep history."),

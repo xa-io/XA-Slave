@@ -130,13 +130,9 @@ public unsafe sealed class SightDistanceService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
-            {
-                log.Warning($"[XASlave] {label} signature was not found.");
                 return null;
-            }
 
             var hook = interopProvider.HookFromAddress<T>(address, detour);
-            log.Information($"[XASlave] Created {label} hook at 0x{address:X}.");
             return hook;
         }
         catch (Exception ex)
@@ -151,10 +147,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         if (address != nint.Zero)
             return;
 
-        if (sigScanner.TryScanText(signature, out address) && address != nint.Zero)
-            log.Information($"[XASlave] Resolved {label} patch address at 0x{address:X}.");
-        else
-            log.Warning($"[XASlave] {label} signature was not found.");
+        sigScanner.TryScanText(signature, out address);
     }
 
     private void UpdateCollisionPatch()
@@ -226,7 +219,6 @@ public unsafe sealed class SightDistanceService : IDisposable
             }
 
             applied = true;
-            log.Information($"[XASlave] Applied {label} patch.");
         }
         catch (Exception ex)
         {
@@ -248,7 +240,6 @@ public unsafe sealed class SightDistanceService : IDisposable
             }
 
             applied = false;
-            log.Information($"[XASlave] Restored {label} patch.");
         }
         catch (Exception ex)
         {

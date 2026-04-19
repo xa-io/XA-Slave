@@ -106,11 +106,23 @@ public sealed class XAModExpertDeliverySettings
 }
 
 [Serializable]
+public sealed class XAModBailoutEscMenuSettings
+{
+    public int TimeoutSeconds { get; set; }
+}
+
+[Serializable]
 public sealed class XAModTradeRefusalSettings
 {
     public bool ShowNotification { get; set; }
     public bool SendEcho { get; set; }
     public string ExtraCommands { get; set; } = string.Empty;
+}
+
+[Serializable]
+public sealed class XAModAutoLeaveDutySettings
+{
+    public int DelaySeconds { get; set; }
 }
 
 [Serializable]

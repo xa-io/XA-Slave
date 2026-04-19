@@ -91,13 +91,9 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
-            {
-                log.Warning($"[XASlave] {label} signature was not found.");
                 return null;
-            }
 
             var hook = interopProvider.HookFromAddress<T>(address, detour);
-            log.Information($"[XASlave] Created {label} hook at 0x{address:X}.");
             return hook;
         }
         catch (Exception ex)

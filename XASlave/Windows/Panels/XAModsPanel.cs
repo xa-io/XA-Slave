@@ -196,6 +196,18 @@ public partial class SlaveWindow
                 configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
         }
 
+        void ApplyAutoLeaveDutyConfiguration()
+        {
+            configuration.AutoLeaveDutyDelaySeconds = AutoLeaveDutyService.ClampDelaySeconds(configuration.AutoLeaveDutyDelaySeconds);
+            plugin.AutoLeaveDuty.ApplyConfiguration(configuration.AutoLeaveDutyDelaySeconds);
+        }
+
+        void ApplyBailoutEscMenuConfiguration()
+        {
+            configuration.BailoutEscMenuSeconds = EscMenuBailoutService.NormalizeTimeoutSeconds(configuration.BailoutEscMenuSeconds);
+            plugin.EscMenuBailout.ApplyConfiguration(configuration.BailoutEscMenuSeconds);
+        }
+
         void ApplyTradeRefusalConfiguration()
         {
             plugin.AutoRefuseTrade.ApplyConfiguration(
@@ -1076,6 +1088,30 @@ public partial class SlaveWindow
                 ImGui.TextDisabled(blockedMessage);
         }
 
+        void DrawBailoutEscMenuOptions()
+        {
+            if (!configuration.BailoutEscMenuEnabled)
+                return;
+
+            var timeoutOptions = EscMenuBailoutService.TimeoutOptions;
+            var timeoutIndex = Array.IndexOf(timeoutOptions, configuration.BailoutEscMenuSeconds);
+            if (timeoutIndex < 0)
+            {
+                configuration.BailoutEscMenuSeconds = EscMenuBailoutService.NormalizeTimeoutSeconds(configuration.BailoutEscMenuSeconds);
+                timeoutIndex = Array.IndexOf(timeoutOptions, configuration.BailoutEscMenuSeconds);
+            }
+
+            ImGui.SetNextItemWidth(Scale(180f));
+            if (ImGui.SliderInt("Timeout##BailoutEscMenu", ref timeoutIndex, 0, timeoutOptions.Length - 1, $"{timeoutOptions[timeoutIndex]} sec"))
+            {
+                configuration.BailoutEscMenuSeconds = timeoutOptions[timeoutIndex];
+                ApplyBailoutEscMenuConfiguration();
+                SaveConfiguration();
+            }
+
+            ImGui.TextDisabled("Closes addon:SystemMenu locally if it stays open past the selected timer.");
+        }
+
         void DrawDozeSitAnywhereTools()
         {
             if (ImGui.Button("Sit now##DozeSitAnywhere") && !plugin.DozeSitAnywhere.RequestSit())
@@ -1106,6 +1142,24 @@ public partial class SlaveWindow
             }
 
             ImGui.TextDisabled("Delay starts when a fresh movement start is detected.");
+        }
+
+        void DrawAutoLeaveDutyOptions()
+        {
+            var delaySeconds = configuration.AutoLeaveDutyDelaySeconds;
+            if (ImGui.SliderInt(
+                    "Leave after##AutoLeaveDuty",
+                    ref delaySeconds,
+                    AutoLeaveDutyService.DelaySecondsMinimum,
+                    AutoLeaveDutyService.DelaySecondsMaximum,
+                    "%d sec"))
+            {
+                configuration.AutoLeaveDutyDelaySeconds = delaySeconds;
+                ApplyAutoLeaveDutyConfiguration();
+                SaveConfiguration();
+            }
+
+            ImGui.TextDisabled("After duty completion, XA waits this long before opening the duty menu and confirming Leave Duty.");
         }
 
         void DrawExpertDeliveryOptions()
@@ -1407,7 +1461,7 @@ public partial class SlaveWindow
             plugin.SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled,
             applied => configuration.AutoIgnoreMinimumWindowSizeEnabled = applied,
             "Lowers the client minimum window size and re-syncs rendering after restore or maximize.",
-            "Lowers the client-side minimum width and height limits, but keeps a guarded 250x200 floor because smaller values have been observed to crash the client. While this toggle is enabled, it also watches the real client size and rearms the game resolution state after external restores or maximizes so rendering can recover cleanly.",
+            "Lowers the client-side minimum width and height limits, but keeps a guarded 250x200 floor because smaller values have been observed to crash the client. While this toggle is enabled, XA watches the real client size after restore or maximize operations and clamps undersized results back up so rendering can recover cleanly without subclassing the game window.",
             plugin.SystemWindowMods.IgnoreMinimumWindowSizeStatusText);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
@@ -1440,6 +1494,18 @@ public partial class SlaveWindow
             "Monitors the `Dialogue` addon for disconnect/lobby error markers such as `90002`, `3102`, `Connection with the server was lost.`, and `You are still logged into the game.`, then clicks the live `OK` button automatically. `Instant Logout` also arms this same monitor for 10 seconds even when this toggle is off.",
             plugin.LobbyErrorAutoClose.StatusText,
             searchTerms: ["90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "bailout-esc-menu",
+            "Bailout ESC Menu",
+            () => configuration.BailoutEscMenuEnabled,
+            plugin.EscMenuBailout.SetEnabled,
+            applied => configuration.BailoutEscMenuEnabled = applied,
+            "Monitors addon:SystemMenu and force-closes it if it sits open too long.",
+            "Watches `addon:SystemMenu` on the live client. If the ESC / System menu stays open longer than the selected timer, XA Slave closes it locally through the same direct addon close path used by the debug test button.",
+            plugin.EscMenuBailout.StatusText,
+            searchTerms: ["SystemMenu", "ESC menu", "escape menu", "close system menu", "timeout", "bailout"],
+            drawOptions: DrawBailoutEscMenuOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
             "auto-hide-game-objects",
@@ -1568,6 +1634,17 @@ public partial class SlaveWindow
 
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
+            "anti-afk",
+            "Anti-AFK",
+            () => configuration.AntiAfkEnabled,
+            plugin.AntiAfk.SetEnabled,
+            applied => configuration.AntiAfkEnabled = applied,
+            "Resets the local AFK timer every 9 minutes so this client stays ahead of the game's 10-minute idle kick path.",
+            "Keeps the local AFK timer fresh on a 9-minute cadence while enabled. XA only touches the local idle timer; it does not send chat or movement packets.",
+            plugin.AntiAfk.StatusText,
+            searchTerms: ["afk", "idle", "kick", "timer"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
             "auto-expert-delivery",
             "Automate Expert Delivery",
             () => configuration.AutoUnlockExpertDeliveryEnabled,
@@ -1625,6 +1702,41 @@ public partial class SlaveWindow
             searchTerms: ["1665", "Teleport", "stuck", "log message"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
+            "auto-leave-duty",
+            "Auto Leave Duty",
+            () => configuration.AutoLeaveDutyEnabled,
+            plugin.AutoLeaveDuty.SetEnabled,
+            applied => configuration.AutoLeaveDutyEnabled = applied,
+            "Leaves a completed duty automatically after combat and blocking duty UI states clear.",
+            "Watches for duty completion, waits the selected delay, then opens the duty menu and confirms Leave Duty once combat, cutscene, and occupied-state blockers are gone. This is meant for normal completed-duty cleanup and does not force an early exit.",
+            plugin.AutoLeaveDuty.StatusText,
+            searchTerms: ["completed duty", "leave duty", "instance", "dungeon", "raid", "delay", "1-10 sec", "duty menu"],
+            drawOptions: DrawAutoLeaveDutyOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "auto-merge",
+            "Auto Merge",
+            () => configuration.AutoMergeEnabled,
+            plugin.AutoMerge.SetEnabled,
+            applied => configuration.AutoMergeEnabled = applied,
+            "Merges incomplete main-bag stacks after opening the inventory.",
+            "Watches for the main inventory window to open, then walks incomplete normal or HQ bag stacks together until the mergeable stacks settle.",
+            plugin.AutoMerge.StatusText,
+            searchTerms: ["inventory", "stacks", "merge", "bags"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.IllegalMods,
+            "quick-return",
+            "Instance Return",
+            () => configuration.QuickReturnEnabled,
+            plugin.QuickReturn.SetEnabled,
+            applied => configuration.QuickReturnEnabled = applied,
+            "Skips Return cast/cooldown, leaves the in-game confirmation prompt manual, and stays off in PvP.",
+            "Hooks the native Return action so XA can fire the fast return command directly and leave or disband party first when the current party state would otherwise block that path. The in-game confirmation prompt is left for the user.",
+            plugin.QuickReturn.StatusText,
+            searchTerms: ["Return", "instance return", "cast", "cooldown", "instant", "PvP", "party", "disband", "leave party", "manual confirm"],
+            requireCtrlShiftToEnable: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
             "custom-sight-distance",
             "Custom Sight Distance",
             () => configuration.CustomSightDistanceEnabled,
@@ -1660,7 +1772,7 @@ public partial class SlaveWindow
             searchTerms: ["Sprint delay", "movement-start delay", "recast delay"],
             drawOptions: DrawInfiniteSprintOptions);
         AddSavedFeatureEntry(
-            ToonModsSection.PlayerMods,
+            ToonModsSection.IllegalMods,
             "instant-logout",
             "Instant Logout",
             () => configuration.InstantLogoutEnabled,
@@ -1670,7 +1782,19 @@ public partial class SlaveWindow
             "Uses the native contents-finder request path for hard logout. `/xa killgame` waits for the logout to complete, then sends `/xlkill`. When this toggle is off, the panel buttons are hidden and those commands do nothing. Logout and kill-game actions are also blocked while Special Rendering Modes is actively hiding chat.",
             plugin.InstantLogout.StatusText,
             searchTerms: ["logout", "/xa logout", "/xa killgame", "Log out now", "Kill game now"],
+            requireCtrlShiftToEnable: true,
             drawOptions: DrawInstantLogoutTool);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "item-commands",
+            "Item Commands",
+            () => configuration.ItemCommandsEnabled,
+            plugin.ItemCommands.SetEnabled,
+            applied => configuration.ItemCommandsEnabled = applied,
+            "Adds `/xa equip <itemId>`.",
+            "Adds an XA-routed item-equip command: `/xa equip <itemId>` equips from the main inventory or armory chest.",
+            plugin.ItemCommands.StatusText,
+            searchTerms: ["/xa equip", "equip item id", "armory"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "xa-peep",

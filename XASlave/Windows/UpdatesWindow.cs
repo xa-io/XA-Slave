@@ -22,8 +22,26 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
-            Header = "v0.0.0.22 - 2026-04-17",
+            Header = "v0.0.0.23 - 2026-04-19",
             HighlightAsCurrentRelease = true,
+            Lines =
+            [
+                "Fixes",
+                "- Fixed the update-time reload hang path so Dalamud is less likely to stall when XA Slave reloads during plugin updates",
+                "- Fixed the `Kill Game` titlebar favourite highlight so it refreshes correctly even while the main XA Slave window is collapsed",
+                "- Xagman trading conflicts were hardened with owner-collection and queue-flow fixes so empty or already-satisfied owner passes are less likely to stall follow-up trading work",
+                "",
+                "New XA Mods / QoL",
+                "- Added `Bailout ESC Menu` to close a stuck `SystemMenu` after the selected timeout",
+                "- Added `Auto Leave Duty` to exit completed duties after a configurable delay once combat and blockers clear",
+                "- Added `Instance Return` to skip the Return cast/cooldown path while leaving the in-game confirmation to the user",
+                "- Added `Anti-AFK` with a 9-minute local timer refresh cadence",
+                "- Added `Auto Merge` to combine incomplete inventory stacks when the inventory window opens",
+            ],
+        },
+        new VersionEntry
+        {
+            Header = "v0.0.0.22 - 2026-04-17",
             Lines =
             [
                 "Fixes",

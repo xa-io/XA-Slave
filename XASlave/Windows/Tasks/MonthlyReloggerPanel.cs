@@ -216,6 +216,7 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Personal", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
             ImGui.TableSetupColumn("Last Logged In", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f)); // remove
+            ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
             // Build filtered list using persistent data

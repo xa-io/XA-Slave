@@ -47,7 +47,6 @@ public sealed class IpcProvider : IDisposable
         runTaskProvider = pluginInterface.GetIpcProvider<string, object>("XASlave.RunTask");
         runTaskProvider.RegisterAction(RunTask);
 
-        log.Information("[XASlave] IPC provider initialized (3 channels).");
     }
 
     private bool IsBusy()

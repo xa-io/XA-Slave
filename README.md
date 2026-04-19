@@ -10,31 +10,35 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Save to XA Database** - Push data to XA Database with optional cadence-gated login collection and a built-in task log for collection/save debugging.
 - **Auto-Glam Weather** - Configure per-weather glamour plate lists, then randomly apply valid class/job and plate choices when the active weather changes.
 - **City Chat Flooder** - Send announcements across selected worlds and cities with looping and delay controls.
-- **Xagman** - Coordinate cross-client Tony / Franchise Owner FC trading with configurable same-PC or LAN hub support, `/xa db ...` Dropbox queueing, `Give` / `Take` / `Balance` / `TopUp` routing, item-list imports and exports, supplier matching with an optional `Ignore Gil in Select Matching Items` filter, standby queue control, optional FC-return cleanup, safer trade recovery, and shared task completion actions. `TopUp` refills owners up to the configured amount without taking any surplus back.
+- **Xagman** - Coordinate cross-client Tony / Franchise Owner FC trading with configurable same-PC or LAN hub support, `/xa db ...` Dropbox queueing, `Give` / `Take` / `Balance` / `TopUp` routing, item-list imports and exports, supplier matching with an optional `Ignore Gil in Select Matching Items` filter, standby queue control, optional FC-return cleanup, safer trade recovery, inline character-selection checkboxes, compact trash-can action headers, and shared task completion actions. Owner collection now skips empty give passes cleanly and fixed `Give N` amounts do not keep retrading across retry passes before Tony request-building starts. `TopUp` refills owners up to the configured amount without taking any surplus back.
 - **Monthly Relogger** - Cycle through characters with AutoRetainer integration, XA Database-backed rank and personal-plot visibility, failure highlighting, optional per-character actions, and shared task completion actions.
 - **Shared Task Completion Options** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` all share the same `Task Options on Complete` footer with `Logout`, `Kill Game`, and `Enable AR Multi Mode`. `Kill Game` always uses XA's hard logout + close-client flow even if `Instant Logout` is disabled in XA Mods.
 - **Prep Logistics** - Relog selected characters, see available main-inventory space, move them to a target world or location, and finish through the shared task completion actions.
 - **Auto-Accept FC Invites** - Monitor for FC invitations, automatically accept them, wait for a configurable period, and optionally leave again through the built-in floater-assist flow.
 - **FC Permissions Updater** - Review FC rosters with member-rank and FC-rank visibility before running shared permissions updates and the shared completion actions.
 - **Check Duplicate Plots** - Scan characters for duplicate housing plots and optionally rerun follow-up actions with the shared completion actions.
-- **Screenshot-Safe Character Lists** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` can anonymize visible character and world labels with one shared `Anonymize` toggle. Changing that checkbox in any task list immediately carries across the others, the same setting is exposed as the `Anonymize Character Lists` XA Mod, and the mass-character table columns can now be resized with the widths preserved through saved table settings.
+- **Screenshot-Safe Character Lists** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` can anonymize visible character and world labels with one shared `Anonymize` toggle. Changing that checkbox in any task list immediately carries across the others, the same setting is exposed as the `Anonymize Character Lists` XA Mod, the mass-character table columns can be resized with the widths preserved through saved table settings, and the scrollable task lists now keep their header rows pinned while you move through long character lists.
 - **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared action flow and shared completion actions.
 - **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, safer menu recovery, a workshop-side Company Chest gil sync into XA Database after the bell path finishes, and shared completion actions.
 - **Window Renamer** - Rename the FFXIV game window with an optional custom title, process-ID prefix, and current-character suffix.
-- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, a live enabled counter, `Show Only Enabled`, `Disable All Mods`, preset save/load, clipboard `Export` / `Import`, inline help, and direct `/xa xamods` navigation. Saved presets and exported XA Mods packages now restore the supported subsettings for the enabled mods as well, including the shipped option groups behind background rendering, object hiding, custom resolutions, low-resolution scale, Special Rendering Modes, expanded right-click providers, Expert Delivery, trade refusal, custom sight distance, Infinite Sprint delay, and XA Peep.
+- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, a live enabled counter, `Show Only Enabled`, `Disable All Mods`, preset save/load, clipboard `Export` / `Import`, inline help, and direct `/xa xamods` navigation. Saved presets and exported XA Mods packages now restore the supported subsettings for the enabled mods as well, including the shipped option groups behind background rendering, object hiding, custom resolutions, low-resolution scale, Special Rendering Modes, expanded right-click providers, Expert Delivery, `Auto Leave Duty` delay, `Bailout ESC Menu`, trade refusal, custom sight distance, Infinite Sprint delay, and XA Peep.
 
   | Game Mods | Graphic Mods | Player Mods | Plugin Mods |
   | --- | --- | --- | --- |
-  | Allow Multiple Game Instances | Disable Background Rendering | Automate Expert Delivery | Anonymize Character Lists |
-  | Cancel Login Cooldown | Custom Resolutions | Clear Teleportation Lock | Force PeepingTom |
-  | Close Lobby Errors | Hide Game Objects | Custom Sight Distance |  |
-  | Copy Item Name For All | Ignore Minimum Window Size | Doze & Sit Anywhere |  |
-  | Display Actual Queue Position | Low Resolution | Infinite Sprint |  |
-  | Display MSQ Progress | Special Rendering Modes | Instant Logout |  |
-  | Expanded Player Right-Click Menu Search |  | XA Peep |  |
-  | Hide Unnecessary Popups |  | Refuse Trade Request |  |
-  | Live Anonymous Mode |  | Reveal Undiscovered Areas |  |
-  | Prevent Game Exiting From Lobby Errors |  |  |  |
+  | Allow Multiple Game Instances | Disable Background Rendering | Anti-AFK | Anonymize Character Lists |
+  | Bailout ESC Menu |  | Automate Expert Delivery |  |
+  | Cancel Login Cooldown | Custom Resolutions | Auto Leave Duty | Force PeepingTom |
+  | Close Lobby Errors | Hide Game Objects | Auto Merge |  |
+  | Copy Item Name For All | Ignore Minimum Window Size | Clear Teleportation Lock |  |
+  | Display Actual Queue Position | Low Resolution | Custom Sight Distance |  |
+  | Display MSQ Progress | Special Rendering Modes | Doze & Sit Anywhere |  |
+  | Expanded Player Right-Click Menu Search |  | Infinite Sprint |  |
+  | Hide Unnecessary Popups |  | Instant Logout |  |
+  | Live Anonymous Mode |  | Item Commands |  |
+  | Prevent Game Exiting From Lobby Errors |  | Instance Return |  |
+  |  |  | Refuse Trade Request |  |
+  |  |  | Reveal Undiscovered Areas |  |
+  |  |  | XA Peep |  |
   | Skip Cutscenes |  |  |  |
   | Skip Cutscenes Feeding Chocobo |  |  |  |
   | Skip Dialogue |  |  |  |
@@ -43,13 +47,13 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Export Data** - Export multi-character tables from AutoRetainer, Lifestream, and XA Database into timestamped TSV or CSV snapshots, or overwrite the same fixed file path when `Overwrite fixed file path` is enabled.
 - **Repo List** - Review commonly required custom plugin repositories with installer/settings shortcuts, plugin presence checks, and copy-to-clipboard repo URLs.
 - **IPC Calls Available** - Review the IPC integrations XA Slave can talk to, along with cached/live availability checks for supported plugins and the XA Slave provider channels other plugins can call, including `XASlave.ExecuteCommand` for the shipped `/xa` command surface plus simple direct-call examples such as `XASlave.ExecuteCommand("xamods")` shown directly in the XA Slave provider block.
-- **Commands** - Review the current XA slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, and `Plugin Mods`, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
+- **Commands** - Review the current XA slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, and `Plugin Mods`, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, `/xa equip` coverage behind `Item Commands`, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
 - **Priority Tasks** - Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
-- **XA Mods Native Hooks** - Adds multi-instance launch-lock cleanup, character-select login cooldown clearing, Scenario Tree MSQ progress display, actual queue-position ETA hooks, object-hide controls, inventory item-name copy actions, Special Rendering Modes controls, custom sight-distance sliders, guarded custom window-size controls that clamp the live client back up to the safe `250x200` floor, teleport-lock recovery, and a checkbox-gated hard logout seam built on the native contents-finder request path.
+- **XA Mods Native Hooks** - Adds XA-owned game and player QoL hooks for multi-instance handling, login and queue cleanup, menu and duty recovery, inventory and item actions, Return and logout shortcuts, rendering and camera controls, teleport-lock recovery, and other local client-side utility features.
 
 ## Commands
 
-The in-plugin `References > Commands` page is the full source of truth for descriptions and notes. The same XA command surface can also be driven over IPC through `XASlave.ExecuteCommand` by passing the text you would normally enter after `/xa`. The main shipped `/xa` surface includes:
+The in-plugin `References > Commands` page is the full index for command descriptions and notes. The same XA command surface can also be used over IPC through `XASlave.ExecuteCommand`.
 
 ### General
 
@@ -97,7 +101,7 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 | `/xa hideobjects on/off` | Toggle `Hide Game Objects`. |
 | `/xa lowres <scale>` | Set and enable `Low Resolution`. |
 | `/xa lowres off` | Disable `Low Resolution`. |
-| `/xa minwindow on/off` | Toggle `Ignore Minimum Window Size`; when enabled XA lowers the live minimum to `250x200`, and when disabled XA restores the normal game minimum floor even if `Custom Resolutions` remains enabled. |
+| `/xa minwindow on/off` | Toggle `Ignore Minimum Window Size`; when enabled XA lowers the live minimum to `250x200`, corrects undersized restore or maximize results after the window changes, and when disabled XA restores the normal game minimum floor even if `Custom Resolutions` remains enabled. |
 | `/xa res <width>x<height>` | Apply a custom client resolution at or above the guarded `250x200` floor. |
 | `/xa res add <width>x<height>` | Add a saved custom-resolution button. |
 | `/xa res remove <width>x<height>` | Remove a saved custom-resolution button. |
@@ -108,10 +112,16 @@ The in-plugin `References > Commands` page is the full source of truth for descr
 
 | Command | Purpose |
 | --- | --- |
+| `/xa antiafk on/off` | Toggle `Anti-AFK`. |
+| `/xa equip <itemId>` | Equip an item by ID. |
 | `/xa doze` | Trigger Doze Anywhere while `Doze & Sit Anywhere` is enabled. |
 | `/xa expertdelivery on/off` | Toggle `Automate Expert Delivery`. |
 | `/xa instantlogout on/off` | Toggle `Instant Logout`. |
+| `/xa itemcommands on/off` | Toggle `Item Commands`. |
 | `/xa killgame` | Hard logout, then close the client while chat is visible. |
+| `/xa leaveduty on/off` | Toggle `Auto Leave Duty` (`/xa autoleaveduty` is also accepted). |
+| `/xa automerge on/off` | Toggle `Auto Merge`. |
+| `/xa instancereturn on/off` | Toggle `Instance Return`. |
 | `/xa logout` | Trigger XA's hard logout seam while chat is visible. |
 | `/xa peep [on/off/clear]` | Open XA Peep's small list, toggle its tracker, or clear its stored history. |
 | `/xa playerrestore` | Disable the current Player Mods toggles. |

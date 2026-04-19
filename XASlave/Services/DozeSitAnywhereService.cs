@@ -165,14 +165,7 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
         initialized = true;
 
         if (sigScanner.TryScanText(Sigs.UseEmoteSig, out var useEmoteAddress) && useEmoteAddress != nint.Zero)
-        {
             useEmote = (delegate* unmanaged<nint, ushort, nint, byte, byte, void>)useEmoteAddress;
-            log.Information($"[XASlave] Located Doze & Sit Anywhere emote function at 0x{useEmoteAddress:X}.");
-        }
-        else
-        {
-            log.Warning("[XASlave] Doze & Sit Anywhere emote signature was not found.");
-        }
 
         shouldSnapHook = TryCreateHook(Sigs.ShouldSnapSig, ShouldSnapDetour, "DozeShouldSnap");
         shouldSnapUnsitHook = TryCreateHook(Sigs.ShouldSnapUnsitSig, ShouldSnapUnsitDetour, "SitShouldSnapUnsit");
@@ -217,13 +210,9 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
-            {
-                log.Warning($"[XASlave] {label} signature was not found.");
                 return null;
-            }
 
             var hook = interopProvider.HookFromAddress<ShouldSnapDelegate>(address, detour);
-            log.Information($"[XASlave] Created {label} hook at 0x{address:X}.");
             return hook;
         }
         catch (Exception ex)

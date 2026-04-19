@@ -155,6 +155,7 @@ public partial class SlaveWindow : Window, IDisposable
         WindowName = plugin.Configuration.ShowVersionInUpdatesTitle
             ? $"XA Slave v{PluginVersion}###SlaveWindow"
             : "XA Slave###SlaveWindow";
+        RefreshTitleBarFavIconColors();
     }
 
     private static readonly Vector4 FavIconColorOn  = new(1.00f, 1.00f, 1.00f, 1.0f);

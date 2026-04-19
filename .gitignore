@@ -9,6 +9,9 @@ obj/
 *.suo
 *.cache
 
+# Local-only debug partials
+XASlave/Windows/SlaveWindow.Debug.cs
+
 # Backups (local development history)
 backups/
 

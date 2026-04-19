@@ -27,8 +27,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private const int AutoRetainerMultiModeCacheMilliseconds = 1000;
     private const int WindowStyleIndex = -16;
     private const int WindowExStyleIndex = -20;
-    private const int WindowProcIndex = -4;
-    private const uint WmGetMinMaxInfo = 0x0024;
     private const uint SetWindowPosNoZOrder = 0x0004;
     private const uint SetWindowPosNoActivate = 0x0010;
     private const float MinimumLowResolutionScale = 0.01f;
@@ -49,8 +47,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private Hook<DeviceDx11PostTickDelegate>? deviceDx11PostTickHook;
     private Hook<NamePlateDrawDelegate>? namePlateDrawHook;
     private ToggleFadeDelegate? toggleFadeDelegate;
-    private readonly WindowProcDelegate windowProcDelegate;
-
     private bool initialized;
     private bool cancelLoginCooldownEnabled;
     private bool customResolutionsEnabled;
@@ -80,9 +76,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private int lastAppliedCustomResolutionHeight;
     private byte originalLowResolutionUpscaleType;
     private float lowResolutionScale = 0.25f;
-    private nint subclassedWindowHandle;
-    private nint originalWindowProc;
-
     public SystemWindowModsService(
         ISigScanner sigScanner,
         IGameInteropProvider interopProvider,
@@ -99,8 +92,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         this.gameConfig = gameConfig;
         this.clientState = clientState;
         this.isAutoRetainerMultiModeEnabled = isAutoRetainerMultiModeEnabled;
-        this.windowProcDelegate = WindowProcDetour;
-
         this.framework.Update += OnFrameworkUpdate;
     }
 
@@ -444,7 +435,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
         RestoreLowResolutionConfiguration();
         RefreshWindowSizeLimits();
-        RestoreWindowProcSubclass();
         UpdateAgentLobbyHookState();
         UpdateAtkMessageBoxHookState();
         UpdateAgentMapHookState();
@@ -459,7 +449,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private string GetIgnoreMinimumWindowSizeStatusText()
     {
-        return $"Enabled - minimum size is clamped to {SafeMinimumWindowWidth}x{SafeMinimumWindowHeight}. Resize sync is armed for restore and maximize operations.";
+        return $"Enabled - minimum size is clamped to {SafeMinimumWindowWidth}x{SafeMinimumWindowHeight} and XA will correct undersized restore or maximize results after the window changes.";
     }
 
     private string GetIgnoreMinimumWindowSizeDisabledStatusText()
@@ -510,14 +500,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         try
         {
             if (sigScanner.TryScanText(Sigs.ToggleFadeSig, out var toggleFadeAddress) && toggleFadeAddress != nint.Zero)
-            {
                 toggleFadeDelegate = Marshal.GetDelegateForFunctionPointer<ToggleFadeDelegate>(toggleFadeAddress);
-                log.Information($"[XASlave] Resolved SpecialRenderMode toggle delegate at 0x{toggleFadeAddress:X}.");
-            }
-            else
-            {
-                log.Warning("[XASlave] SpecialRenderMode toggle delegate signature was not found.");
-            }
         }
         catch (Exception ex)
         {
@@ -532,13 +515,9 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
-            {
-                log.Warning($"[XASlave] {label} signature was not found.");
                 return null;
-            }
 
             var hook = interopProvider.HookFromAddress<T>(address, detour);
-            log.Information($"[XASlave] Created {label} hook at 0x{address:X}.");
             return hook;
         }
         catch (Exception ex)
@@ -626,8 +605,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private void OnFrameworkUpdate(IFramework _)
     {
-        EnsureWindowProcSubclass();
-
         if (ShouldSynchronizeWindowSize())
             UpdateWindowSizeSynchronization();
 
@@ -810,7 +787,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (customResolutionsEnabled)
             CustomResolutionsStatusText = GetCustomResolutionsStatusText();
 
-        log.Information($"[XASlave] Re-synchronized game resolution to {clientWidth}x{clientHeight} after a window-size change.");
     }
 
     private bool TryClampClientSizeToSafeMinimum(GameWindow* gameWindow, int clientWidth, int clientHeight)
@@ -964,112 +940,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             : DefaultGameMinimumWindowHeight;
     }
 
-    private void EnsureWindowProcSubclass()
-    {
-        var gameWindow = GameWindow.Instance();
-        if (gameWindow == null || gameWindow->WindowHandle == nint.Zero)
-            return;
-
-        var windowHandle = gameWindow->WindowHandle;
-        if (subclassedWindowHandle == windowHandle && originalWindowProc != nint.Zero)
-            return;
-
-        RestoreWindowProcSubclass();
-
-        var newWindowProc = Marshal.GetFunctionPointerForDelegate(windowProcDelegate);
-        var previousWindowProc = SetWindowLongPtr(windowHandle, WindowProcIndex, newWindowProc);
-        if (previousWindowProc == nint.Zero && Marshal.GetLastWin32Error() != 0)
-        {
-            log.Warning($"[XASlave] Failed to subclass the game window for minimum-size enforcement. Win32 error: {Marshal.GetLastWin32Error()}.");
-            return;
-        }
-
-        subclassedWindowHandle = windowHandle;
-        originalWindowProc = previousWindowProc;
-    }
-
-    private void RestoreWindowProcSubclass()
-    {
-        if (subclassedWindowHandle == nint.Zero || originalWindowProc == nint.Zero)
-            return;
-
-        SetWindowLongPtr(subclassedWindowHandle, WindowProcIndex, originalWindowProc);
-        subclassedWindowHandle = nint.Zero;
-        originalWindowProc = nint.Zero;
-    }
-
-    private nint WindowProcDetour(nint windowHandle, uint message, nint wParam, nint lParam)
-    {
-        var result = originalWindowProc != nint.Zero
-            ? CallWindowProc(originalWindowProc, windowHandle, message, wParam, lParam)
-            : nint.Zero;
-
-        if (message == WmGetMinMaxInfo && lParam != nint.Zero && TryGetActiveMinimumClientSize(out var minimumClientWidth, out var minimumClientHeight))
-            ApplyMinimumTrackSize(windowHandle, lParam, minimumClientWidth, minimumClientHeight);
-
-        return result;
-    }
-
-    private bool TryGetActiveMinimumClientSize(out int minimumClientWidth, out int minimumClientHeight)
-    {
-        if (ShouldUseLoweredMinimumWindowSize())
-        {
-            minimumClientWidth = SafeMinimumWindowWidth;
-            minimumClientHeight = SafeMinimumWindowHeight;
-            return true;
-        }
-
-        var restoredMinimumWidth = GetRestoredMinimumWindowWidth();
-        var restoredMinimumHeight = GetRestoredMinimumWindowHeight();
-        if (restoredMinimumWidth > 0 && restoredMinimumHeight > 0)
-        {
-            minimumClientWidth = restoredMinimumWidth;
-            minimumClientHeight = restoredMinimumHeight;
-            return true;
-        }
-
-        minimumClientWidth = 0;
-        minimumClientHeight = 0;
-        return false;
-    }
-
-    private void ApplyMinimumTrackSize(nint windowHandle, nint minMaxInfoPtr, int minimumClientWidth, int minimumClientHeight)
-    {
-        if (!TryConvertClientSizeToWindowSize(windowHandle, minimumClientWidth, minimumClientHeight, out var minimumWindowWidth, out var minimumWindowHeight))
-            return;
-
-        var minMaxInfo = Marshal.PtrToStructure<MinMaxInfo>(minMaxInfoPtr);
-        minMaxInfo.PtMinTrackSize.X = Math.Max(minMaxInfo.PtMinTrackSize.X, minimumWindowWidth);
-        minMaxInfo.PtMinTrackSize.Y = Math.Max(minMaxInfo.PtMinTrackSize.Y, minimumWindowHeight);
-        Marshal.StructureToPtr(minMaxInfo, minMaxInfoPtr, false);
-    }
-
-    private static bool TryConvertClientSizeToWindowSize(nint windowHandle, int clientWidth, int clientHeight, out int windowWidth, out int windowHeight)
-    {
-        windowWidth = 0;
-        windowHeight = 0;
-
-        if (windowHandle == nint.Zero || clientWidth <= 0 || clientHeight <= 0)
-            return false;
-
-        var style = GetWindowLongPtr(windowHandle, WindowStyleIndex);
-        var exStyle = GetWindowLongPtr(windowHandle, WindowExStyleIndex);
-        var desiredRect = new WindowRect
-        {
-            Left = 0,
-            Top = 0,
-            Right = clientWidth,
-            Bottom = clientHeight,
-        };
-
-        if (!AdjustWindowRectEx(ref desiredRect, style.ToInt32(), false, exStyle.ToInt32()))
-            return false;
-
-        windowWidth = desiredRect.Right - desiredRect.Left;
-        windowHeight = desiredRect.Bottom - desiredRect.Top;
-        return windowWidth > 0 && windowHeight > 0;
-    }
-
     private bool TryClampClientSizeToMinimum(GameWindow* gameWindow, int clientWidth, int clientHeight, int minimumWidth, int minimumHeight, string actionDescription)
     {
         if (gameWindow == null || gameWindow->WindowHandle == nint.Zero || minimumWidth <= 0 || minimumHeight <= 0)
@@ -1198,12 +1068,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     [DllImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
     private static extern nint GetWindowLongPtr(nint windowHandle, int index);
 
-    [DllImport("user32.dll", EntryPoint = "SetWindowLongPtrW", SetLastError = true)]
-    private static extern nint SetWindowLongPtr(nint windowHandle, int index, nint newProc);
-
-    [DllImport("user32.dll", EntryPoint = "CallWindowProcW")]
-    private static extern nint CallWindowProc(nint previousProc, nint windowHandle, uint message, nint wParam, nint lParam);
-
     [DllImport("user32.dll")]
     private static extern bool AdjustWindowRectEx(ref WindowRect rect, int style, bool hasMenu, int exStyle);
 
@@ -1315,23 +1179,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     }
 
     [StructLayout(LayoutKind.Sequential)]
-    private struct MinMaxInfo
-    {
-        public Point PtReserved;
-        public Point PtMaxSize;
-        public Point PtMaxPosition;
-        public Point PtMinTrackSize;
-        public Point PtMaxTrackSize;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct Point
-    {
-        public int X;
-        public int Y;
-    }
-
-    [StructLayout(LayoutKind.Sequential)]
     private struct ProcessHandleTableEntryInfo
     {
         public ulong HandleValue;
@@ -1368,6 +1215,4 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private delegate void NamePlateDrawDelegate(AtkUnitBase* addon);
 
     private delegate void ToggleFadeDelegate(EnvironmentManager* manager, int a2, float fadeDuration, Vector4* fadeColor);
-
-    private delegate nint WindowProcDelegate(nint windowHandle, uint message, nint wParam, nint lParam);
 }

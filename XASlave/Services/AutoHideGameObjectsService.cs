@@ -163,13 +163,9 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(Sigs.UpdateObjectArraysSig, out var address) || address == nint.Zero)
-            {
-                log.Warning("[XASlave] Auto Hide Game Objects signature was not found.");
                 return;
-            }
 
             updateObjectArraysHook = interopProvider.HookFromAddress<UpdateObjectArraysDelegate>(address, UpdateObjectArraysDetour);
-            log.Information($"[XASlave] Created AutoHideGameObjects hook at 0x{address:X}.");
         }
         catch (Exception ex)
         {
