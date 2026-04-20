@@ -288,6 +288,7 @@ public class Configuration : IPluginConfiguration
     public bool AutoSkipCutscenesFeedingChocoboEnabled { get; set; } = false;
     public bool AutoIgnoreMinimumWindowSizeEnabled { get; set; } = false;
     public bool AutoHideUnnecessaryPopupsEnabled { get; set; } = false;
+    public bool AutoHideUnnecessaryPopupsHideHowToNoticeEnabled { get; set; } = false;
     public bool AutoPreventGameExitingFromLobbyErrorsEnabled { get; set; } = false;
     public bool AutoCloseLobbyErrorsEnabled { get; set; } = false;
     public bool DisplayActualQueuePositionEnabled { get; set; } = false;

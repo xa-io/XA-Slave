@@ -9,7 +9,7 @@ namespace XASlave.Services;
 
 public unsafe sealed class PopupCleanerService : IDisposable
 {
-    private static readonly HashSet<string> AddonNames =
+    private static readonly string[] BaseAddonNames =
     [
         "_NotificationCircleBook",
         "AchievementInfo",
@@ -17,7 +17,13 @@ public unsafe sealed class PopupCleanerService : IDisposable
         "PlayGuide",
         "HowTo",
         "WebLauncher",
-        "LicenseViewer"
+        "LicenseViewer",
+    ];
+
+    private static readonly string[] AddonNamesWithHowToNotice =
+    [
+        ..BaseAddonNames,
+        "HowToNotice",
     ];
 
     private readonly IAddonLifecycle addonLifecycle;
@@ -25,6 +31,7 @@ public unsafe sealed class PopupCleanerService : IDisposable
 
     private bool enabled;
     private bool registered;
+    private bool hideHowToNotice;
 
     public PopupCleanerService(IAddonLifecycle addonLifecycle, IPluginLog log)
     {
@@ -33,25 +40,47 @@ public unsafe sealed class PopupCleanerService : IDisposable
     }
 
     public bool IsEnabled => enabled;
+    public bool HideHowToNotice => hideHowToNotice;
 
     public string StatusText { get; private set; } = "Disabled";
+
+    public void ApplyConfiguration(bool hideHowToNotice)
+    {
+        if (this.hideHowToNotice == hideHowToNotice)
+        {
+            UpdateStatusText();
+            return;
+        }
+
+        this.hideHowToNotice = hideHowToNotice;
+        if (registered)
+        {
+            Unregister();
+            Register();
+        }
+
+        UpdateStatusText();
+    }
 
     public bool SetEnabled(bool value)
     {
         if (value == enabled)
+        {
+            UpdateStatusText();
             return enabled;
+        }
 
         if (!value)
         {
             enabled = false;
             Unregister();
-            StatusText = "Disabled";
+            UpdateStatusText();
             return false;
         }
 
         Register();
         enabled = true;
-        StatusText = "Enabled - common popups are auto-closed.";
+        UpdateStatusText();
         return true;
     }
 
@@ -66,7 +95,7 @@ public unsafe sealed class PopupCleanerService : IDisposable
         if (registered)
             return;
 
-        addonLifecycle.RegisterListener(AddonEvent.PreDraw, AddonNames, OnAddon);
+        addonLifecycle.RegisterListener(AddonEvent.PreDraw, hideHowToNotice ? AddonNamesWithHowToNotice : BaseAddonNames, OnAddon);
         registered = true;
     }
 
@@ -98,5 +127,18 @@ public unsafe sealed class PopupCleanerService : IDisposable
         {
             log.Warning(ex, "[XASlave] Popup cleaner failed while closing an addon.");
         }
+    }
+
+    private void UpdateStatusText()
+    {
+        if (!enabled)
+        {
+            StatusText = "Disabled";
+            return;
+        }
+
+        StatusText = hideHowToNotice
+            ? "Enabled - common popups plus HowToNotice are auto-closed."
+            : "Enabled - common popups are auto-closed.";
     }
 }

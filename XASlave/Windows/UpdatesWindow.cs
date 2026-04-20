@@ -23,6 +23,15 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.25 - 2026-04-20",
+            Lines =
+            [
+                "XA Mods",
+                "- `Hide Unnecessary Popups` now has an opt-in `Also hide HowToNotice` subsetting",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.24 - 2026-04-19",
             Lines =
             [

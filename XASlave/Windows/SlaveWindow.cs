@@ -1670,6 +1670,7 @@ public partial class SlaveWindow : Window, IDisposable
         ImGui.Separator();
         ImGui.PushTextWrapPos(0f);
         ImGui.Text("XA Slave is still in a very early phase. Expect ongoing changes, new automation surfaces, and many months of additional features.");
+
         ImGui.Spacing();
         DrawWrappedDisabledText("General Terms");
         DrawWrappedBulletText("Treat every automation workflow as supervised until you trust the exact task and configuration you are running.");

@@ -357,6 +357,7 @@ public sealed class Plugin : IDalamudPlugin
         });
         QueueDeferredStartupAction(() =>
         {
+            ApplyStoredXAModConfiguration("auto-hide-unnecessary-popups");
             if (Configuration.AutoHideUnnecessaryPopupsEnabled && !PopupCleaner.SetEnabled(true))
             {
                 Configuration.AutoHideUnnecessaryPopupsEnabled = false;
@@ -1645,6 +1646,12 @@ public sealed class Plugin : IDalamudPlugin
                     TimeoutSeconds = Configuration.BailoutEscMenuSeconds,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "auto-hide-unnecessary-popups":
+                snapshot = JsonSerializer.SerializeToElement(new XAModPopupCleanerSettings
+                {
+                    HideHowToNotice = Configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "auto-leave-duty":
                 snapshot = JsonSerializer.SerializeToElement(new XAModAutoLeaveDutySettings
                 {
@@ -1751,6 +1758,13 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
                     Configuration.AutoHideGameObjectsUseOccultCrescentRules);
             }
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "auto-hide-unnecessary-popups", out XAModPopupCleanerSettings? popupCleanerSettings)
+            && popupCleanerSettings != null)
+        {
+            Configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled = popupCleanerSettings.HideHowToNotice;
+            PopupCleaner.ApplyConfiguration(Configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "custom-resolutions", out XAModCustomResolutionsSettings? customResolutionSettings)
@@ -2320,6 +2334,9 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoHideGameObjectsDisableInDuties,
                     Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
                     Configuration.AutoHideGameObjectsUseOccultCrescentRules);
+                break;
+            case "auto-hide-unnecessary-popups":
+                PopupCleaner.ApplyConfiguration(Configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled);
                 break;
             case "low-resolution":
                 SystemWindowMods.ApplyLowResolutionConfiguration(Configuration.LowResolutionScale);
@@ -2931,5 +2948,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.24";
+    public const string Version = "0.0.0.25";
 }

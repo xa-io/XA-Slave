@@ -235,6 +235,11 @@ public partial class SlaveWindow
             plugin.PlayerMods.ApplyInfiniteSprintConfiguration(configuration.InfiniteSprintDelaySeconds);
         }
 
+        void ApplyPopupCleanerConfiguration()
+        {
+            plugin.PopupCleaner.ApplyConfiguration(configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled);
+        }
+
         void DrawFeatureToggle(
             string label,
             bool currentValue,
@@ -727,6 +732,21 @@ public partial class SlaveWindow
 
             ImGui.TextDisabled("Friends, party members, alliance members, icon-marked objects, and your own actor stay visible.");
             ImGui.TextDisabled("Occult Crescent rules keep your current target and dead players visible, then start hiding additional players after the visible count grows.");
+        }
+
+        void DrawHideUnnecessaryPopupsOptions()
+        {
+            var hideHowToNotice = configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled;
+            if (ImGui.Checkbox("Also hide HowToNotice##HideUnnecessaryPopups", ref hideHowToNotice))
+            {
+                configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled = hideHowToNotice;
+                ApplyPopupCleanerConfiguration();
+                SaveConfiguration();
+            }
+
+            ImGui.TextDisabled(hideHowToNotice
+                ? "HowToNotice tutorial prompts are included in the popup cleaner list."
+                : "HowToNotice stays visible unless this extra checkbox is turned on.");
         }
 
         void DrawPlayerSearchOptions()
@@ -1471,8 +1491,10 @@ public partial class SlaveWindow
             plugin.PopupCleaner.SetEnabled,
             applied => configuration.AutoHideUnnecessaryPopupsEnabled = applied,
             "Closes tutorial and recommendation popups as they appear.",
-            "Closes a fixed set of tutorial and recommendation surfaces as they are drawn, including Play Guide, How To, recommendation, launcher, and achievement-style popups.",
-            plugin.PopupCleaner.StatusText);
+            "Closes a fixed set of tutorial and recommendation surfaces as they are drawn, including Play Guide, How To, recommendation, launcher, and achievement-style popups. Use the subsetting below if you also want XA to hide `HowToNotice`.",
+            plugin.PopupCleaner.StatusText,
+            searchTerms: ["HowToNotice", "HowTo", "PlayGuide", "RecommendList", "AchievementInfo"],
+            drawOptions: DrawHideUnnecessaryPopupsOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-prevent-game-exiting-from-lobby-errors",

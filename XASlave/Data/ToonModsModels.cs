@@ -72,6 +72,12 @@ public sealed class XAModLowResolutionSettings
 }
 
 [Serializable]
+public sealed class XAModPopupCleanerSettings
+{
+    public bool HideHowToNotice { get; set; }
+}
+
+[Serializable]
 public sealed class XAModSpecialRenderModesSettings
 {
     public float BackgroundColorR { get; set; }
