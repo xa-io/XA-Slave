@@ -1726,14 +1726,14 @@ public partial class SlaveWindow
         AddSavedFeatureEntry(
             ToonModsSection.IllegalMods,
             "quick-return",
-            "Instance Return",
+            "Instant Return",
             () => configuration.QuickReturnEnabled,
             plugin.QuickReturn.SetEnabled,
             applied => configuration.QuickReturnEnabled = applied,
             "Skips Return cast/cooldown, leaves the in-game confirmation prompt manual, and stays off in PvP.",
             "Hooks the native Return action so XA can fire the fast return command directly and leave or disband party first when the current party state would otherwise block that path. The in-game confirmation prompt is left for the user.",
             plugin.QuickReturn.StatusText,
-            searchTerms: ["Return", "instance return", "cast", "cooldown", "instant", "PvP", "party", "disband", "leave party", "manual confirm"],
+            searchTerms: ["Return", "instant return", "instance return", "cast", "cooldown", "instant", "PvP", "party", "disband", "leave party", "manual confirm"],
             requireCtrlShiftToEnable: true);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,

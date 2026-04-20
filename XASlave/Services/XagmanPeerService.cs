@@ -48,6 +48,8 @@ public sealed class XagmanPeerService : IDisposable
     private bool isPingSchedulerRunning;
     private DateTime lastPingSent = DateTime.MinValue;
     private const int PingIntervalMs = 100; // 100ms between pings to prevent overlap while staying fast
+    private int registerSendRequested;
+    private int registerSendRunning;
 
     private TcpListener? hubListener;
     private Task? hubAcceptTask;
@@ -138,10 +140,84 @@ public sealed class XagmanPeerService : IDisposable
 
         started = true;
         TryStartHubListener();
-        outboundClientTask ??= Task.Run(() => RunOutboundClientLoopAsync(cancellationTokenSource.Token));
+        if (outboundClientTask == null || outboundClientTask.IsCompleted)
+            outboundClientTask = Task.Run(() => RunOutboundClientLoopAsync(cancellationTokenSource.Token));
         SetStatus(isHub
             ? $"Starting Xagman hub on {HubEndpoint}..."
             : $"Connecting to Xagman hub {HubEndpoint}...");
+    }
+
+    public void Stop()
+    {
+        if (isDisposed)
+            return;
+
+        started = false;
+
+        StreamWriter? writerToDispose;
+        TcpClient? clientToDispose;
+        lock (syncRoot)
+        {
+            localPresence = null;
+            writerToDispose = outboundWriter;
+            clientToDispose = outboundClient;
+            outboundWriter = null;
+            outboundClient = null;
+        }
+
+        try
+        {
+            writerToDispose?.Dispose();
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            clientToDispose?.Dispose();
+        }
+        catch
+        {
+        }
+
+        try
+        {
+            hubListener?.Stop();
+        }
+        catch
+        {
+        }
+
+        hubListener = null;
+        isHub = false;
+
+        lock (hubLock)
+        {
+            foreach (var session in hubSessions.Values.ToList())
+            {
+                try
+                {
+                    session.Client.Dispose();
+                }
+                catch
+                {
+                }
+            }
+
+            hubSessions.Clear();
+        }
+
+        lock (pingScheduleLock)
+        {
+            pingQueue.Clear();
+            isPingSchedulerRunning = false;
+        }
+
+        Interlocked.Exchange(ref registerSendRequested, 0);
+
+        UpdatePeers(Array.Empty<XagmanPeerPresence>());
+        SetStatus($"Disconnected from Xagman hub {HubEndpoint}.");
     }
 
     public void PublishPresence(XagmanPeerPresence record)
@@ -152,7 +228,7 @@ public sealed class XagmanPeerService : IDisposable
         if (!started)
             return;
 
-        _ = SendRegisterAsync();
+        QueueRegisterSend();
     }
 
     public void RepublishPresence()
@@ -160,7 +236,52 @@ public sealed class XagmanPeerService : IDisposable
         if (!started)
             return;
 
-        _ = SendRegisterAsync();
+        QueueRegisterSend();
+    }
+
+    private void QueueRegisterSend()
+    {
+        if (!started || isDisposed)
+            return;
+
+        Interlocked.Exchange(ref registerSendRequested, 1);
+        if (Interlocked.CompareExchange(ref registerSendRunning, 1, 0) != 0)
+            return;
+
+        _ = Task.Run(ProcessRegisterQueueAsync);
+    }
+
+    private async Task ProcessRegisterQueueAsync()
+    {
+        try
+        {
+            while (!isDisposed && started)
+            {
+                if (Interlocked.Exchange(ref registerSendRequested, 0) == 0)
+                    break;
+
+                await SendRegisterAsync().ConfigureAwait(false);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Xagman background register sender failed.");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref registerSendRunning, 0);
+
+            if (!isDisposed
+                && started
+                && Interlocked.CompareExchange(ref registerSendRequested, 0, 0) != 0
+                && Interlocked.CompareExchange(ref registerSendRunning, 1, 0) == 0)
+            {
+                _ = Task.Run(ProcessRegisterQueueAsync);
+            }
+        }
     }
 
     public async Task<bool> WaitForConnectionAsync(TimeSpan timeout, CancellationToken cancellationToken = default)
@@ -191,33 +312,12 @@ public sealed class XagmanPeerService : IDisposable
 
     public void Dispose()
     {
+        if (isDisposed)
+            return;
+
+        Stop();
         isDisposed = true;
-        started = false;
         cancellationTokenSource.Cancel();
-
-        try
-        {
-            hubListener?.Stop();
-        }
-        catch
-        {
-        }
-
-        lock (hubLock)
-        {
-            foreach (var session in hubSessions.Values.ToList())
-            {
-                try
-                {
-                    session.Client.Dispose();
-                }
-                catch
-                {
-                }
-            }
-
-            hubSessions.Clear();
-        }
 
         try
         {
@@ -281,7 +381,7 @@ public sealed class XagmanPeerService : IDisposable
         if (hubListener == null)
             return;
 
-        while (!cancellationToken.IsCancellationRequested)
+        while (!cancellationToken.IsCancellationRequested && started)
         {
             try
             {
@@ -293,6 +393,14 @@ public sealed class XagmanPeerService : IDisposable
                 break;
             }
             catch (ObjectDisposedException)
+            {
+                break;
+            }
+            catch (SocketException ex) when (!started
+                                             || isDisposed
+                                             || ex.SocketErrorCode == SocketError.OperationAborted
+                                             || ex.SocketErrorCode == SocketError.Interrupted
+                                             || ex.ErrorCode == 995)
             {
                 break;
             }
@@ -314,7 +422,7 @@ public sealed class XagmanPeerService : IDisposable
 
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
+            while (!cancellationToken.IsCancellationRequested && started)
             {
                 var line = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
                 if (string.IsNullOrWhiteSpace(line))
@@ -423,6 +531,9 @@ public sealed class XagmanPeerService : IDisposable
 
     private async Task BroadcastPeerListsAsync(CancellationToken cancellationToken)
     {
+        if (!started || isDisposed)
+            return;
+
         List<(HubClientSession Session, XagmanPeerPresence Presence)> recipients;
         lock (hubLock)
         {
@@ -529,7 +640,7 @@ public sealed class XagmanPeerService : IDisposable
 
     private async Task RunOutboundClientLoopAsync(CancellationToken cancellationToken)
     {
-        while (!cancellationToken.IsCancellationRequested)
+        while (!cancellationToken.IsCancellationRequested && started)
         {
             TcpClient? tcpClient = null;
             StreamWriter? writer = null;
@@ -609,6 +720,9 @@ public sealed class XagmanPeerService : IDisposable
 
                 UpdatePeers(Array.Empty<XagmanPeerPresence>());
             }
+
+            if (!started)
+                break;
 
             try
             {

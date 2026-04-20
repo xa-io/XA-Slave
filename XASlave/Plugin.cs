@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
+using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Command;
@@ -75,6 +76,11 @@ public sealed class Plugin : IDalamudPlugin
         string StatusText,
         bool IsReady);
 
+    private readonly record struct DeferredStartupAction(
+        Action Action,
+        string? Name,
+        int LineNumber);
+
     public readonly record struct TitleBarFavXAModInfo(
         string Key,
         string DisplayName,
@@ -136,6 +142,10 @@ public sealed class Plugin : IDalamudPlugin
     private UIModule.UiFlags appliedSpecialRenderUiFlags;
     private bool hasAppliedSpecialRenderUiFlags;
     private bool isDisposed;
+    private readonly Queue<DeferredStartupAction> deferredStartupActions = new();
+    private bool deferredStartupQueueScheduled;
+    private const double DeferredStartupActionDebugThresholdMilliseconds = 5.0;
+    private const double DeferredStartupActionWarningThresholdMilliseconds = 25.0;
 
     public Plugin()
     {
@@ -231,7 +241,7 @@ public sealed class Plugin : IDalamudPlugin
         ExternalTaskLoader = new ExternalTaskLoader(this, PluginInterface, Log);
         WindowRenamer = new WindowRenamerService(Log);
         AutoSkipCutscenes = new AutoSkipCutsceneService(Condition, Framework, SigScanner, GameInterop, Log);
-        BuddyFeedCutsceneSkip = new BuddyFeedCutsceneSkipService(SigScanner, GameInterop, Log);
+        BuddyFeedCutsceneSkip = new BuddyFeedCutsceneSkipService(SigScanner, GameInterop, ClientState, Log);
         PopupCleaner = new PopupCleanerService(AddonLifecycle, Log);
         SystemWindowMods = new SystemWindowModsService(SigScanner, GameInterop, Log, Framework, GameConfig, ClientState, () => IpcClient.AutoRetainerGetMultiModeEnabled());
         LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Log);
@@ -263,54 +273,18 @@ public sealed class Plugin : IDalamudPlugin
         if (Configuration.XagmanPeerConnectionsEnabled)
             XagmanPeers.Start();
 
-        SystemWindowMods.SetDisableBackgroundRenderingOnlyWhenMinimized(Configuration.DisableBackgroundGameRenderingOnlyWhenMinimized);
-        SystemWindowMods.SetDisableBackgroundRenderingDisableWhenArMultiIsOn(Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn);
-        AutoHideGameObjects.ApplyConfiguration(
-            Configuration.AutoHideGameObjectsHidePlayer,
-            Configuration.AutoHideGameObjectsHideUnimportantEnpc,
-            Configuration.AutoHideGameObjectsHidePet,
-            Configuration.AutoHideGameObjectsHideChocobo,
-            Configuration.AutoHideGameObjectsDisableInDuties,
-            Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
-            Configuration.AutoHideGameObjectsUseOccultCrescentRules);
-        SightDistance.ApplyConfiguration(
-            Configuration.CustomSightDistanceMaxDistance,
-            Configuration.CustomSightDistanceMinDistance,
-            Configuration.CustomSightDistanceMaxRotation,
-            Configuration.CustomSightDistanceMinRotation,
-            Configuration.CustomSightDistanceMaxFoV,
-            Configuration.CustomSightDistanceMinFoV,
-            Configuration.CustomSightDistanceFoV,
-            Configuration.CustomSightDistanceIgnoreCollision);
-        PlayerSearchContextMenu.ApplyConfiguration(
-            Configuration.ExpandedPlayerRightClickMenuSearchFflogsEnabled,
-            Configuration.ExpandedPlayerRightClickMenuSearchLodestoneEnabled,
-            Configuration.ExpandedPlayerRightClickMenuSearchLalachievementsEnabled,
-            Configuration.ExpandedPlayerRightClickMenuSearchOpenAllEnabled);
-        AutoUnlockExpertDelivery.ApplyConfiguration(
-            Configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen,
-            Configuration.AutoUnlockExpertDeliveryDefaultPage,
-            Configuration.AutoUnlockExpertDeliverySkipHq,
-            Configuration.AutoUnlockExpertDeliverySkipMateria,
-            Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
         var normalizedAutoLeaveDutyDelay = AutoLeaveDutyService.ClampDelaySeconds(Configuration.AutoLeaveDutyDelaySeconds);
         if (Configuration.AutoLeaveDutyDelaySeconds != normalizedAutoLeaveDutyDelay)
         {
             Configuration.AutoLeaveDutyDelaySeconds = normalizedAutoLeaveDutyDelay;
             Configuration.Save();
         }
-        AutoLeaveDuty.ApplyConfiguration(Configuration.AutoLeaveDutyDelaySeconds);
-        AutoRefuseTrade.ApplyConfiguration(
-            Configuration.AutoRefuseTradeShowNotification,
-            Configuration.AutoRefuseTradeSendEcho,
-            Configuration.AutoRefuseTradeExtraCommands);
         var normalizedBailoutEscMenuSeconds = EscMenuBailoutService.NormalizeTimeoutSeconds(Configuration.BailoutEscMenuSeconds);
         if (Configuration.BailoutEscMenuSeconds != normalizedBailoutEscMenuSeconds)
         {
             Configuration.BailoutEscMenuSeconds = normalizedBailoutEscMenuSeconds;
             Configuration.Save();
         }
-        EscMenuBailout.ApplyConfiguration(Configuration.BailoutEscMenuSeconds);
         var normalizedInfiniteSprintDelay = PlayerModsService.ClampInfiniteSprintDelaySeconds(Configuration.InfiniteSprintDelaySeconds);
         if (Math.Abs(Configuration.InfiniteSprintDelaySeconds - normalizedInfiniteSprintDelay) > 0.001f)
         {
@@ -323,255 +297,361 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.LowResolutionScale = normalizedLowResolutionScale;
             Configuration.Save();
         }
-        PlayerMods.ApplyInfiniteSprintConfiguration(Configuration.InfiniteSprintDelaySeconds);
-        SystemWindowMods.ApplyLowResolutionConfiguration(Configuration.LowResolutionScale);
-
-        if (Configuration.AutoAllowMultipleGameInstancesEnabled && !SystemWindowMods.SetAllowMultipleGameInstancesEnabled(true))
-        {
-            Configuration.AutoAllowMultipleGameInstancesEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoCancelLoginCooldownEnabled && !SystemWindowMods.SetCancelLoginCooldownEnabled(true))
-        {
-            Configuration.AutoCancelLoginCooldownEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoDisplayMsqProgressEnabled && !MsqProgressDisplay.SetEnabled(true))
-        {
-            Configuration.AutoDisplayMsqProgressEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.CopyItemNameForAllEnabled && !CopyItemNameContextMenu.SetEnabled(true))
-        {
-            Configuration.CopyItemNameForAllEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoSkipCutscenesEnabled && !AutoSkipCutscenes.SetEnabled(true))
-        {
-            Configuration.AutoSkipCutscenesEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoSkipCutscenesFeedingChocoboEnabled && !BuddyFeedCutsceneSkip.SetEnabled(true))
-        {
-            Configuration.AutoSkipCutscenesFeedingChocoboEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoIgnoreMinimumWindowSizeEnabled && !SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled(true))
-        {
-            Configuration.AutoIgnoreMinimumWindowSizeEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoHideUnnecessaryPopupsEnabled && !PopupCleaner.SetEnabled(true))
-        {
-            Configuration.AutoHideUnnecessaryPopupsEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled && !SystemWindowMods.SetPreventLobbyExitEnabled(true))
-        {
-            Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoCloseLobbyErrorsEnabled && !LobbyErrorAutoClose.SetEnabled(true))
-        {
-            Configuration.AutoCloseLobbyErrorsEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.DisplayActualQueuePositionEnabled && !QueuePositionDisplay.SetEnabled(true))
-        {
-            Configuration.DisplayActualQueuePositionEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoHideGameObjectsEnabled && !AutoHideGameObjects.SetEnabled(true))
-        {
-            Configuration.AutoHideGameObjectsEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoSkipDialogueEnabled && !DialogueSkip.SetEnabled(true))
-        {
-            Configuration.AutoSkipDialogueEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.CustomResolutionsEnabled && !SystemWindowMods.SetCustomResolutionsEnabled(true))
-        {
-            Configuration.CustomResolutionsEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.DisableBackgroundGameRenderingEnabled && !SystemWindowMods.SetDisableBackgroundRenderingEnabled(true))
-        {
-            Configuration.DisableBackgroundGameRenderingEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.LowResolutionEnabled && !SystemWindowMods.SetLowResolutionEnabled(true))
-        {
-            Configuration.LowResolutionEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.CustomSightDistanceEnabled && !SightDistance.SetEnabled(true))
-        {
-            Configuration.CustomSightDistanceEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.ExpandedPlayerRightClickMenuSearchEnabled && !PlayerSearchContextMenu.SetEnabled(true))
-        {
-            Configuration.ExpandedPlayerRightClickMenuSearchEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.LiveAnonymousModeEnabled && !NameplatePrivacy.SetAnonymousModeEnabled(true))
-        {
-            Configuration.LiveAnonymousModeEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoUnlockExpertDeliveryEnabled && !AutoUnlockExpertDelivery.SetEnabled(true))
-        {
-            Configuration.AutoUnlockExpertDeliveryEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AntiAfkEnabled && !AntiAfk.SetEnabled(true))
-        {
-            Configuration.AntiAfkEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoLeaveDutyEnabled && !AutoLeaveDuty.SetEnabled(true))
-        {
-            Configuration.AutoLeaveDutyEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoMergeEnabled && !AutoMerge.SetEnabled(true))
-        {
-            Configuration.AutoMergeEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.QuickReturnEnabled && !QuickReturn.SetEnabled(true))
-        {
-            Configuration.QuickReturnEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.UnlockExpertDeliveryEnabled && !ExpertDeliveryUnlock.SetEnabled(true))
-        {
-            Configuration.UnlockExpertDeliveryEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoRefuseTradeRequestEnabled && !AutoRefuseTrade.SetEnabled(true))
-        {
-            Configuration.AutoRefuseTradeRequestEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoRevealUndiscoveredAreasEnabled && !SystemWindowMods.SetRevealUndiscoveredAreasEnabled(true))
-        {
-            Configuration.AutoRevealUndiscoveredAreasEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.AutoClearTeleportationLockEnabled && !TeleportLockClear.SetEnabled(true))
-        {
-            Configuration.AutoClearTeleportationLockEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.BailoutEscMenuEnabled && !EscMenuBailout.SetEnabled(true))
-        {
-            Configuration.BailoutEscMenuEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.SpecialRenderModesEnabled)
-            ApplySpecialRenderModesConfiguration();
-
         DozeSitAnywhere.ApplyConfiguration(
             Configuration.DozeSitAnywhereAllowDoze,
             Configuration.DozeSitAnywhereAllowSit);
-
-        if (Configuration.DozeSitAnywhereEnabled && !DozeSitAnywhere.SetEnabled(true))
+        QueueDeferredStartupAction(() =>
         {
-            Configuration.DozeSitAnywhereEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.InfiniteSprintEnabled && !PlayerMods.SetInfiniteSprintEnabled(true))
-        {
-            Configuration.InfiniteSprintEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.InstantLogoutEnabled && !InstantLogout.SetEnabled(true))
-        {
-            Configuration.InstantLogoutEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.ItemCommandsEnabled && !ItemCommands.SetEnabled(true))
-        {
-            Configuration.ItemCommandsEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.XAPeepEnabled)
-        {
-            Framework.RunOnTick(() =>
+            if (Configuration.AutoAllowMultipleGameInstancesEnabled && !SystemWindowMods.SetAllowMultipleGameInstancesEnabled(true))
             {
-                if (!Configuration.XAPeepEnabled)
-                    return;
-
-                if (XAPeep.SetEnabled(true))
-                    return;
-
-                Configuration.XAPeepEnabled = false;
+                Configuration.AutoAllowMultipleGameInstancesEnabled = false;
                 Configuration.Save();
-            });
-        }
-
-        if (Configuration.TitleBarFavKillGameEnabled && !Configuration.InstantLogoutEnabled)
-        {
-            var instantLogoutApplied = InstantLogout.SetEnabled(true);
-            if (instantLogoutApplied)
-            {
-                Configuration.InstantLogoutEnabled = true;
             }
-            else
+        });
+        QueueDeferredStartupAction("AutoCancelLoginCooldownEnabled", () =>
+        {
+            if (Configuration.AutoCancelLoginCooldownEnabled && !SystemWindowMods.SetCancelLoginCooldownEnabled(true))
             {
-                Configuration.TitleBarFavKillGameEnabled = false;
+                Configuration.AutoCancelLoginCooldownEnabled = false;
+                Configuration.Save();
             }
-
-            Configuration.Save();
-        }
-
-        if (Configuration.MoveableAfterDeathEnabled && !PlayerMods.SetMoveableAfterDeathEnabled(true))
+        });
+        QueueDeferredStartupAction(() =>
         {
-            Configuration.MoveableAfterDeathEnabled = false;
-            Configuration.Save();
-        }
-
-        if (Configuration.ForcePeepingTomEnabled && !PeepingTomIntegration.SetForceEnabled(true))
+            if (Configuration.AutoDisplayMsqProgressEnabled && !MsqProgressDisplay.SetEnabled(true))
+            {
+                Configuration.AutoDisplayMsqProgressEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
         {
-            Configuration.ForcePeepingTomEnabled = false;
+            if (Configuration.CopyItemNameForAllEnabled && !CopyItemNameContextMenu.SetEnabled(true))
+            {
+                Configuration.CopyItemNameForAllEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoSkipCutscenesEnabled", () =>
+        {
+            if (Configuration.AutoSkipCutscenesEnabled && !AutoSkipCutscenes.SetEnabled(true))
+            {
+                Configuration.AutoSkipCutscenesEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoSkipCutscenesFeedingChocoboEnabled", () =>
+        {
+            if (!Configuration.AutoSkipCutscenesFeedingChocoboEnabled)
+                return;
+
+            BuddyFeedCutsceneSkip.RestoreEnabledOnStartup();
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.AutoIgnoreMinimumWindowSizeEnabled && !SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled(true))
+            {
+                Configuration.AutoIgnoreMinimumWindowSizeEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.AutoHideUnnecessaryPopupsEnabled && !PopupCleaner.SetEnabled(true))
+            {
+                Configuration.AutoHideUnnecessaryPopupsEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoPreventGameExitingFromLobbyErrorsEnabled", () =>
+        {
+            if (Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled && !SystemWindowMods.SetPreventLobbyExitEnabled(true))
+            {
+                Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.AutoCloseLobbyErrorsEnabled && !LobbyErrorAutoClose.SetEnabled(true))
+            {
+                Configuration.AutoCloseLobbyErrorsEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("DisplayActualQueuePositionEnabled", () =>
+        {
+            if (Configuration.DisplayActualQueuePositionEnabled && !QueuePositionDisplay.SetEnabled(true))
+            {
+                Configuration.DisplayActualQueuePositionEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoHideGameObjectsEnabled", () =>
+        {
+            if (!Configuration.AutoHideGameObjectsEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("auto-hide-game-objects");
+            if (!AutoHideGameObjects.SetEnabled(true))
+            {
+                Configuration.AutoHideGameObjectsEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoSkipDialogueEnabled", () =>
+        {
+            if (Configuration.AutoSkipDialogueEnabled && !DialogueSkip.SetEnabled(true))
+            {
+                Configuration.AutoSkipDialogueEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.CustomResolutionsEnabled && !SystemWindowMods.SetCustomResolutionsEnabled(true))
+            {
+                Configuration.CustomResolutionsEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("DisableBackgroundGameRenderingEnabled", () =>
+        {
+            if (!Configuration.DisableBackgroundGameRenderingEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("disable-background-game-rendering");
+            if (!SystemWindowMods.SetDisableBackgroundRenderingEnabled(true))
+            {
+                Configuration.DisableBackgroundGameRenderingEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.LowResolutionEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("low-resolution");
+            if (!SystemWindowMods.SetLowResolutionEnabled(true))
+            {
+                Configuration.LowResolutionEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("CustomSightDistanceEnabled", () =>
+        {
+            if (!Configuration.CustomSightDistanceEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("custom-sight-distance");
+            if (!SightDistance.SetEnabled(true))
+            {
+                Configuration.CustomSightDistanceEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.ExpandedPlayerRightClickMenuSearchEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("expanded-player-right-click-menu-search");
+            if (!PlayerSearchContextMenu.SetEnabled(true))
+            {
+                Configuration.ExpandedPlayerRightClickMenuSearchEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.LiveAnonymousModeEnabled && !NameplatePrivacy.SetAnonymousModeEnabled(true))
+            {
+                Configuration.LiveAnonymousModeEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.AutoUnlockExpertDeliveryEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("auto-expert-delivery");
+            if (!AutoUnlockExpertDelivery.SetEnabled(true))
+            {
+                Configuration.AutoUnlockExpertDeliveryEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.AntiAfkEnabled && !AntiAfk.SetEnabled(true))
+            {
+                Configuration.AntiAfkEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.AutoLeaveDutyEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("auto-leave-duty");
+            if (!AutoLeaveDuty.SetEnabled(true))
+            {
+                Configuration.AutoLeaveDutyEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.AutoMergeEnabled && !AutoMerge.SetEnabled(true))
+            {
+                Configuration.AutoMergeEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("QuickReturnEnabled", () =>
+        {
+            if (Configuration.QuickReturnEnabled && !QuickReturn.SetEnabled(true))
+            {
+                Configuration.QuickReturnEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.UnlockExpertDeliveryEnabled && !ExpertDeliveryUnlock.SetEnabled(true))
+            {
+                Configuration.UnlockExpertDeliveryEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoRefuseTradeRequestEnabled", () =>
+        {
+            if (!Configuration.AutoRefuseTradeRequestEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("auto-refuse-trade-request");
+            if (!AutoRefuseTrade.SetEnabled(true))
+            {
+                Configuration.AutoRefuseTradeRequestEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoRevealUndiscoveredAreasEnabled", () =>
+        {
+            if (Configuration.AutoRevealUndiscoveredAreasEnabled && !SystemWindowMods.SetRevealUndiscoveredAreasEnabled(true))
+            {
+                Configuration.AutoRevealUndiscoveredAreasEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.AutoClearTeleportationLockEnabled && !TeleportLockClear.SetEnabled(true))
+            {
+                Configuration.AutoClearTeleportationLockEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.BailoutEscMenuEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("bailout-esc-menu");
+            if (!EscMenuBailout.SetEnabled(true))
+            {
+                Configuration.BailoutEscMenuEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.SpecialRenderModesEnabled)
+                ApplySpecialRenderModesConfiguration();
+        });
+        QueueDeferredStartupAction("DozeSitAnywhereEnabled", () =>
+        {
+            if (Configuration.DozeSitAnywhereEnabled && !DozeSitAnywhere.SetEnabled(true))
+            {
+                Configuration.DozeSitAnywhereEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.InfiniteSprintEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("infinite-sprint");
+            if (!PlayerMods.SetInfiniteSprintEnabled(true))
+            {
+                Configuration.InfiniteSprintEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("InstantLogoutEnabled", () =>
+        {
+            if (Configuration.InstantLogoutEnabled && !InstantLogout.SetEnabled(true))
+            {
+                Configuration.InstantLogoutEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.ItemCommandsEnabled && !ItemCommands.SetEnabled(true))
+            {
+                Configuration.ItemCommandsEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.XAPeepEnabled)
+                return;
+
+            if (XAPeep.SetEnabled(true))
+                return;
+
+            Configuration.XAPeepEnabled = false;
             Configuration.Save();
-        }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.TitleBarFavKillGameEnabled && !Configuration.InstantLogoutEnabled)
+            {
+                var instantLogoutApplied = InstantLogout.SetEnabled(true);
+                if (instantLogoutApplied)
+                {
+                    Configuration.InstantLogoutEnabled = true;
+                }
+                else
+                {
+                    Configuration.TitleBarFavKillGameEnabled = false;
+                }
+
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.MoveableAfterDeathEnabled && !PlayerMods.SetMoveableAfterDeathEnabled(true))
+            {
+                Configuration.MoveableAfterDeathEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.ForcePeepingTomEnabled && !PeepingTomIntegration.SetForceEnabled(true))
+            {
+                Configuration.ForcePeepingTomEnabled = false;
+                Configuration.Save();
+            }
+        });
 
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
@@ -585,14 +665,37 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(UpdatesWindow);
 
         if (Configuration.OpenPluginOnLoad)
-            SlaveWindow.IsOpen = true;
+        {
+            QueueDeferredStartupAction(() =>
+            {
+                SlaveWindow.IsOpen = true;
+            });
+        }
 
-        XAPeepWindow.IsOpen = Configuration.XAPeepAutoOpenWindowOnPluginLoad || Configuration.XAPeepWindowOpen;
-        XAPeepHistoryWindow.IsOpen = Configuration.XAPeepHistoryWindowOpen;
+        if (Configuration.XAPeepAutoOpenWindowOnPluginLoad || Configuration.XAPeepWindowOpen)
+        {
+            QueueDeferredStartupAction(() =>
+            {
+                XAPeepWindow.IsOpen = true;
+            });
+        }
 
-        // Apply window rename on plugin load if enabled
+        if (Configuration.XAPeepHistoryWindowOpen)
+        {
+            QueueDeferredStartupAction(() =>
+            {
+                XAPeepHistoryWindow.IsOpen = true;
+            });
+        }
+
+        // Apply window rename on plugin load after the initial startup burst.
         if (Configuration.WindowRenamerEnabled)
-            WindowRenamer.ApplyFromConfig(Configuration);
+        {
+            QueueDeferredStartupAction(() =>
+            {
+                WindowRenamer.ApplyFromConfig(Configuration);
+            });
+        }
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
@@ -607,7 +710,66 @@ public sealed class Plugin : IDalamudPlugin
         ClientState.Login += OnLogin;
         ClientState.Logout += OnLogout;
 
-        LogStartupSummary();
+        ScheduleDeferredStartupQueue();
+    }
+
+    private void QueueDeferredStartupAction(Action action, [CallerLineNumber] int lineNumber = 0)
+    {
+        deferredStartupActions.Enqueue(new DeferredStartupAction(action, null, lineNumber));
+    }
+
+    private void QueueDeferredStartupAction(string name, Action action, [CallerLineNumber] int lineNumber = 0)
+    {
+        deferredStartupActions.Enqueue(new DeferredStartupAction(action, name, lineNumber));
+    }
+
+    private void ScheduleDeferredStartupQueue()
+    {
+        if (deferredStartupQueueScheduled || isDisposed)
+            return;
+
+        deferredStartupQueueScheduled = true;
+        Framework.RunOnTick(ProcessDeferredStartupQueue, delayTicks: 1);
+    }
+
+    private void ProcessDeferredStartupQueue()
+    {
+        deferredStartupQueueScheduled = false;
+        if (isDisposed)
+            return;
+
+        if (deferredStartupActions.Count == 0)
+        {
+            LogStartupSummary();
+            return;
+        }
+
+        try
+        {
+            var deferredAction = deferredStartupActions.Dequeue();
+            var stopwatch = Stopwatch.StartNew();
+            deferredAction.Action();
+            stopwatch.Stop();
+
+            var elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+            if (elapsedMilliseconds >= DeferredStartupActionDebugThresholdMilliseconds)
+            {
+                var label = string.IsNullOrWhiteSpace(deferredAction.Name)
+                    ? $"Plugin.cs:{deferredAction.LineNumber}"
+                    : deferredAction.Name;
+                var message = $"[XASlave] Deferred startup action '{label}' took {elapsedMilliseconds:F1}ms.";
+                if (elapsedMilliseconds >= DeferredStartupActionWarningThresholdMilliseconds)
+                    Log.Warning(message);
+                else
+                    Log.Debug(message);
+            }
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[XASlave] Deferred startup action failed.");
+        }
+
+        ScheduleDeferredStartupQueue();
     }
 
     private void LogStartupSummary()
@@ -646,7 +808,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Skip Dialogue", Configuration.AutoSkipDialogueEnabled, DialogueSkip.StatusText);
         yield return CreateStartupSurfaceStatus("Background Rendering Pause", Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.DisableBackgroundRenderingStatusText);
         yield return CreateStartupSurfaceStatus("Custom Sight Distance", Configuration.CustomSightDistanceEnabled, SightDistance.StatusText);
-        yield return CreateStartupSurfaceStatus("Instance Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText);
+        yield return CreateStartupSurfaceStatus("Instant Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText);
         yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText);
         yield return CreateStartupSurfaceStatus("Reveal Undiscovered Areas", Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.RevealUndiscoveredAreasStatusText);
         yield return CreateStartupSurfaceStatus("Special Render Modes", Configuration.SpecialRenderModesEnabled, SystemWindowMods.SpecialRenderModesStatusText);
@@ -686,6 +848,7 @@ public sealed class Plugin : IDalamudPlugin
         TryCleanup("WindowSystem.RemoveAllWindows", WindowSystem.RemoveAllWindows);
 
         TryDispose("SlaveWindow", SlaveWindow);
+        TryCleanup("XagmanPeers.Stop", XagmanPeers.Stop);
         TryDispose("TaskRunner", TaskRunner);
         TryDispose("AutoCollector", AutoCollector);
 
@@ -1148,16 +1311,17 @@ public sealed class Plugin : IDalamudPlugin
         if (!TryParseLowResolutionCommand(value, out var scale, out message))
             return false;
 
+        if (!Configuration.LowResolutionEnabled)
+        {
+            message = "Enable `Low Resolution` in XA Mods first.";
+            return false;
+        }
+
         Configuration.LowResolutionScale = scale;
         SystemWindowMods.ApplyLowResolutionConfiguration(scale);
-        var applied = SystemWindowMods.SetLowResolutionEnabled(true);
-        Configuration.LowResolutionEnabled = applied;
         Configuration.Save();
-
-        message = applied
-            ? $"Low Resolution enabled at {scale:0.00}."
-            : SystemWindowMods.LowResolutionStatusText;
-        return applied;
+        message = $"Low Resolution scale set to {scale:0.00}.";
+        return true;
     }
 
     private static bool TryParseLowResolutionCommand(string value, out float scale, out string message)
@@ -1559,8 +1723,11 @@ public sealed class Plugin : IDalamudPlugin
         {
             Configuration.DisableBackgroundGameRenderingOnlyWhenMinimized = backgroundRenderingSettings.OnlyWhenMinimized;
             Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn = backgroundRenderingSettings.DisableWhenArMultiIsOn;
-            SystemWindowMods.SetDisableBackgroundRenderingOnlyWhenMinimized(Configuration.DisableBackgroundGameRenderingOnlyWhenMinimized);
-            SystemWindowMods.SetDisableBackgroundRenderingDisableWhenArMultiIsOn(Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn);
+            if (Configuration.DisableBackgroundGameRenderingEnabled)
+            {
+                SystemWindowMods.SetDisableBackgroundRenderingOnlyWhenMinimized(Configuration.DisableBackgroundGameRenderingOnlyWhenMinimized);
+                SystemWindowMods.SetDisableBackgroundRenderingDisableWhenArMultiIsOn(Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn);
+            }
         }
 
         if (TryDeserializeXAModSettings(modSettings, "auto-hide-game-objects", out XAModAutoHideGameObjectsSettings? autoHideSettings)
@@ -1573,14 +1740,17 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.AutoHideGameObjectsDisableInDuties = autoHideSettings.DisableInDuties;
             Configuration.AutoHideGameObjectsDisableInIslandSanctuary = autoHideSettings.DisableInIslandSanctuary;
             Configuration.AutoHideGameObjectsUseOccultCrescentRules = autoHideSettings.UseOccultCrescentRules;
-            AutoHideGameObjects.ApplyConfiguration(
-                Configuration.AutoHideGameObjectsHidePlayer,
-                Configuration.AutoHideGameObjectsHideUnimportantEnpc,
-                Configuration.AutoHideGameObjectsHidePet,
-                Configuration.AutoHideGameObjectsHideChocobo,
-                Configuration.AutoHideGameObjectsDisableInDuties,
-                Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
-                Configuration.AutoHideGameObjectsUseOccultCrescentRules);
+            if (Configuration.AutoHideGameObjectsEnabled)
+            {
+                AutoHideGameObjects.ApplyConfiguration(
+                    Configuration.AutoHideGameObjectsHidePlayer,
+                    Configuration.AutoHideGameObjectsHideUnimportantEnpc,
+                    Configuration.AutoHideGameObjectsHidePet,
+                    Configuration.AutoHideGameObjectsHideChocobo,
+                    Configuration.AutoHideGameObjectsDisableInDuties,
+                    Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
+                    Configuration.AutoHideGameObjectsUseOccultCrescentRules);
+            }
         }
 
         if (TryDeserializeXAModSettings(modSettings, "custom-resolutions", out XAModCustomResolutionsSettings? customResolutionSettings)
@@ -1593,7 +1763,8 @@ public sealed class Plugin : IDalamudPlugin
             && lowResolutionSettings != null)
         {
             Configuration.LowResolutionScale = SystemWindowModsService.ClampLowResolutionScale(lowResolutionSettings.Scale);
-            SystemWindowMods.ApplyLowResolutionConfiguration(Configuration.LowResolutionScale);
+            if (Configuration.LowResolutionEnabled)
+                SystemWindowMods.ApplyLowResolutionConfiguration(Configuration.LowResolutionScale);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "special-rendering-modes", out XAModSpecialRenderModesSettings? specialRenderSettings)
@@ -1620,11 +1791,14 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.ExpandedPlayerRightClickMenuSearchLodestoneEnabled = playerSearchSettings.LodestoneEnabled;
             Configuration.ExpandedPlayerRightClickMenuSearchLalachievementsEnabled = playerSearchSettings.LalachievementsEnabled;
             Configuration.ExpandedPlayerRightClickMenuSearchOpenAllEnabled = playerSearchSettings.OpenAllEnabled;
-            PlayerSearchContextMenu.ApplyConfiguration(
-                Configuration.ExpandedPlayerRightClickMenuSearchFflogsEnabled,
-                Configuration.ExpandedPlayerRightClickMenuSearchLodestoneEnabled,
-                Configuration.ExpandedPlayerRightClickMenuSearchLalachievementsEnabled,
-                Configuration.ExpandedPlayerRightClickMenuSearchOpenAllEnabled);
+            if (Configuration.ExpandedPlayerRightClickMenuSearchEnabled)
+            {
+                PlayerSearchContextMenu.ApplyConfiguration(
+                    Configuration.ExpandedPlayerRightClickMenuSearchFflogsEnabled,
+                    Configuration.ExpandedPlayerRightClickMenuSearchLodestoneEnabled,
+                    Configuration.ExpandedPlayerRightClickMenuSearchLalachievementsEnabled,
+                    Configuration.ExpandedPlayerRightClickMenuSearchOpenAllEnabled);
+            }
         }
 
         if (TryDeserializeXAModSettings(modSettings, "auto-expert-delivery", out XAModExpertDeliverySettings? expertDeliverySettings)
@@ -1635,26 +1809,31 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.AutoUnlockExpertDeliverySkipHq = expertDeliverySettings.SkipHq;
             Configuration.AutoUnlockExpertDeliverySkipMateria = expertDeliverySettings.SkipMateria;
             Configuration.AutoUnlockExpertDeliveryIgnoreSealCap = expertDeliverySettings.IgnoreSealCap;
-            AutoUnlockExpertDelivery.ApplyConfiguration(
-                Configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen,
-                Configuration.AutoUnlockExpertDeliveryDefaultPage,
-                Configuration.AutoUnlockExpertDeliverySkipHq,
-                Configuration.AutoUnlockExpertDeliverySkipMateria,
-                Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+            if (Configuration.AutoUnlockExpertDeliveryEnabled)
+            {
+                AutoUnlockExpertDelivery.ApplyConfiguration(
+                    Configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen,
+                    Configuration.AutoUnlockExpertDeliveryDefaultPage,
+                    Configuration.AutoUnlockExpertDeliverySkipHq,
+                    Configuration.AutoUnlockExpertDeliverySkipMateria,
+                    Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+            }
         }
 
         if (TryDeserializeXAModSettings(modSettings, "bailout-esc-menu", out XAModBailoutEscMenuSettings? bailoutEscMenuSettings)
             && bailoutEscMenuSettings != null)
         {
             Configuration.BailoutEscMenuSeconds = EscMenuBailoutService.NormalizeTimeoutSeconds(bailoutEscMenuSettings.TimeoutSeconds);
-            EscMenuBailout.ApplyConfiguration(Configuration.BailoutEscMenuSeconds);
+            if (Configuration.BailoutEscMenuEnabled)
+                EscMenuBailout.ApplyConfiguration(Configuration.BailoutEscMenuSeconds);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "auto-leave-duty", out XAModAutoLeaveDutySettings? autoLeaveDutySettings)
             && autoLeaveDutySettings != null)
         {
             Configuration.AutoLeaveDutyDelaySeconds = AutoLeaveDutyService.ClampDelaySeconds(autoLeaveDutySettings.DelaySeconds);
-            AutoLeaveDuty.ApplyConfiguration(Configuration.AutoLeaveDutyDelaySeconds);
+            if (Configuration.AutoLeaveDutyEnabled)
+                AutoLeaveDuty.ApplyConfiguration(Configuration.AutoLeaveDutyDelaySeconds);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "auto-refuse-trade-request", out XAModTradeRefusalSettings? tradeRefusalSettings)
@@ -1663,10 +1842,13 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.AutoRefuseTradeShowNotification = tradeRefusalSettings.ShowNotification;
             Configuration.AutoRefuseTradeSendEcho = tradeRefusalSettings.SendEcho;
             Configuration.AutoRefuseTradeExtraCommands = tradeRefusalSettings.ExtraCommands ?? string.Empty;
-            AutoRefuseTrade.ApplyConfiguration(
-                Configuration.AutoRefuseTradeShowNotification,
-                Configuration.AutoRefuseTradeSendEcho,
-                Configuration.AutoRefuseTradeExtraCommands);
+            if (Configuration.AutoRefuseTradeRequestEnabled)
+            {
+                AutoRefuseTrade.ApplyConfiguration(
+                    Configuration.AutoRefuseTradeShowNotification,
+                    Configuration.AutoRefuseTradeSendEcho,
+                    Configuration.AutoRefuseTradeExtraCommands);
+            }
         }
 
         if (TryDeserializeXAModSettings(modSettings, "custom-sight-distance", out XAModCustomSightDistanceSettings? sightDistanceSettings)
@@ -1688,22 +1870,26 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.CustomSightDistanceMinFoV = minFoV;
             Configuration.CustomSightDistanceFoV = currentFoV;
             Configuration.CustomSightDistanceIgnoreCollision = sightDistanceSettings.IgnoreCollision;
-            SightDistance.ApplyConfiguration(
-                Configuration.CustomSightDistanceMaxDistance,
-                Configuration.CustomSightDistanceMinDistance,
-                Configuration.CustomSightDistanceMaxRotation,
-                Configuration.CustomSightDistanceMinRotation,
-                Configuration.CustomSightDistanceMaxFoV,
-                Configuration.CustomSightDistanceMinFoV,
-                Configuration.CustomSightDistanceFoV,
-                Configuration.CustomSightDistanceIgnoreCollision);
+            if (Configuration.CustomSightDistanceEnabled)
+            {
+                SightDistance.ApplyConfiguration(
+                    Configuration.CustomSightDistanceMaxDistance,
+                    Configuration.CustomSightDistanceMinDistance,
+                    Configuration.CustomSightDistanceMaxRotation,
+                    Configuration.CustomSightDistanceMinRotation,
+                    Configuration.CustomSightDistanceMaxFoV,
+                    Configuration.CustomSightDistanceMinFoV,
+                    Configuration.CustomSightDistanceFoV,
+                    Configuration.CustomSightDistanceIgnoreCollision);
+            }
         }
 
         if (TryDeserializeXAModSettings(modSettings, "infinite-sprint", out XAModInfiniteSprintSettings? infiniteSprintSettings)
             && infiniteSprintSettings != null)
         {
             Configuration.InfiniteSprintDelaySeconds = PlayerModsService.ClampInfiniteSprintDelaySeconds(infiniteSprintSettings.DelaySeconds);
-            PlayerMods.ApplyInfiniteSprintConfiguration(Configuration.InfiniteSprintDelaySeconds);
+            if (Configuration.InfiniteSprintEnabled)
+                PlayerMods.ApplyInfiniteSprintConfiguration(Configuration.InfiniteSprintDelaySeconds);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "xa-peep", out XAModXAPeepSettings? xaPeepSettings)
@@ -2117,6 +2303,71 @@ public sealed class Plugin : IDalamudPlugin
         return success;
     }
 
+    private void ApplyStoredXAModConfiguration(string key)
+    {
+        switch (key.ToLowerInvariant())
+        {
+            case "disable-background-game-rendering":
+                SystemWindowMods.SetDisableBackgroundRenderingOnlyWhenMinimized(Configuration.DisableBackgroundGameRenderingOnlyWhenMinimized);
+                SystemWindowMods.SetDisableBackgroundRenderingDisableWhenArMultiIsOn(Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn);
+                break;
+            case "auto-hide-game-objects":
+                AutoHideGameObjects.ApplyConfiguration(
+                    Configuration.AutoHideGameObjectsHidePlayer,
+                    Configuration.AutoHideGameObjectsHideUnimportantEnpc,
+                    Configuration.AutoHideGameObjectsHidePet,
+                    Configuration.AutoHideGameObjectsHideChocobo,
+                    Configuration.AutoHideGameObjectsDisableInDuties,
+                    Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
+                    Configuration.AutoHideGameObjectsUseOccultCrescentRules);
+                break;
+            case "low-resolution":
+                SystemWindowMods.ApplyLowResolutionConfiguration(Configuration.LowResolutionScale);
+                break;
+            case "expanded-player-right-click-menu-search":
+                PlayerSearchContextMenu.ApplyConfiguration(
+                    Configuration.ExpandedPlayerRightClickMenuSearchFflogsEnabled,
+                    Configuration.ExpandedPlayerRightClickMenuSearchLodestoneEnabled,
+                    Configuration.ExpandedPlayerRightClickMenuSearchLalachievementsEnabled,
+                    Configuration.ExpandedPlayerRightClickMenuSearchOpenAllEnabled);
+                break;
+            case "auto-expert-delivery":
+                AutoUnlockExpertDelivery.ApplyConfiguration(
+                    Configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen,
+                    Configuration.AutoUnlockExpertDeliveryDefaultPage,
+                    Configuration.AutoUnlockExpertDeliverySkipHq,
+                    Configuration.AutoUnlockExpertDeliverySkipMateria,
+                    Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+                break;
+            case "bailout-esc-menu":
+                EscMenuBailout.ApplyConfiguration(Configuration.BailoutEscMenuSeconds);
+                break;
+            case "auto-leave-duty":
+                AutoLeaveDuty.ApplyConfiguration(Configuration.AutoLeaveDutyDelaySeconds);
+                break;
+            case "auto-refuse-trade-request":
+                AutoRefuseTrade.ApplyConfiguration(
+                    Configuration.AutoRefuseTradeShowNotification,
+                    Configuration.AutoRefuseTradeSendEcho,
+                    Configuration.AutoRefuseTradeExtraCommands);
+                break;
+            case "custom-sight-distance":
+                SightDistance.ApplyConfiguration(
+                    Configuration.CustomSightDistanceMaxDistance,
+                    Configuration.CustomSightDistanceMinDistance,
+                    Configuration.CustomSightDistanceMaxRotation,
+                    Configuration.CustomSightDistanceMinRotation,
+                    Configuration.CustomSightDistanceMaxFoV,
+                    Configuration.CustomSightDistanceMinFoV,
+                    Configuration.CustomSightDistanceFoV,
+                    Configuration.CustomSightDistanceIgnoreCollision);
+                break;
+            case "infinite-sprint":
+                PlayerMods.ApplyInfiniteSprintConfiguration(Configuration.InfiniteSprintDelaySeconds);
+                break;
+        }
+    }
+
     private bool RestoreAllXAMods(out string message)
     {
         var disabledCount = DisableXAModDefinitions(GetAllXAModDefinitions());
@@ -2222,14 +2473,14 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("auto-expert-delivery", "Automate Expert Delivery", XAModsRestoreScope.Player, () => Configuration.AutoUnlockExpertDeliveryEnabled, AutoUnlockExpertDelivery.SetEnabled, applied => Configuration.AutoUnlockExpertDeliveryEnabled = applied, () => AutoUnlockExpertDelivery.StatusText);
         yield return new("auto-leave-duty", "Auto Leave Duty", XAModsRestoreScope.Player, () => Configuration.AutoLeaveDutyEnabled, AutoLeaveDuty.SetEnabled, applied => Configuration.AutoLeaveDutyEnabled = applied, () => AutoLeaveDuty.StatusText);
         yield return new("auto-merge", "Auto Merge", XAModsRestoreScope.Player, () => Configuration.AutoMergeEnabled, AutoMerge.SetEnabled, applied => Configuration.AutoMergeEnabled = applied, () => AutoMerge.StatusText);
-        yield return new("quick-return", "Instance Return", XAModsRestoreScope.Player, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusText);
+        yield return new("quick-return", "Instant Return", XAModsRestoreScope.Illegal, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusText);
         yield return new("auto-refuse-trade-request", "Refuse Trade Request", XAModsRestoreScope.Player, () => Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.SetEnabled, applied => Configuration.AutoRefuseTradeRequestEnabled = applied, () => AutoRefuseTrade.StatusText);
         yield return new("auto-reveal-undiscovered-areas", "Reveal Undiscovered Areas", XAModsRestoreScope.Player, () => Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.SetRevealUndiscoveredAreasEnabled, applied => Configuration.AutoRevealUndiscoveredAreasEnabled = applied, () => SystemWindowMods.RevealUndiscoveredAreasStatusText);
         yield return new("auto-clear-teleportation-lock", "Clear Teleportation Lock", XAModsRestoreScope.Player, () => Configuration.AutoClearTeleportationLockEnabled, TeleportLockClear.SetEnabled, applied => Configuration.AutoClearTeleportationLockEnabled = applied, () => TeleportLockClear.StatusText);
         yield return new("custom-sight-distance", "Custom Sight Distance", XAModsRestoreScope.Player, () => Configuration.CustomSightDistanceEnabled, SightDistance.SetEnabled, applied => Configuration.CustomSightDistanceEnabled = applied, () => SightDistance.StatusText);
         yield return new("doze-sit-anywhere", "Doze & Sit Anywhere", XAModsRestoreScope.Player, () => Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.SetEnabled, applied => Configuration.DozeSitAnywhereEnabled = applied, () => DozeSitAnywhere.StatusText);
         yield return new("infinite-sprint", "Infinite Sprint", XAModsRestoreScope.Player, () => Configuration.InfiniteSprintEnabled, PlayerMods.SetInfiniteSprintEnabled, applied => Configuration.InfiniteSprintEnabled = applied, () => PlayerMods.InfiniteSprintStatusText);
-        yield return new("instant-logout", "Instant Logout", XAModsRestoreScope.Player, () => Configuration.InstantLogoutEnabled, InstantLogout.SetEnabled, applied => Configuration.InstantLogoutEnabled = applied, () => InstantLogout.StatusText);
+        yield return new("instant-logout", "Instant Logout", XAModsRestoreScope.Illegal, () => Configuration.InstantLogoutEnabled, InstantLogout.SetEnabled, applied => Configuration.InstantLogoutEnabled = applied, () => InstantLogout.StatusText);
         yield return new("item-commands", "Item Commands", XAModsRestoreScope.Player, () => Configuration.ItemCommandsEnabled, ItemCommands.SetEnabled, applied => Configuration.ItemCommandsEnabled = applied, () => ItemCommands.StatusText);
         yield return new("xa-peep", "XA Peep", XAModsRestoreScope.Player, () => Configuration.XAPeepEnabled, XAPeep.SetEnabled, applied => Configuration.XAPeepEnabled = applied, () => XAPeep.StatusText);
 
@@ -2286,6 +2537,7 @@ public sealed class Plugin : IDalamudPlugin
             return true;
         }
 
+        ApplyStoredXAModConfiguration(definition.Key);
         var applied = definition.Apply(true);
         definition.Store(applied);
         Configuration.Save();
@@ -2400,7 +2652,7 @@ public sealed class Plugin : IDalamudPlugin
             case "instancereturn":
             case "quickreturn":
             case "instantreturn":
-                definition = new("instancereturn", "/xa instancereturn on|off", GetXAModDefinition("quick-return"));
+                definition = new("instantreturn", "/xa instantreturn on|off", GetXAModDefinition("quick-return"));
                 return true;
             case "refusetrade":
                 definition = new("refusetrade", "/xa refusetrade on|off", GetXAModDefinition("auto-refuse-trade-request"));
@@ -2679,5 +2931,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.23";
+    public const string Version = "0.0.0.24";
 }

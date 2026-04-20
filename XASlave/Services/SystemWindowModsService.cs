@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
@@ -29,6 +30,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private const int WindowExStyleIndex = -20;
     private const uint SetWindowPosNoZOrder = 0x0004;
     private const uint SetWindowPosNoActivate = 0x0010;
+    private const double FrameworkUpdateTimingDebugThresholdMilliseconds = 5.0;
+    private const double FrameworkUpdateTimingWarningThresholdMilliseconds = 25.0;
     private const float MinimumLowResolutionScale = 0.01f;
     private const float MaximumLowResolutionScale = 1.00f;
     private const byte MaximumSupportedLowResolutionUpscaleType = 1;
@@ -47,7 +50,12 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private Hook<DeviceDx11PostTickDelegate>? deviceDx11PostTickHook;
     private Hook<NamePlateDrawDelegate>? namePlateDrawHook;
     private ToggleFadeDelegate? toggleFadeDelegate;
-    private bool initialized;
+    private bool agentLobbyHookInitialized;
+    private bool atkMessageBoxHookInitialized;
+    private bool agentMapHookInitialized;
+    private bool deviceDx11PostTickHookInitialized;
+    private bool namePlateDrawHookInitialized;
+    private bool toggleFadeDelegateInitialized;
     private bool cancelLoginCooldownEnabled;
     private bool customResolutionsEnabled;
     private bool ignoreMinimumWindowSizeEnabled;
@@ -175,14 +183,21 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return false;
         }
 
-        EnsureInitialized();
+        cancelLoginCooldownEnabled = true;
+        if (clientState.IsLoggedIn)
+        {
+            CancelLoginCooldownStatusText = "Ready - login cooldown hook will arm when you return to lobby.";
+            return true;
+        }
+
+        EnsureAgentLobbyHookInitialized();
         if (agentLobbyUpdateHook == null)
         {
+            cancelLoginCooldownEnabled = false;
             CancelLoginCooldownStatusText = "Unavailable - AgentLobby update hook missing.";
             return false;
         }
 
-        cancelLoginCooldownEnabled = true;
         UpdateAgentLobbyHookState();
         CancelLoginCooldownStatusText = "Enabled - character-select login cooldown is cleared locally.";
         return true;
@@ -286,14 +301,21 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return false;
         }
 
-        EnsureInitialized();
+        preventLobbyExitEnabled = true;
+        if (clientState.IsLoggedIn)
+        {
+            PreventLobbyExitStatusText = "Ready - lobby error hook will arm when you return to lobby.";
+            return true;
+        }
+
+        EnsureAtkMessageBoxHookInitialized();
         if (atkMessageBoxReceiveEventHook == null)
         {
+            preventLobbyExitEnabled = false;
             PreventLobbyExitStatusText = "Unavailable - lobby error hook missing.";
             return false;
         }
 
-        preventLobbyExitEnabled = true;
         UpdateAtkMessageBoxHookState();
         PreventLobbyExitStatusText = "Enabled - lobby shutdown timeout is overridden.";
         return true;
@@ -309,7 +331,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return false;
         }
 
-        EnsureInitialized();
+        EnsureAgentMapHookInitialized();
         if (agentMapUpdateHook == null)
         {
             RevealUndiscoveredAreasStatusText = "Unavailable - map update hook missing.";
@@ -359,7 +381,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return false;
         }
 
-        EnsureInitialized();
+        EnsureBackgroundRenderingHooksInitialized();
         if (deviceDx11PostTickHook == null || namePlateDrawHook == null)
         {
             DisableBackgroundRenderingStatusText = "Unavailable - render hooks are incomplete.";
@@ -485,17 +507,54 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             : "Enabled - DX11 and nameplate hooks pause rendering while inactive.";
     }
 
-    private void EnsureInitialized()
+    private void EnsureAgentLobbyHookInitialized()
     {
-        if (initialized)
+        if (agentLobbyHookInitialized)
             return;
 
-        initialized = true;
+        agentLobbyHookInitialized = true;
         agentLobbyUpdateHook = TryCreateHook<AgentLobbyUpdateDelegate>(Sigs.AgentLobbyUpdateSig, AgentLobbyUpdateDetour, "AgentLobbyUpdate");
+    }
+
+    private void EnsureAtkMessageBoxHookInitialized()
+    {
+        if (atkMessageBoxHookInitialized)
+            return;
+
+        atkMessageBoxHookInitialized = true;
         atkMessageBoxReceiveEventHook = TryCreateHook<AtkMessageBoxReceiveEventDelegate>(Sigs.AtkMessageBoxReceiveEventSig, AtkMessageBoxReceiveEventDetour, "AtkMessageBoxReceiveEvent");
+    }
+
+    private void EnsureAgentMapHookInitialized()
+    {
+        if (agentMapHookInitialized)
+            return;
+
+        agentMapHookInitialized = true;
         agentMapUpdateHook = TryCreateHook<AgentMapUpdateDelegate>(Sigs.AgentMapUpdateSig, AgentMapUpdateDetour, "AgentMapUpdate");
-        deviceDx11PostTickHook = TryCreateHook<DeviceDx11PostTickDelegate>(Sigs.DeviceDx11PostTickSig, DeviceDx11PostTickDetour, "DeviceDX11PostTick");
-        namePlateDrawHook = TryCreateHook<NamePlateDrawDelegate>(Sigs.NamePlateDrawSig, NamePlateDrawDetour, "NamePlateDraw");
+    }
+
+    private void EnsureBackgroundRenderingHooksInitialized()
+    {
+        if (!deviceDx11PostTickHookInitialized)
+        {
+            deviceDx11PostTickHookInitialized = true;
+            deviceDx11PostTickHook = TryCreateHook<DeviceDx11PostTickDelegate>(Sigs.DeviceDx11PostTickSig, DeviceDx11PostTickDetour, "DeviceDX11PostTick");
+        }
+
+        if (!namePlateDrawHookInitialized)
+        {
+            namePlateDrawHookInitialized = true;
+            namePlateDrawHook = TryCreateHook<NamePlateDrawDelegate>(Sigs.NamePlateDrawSig, NamePlateDrawDetour, "NamePlateDraw");
+        }
+    }
+
+    private void EnsureToggleFadeDelegateInitialized()
+    {
+        if (toggleFadeDelegateInitialized)
+            return;
+
+        toggleFadeDelegateInitialized = true;
 
         try
         {
@@ -529,7 +588,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     public bool SetSpecialRenderWorldHidden(bool hidden, Vector4 color)
     {
-        EnsureInitialized();
+        EnsureToggleFadeDelegateInitialized();
         var frameworkInstance = Framework.Instance();
         if (toggleFadeDelegate == null || frameworkInstance == null)
             return false;
@@ -605,18 +664,77 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private void OnFrameworkUpdate(IFramework _)
     {
+        var totalStopwatch = Stopwatch.StartNew();
+        if (cancelLoginCooldownEnabled
+            && !clientState.IsLoggedIn
+            && (agentLobbyUpdateHook == null || agentLobbyUpdateHook.IsDisposed || !agentLobbyUpdateHook.IsEnabled))
+        {
+            MeasureFrameworkUpdateStep("SystemWindowMods.CancelLoginCooldownLobbyArm", () =>
+            {
+                EnsureAgentLobbyHookInitialized();
+                UpdateAgentLobbyHookState();
+            });
+            if (agentLobbyUpdateHook != null && !agentLobbyUpdateHook.IsDisposed && agentLobbyUpdateHook.IsEnabled)
+                CancelLoginCooldownStatusText = "Enabled - character-select login cooldown is cleared locally.";
+        }
+
+        if (preventLobbyExitEnabled
+            && !clientState.IsLoggedIn
+            && (atkMessageBoxReceiveEventHook == null || atkMessageBoxReceiveEventHook.IsDisposed || !atkMessageBoxReceiveEventHook.IsEnabled))
+        {
+            MeasureFrameworkUpdateStep("SystemWindowMods.PreventLobbyExitLobbyArm", () =>
+            {
+                EnsureAtkMessageBoxHookInitialized();
+                UpdateAtkMessageBoxHookState();
+            });
+            if (atkMessageBoxReceiveEventHook != null && !atkMessageBoxReceiveEventHook.IsDisposed && atkMessageBoxReceiveEventHook.IsEnabled)
+                PreventLobbyExitStatusText = "Enabled - lobby shutdown timeout is overridden.";
+        }
+
         if (ShouldSynchronizeWindowSize())
-            UpdateWindowSizeSynchronization();
+            MeasureFrameworkUpdateStep("SystemWindowMods.UpdateWindowSizeSynchronization", UpdateWindowSizeSynchronization);
 
         if (lowResolutionEnabled)
-            UpdateLowResolutionScale();
+            MeasureFrameworkUpdateStep("SystemWindowMods.UpdateLowResolutionScale", UpdateLowResolutionScale);
 
         if (disableBackgroundRenderingEnabled
             && disableBackgroundRenderingDisableWhenArMultiIsOn
-            && RefreshAutoRetainerMultiModeCache(false))
+            && MeasureFrameworkUpdateStep("SystemWindowMods.RefreshAutoRetainerMultiModeCache", () => RefreshAutoRetainerMultiModeCache(false)))
         {
             DisableBackgroundRenderingStatusText = GetBackgroundRenderingStatusText();
         }
+
+        totalStopwatch.Stop();
+        LogFrameworkUpdateStepDuration("SystemWindowMods.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
+    }
+
+    private void MeasureFrameworkUpdateStep(string label, Action action)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        action();
+        stopwatch.Stop();
+        LogFrameworkUpdateStepDuration(label, stopwatch.Elapsed.TotalMilliseconds);
+    }
+
+    private bool MeasureFrameworkUpdateStep(string label, Func<bool> func)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        var result = func();
+        stopwatch.Stop();
+        LogFrameworkUpdateStepDuration(label, stopwatch.Elapsed.TotalMilliseconds);
+        return result;
+    }
+
+    private void LogFrameworkUpdateStepDuration(string label, double elapsedMilliseconds)
+    {
+        if (elapsedMilliseconds < FrameworkUpdateTimingDebugThresholdMilliseconds)
+            return;
+
+        var message = $"[XASlave] Framework tick step '{label}' took {elapsedMilliseconds:F1}ms.";
+        if (elapsedMilliseconds >= FrameworkUpdateTimingWarningThresholdMilliseconds)
+            log.Warning(message);
+        else
+            log.Debug(message);
     }
 
     private bool RefreshAutoRetainerMultiModeCache(bool force)

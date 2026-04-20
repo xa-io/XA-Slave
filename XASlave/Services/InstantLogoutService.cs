@@ -45,15 +45,8 @@ public sealed class InstantLogoutService : IDisposable
             return false;
         }
 
-        EnsureInitialized();
-        if (requestContentsFinder == null)
-        {
-            StatusText = "Unavailable - contents finder request signature missing.";
-            return false;
-        }
-
         enabled = true;
-        StatusText = "Enabled - `/xa logout` hard logs out and `/xa killgame` exits after logout.";
+        RefreshStatusText();
         return true;
     }
 
@@ -113,6 +106,19 @@ public sealed class InstantLogoutService : IDisposable
         requestContentsFinder = null;
     }
 
+    private void RefreshStatusText()
+    {
+        if (!enabled)
+        {
+            StatusText = "Disabled";
+            return;
+        }
+
+        StatusText = requestContentsFinder == null
+            ? "Ready - `/xa logout` and `/xa killgame` will resolve their request surface on first use."
+            : "Enabled - `/xa logout` hard logs out and `/xa killgame` exits after logout.";
+    }
+
     private void UpdateSubscription(bool targetEnabled)
     {
         if (subscribed == targetEnabled)
@@ -161,6 +167,7 @@ public sealed class InstantLogoutService : IDisposable
             return;
 
         requestContentsFinder = Marshal.GetDelegateForFunctionPointer<RequestContentsFinderDelegate>(address);
+        RefreshStatusText();
     }
 
     [StructLayout(LayoutKind.Explicit, Size = 10)]

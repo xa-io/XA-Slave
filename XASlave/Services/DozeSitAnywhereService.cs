@@ -69,17 +69,9 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
             return false;
         }
 
-        EnsureInitialized();
-        if (useEmote == null || shouldSnapHook == null || shouldSnapUnsitHook == null)
-        {
-            StatusText = "Unavailable - Doze/Sit Anywhere signatures or hooks are missing.";
-            return false;
-        }
-
         try
         {
             enabled = true;
-            UpdateHookStates();
             RefreshStatusText();
             return true;
         }
@@ -96,6 +88,13 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
     public bool RequestDoze()
     {
+        if (enabled && !initialized)
+        {
+            EnsureInitialized();
+            UpdateHookStates();
+            RefreshStatusText();
+        }
+
         if (!TryGetEmoteAgent(out var agent))
             return false;
 
@@ -120,6 +119,13 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
     public bool RequestSit()
     {
+        if (enabled && !initialized)
+        {
+            EnsureInitialized();
+            UpdateHookStates();
+            RefreshStatusText();
+        }
+
         if (!TryGetEmoteAgent(out var agent))
             return false;
 
@@ -186,6 +192,12 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
         if (!enabled)
         {
             StatusText = "Disabled";
+            return;
+        }
+
+        if (!initialized)
+        {
+            StatusText = "Ready - `/xa sit`, `/xa doze`, panel buttons, and titlebar favourites will arm local emote hooks on first use.";
             return;
         }
 

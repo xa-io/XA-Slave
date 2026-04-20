@@ -10,6 +10,7 @@ namespace XASlave.Services;
 
 public unsafe sealed class PlayerModsService : IDisposable
 {
+    private const double MovePermissionHookReloadGuardSeconds = 5.0;
     private const int SprintActionId = 3;
     private const ushort SprintStatusId = 50;
     private const ushort CosmicSprintStatusId = 4398;
@@ -35,10 +36,12 @@ public unsafe sealed class PlayerModsService : IDisposable
     private bool frameworkSubscribed;
     private bool infiniteSprintEnabled;
     private bool moveableAfterDeathEnabled;
+    private bool moveableAfterDeathEnablePending;
 
     private DateTime lastSprintAttemptUtc = DateTime.MinValue;
     private DateTime lastObservedMovementUtc = DateTime.MinValue;
     private DateTime currentMovementStartedUtc = DateTime.MinValue;
+    private readonly DateTime movePermissionHookCreationAllowedAtUtc = DateTime.UtcNow.AddSeconds(MovePermissionHookReloadGuardSeconds);
     private Vector3 lastObservedLocalPosition;
     private bool hasObservedLocalPosition;
     private float infiniteSprintDelaySeconds = InfiniteSprintDelaySecondsDefault;
@@ -90,12 +93,23 @@ public unsafe sealed class PlayerModsService : IDisposable
         if (!value)
         {
             moveableAfterDeathEnabled = false;
+            moveableAfterDeathEnablePending = false;
             UpdateMovePermissionHookState();
+            UpdateFrameworkSubscription();
             MoveableAfterDeathStatusText = "Disabled";
             return false;
         }
 
-        EnsureInitialized();
+        if (!TryEnsureMovePermissionHookReady(out var pendingStatusText))
+        {
+            moveableAfterDeathEnabled = false;
+            moveableAfterDeathEnablePending = true;
+            UpdateFrameworkSubscription();
+            MoveableAfterDeathStatusText = pendingStatusText;
+            return true;
+        }
+
+        moveableAfterDeathEnablePending = false;
         if (movePermissionHook == null)
         {
             MoveableAfterDeathStatusText = "Unavailable - movement permission hook missing.";
@@ -112,6 +126,7 @@ public unsafe sealed class PlayerModsService : IDisposable
     {
         infiniteSprintEnabled = false;
         moveableAfterDeathEnabled = false;
+        moveableAfterDeathEnablePending = false;
         ResetInfiniteSprintMovementTracking();
 
         UpdateFrameworkSubscription();
@@ -119,13 +134,32 @@ public unsafe sealed class PlayerModsService : IDisposable
         DisposeHook(ref movePermissionHook);
     }
 
-    private void EnsureInitialized()
+    private bool TryEnsureMovePermissionHookReady(out string statusText)
     {
+        statusText = string.Empty;
+        if (movePermissionHook is { IsDisposed: false })
+            return true;
+
+        var guardRemainingSeconds = (movePermissionHookCreationAllowedAtUtc - DateTime.UtcNow).TotalSeconds;
+        if (guardRemainingSeconds > 0)
+        {
+            statusText = $"Pending - waiting {guardRemainingSeconds:0.0}s after reload before arming the movement permission hook.";
+            return false;
+        }
+
         if (initialized)
-            return;
+        {
+            statusText = "Unavailable - movement permission hook missing.";
+            return false;
+        }
 
         initialized = true;
         movePermissionHook = TryCreateHook<MovePermissionDelegate>(Sigs.MovePermissionSig, MovePermissionDetour, "MovePermission");
+        if (movePermissionHook != null)
+            return true;
+
+        statusText = "Unavailable - movement permission hook missing.";
+        return false;
     }
 
     private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
@@ -148,7 +182,7 @@ public unsafe sealed class PlayerModsService : IDisposable
 
     private void UpdateFrameworkSubscription()
     {
-        var shouldSubscribe = infiniteSprintEnabled;
+        var shouldSubscribe = infiniteSprintEnabled || moveableAfterDeathEnablePending;
         if (shouldSubscribe == frameworkSubscribed)
             return;
 
@@ -202,6 +236,21 @@ public unsafe sealed class PlayerModsService : IDisposable
     {
         if (infiniteSprintEnabled)
             TryApplySprint();
+
+        if (!moveableAfterDeathEnablePending)
+            return;
+
+        if (!TryEnsureMovePermissionHookReady(out var pendingStatusText))
+        {
+            MoveableAfterDeathStatusText = pendingStatusText;
+            return;
+        }
+
+        moveableAfterDeathEnablePending = false;
+        moveableAfterDeathEnabled = true;
+        UpdateMovePermissionHookState();
+        UpdateFrameworkSubscription();
+        MoveableAfterDeathStatusText = "Enabled - local movement permission stays open after death.";
     }
 
     private void RefreshInfiniteSprintStatusText()

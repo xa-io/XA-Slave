@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using System.Numerics;
+using System;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
@@ -22,19 +23,37 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.24 - 2026-04-19",
+            Lines =
+            [
+                "Fixes",
+                "- Startup XA Mods, saved window opens, and some context-specific hooks now arm later when needed, reducing update-time `FrameworkUpdate` hitches",
+                "- Xagman owner sendoff now waits for a final two-step give/request check before the owner leaves",
+                "- Xagman partial Tony resupply trades now keep the owner in the wait loop with the reduced remaining request",
+                "- Xagman peer start, stop, recall, and completion commands now move their local task and log work back to the framework thread",
+                "- `Close Lobby Errors` now catches supported numeric error codes even when those codes appear inside longer dialog text",
+                "",
+                "Quality Of Life",
+                "- `/xa lowres <scale>` now requires `Low Resolution` to already be enabled",
+                "- Titlebar resolution favourites now stay dim and print the same enable-first error unless `Custom Resolutions` is enabled",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.23 - 2026-04-19",
-            HighlightAsCurrentRelease = true,
             Lines =
             [
                 "Fixes",
                 "- Fixed the update-time reload hang path so Dalamud is less likely to stall when XA Slave reloads during plugin updates",
                 "- Fixed the `Kill Game` titlebar favourite highlight so it refreshes correctly even while the main XA Slave window is collapsed",
                 "- Xagman trading conflicts were hardened with owner-collection and queue-flow fixes so empty or already-satisfied owner passes are less likely to stall follow-up trading work",
+                "- Xagman partial Tony resupply trades now keep the owner waiting with the reduced remaining request instead of yielding too early and missing Tony's immediate follow-up trade request",
+                "- Xagman now performs a two-step whole-flow completion verification before owner sendoff, so a completed trade no longer sends the owner home until both give-side and Tony-supply-side reconciliation checks come back clean",
                 "",
                 "New XA Mods / QoL",
                 "- Added `Bailout ESC Menu` to close a stuck `SystemMenu` after the selected timeout",
                 "- Added `Auto Leave Duty` to exit completed duties after a configurable delay once combat and blockers clear",
-                "- Added `Instance Return` to skip the Return cast/cooldown path while leaving the in-game confirmation to the user",
+                "- Added `Instant Return` to skip the Return cast/cooldown path while leaving the in-game confirmation to the user",
                 "- Added `Anti-AFK` with a 9-minute local timer refresh cadence",
                 "- Added `Auto Merge` to combine incomplete inventory stacks when the inventory window opens",
             ],
@@ -273,14 +292,14 @@ public sealed class UpdatesWindow : Window
 
     public override void Draw()
     {
-        var currentReleaseIndex = versions.FindIndex(entry => entry.HighlightAsCurrentRelease);
-        if (currentReleaseIndex < 0)
-            currentReleaseIndex = 0;
-        var currentReleaseHeader = versions[currentReleaseIndex].Header;
+        var currentVersionIndex = versions.FindIndex(entry => HeaderMatchesRunningVersion(entry.Header));
+        if (currentVersionIndex < 0)
+            currentVersionIndex = 0;
+        var currentVersionHeader = versions[currentVersionIndex].Header;
 
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Version History");
         ImGui.TextDisabled($"Installed build: XA Slave v{BuildInfo.Version}");
-        ImGui.TextDisabled($"Current published notes: {currentReleaseHeader}");
+        ImGui.TextDisabled($"Current version notes: {currentVersionHeader}");
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -294,18 +313,18 @@ public sealed class UpdatesWindow : Window
         for (var i = 0; i < versions.Count; i++)
         {
             var entry = versions[i];
-            var isLatest = i == currentReleaseIndex;
+            var isCurrentVersion = i == currentVersionIndex;
 
             ImGui.PushID(i);
 
-            if (isLatest)
+            if (isCurrentVersion)
                 ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.4f, 1.0f, 0.4f, 1.0f));
 
             if (firstDraw)
-                ImGui.SetNextItemOpen(isLatest, ImGuiCond.Always);
+                ImGui.SetNextItemOpen(isCurrentVersion, ImGuiCond.Always);
             var open = ImGui.CollapsingHeader(entry.Header);
 
-            if (isLatest)
+            if (isCurrentVersion)
                 ImGui.PopStyleColor();
 
             if (open)
@@ -363,10 +382,27 @@ public sealed class UpdatesWindow : Window
     private static float Scale(float value)
         => value * UiScale;
 
+    private static bool HeaderMatchesRunningVersion(string header)
+    {
+        return string.Equals(GetVersionToken(header), $"v{BuildInfo.Version}", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static string GetVersionToken(string header)
+    {
+        var trimmed = header?.Trim() ?? string.Empty;
+        var separatorIndex = trimmed.IndexOf(" - ", StringComparison.Ordinal);
+        if (separatorIndex > 0)
+            return trimmed[..separatorIndex].Trim();
+
+        var firstSpaceIndex = trimmed.IndexOf(' ');
+        return firstSpaceIndex > 0
+            ? trimmed[..firstSpaceIndex].Trim()
+            : trimmed;
+    }
+
     private sealed class VersionEntry
     {
         public string Header { get; init; } = string.Empty;
-        public bool HighlightAsCurrentRelease { get; init; }
         public List<string> Lines { get; init; } = [];
     }
 }

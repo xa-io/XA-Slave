@@ -153,8 +153,7 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
 
         foreach (var marker in DialogueMarkers)
         {
-            var contains = marker.Contains(' ');
-            if (AddonHelper.AddonHasText(DialogueAddonName, marker, contains))
+            if (AddonHelper.AddonHasText(DialogueAddonName, marker, true))
                 return true;
         }
 

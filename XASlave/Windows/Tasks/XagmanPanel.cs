@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Globalization;
 using System.Linq;
 using System.Numerics;
@@ -481,7 +482,7 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Region/DC", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
             ImGui.TableSetupColumn("Inv", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
             ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
-            ImGui.TableSetupColumn("🗑️", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            ImGui.TableSetupColumn(string.Empty, ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
@@ -620,7 +621,7 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Region/DC", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
             ImGui.TableSetupColumn("Inv", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
             ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
-            ImGui.TableSetupColumn("🗑️", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            ImGui.TableSetupColumn(string.Empty, ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
@@ -834,7 +835,7 @@ public partial class SlaveWindow
                 ImGui.TableSetupColumn("Mode", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
                 ImGui.TableSetupColumn("Amt", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             }
-            ImGui.TableSetupColumn("🗑️", ImGuiTableColumnFlags.WidthFixed, Scale(30f));
+            ImGui.TableSetupColumn(string.Empty, ImGuiTableColumnFlags.WidthFixed, Scale(30f));
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
             for (var i = 0; i < items.Count; i++)
@@ -1643,22 +1644,32 @@ public partial class SlaveWindow
             .ToList();
     }
 
+    private System.Threading.Tasks.Task RunXagmanPeerUiActionAsync(System.Action action)
+    {
+        return Plugin.Framework.RunOnFrameworkThread(action);
+    }
+
+    private System.Threading.Tasks.Task AddXagmanPeerLogAsync(string message)
+    {
+        return RunXagmanPeerUiActionAsync(() => plugin.TaskRunner.AddLog(message));
+    }
+
     private async System.Threading.Tasks.Task<bool> EnsureXagmanPeerCommandChannelAsync(string commandLabel)
     {
         if (plugin.XagmanPeers == null || plugin.XagmanPeers.IsDisposed || !plugin.XagmanPeers.IsStarted)
         {
-            plugin.TaskRunner.AddLog($"Xagman: Cannot send {commandLabel} command - peer service is not available");
+            await AddXagmanPeerLogAsync($"Xagman: Cannot send {commandLabel} command - peer service is not available").ConfigureAwait(false);
             return false;
         }
 
         if (plugin.XagmanPeers.IsConnected)
             return true;
 
-        plugin.TaskRunner.AddLog($"Xagman: Waiting for local TCP peer connection before sending {commandLabel} command...");
+        await AddXagmanPeerLogAsync($"Xagman: Waiting for local TCP peer connection before sending {commandLabel} command...").ConfigureAwait(false);
         if (await plugin.XagmanPeers.WaitForConnectionAsync(TimeSpan.FromSeconds(5)).ConfigureAwait(false))
             return true;
 
-        plugin.TaskRunner.AddLog($"Xagman: Cannot send {commandLabel} command - local TCP peer connection is not ready ({plugin.XagmanPeers.LastStatus})");
+        await AddXagmanPeerLogAsync($"Xagman: Cannot send {commandLabel} command - local TCP peer connection is not ready ({plugin.XagmanPeers.LastStatus})").ConfigureAwait(false);
         return false;
     }
 
@@ -1691,20 +1702,20 @@ public partial class SlaveWindow
             var peers = await WaitForXagmanCommandTargetPeersAsync(3.0).ConfigureAwait(false);
             if (peers.Count == 0)
             {
-                plugin.TaskRunner.AddLog("Xagman: No connected peers to send start command to");
+                await AddXagmanPeerLogAsync("Xagman: No connected peers to send start command to").ConfigureAwait(false);
                 return;
             }
 
-            plugin.TaskRunner.AddLog($"Xagman: Sending start command to {peers.Count} connected peers...");
+            await AddXagmanPeerLogAsync($"Xagman: Sending start command to {peers.Count} connected peers...").ConfigureAwait(false);
 
             if (await plugin.XagmanPeers.SendStartTaskToAllPeersAsync().ConfigureAwait(false))
-                plugin.TaskRunner.AddLog("Xagman: Start command sent successfully");
+                await AddXagmanPeerLogAsync("Xagman: Start command sent successfully").ConfigureAwait(false);
             else
-                plugin.TaskRunner.AddLog($"Xagman: Failed to send start command to peers ({plugin.XagmanPeers.LastStatus})");
+                await AddXagmanPeerLogAsync($"Xagman: Failed to send start command to peers ({plugin.XagmanPeers.LastStatus})").ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            plugin.TaskRunner.AddLog($"Xagman: Failed to send start command to peers: {ex.Message}");
+            await AddXagmanPeerLogAsync($"Xagman: Failed to send start command to peers: {ex.Message}").ConfigureAwait(false);
             Plugin.Log.Error(ex, "[Xagman] StartAllXagmanPeers failed");
         }
     }
@@ -1723,29 +1734,31 @@ public partial class SlaveWindow
                 var peers = await WaitForXagmanCommandTargetPeersAsync(1.0).ConfigureAwait(false);
                 if (peers.Count == 0)
                 {
-                    plugin.TaskRunner.AddLog("Xagman: No connected peers to send stop command to");
+                    await AddXagmanPeerLogAsync("Xagman: No connected peers to send stop command to").ConfigureAwait(false);
                 }
                 else
                 {
-                    plugin.TaskRunner.AddLog($"Xagman: Sending stop command to {peers.Count} connected peers...");
+                    await AddXagmanPeerLogAsync($"Xagman: Sending stop command to {peers.Count} connected peers...").ConfigureAwait(false);
                     if (await plugin.XagmanPeers.SendStopTaskToAllPeersAsync().ConfigureAwait(false))
-                        plugin.TaskRunner.AddLog("Xagman: Stop command sent successfully");
+                        await AddXagmanPeerLogAsync("Xagman: Stop command sent successfully").ConfigureAwait(false);
                     else
-                        plugin.TaskRunner.AddLog($"Xagman: Failed to send stop command to peers ({plugin.XagmanPeers.LastStatus})");
+                        await AddXagmanPeerLogAsync($"Xagman: Failed to send stop command to peers ({plugin.XagmanPeers.LastStatus})").ConfigureAwait(false);
                 }
             }
 
-            // Also stop local task if running
-            if (xagmanRunning)
+            await RunXagmanPeerUiActionAsync(() =>
             {
+                if (!xagmanRunning)
+                    return;
+
                 StopXagmanTask();
                 xagmanStatusText = "Stopped via peer command";
                 plugin.TaskRunner.AddLog("Xagman: Stopped task via peer command");
-            }
+            }).ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            plugin.TaskRunner.AddLog($"Xagman: Failed to send stop command to peers: {ex.Message}");
+            await AddXagmanPeerLogAsync($"Xagman: Failed to send stop command to peers: {ex.Message}").ConfigureAwait(false);
             Plugin.Log.Error(ex, "[Xagman] StopAllXagmanPeers failed");
         }
     }
@@ -1765,19 +1778,19 @@ public partial class SlaveWindow
             var peers = await WaitForXagmanCommandTargetPeersAsync(1.0).ConfigureAwait(false);
             if (peers.Count == 0)
             {
-                plugin.TaskRunner.AddLog("Xagman: No connected peers to send recall command to");
+                await AddXagmanPeerLogAsync("Xagman: No connected peers to send recall command to").ConfigureAwait(false);
                 return;
             }
 
-            plugin.TaskRunner.AddLog($"Xagman: Sending recall command to {peers.Count} connected peers...");
+            await AddXagmanPeerLogAsync($"Xagman: Sending recall command to {peers.Count} connected peers...").ConfigureAwait(false);
             if (await plugin.XagmanPeers.SendRecallTaskToAllPeersAsync().ConfigureAwait(false))
-                plugin.TaskRunner.AddLog("Xagman: Recall command sent successfully");
+                await AddXagmanPeerLogAsync("Xagman: Recall command sent successfully").ConfigureAwait(false);
             else
-                plugin.TaskRunner.AddLog($"Xagman: Failed to send recall command to peers ({plugin.XagmanPeers.LastStatus})");
+                await AddXagmanPeerLogAsync($"Xagman: Failed to send recall command to peers ({plugin.XagmanPeers.LastStatus})").ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            plugin.TaskRunner.AddLog($"Xagman: Failed to send recall command to peers: {ex.Message}");
+            await AddXagmanPeerLogAsync($"Xagman: Failed to send recall command to peers: {ex.Message}").ConfigureAwait(false);
             Plugin.Log.Error(ex, "[Xagman] RecallAllXagmanPeersForFailure failed");
         }
     }
@@ -1797,19 +1810,19 @@ public partial class SlaveWindow
             var peers = await WaitForXagmanCommandTargetPeersAsync(1.0).ConfigureAwait(false);
             if (peers.Count == 0)
             {
-                plugin.TaskRunner.AddLog("Xagman: No connected peers to send completion command to");
+                await AddXagmanPeerLogAsync("Xagman: No connected peers to send completion command to").ConfigureAwait(false);
                 return;
             }
 
-            plugin.TaskRunner.AddLog($"Xagman: Sending completion command to {peers.Count} connected peers...");
+            await AddXagmanPeerLogAsync($"Xagman: Sending completion command to {peers.Count} connected peers...").ConfigureAwait(false);
             if (await plugin.XagmanPeers.SendCompleteTaskToAllPeersAsync().ConfigureAwait(false))
-                plugin.TaskRunner.AddLog("Xagman: Completion command sent successfully");
+                await AddXagmanPeerLogAsync("Xagman: Completion command sent successfully").ConfigureAwait(false);
             else
-                plugin.TaskRunner.AddLog($"Xagman: Failed to send completion command to peers ({plugin.XagmanPeers.LastStatus})");
+                await AddXagmanPeerLogAsync($"Xagman: Failed to send completion command to peers ({plugin.XagmanPeers.LastStatus})").ConfigureAwait(false);
         }
         catch (Exception ex)
         {
-            plugin.TaskRunner.AddLog($"Xagman: Failed to send completion command to peers: {ex.Message}");
+            await AddXagmanPeerLogAsync($"Xagman: Failed to send completion command to peers: {ex.Message}").ConfigureAwait(false);
             Plugin.Log.Error(ex, "[Xagman] CompleteAllXagmanPeers failed");
         }
     }
@@ -3513,6 +3526,7 @@ public partial class SlaveWindow
             const double ownerTradeRangeRetryCooldownSeconds = 2.0;
             var ownerCollectionRetryRequested = false;
             var ownerCollectionQueuedEntries = 0;
+            var ownerSendoffVerified = false;
             var ownerCollectionTooFarAwayRetryCount = 0;
             var ownerCollectionTooFarAwayLastRetryUtc = DateTime.MinValue;
             var ownerRequestedTooFarAwayRetryCount = 0;
@@ -3728,7 +3742,19 @@ public partial class SlaveWindow
                     return true;
                 }
 
-                return HasXagmanRequestedTradeProgress(xagmanOwnerRequestedItems, charName);
+                if (!HasXagmanActiveTonyTradeLock(charName))
+                {
+                    SetXagmanOwnerRequestedItems(remainingRequests, false);
+                    return BeginStandbyForTonyRotation(activeTradeLockLostMessage);
+                }
+
+                if (HasXagmanRequestedTradeProgress(xagmanOwnerRequestedItems, charName))
+                {
+                    SetXagmanOwnerRequestedItems(remainingRequests, false);
+                    return false;
+                }
+
+                return false;
             }
 
             void EvaluateOwnerCollectionRetry(int collectionPassNumber)
@@ -3750,6 +3776,38 @@ public partial class SlaveWindow
                 }
 
                 runner.AddLog($"Xagman: owner {charName} still has give items remaining after collection pass {collectionPassNumber}; retrying owner give trade before any Tony supply requests.");
+            }
+
+            bool EvaluateOwnerSendoffReconciliation(int verificationPassNumber, bool yieldOnFailure)
+            {
+                ownerSendoffVerified = false;
+                ownerCollectionRetryRequested = HasXagmanOwnerCollectionItemsRemaining(cfg.XagmanItems, charName);
+                var remainingRequestedItems = BuildXagmanOwnerTradeRequests(cfg.XagmanItems, charName, false);
+                if (!ownerCollectionRetryRequested && remainingRequestedItems.Count == 0)
+                {
+                    SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
+                    ownerSendoffVerified = true;
+                    runner.AddLog($"Xagman: owner {charName} completion verification {verificationPassNumber}/2 passed; no additional give or Tony supply work remains before sendoff.");
+                    return true;
+                }
+
+                SetXagmanOwnerRequestedItems(remainingRequestedItems, false);
+                var remainingRequestUnits = remainingRequestedItems.Sum(item => Math.Max(0, item.Quantity));
+                var remainingSummary = ownerCollectionRetryRequested && remainingRequestedItems.Count > 0
+                    ? $"owner give-items still remain and {remainingRequestedItems.Count} Tony supply entr{(remainingRequestedItems.Count == 1 ? "y" : "ies")} totaling {remainingRequestUnits} units are still needed"
+                    : ownerCollectionRetryRequested
+                        ? "owner give-items still remain"
+                        : $"{remainingRequestedItems.Count} Tony supply entr{(remainingRequestedItems.Count == 1 ? "y" : "ies")} totaling {remainingRequestUnits} units are still needed";
+
+                if (yieldOnFailure)
+                {
+                    return BeginStandbyForTonyRotation(
+                        $"Xagman: owner {charName} completion verification {verificationPassNumber}/2 found unresolved work after the trade flow ({remainingSummary}); yielding before sendoff so the remaining work can be retried.");
+                }
+
+                runner.AddLog(
+                    $"Xagman: owner {charName} completion verification {verificationPassNumber}/2 found unresolved work after the trade flow ({remainingSummary}); running one more full reconciliation check before sendoff.");
+                return false;
             }
 
             void AddRepeatedOwnerCollectionPass(int collectionPassNumber)
@@ -4501,22 +4559,25 @@ public partial class SlaveWindow
             AppendXagmanDropboxAutoAcceptStep(steps, $"Xagman Requested Trade {charName}", false, () => standbyRequested);
             steps.Add(new TaskStep
             {
-                Name = $"Xagman Requested Trade Verify Remaining Needs: {charName}",
-                ShouldSkip = () => relogFailed || standbyRequested || xagmanOwnerRequestedItems.Count == 0,
+                Name = $"Xagman Completion Verify 1: {charName}",
+                ShouldSkip = () => relogFailed || standbyRequested,
                 OnEnter = () =>
                 {
                     xagmanObservedDropboxBusy = false;
-                    var remainingRequestedItems = BuildXagmanOwnerTradeRequests(cfg.XagmanItems, charName, false);
-                    if (remainingRequestedItems.Count == 0)
-                    {
-                        SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
-                        return;
-                    }
-
-                    SetXagmanOwnerRequestedItems(remainingRequestedItems, false);
-                    var remainingUnits = remainingRequestedItems.Sum(item => Math.Max(0, item.Quantity));
-                    BeginStandbyForTonyRotation(
-                        $"Xagman: owner {charName} still needs {remainingRequestedItems.Count} Tony supply entr{(remainingRequestedItems.Count == 1 ? "y" : "ies")} totaling {remainingUnits} units after the requested trade and is yielding for the next Tony.");
+                    EvaluateOwnerSendoffReconciliation(1, false);
+                },
+                IsComplete = () => true,
+                TimeoutSec = 1f,
+            });
+            steps.Add(MonthlyReloggerTask.MakeDelay($"Xagman Completion Verify Wait: {charName}", 0.75f, () => relogFailed || standbyRequested));
+            steps.Add(new TaskStep
+            {
+                Name = $"Xagman Completion Verify 2: {charName}",
+                ShouldSkip = () => relogFailed || standbyRequested,
+                OnEnter = () =>
+                {
+                    xagmanObservedDropboxBusy = false;
+                    EvaluateOwnerSendoffReconciliation(2, true);
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -4524,7 +4585,7 @@ public partial class SlaveWindow
             steps.Add(new TaskStep
             {
                 Name = $"Xagman Trade Release Queue Slot: {charName}",
-                ShouldSkip = () => relogFailed || standbyRequested,
+                ShouldSkip = () => relogFailed || standbyRequested || !ownerSendoffVerified,
                 OnEnter = () =>
                 {
                     SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
@@ -4897,13 +4958,16 @@ public partial class SlaveWindow
 
     private void UpdateXagmanFrameworkTick()
     {
-        ProcessXagmanPendingMatchSelection();
+        var totalStopwatch = Stopwatch.StartNew();
+        MeasureFrameworkUpdateStep("Xagman.ProcessPendingMatchSelection", ProcessXagmanPendingMatchSelection);
         if (xagmanRunning && xagmanActiveRole == XagmanRole.Tony && !plugin.TaskRunner.IsRunning)
-            UpdateXagmanTonyRuntime();
+            MeasureFrameworkUpdateStep("Xagman.UpdateTonyRuntime", UpdateXagmanTonyRuntime);
         var publishInterval = xagmanRunning ? 1.0 : 5.0;
         if ((DateTime.UtcNow - xagmanLastPresencePublishUtc).TotalSeconds >= publishInterval)
-            PublishXagmanPresence();
-        UpdatePriorityTaskExternalStatus();
+            MeasureFrameworkUpdateStep("Xagman.PublishPresence", PublishXagmanPresence);
+        MeasureFrameworkUpdateStep("Xagman.UpdatePriorityTaskExternalStatus", UpdatePriorityTaskExternalStatus);
+        totalStopwatch.Stop();
+        LogFrameworkUpdateStepDuration("Xagman.UpdateXagmanFrameworkTick", totalStopwatch.Elapsed.TotalMilliseconds);
     }
 
     private bool TryReassertXagmanTonyMeetup()

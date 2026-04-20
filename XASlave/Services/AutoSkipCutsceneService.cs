@@ -54,37 +54,15 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     public bool SetEnabled(bool value)
     {
         if (value == enabled)
+        {
+            RefreshStatusText();
             return enabled;
+        }
 
         if (!value)
         {
             Disable();
             StatusText = "Disabled";
-            return false;
-        }
-
-        EnsureInitialized();
-        if (!HasAnyCutsceneSurface())
-        {
-            StatusText = "Unavailable - cutscene signatures were not found.";
-            log.Warning("[XASlave] Auto Skip Cutscenes unavailable: no cutscene hook or patch signatures were found.");
-            return false;
-        }
-
-        availableSurfaceCount = 0;
-        availableSurfaceCount += ToggleHook(cutsceneHandleInputHook, true, "CutsceneHandleInput");
-        availableSurfaceCount += ToggleHook(playCutsceneHook, true, "PlayCutscene");
-        availableSurfaceCount += ToggleHook(playCutsceneLuaHook, true, "PlayCutsceneLua");
-        availableSurfaceCount += ToggleHook(isCutsceneSeenHook, true, "IsCutsceneSeen");
-        availableSurfaceCount += ToggleHook(playStaffRollHook, true, "PlayStaffRoll");
-        availableSurfaceCount += ToggleHook(playToBeContinuedHook, true, "PlayToBeContinued");
-        if (cutsceneUnskippablePatchAddress != nint.Zero)
-            availableSurfaceCount++;
-
-        if (availableSurfaceCount == 0)
-        {
-            StatusText = "Unavailable - cutscene hooks failed to enable.";
-            log.Warning("[XASlave] Auto Skip Cutscenes could not enable any hook or patch surfaces.");
             return false;
         }
 
@@ -95,8 +73,10 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         }
 
         enabled = true;
-        SyncCutscenePatchState();
-        StatusText = $"Enabled ({availableSurfaceCount} cutscene surfaces available).";
+        if (condition[ConditionFlag.OccupiedInCutSceneEvent])
+            EnsureInitializedForEnabledState();
+
+        RefreshStatusText();
         return true;
     }
 
@@ -145,6 +125,59 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
         if (!sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress))
             log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature.");
+    }
+
+    private void EnsureInitializedForEnabledState()
+    {
+        EnsureInitialized();
+        if (!HasAnyCutsceneSurface())
+        {
+            StatusText = "Unavailable - cutscene signatures were not found.";
+            log.Warning("[XASlave] Auto Skip Cutscenes unavailable: no cutscene hook or patch signatures were found.");
+            return;
+        }
+
+        availableSurfaceCount = 0;
+        availableSurfaceCount += ToggleHook(cutsceneHandleInputHook, true, "CutsceneHandleInput");
+        availableSurfaceCount += ToggleHook(playCutsceneHook, true, "PlayCutscene");
+        availableSurfaceCount += ToggleHook(playCutsceneLuaHook, true, "PlayCutsceneLua");
+        availableSurfaceCount += ToggleHook(isCutsceneSeenHook, true, "IsCutsceneSeen");
+        availableSurfaceCount += ToggleHook(playStaffRollHook, true, "PlayStaffRoll");
+        availableSurfaceCount += ToggleHook(playToBeContinuedHook, true, "PlayToBeContinued");
+        if (cutsceneUnskippablePatchAddress != nint.Zero)
+            availableSurfaceCount++;
+
+        if (availableSurfaceCount == 0)
+        {
+            StatusText = "Unavailable - cutscene hooks failed to enable.";
+            log.Warning("[XASlave] Auto Skip Cutscenes could not enable any hook or patch surfaces.");
+            return;
+        }
+
+        SyncCutscenePatchState();
+    }
+
+    private void RefreshStatusText()
+    {
+        if (!enabled)
+        {
+            StatusText = "Disabled";
+            return;
+        }
+
+        if (!initialized)
+        {
+            StatusText = "Ready - cutscene hooks will arm when the next cutscene starts.";
+            return;
+        }
+
+        if (availableSurfaceCount == 0)
+        {
+            StatusText = "Unavailable - cutscene hooks failed to enable.";
+            return;
+        }
+
+        StatusText = $"Enabled ({availableSurfaceCount} cutscene surfaces available).";
     }
 
     private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
@@ -257,6 +290,12 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
     private void OnFrameworkUpdate(IFramework _)
     {
+        if (enabled && !initialized && condition[ConditionFlag.OccupiedInCutSceneEvent])
+        {
+            EnsureInitializedForEnabledState();
+            RefreshStatusText();
+        }
+
         SyncCutscenePatchState();
         if (!enabled || !condition[ConditionFlag.OccupiedInCutSceneEvent])
             return;

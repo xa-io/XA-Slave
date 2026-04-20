@@ -34,6 +34,8 @@ public partial class SlaveWindow : Window, IDisposable
     private const float DefaultTaskMenuWidth = 100f;
     private const float MinTaskMenuWidth = 30f;
     private const float MaxTaskMenuWidth = DefaultTaskMenuWidth * 2f;
+    private const double FrameworkUpdateTimingDebugThresholdMilliseconds = 5.0;
+    private const double FrameworkUpdateTimingWarningThresholdMilliseconds = 25.0;
     private const float TaskLayoutColumnGap = 3f;
     private static float UiScale => ImGuiHelpers.GlobalScale;
     private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
@@ -279,6 +281,7 @@ public partial class SlaveWindow : Window, IDisposable
             if (!item.Enabled) continue;
             var w = item.Width;
             var h = item.Height;
+            var buttonIndex = TitleBarButtons.Count;
             TitleBarButtons.Add(new TitleBarButton
             {
                 Icon = FontAwesomeIcon.Desktop,
@@ -287,9 +290,17 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     using var tt = ImRaii.Tooltip();
                     ImGui.TextUnformatted($"Resolution: {w}x{h}");
+                    ImGui.TextDisabled(plugin.Configuration.CustomResolutionsEnabled
+                        ? "Custom Resolutions is enabled."
+                        : "Enable XA Mods > Custom Resolutions first.");
                 },
-                Click = _ => { plugin.SystemWindowMods.TryApplyCustomResolution(w, h, out var resMsg); },
+                Click = _ =>
+                {
+                    if (!plugin.SystemWindowMods.TryApplyCustomResolution(w, h, out var resMsg))
+                        Plugin.ChatGui.PrintError($"[XASlave] {resMsg}");
+                },
             });
+            titleBarFavCustomColorResolvers[buttonIndex] = () => plugin.Configuration.CustomResolutionsEnabled ? FavIconColorOn : FavIconColorOff;
         }
 
         // ── Custom favourites ──
@@ -1018,18 +1029,27 @@ public partial class SlaveWindow : Window, IDisposable
 
     private void OnFrameworkUpdate(IFramework framework)
     {
-        plugin.EnforceSpecialRenderSafetyOnFrameworkTick();
-        UpdatePriorityTaskMonitors();
-        UpdatePriorityTaskExternalStatus();
-        OnExportDataFrameworkTick();
-        UpdateXagmanFrameworkTick();
+        var totalStopwatch = Stopwatch.StartNew();
+        MeasureFrameworkUpdateStep("SlaveWindow.EnforceSpecialRenderSafety", plugin.EnforceSpecialRenderSafetyOnFrameworkTick);
+        MeasureFrameworkUpdateStep("SlaveWindow.UpdatePriorityTaskMonitors", UpdatePriorityTaskMonitors);
+        MeasureFrameworkUpdateStep("SlaveWindow.UpdatePriorityTaskExternalStatus", UpdatePriorityTaskExternalStatus);
+        MeasureFrameworkUpdateStep("SlaveWindow.OnExportDataFrameworkTick", OnExportDataFrameworkTick);
+        MeasureFrameworkUpdateStep("SlaveWindow.UpdateXagmanFrameworkTick", UpdateXagmanFrameworkTick);
 
         if (!autoCollectScheduledAt.HasValue || !Plugin.PlayerState.IsLoaded || plugin.AutoCollector.IsRunning)
+        {
+            totalStopwatch.Stop();
+            LogFrameworkUpdateStepDuration("SlaveWindow.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
             return;
+        }
 
         var delay = (float)(DateTime.UtcNow - autoCollectScheduledAt.Value).TotalSeconds;
         if (delay < autoCollectScheduledDelaySeconds || !plugin.AutoCollector.IsNormalCondition())
+        {
+            totalStopwatch.Stop();
+            LogFrameworkUpdateStepDuration("SlaveWindow.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
             return;
+        }
 
         autoCollectScheduledAt = null;
 
@@ -1045,6 +1065,8 @@ public partial class SlaveWindow : Window, IDisposable
             autoCollectSkipPending = false;
             autoCollectSkipMessage = string.Empty;
             autoCollectResumeArOnCompletion = false;
+            totalStopwatch.Stop();
+            LogFrameworkUpdateStepDuration("SlaveWindow.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
             return;
         }
 
@@ -1053,7 +1075,29 @@ public partial class SlaveWindow : Window, IDisposable
         autoCollectSkipPending = false;
         autoCollectSkipMessage = string.Empty;
         autoCollectResumeArOnCompletion = false;
-        RunAutoCollection(resumeArAfterCollection);
+        MeasureFrameworkUpdateStep("SlaveWindow.RunAutoCollection", () => RunAutoCollection(resumeArAfterCollection));
+        totalStopwatch.Stop();
+        LogFrameworkUpdateStepDuration("SlaveWindow.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
+    }
+
+    private void MeasureFrameworkUpdateStep(string label, System.Action action)
+    {
+        var stopwatch = Stopwatch.StartNew();
+        action();
+        stopwatch.Stop();
+        LogFrameworkUpdateStepDuration(label, stopwatch.Elapsed.TotalMilliseconds);
+    }
+
+    private void LogFrameworkUpdateStepDuration(string label, double elapsedMilliseconds)
+    {
+        if (elapsedMilliseconds < FrameworkUpdateTimingDebugThresholdMilliseconds)
+            return;
+
+        var message = $"[XASlave] Framework tick step '{label}' took {elapsedMilliseconds:F1}ms.";
+        if (elapsedMilliseconds >= FrameworkUpdateTimingWarningThresholdMilliseconds)
+            Plugin.Log.Warning(message);
+        else
+            Plugin.Log.Debug(message);
     }
 
     private void UpdatePriorityTaskMonitors()

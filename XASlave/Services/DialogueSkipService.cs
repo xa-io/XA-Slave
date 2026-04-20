@@ -39,6 +39,8 @@ public unsafe sealed class DialogueSkipService : IDisposable
         this.log = log;
     }
 
+    public bool IsEnabled => enabled;
+
     public string StatusText { get; private set; } = "Disabled";
 
     public bool SetEnabled(bool value)
@@ -58,9 +60,7 @@ public unsafe sealed class DialogueSkipService : IDisposable
             return false;
         }
 
-        EnsureInitialized();
         enabled = true;
-        UpdateHookState(true);
         UpdateSubscription(true);
         RefreshStatusText();
         return true;
@@ -110,6 +110,12 @@ public unsafe sealed class DialogueSkipService : IDisposable
         if (!enabled)
         {
             StatusText = "Disabled";
+            return;
+        }
+
+        if (!initialized)
+        {
+            StatusText = "Ready - Talk auto-advance is active and native dialogue hooks will arm on first dialogue.";
             return;
         }
 
@@ -293,6 +299,13 @@ public unsafe sealed class DialogueSkipService : IDisposable
     {
         if (!enabled || args.Addon.IsNull)
             return;
+
+        if (!initialized)
+        {
+            EnsureInitialized();
+            UpdateHookState(true);
+            RefreshStatusText();
+        }
 
         var now = Environment.TickCount64;
         if (now - lastAdvanceTick < 150)

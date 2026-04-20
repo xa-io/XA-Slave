@@ -148,13 +148,20 @@ public sealed class TaskRunner : IDisposable
 
     public void SetExternalStatus(string statusText)
     {
-        externalStatusText = statusText?.Trim() ?? string.Empty;
+        var normalizedStatusText = statusText?.Trim() ?? string.Empty;
+        if (string.Equals(externalStatusText, normalizedStatusText, StringComparison.Ordinal))
+            return;
+
+        externalStatusText = normalizedStatusText;
         if (!running)
             UpdateDtrBar();
     }
 
     public void ClearExternalStatus()
     {
+        if (string.IsNullOrEmpty(externalStatusText))
+            return;
+
         externalStatusText = string.Empty;
         if (!running)
             UpdateDtrBar();

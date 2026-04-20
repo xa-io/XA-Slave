@@ -89,7 +89,7 @@ public unsafe sealed class QuickReturnService : IDisposable
         }
         catch (Exception ex)
         {
-            log.Warning(ex, "[XASlave] Instance Return failed to create the Return hook.");
+            log.Warning(ex, "[XASlave] Instant Return failed to create the Return hook.");
         }
     }
 
@@ -112,7 +112,7 @@ public unsafe sealed class QuickReturnService : IDisposable
         }
         catch (Exception ex)
         {
-            log.Warning(ex, $"[XASlave] Instance Return failed to {(targetEnabled ? "enable" : "disable")} the Return hook.");
+            log.Warning(ex, $"[XASlave] Instant Return failed to {(targetEnabled ? "enable" : "disable")} the Return hook.");
         }
     }
 
@@ -158,12 +158,12 @@ public unsafe sealed class QuickReturnService : IDisposable
                 return;
             }
 
-            log.Information("[XASlave] Instance Return sent the fast Return command.");
+            log.Information("[XASlave] Instant Return sent the fast Return command.");
             return;
         }
         catch (Exception ex)
         {
-            log.Warning(ex, "[XASlave] Instance Return failed while intercepting Return.");
+            log.Warning(ex, "[XASlave] Instant Return failed while intercepting Return.");
         }
 
         returnHook?.Original(agent);
@@ -187,7 +187,7 @@ public unsafe sealed class QuickReturnService : IDisposable
         }
         catch (Exception ex)
         {
-            log.Warning(ex, "[XASlave] Instance Return failed while updating party state before Return.");
+            log.Warning(ex, "[XASlave] Instant Return failed while updating party state before Return.");
         }
     }
 
