@@ -353,6 +353,7 @@ public sealed class XAPeepService : IDisposable
                 state = CreateState(player, nowUtc);
                 activeTargeters[player.GameObjectId] = state;
                 ShowCenterNotification(state, nowUtc);
+                ShowChatNotification(state);
                 TryPlayTargetSound(nowUtc);
             }
 
@@ -524,6 +525,19 @@ public sealed class XAPeepService : IDisposable
             ? $"{compactName} is targeting you"
             : $"{compactName} is targeting you x{totalTargetCount}";
         centerNotificationUntilUtc = nowUtc + CenterNotificationDuration;
+    }
+
+    private void ShowChatNotification(ActiveTargeterState state)
+    {
+        if (!configuration.XAPeepShowChatNotification)
+            return;
+
+        var compactName = XAPeepData.FormatCompactName(state.Name);
+        var totalTargetCount = state.PriorTargetCount + 1;
+        var message = totalTargetCount <= 1
+            ? $"{compactName} is targeting you."
+            : $"{compactName} is targeting you x{totalTargetCount}.";
+        Plugin.ChatGui.Print($"[XASlave] {message}");
     }
 
     private void TryPlayTargetSound(DateTime nowUtc)

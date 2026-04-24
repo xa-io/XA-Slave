@@ -393,6 +393,33 @@ public static class AddonHelper
             : -1;
     }
 
+    public static unsafe bool SelectAddonListText(string addonName, int callbackIndex, bool closeAfter = true)
+    {
+        var addon = GetAddon(addonName);
+        if (addon == null || !addon->IsVisible)
+        {
+            Plugin.Log.Warning($"[XASlave] AddonHelper.SelectAddonListText: '{addonName}' not visible or null.");
+            return false;
+        }
+
+        if (callbackIndex < 0)
+        {
+            Plugin.Log.Warning($"[XASlave] AddonHelper.SelectAddonListText: callback index {callbackIndex} is invalid for '{addonName}'.");
+            return false;
+        }
+
+        var ok = closeAfter
+            ? FireCallbackAndClose(addonName, callbackIndex)
+            : FireCallback(addonName, callbackIndex);
+        if (ok)
+        {
+            Plugin.Log.Information(
+                $"[XASlave] AddonHelper.SelectAddonListText: selected callback index {callbackIndex} in '{addonName}' (closeAfter={closeAfter}).");
+        }
+
+        return ok;
+    }
+
     public static unsafe bool SelectAddonListText(string addonName, string text, bool contains = false)
     {
         var addon = GetAddon(addonName);

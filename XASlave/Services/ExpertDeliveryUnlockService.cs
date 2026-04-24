@@ -7,7 +7,32 @@ namespace XASlave.Services;
 
 public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
 {
-    private const byte ForcedRankFloor = 11;
+    public const int MinForcedRankFloor = 0;
+    public const int MaxForcedRankFloor = 19;
+    public const int DefaultForcedRankFloor = 11;
+    private static readonly string[] ForcedRankFloorLabels =
+    {
+        "0 - No Spoof / Real Rank",
+        "1 - Storm Private Third Class",
+        "2 - Storm Private Second Class",
+        "3 - Storm Private First Class",
+        "4 - Storm Corporal",
+        "5 - Storm Sergeant Third Class",
+        "6 - Storm Sergeant Second Class",
+        "7 - Storm Sergeant First Class",
+        "8 - Chief Storm Sergeant",
+        "9 - Second Storm Lieutenant",
+        "10 - First Storm Lieutenant",
+        "11 - Storm Captain",
+        "12 - Second Storm Commander",
+        "13 - First Storm Commander",
+        "14 - High Storm Commander",
+        "15 - Rear Storm Marshal",
+        "16 - Vice Storm Marshal",
+        "17 - Storm Marshal",
+        "18 - Grand Storm Marshal",
+        "19 - Storm Champion",
+    };
 
     private readonly IGameInteropProvider interopProvider;
     private readonly IPluginLog log;
@@ -15,6 +40,7 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
     private Hook<GetGrandCompanyRankDelegate>? getGrandCompanyRankHook;
     private bool initialized;
     private bool enabled;
+    private byte forcedRankFloor = (byte)DefaultForcedRankFloor;
 
     public ExpertDeliveryUnlockService(
         IGameInteropProvider interopProvider,
@@ -25,8 +51,26 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
     }
 
     public bool IsEnabled => enabled;
+    public int ForcedRankFloor => forcedRankFloor;
 
     public string StatusText { get; private set; } = "Disabled";
+
+    public static int NormalizeForcedRankFloor(int value)
+    {
+        return Math.Clamp(value, MinForcedRankFloor, MaxForcedRankFloor);
+    }
+
+    public static string GetForcedRankFloorLabel(int value)
+    {
+        var normalizedValue = NormalizeForcedRankFloor(value);
+        return ForcedRankFloorLabels[normalizedValue - MinForcedRankFloor];
+    }
+
+    public void ApplyConfiguration(int forcedRankFloor)
+    {
+        this.forcedRankFloor = (byte)NormalizeForcedRankFloor(forcedRankFloor);
+        RefreshStatusText();
+    }
 
     public bool SetEnabled(bool value)
     {
@@ -101,13 +145,13 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
             return;
         }
 
-        StatusText = $"Enabled - local GC rank floor is {ForcedRankFloor}.";
+        StatusText = $"Enabled - local GC rank floor is {GetForcedRankFloorLabel(forcedRankFloor)}.";
     }
 
     private byte GetGrandCompanyRankDetour(PlayerState* playerState)
     {
         var original = getGrandCompanyRankHook?.Original(playerState) ?? 0;
-        return Math.Max(original, ForcedRankFloor);
+        return Math.Max(original, forcedRankFloor);
     }
 
     private delegate byte GetGrandCompanyRankDelegate(PlayerState* playerState);

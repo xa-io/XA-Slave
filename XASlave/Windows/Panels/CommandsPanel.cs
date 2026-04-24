@@ -65,7 +65,7 @@ public partial class SlaveWindow
 
     private static readonly CommandReferenceEntry[] PlayerModsCommandEntries =
     {
-        new("/xa antiafk on|off", "Toggle `Anti-AFK`.", "Resets the local AFK timer roughly every 9 minutes while the mod stays enabled so the client stays ahead of the game's 10-minute AFK kick."),
+        new("/xa antiafk on|off", "Toggle `Anti-AFK`.", "Resets the local AFK timer roughly every 2 minutes while the mod stays enabled so the client stays ahead of the game's 10-minute AFK kick."),
         new("/xa equip <itemId>", "Equip an item by ID.", "XA scans the main inventory and armory chest, then queues the matching equip move to the correct slot."),
         new("/xa doze", "Trigger Doze Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
         new("/xa expertdelivery on|off", "Toggle `Automate Expert Delivery`.", "Controls the hand-in automation feature, not the unlock bypass."),
@@ -89,6 +89,12 @@ public partial class SlaveWindow
         new("/xa anonchars on|off", "Toggle `Anonymize Character Lists`.", "Forces screenshot-safe aliases in XA Slave character-list tables and duplicate summaries. Every task-list `Anonymize` checkbox writes to this same shared global setting, and it can also be exposed through titlebar favourites because it is a normal XA Mod."),
         new("/xa peepingtom on|off", "Toggle `Force PeepingTom`.", "Controls XA's runtime PvP forcing path for PeepingTom."),
         new("/xa pluginrestore", "Disable the current top-level Plugin Mods toggles.", "Covers XA's plugin-scoped toggles such as `Anonymize Character Lists` and `Force PeepingTom`."),
+    };
+
+    private static readonly CommandReferenceEntry[] EurekaModsCommandEntries =
+    {
+        new("/xa eurekaid on|off", "Toggle `Instance ID`.", "Only enables or disables the live Eureka instance display surface and optional DTR output. Use `Field Operations` -> `Eureka Instance Hunter` for the actual Rodney `Start` / `Stop` farming loop."),
+        new("/xa eurekarestore", "Disable the current top-level Eureka Mods toggles.", "Turns off the Eureka-only XA Mods section in one command."),
     };
 
     private static readonly CommandReferenceEntry[] IllegalModsCommandEntries =
@@ -121,6 +127,7 @@ public partial class SlaveWindow
         DrawFilteredCommandSection("Graphic Mods", GraphicModsCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Player Mods", PlayerModsCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Plugin Mods", PluginModsCommandEntries, ref visibleSectionCount);
+        DrawFilteredCommandSection("Eureka Mods", EurekaModsCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Illegal Shit You Shouldn't Use", IllegalModsCommandEntries, ref visibleSectionCount);
 
         if (visibleSectionCount == 0)

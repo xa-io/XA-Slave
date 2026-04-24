@@ -343,9 +343,37 @@ public class Configuration : IPluginConfiguration
     public bool AntiAfkEnabled { get; set; } = false;
     public bool AutoLeaveDutyEnabled { get; set; } = false;
     public int AutoLeaveDutyDelaySeconds { get; set; } = AutoLeaveDutyService.DelaySecondsDefault;
+    public bool EurekaInstanceIdEnabled { get; set; } = false;
+    public int EurekaInstanceIdZone { get; set; } = (int)EurekaInstanceIdService.DefaultZone;
+    public int EurekaInstanceIdBaselineInstanceId { get; set; } = 0;
+    public bool EurekaInstanceIdShowInDtr { get; set; } = false;
+    public int EurekaInstanceIdLeaveDutyDelaySeconds { get; set; } = EurekaInstanceIdService.LeaveDutyDelaySecondsDefault;
+    public bool EurekaInstanceIdAnemosEnabled { get; set; } = false;
+    public int EurekaInstanceIdAnemosBaselineInstanceId { get; set; } = 0;
+    public bool EurekaInstanceIdPagosEnabled { get; set; } = false;
+    public int EurekaInstanceIdPagosBaselineInstanceId { get; set; } = 0;
+    public bool EurekaInstanceIdPyrosEnabled { get; set; } = false;
+    public int EurekaInstanceIdPyrosBaselineInstanceId { get; set; } = 0;
+    public bool EurekaInstanceIdHydatosEnabled { get; set; } = false;
+    public int EurekaInstanceIdHydatosBaselineInstanceId { get; set; } = 0;
+    public bool EurekaInstanceIdPlaySound { get; set; } = false;
+    public int EurekaInstanceIdSoundEffectId { get; set; } = 0;
+    public float EurekaInstanceIdSoundVolume { get; set; } = EurekaInstanceIdService.DefaultSoundVolume;
+
+    // Eureka Logogram Creator
+    public bool AutoRefreshAllPagesOnOpen { get; set; } = true;
+    public bool AutoDestroyWhenMagiaBoardFull { get; set; } = false;
+    public bool AutoRetryFailedExtraction { get; set; } = false;
+    public Dictionary<uint, int> PreferredRecipeIndexes { get; set; } = new();
+    public Dictionary<ulong, int> LogogramSourceGilCosts { get; set; } = new();
+    public List<FavoritePlate> FavoritePlates { get; set; } = new();
+    public bool ShowFavoritesOverlay { get; set; } = true;
+    public int QueueStepFrameDelay { get; set; } = 20;
+    public bool EurekaLogogramCreatorDefaultSettingsMigrationApplied { get; set; } = false;
     public bool AutoMergeEnabled { get; set; } = false;
     public bool QuickReturnEnabled { get; set; } = false;
     public bool UnlockExpertDeliveryEnabled { get; set; } = false;
+    public int UnlockExpertDeliveryForcedRankFloor { get; set; } = ExpertDeliveryUnlockService.DefaultForcedRankFloor;
     public bool AutoRefuseTradeRequestEnabled { get; set; } = false;
     public bool AutoRefuseTradeShowNotification { get; set; } = true;
     public bool AutoRefuseTradeSendEcho { get; set; } = false;
@@ -372,6 +400,7 @@ public class Configuration : IPluginConfiguration
     public bool XAPeepShowTargeterDot { get; set; } = true;
     public bool XAPeepShowTargetersCard { get; set; } = true;
     public bool XAPeepShowCenterNotification { get; set; } = false;
+    public bool XAPeepShowChatNotification { get; set; } = false;
     public bool XAPeepPlaySound { get; set; } = false;
     public int XAPeepSoundEffectId { get; set; } = 0;
     public float XAPeepSoundVolume { get; set; } = 0.45f;
@@ -404,6 +433,7 @@ public class Configuration : IPluginConfiguration
     public bool MenuAutomatedTasksExpanded { get; set; } = true;
     public bool MenuCityShenanigansExpanded { get; set; } = true;
     public bool MenuFcRelationsExpanded { get; set; } = true;
+    public bool MenuFieldOperationsExpanded { get; set; } = true;
     public bool MenuUtilityExpanded { get; set; } = true;
     public bool MenuReferenceExpanded { get; set; } = true;
     public bool ToonModsGameModsExpanded { get; set; } = true;
@@ -411,6 +441,7 @@ public class Configuration : IPluginConfiguration
     public bool ToonModsPlayerModsExpanded { get; set; } = true;
     public bool ToonModsIllegalModsExpanded { get; set; } = true;
     public bool ToonModsPluginModsExpanded { get; set; } = true;
+    public bool ToonModsEurekaExpanded { get; set; } = true;
     public float TaskMenuWidth { get; set; } = 180f;
     public string LastSelectedBuiltInTask { get; set; } = "";
     public string LastSelectedExternalTaskName { get; set; } = "";

@@ -112,6 +112,12 @@ public sealed class XAModExpertDeliverySettings
 }
 
 [Serializable]
+public sealed class XAModUnlockExpertDeliverySettings
+{
+    public int ForcedRankFloor { get; set; }
+}
+
+[Serializable]
 public sealed class XAModBailoutEscMenuSettings
 {
     public int TimeoutSeconds { get; set; }
@@ -129,6 +135,26 @@ public sealed class XAModTradeRefusalSettings
 public sealed class XAModAutoLeaveDutySettings
 {
     public int DelaySeconds { get; set; }
+}
+
+[Serializable]
+public sealed class XAModEurekaInstanceIdSettings
+{
+    public int? Zone { get; set; }
+    public int? BaselineInstanceId { get; set; }
+    public bool? ShowInDtr { get; set; }
+    public int? LeaveDutyDelaySeconds { get; set; }
+    public bool? AnemosEnabled { get; set; }
+    public int? AnemosBaselineInstanceId { get; set; }
+    public bool? PagosEnabled { get; set; }
+    public int? PagosBaselineInstanceId { get; set; }
+    public bool? PyrosEnabled { get; set; }
+    public int? PyrosBaselineInstanceId { get; set; }
+    public bool? HydatosEnabled { get; set; }
+    public int? HydatosBaselineInstanceId { get; set; }
+    public bool PlaySound { get; set; }
+    public int SoundEffectId { get; set; }
+    public float SoundVolume { get; set; }
 }
 
 [Serializable]
@@ -175,6 +201,7 @@ public sealed class XAModXAPeepSettings
     public float TargeterDotSize { get; set; }
     public bool ShowTargetersCard { get; set; }
     public bool ShowCenterNotification { get; set; }
+    public bool ShowChatNotification { get; set; }
     public bool PlaySound { get; set; }
     public int SoundEffectId { get; set; }
     public float SoundVolume { get; set; }

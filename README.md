@@ -20,32 +20,32 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Screenshot-Safe Character Lists** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` can anonymize visible character and world labels with one shared `Anonymize` toggle. Changing that checkbox in any task list immediately carries across the others, the same setting is exposed as the `Anonymize Character Lists` XA Mod, the mass-character table columns can be resized with the widths preserved through saved table settings, and the scrollable task lists now keep their header rows pinned while you move through long character lists.
 - **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared action flow and shared completion actions.
 - **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, safer menu recovery, a workshop-side Company Chest gil sync into XA Database after the bell path finishes, and shared completion actions.
+- **Field Operations** - Eureka tools for instance tracking and Logos Manipulator automation. `Instance Hunter` provides per-zone baselines, live instance ID display, Rodney controls, alert previews, and automatic baseline rollover. `Logogram Creator` brings the AutoLogoAction flow into XA Slave with favorites, recipe locks, queue automation, manipulator-aware tabs, favorite overlays, and a floating cancel control that stops the active run and clears queued plates.
 - **Window Renamer** - Rename the FFXIV game window with an optional custom title, process-ID prefix, and current-character suffix.
-- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, a live enabled counter, `Show Only Enabled`, `Disable All Mods`, preset save/load, clipboard `Export` / `Import`, inline help, and direct `/xa xamods` navigation. Saved presets and exported XA Mods packages now restore the supported subsettings for the enabled mods as well, including the shipped option groups behind background rendering, object hiding, `Hide Unnecessary Popups` (`HowToNotice` opt-in), custom resolutions, low-resolution scale, Special Rendering Modes, expanded right-click providers, Expert Delivery, `Auto Leave Duty` delay, `Bailout ESC Menu`, trade refusal, custom sight distance, Infinite Sprint delay, and XA Peep alert options such as chat notifications.
+- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation. Presets and exported packages restore supported mod subsettings, including Eureka live-ID display, trade refusal, Expert Delivery options, Infinite Sprint delay, XA Peep alerts, and other shipped option groups. `Skip Cutscenes` arms its native hooks immediately when enabled.
 
-  | Game Mods | Graphic Mods | Player Mods | Plugin Mods |
-  | --- | --- | --- | --- |
-  | Allow Multiple Game Instances | Disable Background Rendering | Anti-AFK | Anonymize Character Lists |
-  | Bailout ESC Menu |  | Automate Expert Delivery |  |
-  | Cancel Login Cooldown | Custom Resolutions | Auto Leave Duty | Force PeepingTom |
-  | Close Lobby Errors | Hide Game Objects | Auto Merge |  |
-  | Copy Item Name For All | Ignore Minimum Window Size | Clear Teleportation Lock |  |
-  | Display Actual Queue Position | Low Resolution | Custom Sight Distance |  |
-  | Display MSQ Progress | Special Rendering Modes | Doze & Sit Anywhere |  |
-  | Expanded Player Right-Click Menu Search |  | Infinite Sprint |  |
-  | Hide Unnecessary Popups |  | Item Commands |  |
-  | Live Anonymous Mode |  | Refuse Trade Request |  |
-  | Prevent Game Exiting From Lobby Errors |  | Reveal Undiscovered Areas |  |
-  |  |  | XA Peep |  |
-  | Skip Cutscenes |  |  |  |
-  | Skip Cutscenes Feeding Chocobo |  |  |  |
-  | Skip Dialogue |  |  |  |
+  | Game Mods | Graphic Mods | Player Mods | Plugin Mods | Eureka Mods |
+  | --- | --- | --- | --- | --- |
+  | Allow Multiple Game Instances | Ignore Minimum Window Size | Anti-AFK | Anonymize Character Lists | Instance ID |
+  | Cancel Login Cooldown | Hide Game Objects | Automate Expert Delivery | Force PeepingTom | Logogram Creator |
+  | Display MSQ Progress | Custom Resolutions | Auto Leave Duty |  |  |
+  | Skip Cutscenes | Disable Background Rendering | Auto Merge |  |  |
+  | Skip Cutscenes Feeding Chocobo | Low Resolution | Refuse Trade Request |  |  |
+  | Hide Unnecessary Popups | Special Rendering Modes | Reveal Undiscovered Areas |  |  |
+  | Prevent Game Exiting From Lobby Errors |  | Clear Teleportation Lock |  |  |
+  | Close Lobby Errors |  | Custom Sight Distance |  |  |
+  | Bailout ESC Menu |  | Doze & Sit Anywhere |  |  |
+  | Skip Dialogue |  | Infinite Sprint |  |  |
+  | Display Actual Queue Position |  | Item Commands |  |  |
+  | Copy Item Name For All |  | XA Peep |  |  |
+  | Expanded Player Right-Click Menu Search |  |  |  |  |
+  | Live Anonymous Mode |  |  |  |  |
 
 - **Plugin Operations** - Manage plugin startup behavior, verbose task logging, the version display in the main XA Slave window title, and titlebar favourites. Custom favourites can open panels, load XA Mod presets, toggle XA Mods, drive `Special Rendering Modes` presets, fire `Sit now` / `Doze now`, run `All XA Mods Off`, or stop all automated tasks and disconnect Xagman. Resolution favourites stay dim and print an error unless `Custom Resolutions` is enabled, `Kill Game` auto-enables `Instant Logout` when selected, and `Show Updates` opens the standalone version-history window with the current release notes highlighted.
 - **Export Data** - Export multi-character tables from AutoRetainer, Lifestream, and XA Database into timestamped TSV or CSV snapshots, or overwrite the same fixed file path when `Overwrite fixed file path` is enabled.
 - **Repo List** - Review commonly required custom plugin repositories with installer/settings shortcuts, plugin presence checks, and copy-to-clipboard repo URLs.
 - **IPC Calls Available** - Review the IPC integrations XA Slave can talk to, along with cached/live availability checks for supported plugins and the XA Slave provider channels other plugins can call, including `XASlave.ExecuteCommand` for the shipped `/xa` command surface plus simple direct-call examples such as `XASlave.ExecuteCommand("xamods")` shown directly in the XA Slave provider block.
-- **Commands** - Review the current XA slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, and `Plugin Mods`, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, `/xa equip` coverage behind `Item Commands`, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
+- **Commands** - Review the current XA slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, `Plugin Mods`, `Eureka Mods`, and more, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, `/xa equip` coverage behind `Item Commands`, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
 - **Priority Tasks** - Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
 - **XA Mods Native Hooks** - Adds XA-owned game and player QoL hooks for multi-instance handling, login and queue cleanup, menu and duty recovery, inventory and item actions, Return and logout shortcuts, rendering and camera controls, teleport-lock recovery, and other local client-side utility features.
 
@@ -110,7 +110,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 
 | Command | Purpose |
 | --- | --- |
-| `/xa antiafk on/off` | Toggle `Anti-AFK`. |
+| `/xa antiafk on/off` | Toggle `Anti-AFK`; while enabled XA refreshes the local AFK timer every 2 minutes. |
 | `/xa equip <itemId>` | Equip an item by ID. |
 | `/xa doze` | Trigger Doze Anywhere while `Doze & Sit Anywhere` is enabled. |
 | `/xa expertdelivery on/off` | Toggle `Automate Expert Delivery`. |
@@ -135,6 +135,13 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa peepingtom on/off` | Toggle `Force PeepingTom`. |
 | `/xa anonchars on/off` | Toggle `Anonymize Character Lists`. |
 | `/xa pluginrestore` | Disable the current Plugin Mods toggles. |
+
+### Eureka Mods
+
+| Command | Purpose |
+| --- | --- |
+| `/xa eurekaid on/off` | Toggle the live `Instance ID` display surface and optional DTR output. Use `Field Operations` -> `Eureka Instance Hunter` for the farming loop. |
+| `/xa eurekarestore` | Disable the current Eureka Mods toggles. |
 
 ## Dependencies
 

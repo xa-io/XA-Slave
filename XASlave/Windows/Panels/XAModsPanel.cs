@@ -17,11 +17,19 @@ public partial class SlaveWindow
         GameMods,
         GraphicMods,
         PlayerMods,
-        IllegalMods,
         PluginMods,
+        EurekaMods,
+        IllegalMods,
     }
 
     private static readonly string[] AutoExpertDeliveryPageLabels = { "Supply Missions", "Provisioning Missions", "Expert Delivery" };
+    private static readonly EurekaInstanceIdService.EurekaZone[] EurekaZoneOptions =
+    {
+        EurekaInstanceIdService.EurekaZone.Anemos,
+        EurekaInstanceIdService.EurekaZone.Pagos,
+        EurekaInstanceIdService.EurekaZone.Pyros,
+        EurekaInstanceIdService.EurekaZone.Hydatos,
+    };
     private string toonModsSearchText = string.Empty;
     private bool toonModsShowOnlyEnabled;
     private string toonModsSavedListName = string.Empty;
@@ -39,8 +47,9 @@ public partial class SlaveWindow
             ToonModsSection.GameMods => plugin.Configuration.ToonModsGameModsExpanded,
             ToonModsSection.GraphicMods => plugin.Configuration.ToonModsGraphicModsExpanded,
             ToonModsSection.PlayerMods => plugin.Configuration.ToonModsPlayerModsExpanded,
-            ToonModsSection.IllegalMods => plugin.Configuration.ToonModsIllegalModsExpanded,
             ToonModsSection.PluginMods => plugin.Configuration.ToonModsPluginModsExpanded,
+            ToonModsSection.EurekaMods => plugin.Configuration.ToonModsEurekaExpanded,
+            ToonModsSection.IllegalMods => plugin.Configuration.ToonModsIllegalModsExpanded,
             _ => true,
         };
     }
@@ -67,17 +76,23 @@ public partial class SlaveWindow
 
                 plugin.Configuration.ToonModsPlayerModsExpanded = expanded;
                 break;
-            case ToonModsSection.IllegalMods:
-                if (plugin.Configuration.ToonModsIllegalModsExpanded == expanded)
-                    return;
-
-                plugin.Configuration.ToonModsIllegalModsExpanded = expanded;
-                break;
             case ToonModsSection.PluginMods:
                 if (plugin.Configuration.ToonModsPluginModsExpanded == expanded)
                     return;
 
                 plugin.Configuration.ToonModsPluginModsExpanded = expanded;
+                break;
+            case ToonModsSection.EurekaMods:
+                if (plugin.Configuration.ToonModsEurekaExpanded == expanded)
+                    return;
+
+                plugin.Configuration.ToonModsEurekaExpanded = expanded;
+                break;
+            case ToonModsSection.IllegalMods:
+                if (plugin.Configuration.ToonModsIllegalModsExpanded == expanded)
+                    return;
+
+                plugin.Configuration.ToonModsIllegalModsExpanded = expanded;
                 break;
             default:
                 return;
@@ -194,6 +209,17 @@ public partial class SlaveWindow
                 configuration.AutoUnlockExpertDeliverySkipHq,
                 configuration.AutoUnlockExpertDeliverySkipMateria,
                 configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+        }
+
+        void ApplyUnlockExpertDeliveryConfiguration()
+        {
+            configuration.UnlockExpertDeliveryForcedRankFloor = ExpertDeliveryUnlockService.NormalizeForcedRankFloor(configuration.UnlockExpertDeliveryForcedRankFloor);
+            plugin.ExpertDeliveryUnlock.ApplyConfiguration(configuration.UnlockExpertDeliveryForcedRankFloor);
+        }
+
+        string GetUnlockExpertDeliveryRankLabel(int rank)
+        {
+            return ExpertDeliveryUnlockService.GetForcedRankFloorLabel(rank);
         }
 
         void ApplyAutoLeaveDutyConfiguration()
@@ -1182,6 +1208,18 @@ public partial class SlaveWindow
             ImGui.TextDisabled("After duty completion, XA waits this long before opening the duty menu and confirming Leave Duty.");
         }
 
+        void DrawEurekaInstanceIdOptions()
+        {
+            DrawEurekaInstanceIdSharedDisplayOptions("EurekaInstanceId");
+
+            if (ImGui.Button("Open Eureka Instance Hunter##EurekaInstanceId"))
+                OpenEurekaInstanceHunterTask();
+
+            ImGui.TextDisabled("`Instance ID` here is the shared global trigger for the live Eureka ID surface and optional DTR entry.");
+            ImGui.TextDisabled("The actual Rodney scanner now lives in `Field Operations` -> `Eureka Instance Hunter`, including the zone rows, baselines, `Start` / `Stop`, leave-duty delay, and alert settings.");
+            ImGui.TextDisabled(plugin.EurekaInstanceId.StatusText);
+        }
+
         void DrawExpertDeliveryOptions()
         {
             var autoSwitchWhenOpen = configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen;
@@ -1243,6 +1281,32 @@ public partial class SlaveWindow
             ImGui.TextDisabled(ignoreSealCap
                 ? "Allows Expert Delivery hand-ins to continue even when the next item would overcap Company Seals. Excess seals will be lost."
                 : "Hand-ins stop before the next selected item would exceed the real Company Seal cap.");
+        }
+
+        void DrawUnlockExpertDeliveryOptions()
+        {
+            var selectedRank = ExpertDeliveryUnlockService.NormalizeForcedRankFloor(configuration.UnlockExpertDeliveryForcedRankFloor);
+            if (ImGui.BeginCombo("GC rank floor##UnlockExpertDelivery", GetUnlockExpertDeliveryRankLabel(selectedRank)))
+            {
+                for (var rank = ExpertDeliveryUnlockService.MinForcedRankFloor; rank <= ExpertDeliveryUnlockService.MaxForcedRankFloor; rank++)
+                {
+                    var isSelected = selectedRank == rank;
+                    if (ImGui.Selectable(GetUnlockExpertDeliveryRankLabel(rank), isSelected))
+                    {
+                        configuration.UnlockExpertDeliveryForcedRankFloor = rank;
+                        ApplyUnlockExpertDeliveryConfiguration();
+                        SaveConfiguration();
+                        selectedRank = rank;
+                    }
+
+                    if (isSelected)
+                        ImGui.SetItemDefaultFocus();
+                }
+
+                ImGui.EndCombo();
+            }
+
+            ImGui.TextDisabled("Rank 0 leaves the real rank untouched. Higher values use the named GC-rank labels from your reference list and only spoof upward when needed.");
         }
 
         void DrawTradeRefusalOptions()
@@ -1384,6 +1448,13 @@ public partial class SlaveWindow
             if (ImGui.Checkbox("Show center-screen notification##XAPeep", ref showCenterNotification))
             {
                 configuration.XAPeepShowCenterNotification = showCenterNotification;
+                SaveConfiguration();
+            }
+
+            var showChatNotification = configuration.XAPeepShowChatNotification;
+            if (ImGui.Checkbox("Print chat notification##XAPeep", ref showChatNotification))
+            {
+                configuration.XAPeepShowChatNotification = showChatNotification;
                 SaveConfiguration();
             }
 
@@ -1661,8 +1732,8 @@ public partial class SlaveWindow
             () => configuration.AntiAfkEnabled,
             plugin.AntiAfk.SetEnabled,
             applied => configuration.AntiAfkEnabled = applied,
-            "Resets the local AFK timer every 9 minutes so this client stays ahead of the game's 10-minute idle kick path.",
-            "Keeps the local AFK timer fresh on a 9-minute cadence while enabled. XA only touches the local idle timer; it does not send chat or movement packets.",
+            "Resets the local AFK timer every 2 minutes so this client stays ahead of the game's 10-minute idle kick path.",
+            "Keeps the local AFK timer fresh on a 2-minute cadence while enabled. XA only touches the local idle timer; it does not send chat or movement packets.",
             plugin.AntiAfk.StatusText,
             searchTerms: ["afk", "idle", "kick", "timer"]);
         AddSavedFeatureEntry(
@@ -1684,11 +1755,14 @@ public partial class SlaveWindow
             () => configuration.UnlockExpertDeliveryEnabled,
             plugin.ExpertDeliveryUnlock.SetEnabled,
             applied => configuration.UnlockExpertDeliveryEnabled = applied,
-            "Forces a fixed local Grand Company rank floor of 11 so Expert Delivery appears.",
-            "Locally spoofs a minimum Grand Company rank of 11 so the Expert Delivery entry appears.",
+            "Lets you choose the local Grand Company rank floor XA spoofs so Expert Delivery can appear at the selected threshold.",
+            "Locally spoofs the selected minimum Grand Company rank so the Expert Delivery entry can appear. Use the dropdown below to choose the floor XA returns.",
             plugin.ExpertDeliveryUnlock.StatusText,
             warningText: "DO NOT USE IF YOUR LODESTONE IS NOT SET TO PRIVATE! You take the risk of revealing your character on the leaderboards by using this. If you're not the actual proper rank, it's easy to determine if you're using this.",
-            requireCtrlShiftToEnable: true);
+            requireCtrlShiftToEnable: true,
+            searchTerms: ["GC rank floor", "Grand Company rank", "rank 0", "rank 19", "Storm Captain", "Storm Champion"],
+            drawOptions: DrawUnlockExpertDeliveryOptions,
+            showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "auto-refuse-trade-request",
@@ -1825,9 +1899,9 @@ public partial class SlaveWindow
             plugin.XAPeep.SetEnabled,
             applied => configuration.XAPeepEnabled = applied,
             "XA target tracker with a small cached list and full history window.",
-            "Tracks players targeting you in all areas, including PvP, keeps the small XA Peep list and the separate history window available through logout, records cumulative per-player counts in XA Slave's local database, and can show purple cards, lines, dots, center-screen notifications, and selectable XA alert sounds that still play even if the game's own sound channel is muted. XA Peep can be filtered to skip party, alliance, or in-combat players, can auto-open its compact window on plugin load, and lets you lock or unlock window resizing from the title bar. Use `/xa peep` to open the small window or `/xa peep on|off` to toggle tracking from chat.",
+            "Tracks players targeting you in all areas, including PvP, keeps the small XA Peep list and the separate history window available through logout, records cumulative per-player counts in XA Slave's local database, and can show purple cards, lines, dots, center-screen notifications, prefixed chat notifications, and selectable XA alert sounds that still play even if the game's own sound channel is muted. XA Peep can be filtered to skip party, alliance, or in-combat players, can auto-open its compact window on plugin load, and lets you lock or unlock window resizing from the title bar. Use `/xa peep` to open the small window or `/xa peep on|off` to toggle tracking from chat.",
             plugin.XAPeep.StatusText,
-            searchTerms: ["Show card when targeted", "Show Targeter's Line", "Show targeter's dot", "targeter line color", "targeter dot color", "targeter dot size", "Show targeters card", "Show center-screen notification", "Log party members", "Log alliance members", "Log players in combat", "Auto open XA Peep on plugin load", "lock", "resize", "/xa peep", "history", "PvP", "sound", "window"],
+            searchTerms: ["Show card when targeted", "Show Targeter's Line", "Show targeter's dot", "targeter line color", "targeter dot color", "targeter dot size", "Show targeters card", "Show center-screen notification", "Print chat notification", "is targeting you", "Log party members", "Log alliance members", "Log players in combat", "Auto open XA Peep on plugin load", "lock", "resize", "/xa peep", "history", "PvP", "sound", "window"],
             drawOptions: DrawXAPeepOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
@@ -1871,6 +1945,19 @@ public partial class SlaveWindow
             "Keeps Peeping Tom target tracking active in PvP by bypassing its local PvP runtime gate. Peeping Tom still controls what markers or windows it shows.",
             plugin.PeepingTomIntegration.StatusText,
             searchTerms: ["PvP", "Peeping Tom"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.EurekaMods,
+            "eureka-instance-id",
+            "Instance ID",
+            () => configuration.EurekaInstanceIdEnabled,
+            plugin.EurekaInstanceId.SetEnabled,
+            applied => configuration.EurekaInstanceIdEnabled = applied,
+            "Shows the live Eureka instance ID while you are inside Anemos, Pagos, Pyros, or Hydatos.",
+            "Turn this on to enable the live Eureka instance surface and the optional DTR entry. The actual Rodney farming loop now lives in `Field Operations` -> `Eureka Instance Hunter`, where XA can scan any mix of `Anemos`, `Pagos`, `Pyros`, and `Hydatos`, use per-zone baselines, leave duplicate runs through the duty menu with a configurable delay, run CharacterSafeWait in Kugane before Rodney interaction, and stop once a selected zone lands on a different instance.",
+            plugin.EurekaInstanceId.StatusText,
+            searchTerms: ["Eureka", "instance", "DTR", "server bar", "Field Operations", "Eureka Instance Hunter", "Rodney", "Anemos", "Pagos", "Pyros", "Hydatos", "farming"],
+            drawOptions: DrawEurekaInstanceIdOptions,
+            showOptionsWhenDisabled: true);
 
         var enabledXAModsCount = toonModDefinitions.Count(entry => entry.GetCurrent());
         ImGui.TextColored(
@@ -1925,6 +2012,7 @@ public partial class SlaveWindow
         DrawModSection(ToonModsSection.GraphicMods, "Graphic Mods");
         DrawModSection(ToonModsSection.PlayerMods, "Player Mods");
         DrawModSection(ToonModsSection.PluginMods, "Plugin Mods");
+        DrawModSection(ToonModsSection.EurekaMods, "Eureka");
         DrawModSection(ToonModsSection.IllegalMods, "Illegal Shit You Shouldn't Use");
 
         if (featureEntries.Count == 0)

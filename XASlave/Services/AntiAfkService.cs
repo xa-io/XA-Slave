@@ -6,7 +6,7 @@ namespace XASlave.Services;
 
 public unsafe sealed class AntiAfkService : IDisposable
 {
-    private const int ResetIntervalMilliseconds = 9 * 60 * 1000;
+    private const int ResetIntervalMilliseconds = 2 * 60 * 1000;
 
     private readonly IFramework framework;
     private readonly IClientState clientState;
@@ -100,7 +100,7 @@ public unsafe sealed class AntiAfkService : IDisposable
     private void RefreshStatusText()
     {
         StatusText = enabled
-            ? "Enabled - resets the local AFK timer every 9 min."
+            ? "Enabled - resets the local AFK timer every 2 min."
             : "Disabled";
     }
 }

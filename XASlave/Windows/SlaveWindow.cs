@@ -60,6 +60,9 @@ public partial class SlaveWindow : Window, IDisposable
         RefreshArSubsBell,
         MultiFcPermissions,
         AutoAcceptFcInvite,
+        // Field Operations
+        EurekaInstanceHunter,
+        EurekaLogogramCreator,
         // Utility
         WindowRenamer,
         PluginOperations,
@@ -80,6 +83,7 @@ public partial class SlaveWindow : Window, IDisposable
         AutomatedTasks,
         CityShenanigans,
         FcRelations,
+        FieldOperations,
         Utility,
         Reference,
     }
@@ -106,6 +110,12 @@ public partial class SlaveWindow : Window, IDisposable
         (SlaveTask.CheckDuplicatePlots, "Check Duplicate Plots"),
         (SlaveTask.ReturnAltsToHomeworlds, "Return Alts To Homeworlds"),
         (SlaveTask.RefreshArSubsBell, "Refresh Sub/Bell/Chest"),
+    };
+
+    private static readonly (SlaveTask Task, string Label)[] FieldOperationsItems =
+    {
+        (SlaveTask.EurekaInstanceHunter, "Instance Hunter"),
+        (SlaveTask.EurekaLogogramCreator, "Logogram Creator"),
     };
 
     private static readonly (SlaveTask Task, string Label)[] UtilityItems =
@@ -817,6 +827,16 @@ public partial class SlaveWindow : Window, IDisposable
             }
         }
 
+        foreach (var (task, label) in FieldOperationsItems)
+        {
+            if (string.Equals(label, menuLabel, StringComparison.OrdinalIgnoreCase))
+            {
+                IsOpen = true;
+                SelectBuiltInTask(task);
+                return;
+            }
+        }
+
         foreach (var (task, label) in UtilityItems)
         {
             if (string.Equals(label, menuLabel, StringComparison.OrdinalIgnoreCase))
@@ -850,6 +870,12 @@ public partial class SlaveWindow : Window, IDisposable
     {
         IsOpen = true;
         SelectBuiltInTask(SlaveTask.XAMods);
+    }
+
+    public void OpenEurekaInstanceHunterTask()
+    {
+        IsOpen = true;
+        SelectBuiltInTask(SlaveTask.EurekaInstanceHunter);
     }
 
     public void OpenCommandsReferenceTask()
@@ -1185,6 +1211,7 @@ public partial class SlaveWindow : Window, IDisposable
                 DrawMenuSection(MenuSection.AutomatedTasks, "Automated Tasks", TaskItems, new Vector4(0.4f, 0.8f, 1.0f, 1.0f));
                 DrawMenuSection(MenuSection.CityShenanigans, "City Shenanigans", CityShenanigansItems, new Vector4(1.0f, 0.7f, 0.4f, 1.0f));
                 DrawMenuSection(MenuSection.FcRelations, "FC Relations", FcItems, new Vector4(0.8f, 0.6f, 1.0f, 1.0f));
+                DrawMenuSection(MenuSection.FieldOperations, "Field Operations", FieldOperationsItems, new Vector4(0.8f, 1.0f, 0.55f, 1.0f));
                 DrawMenuSection(MenuSection.Utility, "Utility", UtilityItems, new Vector4(0.6f, 1.0f, 0.6f, 1.0f));
 
                 foreach (var ext in plugin.ExternalTaskLoader.Tasks)
@@ -1264,6 +1291,12 @@ public partial class SlaveWindow : Window, IDisposable
                             break;
                         case SlaveTask.MultiFcPermissions:
                             DrawMultiFcPermissionsTask();
+                            break;
+                        case SlaveTask.EurekaInstanceHunter:
+                            DrawEurekaInstanceHunterTask();
+                            break;
+                        case SlaveTask.EurekaLogogramCreator:
+                            DrawEurekaLogogramCreatorTask();
                             break;
                         case SlaveTask.WindowRenamer:
                             DrawWindowRenamerTask();
@@ -1577,6 +1610,8 @@ public partial class SlaveWindow : Window, IDisposable
         {
             SlaveTask.SaveToXaDatabase => IsSaveToXaDatabaseActive(),
             SlaveTask.AutoRetainerTasks => IsAutoRetainerHelperActive(),
+            SlaveTask.EurekaInstanceHunter => plugin.EurekaInstanceId.IsScanning,
+            SlaveTask.EurekaLogogramCreator => plugin.EurekaLogogramCreator.HasActiveOrQueuedAutoLogoAction,
             _ => IsPriorityTask(task) && IsTaskActive(task),
         };
     }
@@ -1588,6 +1623,7 @@ public partial class SlaveWindow : Window, IDisposable
             MenuSection.AutomatedTasks => plugin.Configuration.MenuAutomatedTasksExpanded,
             MenuSection.CityShenanigans => plugin.Configuration.MenuCityShenanigansExpanded,
             MenuSection.FcRelations => plugin.Configuration.MenuFcRelationsExpanded,
+            MenuSection.FieldOperations => plugin.Configuration.MenuFieldOperationsExpanded,
             MenuSection.Utility => plugin.Configuration.MenuUtilityExpanded,
             MenuSection.Reference => plugin.Configuration.MenuReferenceExpanded,
             _ => true,
@@ -1609,6 +1645,10 @@ public partial class SlaveWindow : Window, IDisposable
             case MenuSection.FcRelations:
                 if (plugin.Configuration.MenuFcRelationsExpanded == expanded) return;
                 plugin.Configuration.MenuFcRelationsExpanded = expanded;
+                break;
+            case MenuSection.FieldOperations:
+                if (plugin.Configuration.MenuFieldOperationsExpanded == expanded) return;
+                plugin.Configuration.MenuFieldOperationsExpanded = expanded;
                 break;
             case MenuSection.Utility:
                 if (plugin.Configuration.MenuUtilityExpanded == expanded) return;
@@ -1666,7 +1706,7 @@ public partial class SlaveWindow : Window, IDisposable
             ImGui.SameLine();
         if (ImGui.Button("Update History"))
             plugin.UpdatesWindow.Toggle();
-
+            
         ImGui.Separator();
         ImGui.PushTextWrapPos(0f);
         ImGui.Text("XA Slave is still in a very early phase. Expect ongoing changes, new automation surfaces, and many months of additional features.");
@@ -1781,6 +1821,13 @@ public partial class SlaveWindow : Window, IDisposable
             ImGui.TextDisabled("|");
             ImGui.SameLine();
             ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), GetPriorityTaskStatusLabel(activePriorityTask));
+        }
+        else if (plugin.EurekaInstanceId.IsScanning)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled("|");
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.35f, 1.0f, 0.45f, 1.0f), "Eureka Hunter");
         }
     }
 }

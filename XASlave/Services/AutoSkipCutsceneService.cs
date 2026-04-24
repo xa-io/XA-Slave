@@ -73,9 +73,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         }
 
         enabled = true;
-        if (condition[ConditionFlag.OccupiedInCutSceneEvent])
-            EnsureInitializedForEnabledState();
-
+        EnsureInitializedForEnabledState();
         RefreshStatusText();
         return true;
     }
@@ -290,12 +288,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
     private void OnFrameworkUpdate(IFramework _)
     {
-        if (enabled && !initialized && condition[ConditionFlag.OccupiedInCutSceneEvent])
-        {
-            EnsureInitializedForEnabledState();
-            RefreshStatusText();
-        }
-
         SyncCutscenePatchState();
         if (!enabled || !condition[ConditionFlag.OccupiedInCutSceneEvent])
             return;
@@ -306,12 +298,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
         lastPromptAttemptUtc = now;
         if (AddonHelper.IsAddonReady("SelectString"))
-        {
             AddonHelper.FireCallbackAndClose("SelectString", 0);
-            return;
-        }
-
-        KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
     }
 
     private byte CutsceneHandleInputDetour(nint a1, float a2)

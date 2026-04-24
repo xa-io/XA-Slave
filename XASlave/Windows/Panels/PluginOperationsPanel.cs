@@ -22,6 +22,7 @@ public partial class SlaveWindow
         "Check Duplicate Plots",
         "Return Alts To Homeworlds",
         "Refresh Sub/Bell/Chest",
+        "Eureka Instance Hunter",
         "XA Mods",
         "Window Renamer",
         "Plugin Operations",

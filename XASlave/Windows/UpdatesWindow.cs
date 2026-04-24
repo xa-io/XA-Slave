@@ -23,6 +23,22 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.26 - 2026-04-23",
+            Lines =
+            [
+                "Field Operations",
+                "- Added `Eureka Instance Hunter` to auto-rejoin Rodney entries until XA finds a new public instance, with per-zone baselines, alert sounds, and optional DTR output",
+                "- Added `Eureka Logogram Creator` to automate Logos action crafting with favorites, reorderable favorite buttons, overlay shortcuts, and live cancel controls",
+                "",
+                "XA Mods / Alerts",
+                "- `Anti-AFK` now refreshes the local AFK timer every 2 minutes",
+                "- `Skip Cutscenes` no longer sends repeated `Esc` input during normal zone transitions",
+                "- `Unlock Expert Delivery` again has a configurable Grand Company rank-floor dropdown",
+                "- XA Peep can now optionally print chat log notifications when a new player starts targeting you",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.25 - 2026-04-20",
             Lines =
             [
@@ -63,7 +79,7 @@ public sealed class UpdatesWindow : Window
                 "- Added `Bailout ESC Menu` to close a stuck `SystemMenu` after the selected timeout",
                 "- Added `Auto Leave Duty` to exit completed duties after a configurable delay once combat and blockers clear",
                 "- Added `Instant Return` to skip the Return cast/cooldown path while leaving the in-game confirmation to the user",
-                "- Added `Anti-AFK` with a 9-minute local timer refresh cadence",
+                "- Added `Anti-AFK` with a local timer refresh cadence",
                 "- Added `Auto Merge` to combine incomplete inventory stacks when the inventory window opens",
             ],
         },

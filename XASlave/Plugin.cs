@@ -53,6 +53,7 @@ public sealed class Plugin : IDalamudPlugin
         Graphic,
         Player,
         Plugin,
+        Eureka,
         Illegal,
     }
 
@@ -97,6 +98,8 @@ public sealed class Plugin : IDalamudPlugin
     public UpdatesWindow UpdatesWindow { get; init; }
     public XAPeepWindow XAPeepWindow { get; init; }
     public XAPeepHistoryWindow XAPeepHistoryWindow { get; init; }
+    public EurekaLogogramCreatorFavoritesOverlayWindow EurekaLogogramCreatorFavoritesOverlayWindow { get; init; }
+    public EurekaLogogramCreatorAutomationOverlayWindow EurekaLogogramCreatorAutomationOverlayWindow { get; init; }
 
     // Services
     public IpcClient IpcClient { get; init; }
@@ -125,6 +128,8 @@ public sealed class Plugin : IDalamudPlugin
     public AutoRefuseTradeService AutoRefuseTrade { get; init; }
     public AntiAfkService AntiAfk { get; init; }
     public AutoLeaveDutyService AutoLeaveDuty { get; init; }
+    public EurekaInstanceIdService EurekaInstanceId { get; init; }
+    public EurekaLogogramCreatorService EurekaLogogramCreator { get; init; }
     public AutoMergeService AutoMerge { get; init; }
     public ItemCommandsService ItemCommands { get; init; }
     public QuickReturnService QuickReturn { get; init; }
@@ -187,6 +192,14 @@ public sealed class Plugin : IDalamudPlugin
             xaPeepSoundMigrationChanged = true;
         }
 
+        var unlockExpertDeliveryRankFloorChanged = false;
+        var normalizedUnlockExpertDeliveryRankFloor = ExpertDeliveryUnlockService.NormalizeForcedRankFloor(Configuration.UnlockExpertDeliveryForcedRankFloor);
+        if (Configuration.UnlockExpertDeliveryForcedRankFloor != normalizedUnlockExpertDeliveryRankFloor)
+        {
+            Configuration.UnlockExpertDeliveryForcedRankFloor = normalizedUnlockExpertDeliveryRankFloor;
+            unlockExpertDeliveryRankFloorChanged = true;
+        }
+
         var titleBarFavCustomItemsMigrationChanged = false;
         foreach (var item in Configuration.TitleBarFavCustomItems)
         {
@@ -197,6 +210,8 @@ public sealed class Plugin : IDalamudPlugin
             item.SelectionKey = normalizedSelectionKey;
             titleBarFavCustomItemsMigrationChanged = true;
         }
+        var eurekaInstanceIdMigrationChanged = MigrateLegacyEurekaInstanceIdState(Configuration);
+        var eurekaLogogramCreatorDefaultsChanged = ApplyEurekaLogogramCreatorDefaultSettings(Configuration);
         if (!Configuration.XagmanSharedItemsMigrationComplete)
         {
             if (Configuration.XagmanItems.Count == 0 && (Configuration.XagmanTonyItems.Count > 0 || Configuration.XagmanFranchiseItems.Count > 0))
@@ -226,7 +241,10 @@ public sealed class Plugin : IDalamudPlugin
             || xagmanItemsMigrationChanged
             || characterListAnonymizeMigrationChanged
             || xaPeepSoundMigrationChanged
+            || unlockExpertDeliveryRankFloorChanged
             || titleBarFavCustomItemsMigrationChanged
+            || eurekaInstanceIdMigrationChanged
+            || eurekaLogogramCreatorDefaultsChanged
             || xagmanHubAddressChanged
             || xagmanHubPortChanged)
             Configuration.Save();
@@ -255,9 +273,12 @@ public sealed class Plugin : IDalamudPlugin
         NameplatePrivacy = new NameplatePrivacyService(NamePlateGui, Log);
         AutoUnlockExpertDelivery = new AutoUnlockExpertDeliveryService(Framework, DataManager, Log);
         ExpertDeliveryUnlock = new ExpertDeliveryUnlockService(GameInterop, Log);
+        ExpertDeliveryUnlock.ApplyConfiguration(Configuration.UnlockExpertDeliveryForcedRankFloor);
         AutoRefuseTrade = new AutoRefuseTradeService(SigScanner, GameInterop, Log);
         AntiAfk = new AntiAfkService(Framework, ClientState, Log);
         AutoLeaveDuty = new AutoLeaveDutyService(DutyState, ClientState, PlayerState, Condition, Framework, Log);
+        EurekaInstanceId = new EurekaInstanceIdService(Configuration, ClientState, PlayerState, Condition, Framework, Log, DtrBar);
+        EurekaLogogramCreator = new EurekaLogogramCreatorService(Configuration);
         AutoMerge = new AutoMergeService(AddonLifecycle, Framework, ClientState, Condition, DataManager, Log);
         ItemCommands = new ItemCommandsService(DataManager, PlayerState);
         QuickReturn = new QuickReturnService(ClientState, GameInterop, Log);
@@ -279,6 +300,9 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.AutoLeaveDutyDelaySeconds = normalizedAutoLeaveDutyDelay;
             Configuration.Save();
         }
+        if (NormalizeEurekaInstanceIdConfiguration(Configuration))
+            Configuration.Save();
+        EurekaInstanceId.ApplyConfiguration();
         var normalizedBailoutEscMenuSeconds = EscMenuBailoutService.NormalizeTimeoutSeconds(Configuration.BailoutEscMenuSeconds);
         if (Configuration.BailoutEscMenuSeconds != normalizedBailoutEscMenuSeconds)
         {
@@ -506,6 +530,18 @@ public sealed class Plugin : IDalamudPlugin
         });
         QueueDeferredStartupAction(() =>
         {
+            if (!Configuration.EurekaInstanceIdEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("eureka-instance-id");
+            if (!EurekaInstanceId.SetEnabled(true))
+            {
+                Configuration.EurekaInstanceIdEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
             if (Configuration.AutoMergeEnabled && !AutoMerge.SetEnabled(true))
             {
                 Configuration.AutoMergeEnabled = false;
@@ -522,7 +558,11 @@ public sealed class Plugin : IDalamudPlugin
         });
         QueueDeferredStartupAction(() =>
         {
-            if (Configuration.UnlockExpertDeliveryEnabled && !ExpertDeliveryUnlock.SetEnabled(true))
+            if (!Configuration.UnlockExpertDeliveryEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("auto-unlock-expert-delivery");
+            if (!ExpertDeliveryUnlock.SetEnabled(true))
             {
                 Configuration.UnlockExpertDeliveryEnabled = false;
                 Configuration.Save();
@@ -661,6 +701,10 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(XAPeepWindow);
         XAPeepHistoryWindow = new XAPeepHistoryWindow(this);
         WindowSystem.AddWindow(XAPeepHistoryWindow);
+        EurekaLogogramCreatorFavoritesOverlayWindow = new EurekaLogogramCreatorFavoritesOverlayWindow(this);
+        WindowSystem.AddWindow(EurekaLogogramCreatorFavoritesOverlayWindow);
+        EurekaLogogramCreatorAutomationOverlayWindow = new EurekaLogogramCreatorAutomationOverlayWindow(this);
+        WindowSystem.AddWindow(EurekaLogogramCreatorAutomationOverlayWindow);
 
         UpdatesWindow = new UpdatesWindow();
         WindowSystem.AddWindow(UpdatesWindow);
@@ -703,6 +747,7 @@ public sealed class Plugin : IDalamudPlugin
             HelpMessage = "Open XA Slave. Subcommands include xamods/mods, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
         });
 
+        PluginInterface.UiBuilder.Draw += UpdateEurekaLogogramCreatorOverlayWindows;
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.Draw += XAPeep.DrawOverlay;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleMainUi;
@@ -831,6 +876,19 @@ public sealed class Plugin : IDalamudPlugin
             || statusText.StartsWith("Ready", StringComparison.OrdinalIgnoreCase);
     }
 
+    private void UpdateEurekaLogogramCreatorOverlayWindows()
+    {
+        var showFavoritesOverlay = Configuration.ShowFavoritesOverlay
+            && Configuration.FavoritePlates.Count > 0
+            && EurekaLogogramCreator.IsManipulatorVisible()
+            && EurekaLogogramCreator.TryGetSynthesisOverlayAnchor(out _);
+        EurekaLogogramCreatorFavoritesOverlayWindow.IsOpen = showFavoritesOverlay;
+
+        var showAutomationOverlay = EurekaLogogramCreator.HasActiveOrQueuedAutoLogoAction
+            && EurekaLogogramCreator.TryGetSynthesisAutomationOverlayAnchor(out _);
+        EurekaLogogramCreatorAutomationOverlayWindow.IsOpen = showAutomationOverlay;
+    }
+
     public void Dispose()
     {
         if (isDisposed)
@@ -839,6 +897,7 @@ public sealed class Plugin : IDalamudPlugin
         isDisposed = true;
 
         // Detach public-facing callbacks first so a reload cannot re-enter partially disposed UI or services.
+        TryCleanup("UiBuilder.Draw -= UpdateEurekaLogogramCreatorOverlayWindows", () => PluginInterface.UiBuilder.Draw -= UpdateEurekaLogogramCreatorOverlayWindows);
         TryCleanup("UiBuilder.Draw -= WindowSystem.Draw", () => PluginInterface.UiBuilder.Draw -= WindowSystem.Draw);
         TryCleanup("UiBuilder.Draw -= XAPeep.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= XAPeep.DrawOverlay);
         TryCleanup("UiBuilder.OpenConfigUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainUi);
@@ -871,6 +930,8 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoRefuseTrade", AutoRefuseTrade);
         TryDispose("AntiAfk", AntiAfk);
         TryDispose("AutoLeaveDuty", AutoLeaveDuty);
+        TryDispose("EurekaInstanceId", EurekaInstanceId);
+        TryDispose("EurekaLogogramCreator", EurekaLogogramCreator);
         TryDispose("AutoMerge", AutoMerge);
         TryDispose("ItemCommands", ItemCommands);
         TryDispose("QuickReturn", QuickReturn);
@@ -1138,6 +1199,12 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("eurekarestore", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(RestoreXAModsSection(XAModsRestoreScope.Eureka, out var message), message);
+            return;
+        }
+
         if (subcommand.Equals("imlegit", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(RestoreXAModsSection(XAModsRestoreScope.Illegal, out var message), message);
@@ -1242,6 +1309,9 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("pluginrestore", StringComparison.OrdinalIgnoreCase))
             return RestoreXAModsSection(XAModsRestoreScope.Plugin, out message);
+
+        if (subcommand.Equals("eurekarestore", StringComparison.OrdinalIgnoreCase))
+            return RestoreXAModsSection(XAModsRestoreScope.Eureka, out message);
 
         if (subcommand.Equals("imlegit", StringComparison.OrdinalIgnoreCase))
             return RestoreXAModsSection(XAModsRestoreScope.Illegal, out message);
@@ -1640,6 +1710,12 @@ public sealed class Plugin : IDalamudPlugin
                     IgnoreSealCap = Configuration.AutoUnlockExpertDeliveryIgnoreSealCap,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "auto-unlock-expert-delivery":
+                snapshot = JsonSerializer.SerializeToElement(new XAModUnlockExpertDeliverySettings
+                {
+                    ForcedRankFloor = Configuration.UnlockExpertDeliveryForcedRankFloor,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "bailout-esc-menu":
                 snapshot = JsonSerializer.SerializeToElement(new XAModBailoutEscMenuSettings
                 {
@@ -1656,6 +1732,26 @@ public sealed class Plugin : IDalamudPlugin
                 snapshot = JsonSerializer.SerializeToElement(new XAModAutoLeaveDutySettings
                 {
                     DelaySeconds = Configuration.AutoLeaveDutyDelaySeconds,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "eureka-instance-id":
+                snapshot = JsonSerializer.SerializeToElement(new XAModEurekaInstanceIdSettings
+                {
+                    Zone = Configuration.EurekaInstanceIdZone,
+                    BaselineInstanceId = Configuration.EurekaInstanceIdBaselineInstanceId,
+                    ShowInDtr = Configuration.EurekaInstanceIdShowInDtr,
+                    LeaveDutyDelaySeconds = Configuration.EurekaInstanceIdLeaveDutyDelaySeconds,
+                    AnemosEnabled = Configuration.EurekaInstanceIdAnemosEnabled,
+                    AnemosBaselineInstanceId = Configuration.EurekaInstanceIdAnemosBaselineInstanceId,
+                    PagosEnabled = Configuration.EurekaInstanceIdPagosEnabled,
+                    PagosBaselineInstanceId = Configuration.EurekaInstanceIdPagosBaselineInstanceId,
+                    PyrosEnabled = Configuration.EurekaInstanceIdPyrosEnabled,
+                    PyrosBaselineInstanceId = Configuration.EurekaInstanceIdPyrosBaselineInstanceId,
+                    HydatosEnabled = Configuration.EurekaInstanceIdHydatosEnabled,
+                    HydatosBaselineInstanceId = Configuration.EurekaInstanceIdHydatosBaselineInstanceId,
+                    PlaySound = Configuration.EurekaInstanceIdPlaySound,
+                    SoundEffectId = Configuration.EurekaInstanceIdSoundEffectId,
+                    SoundVolume = Configuration.EurekaInstanceIdSoundVolume,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
             case "auto-refuse-trade-request":
@@ -1709,6 +1805,7 @@ public sealed class Plugin : IDalamudPlugin
                     TargeterDotSize = Configuration.XAPeepTargeterDotSize,
                     ShowTargetersCard = Configuration.XAPeepShowTargetersCard,
                     ShowCenterNotification = Configuration.XAPeepShowCenterNotification,
+                    ShowChatNotification = Configuration.XAPeepShowChatNotification,
                     PlaySound = Configuration.XAPeepPlaySound,
                     SoundEffectId = Configuration.XAPeepSoundEffectId,
                     SoundVolume = Configuration.XAPeepSoundVolume,
@@ -1834,6 +1931,13 @@ public sealed class Plugin : IDalamudPlugin
             }
         }
 
+        if (TryDeserializeXAModSettings(modSettings, "auto-unlock-expert-delivery", out XAModUnlockExpertDeliverySettings? unlockExpertDeliverySettings)
+            && unlockExpertDeliverySettings != null)
+        {
+            Configuration.UnlockExpertDeliveryForcedRankFloor = ExpertDeliveryUnlockService.NormalizeForcedRankFloor(unlockExpertDeliverySettings.ForcedRankFloor);
+            ExpertDeliveryUnlock.ApplyConfiguration(Configuration.UnlockExpertDeliveryForcedRankFloor);
+        }
+
         if (TryDeserializeXAModSettings(modSettings, "bailout-esc-menu", out XAModBailoutEscMenuSettings? bailoutEscMenuSettings)
             && bailoutEscMenuSettings != null)
         {
@@ -1848,6 +1952,55 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.AutoLeaveDutyDelaySeconds = AutoLeaveDutyService.ClampDelaySeconds(autoLeaveDutySettings.DelaySeconds);
             if (Configuration.AutoLeaveDutyEnabled)
                 AutoLeaveDuty.ApplyConfiguration(Configuration.AutoLeaveDutyDelaySeconds);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "eureka-instance-id", out XAModEurekaInstanceIdSettings? eurekaInstanceIdSettings)
+            && eurekaInstanceIdSettings != null)
+        {
+            if (eurekaInstanceIdSettings.Zone.HasValue)
+                Configuration.EurekaInstanceIdZone = (int)EurekaInstanceIdService.NormalizeZone(eurekaInstanceIdSettings.Zone.Value);
+            if (eurekaInstanceIdSettings.BaselineInstanceId.HasValue)
+                Configuration.EurekaInstanceIdBaselineInstanceId = EurekaInstanceIdService.NormalizeInstanceId(eurekaInstanceIdSettings.BaselineInstanceId.Value);
+            if (eurekaInstanceIdSettings.ShowInDtr.HasValue)
+                Configuration.EurekaInstanceIdShowInDtr = eurekaInstanceIdSettings.ShowInDtr.Value;
+            if (eurekaInstanceIdSettings.LeaveDutyDelaySeconds.HasValue)
+                Configuration.EurekaInstanceIdLeaveDutyDelaySeconds = EurekaInstanceIdService.ClampLeaveDutyDelaySeconds(eurekaInstanceIdSettings.LeaveDutyDelaySeconds.Value);
+
+            var hasPerZoneData = false;
+            hasPerZoneData |= ApplyEurekaInstanceIdPresetZoneData(
+                Configuration,
+                EurekaInstanceIdService.EurekaZone.Anemos,
+                eurekaInstanceIdSettings.AnemosEnabled,
+                eurekaInstanceIdSettings.AnemosBaselineInstanceId);
+            hasPerZoneData |= ApplyEurekaInstanceIdPresetZoneData(
+                Configuration,
+                EurekaInstanceIdService.EurekaZone.Pagos,
+                eurekaInstanceIdSettings.PagosEnabled,
+                eurekaInstanceIdSettings.PagosBaselineInstanceId);
+            hasPerZoneData |= ApplyEurekaInstanceIdPresetZoneData(
+                Configuration,
+                EurekaInstanceIdService.EurekaZone.Pyros,
+                eurekaInstanceIdSettings.PyrosEnabled,
+                eurekaInstanceIdSettings.PyrosBaselineInstanceId);
+            hasPerZoneData |= ApplyEurekaInstanceIdPresetZoneData(
+                Configuration,
+                EurekaInstanceIdService.EurekaZone.Hydatos,
+                eurekaInstanceIdSettings.HydatosEnabled,
+                eurekaInstanceIdSettings.HydatosBaselineInstanceId);
+
+            if (!hasPerZoneData && eurekaInstanceIdSettings.Zone.HasValue)
+            {
+                ApplyLegacyEurekaInstanceIdSelection(
+                    Configuration,
+                    EurekaInstanceIdService.NormalizeZone(eurekaInstanceIdSettings.Zone.Value),
+                    eurekaInstanceIdSettings.BaselineInstanceId ?? Configuration.EurekaInstanceIdBaselineInstanceId);
+            }
+
+            Configuration.EurekaInstanceIdPlaySound = eurekaInstanceIdSettings.PlaySound;
+            Configuration.EurekaInstanceIdSoundEffectId = EurekaInstanceIdService.ClampSoundEffectId(eurekaInstanceIdSettings.SoundEffectId);
+            Configuration.EurekaInstanceIdSoundVolume = EurekaInstanceIdService.ClampSoundVolume(eurekaInstanceIdSettings.SoundVolume);
+            NormalizeEurekaInstanceIdConfiguration(Configuration);
+            EurekaInstanceId.ApplyConfiguration();
         }
 
         if (TryDeserializeXAModSettings(modSettings, "auto-refuse-trade-request", out XAModTradeRefusalSettings? tradeRefusalSettings)
@@ -1936,6 +2089,7 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.XAPeepTargeterDotSize = Math.Clamp(xaPeepSettings.TargeterDotSize, 1f, 15f);
             Configuration.XAPeepShowTargetersCard = xaPeepSettings.ShowTargetersCard;
             Configuration.XAPeepShowCenterNotification = xaPeepSettings.ShowCenterNotification;
+            Configuration.XAPeepShowChatNotification = xaPeepSettings.ShowChatNotification;
             Configuration.XAPeepPlaySound = xaPeepSettings.PlaySound && soundEffectId > 0;
             Configuration.XAPeepSoundEffectId = soundEffectId;
             Configuration.XAPeepSoundVolume = Math.Clamp(xaPeepSettings.SoundVolume, 0f, 1f);
@@ -2203,6 +2357,199 @@ public sealed class Plugin : IDalamudPlugin
         return changed;
     }
 
+    private static bool MigrateLegacyEurekaInstanceIdState(Configuration configuration)
+    {
+        var changed = NormalizeEurekaInstanceIdConfiguration(configuration);
+        if (HasAnyEurekaInstanceIdZoneEnabled(configuration))
+            return changed;
+
+        if (!configuration.EurekaInstanceIdEnabled && configuration.EurekaInstanceIdBaselineInstanceId <= 0)
+            return changed;
+
+        ApplyLegacyEurekaInstanceIdSelection(
+            configuration,
+            EurekaInstanceIdService.NormalizeZone(configuration.EurekaInstanceIdZone),
+            configuration.EurekaInstanceIdBaselineInstanceId);
+        return true;
+    }
+
+    private static bool ApplyEurekaLogogramCreatorDefaultSettings(Configuration configuration)
+    {
+        if (configuration.EurekaLogogramCreatorDefaultSettingsMigrationApplied)
+            return false;
+
+        var changed = false;
+        var looksUntouched =
+            !configuration.AutoRefreshAllPagesOnOpen
+            && !configuration.AutoDestroyWhenMagiaBoardFull
+            && !configuration.AutoRetryFailedExtraction
+            && configuration.ShowFavoritesOverlay
+            && configuration.QueueStepFrameDelay == 10;
+
+        if (looksUntouched)
+        {
+            configuration.AutoRefreshAllPagesOnOpen = true;
+            configuration.AutoDestroyWhenMagiaBoardFull = false;
+            configuration.AutoRetryFailedExtraction = false;
+            configuration.ShowFavoritesOverlay = true;
+            configuration.QueueStepFrameDelay = 20;
+            changed = true;
+        }
+
+        configuration.EurekaLogogramCreatorDefaultSettingsMigrationApplied = true;
+        changed = true;
+        return changed;
+    }
+
+    private static bool NormalizeEurekaInstanceIdConfiguration(Configuration configuration)
+    {
+        var changed = false;
+
+        var normalizedLegacyZone = (int)EurekaInstanceIdService.NormalizeZone(configuration.EurekaInstanceIdZone);
+        if (configuration.EurekaInstanceIdZone != normalizedLegacyZone)
+        {
+            configuration.EurekaInstanceIdZone = normalizedLegacyZone;
+            changed = true;
+        }
+
+        var normalizedLegacyBaseline = EurekaInstanceIdService.NormalizeInstanceId(configuration.EurekaInstanceIdBaselineInstanceId);
+        if (configuration.EurekaInstanceIdBaselineInstanceId != normalizedLegacyBaseline)
+        {
+            configuration.EurekaInstanceIdBaselineInstanceId = normalizedLegacyBaseline;
+            changed = true;
+        }
+
+        var normalizedLeaveDutyDelay = EurekaInstanceIdService.ClampLeaveDutyDelaySeconds(configuration.EurekaInstanceIdLeaveDutyDelaySeconds);
+        if (configuration.EurekaInstanceIdLeaveDutyDelaySeconds != normalizedLeaveDutyDelay)
+        {
+            configuration.EurekaInstanceIdLeaveDutyDelaySeconds = normalizedLeaveDutyDelay;
+            changed = true;
+        }
+
+        var normalizedSoundEffectId = EurekaInstanceIdService.ClampSoundEffectId(configuration.EurekaInstanceIdSoundEffectId);
+        if (configuration.EurekaInstanceIdSoundEffectId != normalizedSoundEffectId)
+        {
+            configuration.EurekaInstanceIdSoundEffectId = normalizedSoundEffectId;
+            changed = true;
+        }
+
+        var normalizedSoundVolume = EurekaInstanceIdService.ClampSoundVolume(configuration.EurekaInstanceIdSoundVolume);
+        if (Math.Abs(configuration.EurekaInstanceIdSoundVolume - normalizedSoundVolume) > 0.001f)
+        {
+            configuration.EurekaInstanceIdSoundVolume = normalizedSoundVolume;
+            changed = true;
+        }
+
+        changed |= NormalizeEurekaInstanceIdZoneBaseline(configuration, EurekaInstanceIdService.EurekaZone.Anemos);
+        changed |= NormalizeEurekaInstanceIdZoneBaseline(configuration, EurekaInstanceIdService.EurekaZone.Pagos);
+        changed |= NormalizeEurekaInstanceIdZoneBaseline(configuration, EurekaInstanceIdService.EurekaZone.Pyros);
+        changed |= NormalizeEurekaInstanceIdZoneBaseline(configuration, EurekaInstanceIdService.EurekaZone.Hydatos);
+        return changed;
+    }
+
+    private static bool NormalizeEurekaInstanceIdZoneBaseline(Configuration configuration, EurekaInstanceIdService.EurekaZone zone)
+    {
+        var current = GetEurekaInstanceIdZoneBaseline(configuration, zone);
+        var normalized = EurekaInstanceIdService.NormalizeInstanceId(current);
+        if (current == normalized)
+            return false;
+
+        SetEurekaInstanceIdZoneBaseline(configuration, zone, normalized);
+        return true;
+    }
+
+    private static bool ApplyEurekaInstanceIdPresetZoneData(
+        Configuration configuration,
+        EurekaInstanceIdService.EurekaZone zone,
+        bool? enabled,
+        int? baselineInstanceId)
+    {
+        var hasData = false;
+        if (enabled.HasValue)
+        {
+            SetEurekaInstanceIdZoneEnabled(configuration, zone, enabled.Value);
+            hasData = true;
+        }
+
+        if (baselineInstanceId.HasValue)
+        {
+            SetEurekaInstanceIdZoneBaseline(configuration, zone, EurekaInstanceIdService.NormalizeInstanceId(baselineInstanceId.Value));
+            hasData = true;
+        }
+
+        return hasData;
+    }
+
+    private static void ApplyLegacyEurekaInstanceIdSelection(
+        Configuration configuration,
+        EurekaInstanceIdService.EurekaZone zone,
+        int baselineInstanceId)
+    {
+        var normalizedBaseline = EurekaInstanceIdService.NormalizeInstanceId(baselineInstanceId);
+        SetEurekaInstanceIdZoneEnabled(configuration, zone, true);
+        SetEurekaInstanceIdZoneBaseline(configuration, zone, normalizedBaseline);
+        configuration.EurekaInstanceIdZone = (int)zone;
+        configuration.EurekaInstanceIdBaselineInstanceId = normalizedBaseline;
+    }
+
+    private static bool HasAnyEurekaInstanceIdZoneEnabled(Configuration configuration)
+    {
+        return configuration.EurekaInstanceIdAnemosEnabled
+            || configuration.EurekaInstanceIdPagosEnabled
+            || configuration.EurekaInstanceIdPyrosEnabled
+            || configuration.EurekaInstanceIdHydatosEnabled;
+    }
+
+    private static void SetEurekaInstanceIdZoneEnabled(Configuration configuration, EurekaInstanceIdService.EurekaZone zone, bool enabled)
+    {
+        switch (zone)
+        {
+            case EurekaInstanceIdService.EurekaZone.Anemos:
+                configuration.EurekaInstanceIdAnemosEnabled = enabled;
+                break;
+            case EurekaInstanceIdService.EurekaZone.Pagos:
+                configuration.EurekaInstanceIdPagosEnabled = enabled;
+                break;
+            case EurekaInstanceIdService.EurekaZone.Pyros:
+                configuration.EurekaInstanceIdPyrosEnabled = enabled;
+                break;
+            case EurekaInstanceIdService.EurekaZone.Hydatos:
+                configuration.EurekaInstanceIdHydatosEnabled = enabled;
+                break;
+        }
+    }
+
+    private static int GetEurekaInstanceIdZoneBaseline(Configuration configuration, EurekaInstanceIdService.EurekaZone zone)
+    {
+        return zone switch
+        {
+            EurekaInstanceIdService.EurekaZone.Anemos => configuration.EurekaInstanceIdAnemosBaselineInstanceId,
+            EurekaInstanceIdService.EurekaZone.Pagos => configuration.EurekaInstanceIdPagosBaselineInstanceId,
+            EurekaInstanceIdService.EurekaZone.Pyros => configuration.EurekaInstanceIdPyrosBaselineInstanceId,
+            EurekaInstanceIdService.EurekaZone.Hydatos => configuration.EurekaInstanceIdHydatosBaselineInstanceId,
+            _ => 0,
+        };
+    }
+
+    private static void SetEurekaInstanceIdZoneBaseline(Configuration configuration, EurekaInstanceIdService.EurekaZone zone, int baselineInstanceId)
+    {
+        switch (zone)
+        {
+            case EurekaInstanceIdService.EurekaZone.Anemos:
+                configuration.EurekaInstanceIdAnemosBaselineInstanceId = baselineInstanceId;
+                break;
+            case EurekaInstanceIdService.EurekaZone.Pagos:
+                configuration.EurekaInstanceIdPagosBaselineInstanceId = baselineInstanceId;
+                break;
+            case EurekaInstanceIdService.EurekaZone.Pyros:
+                configuration.EurekaInstanceIdPyrosBaselineInstanceId = baselineInstanceId;
+                break;
+            case EurekaInstanceIdService.EurekaZone.Hydatos:
+                configuration.EurekaInstanceIdHydatosBaselineInstanceId = baselineInstanceId;
+                break;
+        }
+    }
+
     internal bool IsAutoRetainerMultiModeEnabled()
         => IpcClient.AutoRetainerGetMultiModeEnabled();
 
@@ -2356,11 +2703,18 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoUnlockExpertDeliverySkipMateria,
                     Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
                 break;
+            case "auto-unlock-expert-delivery":
+                ExpertDeliveryUnlock.ApplyConfiguration(Configuration.UnlockExpertDeliveryForcedRankFloor);
+                break;
             case "bailout-esc-menu":
                 EscMenuBailout.ApplyConfiguration(Configuration.BailoutEscMenuSeconds);
                 break;
             case "auto-leave-duty":
                 AutoLeaveDuty.ApplyConfiguration(Configuration.AutoLeaveDutyDelaySeconds);
+                break;
+            case "eureka-instance-id":
+                NormalizeEurekaInstanceIdConfiguration(Configuration);
+                EurekaInstanceId.ApplyConfiguration();
                 break;
             case "auto-refuse-trade-request":
                 AutoRefuseTrade.ApplyConfiguration(
@@ -2516,6 +2870,8 @@ public sealed class Plugin : IDalamudPlugin
                 ? "Enabled - character-list tables and duplicate summaries use deterministic aliases for screenshot-safe local views."
                 : "Disabled");
         yield return new("force-peepingtom", "Force PeepingTom", XAModsRestoreScope.Plugin, () => Configuration.ForcePeepingTomEnabled, PeepingTomIntegration.SetForceEnabled, applied => Configuration.ForcePeepingTomEnabled = applied, () => PeepingTomIntegration.StatusText);
+
+        yield return new("eureka-instance-id", "Instance ID", XAModsRestoreScope.Eureka, () => Configuration.EurekaInstanceIdEnabled, EurekaInstanceId.SetEnabled, applied => Configuration.EurekaInstanceIdEnabled = applied, () => EurekaInstanceId.StatusText);
 
         yield return new("auto-unlock-expert-delivery", "Unlock Expert Delivery", XAModsRestoreScope.Illegal, () => Configuration.UnlockExpertDeliveryEnabled, ExpertDeliveryUnlock.SetEnabled, applied => Configuration.UnlockExpertDeliveryEnabled = applied, () => ExpertDeliveryUnlock.StatusText);
         yield return new("moveable-after-death", "Moveable After Death", XAModsRestoreScope.Illegal, () => Configuration.MoveableAfterDeathEnabled, PlayerMods.SetMoveableAfterDeathEnabled, applied => Configuration.MoveableAfterDeathEnabled = applied, () => PlayerMods.MoveableAfterDeathStatusText);
@@ -2702,6 +3058,10 @@ public sealed class Plugin : IDalamudPlugin
             case "anonchars":
                 definition = new("anonchars", "/xa anonchars on|off", GetXAModDefinition("anonymize-character-lists"));
                 return true;
+            case "eurekaid":
+            case "eurekainstance":
+                definition = new("eurekaid", "/xa eurekaid on|off", GetXAModDefinition("eureka-instance-id"));
+                return true;
             case "unlockexpert":
                 definition = new("unlockexpert", "/xa unlockexpert on|off", GetXAModDefinition("auto-unlock-expert-delivery"));
                 return true;
@@ -2728,6 +3088,7 @@ public sealed class Plugin : IDalamudPlugin
             XAModsRestoreScope.Graphic => "Graphic Mods",
             XAModsRestoreScope.Player => "Player Mods",
             XAModsRestoreScope.Plugin => "Plugin Mods",
+            XAModsRestoreScope.Eureka => "Eureka Mods",
             XAModsRestoreScope.Illegal => "Illegal Shit You Shouldn't Use",
             _ => "XA Mods",
         };
@@ -2948,5 +3309,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.25";
+    public const string Version = "0.0.0.26";
 }

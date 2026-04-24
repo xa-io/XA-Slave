@@ -8,8 +8,18 @@ public static class CharacterSafetyHelper
 {
     public static bool IsNormalCondition(ICondition condition)
     {
+        return IsSafeCondition(condition, allowBoundByDuty: false);
+    }
+
+    public static bool IsDutySafeCondition(ICondition condition)
+    {
+        return IsSafeCondition(condition, allowBoundByDuty: true);
+    }
+
+    private static bool IsSafeCondition(ICondition condition, bool allowBoundByDuty)
+    {
         return !condition[ConditionFlag.InCombat]
-            && !condition[ConditionFlag.BoundByDuty]
+            && (allowBoundByDuty || !condition[ConditionFlag.BoundByDuty])
             && !condition[ConditionFlag.WatchingCutscene]
             && !condition[ConditionFlag.OccupiedInCutSceneEvent]
             && !condition[ConditionFlag.Occupied]
@@ -48,7 +58,26 @@ public static class CharacterSafetyHelper
             if (local == null)
                 return false;
 
-            return IsNormalCondition(Plugin.Condition);
+            return IsSafeCondition(Plugin.Condition, allowBoundByDuty: false);
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public static bool IsPlayerAvailableInDuty()
+    {
+        try
+        {
+            if (!Plugin.PlayerState.IsLoaded)
+                return false;
+
+            var local = Plugin.ObjectTable.LocalPlayer;
+            if (local == null)
+                return false;
+
+            return IsSafeCondition(Plugin.Condition, allowBoundByDuty: true);
         }
         catch
         {
@@ -59,5 +88,10 @@ public static class CharacterSafetyHelper
     public static bool IsCharacterSafeWaitReady()
     {
         return IsNamePlateReady() && IsPlayerAvailable();
+    }
+
+    public static bool IsCharacterSafeWaitReadyInDuty()
+    {
+        return IsNamePlateReady() && IsPlayerAvailableInDuty();
     }
 }
