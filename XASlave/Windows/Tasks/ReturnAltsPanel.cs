@@ -10,16 +10,16 @@ using XASlave.Services.Tasks;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Return Alts To Homeworlds task panel — partial class split from SlaveWindow.
+/// Return Alts To Homeworlds task panel - partial class split from SlaveWindow.
 /// </summary>
 public partial class SlaveWindow
 {
-    // ── Return Alts To Homeworlds state ──
+    // -- Return Alts To Homeworlds state --
     private readonly HashSet<int> returnAltsSelectedIndices = new();
     private List<(string CharName, ReloggerCharacterData Info)> returnAltsCharList = new();
     private bool returnAltsShowLog;
 
-    // Return Alts — per-character action config
+    // Return Alts - per-character action config
     private bool raDoTextAdvance = true;
     private bool raDoRemoveSprout = true;
     private bool raDoOpenInventory = true;
@@ -34,9 +34,9 @@ public partial class SlaveWindow
     private bool raDoKillGameOnComplete;
     private bool raDoEnableArMulti = true;
 
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     //  Task: Return Alts To Homeworlds
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     private void DrawReturnAltsToHomeworldsTask()
     {
         var cfg = plugin.Configuration;
@@ -47,7 +47,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Useful after DC travel sessions to ensure all characters are on their homeworld for data collection.");
         ImGui.Spacing();
 
-        // ── Data source buttons ──
+        // -- Data source buttons --
         ImGui.TextDisabled("Press buttons in order: Import from AutoRetainer \u2192 Refresh AR Data \u2192 Pull XA Database Info \u2192 Refresh List.");
         ImGui.Spacing();
 
@@ -83,13 +83,13 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Plugin Status ──
+        // -- Plugin Status --
         DrawTaskPluginStatus(raDoCollectPersonalPlotInfo || raDoParseForXaDatabase);
 
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Run controls ──
+        // -- Run controls --
         if (runner.IsRunning && runner.CurrentTaskName == "Return Alts To Homeworlds")
         {
             var progress = runner.TotalItems > 0 ? (float)runner.CompletedItems / runner.TotalItems : 0f;
@@ -140,7 +140,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Character table — only shows non-homeworld characters ──
+        // -- Character table - only shows non-homeworld characters --
         DrawCharacterListHeader("Characters Not On Homeworld", $"({returnAltsCharList.Count} shown)", "returnAltsAnonymize");
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
@@ -219,7 +219,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Actions Per Character ──
+        // -- Actions Per Character --
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Actions Per Character");
         ImGui.Spacing();
         ImGui.TextDisabled("Check if on homeworld \u2192 return via Lifestream if not (always-on)");

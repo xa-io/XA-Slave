@@ -20,9 +20,9 @@ using XASlave.Services.Tasks;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Main window for XA Slave — left-hand task menu with right-side content panel.
+/// Main window for XA Slave - left-hand task menu with right-side content panel.
 /// Tasks are automation jobs that interact with the game and push data to XA Database via IPC.
-/// Partial class — task/panel UI split into Windows/Tasks/ and Windows/Panels/.
+/// Partial class - task/panel UI split into Windows/Tasks/ and Windows/Panels/.
 /// </summary>
 public partial class SlaveWindow : Window, IDisposable
 {
@@ -284,7 +284,7 @@ public partial class SlaveWindow : Window, IDisposable
 
         var cfg = plugin.Configuration;
 
-        // ── Resolution shortcuts (rightmost = added first) ──
+        // -- Resolution shortcuts (rightmost = added first) --
         for (var ri = cfg.TitleBarFavResolutionItems.Count - 1; ri >= 0; ri--)
         {
             var item = cfg.TitleBarFavResolutionItems[ri];
@@ -313,7 +313,7 @@ public partial class SlaveWindow : Window, IDisposable
             titleBarFavCustomColorResolvers[buttonIndex] = () => plugin.Configuration.CustomResolutionsEnabled ? FavIconColorOn : FavIconColorOff;
         }
 
-        // ── Custom favourites ──
+        // -- Custom favourites --
         for (var ci = cfg.TitleBarFavCustomItems.Count - 1; ci >= 0; ci--)
         {
             var item = cfg.TitleBarFavCustomItems[ci];
@@ -327,7 +327,7 @@ public partial class SlaveWindow : Window, IDisposable
             TryAddTitleBarFavCustomButton(ci, selectionKey);
         }
 
-        // ── AR Post-Process toggle ──
+        // -- AR Post-Process toggle --
         if (cfg.TitleBarFavArPostProcessEnabled)
         {
             titleBarFavArPostIdx = TitleBarButtons.Count;
@@ -339,8 +339,8 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     using var tt = ImRaii.Tooltip();
                     ImGui.TextUnformatted(plugin.Configuration.ArPostProcessEnabled
-                        ? "AR Post-Process: On — click to disable"
-                        : "AR Post-Process: Off — click to enable");
+                        ? "AR Post-Process: On - click to disable"
+                        : "AR Post-Process: Off - click to enable");
                 },
                 Click = _ =>
                 {
@@ -350,7 +350,7 @@ public partial class SlaveWindow : Window, IDisposable
             });
         }
 
-        // ── AR Pre-Process toggle ──
+        // -- AR Pre-Process toggle --
         if (cfg.TitleBarFavArPreProcessEnabled)
         {
             titleBarFavArPreIdx = TitleBarButtons.Count;
@@ -362,8 +362,8 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     using var tt = ImRaii.Tooltip();
                     ImGui.TextUnformatted(plugin.Configuration.ArPreProcessEnabled
-                        ? "AR Pre-Process: On — click to disable"
-                        : "AR Pre-Process: Off — click to enable");
+                        ? "AR Pre-Process: On - click to disable"
+                        : "AR Pre-Process: Off - click to enable");
                 },
                 Click = _ =>
                 {
@@ -373,7 +373,7 @@ public partial class SlaveWindow : Window, IDisposable
             });
         }
 
-        // ── Auto-Glam Weather toggle ──
+        // -- Auto-Glam Weather toggle --
         if (cfg.TitleBarFavGlamWeatherEnabled)
         {
             titleBarFavGlamIdx = TitleBarButtons.Count;
@@ -385,8 +385,8 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     using var tt = ImRaii.Tooltip();
                     ImGui.TextUnformatted(glamWeatherRunning
-                        ? "Auto-Glam Weather: Running — click to stop"
-                        : "Auto-Glam Weather: Stopped — click to start");
+                        ? "Auto-Glam Weather: Running - click to stop"
+                        : "Auto-Glam Weather: Stopped - click to start");
                 },
                 Click = _ =>
                 {
@@ -398,7 +398,7 @@ public partial class SlaveWindow : Window, IDisposable
             });
         }
 
-        // ── Fav Mod List ──
+        // -- Fav Mod List --
         if (cfg.TitleBarFavModListEnabled && !string.IsNullOrWhiteSpace(cfg.TitleBarFavModListName))
         {
             var listName = cfg.TitleBarFavModListName;
@@ -415,7 +415,7 @@ public partial class SlaveWindow : Window, IDisposable
             });
         }
 
-        // ── Disable All XA Mods ──
+        // -- Disable All XA Mods --
         if (cfg.TitleBarFavDisableAllModsEnabled)
         {
             TitleBarButtons.Add(new TitleBarButton
@@ -431,7 +431,7 @@ public partial class SlaveWindow : Window, IDisposable
             });
         }
 
-        // ── Kill Game (requires Ctrl+Shift) ──
+        // -- Kill Game (requires Ctrl+Shift) --
         if (cfg.TitleBarFavKillGameEnabled && cfg.InstantLogoutEnabled)
         {
             titleBarFavKillIdx = TitleBarButtons.Count;
@@ -450,9 +450,9 @@ public partial class SlaveWindow : Window, IDisposable
 
                     var held = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
                     if (held)
-                        ImGui.TextUnformatted("/xa killgame — release Ctrl+Shift to cancel");
+                        ImGui.TextUnformatted("/xa killgame - release Ctrl+Shift to cancel");
                     else
-                        ImGui.TextUnformatted("/xa killgame — hold Ctrl+Shift to unlock");
+                        ImGui.TextUnformatted("/xa killgame - hold Ctrl+Shift to unlock");
                 },
                 Click = _ =>
                 {
@@ -1005,7 +1005,7 @@ public partial class SlaveWindow : Window, IDisposable
         {
             autoCollectSkipPending = true;
             autoCollectScheduledDelaySeconds = arMultiEnabled ? 1f : 0f;
-            autoCollectSkipMessage = $"XA Database sync skipped — last sync is still within the {FormatCheckEveryHours(cadenceHours)} window.";
+            autoCollectSkipMessage = $"XA Database sync skipped - last sync is still within the {FormatCheckEveryHours(cadenceHours)} window.";
         }
 
         if (arMultiEnabled && plugin.Configuration.AutoCollectDisableWhenArMultiEnabled)
@@ -1159,7 +1159,7 @@ public partial class SlaveWindow : Window, IDisposable
     {
         RefreshTitleBarFavIconColors();
 
-        // ── Left panel: Task menu ──
+        // -- Left panel: Task menu --
         var storedLeftWidth = ClampTaskMenuWidth(plugin.Configuration.TaskMenuWidth);
         if (Math.Abs(storedLeftWidth - plugin.Configuration.TaskMenuWidth) > 0.01f)
         {
@@ -1196,7 +1196,7 @@ public partial class SlaveWindow : Window, IDisposable
         ImGui.PopStyleColor(3);
         ImGui.PopStyleVar();
 
-        // ── Status bar ──
+        // -- Status bar --
         ImGui.Separator();
         DrawStatusBar();
     }
@@ -1331,9 +1331,9 @@ public partial class SlaveWindow : Window, IDisposable
         ImGui.PopStyleColor();
     }
 
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     //  Status Bar
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     private static bool TryGetVisibleTaskLabel(string rawLabel, out string visibleLabel)
     {
         const string testingMarker = "[IF=Testing]";

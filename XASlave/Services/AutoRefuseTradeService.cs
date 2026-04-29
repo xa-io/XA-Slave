@@ -1,6 +1,7 @@
 using System;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
@@ -11,6 +12,8 @@ namespace XASlave.Services;
 public unsafe sealed class AutoRefuseTradeService : IDisposable
 {
     private const string RefusedTradeMessage = "XA Slave: Refused incoming trade request.";
+    private const string UnknownTraderName = "the trader";
+    private const int IncomingTraderEntityIdTtlMs = 5000;
 
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
@@ -26,6 +29,8 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     private string extraCommands = string.Empty;
     private long lastOutgoingTradeMs;
     private long lastAutoRefuseMs;
+    private uint lastIncomingTradeEntityId;
+    private long lastIncomingTradeEntityMs;
 
     public AutoRefuseTradeService(
         ISigScanner sigScanner,
@@ -180,9 +185,9 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
         var feedbackMode = showNotification switch
         {
-            true when sendEcho => "notification + /echo",
+            true when sendEcho => "notification + /e",
             true => "notification only",
-            _ when sendEcho => "/echo only",
+            _ when sendEcho => "/e only",
             _ => "silent"
         };
 
@@ -191,9 +196,9 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         surfaceCount += tradeStatusUpdateHook != null ? 1 : 0;
         var extraCommandLabel = CountExtraCommands() switch
         {
-            0 => "no extra commands",
-            1 => "1 extra command",
-            var count => $"{count} extra commands"
+            0 => "no extra messages",
+            1 => "1 extra message/command",
+            var count => $"{count} extra messages/commands"
         };
 
         StatusText = $"Enabled - incoming trades are refused automatically ({feedbackMode}, {surfaceCount} surfaces, {extraCommandLabel}).";
@@ -242,7 +247,9 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
             if (!IsLikelyIncomingTrade())
                 return result;
 
-            TryRefuseIncomingTrade();
+            var traderEntityId = ReadTradePacketEntityId(packet);
+            RememberIncomingTrader(traderEntityId);
+            TryRefuseIncomingTrade(traderEntityId);
         }
         catch (Exception ex)
         {
@@ -257,31 +264,72 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         return Environment.TickCount64 - lastOutgoingTradeMs > 3000;
     }
 
-    private bool TryRefuseIncomingTrade()
+    private bool TryRefuseIncomingTrade(uint traderEntityId = 0)
     {
         var nowMs = Environment.TickCount64;
         if (nowMs - lastAutoRefuseMs <= 1000)
             return false;
 
         lastAutoRefuseMs = nowMs;
+        traderEntityId = GetCurrentTraderEntityId(traderEntityId, nowMs);
+        var traderName = ResolveTraderNameSafely(traderEntityId);
         InventoryManager.Instance()->RefuseTrade();
-        NotifyTradeRefused();
-        ExecuteExtraCommands();
+        ReportTradeRefused(traderName);
         return true;
     }
 
-    private void NotifyTradeRefused()
+    private static uint ReadTradePacketEntityId(nint packet)
     {
-        if (!showNotification && !sendEcho)
+        if (packet == nint.Zero)
+            return 0;
+
+        return unchecked((uint)Marshal.ReadInt32(packet + 40));
+    }
+
+    private void RememberIncomingTrader(uint traderEntityId)
+    {
+        if (traderEntityId == 0)
+            return;
+
+        lastIncomingTradeEntityId = traderEntityId;
+        lastIncomingTradeEntityMs = Environment.TickCount64;
+    }
+
+    private uint GetCurrentTraderEntityId(uint traderEntityId, long nowMs)
+    {
+        if (traderEntityId != 0)
+            return traderEntityId;
+
+        if (lastIncomingTradeEntityId != 0 && nowMs - lastIncomingTradeEntityMs <= IncomingTraderEntityIdTtlMs)
+            return lastIncomingTradeEntityId;
+
+        return 0;
+    }
+
+    private void ReportTradeRefused(string traderName)
+    {
+        if (!showNotification && !sendEcho && string.IsNullOrWhiteSpace(extraCommands))
             return;
 
         try
         {
-            if (showNotification)
-                Plugin.Framework.RunOnFrameworkThread(() => Plugin.ToastGui.ShowNormal(RefusedTradeMessage));
+            Plugin.Framework.RunOnFrameworkThread(() =>
+            {
+                try
+                {
+                    if (showNotification)
+                        Plugin.ToastGui.ShowNormal(RefusedTradeMessage);
 
-            if (sendEcho)
-                ChatHelper.SendMessage($"/echo {RefusedTradeMessage}");
+                    if (sendEcho)
+                        ChatHelper.SendMessage($"/e {RefusedTradeMessage}");
+
+                    ExecuteExtraCommands(traderName);
+                }
+                catch (Exception ex)
+                {
+                    log.Warning(ex, "[XASlave] Auto Refuse Trade failed while reporting a refused trade.");
+                }
+            });
         }
         catch (Exception ex)
         {
@@ -289,25 +337,120 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         }
     }
 
-    private void ExecuteExtraCommands()
+    private void ExecuteExtraCommands(string traderName)
     {
         if (string.IsNullOrWhiteSpace(extraCommands))
             return;
 
+        var commands = extraCommands.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        if (commands.Length == 0)
+            return;
+
+        foreach (var command in commands)
+        {
+            var chatEntry = BuildChatEntry(command, traderName);
+            if (string.IsNullOrWhiteSpace(chatEntry))
+                continue;
+
+            ChatHelper.SendMessage(chatEntry);
+        }
+    }
+
+    private static string BuildChatEntry(string line, string traderName)
+    {
+        var expanded = ExpandTradeMessageTokens(line, traderName).Trim();
+        if (string.IsNullOrWhiteSpace(expanded))
+            return string.Empty;
+
+        return expanded.StartsWith("/", StringComparison.Ordinal)
+            ? expanded
+            : $"/e {expanded}";
+    }
+
+    private static string ExpandTradeMessageTokens(string text, string traderName)
+    {
+        var safeTraderName = string.IsNullOrWhiteSpace(traderName) ? UnknownTraderName : traderName.Trim();
+        return text
+            .Replace("<trader>", safeTraderName, StringComparison.OrdinalIgnoreCase)
+            .Replace("<target>", safeTraderName, StringComparison.OrdinalIgnoreCase);
+    }
+
+    private string ResolveTraderNameSafely(uint traderEntityId)
+    {
         try
         {
-            foreach (var command in extraCommands.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                if (string.IsNullOrWhiteSpace(command))
-                    continue;
-
-                ChatHelper.SendMessage(command);
-            }
+            return ResolveTraderName(traderEntityId);
         }
         catch (Exception ex)
         {
-            log.Warning(ex, "[XASlave] Auto Refuse Trade failed while running extra commands.");
+            log.Warning(ex, "[XASlave] Auto Refuse Trade failed while resolving the incoming trader name.");
+            return UnknownTraderName;
         }
+    }
+
+    private static string ResolveTraderName(uint traderEntityId)
+    {
+        if (traderEntityId != 0)
+        {
+            foreach (var actor in Plugin.ObjectTable)
+            {
+                if (actor.EntityId != traderEntityId)
+                    continue;
+
+                var traderName = NormalizeTraderName(actor.Name.TextValue);
+                if (!string.IsNullOrWhiteSpace(traderName))
+                    return traderName;
+            }
+        }
+
+        var targetingPlayerName = ResolveTargetingPlayerName();
+        return string.IsNullOrWhiteSpace(targetingPlayerName)
+            ? UnknownTraderName
+            : targetingPlayerName;
+    }
+
+    private static string ResolveTargetingPlayerName()
+    {
+        var localPlayer = Plugin.ObjectTable.LocalPlayer;
+        if (localPlayer == null || localPlayer.GameObjectId == 0)
+            return string.Empty;
+
+        IPlayerCharacter? closestPlayer = null;
+        var closestDistanceSquared = float.MaxValue;
+        foreach (var actor in Plugin.ObjectTable)
+        {
+            if (actor is not IPlayerCharacter player
+                || player.GameObjectId == 0
+                || player.GameObjectId == localPlayer.GameObjectId
+                || player.TargetObjectId != localPlayer.GameObjectId)
+            {
+                continue;
+            }
+
+            var distanceSquared = System.Numerics.Vector3.DistanceSquared(localPlayer.Position, player.Position);
+            if (closestPlayer != null && distanceSquared >= closestDistanceSquared)
+                continue;
+
+            closestPlayer = player;
+            closestDistanceSquared = distanceSquared;
+        }
+
+        return closestPlayer == null
+            ? string.Empty
+            : NormalizeTraderName(closestPlayer.Name.TextValue);
+    }
+
+    private static string NormalizeTraderName(string name)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+            return string.Empty;
+
+        var trimmed = name.Trim();
+        var atIndex = trimmed.IndexOf('@');
+        if (atIndex >= 0)
+            trimmed = trimmed[..atIndex].Trim();
+
+        return trimmed;
     }
 
     private int CountExtraCommands()

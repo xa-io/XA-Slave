@@ -6,11 +6,11 @@ using Dalamud.Bindings.ImGui;
 namespace XASlave.Windows;
 
 /// <summary>
-/// IPC Calls Available panel — partial class split from SlaveWindow.
+/// IPC Calls Available panel - partial class split from SlaveWindow.
 /// </summary>
 public partial class SlaveWindow
 {
-    // Cached IPC connectivity — refreshed every 5 seconds to avoid HITCH warnings
+    // Cached IPC connectivity - refreshed every 5 seconds to avoid HITCH warnings
     private DateTime ipcCacheExpiry = DateTime.MinValue;
     private bool cachedArAvail, cachedLsAvail, cachedYaAvail, cachedDelAvail, cachedPbAvail, cachedDbxAvail;
     private bool cachedTaAvail, cachedArtAvail, cachedSplatAvail;
@@ -96,7 +96,7 @@ public partial class SlaveWindow
             if (cachedSplatAvail)
                 liveIpcValues["Splatoon.IsLoaded"] = plugin.IpcClient.SplatoonIsLoaded();
 
-            // XA Slave (own channels — direct query, no IPC round-trip)
+            // XA Slave (own channels - direct query, no IPC round-trip)
             liveIpcValues["XASlave.IsBusy"] = plugin.TaskRunner.IsRunning || plugin.AutoCollector.IsRunning;
         }
         catch { /* individual failures already handled in IpcClient try/catch */ }
@@ -133,7 +133,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── XA Slave (provided by this plugin) ──
+        // -- XA Slave (provided by this plugin) --
         DrawIpcPluginStatus("XA Slave (Provider)", true, $"v{PluginVersion}");
 
         var cols0 = livePulls ? 4 : 3;
@@ -154,7 +154,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── XA Database ──
+        // -- XA Database --
         ImGui.TextDisabled("Example IPC usage:");
         ImGui.BulletText("XASlave.IsBusy()");
         ImGui.BulletText("XASlave.ExecuteCommand(\"xamods\")");
@@ -203,7 +203,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── vnavmesh ──
+        // -- vnavmesh --
         var vnavReady = plugin.IpcClient.VnavIsReady();
         DrawIpcPluginStatus("vnavmesh", vnavReady, null);
 
@@ -228,7 +228,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── AutoRetainer ──
+        // -- AutoRetainer --
         DrawIpcPluginStatus("AutoRetainer", cachedArAvail, null);
 
         if (ImGui.BeginTable("IpcAR", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
@@ -249,7 +249,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── Lifestream ──
+        // -- Lifestream --
         DrawIpcPluginStatus("Lifestream", cachedLsAvail, null);
 
         if (ImGui.BeginTable("IpcLS", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
@@ -274,7 +274,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── YesAlready ──
+        // -- YesAlready --
         DrawIpcPluginStatus("YesAlready", cachedYaAvail, null);
 
         if (ImGui.BeginTable("IpcYA", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
@@ -294,7 +294,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── Deliveroo ──
+        // -- Deliveroo --
         DrawIpcPluginStatus("Deliveroo", cachedDelAvail, null);
 
         if (ImGui.BeginTable("IpcDel", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
@@ -312,7 +312,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── PandorasBox ──
+        // -- PandorasBox --
         DrawIpcPluginStatus("PandorasBox", cachedPbAvail, null);
 
         if (ImGui.BeginTable("IpcPB", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
@@ -332,7 +332,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── Dropbox ──
+        // -- Dropbox --
         DrawIpcPluginStatus("Dropbox", cachedDbxAvail, null);
 
         if (ImGui.BeginTable("IpcDB", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
@@ -353,7 +353,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── TextAdvance ──
+        // -- TextAdvance --
         DrawIpcPluginStatus("TextAdvance", cachedTaAvail, null);
 
         if (ImGui.BeginTable("IpcTA", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
@@ -374,7 +374,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── Artisan ──
+        // -- Artisan --
         DrawIpcPluginStatus("Artisan", cachedArtAvail, null);
 
         if (ImGui.BeginTable("IpcArt", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
@@ -400,7 +400,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // ── Splatoon ──
+        // -- Splatoon --
         DrawIpcPluginStatus("Splatoon", cachedSplatAvail, null);
 
         if (ImGui.BeginTable("IpcSplat", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
@@ -419,7 +419,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
-        ImGui.TextDisabled("All calls are try/catch wrapped — missing plugins will not crash XA Slave.");
+        ImGui.TextDisabled("All calls are try/catch wrapped - missing plugins will not crash XA Slave.");
         ImGui.TextDisabled("Channel names verified from each plugin's IPC source code on GitHub.");
         ImGui.TextDisabled("Connectivity refreshed every 5 seconds.");
     }

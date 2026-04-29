@@ -125,7 +125,7 @@ public partial class SlaveWindow
         eurekaHunterStatusExpiryUtc = DateTime.UtcNow.AddSeconds(8);
     }
 
-    private void PlayEurekaInstanceHunterSoundPreview()
+    private unsafe void PlayEurekaInstanceHunterSoundPreview()
     {
         var soundEffectValue = XAPeepData.GetSoundEffectValue(plugin.Configuration.EurekaInstanceIdSoundEffectId);
         if (soundEffectValue == 0)

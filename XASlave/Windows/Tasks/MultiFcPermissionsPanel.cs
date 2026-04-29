@@ -11,10 +11,8 @@ using XASlave.Services.Tasks;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Multi-FC Permissions Updater — logs into multiple characters and updates
+/// Multi-FC Permissions Updater - logs into multiple characters and updates
 /// FC member role permissions to have all permissions enabled.
-///
-/// Converted from: 7.35 XA FC Permissions.lua
 ///
 /// Flow per character:
 ///   1. Relog to character
@@ -24,7 +22,7 @@ namespace XASlave.Windows;
 ///   5. Apply all permissions via FreeCompanyMemberRankEdit callback
 ///   6. Next character
 ///
-/// Callback sequence (from Lua):
+/// Callback sequence:
 ///   FreeCompany true 0 2           → navigate to ranks tab
 ///   FreeCompanyRank true 2 2 ...   → select rank
 ///   FreeCompanyRank true 4 3 1513 557 ... → edit rank
@@ -34,7 +32,7 @@ namespace XASlave.Windows;
 /// </summary>
 public partial class SlaveWindow
 {
-    // ── FC Permissions state ──
+    // -- FC Permissions state --
     private readonly HashSet<int> fcPermsSelectedIndices = new();
     private string fcPermsNewChar = "";
     private string fcPermsSearchFilter = "";
@@ -49,7 +47,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Log into multiple characters and update FC member role to have all permissions.");
         ImGui.Spacing();
 
-        // ── Import / Refresh buttons ──
+        // -- Import / Refresh buttons --
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
         if (!arConfigExists) ImGui.BeginDisabled();
         if (ImGui.Button("Import from AutoRetainer##fcPermsImportAR"))
@@ -106,7 +104,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Run controls ──
+        // -- Run controls --
         var isRunning = plugin.TaskRunner.IsRunning && plugin.TaskRunner.CurrentTaskName == "FC Permissions Updater";
         if (isRunning)
         {
@@ -145,7 +143,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Character List ──
+        // -- Character List --
         DrawCharacterListHeader("Character List", $"({chars.Count} total)", "fcPermsAnonymize");
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
@@ -163,7 +161,7 @@ public partial class SlaveWindow
         ImGui.InputTextWithHint("##fcPermsSearch", "Search name or world...", ref fcPermsSearchFilter, 128);
         ImGui.Spacing();
 
-        // Character table — columns: checkbox, #, character, world, FC name, member rank, FC rank, in FC, remove
+        // Character table - columns: checkbox, #, character, world, FC name, member rank, FC rank, in FC, remove
         var charInfo = cfg.ReloggerCharacterInfo;
 
         if (ImGui.BeginTable("FcPermsCharTable", 9,
@@ -425,7 +423,7 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     runner.CurrentItemLabel = $"[{charIndex}/{charTotal}] {charName}";
-                    runner.AddLog($"── Processing {charName} ({charIndex}/{charTotal}) ──");
+                    runner.AddLog($"-- Processing {charName} ({charIndex}/{charTotal}) --");
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -490,7 +488,7 @@ public partial class SlaveWindow
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Window: {charName}", 0.5f));
 
-            // FC callback sequence (from Lua: callbackXA("FreeCompany true 0 2"))
+            // FC callback sequence ("FreeCompany true 0 2")
             steps.Add(new TaskStep
             {
                 Name = $"FC Navigate Ranks: {charName}",
@@ -505,7 +503,7 @@ public partial class SlaveWindow
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Ranks Nav: {charName}", 0.3f));
 
             // FreeCompanyRank callbacks
-            // callbackXA("FreeCompanyRank true 2 2 Undefined Undefined Undefined")
+            // ("FreeCompanyRank true 2 2 Undefined Undefined Undefined")
             steps.Add(new TaskStep
             {
                 Name = $"FC Rank Select: {charName}",
@@ -520,7 +518,7 @@ public partial class SlaveWindow
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Rank Select Wait: {charName}", 0.3f));
 
-            // callbackXA("FreeCompanyRank true 4 3 1513 557 Undefined")
+            // ("FreeCompanyRank true 4 3 1513 557 Undefined")
             steps.Add(new TaskStep
             {
                 Name = $"FC Rank Edit: {charName}",
@@ -534,7 +532,7 @@ public partial class SlaveWindow
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Rank Edit Wait: {charName}", 0.1f));
 
-            // callbackXA("FreeCompanyRank true 3 2 Undefined Undefined Undefined")
+            // ("FreeCompanyRank true 3 2 Undefined Undefined Undefined")
             steps.Add(new TaskStep
             {
                 Name = $"FC Rank Confirm: {charName}",
@@ -548,7 +546,7 @@ public partial class SlaveWindow
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Rank Confirm Wait: {charName}", 0.1f));
 
-            // callbackXA("ContextMenu true 0 0 0 Undefined Undefined")
+            // ("ContextMenu true 0 0 0 Undefined Undefined")
             steps.Add(new TaskStep
             {
                 Name = $"FC Context Menu: {charName}",
@@ -563,7 +561,7 @@ public partial class SlaveWindow
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Context Wait: {charName}", 0.1f));
 
             // Apply all permissions
-            // callbackXA("FreeCompanyMemberRankEdit true 0 Undefined 1 1 1 1 1 1 1 1 1 1 1 1 3 1 1 1 1 1 3 1 1 1 1 1 1 1 1 -1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 -1 1 1 1")
+            // ("FreeCompanyMemberRankEdit true 0 Undefined 1 1 1 1 1 1 1 1 1 1 1 1 3 1 1 1 1 1 3 1 1 1 1 1 1 1 1 -1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 -1 1 1 1")
             steps.Add(new TaskStep
             {
                 Name = $"Apply Permissions: {charName}",
@@ -572,7 +570,7 @@ public partial class SlaveWindow
                     runner.AddLog("Applying all FC permissions...");
                     if (AddonHelper.IsAddonReady("FreeCompanyMemberRankEdit"))
                     {
-                        // The permission values from the Lua script
+                        // The permission values
                         AddonHelper.FireCallback("FreeCompanyMemberRankEdit",
                             0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1,
                             3, 1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,

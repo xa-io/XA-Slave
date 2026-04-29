@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
+using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
+using CSGameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace XASlave.Services;
 
@@ -12,14 +15,18 @@ namespace XASlave.Services;
 /// Replaces SND-dependent commands like /interact with native Dalamud/FFXIVClientStructs calls.
 ///
 /// Addon callbacks mirror SND's callbackXA("AddonName true 12") format but use
-/// AtkUnitBase.FireCallback directly — no SND dependency.
+/// AtkUnitBase.FireCallback directly - no SND dependency.
 ///
-/// Target interaction uses TargetSystem.InteractWithObject — equivalent to SND's /interact.
+/// Target interaction uses TargetSystem.InteractWithObject - equivalent to SND's /interact.
 /// </summary>
 public static class AddonHelper
 {
     public const string TextErrorAddonName = "_TextError";
     public const string CannotSeeTargetText = "Cannot see target";
+    public const string ContentsFinderConfirmAddonName = "ContentsFinderConfirm";
+
+    private const int ContentsFinderConfirmCommenceCallback = 8;
+    private const int ContentsFinderConfirmCommenceNodeListIndex = 7;
 
     // ═══════════════════════════════════════════════════
     //  Target Interaction (replaces /interact from SND)
@@ -71,7 +78,62 @@ public static class AddonHelper
         if (string.IsNullOrWhiteSpace(targetName))
             return;
 
+        if (TryTargetByName(targetName, out _))
+            return;
+
         ChatHelper.SendMessage($"/target \"{targetName}\"");
+    }
+
+    /// <summary>
+    /// Targets the closest targetable actor whose visible name contains the requested text.
+    /// Mirrors SimpleTweaks' target-fix behavior without waiting for the game command to fail.
+    /// </summary>
+    public static unsafe bool TryTargetByName(string targetName, out string matchedName)
+    {
+        matchedName = string.Empty;
+        var searchName = targetName.Trim();
+        if (string.IsNullOrWhiteSpace(searchName))
+            return false;
+
+        try
+        {
+            var localPlayer = Plugin.ObjectTable.LocalPlayer;
+            if (localPlayer == null)
+                return false;
+
+            IGameObject? closestMatch = null;
+            var closestDistance = float.MaxValue;
+            foreach (var actor in Plugin.ObjectTable)
+            {
+                var actorName = actor.Name.TextValue;
+                if (string.IsNullOrWhiteSpace(actorName)
+                    || !actorName.Contains(searchName, StringComparison.OrdinalIgnoreCase)
+                    || !IsTargetable(actor))
+                {
+                    continue;
+                }
+
+                var distance = Vector3.Distance(localPlayer.Position, actor.Position);
+                if (closestMatch != null && distance >= closestDistance)
+                    continue;
+
+                closestMatch = actor;
+                closestDistance = distance;
+            }
+
+            if (closestMatch == null)
+                return false;
+
+            Plugin.TargetManager.Target = closestMatch;
+            matchedName = closestMatch.Name.TextValue;
+            Plugin.Log.Debug("[XASlave] AddonHelper.TryTargetByName selected {MatchedName} for {SearchName}.", matchedName, searchName);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "[XASlave] AddonHelper.TryTargetByName failed.");
+            return false;
+        }
     }
 
     /// <summary>
@@ -512,7 +574,8 @@ public static class AddonHelper
             AtkValue* atkValues = stackalloc AtkValue[values.Length];
             for (int i = 0; i < values.Length; i++)
             {
-                atkValues[i].Type = (FFXIVClientStructs.FFXIV.Component.GUI.ValueType)3; // Int
+                atkValues[i] = default;
+                atkValues[i].Type = AtkValueType.Int;
                 atkValues[i].Int = values[i];
             }
             addon->FireCallback((uint)values.Length, atkValues);
@@ -528,7 +591,7 @@ public static class AddonHelper
 
     /// <summary>
     /// Fires a callback on the named addon with a "true" first argument + int second argument.
-    /// In SND's callbackXA("AddonName true 12"), "true" is the updateState flag — it tells
+    /// In SND's callbackXA("AddonName true 12"), "true" is the updateState flag - it tells
     /// SND to close/update the addon after firing. The actual callback values sent are just the
     /// remaining args. For addons that DO need a Bool+Int pair, use this method.
     /// For SelectYesno and similar, use FireCallbackAndClose instead.
@@ -545,10 +608,10 @@ public static class AddonHelper
             atkValues[0] = default;
             atkValues[1] = default;
             // Arg 0: Bool "true"
-            atkValues[0].Type = (FFXIVClientStructs.FFXIV.Component.GUI.ValueType)2; // Bool
+            atkValues[0].Type = AtkValueType.Bool;
             atkValues[0].Int = 1; // true
             // Arg 1: Int value
-            atkValues[1].Type = (FFXIVClientStructs.FFXIV.Component.GUI.ValueType)3; // Int
+            atkValues[1].Type = AtkValueType.Int;
             atkValues[1].Int = intArg;
             addon->FireCallback(2, atkValues);
             Plugin.Log.Information($"[XASlave] AddonHelper.FireCallbackTrueInt: fired on '{addonName}' with [Bool:true, Int:{intArg}]");
@@ -578,7 +641,7 @@ public static class AddonHelper
             for (int i = 0; i < values.Length; i++)
             {
                 atkValues[i] = default;
-                atkValues[i].Type = (FFXIVClientStructs.FFXIV.Component.GUI.ValueType)3; // Int
+                atkValues[i].Type = AtkValueType.Int;
                 atkValues[i].Int = values[i];
             }
             addon->FireCallback((uint)values.Length, atkValues);
@@ -635,6 +698,36 @@ public static class AddonHelper
         catch (Exception ex)
         {
             Plugin.Log.Error($"[XASlave] AddonHelper.ClickAddonButton error on '{addonName}' node {nodeListIndex}: {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Commences the visible duty-ready prompt.
+    /// Known-good callback shape from XA/Dhog notes: ContentsFinderConfirm true 8.
+    /// </summary>
+    public static bool ClickContentsFinderConfirmCommence()
+    {
+        if (!IsAddonReady(ContentsFinderConfirmAddonName))
+            return false;
+
+        if (FireCallbackAndClose(ContentsFinderConfirmAddonName, ContentsFinderConfirmCommenceCallback))
+            return true;
+
+        return ClickAddonButton(ContentsFinderConfirmAddonName, ContentsFinderConfirmCommenceNodeListIndex);
+    }
+
+    private static unsafe bool IsTargetable(IGameObject actor)
+    {
+        if (actor.Address == nint.Zero)
+            return false;
+
+        try
+        {
+            return ((CSGameObject*)actor.Address)->GetIsTargetable();
+        }
+        catch
+        {
             return false;
         }
     }

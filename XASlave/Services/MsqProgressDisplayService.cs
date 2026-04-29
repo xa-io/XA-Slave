@@ -55,7 +55,7 @@ public unsafe sealed class MsqProgressDisplayService : IDisposable
 
         Subscribe();
         enabled = true;
-        StatusText = "Enabled - Scenario Tree shows remaining MSQ count and completion percentage.";
+        StatusText = "Enabled - Scenario Tree shows remaining all-MSQ count and completion percentage.";
         TryRefreshScenarioTree();
         return true;
     }
@@ -147,7 +147,7 @@ public unsafe sealed class MsqProgressDisplayService : IDisposable
             if (!IsScenarioTreeReady(scenarioTree) || scenarioTree->AtkValues == null || scenarioTree->AtkValuesCount <= 7)
                 return;
 
-            if (!TryGetCurrentExpansionProgress(out var result) || result.Remaining <= 0)
+            if (!TryGetMainScenarioProgress(out var result) || result.Remaining <= 0)
                 return;
 
             var questSheet = dataManager.GetExcelSheet<Quest>();
@@ -191,7 +191,7 @@ public unsafe sealed class MsqProgressDisplayService : IDisposable
             && scenarioTree->RootNode != null;
     }
 
-    private bool TryGetCurrentExpansionProgress(out MsqProgressResult result)
+    private bool TryGetMainScenarioProgress(out MsqProgressResult result)
     {
         result = default;
         if (!EnsureQuestCache() || allMainScenarioQuests == null || allMainScenarioQuests.Count == 0)
@@ -210,18 +210,15 @@ public unsafe sealed class MsqProgressDisplayService : IDisposable
         if (questSheet == null || !questSheet.TryGetRow(firstIncompleteQuest, out var firstIncompleteQuestData))
             return false;
 
-        var currentJournalGenreId = firstIncompleteQuestData.JournalGenre.Value.RowId;
-        if (currentJournalGenreId == 0)
+        if (firstIncompleteQuestData.JournalGenre.Value.RowId == 0)
             return false;
 
-        var currentExpansionQuests = allMainScenarioQuests
-            .Where(quest => quest.JournalGenre.Value.RowId == currentJournalGenreId)
-            .ToList();
-        if (currentExpansionQuests.Count == 0)
+        var totalCount = GetAdjustedMainScenarioQuestCount();
+        if (totalCount <= 0)
             return false;
 
         var completedCount = 0;
-        foreach (var quest in currentExpansionQuests)
+        foreach (var quest in allMainScenarioQuests)
         {
             var maxSequence = 0u;
             for (var i = 0; i < quest.TodoParams.Count; i++)
@@ -231,16 +228,24 @@ public unsafe sealed class MsqProgressDisplayService : IDisposable
                 completedCount++;
         }
 
-        var totalCount = currentJournalGenreId == 1
-            ? AdjustArrQuestCount(currentExpansionQuests.Count)
-            : currentExpansionQuests.Count;
-        if (totalCount <= 0)
-            return false;
-
+        completedCount = Math.Clamp(completedCount, 0, totalCount);
         var remaining = Math.Max(0, totalCount - completedCount);
         var percentComplete = completedCount * 100f / totalCount;
         result = new MsqProgressResult(remaining, percentComplete, firstIncompleteQuest);
         return true;
+    }
+
+    private int GetAdjustedMainScenarioQuestCount()
+    {
+        if (allMainScenarioQuests == null || allMainScenarioQuests.Count == 0)
+            return 0;
+
+        var totalCount = allMainScenarioQuests.Count;
+        var arrQuestCount = allMainScenarioQuests.Count(quest => quest.JournalGenre.Value.RowId == 1);
+        if (arrQuestCount > 0)
+            totalCount = totalCount - arrQuestCount + AdjustArrQuestCount(arrQuestCount);
+
+        return Math.Max(0, totalCount);
     }
 
     private static int AdjustArrQuestCount(int baseCount)

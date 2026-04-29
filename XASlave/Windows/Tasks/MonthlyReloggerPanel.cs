@@ -12,13 +12,13 @@ using XASlave.Services.Tasks;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Monthly Relogger task panel — partial class split from SlaveWindow.
+/// Monthly Relogger task panel - partial class split from SlaveWindow.
 /// </summary>
 public partial class SlaveWindow
 {
     private const int ReloggerStaleSliderMaxValue = 45;
 
-    // ── Monthly Relogger state ──
+    // -- Monthly Relogger state --
     private MonthlyReloggerTask? reloggerTask;
     private readonly HashSet<int> reloggerSelectedIndices = new();
     private int reloggerStaleSelectDaysInput = -1;
@@ -30,9 +30,9 @@ public partial class SlaveWindow
     private string arImportStatus = string.Empty;
     private DateTime arImportStatusExpiry = DateTime.MinValue;
 
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     //  Task: Monthly Relogger
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     private void DrawMonthlyReloggerTask()
     {
         var cfg = plugin.Configuration;
@@ -50,14 +50,14 @@ public partial class SlaveWindow
 
         var staleSelectDays = reloggerStaleSelectDaysInput;
 
-        // ── Title + Description ──
+        // -- Title + Description --
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Monthly Relogger");
         ImGui.TextDisabled("Rotate through characters, executing actions on each.");
         ImGui.TextDisabled("This is used to ensure you do not lose FC Master Rank or Plots.");
         ImGui.TextDisabled("Requires Lifestream Path To Door, and Enter House in Lifestream settings, to work correctly.");
         ImGui.Spacing();
 
-        // ── Import / Refresh buttons ──
+        // -- Import / Refresh buttons --
         ImGui.TextDisabled("Press buttons in order: Import from AutoRetainer → Refresh AR Data → Pull XA Database Info.");
         ImGui.Spacing();
 
@@ -95,13 +95,13 @@ public partial class SlaveWindow
         }
 
 
-        // ── Plugin Status ──
+        // -- Plugin Status --
         DrawPluginStatusChecker();
 
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Run controls ──
+        // -- Run controls --
         if (runner.IsRunning && runner.CurrentTaskName == "Monthly Relogger")
         {
             var progress = runner.TotalItems > 0 ? (float)runner.CompletedItems / runner.TotalItems : 0f;
@@ -176,7 +176,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Character List ──
+        // -- Character List --
         DrawCharacterListHeader("Character List", $"({chars.Count} total)", "reloggerAnonymize");
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
@@ -196,7 +196,7 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        // Character table — always shows all columns from persistent ReloggerCharacterInfo
+        // Character table - always shows all columns from persistent ReloggerCharacterInfo
         // Columns: checkbox, #, character, region, lv, gil, current rank, fc, in fc, personal, last logged in, remove
         var charInfo = cfg.ReloggerCharacterInfo;
 
@@ -451,7 +451,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Per-Character Action Config ──
+        // -- Per-Character Action Config --
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Actions Per Character");
         ImGui.Spacing();
 
@@ -508,7 +508,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Log output ──
+        // -- Log output --
         // Status display
         if (runner.CurrentTaskName == "Monthly Relogger" && runner.StatusText == "Complete")
         {
@@ -850,7 +850,7 @@ public partial class SlaveWindow
                 if (fcIdObj != null && fcIdObj != DBNull.Value)
                     data.FCID = Convert.ToInt64(fcIdObj);
 
-                // Housing data — always assign to clear stale values
+                // Housing data - always assign to clear stale values
                 data.PersonalEstate = reader["personal_estate"]?.ToString() ?? "";
                 data.Apartment = reader["apartment"]?.ToString() ?? "";
                 data.FcEstate = reader["fc_estate"]?.ToString() ?? "";
@@ -1052,9 +1052,9 @@ public partial class SlaveWindow
         return false;
     }
 
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     //  Plugin Status Checker (equivalent to CheckPluginEnabledXA)
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     private void DrawPluginStatusChecker()
     {
         var ipc = plugin.IpcClient;
@@ -1089,7 +1089,7 @@ public partial class SlaveWindow
         if (allRequiredOk)
             ImGui.TextColored(green, "All required plugins loaded.");
         else
-            ImGui.TextColored(red, "WARNING: Missing required plugins — relogger may not function correctly.");
+            ImGui.TextColored(red, "WARNING: Missing required plugins - relogger may not function correctly.");
 
         // Required plugins row
         ImGui.Text("Required: ");

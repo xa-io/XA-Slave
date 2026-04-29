@@ -10,25 +10,17 @@ using XASlave.Data;
 namespace XASlave.Services.Tasks;
 
 /// <summary>
-/// Monthly Relogger — rotates through a list of characters, logging into each
+/// Monthly Relogger - rotates through a list of characters, logging into each
 /// and executing a configurable sequence of actions per character.
 ///
-/// Converted from: 7.35 XA Monthly Relogger.lua
 /// Uses IPC: AutoRetainer (relog, multi-mode), Lifestream (home/fc), TextAdvance, XA Database
 /// Uses commands: /ays relog, /at y, /nastatus off, /inventory, /armourychest, /saddlebag, /freecompanycmd
-///
-/// Lifestream wait pattern (mirrors xafunc.lua):
-///   1. Issue command → wait 1s
-///   2. Poll Lifestream.IsBusy every ~1s until it becomes busy (short timeout for missing house)
-///   3. Poll until Lifestream.IsBusy becomes false
-///   4. Confirm not-busy 3 consecutive times with 1s intervals
-///   5. CharacterSafeWait
 /// </summary>
 public sealed class MonthlyReloggerTask
 {
     private readonly Plugin plugin;
 
-    // ── Configurable actions per character ──
+    // -- Configurable actions per character --
     public bool DoEnableTextAdvance { get; set; } = true;
     public bool DoRemoveSprout { get; set; } = true;
     public bool DoOpenInventory { get; set; } = true;
@@ -73,7 +65,7 @@ public sealed class MonthlyReloggerTask
         runner.CompletedItems = 0;
         runner.SuppressLogoutCancel = true; // Relogger expects logouts during /ays relog
 
-        // ── PRIORITY #1: Disable AR Multi Mode FIRST ──
+        // -- PRIORITY #1: Disable AR Multi Mode FIRST --
         // Must happen before pre-flight to prevent AR from relogging during checks
         steps.Add(new TaskStep
         {
@@ -96,7 +88,7 @@ public sealed class MonthlyReloggerTask
         // ═══════════════════════════════════════════════════════
         steps.AddRange(BuildPreFlightSteps(characters, runner));
 
-        // ── Steps for each character ──
+        // -- Steps for each character --
         for (int i = 0; i < characters.Count; i++)
         {
             var charName = characters[i];
@@ -110,7 +102,7 @@ public sealed class MonthlyReloggerTask
                 OnEnter = () =>
                 {
                     runner.CurrentItemLabel = $"[{charIndex}/{charTotal}] {charName}";
-                    runner.AddLog($"── Processing {charName} ({charIndex}/{charTotal}) ──");
+                    runner.AddLog($"-- Processing {charName} ({charIndex}/{charTotal}) --");
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -123,7 +115,7 @@ public sealed class MonthlyReloggerTask
             steps.AddRange(BuildDutyGuardSteps(charName, runner, relogState));
             steps.AddRange(BuildHomeworldCheckSteps(charName, runner, relogState));
 
-            // Per-character actions — built inline so ordering is correct
+            // Per-character actions - built inline so ordering is correct
             // Each action step is gated by relog success
             var perCharActions = BuildPerCharacterActions(charName, charIndex, charTotal, runner);
             foreach (var action in perCharActions)
@@ -164,7 +156,7 @@ public sealed class MonthlyReloggerTask
                     runner.CompletedItems = capturedCharIndex;
                     if (relogState.Failed)
                     {
-                        runner.AddLog($"Skipped {capturedCharName} ({capturedCharIndex}/{charTotal}) — relog failed");
+                        runner.AddLog($"Skipped {capturedCharName} ({capturedCharIndex}/{charTotal}) - relog failed");
                         return;
                     }
 
@@ -195,7 +187,7 @@ public sealed class MonthlyReloggerTask
             });
         }
 
-        // ── Summary: Report any failed characters ──
+        // -- Summary: Report any failed characters --
         steps.Add(new TaskStep
         {
             Name = "Relogger Summary",
@@ -221,7 +213,7 @@ public sealed class MonthlyReloggerTask
 
         AddSharedCompletionSteps(steps, runner, DoLogoutOnComplete, DoKillGameOnComplete, DoEnableArMultiOnComplete);
 
-        // ── Optional: Re-enable AR Multi Mode after all characters processed ──
+        // -- Optional: Re-enable AR Multi Mode after all characters processed --
         steps.Add(MakeDelay("Final Cooldown", 1.0f));
 
         return steps;
@@ -229,7 +221,6 @@ public sealed class MonthlyReloggerTask
 
     /// <summary>
     /// Builds relog steps for a character with retry logic.
-    /// Equivalent to ARRelogXA(name) in xafunc.lua.
     /// Uses /ays relog Name@World command via CommandManager.
     ///
     /// Flow:
@@ -368,7 +359,7 @@ public sealed class MonthlyReloggerTask
                     if (capturedAttempt >= MaxRelogAttempts)
                     {
                         RecordRelogFailure(runner, relogState, charName,
-                            $"FAILED: {charName} — could not relog after {MaxRelogAttempts} attempts (current: '{current}')");
+                            $"FAILED: {charName} - could not relog after {MaxRelogAttempts} attempts (current: '{current}')");
                     }
                     else
                     {
@@ -404,7 +395,6 @@ public sealed class MonthlyReloggerTask
 
     /// <summary>
     /// Builds the per-character action steps.
-    /// Equivalent to the sequence in ProcessToonXA() from the Lua script.
     /// </summary>
     private List<TaskStep> BuildPerCharacterActions(string charName, int idx, int total, TaskRunner runner)
     {
@@ -479,7 +469,7 @@ public sealed class MonthlyReloggerTask
         }
 
         // OpenSaddlebagsXA() → /saddlebag
-        // Not every character has saddlebags unlocked — send command and use short timeout
+        // Not every character has saddlebags unlocked - send command and use short timeout
         if (DoOpenSaddlebags)
         {
             steps.Add(new TaskStep
@@ -491,7 +481,7 @@ public sealed class MonthlyReloggerTask
                     ChatHelper.SendMessage("/saddlebag");
                 },
                 IsComplete = () => AddonHelper.IsAddonVisible("InventoryBuddy"),
-                TimeoutSec = 3f, // Short timeout — if saddlebag not unlocked, skip gracefully
+                TimeoutSec = 3f, // Short timeout - if saddlebag not unlocked, skip gracefully
             });
             steps.Add(MakeDelay("Saddlebag Delay", 0.5f));
         }
@@ -532,7 +522,7 @@ public sealed class MonthlyReloggerTask
         }
 
         // return_to_homeXA() → Lifestream: /li home
-        // Short timeout (5s) for "wait busy" — if char has no house, Lifestream never becomes busy
+        // Short timeout (5s) for "wait busy" - if char has no house, Lifestream never becomes busy
         if (DoReturnToHome)
         {
             steps.AddRange(BuildLifestreamTeleportSteps(
@@ -551,7 +541,7 @@ public sealed class MonthlyReloggerTask
                 "FC", "fc", runner, waitBusyTimeoutSec: 8f));
         }
 
-        // Parse for XA Database — full FC collection mirroring AutoCollectionService
+        // Parse for XA Database - full FC collection mirroring AutoCollectionService
         // Opens FC window → Members tab → Info tab → Housing search → close all → save
         if (DoParseForXaDatabase)
         {
@@ -566,14 +556,14 @@ public sealed class MonthlyReloggerTask
                     var local = Plugin.ObjectTable.LocalPlayer;
                     if (local != null && local.CurrentWorld.RowId != local.HomeWorld.RowId)
                     {
-                        runner.AddLog("Not on home world — skipping FC collection (FC data unavailable when visiting)");
+                        runner.AddLog("Not on home world - skipping FC collection (FC data unavailable when visiting)");
                         skipFc = true;
                         return;
                     }
                     var fcTag = local?.CompanyTag.ToString() ?? string.Empty;
                     if (string.IsNullOrEmpty(fcTag))
                     {
-                        runner.AddLog("Not in a Free Company — skipping FC collection");
+                        runner.AddLog("Not in a Free Company - skipping FC collection");
                         skipFc = true;
                         return;
                     }
@@ -682,7 +672,7 @@ public sealed class MonthlyReloggerTask
             });
             steps.Add(MakeDelay("Parse XA: FC Close Delay", 0.5f));
 
-            // Final save to XA Database — all collected data (inventory, armoury, saddlebag, FC, housing)
+            // Final save to XA Database - all collected data (inventory, armoury, saddlebag, FC, housing)
             steps.Add(new TaskStep
             {
                 Name = "Parse XA: Save to Database",
@@ -890,8 +880,8 @@ public sealed class MonthlyReloggerTask
 
     /// <summary>
     /// Builds the full Lifestream teleport step sequence.
-    /// Mirrors the xafunc.lua pattern: issue command, wait 1s, poll Lifestream busy,
-    /// wait for completion, confirm 3 times not-busy, then CharacterSafeWait.
+    /// Issue command, wait 1s, poll Lifestream busy, wait for
+    /// completion, confirm 3 times not-busy, then CharacterSafeWait.
     ///
     /// waitBusyTimeoutSec controls how long we wait for Lifestream to START being busy.
     /// Short timeout (3-5s) means "skip if this char doesn't have a house".
@@ -918,7 +908,7 @@ public sealed class MonthlyReloggerTask
         steps.Add(MakeDelay($"Teleport {label}: Init Wait", 1.0f));
 
         // 3. Wait for Lifestream to become busy (start the teleport)
-        //    Short timeout — if it never becomes busy, the teleport destination doesn't exist
+        //    Short timeout - if it never becomes busy, the teleport destination doesn't exist
         steps.Add(new TaskStep
         {
             Name = $"Teleport {label}: Wait Start",
@@ -944,7 +934,7 @@ public sealed class MonthlyReloggerTask
             });
         }
 
-        // 5. Confirm Lifestream is not busy — 3 consecutive 1-second checks
+        // 5. Confirm Lifestream is not busy - 3 consecutive 1-second checks
         //    This prevents false positives from brief not-busy flickers
         {
             int confirmCount = 0;
@@ -999,10 +989,10 @@ public sealed class MonthlyReloggerTask
     /// <summary>
     /// Builds the pre-flight step sequence executed BEFORE any character processing.
     /// Handles:
-    ///   1. _TitleLogo / _TitleMenu (main menu) — already safe, proceed
-    ///   2. CharaSelect — click Exit to return to main menu
-    ///   3. MovieStaffList (main menu movie) — press ESC, wait for title screen
-    ///   4. Logged in — check for duty, SafeWait 3-pass, reorder character list
+    ///   1. _TitleLogo / _TitleMenu (main menu) - already safe, proceed
+    ///   2. CharaSelect - click Exit to return to main menu
+    ///   3. MovieStaffList (main menu movie) - press ESC, wait for title screen
+    ///   4. Logged in - check for duty, SafeWait 3-pass, reorder character list
     /// </summary>
     private List<TaskStep> BuildPreFlightSteps(List<string> characters, TaskRunner runner)
     {
@@ -1017,11 +1007,11 @@ public sealed class MonthlyReloggerTask
             {
                 runner.AddLog("Pre-flight: detecting game state...");
 
-                // Check MovieStaffList FIRST — most specific, only visible during main menu movie
+                // Check MovieStaffList FIRST - most specific, only visible during main menu movie
                 // During movie: _ScreenText, MovieStaffList, CursorAddon (no _TitleLogo/_TitleMenu)
                 if (AddonHelper.IsAddonVisible("MovieStaffList"))
                 {
-                    runner.AddLog("Pre-flight: main menu movie playing — will press ESC.");
+                    runner.AddLog("Pre-flight: main menu movie playing - will press ESC.");
                     preFlightState.OnMovie = true;
                     return;
                 }
@@ -1029,7 +1019,7 @@ public sealed class MonthlyReloggerTask
                 // Character select screen
                 if (AddonHelper.IsAddonVisible("CharaSelect") || AddonHelper.IsAddonVisible("_CharaSelectListMenu"))
                 {
-                    runner.AddLog("Pre-flight: on character select — will exit to main menu.");
+                    runner.AddLog("Pre-flight: on character select - will exit to main menu.");
                     preFlightState.OnCharaSelect = true;
                     return;
                 }
@@ -1037,12 +1027,12 @@ public sealed class MonthlyReloggerTask
                 // Main menu (title screen)
                 if (AddonHelper.IsAddonVisible("_TitleLogo") || AddonHelper.IsAddonVisible("_TitleMenu"))
                 {
-                    runner.AddLog("Pre-flight: on main menu — ready to proceed.");
+                    runner.AddLog("Pre-flight: on main menu - ready to proceed.");
                     preFlightState.OnMainMenu = true;
                     return;
                 }
 
-                // Not on any title screen — check if logged in
+                // Not on any title screen - check if logged in
                 var current = GetCurrentCharacterNameWorld();
                 if (!string.IsNullOrEmpty(current))
                 {
@@ -1052,14 +1042,14 @@ public sealed class MonthlyReloggerTask
                 }
                 else
                 {
-                    runner.AddLog("Pre-flight: unknown state — will attempt to proceed.");
+                    runner.AddLog("Pre-flight: unknown state - will attempt to proceed.");
                 }
             },
             IsComplete = () => true,
             TimeoutSec = 5f,
         });
 
-        // Step 2: Handle CharaSelect — exit to main menu
+        // Step 2: Handle CharaSelect - exit to main menu
         steps.Add(new TaskStep
         {
             Name = "Pre-Flight: Exit CharaSelect",
@@ -1080,11 +1070,11 @@ public sealed class MonthlyReloggerTask
             OnTimeout = () =>
             {
                 if (preFlightState.OnCharaSelect)
-                    runner.AddLog("Pre-flight: timeout waiting for main menu after CharaSelect exit — proceeding anyway.");
+                    runner.AddLog("Pre-flight: timeout waiting for main menu after CharaSelect exit - proceeding anyway.");
             },
         });
 
-        // Step 3: Handle MovieStaffList — press ESC and wait for title screen
+        // Step 3: Handle MovieStaffList - press ESC and wait for title screen
         steps.Add(new TaskStep
         {
             Name = "Pre-Flight: ESC Movie",
@@ -1103,7 +1093,7 @@ public sealed class MonthlyReloggerTask
             OnTimeout = () =>
             {
                 if (preFlightState.OnMovie)
-                    runner.AddLog("Pre-flight: timeout waiting for title screen after ESC — proceeding anyway.");
+                    runner.AddLog("Pre-flight: timeout waiting for title screen after ESC - proceeding anyway.");
             },
         });
 
@@ -1118,7 +1108,7 @@ public sealed class MonthlyReloggerTask
                 if (!preFlightState.IsLoggedIn) return;
                 if (Plugin.Condition[ConditionFlag.BoundByDuty])
                 {
-                    runner.AddLog("Pre-flight: in a duty — will attempt to leave before proceeding.");
+                    runner.AddLog("Pre-flight: in a duty - will attempt to leave before proceeding.");
                     preFlightState.InDuty = true;
                 }
             },
@@ -1135,7 +1125,7 @@ public sealed class MonthlyReloggerTask
 
         AddLoggedCharacterSafeWait3Pass(steps, "Pre-Flight SafeWait", 30f, runner, () => !preFlightState.IsLoggedIn);
 
-        // Step 6: Reorder character list — move currently-logged-in character to position 0
+        // Step 6: Reorder character list - move currently-logged-in character to position 0
         steps.Add(new TaskStep
         {
             Name = "Pre-Flight: Reorder Characters",
@@ -1159,7 +1149,7 @@ public sealed class MonthlyReloggerTask
                 }
                 else
                 {
-                    runner.AddLog($"Pre-flight: {currentChar} not in selected list — no reordering needed.");
+                    runner.AddLog($"Pre-flight: {currentChar} not in selected list - no reordering needed.");
                 }
             },
             IsComplete = () => true,
@@ -1184,7 +1174,7 @@ public sealed class MonthlyReloggerTask
 
     /// <summary>
     /// Builds a step-based duty leave sequence for pre-flight.
-    /// Gated by preFlightState.InDuty — skips immediately if not in duty.
+    /// Gated by preFlightState.InDuty - skips immediately if not in duty.
     /// </summary>
     private static List<TaskStep> BuildDutyLeaveSequence(string label, TaskRunner runner, PreFlightState state)
     {
@@ -1212,7 +1202,7 @@ public sealed class MonthlyReloggerTask
                 OnTimeout = () =>
                 {
                     if (state.InDuty && Plugin.Condition[ConditionFlag.InCombat])
-                        runner.AddLog($"{label}: still in combat after 30s — will attempt to leave anyway.");
+                        runner.AddLog($"{label}: still in combat after 30s - will attempt to leave anyway.");
                 },
             });
         }
@@ -1272,7 +1262,7 @@ public sealed class MonthlyReloggerTask
             OnTimeout = () =>
             {
                 if (state.InDuty && Plugin.Condition[ConditionFlag.BoundByDuty])
-                    runner.AddLog($"{label}: still in duty after leave attempt — proceeding anyway.");
+                    runner.AddLog($"{label}: still in duty after leave attempt - proceeding anyway.");
             },
         });
 
@@ -1288,7 +1278,7 @@ public sealed class MonthlyReloggerTask
 
     /// <summary>
     /// Builds homeworld check steps. If the character is not on their homeworld,
-    /// uses Lifestream to travel back. Always-on — cannot be disabled.
+    /// uses Lifestream to travel back. Always-on - cannot be disabled.
     /// Gated by relogState.Failed.
     /// </summary>
     private List<TaskStep> BuildHomeworldCheckSteps(string charName, TaskRunner runner, RelogState relogState)
@@ -1319,7 +1309,7 @@ public sealed class MonthlyReloggerTask
                     var homeName = local.HomeWorld.Value.Name.ToString();
                     if (currentWorldId != homeWorldId)
                     {
-                        runner.AddLog($"Not on homeworld — currently on {currentName}, returning to {homeName}...");
+                        runner.AddLog($"Not on homeworld - currently on {currentName}, returning to {homeName}...");
                         needsReturn = true;
                     }
                     else
@@ -1357,7 +1347,7 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 3f,
         });
 
-        // Wait for Lifestream to start (if returning) — 2s init delay then poll
+        // Wait for Lifestream to start (if returning) - 2s init delay then poll
         steps.Add(MakeDelay($"Homeworld Return: Init ({charName})", 2.0f));
 
         steps.Add(new TaskStep
@@ -1451,7 +1441,7 @@ public sealed class MonthlyReloggerTask
 
     /// <summary>
     /// Builds step-based duty guard steps for a specific character.
-    /// All steps gated by relogState — skipped if relog failed.
+    /// All steps gated by relogState - skipped if relog failed.
     /// Uses the same leave sequence as pre-flight but gated by per-char state.
     /// </summary>
     private static List<TaskStep> BuildDutyGuardSteps(string charName, TaskRunner runner, RelogState relogState)
@@ -1470,7 +1460,7 @@ public sealed class MonthlyReloggerTask
                 if (relogState.Failed) return;
                 dutyDetected = Plugin.Condition[ConditionFlag.BoundByDuty];
                 if (dutyDetected)
-                    runner.AddLog($"WARNING: {charName} is in a duty — attempting to leave...");
+                    runner.AddLog($"WARNING: {charName} is in a duty - attempting to leave...");
                 else
                     runner.AddLog($"Duty Guard: {charName} is not in a duty.");
             },
@@ -1545,7 +1535,7 @@ public sealed class MonthlyReloggerTask
             {
                 if (!relogState.Failed && dutyDetected && Plugin.Condition[ConditionFlag.BoundByDuty])
                 {
-                    RecordRelogFailure(runner, relogState, charName, $"FAILED: {charName} — unable to leave duty, halting.");
+                    RecordRelogFailure(runner, relogState, charName, $"FAILED: {charName} - unable to leave duty, halting.");
                 }
             },
         });
@@ -1667,8 +1657,7 @@ public sealed class MonthlyReloggerTask
     }
 
     /// <summary>
-    /// CharacterSafeWait equivalent — waits for NamePlate addon + player available + not zoning.
-    /// Mirrors CharacterSafeWaitXA() from xafunc.lua.
+    /// CharacterSafeWait equivalent - waits for NamePlate addon + player available + not zoning.
     /// </summary>
     public static TaskStep BuildCharacterSafeWait(string name, float timeoutSec)
     {
@@ -1681,14 +1670,13 @@ public sealed class MonthlyReloggerTask
     }
 
     /// <summary>
-    /// CharacterSafeWait 3-Pass — confirms the player is truly safe by requiring
+    /// CharacterSafeWait 3-Pass - confirms the player is truly safe by requiring
     /// 3 consecutive successful checks with 1-second intervals between each.
     /// This prevents false positives during zone transitions or animation states.
     ///
     /// Hard rule: Any time the plugin needs to confirm the player is safe before
     /// performing actions, use this 3-pass variant instead of the single-check version.
     ///
-    /// Mirrors the xafunc.lua Lifestream wait pattern:
     ///   "Confirm not-busy 3 consecutive times with 1s intervals"
     /// </summary>
     public static List<TaskStep> BuildCharacterSafeWait3Pass(string label, float perPassTimeoutSec = 15f)
@@ -1805,7 +1793,7 @@ public sealed class MonthlyReloggerTask
     }
 
     /// <summary>
-    /// Mount up step — equivalent to MountUpXA() → /gaction "Mount Roulette".
+    /// Mount up step - equivalent to MountUpXA() → /gaction "Mount Roulette".
     /// Usable as a template for future tasks that involve movement.
     /// </summary>
     public static TaskStep BuildMountUp(string name = "Mount Up")
@@ -1820,7 +1808,7 @@ public sealed class MonthlyReloggerTask
     }
 
     // ═══════════════════════════════════════════════════════
-    //  Game state checks — reusable across tasks
+    //  Game state checks - reusable across tasks
     // ═══════════════════════════════════════════════════════
 
     /// <summary>

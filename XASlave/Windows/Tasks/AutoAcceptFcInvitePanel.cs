@@ -8,11 +8,9 @@ using XASlave.Services.Tasks;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Auto-Accept FC Invites/Leave — monitors for FC creation and join invitations,
+/// Auto-Accept FC Invites/Leave - monitors for FC creation and join invitations,
 /// automatically accepts them, waits a configurable time, then leaves the FC.
 /// Designed for single character use (FC floater assist).
-///
-/// Converted from: 7.35 XA FC Floater Assist.lua
 ///
 /// Flow:
 ///   1. Monitor for _NotificationFcMake (FC creation invite) and _NotificationFcJoin (FC join invite)
@@ -26,7 +24,7 @@ namespace XASlave.Windows;
 /// </summary>
 public partial class SlaveWindow
 {
-    // ── FC Floater state ──
+    // -- FC Floater state --
     private bool fcFloaterRunning;
     private bool fcFloaterShowLog;
     private float fcFloaterCheckInterval = 1.0f;
@@ -37,7 +35,7 @@ public partial class SlaveWindow
     private DateTime fcFloaterLastCheck = DateTime.MinValue;
     private int fcFloaterInvitesProcessed;
 
-    // FC invite callback constants (from Lua script)
+    // FC invite callback constants
     private const int InviteTypeCreate = 14;
     private const int InviteTypeJoin = 15;
 
@@ -262,8 +260,7 @@ public partial class SlaveWindow
         });
         steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: Join Wait", fcFloaterWaitAfterJoin));
 
-        // Leave FC — open FC window, navigate to Info tab, click Leave button
-        // Reference: .xafunc.lua LeaveFreeCompanyXA()
+        // Leave FC - open FC window, navigate to Info tab, click Leave button
         steps.Add(new TaskStep
         {
             Name = "FC Floater: Open FC Window",
@@ -277,7 +274,7 @@ public partial class SlaveWindow
         });
         steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: FC Load", 1.0f));
 
-        // Navigate to Info tab — callback "FreeCompany false 0 5"
+        // Navigate to Info tab - callback "FreeCompany false 0 5"
         steps.Add(new TaskStep
         {
             Name = "FC Floater: Info Tab",
@@ -292,7 +289,7 @@ public partial class SlaveWindow
         });
         steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: Info Load", 1.0f));
 
-        // Click Leave FC — callback "FreeCompanyStatus true 3"
+        // Click Leave FC - callback "FreeCompanyStatus true 3"
         steps.Add(new TaskStep
         {
             Name = "FC Floater: Click Leave",

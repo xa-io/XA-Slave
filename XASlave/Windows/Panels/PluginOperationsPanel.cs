@@ -7,7 +7,7 @@ namespace XASlave.Windows;
 
 public partial class SlaveWindow
 {
-    // ── All known built-in menu labels for custom fav target picker ──
+    // -- All known built-in menu labels for custom fav target picker --
     private static readonly string[] AllBuiltInMenuLabels =
     {
         "AutoRetainer Helper",
@@ -213,7 +213,7 @@ public partial class SlaveWindow
             RebuildTitleBarFavButtons();
         }
         ImGui.SameLine();
-        FavRowLabel("Kill Game  [skull]  — hold Ctrl+Shift to fire");
+        FavRowLabel("Kill Game  [skull]  - hold Ctrl+Shift to fire");
 
         ImGui.TextDisabled("Enabling this also turns on XA Mods > Instant Logout. Disabling this titlebar icon does not disable the XA Mod.");
         ImGui.Spacing();
@@ -346,7 +346,7 @@ public partial class SlaveWindow
             ImGui.SetNextItemWidth(Scale(220f));
             var comboLabel = pluginOpsFavCustomMenuInputs[i].Length > 0
                 ? GetTitleBarFavSelectionLabel(pluginOpsFavCustomMenuInputs[i])
-                : "(none — click to pick)";
+                : "(none - click to pick)";
             if (ImGui.BeginCombo($"##menu{i}", comboLabel))
             {
                 var searchInput = pluginOpsFavCustomSearchInputs[i];

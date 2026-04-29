@@ -45,7 +45,7 @@ public partial class SlaveWindow
         var cyan = new Vector4(0.4f, 0.8f, 1.0f, 1.0f);
         var yellow = new Vector4(1.0f, 0.8f, 0.3f, 1.0f);
 
-        // ── Title ──
+        // -- Title --
         ImGui.TextColored(cyan, "City Chat Flooder");
         ImGui.TextDisabled("Travel through worlds and cities, sending announcements in chat.");
         ImGui.TextDisabled("Worlds are processed in order: Region > Data Center > World.");
@@ -53,7 +53,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Plugin Status ──
+        // -- Plugin Status --
         var lsOk = plugin.IpcClient.IsLifestreamAvailable();
         ImGui.Text("Required: ");
         ImGui.SameLine();
@@ -62,7 +62,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Run Controls ──
+        // -- Run Controls --
         if (runner.IsRunning && runner.CurrentTaskName == "City Chat Flooder")
         {
             var progress = runner.TotalItems > 0 ? (float)runner.CompletedItems / runner.TotalItems : 0f;
@@ -133,7 +133,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Chat Channel + Timing ──
+        // -- Chat Channel + Timing --
         ImGui.TextColored(cyan, "Chat Channel");
         ImGui.Spacing();
         var channelIdx = Array.IndexOf(FloorderChannelOptions, cfg.FloorderChatChannel);
@@ -171,7 +171,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── World Selection Grid ──
+        // -- World Selection Grid --
         ImGui.TextColored(cyan, $"Worlds ({cfg.FloorderSelectedWorlds.Count} selected)");
         ImGui.SameLine();
         if (ImGui.SmallButton("Select All##flworlds"))
@@ -249,7 +249,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── City Selection ──
+        // -- City Selection --
         ImGui.TextColored(cyan, $"Cities ({cfg.FloorderSelectedCities.Count} selected)");
         ImGui.SameLine();
         if (ImGui.SmallButton("Select All##flcities"))
@@ -363,7 +363,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Announcements ──
+        // -- Announcements --
         ImGui.TextColored(cyan, $"Announcements ({cfg.FloorderAnnouncements.Count})");
         ImGui.TextDisabled("One random announcement is picked per city visit.");
         ImGui.TextDisabled($"Maximum {FloorderMaxMessageLength} characters per message.");
@@ -417,7 +417,7 @@ public partial class SlaveWindow
             ImGui.PopStyleColor();
         }
 
-        // ── Log ──
+        // -- Log --
         DrawTaskLog("flooder", ref floorderShowLog, runner);
     }
 
@@ -432,7 +432,7 @@ public partial class SlaveWindow
         var cityList = cfg.FloorderSelectedCities.ToList();
         var totalCityVisits = orderedWorlds.Count * cityList.Count;
 
-        // ── Region validation ──
+        // -- Region validation --
         // Cross-region travel rules: NA↔NA, EU↔EU, JP↔JP only. Any region can travel to OCE.
         // If selected worlds include regions unreachable from current world, halt.
         try
@@ -474,7 +474,7 @@ public partial class SlaveWindow
         runner.TotalItems = totalCityVisits;
         runner.CompletedItems = 0;
 
-        // ── Pre-flight: CharacterSafeWait ──
+        // -- Pre-flight: CharacterSafeWait --
         foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass("Pre-flight SafeWait", 30f))
             steps.Add(sw);
 
@@ -483,7 +483,7 @@ public partial class SlaveWindow
         {
             var capturedWorld = world;
 
-            // World travel — skip if already on this world
+            // World travel - skip if already on this world
             var worldSkipped = new bool[] { false };
             steps.Add(new TaskStep
             {
@@ -497,7 +497,7 @@ public partial class SlaveWindow
                         var currentWorld = local?.CurrentWorld.ValueNullable?.Name.ToString() ?? "";
                         if (currentWorld.Equals(capturedWorld, StringComparison.OrdinalIgnoreCase))
                         {
-                            runner.AddLog($"==== Already on {capturedWorld} — skipping world travel ====");
+                            runner.AddLog($"==== Already on {capturedWorld} - skipping world travel ====");
                             worldSkipped[0] = true;
                             return;
                         }
@@ -533,7 +533,7 @@ public partial class SlaveWindow
                 var capturedCity = city;
                 var capturedIdx = visitIndex++;
 
-                // City travel — skip if already in this city
+                // City travel - skip if already in this city
                 var citySkipped = new bool[] { false };
                 steps.Add(new TaskStep
                 {
@@ -550,7 +550,7 @@ public partial class SlaveWindow
                                 var zoneName = row.PlaceName.Value.Name.ToString();
                                 if (zoneName.Equals(capturedCity, StringComparison.OrdinalIgnoreCase))
                                 {
-                                    runner.AddLog($"  Already in {capturedCity} — skipping city travel");
+                                    runner.AddLog($"  Already in {capturedCity} - skipping city travel");
                                     citySkipped[0] = true;
                                     return;
                                 }

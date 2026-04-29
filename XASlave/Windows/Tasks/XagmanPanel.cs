@@ -2808,7 +2808,7 @@ public partial class SlaveWindow
             SetXagmanActiveMeetDestination(string.Empty, string.Empty);
         TryResolveXagmanMeetDestinationForOwner();
         if (ShouldPreArmXagmanOwnerAutoAcceptForPendingTonySupply(xagmanActiveCharacter))
-            TrySetXagmanDropboxAutoAccept(true);
+            TryRequireXagmanReceiverAutoAccept($"owner {xagmanActiveCharacter} pending Tony supply");
         PublishXagmanPresence();
         var steps = BuildXagmanFranchiseSteps(selected, startIndex);
         plugin.TaskRunner.Start("Xagman", steps, onFinished: OnXagmanFranchiseTaskFinished, onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"));
@@ -3519,7 +3519,6 @@ public partial class SlaveWindow
             var standbyRequested = false;
             var resumingStandbyOwner = xagmanQueueRequestedAtUtc > DateTime.MinValue
                 && xagmanActiveCharacter.Equals(charName, StringComparison.OrdinalIgnoreCase);
-            var activeTradeLockLostMessage = $"Xagman: owner {charName} yielded Tony because another owner already holds the active trade lock.";
             const float ownerTradeStopDistance = 1.5f;
             const int maxOwnerCollectionTradePasses = 3;
             const int maxOwnerTradeRangeRetries = 3;
@@ -3542,6 +3541,17 @@ public partial class SlaveWindow
             {
                 ownerRequestedTooFarAwayRetryCount = 0;
                 ownerRequestedTooFarAwayLastRetryUtc = DateTime.MinValue;
+            }
+
+            string GetActiveTradeLockLostMessage()
+            {
+                var tonyPeer = GetXagmanLiveTonyPeer();
+                var activePartner = tonyPeer?.ActiveTradePartner ?? string.Empty;
+                if (!string.IsNullOrWhiteSpace(activePartner)
+                    && !activePartner.Equals(charName, StringComparison.OrdinalIgnoreCase))
+                    return $"Xagman: owner {charName} yielded Tony because Tony is now trading with {activePartner}.";
+
+                return $"Xagman: owner {charName} yielded Tony because Tony no longer advertises this owner as the active trade partner; owner inventory checks will decide remaining work.";
             }
 
             bool HandleOwnerTradeFailure(
@@ -3613,7 +3623,7 @@ public partial class SlaveWindow
                     return false;
                 if (HasXagmanActiveTonyTradeLock(charName))
                     return false;
-                return BeginStandbyForTonyRotation(activeTradeLockLostMessage);
+                return BeginStandbyForTonyRotation(GetActiveTradeLockLostMessage());
             }
 
             bool ShouldSkipTradeFlow()
@@ -3644,21 +3654,29 @@ public partial class SlaveWindow
 
                 standbyRequested = true;
                 xagmanOwnerCurrentCharacterIndex = i;
-                var shouldCleanupTrade = xagmanObservedDropboxBusy
-                    || plugin.IpcClient.DropboxIsBusy()
+                var dropboxBusy = plugin.IpcClient.DropboxIsBusy();
+                var tradeWindowVisible = AddonHelper.IsAddonVisible("Trade");
+                var shouldStopQueue = xagmanObservedDropboxBusy || dropboxBusy;
+                var shouldCleanupTrade = shouldStopQueue
+                    || tradeWindowVisible
                     || GetXagmanTradeFailureKind(out _) != XagmanTradeFailureKind.None;
-                var stoppedQueue = shouldCleanupTrade && TryStopXagmanDropboxTradeQueue();
+                var stoppedQueue = shouldStopQueue && TryStopXagmanDropboxTradeQueue();
                 var sentEscape = shouldCleanupTrade && TryAbortXagmanTradeWindow();
 
                 if (shouldCleanupTrade)
                 {
-                    if (stoppedQueue)
-                        runner.AddLog($"Xagman: stopped Dropbox item trade queue for {charName} before standby.");
-                    else
-                        runner.AddLog($"Xagman: could not confirm Dropbox item trade queue stop for {charName}; continuing into standby.");
+                    if (shouldStopQueue)
+                    {
+                        if (stoppedQueue)
+                            runner.AddLog($"Xagman: stopped Dropbox item trade queue for {charName} before standby.");
+                        else
+                            runner.AddLog($"Xagman: could not confirm Dropbox item trade queue stop for {charName}; continuing into standby.");
+                    }
 
                     if (sentEscape)
                         runner.AddLog($"Xagman: sent ESC to close Trade for {charName} before standby.");
+
+                    ClearXagmanDropbox();
                 }
 
                 xagmanObservedDropboxBusy = false;
@@ -3693,14 +3711,14 @@ public partial class SlaveWindow
                     if (!HasXagmanOwnerCollectionItemsRemaining(cfg.XagmanItems, charName))
                         return true;
                     if (!HasXagmanActiveTonyTradeLock(charName))
-                        return BeginStandbyForTonyRotation(activeTradeLockLostMessage);
+                        return BeginStandbyForTonyRotation(GetActiveTradeLockLostMessage());
                     return false;
                 }
 
                 if (HasXagmanOwnerCollectionTradeCompleted(cfg.XagmanItems, charName))
                     return true;
                 if (!HasXagmanActiveTonyTradeLock(charName))
-                    return BeginStandbyForTonyRotation(activeTradeLockLostMessage);
+                    return BeginStandbyForTonyRotation(GetActiveTradeLockLostMessage());
                 return true;
             }
 
@@ -3726,13 +3744,7 @@ public partial class SlaveWindow
                         SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
                         return true;
                     }
-                    return BeginStandbyForTonyRotation(activeTradeLockLostMessage);
-                }
-
-                if (plugin.IpcClient.DropboxIsBusy())
-                {
-                    xagmanObservedDropboxBusy = true;
-                    return false;
+                    return BeginStandbyForTonyRotation(GetActiveTradeLockLostMessage());
                 }
 
                 var remainingRequests = BuildXagmanOwnerTradeRequests(cfg.XagmanItems, charName, false);
@@ -3745,7 +3757,7 @@ public partial class SlaveWindow
                 if (!HasXagmanActiveTonyTradeLock(charName))
                 {
                     SetXagmanOwnerRequestedItems(remainingRequests, false);
-                    return BeginStandbyForTonyRotation(activeTradeLockLostMessage);
+                    return BeginStandbyForTonyRotation(GetActiveTradeLockLostMessage());
                 }
 
                 if (HasXagmanRequestedTradeProgress(xagmanOwnerRequestedItems, charName))
@@ -3968,7 +3980,7 @@ public partial class SlaveWindow
                     },
                 });
                 steps.Add(MonthlyReloggerTask.MakeDelay($"Xagman Trade Confirm Arrival Wait: {charName}{stepSuffix}", 0.5f, ShouldSkipRepeatedTradeExecution));
-                AppendXagmanDropboxAutoAcceptStep(steps, $"Xagman Trade {charName}{stepSuffix}", true, ShouldSkipRepeatedTradeExecution);
+                AppendXagmanDropboxAutoAcceptStep(steps, $"Xagman Trade {charName}{stepSuffix}", false, ShouldSkipRepeatedTradeExecution);
                 steps.Add(new TaskStep
                 {
                     Name = $"Xagman Trade Start: {charName}{stepSuffix}",
@@ -3978,7 +3990,15 @@ public partial class SlaveWindow
                         if (ShouldSkipRepeatedTradeExecution())
                             return;
                         ResetOwnerCollectionRangeRetry();
-                        StartXagmanDropboxTrade();
+                        if (!StartXagmanDropboxTrade($"owner give trade {charName}{stepSuffix}"))
+                        {
+                            relogFailed = true;
+                            xagmanStatus = XagmanStatus.Error;
+                            xagmanStatusText = $"Failed to start Dropbox trading queue for owner {charName}.";
+                            if (!runner.FailedCharacters.Contains(charName))
+                                runner.FailedCharacters.Add(charName);
+                            return;
+                        }
                         xagmanObservedDropboxBusy = plugin.IpcClient.DropboxIsBusy();
                     },
                     IsComplete = () => true,
@@ -4000,6 +4020,7 @@ public partial class SlaveWindow
                         xagmanStatusText = $"Trade timed out for owner {charName}.";
                         if (!runner.FailedCharacters.Contains(charName))
                         runner.FailedCharacters.Add(charName);
+                        CleanupXagmanDropboxTradeAttempt($"owner {charName} repeated give trade timeout");
                     },
                 });
                 AppendXagmanDropboxAutoAcceptStep(steps, $"Xagman Trade {charName}{stepSuffix}", false, () => standbyRequested || !ownerCollectionRetryRequested || repeatedCollectionQueuedEntries <= 0);
@@ -4219,7 +4240,16 @@ public partial class SlaveWindow
                 steps,
                 $"Xagman Tony Supply Handoff {charName}",
                 true,
-                () => relogFailed || !ShouldArmOwnerAutoAcceptForPendingTonySupply());
+                () => relogFailed || !ShouldArmOwnerAutoAcceptForPendingTonySupply(),
+                requireSuccess: true,
+                onFailure: () =>
+                {
+                    relogFailed = true;
+                    xagmanStatus = XagmanStatus.Error;
+                    xagmanStatusText = $"Failed to enable Dropbox auto-accept for Tony supply handoff {charName}.";
+                    if (!runner.FailedCharacters.Contains(charName))
+                        runner.FailedCharacters.Add(charName);
+                });
             steps.Add(new TaskStep
             {
                 Name = $"Xagman Approach Tony: {charName}",
@@ -4361,7 +4391,7 @@ public partial class SlaveWindow
                 },
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"Xagman Trade Confirm Arrival Wait: {charName}", 0.5f, ShouldSkipOwnerCollectionTradeExecution));
-            AppendXagmanDropboxAutoAcceptStep(steps, $"Xagman Trade {charName}", true, ShouldSkipOwnerCollectionTradeExecution);
+            AppendXagmanDropboxAutoAcceptStep(steps, $"Xagman Trade {charName}", false, ShouldSkipOwnerCollectionTradeExecution);
             steps.Add(new TaskStep
             {
                 Name = $"Xagman Trade Start: {charName}",
@@ -4371,7 +4401,15 @@ public partial class SlaveWindow
                     if (ShouldSkipOwnerCollectionTradeExecution())
                         return;
                     ResetOwnerCollectionRangeRetry();
-                    StartXagmanDropboxTrade();
+                    if (!StartXagmanDropboxTrade($"owner give trade {charName}"))
+                    {
+                        relogFailed = true;
+                        xagmanStatus = XagmanStatus.Error;
+                        xagmanStatusText = $"Failed to start Dropbox trading queue for owner {charName}.";
+                        if (!runner.FailedCharacters.Contains(charName))
+                            runner.FailedCharacters.Add(charName);
+                        return;
+                    }
                     xagmanObservedDropboxBusy = plugin.IpcClient.DropboxIsBusy();
                 },
                 IsComplete = () => true,
@@ -4393,6 +4431,7 @@ public partial class SlaveWindow
                     xagmanStatusText = $"Trade timed out for owner {charName}.";
                     if (!runner.FailedCharacters.Contains(charName))
                     runner.FailedCharacters.Add(charName);
+                    CleanupXagmanDropboxTradeAttempt($"owner {charName} give trade timeout");
                 },
             });
             AppendXagmanDropboxAutoAcceptStep(steps, $"Xagman Trade {charName}", false, () => standbyRequested || ownerCollectionQueuedEntries <= 0 || ShouldArmOwnerAutoAcceptForPendingTonySupply());
@@ -4522,18 +4561,30 @@ public partial class SlaveWindow
                 },
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"Xagman Requested Trade Confirm Arrival Wait: {charName}", 0.5f, ShouldSkipRequestedTradeFlow));
-            AppendXagmanDropboxAutoAcceptStep(steps, $"Xagman Requested Trade {charName}", true, ShouldSkipRequestedTradeFlow);
+            AppendXagmanDropboxAutoAcceptStep(
+                steps,
+                $"Xagman Requested Trade {charName}",
+                true,
+                ShouldSkipRequestedTradeFlow,
+                requireSuccess: true,
+                onFailure: () =>
+                {
+                    relogFailed = true;
+                    xagmanStatus = XagmanStatus.Error;
+                    xagmanStatusText = $"Failed to enable Dropbox auto-accept for requested trade {charName}.";
+                    if (!runner.FailedCharacters.Contains(charName))
+                        runner.FailedCharacters.Add(charName);
+                });
             steps.Add(new TaskStep
             {
-                Name = $"Xagman Requested Trade Start: {charName}",
+                Name = $"Xagman Requested Trade Receiver Ready: {charName}",
                 ShouldSkip = ShouldSkipRequestedTradeFlow,
                 OnEnter = () =>
                 {
                     if (ShouldSkipRequestedTradeFlow())
                         return;
                     ResetOwnerRequestedRangeRetry();
-                    StartXagmanDropboxTrade();
-                    xagmanObservedDropboxBusy = plugin.IpcClient.DropboxIsBusy();
+                    xagmanObservedDropboxBusy = false;
                 },
                 IsComplete = () => true,
                 TimeoutSec = 3f,
@@ -4542,7 +4593,7 @@ public partial class SlaveWindow
             {
                 Name = $"Xagman Requested Trade Wait: {charName}",
                 ShouldSkip = () => relogFailed || standbyRequested || xagmanOwnerRequestedItems.Count == 0,
-                OnEnter = () => xagmanObservedDropboxBusy = plugin.IpcClient.DropboxIsBusy(),
+                OnEnter = () => xagmanObservedDropboxBusy = false,
                 IsComplete = () => relogFailed || standbyRequested || xagmanOwnerRequestedItems.Count == 0 || PollOwnerRequestedTradeWait() || TryEnterStandby(),
                 TimeoutSec = 600f,
                 OnTimeout = () =>
@@ -4554,6 +4605,7 @@ public partial class SlaveWindow
                     xagmanStatusText = $"Requested trade timed out for owner {charName}.";
                     if (!runner.FailedCharacters.Contains(charName))
                         runner.FailedCharacters.Add(charName);
+                    CleanupXagmanDropboxTradeAttempt($"owner {charName} requested trade timeout");
                 },
             });
             AppendXagmanDropboxAutoAcceptStep(steps, $"Xagman Requested Trade {charName}", false, () => standbyRequested);
@@ -5030,6 +5082,8 @@ public partial class SlaveWindow
     {
         if (!xagmanRunning || xagmanActiveRole != XagmanRole.Tony)
             return;
+        if (xagmanStatus == XagmanStatus.Error)
+            return;
         var liveRelevantOwnerPeers = GetXagmanRelevantOwnerPeersForTony(xagmanActiveCharacter, enabledOnly: true, freshOnly: true);
         UpdateXagmanTonyOwnerDisconnectCompletionState(liveRelevantOwnerPeers);
         if (TryReassertXagmanTonyMeetup())
@@ -5065,7 +5119,7 @@ public partial class SlaveWindow
             {
                 TrySetXagmanDropboxAutoAccept(false);
                 ClearXagmanDropbox();
-                plugin.TaskRunner.AddLog($"Xagman: completed trade with {xagmanActiveTradePartner}.");
+                plugin.TaskRunner.AddLog($"Xagman: Dropbox trade queue ended for {xagmanActiveTradePartner}; waiting for owner inventory reconciliation before treating the handoff as complete.");
                 xagmanActiveTradePartner = string.Empty;
                 xagmanActiveTradePartnerInstanceId = string.Empty;
                 xagmanLastTonyActionAtUtc = DateTime.UtcNow;
@@ -5144,7 +5198,14 @@ public partial class SlaveWindow
             {
                 xagmanActiveTradePartner = inFlightOwner.ActiveCharacter;
                 xagmanActiveTradePartnerInstanceId = inFlightOwner.InstanceId;
-                TrySetXagmanDropboxAutoAccept(true);
+                if (!TryRequireXagmanReceiverAutoAccept($"Tony receiving from {inFlightOwner.ActiveCharacter}"))
+                {
+                    xagmanStatus = XagmanStatus.Error;
+                    xagmanStatusText = $"Failed to enable Dropbox auto-accept while receiving from {inFlightOwner.ActiveCharacter}.";
+                    xagmanActiveTradePartner = string.Empty;
+                    xagmanActiveTradePartnerInstanceId = string.Empty;
+                    return;
+                }
             }
             xagmanStatus = inFlightOwner.Status == XagmanStatus.Trading ? XagmanStatus.Trading : XagmanStatus.Called;
             xagmanStatusText = $"Tony {xagmanActiveCharacter} is waiting for {inFlightOwner.ActiveCharacter} to finish the active trade handoff.";
@@ -5182,7 +5243,16 @@ public partial class SlaveWindow
         xagmanActiveTradePartner = next.ActiveCharacter;
         xagmanActiveTradePartnerInstanceId = next.InstanceId;
         if (!hasRequestedItems)
-            TrySetXagmanDropboxAutoAccept(true);
+        {
+            if (!TryRequireXagmanReceiverAutoAccept($"Tony receiving from {next.ActiveCharacter}"))
+            {
+                xagmanStatus = XagmanStatus.Error;
+                xagmanStatusText = $"Failed to enable Dropbox auto-accept while receiving from {next.ActiveCharacter}.";
+                xagmanActiveTradePartner = string.Empty;
+                xagmanActiveTradePartnerInstanceId = string.Empty;
+                return;
+            }
+        }
         xagmanStatus = XagmanStatus.Called;
         xagmanStatusText = $"Tony {xagmanActiveCharacter} called {next.ActiveCharacter}.";
         xagmanLastTonyActionAtUtc = DateTime.UtcNow;
@@ -5438,6 +5508,59 @@ public partial class SlaveWindow
         }
         if (usingSupplyRequests)
             plugin.TaskRunner.AddLog($"Xagman: Tony will supply {supplyRequests.Count} requested item entr{(supplyRequests.Count == 1 ? "y" : "ies")} to {partnerName}.");
+        bool PollTonyTradeWait()
+        {
+            var ownerStandbyRotationReady = TryObserveXagmanOwnerStandbyRotationRequest();
+            if (ownerStandbyRotationReady.HasValue)
+                return ownerStandbyRotationReady.Value;
+
+            var busy = plugin.IpcClient.DropboxIsBusy();
+            if (busy)
+            {
+                xagmanObservedDropboxBusy = true;
+                return false;
+            }
+
+            if (!usingSupplyRequests)
+            {
+                if (xagmanObservedDropboxBusy)
+                {
+                    runner.AddLog($"Xagman: Dropbox trading queue ended for {partnerName}; releasing the trade lock for owner reconciliation.");
+                    TrySetXagmanDropboxAutoAccept(false);
+                    ClearXagmanDropbox();
+                    xagmanObservedDropboxBusy = false;
+                    xagmanActiveTradePartner = string.Empty;
+                    xagmanActiveTradePartnerInstanceId = string.Empty;
+                    xagmanLastTonyActionAtUtc = DateTime.UtcNow;
+                    return true;
+                }
+
+                return false;
+            }
+
+            var liveOwnerPeer = GetXagmanActiveTradeOwnerPeer() ?? ownerPeer;
+            var remainingRequests = liveOwnerPeer?.RequestedItems?.Count(entry => entry.ItemId > 0) ?? requestedItems?.Count(entry => entry.ItemId > 0) ?? 0;
+            if (liveOwnerPeer != null && remainingRequests == 0)
+            {
+                xagmanObservedDropboxBusy = false;
+                return true;
+            }
+
+            if (xagmanObservedDropboxBusy)
+            {
+                runner.AddLog($"Xagman: Dropbox trading queue ended for {partnerName} before owner confirmed requested supply; releasing the trade lock for owner reconciliation.");
+                TrySetXagmanDropboxAutoAccept(false);
+                ClearXagmanDropbox();
+                xagmanObservedDropboxBusy = false;
+                xagmanActiveTradePartner = string.Empty;
+                xagmanActiveTradePartnerInstanceId = string.Empty;
+                xagmanLastTonyActionAtUtc = DateTime.UtcNow;
+                return true;
+            }
+
+            return false;
+        }
+
         var steps = new List<TaskStep>
         {
             new()
@@ -5521,9 +5644,9 @@ public partial class SlaveWindow
             MonthlyReloggerTask.MakeDelay($"Xagman Tony Trade Focus Wait {partnerName}", 0.15f, ShouldSkipTonyTradeFlow),
             new()
             {
-                Name = $"Xagman Tony Trade {partnerName}: Enable Auto-Accept Trades",
+                Name = $"Xagman Tony Trade {partnerName}: Disable Auto-Accept Trades",
                 ShouldSkip = ShouldSkipTonyTradeFlow,
-                OnEnter = () => TrySetXagmanDropboxAutoAccept(true),
+                OnEnter = () => TrySetXagmanDropboxAutoAccept(false),
                 IsComplete = () => true,
                 TimeoutSec = 0.5f,
             },
@@ -5533,7 +5656,11 @@ public partial class SlaveWindow
                 ShouldSkip = ShouldSkipTonyTradeFlow,
                 OnEnter = () =>
                 {
-                    StartXagmanDropboxTrade();
+                    if (!StartXagmanDropboxTrade($"Tony trade with {partnerName}"))
+                    {
+                        AbortTonyTrade($"Failed to start Dropbox trading queue with {partnerName}.", true);
+                        return;
+                    }
                     xagmanObservedDropboxBusy = plugin.IpcClient.DropboxIsBusy();
                 },
                 IsComplete = () => true,
@@ -5543,8 +5670,8 @@ public partial class SlaveWindow
             {
                 Name = $"Xagman Tony Trade Wait {partnerName}",
                 ShouldSkip = ShouldSkipTonyTradeFlow,
-                OnEnter = () => xagmanObservedDropboxBusy = plugin.IpcClient.DropboxIsBusy(),
-                IsComplete = PollXagmanTonyTradeWait,
+                OnEnter = () => xagmanObservedDropboxBusy = false,
+                IsComplete = PollTonyTradeWait,
                 TimeoutSec = 600f,
                 OnTimeout = () => AbortTonyTrade($"Trade timed out with {partnerName}.", true),
             },
@@ -6140,7 +6267,7 @@ public partial class SlaveWindow
          xagmanActiveTradePartnerInstanceId = tonyPeer.InstanceId;
          xagmanTonyMode = tonyPeer.TonyMode;
          if (ShouldPreArmXagmanOwnerAutoAcceptForPendingTonySupply(characterNameWorld))
-             TrySetXagmanDropboxAutoAccept(true);
+             TryRequireXagmanReceiverAutoAccept($"owner {characterNameWorld} pending Tony supply");
          return true;
      }
      private XagmanTonyMode GetXagmanActiveTonyMode()
@@ -6176,13 +6303,27 @@ public partial class SlaveWindow
          ClearXagmanDropbox();
      }
 
-     private void AppendXagmanDropboxAutoAcceptStep(List<TaskStep> steps, string label, bool enabled, Func<bool>? shouldSkip = null)
+     private void AppendXagmanDropboxAutoAcceptStep(
+        List<TaskStep> steps,
+        string label,
+        bool enabled,
+        Func<bool>? shouldSkip = null,
+        bool requireSuccess = false,
+        System.Action? onFailure = null)
      {
          steps.Add(new TaskStep
          {
              Name = $"{label}: {(enabled ? "Enable" : "Disable")} Auto-Accept Trades",
              ShouldSkip = shouldSkip,
-             OnEnter = () => TrySetXagmanDropboxAutoAccept(enabled),
+             OnEnter = () =>
+             {
+                 var success = TrySetXagmanDropboxAutoAccept(enabled);
+                 if (requireSuccess && !success)
+                 {
+                     plugin.TaskRunner.AddLog($"Xagman: failed to {(enabled ? "enable" : "disable")} Dropbox auto-accept trades for {label}.");
+                     onFailure?.Invoke();
+                 }
+             },
              IsComplete = () => true,
              TimeoutSec = 0.5f,
          });
@@ -6206,9 +6347,32 @@ public partial class SlaveWindow
          plugin.TaskRunner.AddLog($"Xagman: {message}");
      }
 
-     private void StartXagmanDropboxTrade()
+     private bool StartXagmanDropboxTrade(string contextLabel)
      {
-         plugin.IpcClient.DropboxBeginTrading();
+         if (plugin.IpcClient.DropboxBeginTrading())
+             return true;
+
+         plugin.TaskRunner.AddLog(string.IsNullOrWhiteSpace(contextLabel)
+             ? "Xagman: failed to start the Dropbox trading queue."
+             : $"Xagman: failed to start the Dropbox trading queue for {contextLabel}.");
+         return false;
+     }
+
+     private void CleanupXagmanDropboxTradeAttempt(string contextLabel)
+     {
+         var stoppedQueue = TryStopXagmanDropboxTradeQueue();
+         var sentEscape = TryAbortXagmanTradeWindow();
+         ClearXagmanDropbox();
+         TrySetXagmanDropboxAutoAccept(false);
+         xagmanObservedDropboxBusy = false;
+
+         if (stoppedQueue)
+             plugin.TaskRunner.AddLog($"Xagman: stopped Dropbox item trade queue for {contextLabel}.");
+         else
+             plugin.TaskRunner.AddLog($"Xagman: could not confirm Dropbox item trade queue stop for {contextLabel}.");
+
+         if (sentEscape)
+             plugin.TaskRunner.AddLog($"Xagman: sent ESC to close Trade for {contextLabel}.");
      }
 
      private static XagmanTradeFailureKind ClassifyXagmanTradeFailureText(string text)
@@ -6246,15 +6410,6 @@ public partial class SlaveWindow
         var firstMatch = GetXagmanTradeFailureMatches(AddonHelper.GetAddonTextEntries(addonName)).FirstOrDefault();
         matchedText = firstMatch.Text ?? string.Empty;
         return firstMatch.Kind;
-    }
-
-     private bool PollXagmanTonyTradeWait()
-    {
-        var ownerStandbyRotationReady = TryObserveXagmanOwnerStandbyRotationRequest();
-        if (ownerStandbyRotationReady.HasValue)
-            return ownerStandbyRotationReady.Value;
-
-        return PollXagmanTradeCompletion();
     }
 
      private static string GetXagmanOwnerStandbyRotationRequestKey(XagmanPeerPresence ownerPeer)
@@ -6323,6 +6478,17 @@ public partial class SlaveWindow
             Plugin.Log.Error(ex, $"[Xagman] Failed to set Dropbox auto-accept to {enabled}.");
             return false;
         }
+    }
+
+     private bool TryRequireXagmanReceiverAutoAccept(string contextLabel)
+    {
+        if (TrySetXagmanDropboxAutoAccept(true))
+            return true;
+
+        plugin.TaskRunner.AddLog(string.IsNullOrWhiteSpace(contextLabel)
+            ? "Xagman: failed to enable Dropbox auto-accept on the receiving side."
+            : $"Xagman: failed to enable Dropbox auto-accept for {contextLabel}.");
+        return false;
     }
 
      private bool TryStopXagmanDropboxTradeQueue()
@@ -7146,17 +7312,6 @@ public partial class SlaveWindow
             : $"Xagman: owner {activePartner} requested Tony rotation after trade failure; rotating Tony {xagmanActiveCharacter}.");
         RotateXagmanTony();
         return true;
-    }
-
-     private bool PollXagmanTradeCompletion()
-    {
-        var busy = plugin.IpcClient.DropboxIsBusy();
-        if (busy)
-        {
-            xagmanObservedDropboxBusy = true;
-            return false;
-        }
-        return xagmanObservedDropboxBusy;
     }
 
      private void FocusXagmanCurrentTarget()

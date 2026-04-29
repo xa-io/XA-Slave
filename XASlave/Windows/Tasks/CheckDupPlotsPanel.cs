@@ -10,16 +10,16 @@ using XASlave.Services.Tasks;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Check Duplicate Plots task panel — partial class split from SlaveWindow.
+/// Check Duplicate Plots task panel - partial class split from SlaveWindow.
 /// </summary>
 public partial class SlaveWindow
 {
-    // ── Check Duplicate Plots state ──
+    // -- Check Duplicate Plots state --
     private readonly HashSet<int> dupPlotsSelectedIndices = new();
     private List<(string CharName, ReloggerCharacterData Info)> dupPlotsCharList = new();
     private bool dupPlotsShowLog;
 
-    // Check Duplicate Plots — per-character action config
+    // Check Duplicate Plots - per-character action config
     private bool dupDoTextAdvance = true;
     private bool dupDoRemoveSprout = true;
     private bool dupDoOpenInventory = true;
@@ -34,9 +34,9 @@ public partial class SlaveWindow
     private bool dupDoKillGameOnComplete;
     private bool dupDoEnableArMulti = true;
 
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     //  Task: Check Duplicate Plots
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     private void DrawCheckDuplicatePlotsTask()
     {
         var cfg = plugin.Configuration;
@@ -49,7 +49,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Process selected characters to refresh housing data and clear stale duplicates.");
         ImGui.Spacing();
 
-        // ── Data source buttons ──
+        // -- Data source buttons --
         ImGui.TextDisabled("Press the buttons in order to manually refresh the character list: Pull XA Database Info \u2192 Refresh List.");
         ImGui.Spacing();
 
@@ -68,13 +68,13 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Plugin Status ──
+        // -- Plugin Status --
         DrawTaskPluginStatus(dupDoCollectPersonalPlotInfo || dupDoParseForXaDatabase);
 
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Duplicate summary (always visible) ──
+        // -- Duplicate summary (always visible) --
         // Duplicates = same World + same Address (different worlds can have same plot number)
         var allWithHousing = charInfo
             .Where(kv => !string.IsNullOrEmpty(kv.Value.PersonalEstate)
@@ -139,7 +139,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Run controls ──
+        // -- Run controls --
         if (runner.IsRunning && runner.CurrentTaskName == "Check Duplicate Plots")
         {
             var progress = runner.TotalItems > 0 ? (float)runner.CompletedItems / runner.TotalItems : 0f;
@@ -210,7 +210,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Character table with housing columns ──
+        // -- Character table with housing columns --
         DrawCharacterListHeader("Characters with Housing Data", $"({dupPlotsCharList.Count} shown)", "dupPlotsAnonymize");
         anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
@@ -284,7 +284,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Actions Per Character ──
+        // -- Actions Per Character --
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Actions Per Character");
         ImGui.Spacing();
         ImGui.TextDisabled("Check if on homeworld \u2192 return via Lifestream if not (always-on)");

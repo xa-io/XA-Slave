@@ -16,7 +16,7 @@ namespace XASlave.Windows;
 /// </summary>
 public partial class SlaveWindow
 {
-    /// <summary>Draw plugin status checker for tasks — same pattern as Monthly Relogger.
+    /// <summary>Draw plugin status checker for tasks - same pattern as Monthly Relogger.
     /// XA Database becomes required when parseForXaDb is checked.</summary>
     private void DrawTaskPluginStatus(bool requiresXaDb)
     {

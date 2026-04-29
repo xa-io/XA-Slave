@@ -34,7 +34,7 @@ public partial class SlaveWindow
     {
         new("/xa anonymous on|off", "Toggle `Live Anonymous Mode`.", "Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases."),
         new("/xa chocobocutscene on|off", "Toggle `Skip Cutscenes Feeding Chocobo`.", "Only affects the companion-feeding cutscene surface."),
-        new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "Auto-confirms supported disconnect and stuck-logout lobby Dialogue popups, including `3102`."),
+        new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "Auto-confirms supported disconnect and stuck-logout lobby Dialogue popups."),
         new("/xa copyitemname on|off", "Toggle `Copy Item Name For All`.", "Adds XA item-name copy actions to supported context menus."),
         new("/xa gamerestore", "Disable the current top-level Game Mods toggles.", "Turns off the current Game Mods section in one command."),
         new("/xa hidepopups on|off", "Toggle `Hide Unnecessary Popups`.", "Closes supported tutorial and recommendation popups."),
@@ -46,6 +46,7 @@ public partial class SlaveWindow
         new("/xa queueposition on|off", "Toggle `Display Actual Queue Position`.", "Shows queue position and ETA details when available."),
         new("/xa skipcutscenes on|off", "Toggle `Skip Cutscenes`.", "Controls XA's main cutscene-skip surface."),
         new("/xa skipdialogue on|off", "Toggle `Skip Dialogue`.", "Auto-advances the `Talk` addon and the broader native talk surfaces when available."),
+        new("/xa targetfix on|off", "Toggle `Fix /target Command`.", "Repairs failed `/target` name lookups by selecting the closest targetable matching actor."),
     };
 
     private static readonly CommandReferenceEntry[] GraphicModsCommandEntries =

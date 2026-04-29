@@ -7,7 +7,7 @@ using XASlave.Services;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Repo List panel — curated repository links and plugin presence checks for XA Slave.
+/// Repo List panel - curated repository links and plugin presence checks for XA Slave.
 /// </summary>
 public partial class SlaveWindow
 {

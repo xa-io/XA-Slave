@@ -5,7 +5,6 @@ namespace XASlave.Data;
 
 /// <summary>
 /// Static FFXIV world/data center/region mappings.
-/// Sourced from dfunc.lua homeworld_lookup and game data.
 /// Used for region-based sorting and filtering of character lists.
 /// </summary>
 public static class WorldData
@@ -27,7 +26,7 @@ public static class WorldData
     /// <summary>All known game worlds with ID, name, DC, and region.</summary>
     public static readonly WorldInfo[] Worlds =
     {
-        // ── NA — Aether ──
+        // -- NA - Aether --
         new(73,  "Adamantoise", "Aether", "NA"),
         new(79,  "Cactuar",     "Aether", "NA"),
         new(54,  "Faerie",      "Aether", "NA"),
@@ -37,7 +36,7 @@ public static class WorldData
         new(99,  "Sargatanas",  "Aether", "NA"),
         new(57,  "Siren",       "Aether", "NA"),
 
-        // ── NA — Crystal ──
+        // -- NA - Crystal --
         new(91,  "Balmung",     "Crystal", "NA"),
         new(34,  "Brynhildr",   "Crystal", "NA"),
         new(74,  "Coeurl",      "Crystal", "NA"),
@@ -47,7 +46,7 @@ public static class WorldData
         new(37,  "Mateus",      "Crystal", "NA"),
         new(41,  "Zalera",      "Crystal", "NA"),
 
-        // ── NA — Dynamis ──
+        // -- NA - Dynamis --
         new(408, "Cuchulainn",  "Dynamis", "NA"),
         new(411, "Golem",       "Dynamis", "NA"),
         new(406, "Halicarnassus","Dynamis", "NA"),
@@ -57,7 +56,7 @@ public static class WorldData
         new(410, "Rafflesia",   "Dynamis", "NA"),
         new(405, "Seraph",      "Dynamis", "NA"),
 
-        // ── NA — Primal ──
+        // -- NA - Primal --
         new(78,  "Behemoth",    "Primal", "NA"),
         new(93,  "Excalibur",   "Primal", "NA"),
         new(53,  "Exodus",      "Primal", "NA"),
@@ -67,7 +66,7 @@ public static class WorldData
         new(64,  "Leviathan",   "Primal", "NA"),
         new(77,  "Ultros",      "Primal", "NA"),
 
-        // ── EU — Chaos ──
+        // -- EU - Chaos --
         new(80,  "Cerberus",    "Chaos", "EU"),
         new(83,  "Louisoix",    "Chaos", "EU"),
         new(71,  "Moogle",      "Chaos", "EU"),
@@ -77,7 +76,7 @@ public static class WorldData
         new(400, "Sagittarius", "Chaos", "EU"),
         new(85,  "Spriggan",    "Chaos", "EU"),
 
-        // ── EU — Light ──
+        // -- EU - Light --
         new(402, "Alpha",       "Light", "EU"),
         new(36,  "Lich",        "Light", "EU"),
         new(66,  "Odin",        "Light", "EU"),
@@ -87,7 +86,7 @@ public static class WorldData
         new(33,  "Twintania",   "Light", "EU"),
         new(42,  "Zodiark",     "Light", "EU"),
 
-        // ── JP — Elemental ──
+        // -- JP - Elemental --
         new(90,  "Aegis",       "Elemental", "JP"),
         new(68,  "Atomos",      "Elemental", "JP"),
         new(45,  "Carbuncle",   "Elemental", "JP"),
@@ -97,7 +96,7 @@ public static class WorldData
         new(72,  "Tonberry",    "Elemental", "JP"),
         new(50,  "Typhon",      "Elemental", "JP"),
 
-        // ── JP — Gaia ──
+        // -- JP - Gaia --
         new(43,  "Alexander",   "Gaia", "JP"),
         new(69,  "Bahamut",     "Gaia", "JP"),
         new(92,  "Durandal",    "Gaia", "JP"),
@@ -107,7 +106,7 @@ public static class WorldData
         new(76,  "Tiamat",      "Gaia", "JP"),
         new(51,  "Ultima",      "Gaia", "JP"),
 
-        // ── JP — Mana ──
+        // -- JP - Mana --
         new(44,  "Anima",       "Mana", "JP"),
         new(23,  "Asura",       "Mana", "JP"),
         new(70,  "Chocobo",     "Mana", "JP"),
@@ -117,7 +116,7 @@ public static class WorldData
         new(28,  "Pandaemonium","Mana", "JP"),
         new(61,  "Titan",       "Mana", "JP"),
 
-        // ── JP — Meteor ──
+        // -- JP - Meteor --
         new(24,  "Belias",      "Meteor", "JP"),
         new(82,  "Mandragora",  "Meteor", "JP"),
         new(60,  "Ramuh",       "Meteor", "JP"),
@@ -127,7 +126,7 @@ public static class WorldData
         new(31,  "Yojimbo",     "Meteor", "JP"),
         new(32,  "Zeromus",     "Meteor", "JP"),
 
-        // ── OCE — Materia ──
+        // -- OCE - Materia --
         new(22,  "Bismarck",    "Materia", "OCE"),
         new(21,  "Ravana",      "Materia", "OCE"),
         new(86,  "Sephirot",    "Materia", "OCE"),
@@ -135,7 +134,7 @@ public static class WorldData
         new(88,  "Zurvan",      "Materia", "OCE"),
     };
 
-    // ── Lookup helpers ──
+    // -- Lookup helpers --
 
     private static readonly Dictionary<uint, WorldInfo> ById =
         Worlds.ToDictionary(w => w.Id);

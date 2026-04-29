@@ -6,15 +6,15 @@ using Dalamud.Interface.Utility.Raii;
 namespace XASlave.Windows;
 
 /// <summary>
-/// AR Processing panel — partial class split from SlaveWindow.
+/// AR Processing panel - partial class split from SlaveWindow.
 /// Configures and monitors both pre-processing (before AR retainers) and
 /// post-processing (after AR retainers, before relog) for AR multi-mode.
 /// </summary>
 public partial class SlaveWindow
 {
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     //  Task: AR Processing (Pre + Post)
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     private void DrawArPostProcessTask()
     {
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "AutoRetainer Tasks");
@@ -23,7 +23,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Plugin status ──
+        // -- Plugin status --
         var arAvail = plugin.IpcClient.IsAutoRetainerAvailable();
         var xaDbAvail = plugin.IpcClient.IsXaDatabaseAvailable();
 
@@ -253,14 +253,14 @@ public partial class SlaveWindow
         else
         {
             ImGui.TextDisabled(plugin.ArPostProcessor.IsRegistered
-                ? "Idle — waiting for AutoRetainer multi-mode events."
+                ? "Idle - waiting for AutoRetainer multi-mode events."
                 : "Not registered (enable Ship Bailout, Pre-Processing, or Post-Processing).");
         }
 
         if (plugin.ArPostProcessor.CharactersPreProcessed > 0 || plugin.ArPostProcessor.CharactersProcessed > 0)
             ImGui.TextDisabled($"Pre-processed: {plugin.ArPostProcessor.CharactersPreProcessed}  |  Post-processed: {plugin.ArPostProcessor.CharactersProcessed}");
 
-        // ── Log ──
+        // -- Log --
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -308,7 +308,7 @@ public partial class SlaveWindow
             }
         }
 
-        // ── How it works ──
+        // -- How it works --
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();

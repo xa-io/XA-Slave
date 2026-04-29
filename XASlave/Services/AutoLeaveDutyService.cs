@@ -1,5 +1,6 @@
 using System;
 using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.DutyState;
 using Dalamud.Plugin.Services;
 
 namespace XASlave.Services;
@@ -99,7 +100,7 @@ public sealed class AutoLeaveDutyService : IDisposable
         subscribed = targetEnabled;
     }
 
-    private void OnDutyCompleted(object? sender, ushort territoryType)
+    private void OnDutyCompleted(IDutyStateEventArgs args)
     {
         if (!enabled || !clientState.IsLoggedIn)
             return;
@@ -110,7 +111,7 @@ public sealed class AutoLeaveDutyService : IDisposable
         UpdateStatusText();
     }
 
-    private void OnTerritoryChanged(ushort territoryType)
+    private void OnTerritoryChanged(uint territoryType)
     {
         if (!pendingLeave)
             return;

@@ -5,7 +5,7 @@ using Dalamud.Bindings.ImGui;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Window Renamer panel — partial class split from SlaveWindow.
+/// Window Renamer panel - partial class split from SlaveWindow.
 /// Renames the FFXIV game window title with enable/disable toggle,
 /// custom title text box, and optional process ID prefix.
 /// </summary>
@@ -14,9 +14,9 @@ public partial class SlaveWindow
     private string windowRenamerTitleInput = string.Empty;
     private bool windowRenamerInitialized;
 
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     //  Task: Window Renamer
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     private void DrawWindowRenamerTask()
     {
         // One-time init: sync local input buffer with persisted config
@@ -32,7 +32,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Enable / Disable ──
+        // -- Enable / Disable --
         var enabled = plugin.Configuration.WindowRenamerEnabled;
         if (ImGui.Checkbox("Enable Window Renamer", ref enabled))
         {
@@ -45,7 +45,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Settings (always visible so user can configure before enabling) ──
+        // -- Settings (always visible so user can configure before enabling) --
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Settings");
         ImGui.Spacing();
 
@@ -110,7 +110,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Preview ──
+        // -- Preview --
         ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), "Preview");
         ImGui.Spacing();
 
@@ -124,6 +124,6 @@ public partial class SlaveWindow
             $"\"{previewTitle}\"");
 
         if (!enabled)
-            ImGui.TextDisabled("(disabled — enable to apply)");
+            ImGui.TextDisabled("(disabled - enable to apply)");
     }
 }

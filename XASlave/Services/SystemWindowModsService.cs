@@ -598,7 +598,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         return true;
     }
 
-    public bool SetSpecialRenderUiVisibility(UIModule.UiFlags flags, bool visible)
+    public bool SetSpecialRenderUiVisibility(UiFlags flags, bool visible)
     {
         var uiModule = UIModule.Instance();
         if (uiModule == null)

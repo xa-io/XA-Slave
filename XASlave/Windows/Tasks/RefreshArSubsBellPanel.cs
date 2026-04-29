@@ -11,11 +11,9 @@ using XASlave.Services.Tasks;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Refresh AR Subs/Bell — Rotates through characters, teleports to FC house,
+/// Refresh AR Subs/Bell - Rotates through characters, teleports to FC house,
 /// interacts with Voyage Control Panel (submarine console) and Summoning Bell
 /// to ensure AutoRetainer has all submarine data correctly.
-///
-/// Converted from: Rotate toons, refresh sub console.lua
 ///
 /// Flow per character:
 ///   1. Relog to character
@@ -30,7 +28,7 @@ namespace XASlave.Windows;
 /// </summary>
 public partial class SlaveWindow
 {
-    // ── Refresh AR Subs/Bell state ──
+    // -- Refresh AR Subs/Bell state --
     private readonly HashSet<int> refreshSubsSelectedIndices = new();
     private string refreshSubsNewChar = "";
     private string refreshSubsSearchFilter = "";
@@ -81,7 +79,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Rotate characters, teleport to FC house, interact with sub console & summoning bell.\n\nTHIS REQUIRES LIFESTREAM TO HAVE PATH TO THE DOOR\nAND TO ENTER THE HOUSE, IF NOT IT WILL FAIL!");
         ImGui.Spacing();
 
-        // ── Import / Refresh buttons ──
+        // -- Import / Refresh buttons --
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
         if (!arConfigExists) ImGui.BeginDisabled();
         if (ImGui.Button("Import from AutoRetainer##refreshSubsImportAR"))
@@ -157,7 +155,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Run controls ──
+        // -- Run controls --
         var isRunning = plugin.TaskRunner.IsRunning
             && (plugin.TaskRunner.CurrentTaskName == "Refresh Sub/Bell/Chest"
                 || plugin.TaskRunner.CurrentTaskName == "Refresh AR Subs/Bell");
@@ -209,7 +207,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Character List ──
+        // -- Character List --
         DrawCharacterListHeader("Character List", $"({chars.Count} total)", "refreshSubsAnonymize");
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
@@ -227,7 +225,7 @@ public partial class SlaveWindow
         ImGui.InputTextWithHint("##refreshSubsSearch", "Search name or world...", ref refreshSubsSearchFilter, 128);
         ImGui.Spacing();
 
-        // Character table — columns: checkbox, #, character, world, retainers, submarines, remove
+        // Character table - columns: checkbox, #, character, world, retainers, submarines, remove
         var charInfo = cfg.ReloggerCharacterInfo;
 
         if (ImGui.BeginTable("RefreshSubsCharTable", 7,
@@ -483,7 +481,7 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     runner.CurrentItemLabel = $"[{charIndex}/{charTotal}] {charName}";
-                    runner.AddLog($"── Processing {charName} ({charIndex}/{charTotal}) ──");
+                    runner.AddLog($"-- Processing {charName} ({charIndex}/{charTotal}) --");
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,

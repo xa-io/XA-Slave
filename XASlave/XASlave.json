@@ -3,11 +3,11 @@
   "Name": "XA Slave",
   "InternalName": "XASlave",
   "RepoUrl": "https://github.com/xa-io/XA-Slave",
-  "AssemblyVersion": "0.0.0.26",
+  "AssemblyVersion": "0.0.0.27",
   "Punchline": "Don't manual.",
   "Description": "Don't manual.",
   "ApplicableVersion": "any",
-  "DalamudApiLevel": 14,
+  "DalamudApiLevel": 15,
   "AcceptsFeedback": false,
   "Tags": [
     "xa",

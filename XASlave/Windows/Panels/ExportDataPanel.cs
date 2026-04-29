@@ -14,15 +14,15 @@ using XASlave.Data;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Export Data panel — partial class split from SlaveWindow.
+/// Export Data panel - partial class split from SlaveWindow.
 /// Reference-tab panel that exports a timestamped multi-character table file
 /// from AutoRetainer, Lifestream, and XA Database data.
 /// </summary>
 public partial class SlaveWindow
 {
-    // ───────────────────────────────────────────────
-    //  Export Data — constants
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - constants
+    // -----------------------------------------------
     private static readonly int[] ExportIntervalOptions = { 0, 6, 12, 24, 48, 72 };
     private static readonly string[] ExportIntervalLabels = { "Always", "6 hours", "12 hours", "24 hours", "48 hours", "72 hours" };
     private const string ExportTaskName = "Export Data";
@@ -65,9 +65,9 @@ public partial class SlaveWindow
     private static readonly Regex ExportWhitespaceRegex = new(@"\s+", RegexOptions.Compiled);
     private static readonly Regex ExportTimestampTokenRegex = new(@"\{timestamp\}", RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
-    // ───────────────────────────────────────────────
-    //  Export Data — instance state
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - instance state
+    // -----------------------------------------------
     private readonly JsonSerializerOptions exportJsonOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -83,9 +83,9 @@ public partial class SlaveWindow
     private string exportPluginConfigsBasePath = string.Empty;
     private bool exportInitialized;
 
-    // ───────────────────────────────────────────────
-    //  Export Data — lifecycle
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - lifecycle
+    // -----------------------------------------------
     private void InitializeExportData()
     {
         if (exportInitialized)
@@ -188,9 +188,9 @@ public partial class SlaveWindow
         exportLastAlwaysOnRunContentId = 0;
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — Draw
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - Draw
+    // -----------------------------------------------
     private void DrawExportData()
     {
         InitializeExportData();
@@ -328,9 +328,9 @@ public partial class SlaveWindow
         }
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — snapshot write
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - snapshot write
+    // -----------------------------------------------
     private bool ExportTryWriteSnapshot(string trigger)
     {
         try
@@ -371,9 +371,9 @@ public partial class SlaveWindow
         }
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — row building
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - row building
+    // -----------------------------------------------
     private List<ExportRow> ExportBuildRows()
     {
         var autoRetainerCharacters = ExportLoadAutoRetainerCharacters();
@@ -430,9 +430,9 @@ public partial class SlaveWindow
             .ToList();
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — AutoRetainer loader
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - AutoRetainer loader
+    // -----------------------------------------------
     private List<ExportAutoRetainerCharacter> ExportLoadAutoRetainerCharacters()
     {
         var path = GetExportAutoRetainerConfigPath();
@@ -481,9 +481,9 @@ public partial class SlaveWindow
         return characters;
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — Lifestream loader
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - Lifestream loader
+    // -----------------------------------------------
     private Dictionary<long, ExportCharacterHousing> ExportLoadLifestreamHousing()
     {
         var path = GetExportLifestreamConfigPath();
@@ -531,9 +531,9 @@ public partial class SlaveWindow
         return result;
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — XA Database snapshot loader
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - XA Database snapshot loader
+    // -----------------------------------------------
     private Dictionary<long, ExportSnapshotSupplement> ExportLoadXaSnapshotSupplements()
     {
         var result = new Dictionary<long, ExportSnapshotSupplement>();
@@ -612,9 +612,9 @@ public partial class SlaveWindow
         return result;
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — output formatting
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - output formatting
+    // -----------------------------------------------
     private string ExportBuildDelimitedOutput(IEnumerable<ExportRow> rows, string delimiter)
     {
         var rowList = rows.ToList();
@@ -639,9 +639,9 @@ public partial class SlaveWindow
         return value;
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — path helpers
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - path helpers
+    // -----------------------------------------------
     private string GetExportAutoRetainerConfigPath()
     {
         return plugin.ArConfigReader.GetAutoRetainerConfigPath();
@@ -723,9 +723,9 @@ public partial class SlaveWindow
         return columns;
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — scheduling helpers
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - scheduling helpers
+    // -----------------------------------------------
     private void ExportResetSchedulingState()
     {
         exportLastAlwaysOnRunContentId = 0;
@@ -771,9 +771,9 @@ public partial class SlaveWindow
             : null;
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — calculation helpers
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - calculation helpers
+    // -----------------------------------------------
     private int ExportCalculateMgp(string currenciesJson, string itemsJson)
     {
         var itemEntries = ExportDeserializeOrDefault<List<ExportItemSnapshot>>(itemsJson) ?? new List<ExportItemSnapshot>();
@@ -844,9 +844,9 @@ public partial class SlaveWindow
         return total;
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — housing helpers
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - housing helpers
+    // -----------------------------------------------
     private List<ExportSharedHousingEntry> ExportParseSharedHousingEntries(string sharedEstates)
     {
         if (string.IsNullOrWhiteSpace(sharedEstates))
@@ -1038,9 +1038,9 @@ public partial class SlaveWindow
         };
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — submarine helpers
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - submarine helpers
+    // -----------------------------------------------
     private string[] ExportFormatSubmarineExports(string voyagesJson)
     {
         var voyages = ExportDeserializeOrDefault<ExportVoyageSnapshot>(voyagesJson);
@@ -1093,9 +1093,9 @@ public partial class SlaveWindow
             : "?";
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — JSON helpers
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - JSON helpers
+    // -----------------------------------------------
     private T? ExportDeserializeOrDefault<T>(string json)
     {
         if (string.IsNullOrWhiteSpace(json) || string.Equals(json, "null", StringComparison.OrdinalIgnoreCase))
@@ -1246,9 +1246,9 @@ public partial class SlaveWindow
         return retainerGil;
     }
 
-    // ───────────────────────────────────────────────
-    //  Export Data — model classes
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
+    //  Export Data - model classes
+    // -----------------------------------------------
     private sealed record ExportAutoRetainerCharacter
     {
         public long ContentId { get; init; }

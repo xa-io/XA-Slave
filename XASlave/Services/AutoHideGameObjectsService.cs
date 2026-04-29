@@ -8,7 +8,6 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
-using BattleNpcSubKind = Dalamud.Game.ClientState.Objects.Enums.BattleNpcSubKind;
 using ObjectKind = FFXIVClientStructs.FFXIV.Client.Game.Object.ObjectKind;
 
 namespace XASlave.Services;
@@ -242,7 +241,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         return original;
     }
 
-    private void OnTerritoryChanged(ushort _)
+    private void OnTerritoryChanged(uint _)
     {
         ResetAllObjects();
         zoneRefreshPassesRemaining = 3;
@@ -379,7 +378,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             && index <= 200
             && index % 2 == 0
             && gameObject->ObjectKind == ObjectKind.BattleNpc
-            && (BattleNpcSubKind)gameObject->SubKind == BattleNpcSubKind.Chocobo
+            && (BattleNpcSubKind)gameObject->SubKind == BattleNpcSubKind.Buddy
             && gameObject->OwnerId != localEntityId)
             return true;
 

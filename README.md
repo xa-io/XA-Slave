@@ -10,7 +10,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Save to XA Database** - Push data to XA Database with optional cadence-gated login collection and a built-in task log for collection/save debugging.
 - **Auto-Glam Weather** - Configure per-weather glamour plate lists, then randomly apply valid class/job and plate choices when the active weather changes.
 - **City Chat Flooder** - Send announcements across selected worlds and cities with looping and delay controls.
-- **Xagman** - Coordinate Tony / Franchise Owner FC trading across same-PC or LAN clients with `/xa db ...` Dropbox queueing, `Give` / `Take` / `Balance` / `TopUp` routing, supplier matching, safer recovery, and shared task completion actions. Includes item-list import/export, standby queue control, optional FC-return cleanup, and owner-side reconciliation so empty give passes are skipped, `Give N` retries do not loop, and owners are not sent home while give/request work remains. `TopUp` refills owners up to the configured amount without taking surplus back.
+- **Xagman** - Coordinate Tony / Franchise Owner FC trading across same-PC or LAN clients with `/xa db ...` Dropbox queueing, `Give` / `Take` / `Balance` / `TopUp` routing, supplier matching, role-aware trade recovery, and shared task completion actions. Includes item-list import/export, standby queue control, optional FC-return cleanup, and owner-side reconciliation so empty give passes are skipped, `Give N` retries do not loop, and owners are not sent home while give/request work remains. `TopUp` refills owners up to the configured amount without taking surplus back.
 - **Monthly Relogger** - Cycle through characters with AutoRetainer integration, XA Database-backed rank and personal-plot visibility, failure highlighting, optional per-character actions, and shared task completion actions.
 - **Shared Task Completion Options** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` all share the same `Task Options on Complete` footer with `Logout`, `Kill Game`, and `Enable AR Multi Mode`. `Kill Game` always uses XA's hard logout + close-client flow even if `Instant Logout` is disabled in XA Mods.
 - **Prep Logistics** - Relog selected characters, see available main-inventory space, move them to a target world or location, and finish through the shared task completion actions.
@@ -20,15 +20,16 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Screenshot-Safe Character Lists** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` can anonymize visible character and world labels with one shared `Anonymize` toggle. Changing that checkbox in any task list immediately carries across the others, the same setting is exposed as the `Anonymize Character Lists` XA Mod, the mass-character table columns can be resized with the widths preserved through saved table settings, and the scrollable task lists now keep their header rows pinned while you move through long character lists.
 - **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared action flow and shared completion actions.
 - **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, safer menu recovery, a workshop-side Company Chest gil sync into XA Database after the bell path finishes, and shared completion actions.
-- **Field Operations** - Eureka tools for instance tracking and Logos Manipulator automation. `Instance Hunter` provides per-zone baselines, live instance ID display, Rodney controls, alert previews, and automatic baseline rollover. `Logogram Creator` brings the AutoLogoAction flow into XA Slave with favorites, recipe locks, queue automation, manipulator-aware tabs, favorite overlays, and a floating cancel control that stops the active run and clears queued plates.
+- **Field Operations** - Eureka tools for instance tracking and Logos Manipulator automation. `Instance Hunter` provides per-zone baselines, live instance ID display, Rodney controls, duty-ready commence handling, alert previews, and automatic baseline rollover. `Logogram Creator` brings the AutoLogoAction flow into XA Slave with favorites, recipe locks, queue automation, manipulator-aware tabs, favorite overlays, and a floating cancel control that stops the active run and clears queued plates.
 - **Window Renamer** - Rename the FFXIV game window with an optional custom title, process-ID prefix, and current-character suffix.
-- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation. Presets and exported packages restore supported mod subsettings, including Eureka live-ID display, trade refusal, Expert Delivery options, Infinite Sprint delay, XA Peep alerts, and other shipped option groups. `Skip Cutscenes` arms its native hooks immediately when enabled.
+- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation. Presets and exported packages restore supported mod subsettings, including Eureka live-ID display, trade refusal, Expert Delivery options, Infinite Sprint delay, XA Peep alerts, and other shipped option groups.
 
   | Game Mods | Graphic Mods | Player Mods | Plugin Mods | Eureka Mods |
   | --- | --- | --- | --- | --- |
   | Allow Multiple Game Instances | Ignore Minimum Window Size | Anti-AFK | Anonymize Character Lists | Instance ID |
   | Cancel Login Cooldown | Hide Game Objects | Automate Expert Delivery | Force PeepingTom | Logogram Creator |
   | Display MSQ Progress | Custom Resolutions | Auto Leave Duty |  |  |
+  | Fix /target Command |  |  |  |  |
   | Skip Cutscenes | Disable Background Rendering | Auto Merge |  |  |
   | Skip Cutscenes Feeding Chocobo | Low Resolution | Refuse Trade Request |  |  |
   | Hide Unnecessary Popups | Special Rendering Modes | Reveal Undiscovered Areas |  |  |
@@ -77,7 +78,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | --- | --- |
 | `/xa anonymous on/off` | Toggle `Live Anonymous Mode`. |
 | `/xa chocobocutscene on/off` | Toggle `Skip Cutscenes Feeding Chocobo`. |
-| `/xa closeerrors on/off` | Toggle `Close Lobby Errors`. |
+| `/xa closeerrors on/off` | Toggle `Close Lobby Errors` for supported disconnect and lobby error popups. |
 | `/xa copyitemname on/off` | Toggle `Copy Item Name For All`. |
 | `/xa gamerestore` | Disable the current Game Mods toggles. |
 | `/xa hidepopups on/off` | Toggle `Hide Unnecessary Popups`. |
@@ -89,6 +90,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa queueposition on/off` | Toggle `Display Actual Queue Position`. |
 | `/xa skipcutscenes on/off` | Toggle `Skip Cutscenes`. |
 | `/xa skipdialogue on/off` | Toggle `Skip Dialogue`. |
+| `/xa targetfix on/off` | Toggle `Fix /target Command`. |
 
 ### Graphic Mods
 

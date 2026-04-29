@@ -137,7 +137,7 @@ public unsafe sealed class BuddyFeedCutsceneSkipService : IDisposable
         RefreshStatusText();
     }
 
-    private void OnTerritoryChanged(ushort _)
+    private void OnTerritoryChanged(uint _)
     {
         if (!enabled)
             return;

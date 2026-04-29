@@ -126,6 +126,7 @@ public sealed class Plugin : IDalamudPlugin
     public AutoUnlockExpertDeliveryService AutoUnlockExpertDelivery { get; init; }
     public ExpertDeliveryUnlockService ExpertDeliveryUnlock { get; init; }
     public AutoRefuseTradeService AutoRefuseTrade { get; init; }
+    public TargetCommandFixService TargetCommandFix { get; init; }
     public AntiAfkService AntiAfk { get; init; }
     public AutoLeaveDutyService AutoLeaveDuty { get; init; }
     public EurekaInstanceIdService EurekaInstanceId { get; init; }
@@ -144,7 +145,7 @@ public sealed class Plugin : IDalamudPlugin
     public SlaveDatabaseService SlaveDatabase { get; init; }
     public XagmanPeerService XagmanPeers { get; private set; }
 
-    private UIModule.UiFlags appliedSpecialRenderUiFlags;
+    private UiFlags appliedSpecialRenderUiFlags;
     private bool hasAppliedSpecialRenderUiFlags;
     private bool isDisposed;
     private readonly Queue<DeferredStartupAction> deferredStartupActions = new();
@@ -275,6 +276,7 @@ public sealed class Plugin : IDalamudPlugin
         ExpertDeliveryUnlock = new ExpertDeliveryUnlockService(GameInterop, Log);
         ExpertDeliveryUnlock.ApplyConfiguration(Configuration.UnlockExpertDeliveryForcedRankFloor);
         AutoRefuseTrade = new AutoRefuseTradeService(SigScanner, GameInterop, Log);
+        TargetCommandFix = new TargetCommandFixService(ChatGui, Log);
         AntiAfk = new AntiAfkService(Framework, ClientState, Log);
         AutoLeaveDuty = new AutoLeaveDutyService(DutyState, ClientState, PlayerState, Condition, Framework, Log);
         EurekaInstanceId = new EurekaInstanceIdService(Configuration, ClientState, PlayerState, Condition, Framework, Log, DtrBar);
@@ -580,6 +582,14 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
+        QueueDeferredStartupAction("TargetCommandFixEnabled", () =>
+        {
+            if (Configuration.TargetCommandFixEnabled && !TargetCommandFix.SetEnabled(true))
+            {
+                Configuration.TargetCommandFixEnabled = false;
+                Configuration.Save();
+            }
+        });
         QueueDeferredStartupAction("AutoRevealUndiscoveredAreasEnabled", () =>
         {
             if (Configuration.AutoRevealUndiscoveredAreasEnabled && !SystemWindowMods.SetRevealUndiscoveredAreasEnabled(true))
@@ -856,6 +866,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Custom Sight Distance", Configuration.CustomSightDistanceEnabled, SightDistance.StatusText);
         yield return CreateStartupSurfaceStatus("Instant Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText);
         yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText);
+        yield return CreateStartupSurfaceStatus("Fix /target Command", Configuration.TargetCommandFixEnabled, TargetCommandFix.StatusText);
         yield return CreateStartupSurfaceStatus("Reveal Undiscovered Areas", Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.RevealUndiscoveredAreasStatusText);
         yield return CreateStartupSurfaceStatus("Special Render Modes", Configuration.SpecialRenderModesEnabled, SystemWindowMods.SpecialRenderModesStatusText);
         yield return CreateStartupSurfaceStatus("Doze & Sit Anywhere", Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.StatusText);
@@ -928,6 +939,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoUnlockExpertDelivery", AutoUnlockExpertDelivery);
         TryDispose("ExpertDeliveryUnlock", ExpertDeliveryUnlock);
         TryDispose("AutoRefuseTrade", AutoRefuseTrade);
+        TryDispose("TargetCommandFix", TargetCommandFix);
         TryDispose("AntiAfk", AntiAfk);
         TryDispose("AutoLeaveDuty", AutoLeaveDuty);
         TryDispose("EurekaInstanceId", EurekaInstanceId);
@@ -1035,23 +1047,23 @@ public sealed class Plugin : IDalamudPlugin
         if (Configuration.WindowRenamerEnabled && Configuration.WindowRenamerShowCurrentCharacter)
             WindowRenamer.ApplyFromConfig(Configuration, string.Empty);
 
-        // Cancel any running task on logout â€” BUT skip if relogger suppresses it
+        // Cancel any running task on logout BUT skip if relogger suppresses it
         // (logout is expected during /ays relog character switches)
         if (TaskRunner.IsRunning && !TaskRunner.SuppressLogoutCancel)
         {
-            Log.Information("[XASlave] Character logged out â€” cancelling running task.");
-            TaskRunner.AddLog("EVENT: Character logged out â€” cancelling running task.");
+            Log.Information("[XASlave] Character logged out, cancelling running task.");
+            TaskRunner.AddLog("EVENT: Character logged out, cancelling running task.");
             TaskRunner.Cancel();
         }
         else if (TaskRunner.IsRunning)
         {
-            Log.Information("[XASlave] Character logged out â€” relogger active, not cancelling.");
-            TaskRunner.AddLog("EVENT: Character logged out â€” relogger active, not cancelling.");
+            Log.Information("[XASlave] Character logged out, relogger active, not cancelling.");
+            TaskRunner.AddLog("EVENT: Character logged out, relogger active, not cancelling.");
         }
 
-        Log.Information("[XASlave] Character logged out â€” sending final save to XA Database.");
+        Log.Information("[XASlave] Character logged out, sending final save to XA Database.");
         if (TaskRunner.IsRunning)
-            TaskRunner.AddLog("EVENT: Character logged out â€” sending final save to XA Database.");
+            TaskRunner.AddLog("EVENT: Character logged out, sending final save to XA Database.");
         SaveToXaDatabaseAndRecordSync(contentId, characterName);
     }
 
@@ -1069,7 +1081,7 @@ public sealed class Plugin : IDalamudPlugin
         var subcommandArgs = firstSpaceIndex >= 0 ? trimmed[(firstSpaceIndex + 1)..].Trim() : string.Empty;
 
 #if false
-        // /xa run <task> â€” test IPC RunTask locally
+        // /xa run <task> test IPC RunTask locally
         if (subcommand.Equals("run", StringComparison.OrdinalIgnoreCase))
         {
             var taskName = subcommandArgs;
@@ -1174,7 +1186,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
-        // Unknown subcommand â€” toggle window
+        // Unknown subcommand - toggle window
         if (subcommand.Equals("resrestore", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(RestoreXAModsSection(XAModsRestoreScope.Graphic, out var message), message);
@@ -2829,6 +2841,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("bailout-esc-menu", "Bailout ESC Menu", XAModsRestoreScope.Game, () => Configuration.BailoutEscMenuEnabled, EscMenuBailout.SetEnabled, applied => Configuration.BailoutEscMenuEnabled = applied, () => EscMenuBailout.StatusText);
         yield return new("auto-skip-dialogue", "Skip Dialogue", XAModsRestoreScope.Game, () => Configuration.AutoSkipDialogueEnabled, DialogueSkip.SetEnabled, applied => Configuration.AutoSkipDialogueEnabled = applied, () => DialogueSkip.StatusText);
         yield return new("display-actual-queue-position", "Display Actual Queue Position", XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusText);
+        yield return new("target-command-fix", "Fix /target Command", XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusText);
         yield return new("copy-item-name-for-all", "Copy Item Name For All", XAModsRestoreScope.Game, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusText);
         yield return new("expanded-player-right-click-menu-search", "Expanded Player Right-Click Menu Search", XAModsRestoreScope.Game, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusText);
         yield return new("live-anonymous-mode", "Live Anonymous Mode", XAModsRestoreScope.Game, () => Configuration.LiveAnonymousModeEnabled, NameplatePrivacy.SetAnonymousModeEnabled, applied => Configuration.LiveAnonymousModeEnabled = applied, () => NameplatePrivacy.AnonymousModeStatusText);
@@ -2984,6 +2997,10 @@ public sealed class Plugin : IDalamudPlugin
             case "queueposition":
                 definition = new("queueposition", "/xa queueposition on|off", GetXAModDefinition("display-actual-queue-position"));
                 return true;
+            case "targetfix":
+            case "targetcommand":
+                definition = new("targetfix", "/xa targetfix on|off", GetXAModDefinition("target-command-fix"));
+                return true;
             case "copyitemname":
                 definition = new("copyitemname", "/xa copyitemname on|off", GetXAModDefinition("copy-item-name-for-all"));
                 return true;
@@ -3103,14 +3120,14 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.SpecialRenderModeBackgroundColorA);
     }
 
-    private static UIModule.UiFlags GetAllSpecialRenderUiFlags()
+    private static UiFlags GetAllSpecialRenderUiFlags()
     {
-        return UIModule.UiFlags.ActionBars
-            | UIModule.UiFlags.Chat
-            | UIModule.UiFlags.Hud
-            | UIModule.UiFlags.Nameplates
-            | UIModule.UiFlags.TargetInfo
-            | UIModule.UiFlags.Shortcuts;
+        return UiFlags.ActionBars
+            | UiFlags.Chat
+            | UiFlags.Hud
+            | UiFlags.Nameplates
+            | UiFlags.TargetInfo
+            | UiFlags.Shortcuts;
     }
 
     private bool ClearUnsafeSpecialRenderHideChatSetting(bool notifyUser)
@@ -3125,39 +3142,39 @@ public sealed class Plugin : IDalamudPlugin
         return true;
     }
 
-    private UIModule.UiFlags GetSpecialRenderHiddenUiFlags()
+    private UiFlags GetSpecialRenderHiddenUiFlags()
     {
-        var hiddenUiFlags = (UIModule.UiFlags)0;
+        var hiddenUiFlags = UiFlags.None;
 
         if (Configuration.SpecialRenderHideAddonsKeepNameplatesEnabled)
         {
-            hiddenUiFlags |= UIModule.UiFlags.ActionBars
-                | UIModule.UiFlags.Chat
-                | UIModule.UiFlags.Hud
-                | UIModule.UiFlags.TargetInfo
-                | UIModule.UiFlags.Shortcuts;
+            hiddenUiFlags |= UiFlags.ActionBars
+                | UiFlags.Chat
+                | UiFlags.Hud
+                | UiFlags.TargetInfo
+                | UiFlags.Shortcuts;
         }
 
         if (Configuration.SpecialRenderHideAddonsKeepChatEnabled)
         {
-            hiddenUiFlags |= UIModule.UiFlags.ActionBars
-                | UIModule.UiFlags.Hud
-                | UIModule.UiFlags.Nameplates
-                | UIModule.UiFlags.TargetInfo
-                | UIModule.UiFlags.Shortcuts;
+            hiddenUiFlags |= UiFlags.ActionBars
+                | UiFlags.Hud
+                | UiFlags.Nameplates
+                | UiFlags.TargetInfo
+                | UiFlags.Shortcuts;
         }
 
         if (Configuration.SpecialRenderHideChatEnabled)
-            hiddenUiFlags |= UIModule.UiFlags.Chat;
+            hiddenUiFlags |= UiFlags.Chat;
 
         if (Configuration.SpecialRenderHideActionBarsEnabled)
-            hiddenUiFlags |= UIModule.UiFlags.ActionBars;
+            hiddenUiFlags |= UiFlags.ActionBars;
 
         if (Configuration.SpecialRenderHideTargetInfoEnabled)
-            hiddenUiFlags |= UIModule.UiFlags.TargetInfo;
+            hiddenUiFlags |= UiFlags.TargetInfo;
 
         if (Configuration.SpecialRenderHideNameplatesEnabled)
-            hiddenUiFlags |= UIModule.UiFlags.Nameplates;
+            hiddenUiFlags |= UiFlags.Nameplates;
 
         return hiddenUiFlags;
     }
@@ -3309,5 +3326,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.26";
+    public const string Version = "0.0.0.27";
 }

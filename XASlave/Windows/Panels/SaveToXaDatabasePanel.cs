@@ -5,7 +5,7 @@ using Dalamud.Bindings.ImGui;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Save to XA Database panel — partial class split from SlaveWindow.
+/// Save to XA Database panel - partial class split from SlaveWindow.
 /// </summary>
 public partial class SlaveWindow
 {
@@ -19,9 +19,9 @@ public partial class SlaveWindow
     private DateTime lastIpcResultExpiry = DateTime.MinValue;
     private bool saveToXaDatabaseShowLog;
 
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     //  Task: Save to XA Database
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     private void DrawSaveToXaDatabaseTask()
     {
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Save to XA Database");
@@ -30,7 +30,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Connection status ──
+        // -- Connection status --
         var dbReady = plugin.IpcClient.IsReady();
         var dbVersion = plugin.IpcClient.GetVersion();
         if (dbReady)
@@ -47,7 +47,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        // ── Manual actions ──
+        // -- Manual actions --
         ImGui.Text("Manual Actions");
         ImGui.Spacing();
 
@@ -75,7 +75,7 @@ public partial class SlaveWindow
                 if (plugin.SaveToXaDatabaseAndRecordSync())
                     SetIpcResult("Save sent to XA Database");
                 else
-                    SetIpcResult("Save failed — XA Database not available");
+                    SetIpcResult("Save failed - XA Database not available");
             }
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Send a save command to XA Database without opening any game windows.");
@@ -145,7 +145,7 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
-        // ── Auto-Collection on Login settings ──
+        // -- Auto-Collection on Login settings --
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Auto-Collection on Login");
         ImGui.Spacing();
 
@@ -203,9 +203,9 @@ public partial class SlaveWindow
         DrawTaskLog("saveToXaDatabase", ref saveToXaDatabaseShowLog, plugin.AutoCollector);
     }
 
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     //  Helpers
-    // ───────────────────────────────────────────────
+    // -----------------------------------------------
     private void RunAutoCollection(bool resumeArOnCompletion = false)
     {
         if (plugin.AutoCollector.IsRunning) return;
@@ -235,7 +235,7 @@ public partial class SlaveWindow
 
                 if (!completed)
                 {
-                    SetIpcResult(resumeArOnCompletion ? "Collection cancelled — AR resumed." : "Collection cancelled.");
+                    SetIpcResult(resumeArOnCompletion ? "Collection cancelled - AR resumed." : "Collection cancelled.");
                     return;
                 }
 
@@ -246,8 +246,8 @@ public partial class SlaveWindow
                 }
 
                 SetIpcResult(lastSaveOk
-                    ? "Collection complete — saved to XA Database"
-                    : "Collection complete — XA Database save failed");
+                    ? "Collection complete - saved to XA Database"
+                    : "Collection complete - XA Database save failed");
             });
 
         if (resumeArOnCompletion)

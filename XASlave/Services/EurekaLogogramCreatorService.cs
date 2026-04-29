@@ -12,7 +12,7 @@ using System.Linq;
 using System.Text.Json;
 using XASlave;
 using DalamudFramework = Dalamud.Plugin.Services.IFramework;
-using ValueType = FFXIVClientStructs.FFXIV.Component.GUI.ValueType;
+using AtkValueType = FFXIVClientStructs.FFXIV.Component.GUI.AtkValueType;
 
 namespace XASlave.Services
 {
@@ -168,7 +168,7 @@ namespace XASlave.Services
         private bool pendingLogosActionRefresh;
         private ulong nextLogosActionRefreshFrame;
         private int pendingLogosActionRefreshAttempts;
-        private ushort cachedLogogramTerritoryId;
+        private uint cachedLogogramTerritoryId;
         private readonly Dictionary<int, long> logogramGilCostById = [];
         private readonly Dictionary<int, ulong> logogramSourceItemIdByLogogramId = [];
 
@@ -245,7 +245,7 @@ namespace XASlave.Services
             }
         }
 
-        private void OnTerritoryChanged(ushort _)
+        private void OnTerritoryChanged(uint _)
         {
             if (IsInEurekaTerritory())
             {
@@ -625,8 +625,8 @@ namespace XASlave.Services
                 var value = &addon->AtkValues[3];
                 var capacity = value->Type switch
                 {
-                    ValueType.UInt => (int)value->UInt,
-                    ValueType.Int => value->Int,
+                    AtkValueType.UInt => (int)value->UInt,
+                    AtkValueType.Int => value->Int,
                     _ => 0,
                 };
 
@@ -2417,7 +2417,7 @@ namespace XASlave.Services
                 var value = &addon->AtkValues[32];
                 var warningText = value->Type switch
                 {
-                    ValueType.String or ValueType.String8 or ValueType.ManagedString => CleanAddonText(value->String.ToString()),
+                    AtkValueType.String or AtkValueType.String8 or AtkValueType.ManagedString => CleanAddonText(value->String.ToString()),
                     _ => string.Empty,
                 };
 
@@ -2528,7 +2528,7 @@ namespace XASlave.Services
                 var value = &addon->AtkValues[36];
                 return value->Type switch
                 {
-                    ValueType.String or ValueType.String8 or ValueType.ManagedString => CleanAddonText(value->String.ToString()),
+                    AtkValueType.String or AtkValueType.String8 or AtkValueType.ManagedString => CleanAddonText(value->String.ToString()),
                     _ => string.Empty,
                 };
             }
@@ -2600,9 +2600,9 @@ namespace XASlave.Services
                 var value = &addon->AtkValues[valueIndex];
                 return value->Type switch
                 {
-                    ValueType.UInt => (int)value->UInt,
-                    ValueType.Int => value->Int,
-                    ValueType.Bool => value->Int,
+                    AtkValueType.UInt => (int)value->UInt,
+                    AtkValueType.Int => value->Int,
+                    AtkValueType.Bool => value->Int,
                     _ => 0,
                 };
             }
@@ -3297,7 +3297,7 @@ namespace XASlave.Services
                 for (var i = 0; i < values.Length; i++)
                 {
                     atkValues[i] = default;
-                    atkValues[i].Type = ValueType.Int;
+                    atkValues[i].Type = AtkValueType.Int;
                     atkValues[i].Int = values[i];
                 }
 

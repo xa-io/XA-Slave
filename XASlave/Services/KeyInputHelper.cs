@@ -11,10 +11,10 @@ namespace XASlave.Services;
 /// available in a Dalamud plugin context.
 ///
 /// Methods:
-///   PressKey(vk)                   — tap key (down + up immediately)     → SND: /send KEY
-///   HoldKey(vk)                    — key down only (must release later)  → SND: /hold KEY
-///   ReleaseKey(vk)                 — key up only                         → SND: /release KEY
-///   HoldKeyForDuration(vk, ms)     — hold key, auto-release after ms     → SND: /hold KEY + /wait + /release KEY
+///   PressKey(vk)                   - tap key (down + up immediately)     → SND: /send KEY
+///   HoldKey(vk)                    - key down only (must release later)  → SND: /hold KEY
+///   ReleaseKey(vk)                 - key up only                         → SND: /release KEY
+///   HoldKeyForDuration(vk, ms)     - hold key, auto-release after ms     → SND: /hold KEY + /wait + /release KEY
 ///
 /// Available VK Constants (use with any method above):
 ///   Movement:  VK_W (0x57), VK_A (0x41), VK_S (0x53), VK_D (0x44)
@@ -42,13 +42,13 @@ public static class KeyInputHelper
     private const uint WM_KEYUP = 0x0101;
     private const string GameWindowClass = "FFXIVGAME";
 
-    // ── Movement Keys ──
+    // -- Movement Keys --
     public const byte VK_W = 0x57;
     public const byte VK_A = 0x41;
     public const byte VK_S = 0x53;
     public const byte VK_D = 0x44;
 
-    // ── Special Keys ──
+    // -- Special Keys --
     public const byte VK_END = 0x23;
     public const byte VK_HOME = 0x24;
     public const byte VK_ESCAPE = 0x1B;
@@ -58,18 +58,18 @@ public static class KeyInputHelper
     public const byte VK_DELETE = 0x2E;
     public const byte VK_INSERT = 0x2D;
 
-    // ── Arrow Keys ──
+    // -- Arrow Keys --
     public const byte VK_LEFT = 0x25;
     public const byte VK_UP = 0x26;
     public const byte VK_RIGHT = 0x27;
     public const byte VK_DOWN = 0x28;
 
-    // ── Modifier Keys ──
+    // -- Modifier Keys --
     public const byte VK_SHIFT = 0x10;
     public const byte VK_CONTROL = 0x11;
     public const byte VK_ALT = 0x12;
 
-    // ── Numpad Keys ──
+    // -- Numpad Keys --
     public const byte VK_NUMPAD0 = 0x60;
     public const byte VK_NUMPAD1 = 0x61;
     public const byte VK_NUMPAD2 = 0x62;
@@ -81,7 +81,7 @@ public static class KeyInputHelper
     public const byte VK_NUMPAD8 = 0x68;
     public const byte VK_NUMPAD9 = 0x69;
 
-    // ── Function Keys ──
+    // -- Function Keys --
     public const byte VK_F1 = 0x70;
     public const byte VK_F2 = 0x71;
     public const byte VK_F3 = 0x72;
@@ -210,7 +210,7 @@ public static class KeyInputHelper
     /// <summary>
     /// Holds a key down, then automatically releases it after the specified duration.
     /// Equivalent to SND's: /hold KEY → /wait N → /release KEY
-    /// Fire-and-forget — returns immediately, release happens on a background thread.
+    /// Fire-and-forget - returns immediately, release happens on a background thread.
     /// </summary>
     public static void HoldKeyForDuration(byte virtualKeyCode, int durationMs)
     {

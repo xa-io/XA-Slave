@@ -52,7 +52,7 @@ public sealed class TaskRunner : IDisposable
     public IReadOnlyList<string> LogMessages => logMessages;
     private const int MaxLogMessages = 8000;
 
-    // Characters that failed to relog — for summary at end of task
+    // Characters that failed to relog - for summary at end of task
     public List<string> FailedCharacters { get; } = new();
 
     public TaskRunner(ICondition condition, IFramework framework, IPluginLog log, IDtrBar dtrBar, IToastGui toastGui)
@@ -63,7 +63,7 @@ public sealed class TaskRunner : IDisposable
         this.dtrBar = dtrBar;
         this.toastGui = toastGui;
 
-        // DTR bar always available — shows "Idle" when no task running
+        // DTR bar always available - shows "Idle" when no task running
         InitDtrBar();
     }
 
@@ -275,7 +275,7 @@ public sealed class TaskRunner : IDisposable
                 return;
             }
 
-            AddLog($"STEP TIMEOUT {FormatStepLabel(stepIndex, step)} after {elapsed:0.00}s (limit {step.TimeoutSec:0.##}s) — skipping.");
+            AddLog($"STEP TIMEOUT {FormatStepLabel(stepIndex, step)} after {elapsed:0.00}s (limit {step.TimeoutSec:0.##}s) - skipping.");
             log.Warning($"[XASlave] TaskRunner step '{step.Name}' timed out after {step.TimeoutSec}s.");
             try { step.OnTimeout?.Invoke(); }
             catch (Exception ex) { log.Error($"[XASlave] TaskRunner step '{step.Name}' OnTimeout error: {ex.Message}"); }
@@ -312,7 +312,7 @@ public sealed class TaskRunner : IDisposable
         // Reset DTR bar to idle
         SetDtrIdle();
 
-        // Toast notification — must run on framework thread
+        // Toast notification - must run on framework thread
         try
         {
             if (!suppressCompletionReport)
@@ -337,7 +337,7 @@ public sealed class TaskRunner : IDisposable
         finally { suppressCompletionReport = false; }
     }
 
-    /// <summary>Initialize DTR bar entry — always visible, shows "Idle" by default.</summary>
+    /// <summary>Initialize DTR bar entry - always visible, shows "Idle" by default.</summary>
     private void InitDtrBar()
     {
         try

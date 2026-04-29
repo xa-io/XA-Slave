@@ -46,11 +46,11 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     public const float DefaultSoundVolume = 0.45f;
     public const EurekaZone DefaultZone = EurekaZone.Hydatos;
 
-    private const ushort KuganeTerritoryId = 628;
-    private const ushort AnemosTerritoryId = 732;
-    private const ushort PagosTerritoryId = 763;
-    private const ushort PyrosTerritoryId = 795;
-    private const ushort HydatosTerritoryId = 827;
+    private const uint KuganeTerritoryId = 628;
+    private const uint AnemosTerritoryId = 732;
+    private const uint PagosTerritoryId = 763;
+    private const uint PyrosTerritoryId = 795;
+    private const uint HydatosTerritoryId = 827;
     private const string RodneyName = "Rodney";
     private const int RodneyStopDistance = 4;
     private const int RetryThrottleMilliseconds = 1500;
@@ -311,7 +311,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         subscribed = targetEnabled;
     }
 
-    private void OnTerritoryChanged(ushort territoryType)
+    private void OnTerritoryChanged(uint territoryType)
     {
         if (!enabled)
             return;
@@ -730,6 +730,26 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
             return;
         }
 
+        if (AddonHelper.IsAddonVisible(AddonHelper.ContentsFinderConfirmAddonName))
+        {
+            if (!AddonHelper.IsAddonReady(AddonHelper.ContentsFinderConfirmAddonName))
+            {
+                UpdateStatusText();
+                return;
+            }
+
+            var now = Environment.TickCount64;
+            if (now - lastInteractionTick < RetryThrottleMilliseconds)
+            {
+                UpdateStatusText();
+                return;
+            }
+
+            TryCommenceDuty(now);
+            UpdateStatusText();
+            return;
+        }
+
         if (AddonHelper.IsAddonVisible("SelectYesno"))
         {
             if (!AddonHelper.IsAddonReady("SelectYesno"))
@@ -749,7 +769,6 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
             {
                 lastInteractionTick = now;
                 ArmZoneEvaluation();
-                state = EurekaHopState.WaitingForZoneLoad;
             }
 
             UpdateStatusText();
@@ -911,6 +930,23 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         }
     }
 
+    private void TryCommenceDuty(long now)
+    {
+        try
+        {
+            if (!AddonHelper.ClickContentsFinderConfirmCommence())
+                return;
+
+            lastInteractionTick = now;
+            ArmZoneEvaluation();
+            state = EurekaHopState.WaitingForZoneLoad;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Eureka Instance ID failed while commencing the Eureka duty.");
+        }
+    }
+
     private void ResetProgress(bool armZoneEvaluation)
     {
         zoneEvaluationPending = armZoneEvaluation;
@@ -1064,7 +1100,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         return false;
     }
 
-    private static bool TryResolveEurekaZoneByTerritoryType(ushort territoryType, out EurekaZone zone)
+    private static bool TryResolveEurekaZoneByTerritoryType(uint territoryType, out EurekaZone zone)
     {
         switch (territoryType)
         {
@@ -1265,6 +1301,14 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
                 StatusText = $"Enabled - selecting Eureka {currentTargetLabel} from Rodney's menu.";
                 return;
             case EurekaHopState.ConfirmingEntry:
+                if (AddonHelper.IsAddonVisible(AddonHelper.ContentsFinderConfirmAddonName))
+                {
+                    StatusText = AddonHelper.IsAddonReady(AddonHelper.ContentsFinderConfirmAddonName)
+                        ? $"Enabled - pressing Commence for Eureka {currentTargetLabel}."
+                        : $"Enabled - waiting for the Eureka {currentTargetLabel} duty-ready prompt.";
+                    return;
+                }
+
                 StatusText = $"Enabled - confirming entry into Eureka {currentTargetLabel}.";
                 return;
             case EurekaHopState.WaitingForZoneLoad:

@@ -6,12 +6,12 @@ using Dalamud.Plugin.Services;
 namespace XASlave.Services;
 
 /// <summary>
-/// IPC provider for XA Slave — exposes channels for external plugins to query/control XA Slave.
+/// IPC provider for XA Slave - exposes channels for external plugins to query/control XA Slave.
 ///
 /// Channels:
-///   XASlave.IsBusy  (Func→bool) — returns true when any task is running
-///   XASlave.ExecuteCommand (Func, string→string) — run the same subcommands accepted by /xa and return an OK/ERROR status string
-///   XASlave.RunTask (Action, string) — start a named task from external plugins
+///   XASlave.IsBusy  (Func→bool) - returns true when any task is running
+///   XASlave.ExecuteCommand (Func, string→string) - run the same subcommands accepted by /xa and return an OK/ERROR status string
+///   XASlave.RunTask (Action, string) - start a named task from external plugins
 ///
 /// ExecuteCommand examples:
 ///   "xamods"
@@ -35,15 +35,15 @@ public sealed class IpcProvider : IDisposable
         this.plugin = plugin;
         this.log = log;
 
-        // XASlave.IsBusy — returns true when TaskRunner or AutoCollector is running
+        // XASlave.IsBusy - returns true when TaskRunner or AutoCollector is running
         isBusyProvider = pluginInterface.GetIpcProvider<bool>("XASlave.IsBusy");
         isBusyProvider.RegisterFunc(IsBusy);
 
-        // XASlave.ExecuteCommand — mirrors the /xa command surface over IPC
+        // XASlave.ExecuteCommand - mirrors the /xa command surface over IPC
         executeCommandProvider = pluginInterface.GetIpcProvider<string, string>("XASlave.ExecuteCommand");
         executeCommandProvider.RegisterFunc(ExecuteCommand);
 
-        // XASlave.RunTask — start a named task (currently supports: "SaveToXaDatabase")
+        // XASlave.RunTask - start a named task (currently supports: "SaveToXaDatabase")
         runTaskProvider = pluginInterface.GetIpcProvider<string, object>("XASlave.RunTask");
         runTaskProvider.RegisterAction(RunTask);
 
@@ -60,7 +60,7 @@ public sealed class IpcProvider : IDisposable
 
         if (plugin.TaskRunner.IsRunning || plugin.AutoCollector.IsRunning)
         {
-            log.Warning($"[XASlave] IPC: RunTask('{taskName}') rejected — already busy.");
+            log.Warning($"[XASlave] IPC: RunTask('{taskName}') rejected - already busy.");
             return;
         }
 
@@ -69,11 +69,11 @@ public sealed class IpcProvider : IDisposable
             case "save":
             case "savetoxadatabase":
                 plugin.SaveToXaDatabaseAndRecordSync();
-                log.Information("[XASlave] IPC: RunTask — triggered Save to XA Database.");
+                log.Information("[XASlave] IPC: RunTask - triggered Save to XA Database.");
                 break;
 
             default:
-                log.Warning($"[XASlave] IPC: RunTask — unknown task '{taskName}'.");
+                log.Warning($"[XASlave] IPC: RunTask - unknown task '{taskName}'.");
                 break;
         }
     }

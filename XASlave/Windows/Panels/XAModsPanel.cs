@@ -1320,7 +1320,7 @@ public partial class SlaveWindow
             }
 
             var sendEcho = configuration.AutoRefuseTradeSendEcho;
-            if (ImGui.Checkbox("Send /echo message##AutoRefuseTrade", ref sendEcho))
+            if (ImGui.Checkbox("Send /e message##AutoRefuseTrade", ref sendEcho))
             {
                 configuration.AutoRefuseTradeSendEcho = sendEcho;
                 ApplyTradeRefusalConfiguration();
@@ -1329,7 +1329,7 @@ public partial class SlaveWindow
 
             var extraCommands = configuration.AutoRefuseTradeExtraCommands;
             if (ImGui.InputTextMultiline(
-                    "Commands after refusal##AutoRefuseTrade",
+                    "Echo lines / commands after refusal##AutoRefuseTrade",
                     ref extraCommands,
                     1024,
                     new Vector2(Math.Max(320f, ImGui.GetContentRegionAvail().X), 72f)))
@@ -1342,7 +1342,8 @@ public partial class SlaveWindow
                 SaveConfiguration();
 
             ImGui.TextDisabled("Feedback stays local to this client and does not send tells, say, or party chat.");
-            ImGui.TextDisabled("Extra commands run locally after XA refuses an incoming trade. Use one command per line.");
+            ImGui.TextDisabled("Plain lines are sent locally as /e. Slash-prefixed lines still run as commands.");
+            ImGui.TextDisabled("Use <trader> or <target> for the incoming trader's first and last name.");
         }
 
         void DrawXAPeepOptions()
@@ -1521,9 +1522,20 @@ public partial class SlaveWindow
             plugin.MsqProgressDisplay.SetEnabled,
             applied => configuration.AutoDisplayMsqProgressEnabled = applied,
             "Expands Scenario Tree with remaining main-scenario count and completion percentage.",
-            "Waits for the addon nodes to be ready, refreshes on `PostDraw`, resolves the first incomplete MSQ, and rewrites the visible summary locally.",
+            "Waits for the addon nodes to be ready, refreshes on `PostDraw`, resolves the first incomplete MSQ, and rewrites the visible summary with all-MSQ completion progress from Lumina quest data.",
             plugin.MsqProgressDisplay.StatusText,
             searchTerms: ["Scenario Tree", "main scenario", "remaining", "completion percentage"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "target-command-fix",
+            "Fix /target Command",
+            () => configuration.TargetCommandFixEnabled,
+            plugin.TargetCommandFix.SetEnabled,
+            applied => configuration.TargetCommandFixEnabled = applied,
+            "Selects the closest targetable actor when the game's `/target` command cannot resolve a visible player or NPC name.",
+            "Mirrors the SimpleTweaks `/target` fix by watching failed target-name errors and choosing the closest matching targetable actor from the object table. XA automation also uses the same direct lookup before falling back to the game command.",
+            plugin.TargetCommandFix.StatusText,
+            searchTerms: ["/target", "SimpleTweaks", "target fix", "Rodney", "NPC", "player"]);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-skip-cutscenes",
@@ -1584,9 +1596,9 @@ public partial class SlaveWindow
             plugin.LobbyErrorAutoClose.SetEnabled,
             applied => configuration.AutoCloseLobbyErrorsEnabled = applied,
             "Confirms disconnect and supported stuck-logout lobby Dialogue popups by pressing `OK` automatically.",
-            "Monitors the `Dialogue` addon for disconnect/lobby error markers such as `90002`, `3102`, `Connection with the server was lost.`, and `You are still logged into the game.`, then clicks the live `OK` button automatically. `Instant Logout` also arms this same monitor for 10 seconds even when this toggle is off.",
+            "Monitors the `Dialogue` addon for disconnect/lobby error markers such as `3088`, `5006`, `90002`, `3102`, `Connection with the server was lost.`, and `You are still logged into the game.`, then clicks the live `OK` button automatically. `Instant Logout` also arms this same monitor for 10 seconds even when this toggle is off.",
             plugin.LobbyErrorAutoClose.StatusText,
-            searchTerms: ["90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK"]);
+            searchTerms: ["3088", "5006", "90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK"]);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "bailout-esc-menu",
@@ -1771,9 +1783,9 @@ public partial class SlaveWindow
             plugin.AutoRefuseTrade.SetEnabled,
             applied => configuration.AutoRefuseTradeRequestEnabled = applied,
             "Refuses incoming trade requests automatically.",
-            "Refuses incoming trade requests unless this client recently initiated one. The options below control local notifications and any extra local commands that should run after each refusal.",
+            "Refuses incoming trade requests unless this client recently initiated one. The options below control local notifications plus custom /e lines or slash commands that should run after each refusal.",
             plugin.AutoRefuseTrade.StatusText,
-            searchTerms: ["Show notification", "Send /echo message", "Commands after refusal"],
+            searchTerms: ["Show notification", "Send /e message", "Echo lines", "Commands after refusal", "<trader>", "<target>"],
             drawOptions: DrawTradeRefusalOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,

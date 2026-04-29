@@ -109,7 +109,7 @@ public sealed class AutoCollectionService : IDisposable
             steps.Add(new TaskStep { Name = "Armoury Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
-        // ── Saddlebag collection ──
+        // -- Saddlebag collection --
         if (doSaddlebag)
         {
             steps.Add(new TaskStep { Name = "Open Saddlebag", OnEnter = () => OpenAgentWindow(AgentId.InventoryBuddy, "InventoryBuddy"), IsComplete = () => IsAddonReady("InventoryBuddy"), TimeoutSec = 3f });
@@ -159,7 +159,7 @@ public sealed class AutoCollectionService : IDisposable
                 msg => log.Information($"[XASlave] AutoCollection: {msg}")));
         }
 
-        // ── FC collection — requires homeworld first, then FC membership ──
+        // -- FC collection - requires homeworld first, then FC membership --
         if (doFc)
         {
             if (!IsOnHomeWorld())
@@ -180,7 +180,7 @@ public sealed class AutoCollectionService : IDisposable
                 steps.Add(new TaskStep { Name = "Click Members Tab", OnEnter = () => { FireAddonCallback("FreeCompany", 1); ClickAddonNode("FreeCompany", 8); }, IsComplete = () => IsAddonReady("FreeCompanyMember") || DelayComplete(3.0f), TimeoutSec = 5f });
                 steps.Add(new TaskStep { Name = "Members Load Delay", IsComplete = () => DelayComplete(1.5f), TimeoutSec = 2f });
 
-                // IPC save after members tab — XA Database addon watcher will also trigger on close
+                // IPC save after members tab - XA Database addon watcher will also trigger on close
                 steps.Add(new TaskStep { Name = "Save Members", OnEnter = () => onSave?.Invoke(), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
 
                 steps.Add(new TaskStep { Name = "Click Info Tab", OnEnter = () => { FireAddonCallback("FreeCompany", 3); ClickAddonNode("FreeCompany", 4); }, IsComplete = () => IsAddonReady("FreeCompanyStatus") || DelayComplete(3.0f), TimeoutSec = 5f });
@@ -419,7 +419,8 @@ public sealed class AutoCollectionService : IDisposable
             AtkValue* atkValues = stackalloc AtkValue[callbackValues.Length];
             for (int i = 0; i < callbackValues.Length; i++)
             {
-                atkValues[i].Type = (FFXIVClientStructs.FFXIV.Component.GUI.ValueType)3;
+                atkValues[i] = default;
+                atkValues[i].Type = AtkValueType.Int;
                 atkValues[i].Int = callbackValues[i];
             }
             addon->FireCallback((uint)callbackValues.Length, atkValues);

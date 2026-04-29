@@ -603,9 +603,9 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
     {
         return playerState->GrandCompany switch
         {
-            1 => playerState->GCRankMaelstrom,
-            2 => playerState->GCRankTwinAdders,
-            3 => playerState->GCRankImmortalFlames,
+            1 => playerState->GCRanks[0],
+            2 => playerState->GCRanks[1],
+            3 => playerState->GCRanks[2],
             _ => 0,
         };
     }

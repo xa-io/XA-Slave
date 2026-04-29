@@ -5,7 +5,7 @@ using Dalamud.Game.ClientState.Objects.Types;
 namespace XASlave.Helpers;
 
 /// <summary>
-/// Shared game math utilities — eliminates duplicated distance calculations across movement functions.
+/// Shared game math utilities - eliminates duplicated distance calculations across movement functions.
 /// </summary>
 public static class GameMath
 {

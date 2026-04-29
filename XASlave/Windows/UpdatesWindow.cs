@@ -8,7 +8,7 @@ using Dalamud.Interface.Windowing;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Standalone version-history window — displays changelog entries as collapsible tree nodes.
+/// Standalone version-history window - displays changelog entries as collapsible tree nodes.
 /// Opened via <c>/xa updates</c> or the ⬆ Show Updates toggle in Plugin Operations.
 /// </summary>
 public sealed class UpdatesWindow : Window
@@ -21,6 +21,23 @@ public sealed class UpdatesWindow : Window
 
     private readonly List<VersionEntry> versions = new()
     {
+        new VersionEntry
+        {
+            Header = "v0.0.0.27 - 2026-04-29",
+            Lines =
+            [
+                "Dalamud API 15",
+                "- Bumped the source, manifest, SDK, and lockfile to the full Dalamud API 15 structure with DalamudPackager 15.0.0",
+                "- API 15 fixes cover callback values, territory and duty signatures, UI flags, GC rank access, buddy kinds, and unsafe sound calls",
+                "",
+                "XA Mods / Fixes",
+                "- `Close Lobby Errors` now catches lobby error `5006` and visiting-character congestion error `3088`",
+                "- Added `Fix /target Command` and `/xa targetfix on|off` to recover failed native `/target` lookups through closest matching game objects",
+                "- `Display MSQ Progress` now uses the adjusted all-MSQ Lumina quest cache for more accurate percentages",
+                "- Eureka Instance Hunter now accepts the `ContentsFinderConfirm` commence prompt after Rodney entry",
+                "- `Refuse Trade Request` and Xagman Dropbox handoff paths are more reliable around requester names, local feedback, and trade timeouts",
+            ],
+        },
         new VersionEntry
         {
             Header = "v0.0.0.26 - 2026-04-23",
@@ -142,7 +159,7 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "FC Chest Gil Capture",
-                "- AR post-processing can now capture FC chest gil — Check FC Chest For Gil targets, paths, interacts, saves, and closes the chest automatically",
+                "- AR post-processing can now capture FC chest gil - Check FC Chest For Gil targets, paths, interacts, saves, and closes the chest automatically",
                 "- Workshop-only guard: chest capture only runs inside the company workshop when XA Database and vnav are both available",
                 "- Refresh Sub/Bell/Chest workshop runs now also refresh FC chest gil in one pass",
                 "",

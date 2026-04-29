@@ -582,7 +582,7 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     runner.CurrentItemLabel = $"[{charIndex}/{charTotal}] {charName} -> {targetDestination}";
-                    runner.AddLog($"── Prep Logistics: {charName} ({charIndex}/{charTotal}) -> {targetDestination} ──");
+                    runner.AddLog($"-- Prep Logistics: {charName} ({charIndex}/{charTotal}) -> {targetDestination} --");
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,

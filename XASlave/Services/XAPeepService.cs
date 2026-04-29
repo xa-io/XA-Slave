@@ -549,7 +549,7 @@ public sealed class XAPeepService : IDisposable
             lastSoundAtUtc = nowUtc;
     }
 
-    private bool TryPlayConfiguredSound()
+    private unsafe bool TryPlayConfiguredSound()
     {
         var soundEffectValue = XAPeepData.GetSoundEffectValue(configuration.XAPeepSoundEffectId);
         if (soundEffectValue == 0)

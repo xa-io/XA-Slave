@@ -190,7 +190,7 @@ public sealed class AutoRetainerConfigReader
             }
         }
 
-        // FC data — match by CID
+        // FC data - match by CID
         var fcName = string.Empty;
         long fcPoints = 0;
         if (fcData.TryGetValue(cid, out var fc))
@@ -203,7 +203,7 @@ public sealed class AutoRetainerConfigReader
         if (entry.TryGetProperty("FCID", out var fcidProp) && fcidProp.ValueKind == JsonValueKind.Number)
             fcidProp.TryGetInt64(out fcid);
 
-        // Submarine data — count entries in OfflineSubmarineData or AdditionalSubmarineData
+        // Submarine data - count entries in OfflineSubmarineData or AdditionalSubmarineData
         var submarineCount = 0;
         if (entry.TryGetProperty("OfflineSubmarineData", out var subArr) && subArr.ValueKind == JsonValueKind.Array)
         {

@@ -8,8 +8,7 @@ using XASlave.Services;
 namespace XASlave.Windows;
 
 /// <summary>
-/// Auto-Glam Against Weather — automatically changes glamour plate based on current weather.
-/// Converted from: auto-glam-against-weather.lua
+/// Auto-Glam Against Weather - automatically changes glamour plate based on current weather.
 ///
 /// Weather groups:
 ///   Sunny  (1,2,3,5,11,14,17,49,50,148,149) → glamour plate for sunny
@@ -20,7 +19,7 @@ namespace XASlave.Windows;
 /// </summary>
 public partial class SlaveWindow
 {
-    // ── Auto-Glam state ──
+    // -- Auto-Glam state --
     private bool glamWeatherRunning;
     private bool glamWeatherShowLog;
     private int glamLastWeatherId = -1;
@@ -416,7 +415,7 @@ public partial class SlaveWindow
                     return;
                 }
 
-                plugin.TaskRunner.AddLog($"[Auto-Glam] Weather changed to {weatherName} — applying class/job {classJob.Value}, plate {plate.Value}");
+                plugin.TaskRunner.AddLog($"[Auto-Glam] Weather changed to {weatherName} - applying class/job {classJob.Value}, plate {plate.Value}");
                 ChatHelper.SendMessage($"/gs change {classJob.Value} {plate.Value}");
                 glamLastWeatherId = weatherId;
             }
