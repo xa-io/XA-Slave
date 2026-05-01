@@ -1,8 +1,9 @@
 using System;
-using System.Runtime.InteropServices;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Enums;
+using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
@@ -194,17 +195,17 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         return result;
     }
 
-    private byte ContentFinderQueuePositionDataDetour(nint a1, uint a2, nint a3)
+    private void ContentFinderQueuePositionDataDetour(ContentsFinderQueueInfo* info, ContentsFinderQueueState state, QueueInfoState* infoState)
     {
         try
         {
-            if (enabled && a3 != nint.Zero)
+            if (enabled && info != null && infoState != null)
             {
-                var position = Marshal.ReadByte(a3 + 4);
-                if (position != 0)
+                var positionInQueue = (sbyte)infoState->PositionInQueue;
+                if (positionInQueue != 0)
                 {
-                    Marshal.WriteByte(a1 + 91, position);
-                    Marshal.WriteByte(a1 + 92, position);
+                    info->PositionInQueue = positionInQueue;
+                    info->ClampedPositionInQueue = positionInQueue;
                 }
             }
         }
@@ -213,7 +214,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             log.Warning(ex, "[XASlave] Queue display failed while applying content finder queue data.");
         }
 
-        return contentFinderQueuePositionDataHook?.Original(a1, a2, a3) ?? 0;
+        contentFinderQueuePositionDataHook?.Original(info, state, infoState);
     }
 
     private static double CalculateQueueWaitSeconds(int position)
@@ -230,5 +231,5 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
 
     private delegate bool AgentWorldTravelUpdateDelegate(nint a1, NumberArrayData* numberArrayData, StringArrayData* stringArrayData, bool a4);
 
-    private delegate byte ContentFinderQueuePositionDataDelegate(nint a1, uint a2, nint a3);
+    private delegate void ContentFinderQueuePositionDataDelegate(ContentsFinderQueueInfo* info, ContentsFinderQueueState state, QueueInfoState* infoState);
 }

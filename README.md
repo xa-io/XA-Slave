@@ -22,7 +22,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, safer menu recovery, a workshop-side Company Chest gil sync into XA Database after the bell path finishes, and shared completion actions.
 - **Field Operations** - Eureka tools for instance tracking and Logos Manipulator automation. `Instance Hunter` provides per-zone baselines, live instance ID display, Rodney controls, duty-ready commence handling, alert previews, and automatic baseline rollover. `Logogram Creator` brings the AutoLogoAction flow into XA Slave with favorites, recipe locks, queue automation, manipulator-aware tabs, favorite overlays, and a floating cancel control that stops the active run and clears queued plates.
 - **Window Renamer** - Rename the FFXIV game window with an optional custom title, process-ID prefix, and current-character suffix.
-- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation. Presets and exported packages restore supported mod subsettings, including Eureka live-ID display, trade refusal, Expert Delivery options, Infinite Sprint delay, XA Peep alerts, and other shipped option groups.
+- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation. Presets and exported packages restore supported mod subsettings, including Eureka live-ID display, trade refusal, Expert Delivery options, Infinite Sprint delay, XA Peep alerts and duty logging, and other shipped option groups.
 
   | Game Mods | Graphic Mods | Player Mods | Plugin Mods | Eureka Mods |
   | --- | --- | --- | --- | --- |
@@ -119,7 +119,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa itemcommands on/off` | Toggle `Item Commands`. |
 | `/xa leaveduty on/off` | Toggle `Auto Leave Duty` (`/xa autoleaveduty` is also accepted). |
 | `/xa automerge on/off` | Toggle `Auto Merge`. |
-| `/xa peep [on/off/clear]` | Open XA Peep's small list, toggle its tracker, or clear its stored history. |
+| `/xa peep [on/off/clear]` | Open XA Peep's small list, toggle its tracker, or clear its stored history; its history window can sort by count, player, last seen, or total time. |
 | `/xa playerrestore` | Disable the current Player Mods toggles. |
 | `/xa refusetrade on/off` | Toggle `Refuse Trade Request`. |
 | `/xa revealmap on/off` | Toggle `Reveal Undiscovered Areas`. |

@@ -193,6 +193,7 @@ public sealed class XAModXAPeepSettings
     public bool LogParty { get; set; }
     public bool LogAlliance { get; set; }
     public bool LogInCombat { get; set; }
+    public bool LogInDuty { get; set; }
     public bool ShowCardWhenTargeted { get; set; }
     public bool ShowTargeterLine { get; set; }
     public XAModColorSettings TargeterLineColor { get; set; } = new();

@@ -20,7 +20,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     private readonly IPluginLog log;
 
     private Hook<AgentShowDelegate>? tradeAgentShowHook;
-    private Hook<TradeRequestDelegate>? tradeRequestHook;
+    private Hook<InventoryManager.Delegates.SendTradeRequest>? sendTradeRequestHook;
     private Hook<TradeStatusUpdateDelegate>? tradeStatusUpdateHook;
     private bool initialized;
     private bool enabled;
@@ -68,13 +68,13 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         }
 
         EnsureInitialized();
-        if (tradeRequestHook == null || (tradeStatusUpdateHook == null && tradeAgentShowHook == null))
+        if (sendTradeRequestHook == null || (tradeStatusUpdateHook == null && tradeAgentShowHook == null))
         {
             StatusText = "Unavailable - trade refusal hooks are missing.";
             return false;
         }
 
-        tradeRequestHook.Enable();
+        sendTradeRequestHook.Enable();
         tradeStatusUpdateHook?.Enable();
         tradeAgentShowHook?.Enable();
         enabled = true;
@@ -89,13 +89,13 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
         if (tradeAgentShowHook is { IsDisposed: false })
             tradeAgentShowHook.Dispose();
-        if (tradeRequestHook is { IsDisposed: false })
-            tradeRequestHook.Dispose();
+        if (sendTradeRequestHook is { IsDisposed: false })
+            sendTradeRequestHook.Dispose();
         if (tradeStatusUpdateHook is { IsDisposed: false })
             tradeStatusUpdateHook.Dispose();
 
         tradeAgentShowHook = null;
-        tradeRequestHook = null;
+        sendTradeRequestHook = null;
         tradeStatusUpdateHook = null;
     }
 
@@ -103,8 +103,8 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     {
         if (tradeAgentShowHook is { IsDisposed: false, IsEnabled: true })
             tradeAgentShowHook.Disable();
-        if (tradeRequestHook is { IsDisposed: false, IsEnabled: true })
-            tradeRequestHook.Disable();
+        if (sendTradeRequestHook is { IsDisposed: false, IsEnabled: true })
+            sendTradeRequestHook.Disable();
         if (tradeStatusUpdateHook is { IsDisposed: false, IsEnabled: true })
             tradeStatusUpdateHook.Disable();
     }
@@ -117,7 +117,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         initialized = true;
 
         tradeAgentShowHook = TryCreateTradeAgentShowHook();
-        tradeRequestHook = TryCreateHook<TradeRequestDelegate>(Sigs.TradeRequestSig, TradeRequestDetour, "TradeRequest");
+        sendTradeRequestHook = TryCreateSendTradeRequestHook();
         tradeStatusUpdateHook = TryCreateHook<TradeStatusUpdateDelegate>(Sigs.TradeStatusUpdateSig, TradeStatusUpdateDetour, "TradeStatusUpdate");
     }
 
@@ -135,6 +135,24 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         catch (Exception ex)
         {
             log.Warning(ex, $"[XASlave] Auto Refuse Trade failed to create {label} hook.");
+            return null;
+        }
+    }
+
+    private Hook<InventoryManager.Delegates.SendTradeRequest>? TryCreateSendTradeRequestHook()
+    {
+        try
+        {
+            var address = (nint)InventoryManager.MemberFunctionPointers.SendTradeRequest;
+            if (address == nint.Zero)
+                return null;
+
+            var hook = interopProvider.HookFromAddress<InventoryManager.Delegates.SendTradeRequest>(address, SendTradeRequestDetour);
+            return hook;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Refuse Trade failed to create SendTradeRequest hook.");
             return null;
         }
     }
@@ -204,10 +222,10 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         StatusText = $"Enabled - incoming trades are refused automatically ({feedbackMode}, {surfaceCount} surfaces, {extraCommandLabel}).";
     }
 
-    private nint TradeRequestDetour(InventoryManager* manager, uint entityId)
+    private void SendTradeRequestDetour(InventoryManager* manager, uint entityId)
     {
         lastOutgoingTradeMs = Environment.TickCount64;
-        return tradeRequestHook?.Original(manager, entityId) ?? 0;
+        sendTradeRequestHook?.Original(manager, entityId);
     }
 
     private void TradeAgentShowDetour(AgentInterface* agent)
@@ -462,7 +480,6 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     }
 
     private delegate void AgentShowDelegate(AgentInterface* agent);
-    private delegate nint TradeRequestDelegate(InventoryManager* manager, uint entityId);
 
     private delegate nint TradeStatusUpdateDelegate(InventoryManager* manager, nint entityId, nint packet);
 }

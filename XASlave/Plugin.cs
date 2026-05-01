@@ -289,7 +289,7 @@ public sealed class Plugin : IDalamudPlugin
         InstantLogout = new InstantLogoutService(ClientState, Framework, SigScanner, Log, LobbyErrorAutoClose);
         TeleportLockClear = new TeleportLockClearService(ChatGui, Log);
         EscMenuBailout = new EscMenuBailoutService(Framework, Log);
-        XAPeep = new XAPeepService(Framework, ClientState, ObjectTable, GameGui, Log, SlaveDatabase, Configuration);
+        XAPeep = new XAPeepService(Framework, ClientState, Condition, ObjectTable, GameGui, Log, SlaveDatabase, Configuration);
         PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
         XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubAddress, Configuration.XagmanHubPort, _ => { });
@@ -1801,6 +1801,7 @@ public sealed class Plugin : IDalamudPlugin
                     LogParty = Configuration.XAPeepLogParty,
                     LogAlliance = Configuration.XAPeepLogAlliance,
                     LogInCombat = Configuration.XAPeepLogInCombat,
+                    LogInDuty = Configuration.XAPeepLogInDuty,
                     ShowCardWhenTargeted = Configuration.XAPeepDisplayLineWhenTargetingMe,
                     ShowTargeterLine = Configuration.XAPeepShowTargeterLine,
                     TargeterLineColor = CreateColorSettings(
@@ -2085,6 +2086,7 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.XAPeepLogParty = xaPeepSettings.LogParty;
             Configuration.XAPeepLogAlliance = xaPeepSettings.LogAlliance;
             Configuration.XAPeepLogInCombat = xaPeepSettings.LogInCombat;
+            Configuration.XAPeepLogInDuty = xaPeepSettings.LogInDuty;
             Configuration.XAPeepDisplayLineWhenTargetingMe = xaPeepSettings.ShowCardWhenTargeted;
             Configuration.XAPeepShowTargeterLine = xaPeepSettings.ShowTargeterLine;
             Configuration.XAPeepTargeterLineColor = new Vector4(
@@ -3326,5 +3328,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.27";
+    public const string Version = "0.0.0.28";
 }

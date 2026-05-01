@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Objects.Types;
@@ -25,6 +26,7 @@ public sealed class XAPeepService : IDisposable
 
     private readonly IFramework framework;
     private readonly IClientState clientState;
+    private readonly ICondition condition;
     private readonly IObjectTable objectTable;
     private readonly IGameGui gameGui;
     private readonly IPluginLog log;
@@ -47,6 +49,7 @@ public sealed class XAPeepService : IDisposable
     public XAPeepService(
         IFramework framework,
         IClientState clientState,
+        ICondition condition,
         IObjectTable objectTable,
         IGameGui gameGui,
         IPluginLog log,
@@ -55,6 +58,7 @@ public sealed class XAPeepService : IDisposable
     {
         this.framework = framework;
         this.clientState = clientState;
+        this.condition = condition;
         this.objectTable = objectTable;
         this.gameGui = gameGui;
         this.log = log;
@@ -342,6 +346,13 @@ public sealed class XAPeepService : IDisposable
             return;
         }
 
+        if (IsDutyLoggingPaused())
+        {
+            FinalizeAllActiveTargeters(nowUtc);
+            UpdateStatusText();
+            return;
+        }
+
         var visibleTargeterIds = new HashSet<ulong>();
 
         foreach (var player in EnumerateTrackedPlayers(localPlayer.GameObjectId))
@@ -386,6 +397,9 @@ public sealed class XAPeepService : IDisposable
         if (player.TargetObjectId != localPlayerGameObjectId)
             return false;
 
+        if (IsDutyLoggingPaused())
+            return false;
+
         if (!configuration.XAPeepLogParty && player.StatusFlags.HasFlag(StatusFlags.PartyMember))
             return false;
 
@@ -396,6 +410,11 @@ public sealed class XAPeepService : IDisposable
             return false;
 
         return true;
+    }
+
+    private bool IsDutyLoggingPaused()
+    {
+        return !configuration.XAPeepLogInDuty && condition[ConditionFlag.BoundByDuty];
     }
 
     private ActiveTargeterState CreateState(IPlayerCharacter player, DateTime nowUtc)
@@ -498,6 +517,14 @@ public sealed class XAPeepService : IDisposable
             StatusText = recentPlayers.Count > 0
                 ? $"Enabled - starting. {recentPlayers.Count} tracked players cached in history."
                 : "Enabled - starting.";
+            return;
+        }
+
+        if (IsDutyLoggingPaused())
+        {
+            StatusText = recentPlayers.Count > 0
+                ? $"Enabled - duty logging paused. {recentPlayers.Count} tracked players in history."
+                : "Enabled - duty logging paused.";
             return;
         }
 

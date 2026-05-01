@@ -1,8 +1,10 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
+using XASlave.Data;
 
 namespace XASlave.Windows;
 
@@ -11,6 +13,9 @@ public sealed class XAPeepHistoryWindow : Window
     private readonly Plugin plugin;
     private static float UiScale => ImGuiHelpers.GlobalScale;
     private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
+    private XAPeepHistorySortColumn sortColumn = XAPeepHistorySortColumn.LastSeen;
+    private bool sortDescending = true;
+    private int tableOpenSerial;
 
     public XAPeepHistoryWindow(Plugin plugin)
         : base("XA Peep History###XAPeepHistoryWindow", ImGuiWindowFlags.None)
@@ -28,6 +33,10 @@ public sealed class XAPeepHistoryWindow : Window
 
     public override void OnOpen()
     {
+        sortColumn = XAPeepHistorySortColumn.LastSeen;
+        sortDescending = true;
+        tableOpenSerial++;
+
         if (plugin.Configuration.XAPeepHistoryWindowOpen)
             return;
 
@@ -68,20 +77,23 @@ public sealed class XAPeepHistoryWindow : Window
         }
 
         if (!ImGui.BeginTable(
-                "##XAPeepHistoryTable",
+                $"##XAPeepHistoryTable{tableOpenSerial}",
                 4,
-                ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.SizingStretchProp,
+                ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.Sortable,
                 new Vector2(-1f, -1f)))
             return;
 
         ImGui.TableSetupScrollFreeze(0, 1);
         ImGui.TableSetupColumn("Count", ImGuiTableColumnFlags.WidthFixed, Scale(56f));
         ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.7f);
-        ImGui.TableSetupColumn("Last Seen", ImGuiTableColumnFlags.WidthFixed, Scale(125f));
+        ImGui.TableSetupColumn("Last Seen", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.PreferSortDescending, Scale(125f));
         ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
         ImGui.TableHeadersRow();
 
-        foreach (var player in trackedPlayers)
+        ApplyTableSortSpecs();
+        var sortedPlayers = SortTrackedPlayers(trackedPlayers);
+
+        foreach (var player in sortedPlayers)
         {
             ImGui.TableNextRow();
             if (!player.IsLive)
@@ -104,6 +116,55 @@ public sealed class XAPeepHistoryWindow : Window
         }
 
         ImGui.EndTable();
+    }
+
+    private void ApplyTableSortSpecs()
+    {
+        var sortSpecs = ImGui.TableGetSortSpecs();
+        if (sortSpecs.SpecsDirty)
+            sortSpecs.SpecsDirty = false;
+
+        if (sortSpecs.SpecsCount <= 0)
+            return;
+
+        unsafe
+        {
+            var spec = sortSpecs.Specs;
+            sortColumn = spec.ColumnIndex switch
+            {
+                0 => XAPeepHistorySortColumn.Count,
+                1 => XAPeepHistorySortColumn.Player,
+                2 => XAPeepHistorySortColumn.LastSeen,
+                3 => XAPeepHistorySortColumn.Total,
+                _ => XAPeepHistorySortColumn.LastSeen,
+            };
+            sortDescending = spec.SortDirection == ImGuiSortDirection.Descending;
+        }
+    }
+
+    private List<XAPeepTrackedPlayerView> SortTrackedPlayers(List<XAPeepTrackedPlayerView> trackedPlayers)
+    {
+        var sortedPlayers = new List<XAPeepTrackedPlayerView>(trackedPlayers);
+        sortedPlayers.Sort((left, right) =>
+        {
+            var compare = sortColumn switch
+            {
+                XAPeepHistorySortColumn.Count => left.TotalTargetCount.CompareTo(right.TotalTargetCount),
+                XAPeepHistorySortColumn.Player => string.Compare(left.DisplayName, right.DisplayName, StringComparison.OrdinalIgnoreCase),
+                XAPeepHistorySortColumn.LastSeen => left.LastSeenUtc.CompareTo(right.LastSeenUtc),
+                XAPeepHistorySortColumn.Total => left.TotalTargetDurationSeconds.CompareTo(right.TotalTargetDurationSeconds),
+                _ => left.LastSeenUtc.CompareTo(right.LastSeenUtc),
+            };
+
+            if (compare == 0)
+                compare = string.Compare(left.DisplayName, right.DisplayName, StringComparison.OrdinalIgnoreCase);
+            if (compare == 0)
+                compare = string.Compare(left.PlayerKey, right.PlayerKey, StringComparison.OrdinalIgnoreCase);
+
+            return sortDescending ? -compare : compare;
+        });
+
+        return sortedPlayers;
     }
 
     private static string FormatDurationSeconds(double durationSeconds)
@@ -135,4 +196,12 @@ public sealed class XAPeepHistoryWindow : Window
 
     private static Vector2 ScaledVector(float x, float y)
         => ImGuiHelpers.ScaledVector2(x, y);
+
+    private enum XAPeepHistorySortColumn
+    {
+        Count,
+        Player,
+        LastSeen,
+        Total,
+    }
 }

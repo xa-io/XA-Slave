@@ -396,6 +396,7 @@ public class Configuration : IPluginConfiguration
     public bool XAPeepLogParty { get; set; } = true;
     public bool XAPeepLogAlliance { get; set; } = false;
     public bool XAPeepLogInCombat { get; set; } = false;
+    public bool XAPeepLogInDuty { get; set; } = false;
     public bool XAPeepDisplayLineWhenTargetingMe { get; set; } = true;
     public bool XAPeepShowTargeterLine { get; set; } = true;
     public bool XAPeepShowTargeterDot { get; set; } = true;

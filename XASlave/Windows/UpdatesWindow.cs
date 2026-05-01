@@ -23,6 +23,20 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.28 - 2026-05-01",
+            Lines =
+            [
+                "XA Peep",
+                "- Added `Log while in duty` so XA Peep can pause duty targeter alerts and history writes unless explicitly enabled",
+                "- XA Peep History columns now sort by Count, Player, Last Seen, or Total, and the window reopens on Last Seen by default",
+                "",
+                "API 15 Follow-up",
+                "- Refuse Trade Request now uses the API 15 InventoryManager trade-request hook path",
+                "- Display Queue Position and protected signatures were refreshed for the API 15 ClientStructs queue/camera paths",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.27 - 2026-04-29",
             Lines =
             [

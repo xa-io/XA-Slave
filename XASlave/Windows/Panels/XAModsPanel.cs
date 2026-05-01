@@ -1396,6 +1396,13 @@ public partial class SlaveWindow
                 SaveConfiguration();
             }
 
+            var logWhileInDuty = configuration.XAPeepLogInDuty;
+            if (ImGui.Checkbox("Log while in duty##XAPeep", ref logWhileInDuty))
+            {
+                configuration.XAPeepLogInDuty = logWhileInDuty;
+                SaveConfiguration();
+            }
+
             var showCardWhenTargeted = configuration.XAPeepDisplayLineWhenTargetingMe;
             if (ImGui.Checkbox("Show card when targeted##XAPeep", ref showCardWhenTargeted))
             {
@@ -1911,9 +1918,9 @@ public partial class SlaveWindow
             plugin.XAPeep.SetEnabled,
             applied => configuration.XAPeepEnabled = applied,
             "XA target tracker with a small cached list and full history window.",
-            "Tracks players targeting you in all areas, including PvP, keeps the small XA Peep list and the separate history window available through logout, records cumulative per-player counts in XA Slave's local database, and can show purple cards, lines, dots, center-screen notifications, prefixed chat notifications, and selectable XA alert sounds that still play even if the game's own sound channel is muted. XA Peep can be filtered to skip party, alliance, or in-combat players, can auto-open its compact window on plugin load, and lets you lock or unlock window resizing from the title bar. Use `/xa peep` to open the small window or `/xa peep on|off` to toggle tracking from chat.",
+            "Tracks players targeting you in all areas, including PvP, keeps the small XA Peep list and the separate history window available through logout, records cumulative per-player counts in XA Slave's local database, and can show purple cards, lines, dots, center-screen notifications, prefixed chat notifications, and selectable XA alert sounds that still play even if the game's own sound channel is muted. XA Peep can be filtered to skip party, alliance, in-combat, or in-duty targeters, can auto-open its compact window on plugin load, and lets you lock or unlock window resizing from the title bar. Use `/xa peep` to open the small window or `/xa peep on|off` to toggle tracking from chat.",
             plugin.XAPeep.StatusText,
-            searchTerms: ["Show card when targeted", "Show Targeter's Line", "Show targeter's dot", "targeter line color", "targeter dot color", "targeter dot size", "Show targeters card", "Show center-screen notification", "Print chat notification", "is targeting you", "Log party members", "Log alliance members", "Log players in combat", "Auto open XA Peep on plugin load", "lock", "resize", "/xa peep", "history", "PvP", "sound", "window"],
+            searchTerms: ["Show card when targeted", "Show Targeter's Line", "Show targeter's dot", "targeter line color", "targeter dot color", "targeter dot size", "Show targeters card", "Show center-screen notification", "Print chat notification", "is targeting you", "Log party members", "Log alliance members", "Log players in combat", "Log while in duty", "Auto open XA Peep on plugin load", "lock", "resize", "/xa peep", "history", "PvP", "sound", "window"],
             drawOptions: DrawXAPeepOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
