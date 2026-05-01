@@ -3,7 +3,7 @@
   "Name": "XA Slave",
   "InternalName": "XASlave",
   "RepoUrl": "https://github.com/xa-io/XA-Slave",
-  "AssemblyVersion": "0.0.0.28",
+  "AssemblyVersion": "0.0.0.29",
   "Punchline": "Don't manual.",
   "Description": "Don't manual.",
   "ApplicableVersion": "any",

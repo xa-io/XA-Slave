@@ -55,7 +55,7 @@ public partial class SlaveWindow
         new("/xa customres on|off", "Toggle `Custom Resolutions`.", "Enables or disables XA's custom-resolution control surface."),
         new("/xa hideobjects on|off", "Toggle `Hide Game Objects`.", "Uses the XA object-hide seam with the current category filters plus the duty, island, and Occult Crescent options."),
         new("/xa lowres <scale>", "Set `Low Resolution` scale from chat while it is already enabled.", "Accepts values from `0.01` to `1.00`, including inputs such as `1` and `0.01`. XA now refuses to arm the feature from chat if the XA Mods toggle is currently off."),
-        new("/xa lowres off", "Disable `Low Resolution`.", "Turns off the forced low-resolution scale and restores the previous runtime upscale mode."),
+        new("/xa lowres off", "Disable `Low Resolution`.", "Forces one live 3D scale `1.00` render pass, then turns off the forced low-resolution scale and restores the previous runtime upscale mode."),
         new("/xa minwindow on|off", "Toggle `Ignore Minimum Window Size`.", "Lowers or restores XA's guarded local minimum-size floor and corrects undersized restore or maximize results after the window changes."),
         new("/xa res <width>x<height>", "Apply a custom client resolution such as `/xa res 500x345`.", "Requires `Custom Resolutions` to be enabled in XA Mods."),
         new("/xa res add <width>x<height>", "Add a saved custom-resolution button.", "Stores a panel preset without needing to use the UI add-button flow."),

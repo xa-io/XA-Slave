@@ -34,6 +34,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private const double FrameworkUpdateTimingWarningThresholdMilliseconds = 25.0;
     private const float MinimumLowResolutionScale = 0.01f;
     private const float MaximumLowResolutionScale = 1.00f;
+    private const float DisabledLowResolutionScale = 1.00f;
+    private const int LowResolutionDisableResetFrames = 1;
     private const byte MaximumSupportedLowResolutionUpscaleType = 1;
     private const byte LowResolutionFallbackUpscaleType = 1;
     private readonly ISigScanner sigScanner;
@@ -60,6 +62,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private bool customResolutionsEnabled;
     private bool ignoreMinimumWindowSizeEnabled;
     private bool lowResolutionEnabled;
+    private bool lowResolutionDisablePending;
     private bool capturedLowResolutionUpscaleType;
     private bool preventLobbyExitEnabled;
     private bool revealUndiscoveredAreasEnabled;
@@ -82,6 +85,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private long lastWindowSizeChangeTick;
     private int lastAppliedCustomResolutionWidth;
     private int lastAppliedCustomResolutionHeight;
+    private int lowResolutionDisableResetFramesRemaining;
     private byte originalLowResolutionUpscaleType;
     private float lowResolutionScale = 0.25f;
     public SystemWindowModsService(
@@ -266,16 +270,19 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     {
         lowResolutionScale = ClampLowResolutionScale(scale);
         if (lowResolutionEnabled)
-            UpdateLowResolutionScale();
+        {
+            if (lowResolutionDisablePending)
+                UpdateLowResolutionDisableResetScale();
+            else
+                UpdateLowResolutionScale();
+        }
     }
 
     public bool SetLowResolutionEnabled(bool value)
     {
         if (!value)
         {
-            lowResolutionEnabled = false;
-            RestoreLowResolutionConfiguration();
-            LowResolutionStatusText = "Disabled";
+            BeginLowResolutionDisable();
             return false;
         }
 
@@ -286,6 +293,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return false;
         }
 
+        lowResolutionDisablePending = false;
+        lowResolutionDisableResetFramesRemaining = 0;
         lowResolutionEnabled = true;
         UpdateLowResolutionScale();
         return true;
@@ -449,6 +458,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         customResolutionsEnabled = false;
         ignoreMinimumWindowSizeEnabled = false;
         lowResolutionEnabled = false;
+        lowResolutionDisablePending = false;
+        lowResolutionDisableResetFramesRemaining = 0;
         preventLobbyExitEnabled = false;
         revealUndiscoveredAreasEnabled = false;
         disableBackgroundRenderingEnabled = false;
@@ -695,7 +706,12 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             MeasureFrameworkUpdateStep("SystemWindowMods.UpdateWindowSizeSynchronization", UpdateWindowSizeSynchronization);
 
         if (lowResolutionEnabled)
-            MeasureFrameworkUpdateStep("SystemWindowMods.UpdateLowResolutionScale", UpdateLowResolutionScale);
+        {
+            if (lowResolutionDisablePending)
+                MeasureFrameworkUpdateStep("SystemWindowMods.UpdateLowResolutionDisableReset", UpdateLowResolutionDisableReset);
+            else
+                MeasureFrameworkUpdateStep("SystemWindowMods.UpdateLowResolutionScale", UpdateLowResolutionScale);
+        }
 
         if (disableBackgroundRenderingEnabled
             && disableBackgroundRenderingDisableWhenArMultiIsOn
@@ -931,6 +947,63 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             : $"Enabled - 3D resolution scale is forced to {normalizedScale:0.00}.";
     }
 
+    private void BeginLowResolutionDisable()
+    {
+        lowResolutionEnabled = true;
+        lowResolutionDisablePending = true;
+        lowResolutionDisableResetFramesRemaining = LowResolutionDisableResetFrames;
+
+        if (!UpdateLowResolutionDisableResetScale())
+        {
+            FinishLowResolutionDisable();
+            return;
+        }
+
+        LowResolutionStatusText = "Disabling - 3D resolution scale is forced to 1.00 for a full render pass before Low Resolution turns off.";
+    }
+
+    private void UpdateLowResolutionDisableReset()
+    {
+        if (!UpdateLowResolutionDisableResetScale())
+        {
+            FinishLowResolutionDisable();
+            return;
+        }
+
+        if (lowResolutionDisableResetFramesRemaining > 0)
+        {
+            lowResolutionDisableResetFramesRemaining--;
+            LowResolutionStatusText = "Disabling - 3D resolution scale is forced to 1.00 for a full render pass before Low Resolution turns off.";
+            return;
+        }
+
+        FinishLowResolutionDisable();
+    }
+
+    private bool UpdateLowResolutionDisableResetScale()
+    {
+        var graphicsConfig = GraphicsConfig.Instance();
+        if (graphicsConfig == null)
+        {
+            LowResolutionStatusText = "Unavailable - graphics configuration surface missing.";
+            return false;
+        }
+
+        if (Math.Abs(graphicsConfig->GraphicsRezoScale - DisabledLowResolutionScale) > 0.0001f)
+            graphicsConfig->GraphicsRezoScale = DisabledLowResolutionScale;
+
+        return true;
+    }
+
+    private void FinishLowResolutionDisable()
+    {
+        lowResolutionEnabled = false;
+        lowResolutionDisablePending = false;
+        lowResolutionDisableResetFramesRemaining = 0;
+        RestoreLowResolutionConfiguration();
+        LowResolutionStatusText = "Disabled - 3D resolution scale reset to 1.00.";
+    }
+
     private void RestoreLowResolutionConfiguration()
     {
         var graphicsConfig = GraphicsConfig.Instance();
@@ -942,7 +1015,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         }
 
         var configuredScale = ClampLowResolutionScale(gameConfig.System.GetUInt("GraphicsRezoScale") / 100f);
-        graphicsConfig->GraphicsRezoScale = configuredScale;
+        graphicsConfig->GraphicsRezoScale = Math.Max(configuredScale, DisabledLowResolutionScale);
 
         if (capturedLowResolutionUpscaleType)
             graphicsConfig->GraphicsRezoUpscaleType = originalLowResolutionUpscaleType;

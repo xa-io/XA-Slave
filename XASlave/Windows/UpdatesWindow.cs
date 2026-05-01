@@ -23,6 +23,17 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.29 - 2026-05-01",
+            Lines =
+            [
+                "XA Mods",
+                "- `Low Resolution` now forces the live 3D resolution scale to 1.00 for a render pass before it finishes disabling",
+                "- The saved Low Resolution slider value is preserved, so your chosen scale is still ready for the next enable",
+                "- The full-scale disable pass is shared by the XA Mods toggle, `/xa lowres off`, presets, section restore, disable-all, and plugin unload",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.28 - 2026-05-01",
             Lines =
             [

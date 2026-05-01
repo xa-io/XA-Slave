@@ -100,7 +100,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa customres on/off` | Toggle `Custom Resolutions`. |
 | `/xa hideobjects on/off` | Toggle `Hide Game Objects`. |
 | `/xa lowres <scale>` | Set `Low Resolution` scale while `Low Resolution` is already enabled. |
-| `/xa lowres off` | Disable `Low Resolution`. |
+| `/xa lowres off` | Disable `Low Resolution` after forcing the live 3D resolution scale to render once at `1.00` without changing the saved slider value. |
 | `/xa minwindow on/off` | Toggle `Ignore Minimum Window Size`; when enabled XA lowers the live minimum to `250x200`, corrects undersized restore or maximize results after the window changes, and when disabled XA restores the normal game minimum floor even if `Custom Resolutions` remains enabled. |
 | `/xa res <width>x<height>` | Apply a custom client resolution at or above the guarded `250x200` floor. |
 | `/xa res add <width>x<height>` | Add a saved custom-resolution button. |
