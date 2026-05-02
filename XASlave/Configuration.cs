@@ -285,6 +285,16 @@ public class Configuration : IPluginConfiguration
     public bool AutoCancelLoginCooldownEnabled { get; set; } = false;
     public bool AutoDisplayMsqProgressEnabled { get; set; } = false;
     public bool CopyItemNameForAllEnabled { get; set; } = false;
+    public bool DisableTitleScreenMovieEnabled { get; set; } = false;
+    public bool ShowItemIdEnabled { get; set; } = false;
+    public bool AutoDisplayIdsEnabled { get; set; } = false;
+    public bool AutoDisplayIdsShowItemId { get; set; } = true;
+    public bool AutoDisplayIdsShowActionId { get; set; } = true;
+    public bool AutoDisplayIdsShowTargetDataId { get; set; } = true;
+    public bool AutoDisplayIdsShowWeatherId { get; set; } = true;
+    public bool AutoDisplayIdsShowZoneInfo { get; set; } = true;
+    public bool CustomTimestampFormatEnabled { get; set; } = false;
+    public string CustomTimestampFormat { get; set; } = ChatTimestampFormatService.DefaultFormat;
     public bool AutoSkipCutscenesFeedingChocoboEnabled { get; set; } = false;
     public bool AutoIgnoreMinimumWindowSizeEnabled { get; set; } = false;
     public bool AutoHideUnnecessaryPopupsEnabled { get; set; } = false;
@@ -334,6 +344,16 @@ public class Configuration : IPluginConfiguration
     public bool ExpandedPlayerRightClickMenuSearchLalachievementsEnabled { get; set; } = true;
     public bool ExpandedPlayerRightClickMenuSearchOpenAllEnabled { get; set; } = true;
     public bool LiveAnonymousModeEnabled { get; set; } = false;
+    public bool BetterInventoryMoverEnabled { get; set; } = false;
+    public BetterInventoryMoverModifierKey BetterInventoryMoverQuickMoveModifier { get; set; } = BetterInventoryMoverModifierKey.LeftShift;
+    public bool BetterCompanyChestEnabled { get; set; } = false;
+    public int BetterCompanyChestDefaultPage { get; set; } = 0;
+    public bool BetterCompanyChestQuickMoveEnabled { get; set; } = true;
+    public bool BetterCompanyChestAutoConfirmNumericInput { get; set; } = true;
+    public bool BetterCompanyChestShowExchangeableValue { get; set; } = true;
+    public bool AutoOpenMoogleMailEnabled { get; set; } = false;
+    public bool EnableItemIconInShopsEnabled { get; set; } = false;
+    public bool FieldEntryCommandEnabled { get; set; } = false;
     public bool AutoUnlockExpertDeliveryEnabled { get; set; } = false;
     public bool AutoUnlockExpertDeliveryAutoSwitchWhenOpen { get; set; } = true;
     public int AutoUnlockExpertDeliveryDefaultPage { get; set; } = 2;
@@ -341,6 +361,7 @@ public class Configuration : IPluginConfiguration
     public bool AutoUnlockExpertDeliverySkipMateria { get; set; } = true;
     public bool AutoUnlockExpertDeliveryIgnoreSealCap { get; set; } = false;
     public bool AntiAfkEnabled { get; set; } = false;
+    public bool AutoDutyCommenceEnabled { get; set; } = false;
     public bool AutoLeaveDutyEnabled { get; set; } = false;
     public int AutoLeaveDutyDelaySeconds { get; set; } = AutoLeaveDutyService.DelaySecondsDefault;
     public bool EurekaInstanceIdEnabled { get; set; } = false;
@@ -412,6 +433,8 @@ public class Configuration : IPluginConfiguration
     public bool MoveableAfterDeathEnabled { get; set; } = false;
     public List<ToonModSavedList> ToonModsSavedLists { get; set; } = new();
     public bool ForcePeepingTomEnabled { get; set; } = false;
+    public bool TeleportHelperEnabled { get; set; } = false;
+    public bool TeleportHelperSelectYes { get; set; } = false;
 
     // -- City Chat Flooder --
     public List<string> FloorderSelectedWorlds { get; set; } = new();

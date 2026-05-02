@@ -12,8 +12,8 @@ public unsafe sealed class PlayerModsService : IDisposable
 {
     private const double MovePermissionHookReloadGuardSeconds = 5.0;
     private const int SprintActionId = 3;
-    private const ushort SprintStatusId = 50;
-    private const ushort CosmicSprintStatusId = 4398;
+    private const uint SprintStatusId = 50;
+    private const uint CosmicSprintStatusId = 4398;
     private const float InfiniteSprintMovementThresholdSquared = 0.0004f;
     private const int InfiniteSprintRecentMovementWindowMilliseconds = 250;
     private const int InfiniteSprintAttemptThrottleMilliseconds = 2_000;

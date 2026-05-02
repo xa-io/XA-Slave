@@ -78,6 +78,37 @@ public sealed class XAModPopupCleanerSettings
 }
 
 [Serializable]
+public sealed class XAModCustomTimestampFormatSettings
+{
+    public string Format { get; set; } = string.Empty;
+}
+
+[Serializable]
+public sealed class XAModAutoDisplayIdsSettings
+{
+    public bool? ShowItemId { get; set; }
+    public bool ShowActionId { get; set; }
+    public bool ShowTargetDataId { get; set; }
+    public bool ShowWeatherId { get; set; }
+    public bool ShowZoneInfo { get; set; }
+}
+
+[Serializable]
+public sealed class XAModBetterInventoryMoverSettings
+{
+    public string QuickMoveModifier { get; set; } = "LeftShift";
+}
+
+[Serializable]
+public sealed class XAModBetterCompanyChestSettings
+{
+    public int DefaultPage { get; set; }
+    public bool QuickMoveEnabled { get; set; }
+    public bool AutoConfirmNumericInput { get; set; }
+    public bool ShowExchangeableValue { get; set; }
+}
+
+[Serializable]
 public sealed class XAModSpecialRenderModesSettings
 {
     public float BackgroundColorR { get; set; }
@@ -129,6 +160,12 @@ public sealed class XAModTradeRefusalSettings
     public bool ShowNotification { get; set; }
     public bool SendEcho { get; set; }
     public string ExtraCommands { get; set; } = string.Empty;
+}
+
+[Serializable]
+public sealed class XAModTeleportHelperSettings
+{
+    public bool SelectYes { get; set; }
 }
 
 [Serializable]

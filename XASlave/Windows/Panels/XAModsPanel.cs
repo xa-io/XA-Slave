@@ -38,6 +38,7 @@ public partial class SlaveWindow
     private bool toonModsStatusIsError;
     private int xaModsCustomResolutionWidth = 500;
     private int xaModsCustomResolutionHeight = 345;
+    private string xaModsFieldEntryQuery = string.Empty;
     private static readonly JsonSerializerOptions toonModsListJsonOptions = ToonModsPresetSerialization.JsonOptions;
 
     private bool GetToonModsSectionExpanded(ToonModsSection section)
@@ -180,6 +181,12 @@ public partial class SlaveWindow
             plugin.SystemWindowMods.SetDisableBackgroundRenderingDisableWhenArMultiIsOn(configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn);
         }
 
+        void ApplyCustomTimestampFormatConfiguration()
+        {
+            configuration.CustomTimestampFormat = ChatTimestampFormatService.NormalizeFormat(configuration.CustomTimestampFormat);
+            plugin.ChatTimestampFormat.ApplyConfiguration(configuration.CustomTimestampFormat);
+        }
+
         void ApplyAutoHideGameObjectsConfiguration()
         {
             plugin.AutoHideGameObjects.ApplyConfiguration(
@@ -240,6 +247,11 @@ public partial class SlaveWindow
                 configuration.AutoRefuseTradeShowNotification,
                 configuration.AutoRefuseTradeSendEcho,
                 configuration.AutoRefuseTradeExtraCommands);
+        }
+
+        void ApplyTeleportHelperConfiguration()
+        {
+            plugin.TeleportHelper.ApplyConfiguration(configuration.TeleportHelperSelectYes);
         }
 
         void ApplySightDistanceConfiguration()
@@ -1004,6 +1016,38 @@ public partial class SlaveWindow
             ImGui.TextDisabled("Uses the game's Standard / AMD FSR runtime scale path. If DLSS is active, XA temporarily switches to AMD FSR and restores the previous scaler when disabled. No sharpen override is applied.");
         }
 
+        void SetCustomTimestampFormat(string format)
+        {
+            configuration.CustomTimestampFormat = ChatTimestampFormatService.NormalizeFormat(format);
+            ApplyCustomTimestampFormatConfiguration();
+            SaveConfiguration();
+        }
+
+        void DrawTimestampFormatPreset(string format, string id)
+        {
+            if (ImGui.Button($"{format}##{id}"))
+                SetCustomTimestampFormat(format);
+        }
+
+        void DrawCustomTimestampFormatOptions()
+        {
+            var format = configuration.CustomTimestampFormat;
+            ImGui.SetNextItemWidth(Scale(180f));
+            if (ImGui.InputText("Format##CustomTimestampFormat", ref format, 80))
+                SetCustomTimestampFormat(format);
+
+            DrawTimestampFormatPreset("[HH:mm]", "CustomTimestampFormatPresetMinutes24");
+            ImGui.SameLine();
+            DrawTimestampFormatPreset("[HH:mm:ss]", "CustomTimestampFormatPresetSeconds24");
+            ImGui.SameLine();
+            DrawTimestampFormatPreset("[hh:mm:ss tt]", "CustomTimestampFormatPresetSeconds12");
+
+            ImGui.TextDisabled("Command: /xa timestampseconds on|off");
+            ImGui.TextDisabled("HH:mm = 12:34");
+            ImGui.TextDisabled("HH:mm:ss = 12:34:56");
+            ImGui.TextDisabled("HH:mm:ss tt = 12:34:56 PM");
+        }
+
         void DrawSightDistanceSlider(string label, string id, float currentValue, float minimumValue, float maximumValue, string format, Action<float> store)
         {
             var value = currentValue;
@@ -1208,6 +1252,254 @@ public partial class SlaveWindow
             ImGui.TextDisabled("After duty completion, XA waits this long before opening the duty menu and confirming Leave Duty.");
         }
 
+        void DrawAutoDisplayIdsOptions()
+        {
+            DrawAutoDisplayIdsCheckbox(
+                "Show Item IDs##AutoDisplayIdsItem",
+                configuration.AutoDisplayIdsShowItemId,
+                value => configuration.AutoDisplayIdsShowItemId = value);
+
+            DrawAutoDisplayIdsCheckbox(
+                "Show Action ID##AutoDisplayIdsAction",
+                configuration.AutoDisplayIdsShowActionId,
+                value => configuration.AutoDisplayIdsShowActionId = value);
+
+            DrawAutoDisplayIdsCheckbox(
+                "Show Target Data ID##AutoDisplayIdsTarget",
+                configuration.AutoDisplayIdsShowTargetDataId,
+                value => configuration.AutoDisplayIdsShowTargetDataId = value);
+
+            DrawAutoDisplayIdsCheckbox(
+                "Show Weather ID##AutoDisplayIdsWeather",
+                configuration.AutoDisplayIdsShowWeatherId,
+                value => configuration.AutoDisplayIdsShowWeatherId = value);
+
+            DrawAutoDisplayIdsCheckbox(
+                "Show Zone And Map IDs in DTR##AutoDisplayIdsZone",
+                configuration.AutoDisplayIdsShowZoneInfo,
+                value => configuration.AutoDisplayIdsShowZoneInfo = value);
+
+            ImGui.TextDisabled($"Zone ID: {plugin.AutoDisplayIds.CurrentZoneId}");
+            ImGui.TextDisabled($"Map ID: {plugin.AutoDisplayIds.CurrentMapId}");
+            ImGui.TextDisabled($"Weather ID: {plugin.AutoDisplayIds.CurrentWeatherId}");
+            ImGui.TextDisabled($"Target Data ID: {plugin.AutoDisplayIds.CurrentTargetDataId}");
+            ImGui.TextDisabled($"Last Action IDs: {plugin.AutoDisplayIds.LastActionOriginalId} -> {plugin.AutoDisplayIds.LastActionResolvedId}");
+            ImGui.TextDisabled($"Item tooltip IDs: {(configuration.AutoDisplayIdsEnabled && configuration.AutoDisplayIdsShowItemId ? plugin.TooltipItemId.StatusText : "Disabled")}");
+        }
+
+        void DrawAutoDisplayIdsCheckbox(string label, bool value, Action<bool> applyValue)
+        {
+            var updatedValue = value;
+            if (!ImGui.Checkbox(label, ref updatedValue))
+                return;
+
+            applyValue(updatedValue);
+            plugin.ApplyAutoDisplayIdsConfiguration();
+            SetToonModsStatus("XA Mods: Auto Display IDs options updated.");
+        }
+
+        void DrawBetterInventoryMoverOptions()
+        {
+            var quickMoveModifier = BetterInventoryMoverService.NormalizeModifier(configuration.BetterInventoryMoverQuickMoveModifier);
+            if (ImGui.BeginCombo("Quick move modifier##BetterInventoryMover", BetterInventoryMoverService.GetModifierLabel(quickMoveModifier)))
+            {
+                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.LeftShift, ref quickMoveModifier);
+                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.LeftControl, ref quickMoveModifier);
+                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.LeftAlt, ref quickMoveModifier);
+                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.RightShift, ref quickMoveModifier);
+                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.RightControl, ref quickMoveModifier);
+                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.RightAlt, ref quickMoveModifier);
+                ImGui.EndCombo();
+            }
+
+            ImGui.TextDisabled($"Hold {plugin.BetterInventoryMover.QuickMoveModifierLabel} and right-click an item while both the source and destination inventory windows are open.");
+            ImGui.TextDisabled("Without the modifier, XA still adds destination-aware context-menu move entries.");
+            ImGui.TextDisabled("Supported pairs: inventory <-> retainer and inventory <-> saddlebag or premium saddlebag.");
+            ImGui.TextDisabled($"Last source addon: {plugin.BetterInventoryMover.LastSourceAddon}");
+            ImGui.TextDisabled($"Last destination: {plugin.BetterInventoryMover.LastDestinationLabel}");
+            ImGui.TextDisabled($"Last item ID: {plugin.BetterInventoryMover.LastItemId}");
+            ImGui.TextDisabled($"Available destinations on last menu: {plugin.BetterInventoryMover.AvailableDestinationCount}");
+        }
+
+        void DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey modifier, ref BetterInventoryMoverModifierKey currentValue)
+        {
+            var isSelected = currentValue == modifier;
+            var label = BetterInventoryMoverService.GetModifierLabel(modifier);
+            if (!ImGui.Selectable($"{label}##BetterInventoryMoverModifier_{modifier}", isSelected))
+                return;
+
+            configuration.BetterInventoryMoverQuickMoveModifier = modifier;
+            currentValue = modifier;
+            plugin.ApplyBetterInventoryMoverConfiguration();
+            SetToonModsStatus($"XA Mods: Better Inventory Mover quick move modifier set to {label}.");
+        }
+
+        void DrawBetterCompanyChestOptions()
+        {
+            var defaultPage = Math.Clamp(configuration.BetterCompanyChestDefaultPage, 0, 6);
+            if (ImGui.BeginCombo("Default chest page##BetterCompanyChest", GetBetterCompanyChestPageLabel(defaultPage)))
+            {
+                DrawBetterCompanyChestPageOption("Disabled", 0, ref defaultPage);
+                DrawBetterCompanyChestPageOption("Page 1", 1, ref defaultPage);
+                DrawBetterCompanyChestPageOption("Page 2", 2, ref defaultPage);
+                DrawBetterCompanyChestPageOption("Page 3", 3, ref defaultPage);
+                DrawBetterCompanyChestPageOption("Page 4", 4, ref defaultPage);
+                DrawBetterCompanyChestPageOption("Page 5", 5, ref defaultPage);
+                DrawBetterCompanyChestPageOption("Crystals", 6, ref defaultPage);
+                ImGui.EndCombo();
+            }
+
+            var quickMoveEnabled = configuration.BetterCompanyChestQuickMoveEnabled;
+            if (ImGui.Checkbox("Enable right-click quick move##BetterCompanyChest", ref quickMoveEnabled))
+            {
+                configuration.BetterCompanyChestQuickMoveEnabled = quickMoveEnabled;
+                plugin.ApplyBetterCompanyChestConfiguration();
+                SetToonModsStatus(quickMoveEnabled ? "XA Mods: FC chest quick move enabled." : "XA Mods: FC chest quick move disabled.");
+            }
+
+            var autoConfirmNumeric = configuration.BetterCompanyChestAutoConfirmNumericInput;
+            if (ImGui.Checkbox("Auto-confirm quantity prompts##BetterCompanyChest", ref autoConfirmNumeric))
+            {
+                configuration.BetterCompanyChestAutoConfirmNumericInput = autoConfirmNumeric;
+                plugin.ApplyBetterCompanyChestConfiguration();
+                SetToonModsStatus(autoConfirmNumeric ? "XA Mods: FC chest quantity prompts auto-confirm." : "XA Mods: FC chest quantity prompts stay manual.");
+            }
+
+            var showExchangeableValue = configuration.BetterCompanyChestShowExchangeableValue;
+            if (ImGui.Checkbox("Show exchangeable gil value on chest##BetterCompanyChest", ref showExchangeableValue))
+            {
+                configuration.BetterCompanyChestShowExchangeableValue = showExchangeableValue;
+                plugin.ApplyBetterCompanyChestConfiguration();
+                SetToonModsStatus(showExchangeableValue ? "XA Mods: FC chest gil value display enabled." : "XA Mods: FC chest gil value display disabled.");
+            }
+
+            ImGui.TextDisabled($"Current page: {plugin.BetterCompanyChest.CurrentPageLabel}");
+            ImGui.TextDisabled($"Exchangeable total: {plugin.BetterCompanyChest.CurrentExchangeableValue:n0} gil");
+        }
+
+        void DrawBetterCompanyChestPageOption(string label, int value, ref int currentValue)
+        {
+            var isSelected = currentValue == value;
+            if (!ImGui.Selectable($"{label}##BetterCompanyChestPage_{value}", isSelected))
+                return;
+
+            configuration.BetterCompanyChestDefaultPage = value;
+            currentValue = value;
+            plugin.ApplyBetterCompanyChestConfiguration();
+            SetToonModsStatus($"XA Mods: Better Company Chest default page set to {label}.");
+        }
+
+        string GetBetterCompanyChestPageLabel(int value)
+        {
+            return value switch
+            {
+                1 => "Page 1",
+                2 => "Page 2",
+                3 => "Page 3",
+                4 => "Page 4",
+                5 => "Page 5",
+                6 => "Crystals",
+                _ => "Disabled",
+            };
+        }
+
+        void DrawAutoOpenMoogleMailOptions()
+        {
+            var enabledForActions = configuration.AutoOpenMoogleMailEnabled;
+            if (!enabledForActions)
+                ImGui.BeginDisabled();
+
+            if (ImGui.Button("Claim Attachments##AutoOpenMoogleMail"))
+            {
+                var success = plugin.AutoOpenMoogleMail.QueueClaimAttachments();
+                SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("Delete Non-Player##AutoOpenMoogleMail"))
+            {
+                var success = plugin.AutoOpenMoogleMail.QueueDeleteNonPlayerLetters();
+                SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("Delete All##AutoOpenMoogleMail"))
+            {
+                var success = plugin.AutoOpenMoogleMail.QueueDeleteAllLetters();
+                SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
+            }
+
+            ImGui.SameLine();
+            if (ImGui.Button("Request Delivery##AutoOpenMoogleMail"))
+            {
+                var success = plugin.AutoOpenMoogleMail.QueueRequestDelivery();
+                SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
+            }
+
+            if (!enabledForActions)
+                ImGui.EndDisabled();
+
+            ImGui.TextDisabled($"Queue state: {plugin.AutoOpenMoogleMail.PendingOperationText}");
+            ImGui.TextDisabled($"Known letters: {plugin.AutoOpenMoogleMail.KnownLetterCount}");
+            ImGui.TextDisabled($"Known new letters: {plugin.AutoOpenMoogleMail.KnownNewLetterCount}");
+            ImGui.TextDisabled($"Known attachments: {plugin.AutoOpenMoogleMail.KnownAttachmentCount}");
+            ImGui.TextDisabled($"Completed operations: {plugin.AutoOpenMoogleMail.CompletedOperationCount}");
+            ImGui.TextDisabled($"Last processed letters: {plugin.AutoOpenMoogleMail.LastProcessedLetterCount}");
+        }
+
+        void DrawEnableItemIconInShopsOptions()
+        {
+            ImGui.TextDisabled("Supported: Shop, InclusionShop, GrandCompanyExchange, ShopExchangeCurrency, ShopExchangeItem, ShopExchangeCoin, CollectablesShop, and FreeShop.");
+            ImGui.TextDisabled($"Last add-on: {plugin.EnableItemIconInShops.LastAddonName}");
+            ImGui.TextDisabled($"Last replacements: {plugin.EnableItemIconInShops.LastReplacementCount}");
+        }
+
+        void DrawFieldEntryCommandOptions()
+        {
+            ImGui.TextDisabled(plugin.FieldEntryCommand.BuildUsageText().Replace("[XASlave] ", string.Empty, StringComparison.Ordinal));
+
+            if (!configuration.FieldEntryCommandEnabled)
+                ImGui.BeginDisabled();
+
+            ImGui.SetNextItemWidth(Scale(260f));
+            ImGui.InputTextWithHint(
+                "Field entry##FieldEntryCommand",
+                "anemos, pagos, pyros, hydatos...",
+                ref xaModsFieldEntryQuery,
+                128);
+
+            ImGui.SameLine();
+            if (ImGui.Button("Queue##FieldEntryCommand"))
+                TryStartFieldEntryCommand(xaModsFieldEntryQuery);
+
+            foreach (var key in plugin.FieldEntryCommand.SupportedKeys)
+            {
+                if (ImGui.SmallButton($"{key}##FieldEntryCommand_{key}"))
+                    TryStartFieldEntryCommand(key);
+
+                ImGui.SameLine();
+            }
+
+            ImGui.NewLine();
+
+            if (!configuration.FieldEntryCommandEnabled)
+                ImGui.EndDisabled();
+
+            ImGui.TextDisabled($"Pending entry: {plugin.FieldEntryCommand.PendingEntryText}");
+            ImGui.TextDisabled($"Suggested zone: {plugin.FieldEntryCommand.LastSuggestedZone}");
+            ImGui.TextWrapped($"Last teleport command: {plugin.FieldEntryCommand.LastTeleportCommand}");
+            ImGui.TextDisabled($"Supported entries: {plugin.FieldEntryCommand.SupportedEntryCount}");
+        }
+
+        void TryStartFieldEntryCommand(string query)
+        {
+            var success = plugin.FieldEntryCommand.TryStart(query);
+            var message = !success && plugin.FieldEntryCommand.StatusText.StartsWith("Unavailable", StringComparison.OrdinalIgnoreCase)
+                ? plugin.FieldEntryCommand.StatusText
+                : plugin.FieldEntryCommand.LastActionText;
+            SetToonModsStatus(message, !success);
+        }
+
         void DrawEurekaInstanceIdOptions()
         {
             DrawEurekaInstanceIdSharedDisplayOptions("EurekaInstanceId");
@@ -1345,6 +1637,38 @@ public partial class SlaveWindow
             ImGui.TextDisabled("Plain lines are sent locally as /e. Slash-prefixed lines still run as commands.");
             ImGui.TextDisabled("Use <trader> or <target> for the incoming trader's first and last name.");
         }
+
+        void DrawTeleportHelperOptions()
+        {
+            var selectYes = configuration.TeleportHelperSelectYes;
+            if (ImGui.BeginCombo("SelectYesNo response##TeleportHelper", GetTeleportHelperResponseLabel(selectYes)))
+            {
+                DrawTeleportHelperResponseOption("No - reject ticket usage", false, ref selectYes);
+                DrawTeleportHelperResponseOption("Yes - allow ticket usage", true, ref selectYes);
+                ImGui.EndCombo();
+            }
+
+            ImGui.TextDisabled(selectYes
+                ? "XA will select Yes when SelectYesNo asks about using an aetheryte ticket."
+                : "This will reject using any aetheryte ticket usage.");
+            ImGui.TextDisabled(plugin.TeleportHelper.LastActionText);
+        }
+
+        void DrawTeleportHelperResponseOption(string label, bool selectYesValue, ref bool currentValue)
+        {
+            var isSelected = currentValue == selectYesValue;
+            if (!ImGui.Selectable($"{label}##TeleportHelper_{selectYesValue}", isSelected))
+                return;
+
+            configuration.TeleportHelperSelectYes = selectYesValue;
+            currentValue = selectYesValue;
+            ApplyTeleportHelperConfiguration();
+            SaveConfiguration();
+            SetToonModsStatus($"XA Mods: Teleport Helper now selects {(selectYesValue ? "Yes" : "No")} on aetheryte ticket prompts.");
+        }
+
+        string GetTeleportHelperResponseLabel(bool selectYes)
+            => selectYes ? "Yes - allow ticket usage" : "No - reject ticket usage";
 
         void DrawXAPeepOptions()
         {
@@ -1534,15 +1858,62 @@ public partial class SlaveWindow
             searchTerms: ["Scenario Tree", "main scenario", "remaining", "completion percentage"]);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
+            "disable-title-screen-movie",
+            "Disable Title Screen Movie",
+            () => configuration.DisableTitleScreenMovieEnabled,
+            plugin.SystemWindowMods.SetDisableTitleScreenMovieEnabled,
+            applied => configuration.DisableTitleScreenMovieEnabled = applied,
+            "Prevents the title screen idle movie from starting.",
+            "Resets `AgentLobby.IdleTime` while enabled so the title screen stays on the normal menu instead of playing the idle intro movie.",
+            plugin.SystemWindowMods.DisableTitleScreenMovieStatusText,
+            searchTerms: ["title screen", "movie", "intro", "AgentLobby", "IdleTime"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "auto-display-ids",
+            "Auto Display IDs",
+            () => configuration.AutoDisplayIdsEnabled,
+            value =>
+            {
+                configuration.AutoDisplayIdsEnabled = value;
+                plugin.ApplyAutoDisplayIdsConfiguration(save: false);
+
+                if (!value)
+                    return plugin.AutoDisplayIds.SetEnabled(false);
+
+                return plugin.AutoDisplayIds.SetEnabled(true);
+            },
+            applied => configuration.AutoDisplayIdsEnabled = applied,
+            "Adds item, action, target, weather, zone, and map IDs to supported local UI surfaces.",
+            "Shows item IDs on item tooltips, action IDs on action details, target data IDs on target info, weather IDs on weather tooltips when available, and optional live zone/map IDs in DTR.",
+            plugin.AutoDisplayIds.StatusText,
+            searchTerms: ["tooltip", "skill id", "action id", "target data id", "weather id", "zone id", "map id"],
+            drawOptions: DrawAutoDisplayIdsOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "custom-timestamp-format",
+            "Custom Timestamp Format",
+            () => configuration.CustomTimestampFormatEnabled,
+            plugin.ChatTimestampFormat.SetEnabled,
+            applied => configuration.CustomTimestampFormatEnabled = applied,
+            "Adds seconds to chat timestamps.",
+            "Hooks the chat timestamp formatter for addon text IDs 7840 and 7841 and formats timestamps as `[HH:mm:ss]` by default.",
+            plugin.ChatTimestampFormat.StatusText,
+            warningText: "Disable other chat timestamp formatter tweaks before enabling this hook.",
+            searchTerms: ["chat", "timestamp", "seconds", "time", "7840", "7841"],
+            drawOptions: DrawCustomTimestampFormatOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
             "target-command-fix",
             "Fix /target Command",
             () => configuration.TargetCommandFixEnabled,
             plugin.TargetCommandFix.SetEnabled,
             applied => configuration.TargetCommandFixEnabled = applied,
             "Selects the closest targetable actor when the game's `/target` command cannot resolve a visible player or NPC name.",
-            "Mirrors the SimpleTweaks `/target` fix by watching failed target-name errors and choosing the closest matching targetable actor from the object table. XA automation also uses the same direct lookup before falling back to the game command.",
+            "Watches failed target-name errors and chooses the closest matching targetable actor from the object table. XA automation also uses the same direct lookup before falling back to the game command.",
             plugin.TargetCommandFix.StatusText,
-            searchTerms: ["/target", "SimpleTweaks", "target fix", "Rodney", "NPC", "player"]);
+            searchTerms: ["/target", "target fix", "Rodney", "NPC", "player"]);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-skip-cutscenes",
@@ -1743,6 +2114,69 @@ public partial class SlaveWindow
             "Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases.",
             "Masks visible player nameplates locally with deterministic CLI/programming aliases such as `CLI Programming`, and removes titles or FC tags from the rewritten plates. The alias choice is keyed from the original character name and world so it stays stable across redraws. This only changes local presentation and does not change server data.",
             plugin.NameplatePrivacy.AnonymousModeStatusText);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "better-inventory-mover",
+            "Better Inventory Mover",
+            () => configuration.BetterInventoryMoverEnabled,
+            plugin.BetterInventoryMover.SetEnabled,
+            applied => configuration.BetterInventoryMoverEnabled = applied,
+            "Adds configurable-modifier right-click moves between open inventory, retainer, saddlebag, and premium saddlebag windows.",
+            "While the source and destination inventory interfaces are both open, holding the configured modifier during item right-click moves to the first available matching destination. Without the modifier, XA adds destination-aware move actions to supported item context menus.",
+            plugin.BetterInventoryMover.StatusText,
+            searchTerms: ["inventory", "retainer", "saddlebag", "premium saddlebag", "move item", "context menu"],
+            drawOptions: DrawBetterInventoryMoverOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "better-company-chest",
+            "Better Company Chest",
+            () => configuration.BetterCompanyChestEnabled,
+            plugin.BetterCompanyChest.SetEnabled,
+            applied => configuration.BetterCompanyChestEnabled = applied,
+            "Adds FC chest defaults, right-click quick move, quantity prompt handling, and exchangeable gil-value display.",
+            "Improves the Company Chest surface with a saved default page, right-click inventory quick move, optional auto-confirm for quantity prompts, and an optional exchangeable-value overlay on the chest window.",
+            plugin.BetterCompanyChest.StatusText,
+            searchTerms: ["Company Chest", "FC chest", "free company chest", "quick move", "quantity", "exchangeable", "crystals"],
+            drawOptions: DrawBetterCompanyChestOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "auto-open-moogle-mail",
+            "Auto Open Moogle Mail",
+            () => configuration.AutoOpenMoogleMailEnabled,
+            plugin.AutoOpenMoogleMail.SetEnabled,
+            applied => configuration.AutoOpenMoogleMailEnabled = applied,
+            "Exposes Moogle Mail cleanup actions on the Letter List.",
+            "XA can queue manual actions for claiming attachments, deleting opened letters, deleting opened NPC letters, and requesting delivery from the Letter List.",
+            plugin.AutoOpenMoogleMail.StatusText,
+            searchTerms: ["Moogle Mail", "Delivery Moogle", "letters", "attachments", "request delivery", "delete letters"],
+            drawOptions: DrawAutoOpenMoogleMailOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "enable-item-icon-in-shops",
+            "Enable Item Icon In Shops",
+            () => configuration.EnableItemIconInShopsEnabled,
+            plugin.EnableItemIconInShops.SetEnabled,
+            applied => configuration.EnableItemIconInShopsEnabled = applied,
+            "Replaces placeholder shop row icons with the actual item icons when the shop addon refreshes.",
+            "Updates supported shop, exchange, collectables, and free-shop addon rows after setup so the visible icon matches the real item.",
+            plugin.EnableItemIconInShops.StatusText,
+            searchTerms: ["shop", "item icon", "GrandCompanyExchange", "CollectablesShop", "FreeShop", "exchange"],
+            drawOptions: DrawEnableItemIconInShopsOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.EurekaMods,
+            "field-operations-entry-command",
+            "Field Operations Entry Command",
+            () => configuration.FieldEntryCommandEnabled,
+            plugin.FieldEntryCommand.SetEnabled,
+            applied => configuration.FieldEntryCommandEnabled = applied,
+            "Adds `/xa fe <entry>` for Eureka entries.",
+            "Queues the requested Eureka entry, requests Pier #1 staging travel when Rodney is not locally reachable, routes to Rodney, and advances supported entry dialogs.",
+            plugin.FieldEntryCommand.StatusText,
+            searchTerms: ["/xa fe", "field entry", "field operations", "Eureka", "Anemos", "Pagos", "Pyros", "Hydatos", "Rodney"],
+            drawOptions: DrawFieldEntryCommandOptions,
+            showOptionsWhenDisabled: true);
 
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -1755,6 +2189,17 @@ public partial class SlaveWindow
             "Keeps the local AFK timer fresh on a 2-minute cadence while enabled. XA only touches the local idle timer; it does not send chat or movement packets.",
             plugin.AntiAfk.StatusText,
             searchTerms: ["afk", "idle", "kick", "timer"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "auto-duty-commence",
+            "Auto Duty Commence",
+            () => configuration.AutoDutyCommenceEnabled,
+            plugin.AutoDutyCommence.SetEnabled,
+            applied => configuration.AutoDutyCommenceEnabled = applied,
+            "Automatically confirms duty commencement prompts.",
+            "Watches the Contents Finder confirm addon and clicks Commence when the standard duty-ready prompt appears.",
+            plugin.AutoDutyCommence.StatusText,
+            searchTerms: ["duty", "commence", "ContentsFinderConfirm", "queue pop", "ready check"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "auto-expert-delivery",
@@ -1953,6 +2398,26 @@ public partial class SlaveWindow
                 ? "Enabled - character-list tables and duplicate summaries use deterministic aliases for screenshot-safe local views."
                 : "Disabled",
             searchTerms: ["screenshot", "character list", "character lists", "anonymize", "privacy", "titlebar favourite"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.PluginMods,
+            "teleport-helper",
+            "Teleport Helper",
+            () => configuration.TeleportHelperEnabled,
+            value =>
+            {
+                ApplyTeleportHelperConfiguration();
+                return plugin.TeleportHelper.SetEnabled(value);
+            },
+            applied => configuration.TeleportHelperEnabled = applied,
+            "Handles SelectYesNo prompts that ask about using an aetheryte ticket for teleporting.",
+            "Monitors the active `SelectYesno` prompt text. When it asks whether to use an aetheryte ticket to teleport, XA selects the configured Yes/No response. The default response is No.",
+            plugin.TeleportHelper.StatusText,
+            warningText: configuration.TeleportHelperSelectYes
+                ? "Yes mode allows aetheryte ticket prompts instead of rejecting them."
+                : "This will reject using any aetheryte ticket usage.",
+            searchTerms: ["SelectYesNo", "SelectYesno", "aetheryte ticket", "teleport", "ticket", "Yes", "No"],
+            drawOptions: DrawTeleportHelperOptions,
+            showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
             ToonModsSection.PluginMods,
             "force-peepingtom",

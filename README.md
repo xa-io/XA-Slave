@@ -22,25 +22,33 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with optional prep actions, region filters, a bell-only mode, safer menu recovery, a workshop-side Company Chest gil sync into XA Database after the bell path finishes, and shared completion actions.
 - **Field Operations** - Eureka tools for instance tracking and Logos Manipulator automation. `Instance Hunter` provides per-zone baselines, live instance ID display, Rodney controls, duty-ready commence handling, alert previews, and automatic baseline rollover. `Logogram Creator` brings the AutoLogoAction flow into XA Slave with favorites, recipe locks, queue automation, manipulator-aware tabs, favorite overlays, and a floating cancel control that stops the active run and clears queued plates.
 - **Window Renamer** - Rename the FFXIV game window with an optional custom title, process-ID prefix, and current-character suffix.
-- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation. Presets and exported packages restore supported mod subsettings, including Eureka live-ID display, trade refusal, Expert Delivery options, Infinite Sprint delay, XA Peep alerts and duty logging, and other shipped option groups.
+- **Auto Open Moogle Mail** - Provides queued Letter List actions for taking attachments, batch-deleting opened letters, batch-deleting opened NPC letters, and requesting delivery with explicit viewer and confirmation cleanup between queued letters plus an in-window Stop control while a queue is active.
+- **XA Mods** - Searchable mod manager grouped by category, with persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation.
 
   | Game Mods | Graphic Mods | Player Mods | Plugin Mods | Eureka Mods |
   | --- | --- | --- | --- | --- |
   | Allow Multiple Game Instances | Ignore Minimum Window Size | Anti-AFK | Anonymize Character Lists | Instance ID |
-  | Cancel Login Cooldown | Hide Game Objects | Automate Expert Delivery | Force PeepingTom | Logogram Creator |
-  | Display MSQ Progress | Custom Resolutions | Auto Leave Duty |  |  |
-  | Fix /target Command |  |  |  |  |
-  | Skip Cutscenes | Disable Background Rendering | Auto Merge |  |  |
-  | Skip Cutscenes Feeding Chocobo | Low Resolution | Refuse Trade Request |  |  |
-  | Hide Unnecessary Popups | Special Rendering Modes | Reveal Undiscovered Areas |  |  |
-  | Prevent Game Exiting From Lobby Errors |  | Clear Teleportation Lock |  |  |
-  | Close Lobby Errors |  | Custom Sight Distance |  |  |
-  | Bailout ESC Menu |  | Doze & Sit Anywhere |  |  |
-  | Skip Dialogue |  | Infinite Sprint |  |  |
-  | Display Actual Queue Position |  | Item Commands |  |  |
-  | Copy Item Name For All |  | XA Peep |  |  |
+  | Cancel Login Cooldown | Hide Game Objects | Auto Duty Commence | Teleport Helper | Field Operations Entry Command |
+  | Display MSQ Progress | Custom Resolutions | Automate Expert Delivery | Force PeepingTom | Logogram Creator |
+  | Disable Title Screen Movie | Disable Background Rendering | Refuse Trade Request |  |  |
+  | Auto Display IDs | Low Resolution | Reveal Undiscovered Areas |  |  |
+  | Custom Timestamp Format | Special Rendering Modes | Clear Teleportation Lock |  |  |
+  | Fix /target Command |  | Auto Leave Duty |  |  |
+  | Skip Cutscenes |  | Auto Merge |  |  |
+  | Skip Cutscenes Feeding Chocobo |  | Custom Sight Distance |  |  |
+  | Hide Unnecessary Popups |  | Doze & Sit Anywhere |  |  |
+  | Prevent Game Exiting From Lobby Errors |  | Infinite Sprint |  |  |
+  | Close Lobby Errors |  | Item Commands |  |  |
+  | Bailout ESC Menu |  | XA Peep |  |  |
+  | Skip Dialogue |  |  |  |  |
+  | Display Actual Queue Position |  |  |  |  |
+  | Copy Item Name For All |  |  |  |  |
   | Expanded Player Right-Click Menu Search |  |  |  |  |
   | Live Anonymous Mode |  |  |  |  |
+  | Better Inventory Mover |  |  |  |  |
+  | Better Company Chest |  |  |  |  |
+  | Auto Open Moogle Mail |  |  |  |  |
+  | Enable Item Icon In Shops |  |  |  |  |
 
 - **Plugin Operations** - Manage plugin startup behavior, verbose task logging, the version display in the main XA Slave window title, and titlebar favourites. Custom favourites can open panels, load XA Mod presets, toggle XA Mods, drive `Special Rendering Modes` presets, fire `Sit now` / `Doze now`, run `All XA Mods Off`, or stop all automated tasks and disconnect Xagman. Resolution favourites stay dim and print an error unless `Custom Resolutions` is enabled, `Kill Game` auto-enables `Instant Logout` when selected, and `Show Updates` opens the standalone version-history window with the current release notes highlighted.
 - **Export Data** - Export multi-character tables from AutoRetainer, Lifestream, and XA Database into timestamped TSV or CSV snapshots, or overwrite the same fixed file path when `Overwrite fixed file path` is enabled.
@@ -77,20 +85,29 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | Command | Purpose |
 | --- | --- |
 | `/xa anonymous on/off` | Toggle `Live Anonymous Mode`. |
+| `/xa companychest on/off` | Toggle `Better Company Chest` page defaults, right-click store/recover moves, quantity prompt confirmation, and the exchangeable-item gil-value display. |
 | `/xa chocobocutscene on/off` | Toggle `Skip Cutscenes Feeding Chocobo`. |
 | `/xa closeerrors on/off` | Toggle `Close Lobby Errors` for supported disconnect and lobby error popups. |
 | `/xa copyitemname on/off` | Toggle `Copy Item Name For All`. |
+| `/xa displayids on/off` | Toggle `Auto Display IDs` for item, action, target, weather, zone, and map IDs. |
+| `/xa fe <entry>` | Queue a supported Eureka `Field Operations Entry Command` entry, such as `/xa fe pagos`: Anemos, Pagos, Pyros, or Hydatos. |
+| `/xa fieldentrycommand on/off` | Toggle `Field Operations Entry Command`. |
 | `/xa gamerestore` | Disable the current Game Mods toggles. |
 | `/xa hidepopups on/off` | Toggle `Hide Unnecessary Popups`. |
+| `/xa inventorymover on/off` | Toggle `Better Inventory Mover`; the quick-move modifier is configurable in the XA Mods panel. |
 | `/xa logincooldown on/off` | Toggle `Cancel Login Cooldown`. |
+| `/xa mooglemail on/off` | Toggle `Auto Open Moogle Mail` Letter List actions. |
 | `/xa msqprogress on/off` | Toggle `Display MSQ Progress`. |
 | `/xa multiinstance on/off` | Toggle `Allow Multiple Game Instances`. |
 | `/xa playersearch on/off` | Toggle `Expanded Player Right-Click Menu Search`. |
 | `/xa preventlobbyexit on/off` | Toggle `Prevent Game Exiting From Lobby Errors`. |
 | `/xa queueposition on/off` | Toggle `Display Actual Queue Position`. |
+| `/xa shopicons on/off` | Toggle `Enable Item Icon In Shops`. |
 | `/xa skipcutscenes on/off` | Toggle `Skip Cutscenes`. |
 | `/xa skipdialogue on/off` | Toggle `Skip Dialogue`. |
 | `/xa targetfix on/off` | Toggle `Fix /target Command`. |
+| `/xa timestampseconds on/off` | Toggle `Custom Timestamp Format` for chat timestamp seconds. |
+| `/xa titlemovie on/off` | Toggle `Disable Title Screen Movie`. |
 
 ### Graphic Mods
 
@@ -99,7 +116,8 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa bgpause on/off` | Toggle `Disable Background Rendering`. |
 | `/xa customres on/off` | Toggle `Custom Resolutions`. |
 | `/xa hideobjects on/off` | Toggle `Hide Game Objects`. |
-| `/xa lowres <scale>` | Set `Low Resolution` scale while `Low Resolution` is already enabled. |
+| `/xa lowres on` | Enable `Low Resolution` with the saved panel scale. |
+| `/xa lowres <scale>` | Set and enable `Low Resolution` scale. |
 | `/xa lowres off` | Disable `Low Resolution` after forcing the live 3D resolution scale to render once at `1.00` without changing the saved slider value. |
 | `/xa minwindow on/off` | Toggle `Ignore Minimum Window Size`; when enabled XA lowers the live minimum to `250x200`, corrects undersized restore or maximize results after the window changes, and when disabled XA restores the normal game minimum floor even if `Custom Resolutions` remains enabled. |
 | `/xa res <width>x<height>` | Apply a custom client resolution at or above the guarded `250x200` floor. |
@@ -113,6 +131,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | Command | Purpose |
 | --- | --- |
 | `/xa antiafk on/off` | Toggle `Anti-AFK`; while enabled XA refreshes the local AFK timer every 2 minutes. |
+| `/xa dutycommence on/off` | Toggle `Auto Duty Commence`. |
 | `/xa equip <itemId>` | Equip an item by ID. |
 | `/xa doze` | Trigger Doze Anywhere while `Doze & Sit Anywhere` is enabled. |
 | `/xa expertdelivery on/off` | Toggle `Automate Expert Delivery`. |
@@ -135,6 +154,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | Command | Purpose |
 | --- | --- |
 | `/xa peepingtom on/off` | Toggle `Force PeepingTom`. |
+| `/xa teleporthelper on/off` | Toggle `Teleport Helper`; the default No response rejects aetheryte-ticket teleport prompts. |
 | `/xa anonchars on/off` | Toggle `Anonymize Character Lists`. |
 | `/xa pluginrestore` | Disable the current Plugin Mods toggles. |
 

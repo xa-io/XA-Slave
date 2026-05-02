@@ -21,7 +21,7 @@ public static class GameMath
 
     /// <summary>
     /// Calculates ring distance from positions and hitbox radii directly.
-    /// Use when you already have the raw values (e.g., inside RunOnFrameworkThread lambdas).
+    /// Use when you already have the raw values (e.g., inside IFramework.Run lambdas).
     /// </summary>
     public static float RingDistance(Vector3 posA, float hitboxA, Vector3 posB, float hitboxB)
     {

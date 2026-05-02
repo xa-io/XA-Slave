@@ -5,6 +5,7 @@ using Dalamud.Game.ClientState.Objects.Types;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using FFXIVClientStructs.FFXIV.Client.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using CSGameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
@@ -590,6 +591,48 @@ public static class AddonHelper
     }
 
     /// <summary>
+    /// Sends an agent event with integer arguments.
+    /// Useful for UI flows routed through an Agent instead of an addon callback.
+    /// </summary>
+    public static unsafe bool SendAgentEvent(AgentId agentId, params int[] values)
+    {
+        try
+        {
+            var agentModule = AgentModule.Instance();
+            if (agentModule == null)
+                return false;
+
+            var agent = agentModule->GetAgentByInternalId(agentId);
+            if (agent == null)
+                return false;
+
+            var result = stackalloc AtkValue[1];
+            result[0] = default;
+
+            AtkValue* eventValues = null;
+            if (values.Length > 0)
+            {
+                var allocatedValues = stackalloc AtkValue[values.Length];
+                eventValues = allocatedValues;
+                for (var index = 0; index < values.Length; index++)
+                {
+                    eventValues[index] = default;
+                    eventValues[index].Type = AtkValueType.Int;
+                    eventValues[index].Int = values[index];
+                }
+            }
+
+            agent->ReceiveEvent(result, eventValues, (uint)values.Length, 0);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "[XASlave] AddonHelper.SendAgentEvent failed for {AgentId}.", agentId);
+            return false;
+        }
+    }
+
+    /// <summary>
     /// Fires a callback on the named addon with a "true" first argument + int second argument.
     /// In SND's callbackXA("AddonName true 12"), "true" is the updateState flag - it tells
     /// SND to close/update the addon after firing. The actual callback values sent are just the
@@ -700,6 +743,35 @@ public static class AddonHelper
             Plugin.Log.Error($"[XASlave] AddonHelper.ClickAddonButton error on '{addonName}' node {nodeListIndex}: {ex.Message}");
             return false;
         }
+    }
+
+    public static unsafe bool ClickResNode(AtkUnitBase* addon, AtkResNode* node)
+    {
+        if (addon == null || node == null)
+            return false;
+
+        try
+        {
+            var evt = node->AtkEventManager.Event;
+            if (evt == null)
+                return false;
+
+            addon->ReceiveEvent((AtkEventType)25, (int)evt->Param, evt);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "[XASlave] AddonHelper.ClickResNode failed.");
+            return false;
+        }
+    }
+
+    public static unsafe bool ClickComponent(AtkUnitBase* addon, AtkComponentBase* component)
+    {
+        if (component == null)
+            return false;
+
+        return ClickResNode(addon, (AtkResNode*)component->OwnerNode);
     }
 
     /// <summary>

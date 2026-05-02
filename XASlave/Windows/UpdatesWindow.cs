@@ -23,6 +23,45 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.30 - 2026-05-02",
+            Lines =
+            [
+                "Release Delta",
+                "- Update History and release notes were reconciled against the changelog entries after v0.0.0.29",
+                "",
+                "Dalamud API 15",
+                "- Backend debugger and task helpers now use Dalamud's API 15 IFramework.Run path",
+                "- Infinite Sprint status checks now use API 15 uint status IDs",
+                "",
+                "Game Mods",
+                "- Added `Disable Title Screen Movie` with `/xa titlemovie on|off`",
+                "- `Disable Title Screen Movie` keeps the title-screen lobby idle timer reset so the idle intro movie does not start",
+                "- Added `Auto Display IDs` with `/xa displayids on|off` for item, action, target, weather, zone, and map IDs",
+                "- `Auto Display IDs` owns item tooltip IDs, action IDs, target/weather IDs, and optional zone/map DTR output; disabling the master toggle disables its tooltip hook and subsettings",
+                "- Added `Custom Timestamp Format` with `/xa timestampseconds on|off`",
+                "- `Custom Timestamp Format` formats chat timestamps as `[HH:mm:ss]` by default and avoids preview work until chat requests timestamp text",
+                "- Added `Better Inventory Mover` with a configurable Shift/Ctrl/Alt quick-move modifier and destination-aware context-menu moves",
+                "- Added `Better Company Chest` with default-page, right-click store/recover, quantity prompt confirmation, and exchangeable-item gil-value display support",
+                "- `Better Company Chest` now handles Free Company Chest context-menu withdrawals and prompt confirmation more reliably",
+                "- Added `Auto Open Moogle Mail` with Letter List Take all, Delete all, Delete NPC, Request delivery, and Stop overlay actions",
+                "- `Auto Open Moogle Mail` handles letter opening, attachment claiming, confirmation handling, viewer close, and cleanup deletes more safely.",
+                "- Added `Enable Item Icon In Shops` with `/xa shopicons on|off`",
+                "- Added `Field Operations Entry Command` with `/xa fe <entry>` for Eureka entries through Pier #1 and Rodney routing",
+                "",
+                "Player Mods",
+                "- Added `Auto Duty Commence` with `/xa dutycommence on|off`",
+                "",
+                "Plugin Mods",
+                "- Added `Teleport Helper` with `/xa teleporthelper on|off`",
+                "- `Teleport Helper` monitors the aetheryte-ticket `SelectYesNo` teleport prompt directly, defaults to No to reject ticket usage, and can be configured to choose Yes instead",
+                "- The ticket helper no longer depends on plugin busy-state gating and now uses final Teleport Helper naming",
+                "",
+                "Commands",
+                "- `/xa lowres on` now restores the saved Low Resolution slider value and `/xa lowres <scale>` sets and enables the feature from chat",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.29 - 2026-05-01",
             Lines =
             [

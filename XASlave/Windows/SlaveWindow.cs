@@ -1706,7 +1706,7 @@ public partial class SlaveWindow : Window, IDisposable
             ImGui.SameLine();
         if (ImGui.Button("Update History"))
             plugin.UpdatesWindow.Toggle();
-            
+
         ImGui.Separator();
         ImGui.PushTextWrapPos(0f);
         ImGui.Text("XA Slave is still in a very early phase. Expect ongoing changes, new automation surfaces, and many months of additional features.");

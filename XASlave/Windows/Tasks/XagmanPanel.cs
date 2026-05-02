@@ -1646,7 +1646,7 @@ public partial class SlaveWindow
 
     private System.Threading.Tasks.Task RunXagmanPeerUiActionAsync(System.Action action)
     {
-        return Plugin.Framework.RunOnFrameworkThread(action);
+        return Plugin.Framework.Run(action);
     }
 
     private System.Threading.Tasks.Task AddXagmanPeerLogAsync(string message)
@@ -1845,7 +1845,7 @@ public partial class SlaveWindow
         try
         {
             // Schedule on main thread to avoid "Not on main thread!" error
-            Plugin.Framework.RunOnFrameworkThread(() =>
+            Plugin.Framework.Run(() =>
             {
                 try
                 {
@@ -1923,7 +1923,7 @@ public partial class SlaveWindow
         try
         {
             // Schedule on main thread to avoid thread issues
-            Plugin.Framework.RunOnFrameworkThread(() =>
+            Plugin.Framework.Run(() =>
             {
                 try
                 {
@@ -1951,7 +1951,7 @@ public partial class SlaveWindow
     {
         try
         {
-            Plugin.Framework.RunOnFrameworkThread(() =>
+            Plugin.Framework.Run(() =>
             {
                 try
                 {
@@ -1974,7 +1974,7 @@ public partial class SlaveWindow
     {
         try
         {
-            Plugin.Framework.RunOnFrameworkThread(() =>
+            Plugin.Framework.Run(() =>
             {
                 try
                 {
@@ -3125,7 +3125,7 @@ public partial class SlaveWindow
             try
             {
                 await System.Threading.Tasks.Task.Delay(delayMs).ConfigureAwait(false);
-                await Plugin.Framework.RunOnFrameworkThread(() => FinalizeXagmanLocalShutdown(reason, disconnectBeforeStop)).ConfigureAwait(false);
+                await Plugin.Framework.Run(() => FinalizeXagmanLocalShutdown(reason, disconnectBeforeStop)).ConfigureAwait(false);
             }
             catch
             {

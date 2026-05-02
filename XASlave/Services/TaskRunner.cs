@@ -321,7 +321,7 @@ public sealed class TaskRunner : IDisposable
                 var completed = CompletedItems;
                 var total = TotalItems;
                 var failCount = FailedCharacters.Count;
-                framework.RunOnFrameworkThread(() =>
+                framework.Run(() =>
                 {
                     var msg = failCount > 0
                         ? $"XA Slave: {taskName} complete ({completed}/{total}, {failCount} failed)"

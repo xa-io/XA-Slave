@@ -33,20 +33,29 @@ public partial class SlaveWindow
     private static readonly CommandReferenceEntry[] GameModsCommandEntries =
     {
         new("/xa anonymous on|off", "Toggle `Live Anonymous Mode`.", "Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases."),
+        new("/xa companychest on|off", "Toggle `Better Company Chest`.", "Adds FC chest page defaults, right-click quick move, prompt confirmation, and panel value tracking."),
         new("/xa chocobocutscene on|off", "Toggle `Skip Cutscenes Feeding Chocobo`.", "Only affects the companion-feeding cutscene surface."),
         new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "Auto-confirms supported disconnect and stuck-logout lobby Dialogue popups."),
         new("/xa copyitemname on|off", "Toggle `Copy Item Name For All`.", "Adds XA item-name copy actions to supported context menus."),
+        new("/xa displayids on|off", "Toggle `Auto Display IDs`.", "Shows selected item, action, target, weather, zone, and map IDs on supported UI surfaces."),
+        new("/xa fe <entry>", "Run `Field Operations Entry Command`.", "Queues a supported Eureka entry: Anemos, Pagos, Pyros, or Hydatos."),
+        new("/xa fieldentrycommand on|off", "Toggle `Field Operations Entry Command`.", "Arms or disarms the field-entry command runner used by `/xa fe`."),
         new("/xa gamerestore", "Disable the current top-level Game Mods toggles.", "Turns off the current Game Mods section in one command."),
         new("/xa hidepopups on|off", "Toggle `Hide Unnecessary Popups`.", "Closes supported tutorial and recommendation popups."),
+        new("/xa inventorymover on|off", "Toggle `Better Inventory Mover`.", "Hold the configured modifier while right-clicking for the first available move, or use the added destination-aware context-menu moves."),
         new("/xa logincooldown on|off", "Toggle `Cancel Login Cooldown`.", "Clears the local temporary character-select cooldown."),
+        new("/xa mooglemail on|off", "Toggle `Auto Open Moogle Mail`.", "Exposes Letter List mail cleanup actions."),
         new("/xa msqprogress on|off", "Toggle `Display MSQ Progress`.", "Expands Scenario Tree with remaining-count and completion details."),
         new("/xa multiinstance on|off", "Toggle `Allow Multiple Game Instances`.", "Also accepts `/xa multibox on|off` as an alias."),
         new("/xa playersearch on|off", "Toggle `Expanded Player Right-Click Menu Search`.", "Adds XA search-provider shortcuts to supported player context menus."),
         new("/xa preventlobbyexit on|off", "Toggle `Prevent Game Exiting From Lobby Errors`.", "Overrides the local forced-shutdown countdown for the supported lobby dialog."),
         new("/xa queueposition on|off", "Toggle `Display Actual Queue Position`.", "Shows queue position and ETA details when available."),
+        new("/xa shopicons on|off", "Toggle `Enable Item Icon In Shops`.", "Replaces supported shop-row placeholder icons with actual item icons after shop setup."),
         new("/xa skipcutscenes on|off", "Toggle `Skip Cutscenes`.", "Controls XA's main cutscene-skip surface."),
         new("/xa skipdialogue on|off", "Toggle `Skip Dialogue`.", "Auto-advances the `Talk` addon and the broader native talk surfaces when available."),
         new("/xa targetfix on|off", "Toggle `Fix /target Command`.", "Repairs failed `/target` name lookups by selecting the closest targetable matching actor."),
+        new("/xa timestampseconds on|off", "Toggle `Custom Timestamp Format`.", "Formats chat timestamps as `[HH:mm:ss]` by default so seconds are visible."),
+        new("/xa titlemovie on|off", "Toggle `Disable Title Screen Movie`.", "Keeps the title-screen idle movie timer reset while the lobby agent is active."),
     };
 
     private static readonly CommandReferenceEntry[] GraphicModsCommandEntries =
@@ -54,7 +63,8 @@ public partial class SlaveWindow
         new("/xa bgpause on|off", "Toggle `Disable Background Rendering`.", "Arms or disarms the DX11 and nameplate background-render pause hooks."),
         new("/xa customres on|off", "Toggle `Custom Resolutions`.", "Enables or disables XA's custom-resolution control surface."),
         new("/xa hideobjects on|off", "Toggle `Hide Game Objects`.", "Uses the XA object-hide seam with the current category filters plus the duty, island, and Occult Crescent options."),
-        new("/xa lowres <scale>", "Set `Low Resolution` scale from chat while it is already enabled.", "Accepts values from `0.01` to `1.00`, including inputs such as `1` and `0.01`. XA now refuses to arm the feature from chat if the XA Mods toggle is currently off."),
+        new("/xa lowres on", "Enable `Low Resolution`.", "Uses the saved panel scale."),
+        new("/xa lowres <scale>", "Set and enable `Low Resolution` scale from chat.", "Accepts values from `0.01` to `1.00`, including inputs such as `1` and `0.01`."),
         new("/xa lowres off", "Disable `Low Resolution`.", "Forces one live 3D scale `1.00` render pass, then turns off the forced low-resolution scale and restores the previous runtime upscale mode."),
         new("/xa minwindow on|off", "Toggle `Ignore Minimum Window Size`.", "Lowers or restores XA's guarded local minimum-size floor and corrects undersized restore or maximize results after the window changes."),
         new("/xa res <width>x<height>", "Apply a custom client resolution such as `/xa res 500x345`.", "Requires `Custom Resolutions` to be enabled in XA Mods."),
@@ -67,6 +77,7 @@ public partial class SlaveWindow
     private static readonly CommandReferenceEntry[] PlayerModsCommandEntries =
     {
         new("/xa antiafk on|off", "Toggle `Anti-AFK`.", "Resets the local AFK timer roughly every 2 minutes while the mod stays enabled so the client stays ahead of the game's 10-minute AFK kick."),
+        new("/xa dutycommence on|off", "Toggle `Auto Duty Commence`.", "Automatically confirms standard Contents Finder commence prompts."),
         new("/xa equip <itemId>", "Equip an item by ID.", "XA scans the main inventory and armory chest, then queues the matching equip move to the correct slot."),
         new("/xa doze", "Trigger Doze Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
         new("/xa expertdelivery on|off", "Toggle `Automate Expert Delivery`.", "Controls the hand-in automation feature, not the unlock bypass."),
@@ -88,8 +99,9 @@ public partial class SlaveWindow
     private static readonly CommandReferenceEntry[] PluginModsCommandEntries =
     {
         new("/xa anonchars on|off", "Toggle `Anonymize Character Lists`.", "Forces screenshot-safe aliases in XA Slave character-list tables and duplicate summaries. Every task-list `Anonymize` checkbox writes to this same shared global setting, and it can also be exposed through titlebar favourites because it is a normal XA Mod."),
+        new("/xa teleporthelper on|off", "Toggle `Teleport Helper`.", "XA selects the configured Yes/No response when `SelectYesNo` asks about using an aetheryte ticket; the default No response rejects ticket usage."),
         new("/xa peepingtom on|off", "Toggle `Force PeepingTom`.", "Controls XA's runtime PvP forcing path for PeepingTom."),
-        new("/xa pluginrestore", "Disable the current top-level Plugin Mods toggles.", "Covers XA's plugin-scoped toggles such as `Anonymize Character Lists` and `Force PeepingTom`."),
+        new("/xa pluginrestore", "Disable the current top-level Plugin Mods toggles.", "Covers XA's plugin-scoped toggles such as `Anonymize Character Lists`, `Teleport Helper`, and `Force PeepingTom`."),
     };
 
     private static readonly CommandReferenceEntry[] EurekaModsCommandEntries =

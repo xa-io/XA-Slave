@@ -117,6 +117,9 @@ public sealed class Plugin : IDalamudPlugin
     public LobbyErrorAutoCloseService LobbyErrorAutoClose { get; init; }
     public QueuePositionDisplayService QueuePositionDisplay { get; init; }
     public MsqProgressDisplayService MsqProgressDisplay { get; init; }
+    public TooltipItemIdService TooltipItemId { get; init; }
+    public AutoDisplayIdsService AutoDisplayIds { get; init; }
+    public ChatTimestampFormatService ChatTimestampFormat { get; init; }
     public AutoHideGameObjectsService AutoHideGameObjects { get; init; }
     public DialogueSkipService DialogueSkip { get; init; }
     public CopyItemNameContextMenuService CopyItemNameContextMenu { get; init; }
@@ -128,7 +131,13 @@ public sealed class Plugin : IDalamudPlugin
     public AutoRefuseTradeService AutoRefuseTrade { get; init; }
     public TargetCommandFixService TargetCommandFix { get; init; }
     public AntiAfkService AntiAfk { get; init; }
+    public AutoDutyCommenceService AutoDutyCommence { get; init; }
     public AutoLeaveDutyService AutoLeaveDuty { get; init; }
+    public BetterInventoryMoverService BetterInventoryMover { get; init; }
+    public BetterCompanyChestService BetterCompanyChest { get; init; }
+    public AutoOpenMoogleMailService AutoOpenMoogleMail { get; init; }
+    public EnableItemIconInShopsService EnableItemIconInShops { get; init; }
+    public FieldEntryCommandService FieldEntryCommand { get; init; }
     public EurekaInstanceIdService EurekaInstanceId { get; init; }
     public EurekaLogogramCreatorService EurekaLogogramCreator { get; init; }
     public AutoMergeService AutoMerge { get; init; }
@@ -141,6 +150,7 @@ public sealed class Plugin : IDalamudPlugin
     public EscMenuBailoutService EscMenuBailout { get; init; }
     public XAPeepService XAPeep { get; init; }
     public PeepingTomIntegrationService PeepingTomIntegration { get; init; }
+    public TeleportHelperService TeleportHelper { get; init; }
     public ArPostProcessService ArPostProcessor { get; init; }
     public SlaveDatabaseService SlaveDatabase { get; init; }
     public XagmanPeerService XagmanPeers { get; private set; }
@@ -266,6 +276,9 @@ public sealed class Plugin : IDalamudPlugin
         LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Log);
         QueuePositionDisplay = new QueuePositionDisplayService(SigScanner, GameInterop, Log);
         MsqProgressDisplay = new MsqProgressDisplayService(AddonLifecycle, DataManager, Log);
+        TooltipItemId = new TooltipItemIdService(AddonLifecycle, GameGui, SigScanner, GameInterop, Log);
+        AutoDisplayIds = new AutoDisplayIdsService(AddonLifecycle, Framework, ClientState, DataManager, TargetManager, DtrBar, Log);
+        ChatTimestampFormat = new ChatTimestampFormatService(SigScanner, GameInterop, Log);
         AutoHideGameObjects = new AutoHideGameObjectsService(Framework, ClientState, Condition, TargetManager, SigScanner, GameInterop, Log);
         DialogueSkip = new DialogueSkipService(AddonLifecycle, SigScanner, GameInterop, Log);
         CopyItemNameContextMenu = new CopyItemNameContextMenuService(ContextMenu, DataManager, Log);
@@ -278,7 +291,13 @@ public sealed class Plugin : IDalamudPlugin
         AutoRefuseTrade = new AutoRefuseTradeService(SigScanner, GameInterop, Log);
         TargetCommandFix = new TargetCommandFixService(ChatGui, Log);
         AntiAfk = new AntiAfkService(Framework, ClientState, Log);
+        AutoDutyCommence = new AutoDutyCommenceService(AddonLifecycle, Log);
         AutoLeaveDuty = new AutoLeaveDutyService(DutyState, ClientState, PlayerState, Condition, Framework, Log);
+        BetterInventoryMover = new BetterInventoryMoverService(ContextMenu, DataManager, Log);
+        BetterCompanyChest = new BetterCompanyChestService(AddonLifecycle, ContextMenu, DataManager, Log);
+        AutoOpenMoogleMail = new AutoOpenMoogleMailService(Framework, Log);
+        EnableItemIconInShops = new EnableItemIconInShopsService(AddonLifecycle, DataManager, Log);
+        FieldEntryCommand = new FieldEntryCommandService(Framework, DataManager, ClientState, IpcClient, Log);
         EurekaInstanceId = new EurekaInstanceIdService(Configuration, ClientState, PlayerState, Condition, Framework, Log, DtrBar);
         EurekaLogogramCreator = new EurekaLogogramCreatorService(Configuration);
         AutoMerge = new AutoMergeService(AddonLifecycle, Framework, ClientState, Condition, DataManager, Log);
@@ -291,6 +310,7 @@ public sealed class Plugin : IDalamudPlugin
         EscMenuBailout = new EscMenuBailoutService(Framework, Log);
         XAPeep = new XAPeepService(Framework, ClientState, Condition, ObjectTable, GameGui, Log, SlaveDatabase, Configuration);
         PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, Log);
+        TeleportHelper = new TeleportHelperService(Framework, ClientState, PlayerState, Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
         XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubAddress, Configuration.XagmanHubPort, _ => { });
         if (Configuration.XagmanPeerConnectionsEnabled)
@@ -323,9 +343,19 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.LowResolutionScale = normalizedLowResolutionScale;
             Configuration.Save();
         }
+        var normalizedCustomTimestampFormat = ChatTimestampFormatService.NormalizeFormat(Configuration.CustomTimestampFormat);
+        if (!string.Equals(Configuration.CustomTimestampFormat, normalizedCustomTimestampFormat, StringComparison.Ordinal))
+        {
+            Configuration.CustomTimestampFormat = normalizedCustomTimestampFormat;
+            Configuration.Save();
+        }
+        ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
+        ApplyAutoDisplayIdsConfiguration(save: false);
+        ApplyBetterCompanyChestConfiguration(save: false);
         DozeSitAnywhere.ApplyConfiguration(
             Configuration.DozeSitAnywhereAllowDoze,
             Configuration.DozeSitAnywhereAllowSit);
+        TeleportHelper.ApplyConfiguration(Configuration.TeleportHelperSelectYes);
         QueueDeferredStartupAction(() =>
         {
             if (Configuration.AutoAllowMultipleGameInstancesEnabled && !SystemWindowMods.SetAllowMultipleGameInstancesEnabled(true))
@@ -347,6 +377,39 @@ public sealed class Plugin : IDalamudPlugin
             if (Configuration.AutoDisplayMsqProgressEnabled && !MsqProgressDisplay.SetEnabled(true))
             {
                 Configuration.AutoDisplayMsqProgressEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("DisableTitleScreenMovieEnabled", () =>
+        {
+            if (Configuration.DisableTitleScreenMovieEnabled && !SystemWindowMods.SetDisableTitleScreenMovieEnabled(true))
+            {
+                Configuration.DisableTitleScreenMovieEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoDisplayIdsEnabled", () =>
+        {
+            if (!Configuration.AutoDisplayIdsEnabled)
+            {
+                Configuration.ShowItemIdEnabled = false;
+                TooltipItemId.SetEnabled(false);
+                return;
+            }
+
+            ApplyStoredXAModConfiguration("auto-display-ids");
+            if (!AutoDisplayIds.SetEnabled(true))
+            {
+                Configuration.AutoDisplayIdsEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("CustomTimestampFormatEnabled", () =>
+        {
+            ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
+            if (Configuration.CustomTimestampFormatEnabled && !ChatTimestampFormat.SetEnabled(true))
+            {
+                Configuration.CustomTimestampFormatEnabled = false;
                 Configuration.Save();
             }
         });
@@ -500,6 +563,55 @@ public sealed class Plugin : IDalamudPlugin
         });
         QueueDeferredStartupAction(() =>
         {
+            ApplyStoredXAModConfiguration("better-inventory-mover");
+            if (Configuration.BetterInventoryMoverEnabled && !BetterInventoryMover.SetEnabled(true))
+            {
+                Configuration.BetterInventoryMoverEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.BetterCompanyChestEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("better-company-chest");
+            if (!BetterCompanyChest.SetEnabled(true))
+            {
+                Configuration.BetterCompanyChestEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.AutoOpenMoogleMailEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("auto-open-moogle-mail");
+            if (!AutoOpenMoogleMail.SetEnabled(true))
+            {
+                Configuration.AutoOpenMoogleMailEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.EnableItemIconInShopsEnabled && !EnableItemIconInShops.SetEnabled(true))
+            {
+                Configuration.EnableItemIconInShopsEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.FieldEntryCommandEnabled && !FieldEntryCommand.SetEnabled(true))
+            {
+                Configuration.FieldEntryCommandEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
             if (!Configuration.AutoUnlockExpertDeliveryEnabled)
                 return;
 
@@ -515,6 +627,14 @@ public sealed class Plugin : IDalamudPlugin
             if (Configuration.AntiAfkEnabled && !AntiAfk.SetEnabled(true))
             {
                 Configuration.AntiAfkEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.AutoDutyCommenceEnabled && !AutoDutyCommence.SetEnabled(true))
+            {
+                Configuration.AutoDutyCommenceEnabled = false;
                 Configuration.Save();
             }
         });
@@ -703,6 +823,18 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
+        QueueDeferredStartupAction("TeleportHelperEnabled", () =>
+        {
+            if (!Configuration.TeleportHelperEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("teleport-helper");
+            if (!TeleportHelper.SetEnabled(true))
+            {
+                Configuration.TeleportHelperEnabled = false;
+                Configuration.Save();
+            }
+        });
 
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
@@ -754,11 +886,13 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
+            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, fe, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
         });
 
         PluginInterface.UiBuilder.Draw += UpdateEurekaLogogramCreatorOverlayWindows;
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
+        PluginInterface.UiBuilder.Draw += BetterCompanyChest.DrawOverlay;
+        PluginInterface.UiBuilder.Draw += AutoOpenMoogleMail.DrawOverlay;
         PluginInterface.UiBuilder.Draw += XAPeep.DrawOverlay;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleMainUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
@@ -860,6 +994,9 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Auto Skip Cutscenes", Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.StatusText);
         yield return CreateStartupSurfaceStatus("Prevent Lobby Exit", Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.PreventLobbyExitStatusText);
         yield return CreateStartupSurfaceStatus("Queue Position Display", Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.StatusText);
+        yield return CreateStartupSurfaceStatus("Disable Title Screen Movie", Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.DisableTitleScreenMovieStatusText);
+        yield return CreateStartupSurfaceStatus("Auto Display IDs", Configuration.AutoDisplayIdsEnabled, AutoDisplayIds.StatusText);
+        yield return CreateStartupSurfaceStatus("Custom Timestamp Format", Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.StatusText);
         yield return CreateStartupSurfaceStatus("Auto Hide Game Objects", Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.StatusText);
         yield return CreateStartupSurfaceStatus("Skip Dialogue", Configuration.AutoSkipDialogueEnabled, DialogueSkip.StatusText);
         yield return CreateStartupSurfaceStatus("Background Rendering Pause", Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.DisableBackgroundRenderingStatusText);
@@ -867,11 +1004,18 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Instant Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText);
         yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText);
         yield return CreateStartupSurfaceStatus("Fix /target Command", Configuration.TargetCommandFixEnabled, TargetCommandFix.StatusText);
+        yield return CreateStartupSurfaceStatus("Better Inventory Mover", Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.StatusText);
+        yield return CreateStartupSurfaceStatus("Better Company Chest", Configuration.BetterCompanyChestEnabled, BetterCompanyChest.StatusText);
+        yield return CreateStartupSurfaceStatus("Auto Open Moogle Mail", Configuration.AutoOpenMoogleMailEnabled, AutoOpenMoogleMail.StatusText);
+        yield return CreateStartupSurfaceStatus("Enable Item Icon In Shops", Configuration.EnableItemIconInShopsEnabled, EnableItemIconInShops.StatusText);
+        yield return CreateStartupSurfaceStatus("Field Operations Entry Command", Configuration.FieldEntryCommandEnabled, FieldEntryCommand.StatusText);
         yield return CreateStartupSurfaceStatus("Reveal Undiscovered Areas", Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.RevealUndiscoveredAreasStatusText);
         yield return CreateStartupSurfaceStatus("Special Render Modes", Configuration.SpecialRenderModesEnabled, SystemWindowMods.SpecialRenderModesStatusText);
         yield return CreateStartupSurfaceStatus("Doze & Sit Anywhere", Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.StatusText);
+        yield return CreateStartupSurfaceStatus("Auto Duty Commence", Configuration.AutoDutyCommenceEnabled, AutoDutyCommence.StatusText);
         yield return CreateStartupSurfaceStatus("Infinite Sprint", Configuration.InfiniteSprintEnabled, PlayerMods.InfiniteSprintStatusText);
         yield return CreateStartupSurfaceStatus("Instant Logout", Configuration.InstantLogoutEnabled, InstantLogout.StatusText);
+        yield return CreateStartupSurfaceStatus("Teleport Helper", Configuration.TeleportHelperEnabled, TeleportHelper.StatusText);
         yield return CreateStartupSurfaceStatus("Unlock Expert Delivery", Configuration.UnlockExpertDeliveryEnabled, ExpertDeliveryUnlock.StatusText);
         yield return CreateStartupSurfaceStatus("Moveable After Death", Configuration.MoveableAfterDeathEnabled, PlayerMods.MoveableAfterDeathStatusText);
     }
@@ -910,6 +1054,8 @@ public sealed class Plugin : IDalamudPlugin
         // Detach public-facing callbacks first so a reload cannot re-enter partially disposed UI or services.
         TryCleanup("UiBuilder.Draw -= UpdateEurekaLogogramCreatorOverlayWindows", () => PluginInterface.UiBuilder.Draw -= UpdateEurekaLogogramCreatorOverlayWindows);
         TryCleanup("UiBuilder.Draw -= WindowSystem.Draw", () => PluginInterface.UiBuilder.Draw -= WindowSystem.Draw);
+        TryCleanup("UiBuilder.Draw -= BetterCompanyChest.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterCompanyChest.DrawOverlay);
+        TryCleanup("UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay);
         TryCleanup("UiBuilder.Draw -= XAPeep.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= XAPeep.DrawOverlay);
         TryCleanup("UiBuilder.OpenConfigUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainUi);
         TryCleanup("UiBuilder.OpenMainUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi);
@@ -930,6 +1076,9 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("LobbyErrorAutoClose", LobbyErrorAutoClose);
         TryDispose("QueuePositionDisplay", QueuePositionDisplay);
         TryDispose("MsqProgressDisplay", MsqProgressDisplay);
+        TryDispose("TooltipItemId", TooltipItemId);
+        TryDispose("AutoDisplayIds", AutoDisplayIds);
+        TryDispose("ChatTimestampFormat", ChatTimestampFormat);
         TryDispose("AutoHideGameObjects", AutoHideGameObjects);
         TryDispose("DialogueSkip", DialogueSkip);
         TryDispose("CopyItemNameContextMenu", CopyItemNameContextMenu);
@@ -941,7 +1090,13 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoRefuseTrade", AutoRefuseTrade);
         TryDispose("TargetCommandFix", TargetCommandFix);
         TryDispose("AntiAfk", AntiAfk);
+        TryDispose("AutoDutyCommence", AutoDutyCommence);
         TryDispose("AutoLeaveDuty", AutoLeaveDuty);
+        TryDispose("BetterInventoryMover", BetterInventoryMover);
+        TryDispose("BetterCompanyChest", BetterCompanyChest);
+        TryDispose("AutoOpenMoogleMail", AutoOpenMoogleMail);
+        TryDispose("EnableItemIconInShops", EnableItemIconInShops);
+        TryDispose("FieldEntryCommand", FieldEntryCommand);
         TryDispose("EurekaInstanceId", EurekaInstanceId);
         TryDispose("EurekaLogogramCreator", EurekaLogogramCreator);
         TryDispose("AutoMerge", AutoMerge);
@@ -954,6 +1109,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("EscMenuBailout", EscMenuBailout);
         TryDispose("XAPeep", XAPeep);
         TryDispose("PeepingTomIntegration", PeepingTomIntegration);
+        TryDispose("TeleportHelper", TeleportHelper);
         TryDispose("ArPostProcessor", ArPostProcessor);
         TryDispose("WindowRenamer", WindowRenamer);
         TryDispose("IpcProvider", IpcProvider);
@@ -1102,6 +1258,12 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (IsFieldEntrySubcommand(subcommand))
+        {
+            PrintCommandResult(TryStartFieldEntryCommand(subcommandArgs, out var message), message);
+            return;
+        }
+
         if (subcommand.Equals("commands", StringComparison.OrdinalIgnoreCase))
         {
             SlaveWindow.OpenCommandsReferenceTask();
@@ -1117,6 +1279,12 @@ public sealed class Plugin : IDalamudPlugin
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(TryHandleXAPeepCommand(subcommandArgs, out var message), message);
+            return;
+        }
+
+        if (subcommand.Equals("mail", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(TryOpenMoogleMailCommand(subcommandArgs, out var message), message);
             return;
         }
 
@@ -1229,6 +1397,37 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.PrintError("[XASlave] That is not a command, please read `/xa commands`.");
     }
 
+    private bool TryStartFieldEntryCommand(string arguments, out string message)
+    {
+        var value = arguments.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            message = FieldEntryCommand.BuildUsageText();
+            return false;
+        }
+
+        var started = FieldEntryCommand.TryStart(value);
+        message = !started && FieldEntryCommand.StatusText.StartsWith("Unavailable", StringComparison.OrdinalIgnoreCase)
+            ? FieldEntryCommand.StatusText
+            : FieldEntryCommand.LastActionText;
+        return started;
+    }
+
+    private bool TryOpenMoogleMailCommand(string arguments, out string message)
+    {
+        if (!string.IsNullOrWhiteSpace(arguments))
+        {
+            message = "Usage: /xa mail.";
+            return false;
+        }
+
+        var opened = AutoOpenMoogleMail.TryOpenLetterListFromCommand();
+        message = opened
+            ? "Opened Moogle Mail."
+            : AutoOpenMoogleMail.LastActionText.Replace("Last action: ", string.Empty, StringComparison.Ordinal);
+        return opened;
+    }
+
     public bool TryExecuteXaCommandFromIpc(string rawCommand, out string message)
     {
         var trimmed = NormalizeXaCommandInput(rawCommand);
@@ -1249,6 +1448,9 @@ public sealed class Plugin : IDalamudPlugin
             return true;
         }
 
+        if (IsFieldEntrySubcommand(subcommand))
+            return TryStartFieldEntryCommand(subcommandArgs, out message);
+
         if (subcommand.Equals("commands", StringComparison.OrdinalIgnoreCase))
         {
             SlaveWindow.OpenCommandsReferenceTask();
@@ -1258,6 +1460,9 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
             return TryHandleXAPeepCommand(subcommandArgs, out message);
+
+        if (subcommand.Equals("mail", StringComparison.OrdinalIgnoreCase))
+            return TryOpenMoogleMailCommand(subcommandArgs, out message);
 
         if (subcommand.Equals("db", StringComparison.OrdinalIgnoreCase))
             return DropboxQueue.TryExecute(subcommandArgs, out message);
@@ -1382,7 +1587,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private bool TryApplyLowResolutionCommand(string value, out string message)
     {
-        if (value.Equals("off", StringComparison.OrdinalIgnoreCase))
+        if (IsExplicitLowResolutionOff(value))
         {
             SystemWindowMods.SetLowResolutionEnabled(false);
             Configuration.LowResolutionEnabled = false;
@@ -1391,20 +1596,46 @@ public sealed class Plugin : IDalamudPlugin
             return true;
         }
 
+        if (IsExplicitLowResolutionOn(value))
+        {
+            Configuration.LowResolutionScale = SystemWindowModsService.ClampLowResolutionScale(Configuration.LowResolutionScale);
+            return SetXAModEnabled(GetXAModDefinition("low-resolution"), true, out message);
+        }
+
         if (!TryParseLowResolutionCommand(value, out var scale, out message))
             return false;
 
+        Configuration.LowResolutionScale = scale;
         if (!Configuration.LowResolutionEnabled)
         {
-            message = "Enable `Low Resolution` in XA Mods first.";
-            return false;
+            if (!SetXAModEnabled(GetXAModDefinition("low-resolution"), true, out message))
+                return false;
+
+            message = $"Low Resolution enabled and scale set to {scale:0.00}.";
+            return true;
         }
 
-        Configuration.LowResolutionScale = scale;
         SystemWindowMods.ApplyLowResolutionConfiguration(scale);
         Configuration.Save();
         message = $"Low Resolution scale set to {scale:0.00}.";
         return true;
+    }
+
+    private static bool IsExplicitLowResolutionOn(string value)
+    {
+        return value.Equals("on", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("enable", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("enabled", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("true", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsExplicitLowResolutionOff(string value)
+    {
+        return value.Equals("off", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("disable", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("disabled", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("false", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("0", StringComparison.OrdinalIgnoreCase);
     }
 
     private static bool TryParseLowResolutionCommand(string value, out float scale, out string message)
@@ -1412,13 +1643,13 @@ public sealed class Plugin : IDalamudPlugin
         scale = 0f;
         if (string.IsNullOrWhiteSpace(value))
         {
-            message = "Usage: /xa lowres <scale> or /xa lowres off.";
+            message = "Usage: /xa lowres on, /xa lowres <scale>, or /xa lowres off.";
             return false;
         }
 
         if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out scale))
         {
-            message = "Usage: /xa lowres <scale> or /xa lowres off.";
+            message = "Usage: /xa lowres on, /xa lowres <scale>, or /xa lowres off.";
             return false;
         }
 
@@ -1688,6 +1919,37 @@ public sealed class Plugin : IDalamudPlugin
                     Scale = Configuration.LowResolutionScale,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "custom-timestamp-format":
+                snapshot = JsonSerializer.SerializeToElement(new XAModCustomTimestampFormatSettings
+                {
+                    Format = Configuration.CustomTimestampFormat,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "auto-display-ids":
+                snapshot = JsonSerializer.SerializeToElement(new XAModAutoDisplayIdsSettings
+                {
+                    ShowItemId = Configuration.AutoDisplayIdsShowItemId,
+                    ShowActionId = Configuration.AutoDisplayIdsShowActionId,
+                    ShowTargetDataId = Configuration.AutoDisplayIdsShowTargetDataId,
+                    ShowWeatherId = Configuration.AutoDisplayIdsShowWeatherId,
+                    ShowZoneInfo = Configuration.AutoDisplayIdsShowZoneInfo,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "better-inventory-mover":
+                snapshot = JsonSerializer.SerializeToElement(new XAModBetterInventoryMoverSettings
+                {
+                    QuickMoveModifier = BetterInventoryMoverService.NormalizeModifier(Configuration.BetterInventoryMoverQuickMoveModifier).ToString(),
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "better-company-chest":
+                snapshot = JsonSerializer.SerializeToElement(new XAModBetterCompanyChestSettings
+                {
+                    DefaultPage = Configuration.BetterCompanyChestDefaultPage,
+                    QuickMoveEnabled = Configuration.BetterCompanyChestQuickMoveEnabled,
+                    AutoConfirmNumericInput = Configuration.BetterCompanyChestAutoConfirmNumericInput,
+                    ShowExchangeableValue = Configuration.BetterCompanyChestShowExchangeableValue,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "special-rendering-modes":
                 snapshot = JsonSerializer.SerializeToElement(new XAModSpecialRenderModesSettings
                 {
@@ -1772,6 +2034,12 @@ public sealed class Plugin : IDalamudPlugin
                     ShowNotification = Configuration.AutoRefuseTradeShowNotification,
                     SendEcho = Configuration.AutoRefuseTradeSendEcho,
                     ExtraCommands = Configuration.AutoRefuseTradeExtraCommands,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "teleport-helper":
+                snapshot = JsonSerializer.SerializeToElement(new XAModTeleportHelperSettings
+                {
+                    SelectYes = Configuration.TeleportHelperSelectYes,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
             case "custom-sight-distance":
@@ -1889,6 +2157,46 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.LowResolutionScale = SystemWindowModsService.ClampLowResolutionScale(lowResolutionSettings.Scale);
             if (Configuration.LowResolutionEnabled)
                 SystemWindowMods.ApplyLowResolutionConfiguration(Configuration.LowResolutionScale);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "custom-timestamp-format", out XAModCustomTimestampFormatSettings? timestampSettings)
+            && timestampSettings != null)
+        {
+            Configuration.CustomTimestampFormat = ChatTimestampFormatService.NormalizeFormat(timestampSettings.Format);
+            ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "auto-display-ids", out XAModAutoDisplayIdsSettings? autoDisplayIdsSettings)
+            && autoDisplayIdsSettings != null)
+        {
+            if (autoDisplayIdsSettings.ShowItemId.HasValue)
+                Configuration.AutoDisplayIdsShowItemId = autoDisplayIdsSettings.ShowItemId.Value;
+            Configuration.AutoDisplayIdsShowActionId = autoDisplayIdsSettings.ShowActionId;
+            Configuration.AutoDisplayIdsShowTargetDataId = autoDisplayIdsSettings.ShowTargetDataId;
+            Configuration.AutoDisplayIdsShowWeatherId = autoDisplayIdsSettings.ShowWeatherId;
+            Configuration.AutoDisplayIdsShowZoneInfo = autoDisplayIdsSettings.ShowZoneInfo;
+            ApplyAutoDisplayIdsConfiguration(save: false);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "better-inventory-mover", out XAModBetterInventoryMoverSettings? inventoryMoverSettings)
+            && inventoryMoverSettings != null)
+        {
+            Configuration.BetterInventoryMoverQuickMoveModifier = ParseBetterInventoryMoverModifier(inventoryMoverSettings.QuickMoveModifier);
+            ApplyBetterInventoryMoverConfiguration(save: false);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "better-company-chest", out XAModBetterCompanyChestSettings? companyChestSettings)
+            && companyChestSettings != null)
+        {
+            Configuration.BetterCompanyChestDefaultPage = Math.Clamp(companyChestSettings.DefaultPage, 0, 6);
+            Configuration.BetterCompanyChestQuickMoveEnabled = companyChestSettings.QuickMoveEnabled;
+            Configuration.BetterCompanyChestAutoConfirmNumericInput = companyChestSettings.AutoConfirmNumericInput;
+            Configuration.BetterCompanyChestShowExchangeableValue = companyChestSettings.ShowExchangeableValue;
+            BetterCompanyChest.ApplyConfiguration(
+                Configuration.BetterCompanyChestDefaultPage,
+                Configuration.BetterCompanyChestQuickMoveEnabled,
+                Configuration.BetterCompanyChestAutoConfirmNumericInput,
+                Configuration.BetterCompanyChestShowExchangeableValue);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "special-rendering-modes", out XAModSpecialRenderModesSettings? specialRenderSettings)
@@ -2029,6 +2337,14 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoRefuseTradeSendEcho,
                     Configuration.AutoRefuseTradeExtraCommands);
             }
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "teleport-helper", out XAModTeleportHelperSettings? teleportHelperSettings)
+            && teleportHelperSettings != null)
+        {
+            Configuration.TeleportHelperSelectYes = teleportHelperSettings.SelectYes;
+            if (Configuration.TeleportHelperEnabled)
+                TeleportHelper.ApplyConfiguration(Configuration.TeleportHelperSelectYes);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "custom-sight-distance", out XAModCustomSightDistanceSettings? sightDistanceSettings)
@@ -2620,6 +2936,63 @@ public sealed class Plugin : IDalamudPlugin
         return success;
     }
 
+    internal void ApplyAutoDisplayIdsConfiguration(bool save = true)
+    {
+        var itemIdsShouldRun = Configuration.AutoDisplayIdsEnabled && Configuration.AutoDisplayIdsShowItemId;
+        if (!itemIdsShouldRun)
+        {
+            TooltipItemId.SetEnabled(false);
+            Configuration.ShowItemIdEnabled = false;
+        }
+        else if (TooltipItemId.SetEnabled(true))
+        {
+            Configuration.ShowItemIdEnabled = true;
+        }
+        else
+        {
+            Configuration.ShowItemIdEnabled = false;
+        }
+
+        AutoDisplayIds.ApplyConfiguration(
+            Configuration.AutoDisplayIdsShowItemId,
+            Configuration.AutoDisplayIdsShowActionId,
+            Configuration.AutoDisplayIdsShowTargetDataId,
+            Configuration.AutoDisplayIdsShowWeatherId,
+            Configuration.AutoDisplayIdsShowZoneInfo);
+
+        if (save)
+            Configuration.Save();
+    }
+
+    internal void ApplyBetterInventoryMoverConfiguration(bool save = true)
+    {
+        Configuration.BetterInventoryMoverQuickMoveModifier = BetterInventoryMoverService.NormalizeModifier(Configuration.BetterInventoryMoverQuickMoveModifier);
+        BetterInventoryMover.ApplyConfiguration(Configuration.BetterInventoryMoverQuickMoveModifier);
+
+        if (save)
+            Configuration.Save();
+    }
+
+    private static BetterInventoryMoverModifierKey ParseBetterInventoryMoverModifier(string? value)
+    {
+        return Enum.TryParse<BetterInventoryMoverModifierKey>(value, true, out var modifier)
+            ? BetterInventoryMoverService.NormalizeModifier(modifier)
+            : BetterInventoryMoverModifierKey.LeftShift;
+    }
+
+    internal void ApplyBetterCompanyChestConfiguration(bool save = true)
+    {
+        Configuration.BetterCompanyChestDefaultPage = Math.Clamp(Configuration.BetterCompanyChestDefaultPage, 0, 6);
+        BetterCompanyChest.ApplyConfiguration(
+            Configuration.BetterCompanyChestDefaultPage,
+            Configuration.BetterCompanyChestQuickMoveEnabled,
+            Configuration.BetterCompanyChestAutoConfirmNumericInput,
+            Configuration.BetterCompanyChestShowExchangeableValue);
+
+        if (save)
+            Configuration.Save();
+    }
+
     public void DisableAllXAMods()
     {
         DisableXAModDefinitions(GetAllXAModDefinitions());
@@ -2699,6 +3072,19 @@ public sealed class Plugin : IDalamudPlugin
             case "auto-hide-unnecessary-popups":
                 PopupCleaner.ApplyConfiguration(Configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled);
                 break;
+            case "auto-display-ids":
+                ApplyAutoDisplayIdsConfiguration(save: false);
+                break;
+            case "better-inventory-mover":
+                ApplyBetterInventoryMoverConfiguration(save: false);
+                break;
+            case "better-company-chest":
+                ApplyBetterCompanyChestConfiguration(save: false);
+                break;
+            case "custom-timestamp-format":
+                Configuration.CustomTimestampFormat = ChatTimestampFormatService.NormalizeFormat(Configuration.CustomTimestampFormat);
+                ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
+                break;
             case "low-resolution":
                 SystemWindowMods.ApplyLowResolutionConfiguration(Configuration.LowResolutionScale);
                 break;
@@ -2735,6 +3121,9 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoRefuseTradeShowNotification,
                     Configuration.AutoRefuseTradeSendEcho,
                     Configuration.AutoRefuseTradeExtraCommands);
+                break;
+            case "teleport-helper":
+                TeleportHelper.ApplyConfiguration(Configuration.TeleportHelperSelectYes);
                 break;
             case "custom-sight-distance":
                 SightDistance.ApplyConfiguration(
@@ -2835,6 +3224,18 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("auto-allow-multiple-game-instances", "Allow Multiple Game Instances", XAModsRestoreScope.Game, () => Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.SetAllowMultipleGameInstancesEnabled, applied => Configuration.AutoAllowMultipleGameInstancesEnabled = applied, () => SystemWindowMods.AllowMultipleGameInstancesStatusText);
         yield return new("auto-cancel-login-cooldown", "Cancel Login Cooldown", XAModsRestoreScope.Game, () => Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.SetCancelLoginCooldownEnabled, applied => Configuration.AutoCancelLoginCooldownEnabled = applied, () => SystemWindowMods.CancelLoginCooldownStatusText);
         yield return new("auto-display-msq-progress", "Display MSQ Progress", XAModsRestoreScope.Game, () => Configuration.AutoDisplayMsqProgressEnabled, MsqProgressDisplay.SetEnabled, applied => Configuration.AutoDisplayMsqProgressEnabled = applied, () => MsqProgressDisplay.StatusText);
+        yield return new("disable-title-screen-movie", "Disable Title Screen Movie", XAModsRestoreScope.Game, () => Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.SetDisableTitleScreenMovieEnabled, applied => Configuration.DisableTitleScreenMovieEnabled = applied, () => SystemWindowMods.DisableTitleScreenMovieStatusText);
+        yield return new("auto-display-ids", "Auto Display IDs", XAModsRestoreScope.Game, () => Configuration.AutoDisplayIdsEnabled, value =>
+        {
+            Configuration.AutoDisplayIdsEnabled = value;
+            ApplyAutoDisplayIdsConfiguration(save: false);
+
+            if (!value)
+                return AutoDisplayIds.SetEnabled(false);
+
+            return AutoDisplayIds.SetEnabled(true);
+        }, applied => Configuration.AutoDisplayIdsEnabled = applied, () => AutoDisplayIds.StatusText);
+        yield return new("custom-timestamp-format", "Custom Timestamp Format", XAModsRestoreScope.Game, () => Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.SetEnabled, applied => Configuration.CustomTimestampFormatEnabled = applied, () => ChatTimestampFormat.StatusText);
         yield return new("auto-skip-cutscenes", "Skip Cutscenes", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.SetEnabled, applied => Configuration.AutoSkipCutscenesEnabled = applied, () => AutoSkipCutscenes.StatusText);
         yield return new("auto-skip-cutscenes-feeding-chocobo", "Skip Cutscenes Feeding Chocobo", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesFeedingChocoboEnabled, BuddyFeedCutsceneSkip.SetEnabled, applied => Configuration.AutoSkipCutscenesFeedingChocoboEnabled = applied, () => BuddyFeedCutsceneSkip.StatusText);
         yield return new("auto-hide-unnecessary-popups", "Hide Unnecessary Popups", XAModsRestoreScope.Game, () => Configuration.AutoHideUnnecessaryPopupsEnabled, PopupCleaner.SetEnabled, applied => Configuration.AutoHideUnnecessaryPopupsEnabled = applied, () => PopupCleaner.StatusText);
@@ -2847,6 +3248,11 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("copy-item-name-for-all", "Copy Item Name For All", XAModsRestoreScope.Game, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusText);
         yield return new("expanded-player-right-click-menu-search", "Expanded Player Right-Click Menu Search", XAModsRestoreScope.Game, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusText);
         yield return new("live-anonymous-mode", "Live Anonymous Mode", XAModsRestoreScope.Game, () => Configuration.LiveAnonymousModeEnabled, NameplatePrivacy.SetAnonymousModeEnabled, applied => Configuration.LiveAnonymousModeEnabled = applied, () => NameplatePrivacy.AnonymousModeStatusText);
+        yield return new("better-inventory-mover", "Better Inventory Mover", XAModsRestoreScope.Game, () => Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.SetEnabled, applied => Configuration.BetterInventoryMoverEnabled = applied, () => BetterInventoryMover.StatusText);
+        yield return new("better-company-chest", "Better Company Chest", XAModsRestoreScope.Game, () => Configuration.BetterCompanyChestEnabled, BetterCompanyChest.SetEnabled, applied => Configuration.BetterCompanyChestEnabled = applied, () => BetterCompanyChest.StatusText);
+        yield return new("auto-open-moogle-mail", "Auto Open Moogle Mail", XAModsRestoreScope.Game, () => Configuration.AutoOpenMoogleMailEnabled, AutoOpenMoogleMail.SetEnabled, applied => Configuration.AutoOpenMoogleMailEnabled = applied, () => AutoOpenMoogleMail.StatusText);
+        yield return new("enable-item-icon-in-shops", "Enable Item Icon In Shops", XAModsRestoreScope.Game, () => Configuration.EnableItemIconInShopsEnabled, EnableItemIconInShops.SetEnabled, applied => Configuration.EnableItemIconInShopsEnabled = applied, () => EnableItemIconInShops.StatusText);
+        yield return new("field-operations-entry-command", "Field Operations Entry Command", XAModsRestoreScope.Game, () => Configuration.FieldEntryCommandEnabled, FieldEntryCommand.SetEnabled, applied => Configuration.FieldEntryCommandEnabled = applied, () => FieldEntryCommand.StatusText);
 
         yield return new("auto-ignore-minimum-window-size", "Ignore Minimum Window Size", XAModsRestoreScope.Graphic, () => Configuration.AutoIgnoreMinimumWindowSizeEnabled, SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled, applied => Configuration.AutoIgnoreMinimumWindowSizeEnabled = applied, () => SystemWindowMods.IgnoreMinimumWindowSizeStatusText);
         yield return new("auto-hide-game-objects", "Hide Game Objects", XAModsRestoreScope.Graphic, () => Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.SetEnabled, applied => Configuration.AutoHideGameObjectsEnabled = applied, () => AutoHideGameObjects.StatusText);
@@ -2856,6 +3262,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("special-rendering-modes", "Special Rendering Modes", XAModsRestoreScope.Graphic, () => Configuration.SpecialRenderModesEnabled, SetSpecialRenderModesEnabled, applied => Configuration.SpecialRenderModesEnabled = applied, () => Configuration.SpecialRenderModesEnabled ? SystemWindowMods.SpecialRenderModesStatusText : "Disabled");
 
         yield return new("anti-afk", "Anti-AFK", XAModsRestoreScope.Player, () => Configuration.AntiAfkEnabled, AntiAfk.SetEnabled, applied => Configuration.AntiAfkEnabled = applied, () => AntiAfk.StatusText);
+        yield return new("auto-duty-commence", "Auto Duty Commence", XAModsRestoreScope.Player, () => Configuration.AutoDutyCommenceEnabled, AutoDutyCommence.SetEnabled, applied => Configuration.AutoDutyCommenceEnabled = applied, () => AutoDutyCommence.StatusText);
         yield return new("auto-expert-delivery", "Automate Expert Delivery", XAModsRestoreScope.Player, () => Configuration.AutoUnlockExpertDeliveryEnabled, AutoUnlockExpertDelivery.SetEnabled, applied => Configuration.AutoUnlockExpertDeliveryEnabled = applied, () => AutoUnlockExpertDelivery.StatusText);
         yield return new("auto-leave-duty", "Auto Leave Duty", XAModsRestoreScope.Player, () => Configuration.AutoLeaveDutyEnabled, AutoLeaveDuty.SetEnabled, applied => Configuration.AutoLeaveDutyEnabled = applied, () => AutoLeaveDuty.StatusText);
         yield return new("auto-merge", "Auto Merge", XAModsRestoreScope.Player, () => Configuration.AutoMergeEnabled, AutoMerge.SetEnabled, applied => Configuration.AutoMergeEnabled = applied, () => AutoMerge.StatusText);
@@ -2885,6 +3292,11 @@ public sealed class Plugin : IDalamudPlugin
                 ? "Enabled - character-list tables and duplicate summaries use deterministic aliases for screenshot-safe local views."
                 : "Disabled");
         yield return new("force-peepingtom", "Force PeepingTom", XAModsRestoreScope.Plugin, () => Configuration.ForcePeepingTomEnabled, PeepingTomIntegration.SetForceEnabled, applied => Configuration.ForcePeepingTomEnabled = applied, () => PeepingTomIntegration.StatusText);
+        yield return new("teleport-helper", "Teleport Helper", XAModsRestoreScope.Plugin, () => Configuration.TeleportHelperEnabled, value =>
+        {
+            TeleportHelper.ApplyConfiguration(Configuration.TeleportHelperSelectYes);
+            return TeleportHelper.SetEnabled(value);
+        }, applied => Configuration.TeleportHelperEnabled = applied, () => TeleportHelper.StatusText);
 
         yield return new("eureka-instance-id", "Instance ID", XAModsRestoreScope.Eureka, () => Configuration.EurekaInstanceIdEnabled, EurekaInstanceId.SetEnabled, applied => Configuration.EurekaInstanceIdEnabled = applied, () => EurekaInstanceId.StatusText);
 
@@ -2978,6 +3390,22 @@ public sealed class Plugin : IDalamudPlugin
             case "msqprogress":
                 definition = new("msqprogress", "/xa msqprogress on|off", GetXAModDefinition("auto-display-msq-progress"));
                 return true;
+            case "titlemovie":
+            case "titlescreenmovie":
+            case "disabletitlemovie":
+                definition = new("titlemovie", "/xa titlemovie on|off", GetXAModDefinition("disable-title-screen-movie"));
+                return true;
+            case "displayids":
+            case "autoids":
+            case "ids":
+                definition = new("displayids", "/xa displayids on|off", GetXAModDefinition("auto-display-ids"));
+                return true;
+            case "timestampseconds":
+            case "chattimestamps":
+            case "timestampformat":
+            case "customtimestamp":
+                definition = new("timestampseconds", "/xa timestampseconds on|off", GetXAModDefinition("custom-timestamp-format"));
+                return true;
             case "skipcutscenes":
                 definition = new("skipcutscenes", "/xa skipcutscenes on|off", GetXAModDefinition("auto-skip-cutscenes"));
                 return true;
@@ -3012,6 +3440,25 @@ public sealed class Plugin : IDalamudPlugin
             case "anonymous":
                 definition = new("anonymous", "/xa anonymous on|off", GetXAModDefinition("live-anonymous-mode"));
                 return true;
+            case "inventorymover":
+            case "betterinventory":
+                definition = new("inventorymover", "/xa inventorymover on|off", GetXAModDefinition("better-inventory-mover"));
+                return true;
+            case "companychest":
+            case "bettercompanychest":
+                definition = new("companychest", "/xa companychest on|off", GetXAModDefinition("better-company-chest"));
+                return true;
+            case "mooglemail":
+                definition = new("mooglemail", "/xa mooglemail on|off", GetXAModDefinition("auto-open-moogle-mail"));
+                return true;
+            case "shopicons":
+            case "itemicons":
+                definition = new("shopicons", "/xa shopicons on|off", GetXAModDefinition("enable-item-icon-in-shops"));
+                return true;
+            case "fieldentrytoggle":
+            case "fieldentrycommand":
+                definition = new("fieldentrycommand", "/xa fieldentrycommand on|off", GetXAModDefinition("field-operations-entry-command"));
+                return true;
             case "minwindow":
                 definition = new("minwindow", "/xa minwindow on|off", GetXAModDefinition("auto-ignore-minimum-window-size"));
                 return true;
@@ -3029,6 +3476,10 @@ public sealed class Plugin : IDalamudPlugin
                 return true;
             case "antiafk":
                 definition = new("antiafk", "/xa antiafk on|off", GetXAModDefinition("anti-afk"));
+                return true;
+            case "dutycommence":
+            case "autodutycommence":
+                definition = new("dutycommence", "/xa dutycommence on|off", GetXAModDefinition("auto-duty-commence"));
                 return true;
             case "expertdelivery":
                 definition = new("expertdelivery", "/xa expertdelivery on|off", GetXAModDefinition("auto-expert-delivery"));
@@ -3074,6 +3525,11 @@ public sealed class Plugin : IDalamudPlugin
             case "peepingtom":
                 definition = new("peepingtom", "/xa peepingtom on|off", GetXAModDefinition("force-peepingtom"));
                 return true;
+            case "teleporthelper":
+            case "tickethelper":
+            case "ticket":
+                definition = new("teleporthelper", "/xa teleporthelper on|off", GetXAModDefinition("teleport-helper"));
+                return true;
             case "anonchars":
                 definition = new("anonchars", "/xa anonchars on|off", GetXAModDefinition("anonymize-character-lists"));
                 return true;
@@ -3097,6 +3553,13 @@ public sealed class Plugin : IDalamudPlugin
     {
         return subcommand.Equals("xamods", StringComparison.OrdinalIgnoreCase)
             || subcommand.Equals("mods", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsFieldEntrySubcommand(string subcommand)
+    {
+        return subcommand.Equals("fe", StringComparison.OrdinalIgnoreCase)
+            || subcommand.Equals("fieldentry", StringComparison.OrdinalIgnoreCase)
+            || subcommand.Equals("fieldoperations", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string GetXAModsRestoreScopeLabel(XAModsRestoreScope scope)
@@ -3328,5 +3791,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.29";
+    public const string Version = "0.0.0.30";
 }

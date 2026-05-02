@@ -331,7 +331,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
         try
         {
-            Plugin.Framework.RunOnFrameworkThread(() =>
+            Plugin.Framework.Run(() =>
             {
                 try
                 {

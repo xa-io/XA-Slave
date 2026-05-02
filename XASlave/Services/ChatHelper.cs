@@ -23,18 +23,37 @@ public static class ChatHelper
     /// Works for both native game commands and Dalamud plugin commands.
     /// </summary>
     public static unsafe void SendMessage(string message)
+        => TrySend(message);
+
+    public static unsafe bool TrySend(string message)
     {
-        if (string.IsNullOrEmpty(message)) return;
+        if (string.IsNullOrWhiteSpace(message))
+            return false;
 
         try
         {
+            var uiModule = UIModule.Instance();
+            if (uiModule == null)
+                return false;
+
             var utf8 = Utf8String.FromString(message);
-            UIModule.Instance()->ProcessChatBoxEntry(utf8);
-            utf8->Dtor(true);
+            if (utf8 == null)
+                return false;
+
+            try
+            {
+                uiModule->ProcessChatBoxEntry(utf8);
+                return true;
+            }
+            finally
+            {
+                utf8->Dtor(true);
+            }
         }
         catch (Exception ex)
         {
             Plugin.Log.Error($"[XASlave] ChatHelper.SendMessage failed: {ex.Message}");
+            return false;
         }
     }
 }

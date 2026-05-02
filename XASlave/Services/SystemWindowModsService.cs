@@ -60,6 +60,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private bool toggleFadeDelegateInitialized;
     private bool cancelLoginCooldownEnabled;
     private bool customResolutionsEnabled;
+    private bool disableTitleScreenMovieEnabled;
     private bool ignoreMinimumWindowSizeEnabled;
     private bool lowResolutionEnabled;
     private bool lowResolutionDisablePending;
@@ -112,6 +113,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     public string CancelLoginCooldownStatusText { get; private set; } = "Disabled";
 
     public string CustomResolutionsStatusText { get; private set; } = "Disabled";
+
+    public string DisableTitleScreenMovieStatusText { get; private set; } = "Disabled";
 
     public string IgnoreMinimumWindowSizeStatusText { get; private set; } = "Disabled";
 
@@ -234,6 +237,20 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         RefreshWindowSizeLimits(gameWindow);
         PrimeWindowSizeSynchronization(gameWindow);
         CustomResolutionsStatusText = "Enabled - preset buttons and `/xa res <width>x<height>` can change the client size locally.";
+        return true;
+    }
+
+    public bool SetDisableTitleScreenMovieEnabled(bool value)
+    {
+        if (!value)
+        {
+            disableTitleScreenMovieEnabled = false;
+            DisableTitleScreenMovieStatusText = "Disabled";
+            return false;
+        }
+
+        disableTitleScreenMovieEnabled = true;
+        UpdateDisableTitleScreenMovie();
         return true;
     }
 
@@ -456,6 +473,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
         cancelLoginCooldownEnabled = false;
         customResolutionsEnabled = false;
+        disableTitleScreenMovieEnabled = false;
         ignoreMinimumWindowSizeEnabled = false;
         lowResolutionEnabled = false;
         lowResolutionDisablePending = false;
@@ -705,6 +723,9 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (ShouldSynchronizeWindowSize())
             MeasureFrameworkUpdateStep("SystemWindowMods.UpdateWindowSizeSynchronization", UpdateWindowSizeSynchronization);
 
+        if (disableTitleScreenMovieEnabled)
+            MeasureFrameworkUpdateStep("SystemWindowMods.UpdateDisableTitleScreenMovie", UpdateDisableTitleScreenMovie);
+
         if (lowResolutionEnabled)
         {
             if (lowResolutionDisablePending)
@@ -921,6 +942,28 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (customResolutionsEnabled)
             CustomResolutionsStatusText = GetCustomResolutionsStatusText();
 
+    }
+
+    private void UpdateDisableTitleScreenMovie()
+    {
+        if (!disableTitleScreenMovieEnabled)
+            return;
+
+        if (clientState.IsLoggedIn)
+        {
+            DisableTitleScreenMovieStatusText = "Ready - title screen movie timer will stay reset when you return to lobby.";
+            return;
+        }
+
+        var agentLobby = AgentLobby.Instance();
+        if (agentLobby == null)
+        {
+            DisableTitleScreenMovieStatusText = "Ready - waiting for the lobby agent.";
+            return;
+        }
+
+        agentLobby->IdleTime = 0;
+        DisableTitleScreenMovieStatusText = "Enabled - title screen idle movie timer is kept at zero.";
     }
 
     private bool TryClampClientSizeToSafeMinimum(GameWindow* gameWindow, int clientWidth, int clientHeight)
