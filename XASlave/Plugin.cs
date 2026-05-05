@@ -45,6 +45,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] public static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
     [PluginService] public static IContextMenu ContextMenu { get; private set; } = null!;
     [PluginService] public static IChatGui ChatGui { get; private set; } = null!;
+    [PluginService] public static INotificationManager NotificationManager { get; private set; } = null!;
 
     private const string CommandName = "/xa";
     private enum XAModsRestoreScope
@@ -75,12 +76,19 @@ public sealed class Plugin : IDalamudPlugin
         string Name,
         bool Requested,
         string StatusText,
-        bool IsReady);
+        bool IsReady,
+        bool IsPending);
 
     private readonly record struct DeferredStartupAction(
         Action Action,
         string? Name,
         int LineNumber);
+
+    private readonly record struct PostLoadXAModActivation(
+        Action Activate,
+        string Key,
+        string DisplayName,
+        TimeSpan Delay);
 
     public readonly record struct TitleBarFavXAModInfo(
         string Key,
@@ -113,15 +121,21 @@ public sealed class Plugin : IDalamudPlugin
     public AutoSkipCutsceneService AutoSkipCutscenes { get; init; }
     public BuddyFeedCutsceneSkipService BuddyFeedCutsceneSkip { get; init; }
     public PopupCleanerService PopupCleaner { get; init; }
+    public DalamudNotificationSuppressorService DalamudNotificationsSuck { get; init; }
     public SystemWindowModsService SystemWindowMods { get; init; }
     public LobbyErrorAutoCloseService LobbyErrorAutoClose { get; init; }
     public QueuePositionDisplayService QueuePositionDisplay { get; init; }
     public MsqProgressDisplayService MsqProgressDisplay { get; init; }
     public TooltipItemIdService TooltipItemId { get; init; }
     public AutoDisplayIdsService AutoDisplayIds { get; init; }
+    public AutoDisplayNetworkLatencyService AutoDisplayNetworkLatency { get; init; }
     public ChatTimestampFormatService ChatTimestampFormat { get; init; }
     public AutoHideGameObjectsService AutoHideGameObjects { get; init; }
     public DialogueSkipService DialogueSkip { get; init; }
+    public AutoLockGameWindowService AutoLockGameWindow { get; init; }
+    public NotifyWhenFriendIsNearService NotifyWhenFriendIsNear { get; init; }
+    public BetterCastBarService BetterCastBar { get; init; }
+    public BetterDutyFinderSettingsService BetterDutyFinder { get; init; }
     public CopyItemNameContextMenuService CopyItemNameContextMenu { get; init; }
     public SightDistanceService SightDistance { get; init; }
     public PlayerSearchContextMenuService PlayerSearchContextMenu { get; init; }
@@ -159,9 +173,24 @@ public sealed class Plugin : IDalamudPlugin
     private bool hasAppliedSpecialRenderUiFlags;
     private bool isDisposed;
     private readonly Queue<DeferredStartupAction> deferredStartupActions = new();
+    private readonly Queue<PostLoadXAModActivation> postLoadXAModActivations = new();
+    private readonly HashSet<string> pendingPostLoadXAModActivations = new(StringComparer.Ordinal);
+    private readonly List<string> completedPostLoadXAModActivations = new();
+    private readonly List<string> failedPostLoadXAModActivations = new();
     private bool deferredStartupQueueScheduled;
+    private bool postLoadXAModActivationsScheduled;
+    private bool postLoadXAModActivationCompletionPending;
+    private bool postLoadXAModActivationCompletionCheckScheduled;
+    private const double DeferredStartupQueueFrameBudgetMilliseconds = 4.0;
+    private const int DeferredStartupQueueMaxActionsPerTick = 24;
+    private const double PostLoadXAModActivationInitialDelaySeconds = 1.0;
+    private const double PostLoadXAModActivationSpacingSeconds = 0.5;
+    private const double DeferredStartupSummaryPendingArmingTimeoutSeconds = 10.0;
     private const double DeferredStartupActionDebugThresholdMilliseconds = 5.0;
     private const double DeferredStartupActionWarningThresholdMilliseconds = 25.0;
+    private const double PostLoadXAModActivationWarningThresholdMilliseconds = 200.0;
+    private DateTime deferredStartupSummaryPendingArmingSinceUtc = DateTime.MinValue;
+    private DateTime postLoadXAModActivationCompletionPendingSinceUtc = DateTime.MinValue;
 
     public Plugin()
     {
@@ -272,15 +301,21 @@ public sealed class Plugin : IDalamudPlugin
         AutoSkipCutscenes = new AutoSkipCutsceneService(Condition, Framework, SigScanner, GameInterop, Log);
         BuddyFeedCutsceneSkip = new BuddyFeedCutsceneSkipService(SigScanner, GameInterop, ClientState, Log);
         PopupCleaner = new PopupCleanerService(AddonLifecycle, Log);
+        DalamudNotificationsSuck = new DalamudNotificationSuppressorService(PluginInterface, Log);
         SystemWindowMods = new SystemWindowModsService(SigScanner, GameInterop, Log, Framework, GameConfig, ClientState, () => IpcClient.AutoRetainerGetMultiModeEnabled());
         LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Log);
         QueuePositionDisplay = new QueuePositionDisplayService(SigScanner, GameInterop, Log);
         MsqProgressDisplay = new MsqProgressDisplayService(AddonLifecycle, DataManager, Log);
         TooltipItemId = new TooltipItemIdService(AddonLifecycle, GameGui, SigScanner, GameInterop, Log);
         AutoDisplayIds = new AutoDisplayIdsService(AddonLifecycle, Framework, ClientState, DataManager, TargetManager, DtrBar, Log);
+        AutoDisplayNetworkLatency = new AutoDisplayNetworkLatencyService(Framework, ClientState, DtrBar, Log);
         ChatTimestampFormat = new ChatTimestampFormatService(SigScanner, GameInterop, Log);
         AutoHideGameObjects = new AutoHideGameObjectsService(Framework, ClientState, Condition, TargetManager, SigScanner, GameInterop, Log);
         DialogueSkip = new DialogueSkipService(AddonLifecycle, SigScanner, GameInterop, Log);
+        AutoLockGameWindow = new AutoLockGameWindowService(Condition, Log);
+        NotifyWhenFriendIsNear = new NotifyWhenFriendIsNearService(Framework, ClientState, ObjectTable, ToastGui, ChatGui, Log);
+        BetterCastBar = new BetterCastBarService(AddonLifecycle, ObjectTable, DataManager, Log);
+        BetterDutyFinder = new BetterDutyFinderSettingsService(SigScanner, GameConfig, Log);
         CopyItemNameContextMenu = new CopyItemNameContextMenuService(ContextMenu, DataManager, Log);
         SightDistance = new SightDistanceService(Framework, SigScanner, GameInterop, Log);
         PlayerSearchContextMenu = new PlayerSearchContextMenuService(ContextMenu, DataManager, Log);
@@ -351,12 +386,16 @@ public sealed class Plugin : IDalamudPlugin
         }
         ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
         ApplyAutoDisplayIdsConfiguration(save: false);
+        ApplyAutoDisplayNetworkLatencyConfiguration(save: false);
+        ApplyDalamudNotificationsSuckConfiguration(save: false);
+        ApplyNotifyWhenFriendIsNearConfiguration(save: false);
+        ApplyBetterCastBarConfiguration(save: false);
         ApplyBetterCompanyChestConfiguration(save: false);
         DozeSitAnywhere.ApplyConfiguration(
             Configuration.DozeSitAnywhereAllowDoze,
             Configuration.DozeSitAnywhereAllowSit);
         TeleportHelper.ApplyConfiguration(Configuration.TeleportHelperSelectYes);
-        QueueDeferredStartupAction(() =>
+        QueueDeferredStartupAction("AutoAllowMultipleGameInstancesEnabled", () =>
         {
             if (Configuration.AutoAllowMultipleGameInstancesEnabled && !SystemWindowMods.SetAllowMultipleGameInstancesEnabled(true))
             {
@@ -372,7 +411,7 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction(() =>
+        QueueDeferredStartupAction("AutoDisplayMsqProgressEnabled", () =>
         {
             if (Configuration.AutoDisplayMsqProgressEnabled && !MsqProgressDisplay.SetEnabled(true))
             {
@@ -404,15 +443,30 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction("CustomTimestampFormatEnabled", () =>
+        QueueDeferredStartupAction("AutoDisplayNetworkLatencyEnabled", () =>
         {
-            ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
-            if (Configuration.CustomTimestampFormatEnabled && !ChatTimestampFormat.SetEnabled(true))
+            if (!Configuration.AutoDisplayNetworkLatencyEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("display-network-latency");
+            if (!AutoDisplayNetworkLatency.SetEnabled(true))
             {
-                Configuration.CustomTimestampFormatEnabled = false;
+                Configuration.AutoDisplayNetworkLatencyEnabled = false;
                 Configuration.Save();
             }
         });
+        if (Configuration.CustomTimestampFormatEnabled)
+        {
+            QueuePostLoadXAModActivation("CustomTimestampFormatEnabled", "Custom Timestamp Format", PostLoadXAModActivationInitialDelaySeconds, () =>
+            {
+                ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
+                if (!ChatTimestampFormat.SetEnabled(true))
+                {
+                    Configuration.CustomTimestampFormatEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction(() =>
         {
             if (Configuration.CopyItemNameForAllEnabled && !CopyItemNameContextMenu.SetEnabled(true))
@@ -421,14 +475,17 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction("AutoSkipCutscenesEnabled", () =>
+        if (Configuration.AutoSkipCutscenesEnabled)
         {
-            if (Configuration.AutoSkipCutscenesEnabled && !AutoSkipCutscenes.SetEnabled(true))
+            QueuePostLoadXAModActivation("AutoSkipCutscenesEnabled", "Auto Skip Cutscenes", PostLoadXAModActivationInitialDelaySeconds + PostLoadXAModActivationSpacingSeconds, () =>
             {
-                Configuration.AutoSkipCutscenesEnabled = false;
-                Configuration.Save();
-            }
-        });
+                if (!AutoSkipCutscenes.RestoreEnabledOnStartup())
+                {
+                    Configuration.AutoSkipCutscenesEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction("AutoSkipCutscenesFeedingChocoboEnabled", () =>
         {
             if (!Configuration.AutoSkipCutscenesFeedingChocoboEnabled)
@@ -453,6 +510,18 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
+        QueueDeferredStartupAction("DalamudNotificationsSuckEnabled", () =>
+        {
+            if (!Configuration.DalamudNotificationsSuckEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("dalamud-notifications-suck");
+            if (!DalamudNotificationsSuck.SetEnabled(true))
+            {
+                Configuration.DalamudNotificationsSuckEnabled = false;
+                Configuration.Save();
+            }
+        });
         QueueDeferredStartupAction("AutoPreventGameExitingFromLobbyErrorsEnabled", () =>
         {
             if (Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled && !SystemWindowMods.SetPreventLobbyExitEnabled(true))
@@ -469,31 +538,74 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction("DisplayActualQueuePositionEnabled", () =>
+        if (Configuration.DisplayActualQueuePositionEnabled)
         {
-            if (Configuration.DisplayActualQueuePositionEnabled && !QueuePositionDisplay.SetEnabled(true))
+            QueuePostLoadXAModActivation("DisplayActualQueuePositionEnabled", "Display Actual Queue Position", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 3), () =>
             {
-                Configuration.DisplayActualQueuePositionEnabled = false;
-                Configuration.Save();
-            }
-        });
-        QueueDeferredStartupAction("AutoHideGameObjectsEnabled", () =>
+                if (!QueuePositionDisplay.SetEnabled(true))
+                {
+                    Configuration.DisplayActualQueuePositionEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
+        if (Configuration.AutoHideGameObjectsEnabled)
         {
-            if (!Configuration.AutoHideGameObjectsEnabled)
-                return;
-
-            ApplyStoredXAModConfiguration("auto-hide-game-objects");
-            if (!AutoHideGameObjects.SetEnabled(true))
+            QueuePostLoadXAModActivation("AutoHideGameObjectsEnabled", "Auto Hide Game Objects", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 4), () =>
             {
-                Configuration.AutoHideGameObjectsEnabled = false;
-                Configuration.Save();
-            }
-        });
+                ApplyStoredXAModConfiguration("auto-hide-game-objects");
+                if (!AutoHideGameObjects.SetEnabled(true))
+                {
+                    Configuration.AutoHideGameObjectsEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction("AutoSkipDialogueEnabled", () =>
         {
             if (Configuration.AutoSkipDialogueEnabled && !DialogueSkip.SetEnabled(true))
             {
                 Configuration.AutoSkipDialogueEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("LockGameWindowInCombatEnabled", () =>
+        {
+            if (Configuration.LockGameWindowInCombatEnabled && !AutoLockGameWindow.SetEnabled(true))
+            {
+                Configuration.LockGameWindowInCombatEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("NotifyWhenFriendIsNearEnabled", () =>
+        {
+            if (!Configuration.NotifyWhenFriendIsNearEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("notify-when-friend-is-near");
+            if (!NotifyWhenFriendIsNear.SetEnabled(true))
+            {
+                Configuration.NotifyWhenFriendIsNearEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("BetterCastBarEnabled", () =>
+        {
+            if (!Configuration.BetterCastBarEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("better-cast-bar");
+            if (!BetterCastBar.SetEnabled(true))
+            {
+                Configuration.BetterCastBarEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("BetterDutyFinderEnabled", () =>
+        {
+            if (Configuration.BetterDutyFinderEnabled && !BetterDutyFinder.SetEnabled(true))
+            {
+                Configuration.BetterDutyFinderEnabled = false;
                 Configuration.Save();
             }
         });
@@ -505,18 +617,18 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction("DisableBackgroundGameRenderingEnabled", () =>
+        if (Configuration.DisableBackgroundGameRenderingEnabled)
         {
-            if (!Configuration.DisableBackgroundGameRenderingEnabled)
-                return;
-
-            ApplyStoredXAModConfiguration("disable-background-game-rendering");
-            if (!SystemWindowMods.SetDisableBackgroundRenderingEnabled(true))
+            QueuePostLoadXAModActivation("DisableBackgroundGameRenderingEnabled", "Disable Background Rendering", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 5), () =>
             {
-                Configuration.DisableBackgroundGameRenderingEnabled = false;
-                Configuration.Save();
-            }
-        });
+                ApplyStoredXAModConfiguration("disable-background-game-rendering");
+                if (!SystemWindowMods.SetDisableBackgroundRenderingEnabled(true))
+                {
+                    Configuration.DisableBackgroundGameRenderingEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction(() =>
         {
             if (!Configuration.LowResolutionEnabled)
@@ -529,18 +641,18 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction("CustomSightDistanceEnabled", () =>
+        if (Configuration.CustomSightDistanceEnabled)
         {
-            if (!Configuration.CustomSightDistanceEnabled)
-                return;
-
-            ApplyStoredXAModConfiguration("custom-sight-distance");
-            if (!SightDistance.SetEnabled(true))
+            QueuePostLoadXAModActivation("CustomSightDistanceEnabled", "Custom Sight Distance", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 2), () =>
             {
-                Configuration.CustomSightDistanceEnabled = false;
-                Configuration.Save();
-            }
-        });
+                ApplyStoredXAModConfiguration("custom-sight-distance");
+                if (!SightDistance.RestoreEnabledOnStartup())
+                {
+                    Configuration.CustomSightDistanceEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction(() =>
         {
             if (!Configuration.ExpandedPlayerRightClickMenuSearchEnabled)
@@ -690,18 +802,18 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction("AutoRefuseTradeRequestEnabled", () =>
+        if (Configuration.AutoRefuseTradeRequestEnabled)
         {
-            if (!Configuration.AutoRefuseTradeRequestEnabled)
-                return;
-
-            ApplyStoredXAModConfiguration("auto-refuse-trade-request");
-            if (!AutoRefuseTrade.SetEnabled(true))
+            QueuePostLoadXAModActivation("AutoRefuseTradeRequestEnabled", "Auto Refuse Trade", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 6), () =>
             {
-                Configuration.AutoRefuseTradeRequestEnabled = false;
-                Configuration.Save();
-            }
-        });
+                ApplyStoredXAModConfiguration("auto-refuse-trade-request");
+                if (!AutoRefuseTrade.SetEnabled(true))
+                {
+                    Configuration.AutoRefuseTradeRequestEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction("TargetCommandFixEnabled", () =>
         {
             if (Configuration.TargetCommandFixEnabled && !TargetCommandFix.SetEnabled(true))
@@ -710,14 +822,17 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction("AutoRevealUndiscoveredAreasEnabled", () =>
+        if (Configuration.AutoRevealUndiscoveredAreasEnabled)
         {
-            if (Configuration.AutoRevealUndiscoveredAreasEnabled && !SystemWindowMods.SetRevealUndiscoveredAreasEnabled(true))
+            QueuePostLoadXAModActivation("AutoRevealUndiscoveredAreasEnabled", "Reveal Undiscovered Areas", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 7), () =>
             {
-                Configuration.AutoRevealUndiscoveredAreasEnabled = false;
-                Configuration.Save();
-            }
-        });
+                if (!SystemWindowMods.SetRevealUndiscoveredAreasEnabled(true))
+                {
+                    Configuration.AutoRevealUndiscoveredAreasEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction(() =>
         {
             if (Configuration.AutoClearTeleportationLockEnabled && !TeleportLockClear.SetEnabled(true))
@@ -893,6 +1008,8 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
         PluginInterface.UiBuilder.Draw += BetterCompanyChest.DrawOverlay;
         PluginInterface.UiBuilder.Draw += AutoOpenMoogleMail.DrawOverlay;
+        PluginInterface.UiBuilder.Draw += BetterCastBar.DrawOverlay;
+        PluginInterface.UiBuilder.Draw += BetterDutyFinder.DrawOverlay;
         PluginInterface.UiBuilder.Draw += XAPeep.DrawOverlay;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleMainUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
@@ -913,6 +1030,12 @@ public sealed class Plugin : IDalamudPlugin
         deferredStartupActions.Enqueue(new DeferredStartupAction(action, name, lineNumber));
     }
 
+    private void QueuePostLoadXAModActivation(string key, string displayName, double delaySeconds, Action action)
+    {
+        pendingPostLoadXAModActivations.Add(key);
+        postLoadXAModActivations.Enqueue(new PostLoadXAModActivation(action, key, displayName, TimeSpan.FromSeconds(delaySeconds)));
+    }
+
     private void ScheduleDeferredStartupQueue()
     {
         if (deferredStartupQueueScheduled || isDisposed)
@@ -930,25 +1053,120 @@ public sealed class Plugin : IDalamudPlugin
 
         if (deferredStartupActions.Count == 0)
         {
-            LogStartupSummary();
+            CompleteInitialStartupQueue();
             return;
         }
 
+        var queueStopwatch = Stopwatch.StartNew();
+        var processedCount = 0;
+
+        while (!isDisposed && deferredStartupActions.Count > 0)
+        {
+            try
+            {
+                var deferredAction = deferredStartupActions.Dequeue();
+                var stopwatch = Stopwatch.StartNew();
+                deferredAction.Action();
+                stopwatch.Stop();
+                processedCount++;
+
+                var elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
+                if (elapsedMilliseconds >= DeferredStartupActionDebugThresholdMilliseconds)
+                {
+                    var label = string.IsNullOrWhiteSpace(deferredAction.Name)
+                        ? $"Plugin.cs:{deferredAction.LineNumber}"
+                        : deferredAction.Name;
+                    var message = $"[XASlave] Deferred startup action '{label}' took {elapsedMilliseconds:F1}ms.";
+                    if (elapsedMilliseconds >= DeferredStartupActionWarningThresholdMilliseconds)
+                        Log.Warning(message);
+                    else
+                        Log.Debug(message);
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, "[XASlave] Deferred startup action failed.");
+            }
+
+            if (processedCount >= DeferredStartupQueueMaxActionsPerTick
+                || queueStopwatch.Elapsed.TotalMilliseconds >= DeferredStartupQueueFrameBudgetMilliseconds)
+                break;
+        }
+
+        if (isDisposed)
+            return;
+
+        if (deferredStartupActions.Count == 0)
+        {
+            CompleteInitialStartupQueue();
+            return;
+        }
+
+        ScheduleDeferredStartupQueue();
+    }
+
+    private void CompleteInitialStartupQueue()
+    {
+        if (HasPendingStartupArming())
+        {
+            if (deferredStartupSummaryPendingArmingSinceUtc == DateTime.MinValue)
+                deferredStartupSummaryPendingArmingSinceUtc = DateTime.UtcNow;
+
+            var pendingSeconds = (DateTime.UtcNow - deferredStartupSummaryPendingArmingSinceUtc).TotalSeconds;
+            if (pendingSeconds < DeferredStartupSummaryPendingArmingTimeoutSeconds)
+            {
+                ScheduleDeferredStartupQueue();
+                return;
+            }
+
+            Log.Warning($"[XASlave] Startup summary waited {pendingSeconds:0.0}s for incremental hook arming; reporting current state. Pending: {DescribePendingStartupArming()}");
+        }
+
+        deferredStartupSummaryPendingArmingSinceUtc = DateTime.MinValue;
+        SchedulePostLoadXAModActivationPhase();
+        LogStartupSummary();
+    }
+
+    private void SchedulePostLoadXAModActivationPhase()
+    {
+        if (postLoadXAModActivationsScheduled || postLoadXAModActivations.Count == 0 || isDisposed)
+            return;
+
+        postLoadXAModActivationsScheduled = true;
+        var scheduledActivations = postLoadXAModActivations.ToArray();
+        completedPostLoadXAModActivations.Clear();
+        failedPostLoadXAModActivations.Clear();
+        postLoadXAModActivationCompletionPending = true;
+        postLoadXAModActivationCompletionCheckScheduled = false;
+        postLoadXAModActivationCompletionPendingSinceUtc = DateTime.MinValue;
+
+        while (postLoadXAModActivations.Count > 0)
+        {
+            var activation = postLoadXAModActivations.Dequeue();
+            Framework.RunOnTick(() => ProcessPostLoadXAModActivation(activation), delay: activation.Delay);
+        }
+
+        Log.Information($"[XASlave] Scheduled post-load XA Mod activation phase for {scheduledActivations.Length} enabled mod(s): {string.Join(", ", scheduledActivations.Select(activation => activation.DisplayName))}.");
+    }
+
+    private void ProcessPostLoadXAModActivation(PostLoadXAModActivation activation)
+    {
+        if (isDisposed)
+            return;
+
+        var completed = false;
         try
         {
-            var deferredAction = deferredStartupActions.Dequeue();
             var stopwatch = Stopwatch.StartNew();
-            deferredAction.Action();
+            activation.Activate();
             stopwatch.Stop();
+            completed = true;
 
             var elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
             if (elapsedMilliseconds >= DeferredStartupActionDebugThresholdMilliseconds)
             {
-                var label = string.IsNullOrWhiteSpace(deferredAction.Name)
-                    ? $"Plugin.cs:{deferredAction.LineNumber}"
-                    : deferredAction.Name;
-                var message = $"[XASlave] Deferred startup action '{label}' took {elapsedMilliseconds:F1}ms.";
-                if (elapsedMilliseconds >= DeferredStartupActionWarningThresholdMilliseconds)
+                var message = $"[XASlave] Post-load XA Mod activation '{activation.DisplayName}' took {elapsedMilliseconds:F1}ms.";
+                if (elapsedMilliseconds >= PostLoadXAModActivationWarningThresholdMilliseconds)
                     Log.Warning(message);
                 else
                     Log.Debug(message);
@@ -956,10 +1174,101 @@ public sealed class Plugin : IDalamudPlugin
         }
         catch (Exception ex)
         {
-            Log.Warning(ex, "[XASlave] Deferred startup action failed.");
+            failedPostLoadXAModActivations.Add(activation.DisplayName);
+            Log.Warning(ex, $"[XASlave] Post-load XA Mod activation '{activation.DisplayName}' failed.");
+        }
+        finally
+        {
+            if (completed)
+                completedPostLoadXAModActivations.Add(activation.DisplayName);
+
+            pendingPostLoadXAModActivations.Remove(activation.Key);
+            if (pendingPostLoadXAModActivations.Count == 0)
+                SchedulePostLoadXAModActivationCompletionCheck();
+        }
+    }
+
+    private void SchedulePostLoadXAModActivationCompletionCheck()
+    {
+        if (postLoadXAModActivationCompletionCheckScheduled || isDisposed)
+            return;
+
+        postLoadXAModActivationCompletionCheckScheduled = true;
+        Framework.RunOnTick(CheckPostLoadXAModActivationCompletion, delayTicks: 1);
+    }
+
+    private void CheckPostLoadXAModActivationCompletion()
+    {
+        postLoadXAModActivationCompletionCheckScheduled = false;
+        if (isDisposed || !postLoadXAModActivationCompletionPending)
+            return;
+
+        if (pendingPostLoadXAModActivations.Count > 0)
+        {
+            SchedulePostLoadXAModActivationCompletionCheck();
+            return;
         }
 
-        ScheduleDeferredStartupQueue();
+        if (HasPendingStartupArming())
+        {
+            if (postLoadXAModActivationCompletionPendingSinceUtc == DateTime.MinValue)
+                postLoadXAModActivationCompletionPendingSinceUtc = DateTime.UtcNow;
+
+            var pendingSeconds = (DateTime.UtcNow - postLoadXAModActivationCompletionPendingSinceUtc).TotalSeconds;
+            if (pendingSeconds < DeferredStartupSummaryPendingArmingTimeoutSeconds)
+            {
+                SchedulePostLoadXAModActivationCompletionCheck();
+                return;
+            }
+
+            Log.Warning($"[XASlave] Post-load XA Mod activation completion waited {pendingSeconds:0.0}s for incremental arming; reporting current state. Pending: {DescribePendingStartupArming()}");
+        }
+
+        postLoadXAModActivationCompletionPending = false;
+        postLoadXAModActivationCompletionPendingSinceUtc = DateTime.MinValue;
+        LogPostLoadXAModActivationComplete();
+    }
+
+    private void LogPostLoadXAModActivationComplete()
+    {
+        if (isDisposed)
+            return;
+
+        var completedText = completedPostLoadXAModActivations.Count == 0
+            ? "None"
+            : string.Join(", ", completedPostLoadXAModActivations);
+
+        if (failedPostLoadXAModActivations.Count == 0)
+        {
+            Log.Information($"[XASlave] Post-load XA Mod activation complete. {completedPostLoadXAModActivations.Count} enabled mod(s) processed: {completedText}.");
+            return;
+        }
+
+        Log.Warning($"[XASlave] Post-load XA Mod activation complete with {failedPostLoadXAModActivations.Count} failure(s). Processed: {completedText}. Failed: {string.Join(", ", failedPostLoadXAModActivations)}.");
+    }
+
+    private bool HasPendingStartupArming()
+    {
+        return IsStartupArmingPending(AutoSkipCutscenes.IsStartupArmingPending, AutoSkipCutscenes.StatusText)
+            || IsStartupArmingPending(SightDistance.IsStartupArmingPending, SightDistance.StatusText);
+    }
+
+    private string DescribePendingStartupArming()
+    {
+        var pending = new List<string>();
+        if (IsStartupArmingPending(AutoSkipCutscenes.IsStartupArmingPending, AutoSkipCutscenes.StatusText))
+            pending.Add($"Auto Skip Cutscenes: {AutoSkipCutscenes.StatusText}");
+
+        if (IsStartupArmingPending(SightDistance.IsStartupArmingPending, SightDistance.StatusText))
+            pending.Add($"Custom Sight Distance: {SightDistance.StatusText}");
+
+        return pending.Count == 0 ? "None" : string.Join("; ", pending);
+    }
+
+    private static bool IsStartupArmingPending(bool pendingFlag, string statusText)
+    {
+        return pendingFlag
+            || statusText.StartsWith("Arming", StringComparison.OrdinalIgnoreCase);
     }
 
     private void LogStartupSummary()
@@ -975,14 +1284,24 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         var armedCount = requestedSurfaces.Count(surface => surface.IsReady);
+        var pending = requestedSurfaces
+            .Where(surface => !surface.IsReady && surface.IsPending)
+            .ToList();
         var unavailable = requestedSurfaces
-            .Where(surface => !surface.IsReady)
+            .Where(surface => !surface.IsReady && !surface.IsPending)
             .ToList();
 
-        var summary = unavailable.Count == 0
-            ? $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed."
-            : $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed, {unavailable.Count} unavailable. Open XA Mods for current status.";
+        var summary = (pending.Count, unavailable.Count) switch
+        {
+            (0, 0) => $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed.",
+            (_, 0) => $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed, {pending.Count} still arming.",
+            (0, _) => $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed, {unavailable.Count} unavailable. Open XA Mods for current status.",
+            _ => $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed, {pending.Count} still arming, {unavailable.Count} unavailable. Open XA Mods for current status.",
+        };
         Log.Information(summary);
+
+        if (pending.Count > 0)
+            Log.Information($"[XASlave] Startup still arming: {string.Join("; ", pending.Select(surface => $"{surface.Name}: {surface.StatusText}"))}");
 
         if (unavailable.Count > 0)
             Log.Warning($"[XASlave] Startup unavailable: {string.Join("; ", unavailable.Select(surface => $"{surface.Name}: {surface.StatusText}"))}");
@@ -991,26 +1310,30 @@ public sealed class Plugin : IDalamudPlugin
     private IEnumerable<StartupSurfaceStatus> GetStartupSurfaceStatuses()
     {
         yield return CreateStartupSurfaceStatus("Cancel Login Cooldown", Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.CancelLoginCooldownStatusText);
-        yield return CreateStartupSurfaceStatus("Auto Skip Cutscenes", Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.StatusText);
+        yield return CreateStartupSurfaceStatus("Auto Skip Cutscenes", Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.StatusText, "AutoSkipCutscenesEnabled");
         yield return CreateStartupSurfaceStatus("Prevent Lobby Exit", Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.PreventLobbyExitStatusText);
-        yield return CreateStartupSurfaceStatus("Queue Position Display", Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.StatusText);
+        yield return CreateStartupSurfaceStatus("Queue Position Display", Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.StatusText, "DisplayActualQueuePositionEnabled");
         yield return CreateStartupSurfaceStatus("Disable Title Screen Movie", Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.DisableTitleScreenMovieStatusText);
         yield return CreateStartupSurfaceStatus("Auto Display IDs", Configuration.AutoDisplayIdsEnabled, AutoDisplayIds.StatusText);
-        yield return CreateStartupSurfaceStatus("Custom Timestamp Format", Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.StatusText);
-        yield return CreateStartupSurfaceStatus("Auto Hide Game Objects", Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.StatusText);
+        yield return CreateStartupSurfaceStatus("Display Network Latency", Configuration.AutoDisplayNetworkLatencyEnabled, AutoDisplayNetworkLatency.StatusText);
+        yield return CreateStartupSurfaceStatus("Custom Timestamp Format", Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.StatusText, "CustomTimestampFormatEnabled");
+        yield return CreateStartupSurfaceStatus("Auto Hide Game Objects", Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.StatusText, "AutoHideGameObjectsEnabled");
         yield return CreateStartupSurfaceStatus("Skip Dialogue", Configuration.AutoSkipDialogueEnabled, DialogueSkip.StatusText);
-        yield return CreateStartupSurfaceStatus("Background Rendering Pause", Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.DisableBackgroundRenderingStatusText);
-        yield return CreateStartupSurfaceStatus("Custom Sight Distance", Configuration.CustomSightDistanceEnabled, SightDistance.StatusText);
+        yield return CreateStartupSurfaceStatus("Lock Game Window In Combat", Configuration.LockGameWindowInCombatEnabled, AutoLockGameWindow.StatusText);
+        yield return CreateStartupSurfaceStatus("Notify When Friend Is Near", Configuration.NotifyWhenFriendIsNearEnabled, NotifyWhenFriendIsNear.StatusText);
+        yield return CreateStartupSurfaceStatus("Better Cast Bar", Configuration.BetterCastBarEnabled, BetterCastBar.StatusText);
+        yield return CreateStartupSurfaceStatus("Better Duty Finder", Configuration.BetterDutyFinderEnabled, BetterDutyFinder.StatusText);
+        yield return CreateStartupSurfaceStatus("Background Rendering Pause", Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.DisableBackgroundRenderingStatusText, "DisableBackgroundGameRenderingEnabled");
+        yield return CreateStartupSurfaceStatus("Custom Sight Distance", Configuration.CustomSightDistanceEnabled, SightDistance.StatusText, "CustomSightDistanceEnabled");
         yield return CreateStartupSurfaceStatus("Instant Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText);
-        yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText);
+        yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText, "AutoRefuseTradeRequestEnabled");
         yield return CreateStartupSurfaceStatus("Fix /target Command", Configuration.TargetCommandFixEnabled, TargetCommandFix.StatusText);
         yield return CreateStartupSurfaceStatus("Better Inventory Mover", Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.StatusText);
         yield return CreateStartupSurfaceStatus("Better Company Chest", Configuration.BetterCompanyChestEnabled, BetterCompanyChest.StatusText);
         yield return CreateStartupSurfaceStatus("Auto Open Moogle Mail", Configuration.AutoOpenMoogleMailEnabled, AutoOpenMoogleMail.StatusText);
         yield return CreateStartupSurfaceStatus("Enable Item Icon In Shops", Configuration.EnableItemIconInShopsEnabled, EnableItemIconInShops.StatusText);
         yield return CreateStartupSurfaceStatus("Field Operations Entry Command", Configuration.FieldEntryCommandEnabled, FieldEntryCommand.StatusText);
-        yield return CreateStartupSurfaceStatus("Reveal Undiscovered Areas", Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.RevealUndiscoveredAreasStatusText);
-        yield return CreateStartupSurfaceStatus("Special Render Modes", Configuration.SpecialRenderModesEnabled, SystemWindowMods.SpecialRenderModesStatusText);
+        yield return CreateStartupSurfaceStatus("Reveal Undiscovered Areas", Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.RevealUndiscoveredAreasStatusText, "AutoRevealUndiscoveredAreasEnabled");
         yield return CreateStartupSurfaceStatus("Doze & Sit Anywhere", Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.StatusText);
         yield return CreateStartupSurfaceStatus("Auto Duty Commence", Configuration.AutoDutyCommenceEnabled, AutoDutyCommence.StatusText);
         yield return CreateStartupSurfaceStatus("Infinite Sprint", Configuration.InfiniteSprintEnabled, PlayerMods.InfiniteSprintStatusText);
@@ -1020,15 +1343,31 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Moveable After Death", Configuration.MoveableAfterDeathEnabled, PlayerMods.MoveableAfterDeathStatusText);
     }
 
-    private static StartupSurfaceStatus CreateStartupSurfaceStatus(string name, bool requested, string statusText)
+    private StartupSurfaceStatus CreateStartupSurfaceStatus(string name, bool requested, string statusText, string? postLoadActivationKey = null)
     {
-        return new StartupSurfaceStatus(name, requested, statusText, IsStartupSurfaceReady(statusText));
+        var postLoadActivationPending = postLoadActivationKey is not null
+            && pendingPostLoadXAModActivations.Contains(postLoadActivationKey);
+        var effectiveStatusText = postLoadActivationPending
+            ? "Scheduled - post-load XA Mod activation will arm after core plugin load."
+            : statusText;
+
+        return new StartupSurfaceStatus(
+            name,
+            requested,
+            effectiveStatusText,
+            IsStartupSurfaceReady(effectiveStatusText),
+            postLoadActivationPending || IsStartupSurfacePending(effectiveStatusText));
     }
 
     private static bool IsStartupSurfaceReady(string statusText)
     {
         return statusText.StartsWith("Enabled", StringComparison.OrdinalIgnoreCase)
             || statusText.StartsWith("Ready", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsStartupSurfacePending(string statusText)
+    {
+        return statusText.StartsWith("Arming", StringComparison.OrdinalIgnoreCase);
     }
 
     private void UpdateEurekaLogogramCreatorOverlayWindows()
@@ -1056,6 +1395,8 @@ public sealed class Plugin : IDalamudPlugin
         TryCleanup("UiBuilder.Draw -= WindowSystem.Draw", () => PluginInterface.UiBuilder.Draw -= WindowSystem.Draw);
         TryCleanup("UiBuilder.Draw -= BetterCompanyChest.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterCompanyChest.DrawOverlay);
         TryCleanup("UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay);
+        TryCleanup("UiBuilder.Draw -= BetterCastBar.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterCastBar.DrawOverlay);
+        TryCleanup("UiBuilder.Draw -= BetterDutyFinder.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterDutyFinder.DrawOverlay);
         TryCleanup("UiBuilder.Draw -= XAPeep.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= XAPeep.DrawOverlay);
         TryCleanup("UiBuilder.OpenConfigUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainUi);
         TryCleanup("UiBuilder.OpenMainUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi);
@@ -1072,15 +1413,21 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoSkipCutscenes", AutoSkipCutscenes);
         TryDispose("BuddyFeedCutsceneSkip", BuddyFeedCutsceneSkip);
         TryDispose("PopupCleaner", PopupCleaner);
+        TryDispose("DalamudNotificationsSuck", DalamudNotificationsSuck);
         TryDispose("SystemWindowMods", SystemWindowMods);
         TryDispose("LobbyErrorAutoClose", LobbyErrorAutoClose);
         TryDispose("QueuePositionDisplay", QueuePositionDisplay);
         TryDispose("MsqProgressDisplay", MsqProgressDisplay);
         TryDispose("TooltipItemId", TooltipItemId);
         TryDispose("AutoDisplayIds", AutoDisplayIds);
+        TryDispose("AutoDisplayNetworkLatency", AutoDisplayNetworkLatency);
         TryDispose("ChatTimestampFormat", ChatTimestampFormat);
         TryDispose("AutoHideGameObjects", AutoHideGameObjects);
         TryDispose("DialogueSkip", DialogueSkip);
+        TryDispose("AutoLockGameWindow", AutoLockGameWindow);
+        TryDispose("NotifyWhenFriendIsNear", NotifyWhenFriendIsNear);
+        TryDispose("BetterCastBar", BetterCastBar);
+        TryDispose("BetterDutyFinder", BetterDutyFinder);
         TryDispose("CopyItemNameContextMenu", CopyItemNameContextMenu);
         TryDispose("SightDistance", SightDistance);
         TryDispose("PlayerSearchContextMenu", PlayerSearchContextMenu);
@@ -1935,6 +2282,55 @@ public sealed class Plugin : IDalamudPlugin
                     ShowZoneInfo = Configuration.AutoDisplayIdsShowZoneInfo,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "display-network-latency":
+                snapshot = JsonSerializer.SerializeToElement(new XAModNetworkLatencySettings
+                {
+                    Format = Configuration.AutoDisplayNetworkLatencyFormat,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "notify-when-friend-is-near":
+                snapshot = JsonSerializer.SerializeToElement(new XAModNotifyWhenFriendIsNearSettings
+                {
+                    Patterns = Configuration.NotifyWhenFriendIsNearPatterns.ToList(),
+                    CooldownSeconds = Configuration.NotifyWhenFriendIsNearCooldownSeconds,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "better-cast-bar":
+                snapshot = JsonSerializer.SerializeToElement(new XAModBetterCastBarSettings
+                {
+                    InterruptedTextX = Configuration.BetterCastBarInterruptedTextPosition.X,
+                    InterruptedTextY = Configuration.BetterCastBarInterruptedTextPosition.Y,
+                    InterruptedTextSize = Configuration.BetterCastBarInterruptedTextSize,
+                    ActionNameTextX = Configuration.BetterCastBarActionNamePosition.X,
+                    ActionNameTextY = Configuration.BetterCastBarActionNamePosition.Y,
+                    ActionNameTextSize = Configuration.BetterCastBarActionNameSize,
+                    CastingTextX = Configuration.BetterCastBarCastingTextPosition.X,
+                    CastingTextY = Configuration.BetterCastBarCastingTextPosition.Y,
+                    CastingTextSize = Configuration.BetterCastBarCastingTextSize,
+                    CastTimeTextX = Configuration.BetterCastBarCastTimeTextPosition.X,
+                    CastTimeTextY = Configuration.BetterCastBarCastTimeTextPosition.Y,
+                    CastTimeTextSize = Configuration.BetterCastBarCastTimeTextSize,
+                    IconAlpha = Configuration.BetterCastBarIconAlpha,
+                    IconX = Configuration.BetterCastBarIconPosition.X,
+                    IconY = Configuration.BetterCastBarIconPosition.Y,
+                    IconScaleX = Configuration.BetterCastBarIconScale.X,
+                    IconScaleY = Configuration.BetterCastBarIconScale.Y,
+                    SlidecastMode = Configuration.BetterCastBarSlidecastMode,
+                    SlidecastThresholdMs = Configuration.BetterCastBarSlidecastThresholdMs,
+                    SlidecastLineWidth = Configuration.BetterCastBarSlidecastLineWidth,
+                    SlidecastLineHeight = Configuration.BetterCastBarSlidecastLineHeight,
+                    SlidecastNotReadyColor = CreateColorSettings(
+                        Configuration.BetterCastBarSlidecastNotReadyColor.X,
+                        Configuration.BetterCastBarSlidecastNotReadyColor.Y,
+                        Configuration.BetterCastBarSlidecastNotReadyColor.Z,
+                        Configuration.BetterCastBarSlidecastNotReadyColor.W),
+                    SlidecastReadyColor = CreateColorSettings(
+                        Configuration.BetterCastBarSlidecastReadyColor.X,
+                        Configuration.BetterCastBarSlidecastReadyColor.Y,
+                        Configuration.BetterCastBarSlidecastReadyColor.Z,
+                        Configuration.BetterCastBarSlidecastReadyColor.W),
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "better-inventory-mover":
                 snapshot = JsonSerializer.SerializeToElement(new XAModBetterInventoryMoverSettings
                 {
@@ -2000,6 +2396,18 @@ public sealed class Plugin : IDalamudPlugin
                 snapshot = JsonSerializer.SerializeToElement(new XAModPopupCleanerSettings
                 {
                     HideHowToNotice = Configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "dalamud-notifications-suck":
+                snapshot = JsonSerializer.SerializeToElement(new XAModDalamudNotificationsSuckSettings
+                {
+                    HideAll = Configuration.DalamudNotificationsSuckHideAll,
+                    HideDalamudUpdates = Configuration.DalamudNotificationsSuckHideDalamudUpdates,
+                    HidePluginLifecycle = Configuration.DalamudNotificationsSuckHidePluginLifecycle,
+                    HidePluginErrors = Configuration.DalamudNotificationsSuckHidePluginErrors,
+                    HideModManagerAlerts = Configuration.DalamudNotificationsSuckHideModManagerAlerts,
+                    HideSuccessInfo = Configuration.DalamudNotificationsSuckHideSuccessInfo,
+                    HideWarningsErrors = Configuration.DalamudNotificationsSuckHideWarningsErrors,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
             case "auto-leave-duty":
@@ -2145,6 +2553,19 @@ public sealed class Plugin : IDalamudPlugin
             PopupCleaner.ApplyConfiguration(Configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled);
         }
 
+        if (TryDeserializeXAModSettings(modSettings, "dalamud-notifications-suck", out XAModDalamudNotificationsSuckSettings? dalamudNotificationSettings)
+            && dalamudNotificationSettings != null)
+        {
+            Configuration.DalamudNotificationsSuckHideAll = dalamudNotificationSettings.HideAll;
+            Configuration.DalamudNotificationsSuckHideDalamudUpdates = dalamudNotificationSettings.HideDalamudUpdates;
+            Configuration.DalamudNotificationsSuckHidePluginLifecycle = dalamudNotificationSettings.HidePluginLifecycle;
+            Configuration.DalamudNotificationsSuckHidePluginErrors = dalamudNotificationSettings.HidePluginErrors;
+            Configuration.DalamudNotificationsSuckHideModManagerAlerts = dalamudNotificationSettings.HideModManagerAlerts;
+            Configuration.DalamudNotificationsSuckHideSuccessInfo = dalamudNotificationSettings.HideSuccessInfo;
+            Configuration.DalamudNotificationsSuckHideWarningsErrors = dalamudNotificationSettings.HideWarningsErrors;
+            ApplyDalamudNotificationsSuckConfiguration(save: false);
+        }
+
         if (TryDeserializeXAModSettings(modSettings, "custom-resolutions", out XAModCustomResolutionsSettings? customResolutionSettings)
             && customResolutionSettings != null)
         {
@@ -2176,6 +2597,63 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.AutoDisplayIdsShowWeatherId = autoDisplayIdsSettings.ShowWeatherId;
             Configuration.AutoDisplayIdsShowZoneInfo = autoDisplayIdsSettings.ShowZoneInfo;
             ApplyAutoDisplayIdsConfiguration(save: false);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "display-network-latency", out XAModNetworkLatencySettings? networkLatencySettings)
+            && networkLatencySettings != null)
+        {
+            Configuration.AutoDisplayNetworkLatencyFormat = AutoDisplayNetworkLatencyService.NormalizeFormat(networkLatencySettings.Format);
+            AutoDisplayNetworkLatency.ApplyConfiguration(Configuration.AutoDisplayNetworkLatencyFormat);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "notify-when-friend-is-near", out XAModNotifyWhenFriendIsNearSettings? friendNearSettings)
+            && friendNearSettings != null)
+        {
+            Configuration.NotifyWhenFriendIsNearPatterns = (friendNearSettings.Patterns ?? [])
+                .Select(pattern => pattern.Trim())
+                .Where(pattern => !string.IsNullOrWhiteSpace(pattern))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            Configuration.NotifyWhenFriendIsNearCooldownSeconds = NotifyWhenFriendIsNearService.NormalizeCooldownSeconds(friendNearSettings.CooldownSeconds);
+            NotifyWhenFriendIsNear.ApplyConfiguration(
+                Configuration.NotifyWhenFriendIsNearPatterns,
+                Configuration.NotifyWhenFriendIsNearCooldownSeconds);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "better-cast-bar", out XAModBetterCastBarSettings? betterCastBarSettings)
+            && betterCastBarSettings != null)
+        {
+            var notReadyColor = betterCastBarSettings.SlidecastNotReadyColor ?? new XAModColorSettings();
+            var readyColor = betterCastBarSettings.SlidecastReadyColor ?? new XAModColorSettings();
+
+            Configuration.BetterCastBarInterruptedTextPosition = new Vector2(betterCastBarSettings.InterruptedTextX, betterCastBarSettings.InterruptedTextY);
+            Configuration.BetterCastBarInterruptedTextSize = Math.Clamp(betterCastBarSettings.InterruptedTextSize, 1, 255);
+            Configuration.BetterCastBarActionNamePosition = new Vector2(betterCastBarSettings.ActionNameTextX, betterCastBarSettings.ActionNameTextY);
+            Configuration.BetterCastBarActionNameSize = Math.Clamp(betterCastBarSettings.ActionNameTextSize, 1, 255);
+            Configuration.BetterCastBarCastingTextPosition = new Vector2(betterCastBarSettings.CastingTextX, betterCastBarSettings.CastingTextY);
+            Configuration.BetterCastBarCastingTextSize = Math.Clamp(betterCastBarSettings.CastingTextSize, 1, 255);
+            Configuration.BetterCastBarCastTimeTextPosition = new Vector2(betterCastBarSettings.CastTimeTextX, betterCastBarSettings.CastTimeTextY);
+            Configuration.BetterCastBarCastTimeTextSize = Math.Clamp(betterCastBarSettings.CastTimeTextSize, 1, 255);
+            Configuration.BetterCastBarIconAlpha = Math.Clamp(betterCastBarSettings.IconAlpha, 0, 255);
+            Configuration.BetterCastBarIconPosition = new Vector2(betterCastBarSettings.IconX, betterCastBarSettings.IconY);
+            Configuration.BetterCastBarIconScale = new Vector2(
+                Math.Clamp(betterCastBarSettings.IconScaleX, 0.1f, 5f),
+                Math.Clamp(betterCastBarSettings.IconScaleY, 0.1f, 5f));
+            Configuration.BetterCastBarSlidecastMode = BetterCastBarService.NormalizeSlidecastMode(betterCastBarSettings.SlidecastMode);
+            Configuration.BetterCastBarSlidecastThresholdMs = Math.Clamp(betterCastBarSettings.SlidecastThresholdMs, 0, 5000);
+            Configuration.BetterCastBarSlidecastLineWidth = Math.Clamp(betterCastBarSettings.SlidecastLineWidth, 1, 20);
+            Configuration.BetterCastBarSlidecastLineHeight = Math.Clamp(betterCastBarSettings.SlidecastLineHeight, 0, 100);
+            Configuration.BetterCastBarSlidecastNotReadyColor = new Vector4(
+                ClampUnitFloat(notReadyColor.R),
+                ClampUnitFloat(notReadyColor.G),
+                ClampUnitFloat(notReadyColor.B),
+                ClampUnitFloat(notReadyColor.A));
+            Configuration.BetterCastBarSlidecastReadyColor = new Vector4(
+                ClampUnitFloat(readyColor.R),
+                ClampUnitFloat(readyColor.G),
+                ClampUnitFloat(readyColor.B),
+                ClampUnitFloat(readyColor.A));
+            BetterCastBar.ApplyConfiguration(Configuration);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "better-inventory-mover", out XAModBetterInventoryMoverSettings? inventoryMoverSettings)
@@ -2499,6 +2977,13 @@ public sealed class Plugin : IDalamudPlugin
 
     private static float ClampUnitFloat(float value)
         => Math.Clamp(value, 0f, 1f);
+
+    private static Vector4 ClampVector4(Vector4 value)
+        => new(
+            ClampUnitFloat(value.X),
+            ClampUnitFloat(value.Y),
+            ClampUnitFloat(value.Z),
+            ClampUnitFloat(value.W));
 
     private bool TryHandleResolutionCommand(string value, out string message)
     {
@@ -2964,6 +3449,70 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
     }
 
+    internal void ApplyAutoDisplayNetworkLatencyConfiguration(bool save = true)
+    {
+        Configuration.AutoDisplayNetworkLatencyFormat = AutoDisplayNetworkLatencyService.NormalizeFormat(Configuration.AutoDisplayNetworkLatencyFormat);
+        AutoDisplayNetworkLatency.ApplyConfiguration(Configuration.AutoDisplayNetworkLatencyFormat);
+
+        if (save)
+            Configuration.Save();
+    }
+
+    internal void ApplyDalamudNotificationsSuckConfiguration(bool save = true)
+    {
+        DalamudNotificationsSuck.ApplyConfiguration(new DalamudNotificationSuppressorOptions
+        {
+            HideAll = Configuration.DalamudNotificationsSuckHideAll,
+            HideDalamudUpdates = Configuration.DalamudNotificationsSuckHideDalamudUpdates,
+            HidePluginLifecycle = Configuration.DalamudNotificationsSuckHidePluginLifecycle,
+            HidePluginErrors = Configuration.DalamudNotificationsSuckHidePluginErrors,
+            HideModManagerAlerts = Configuration.DalamudNotificationsSuckHideModManagerAlerts,
+            HideSuccessInfo = Configuration.DalamudNotificationsSuckHideSuccessInfo,
+            HideWarningsErrors = Configuration.DalamudNotificationsSuckHideWarningsErrors,
+        });
+
+        if (save)
+            Configuration.Save();
+    }
+
+    internal void ApplyNotifyWhenFriendIsNearConfiguration(bool save = true)
+    {
+        Configuration.NotifyWhenFriendIsNearPatterns = Configuration.NotifyWhenFriendIsNearPatterns
+            .Select(pattern => pattern.Trim())
+            .Where(pattern => !string.IsNullOrWhiteSpace(pattern))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        Configuration.NotifyWhenFriendIsNearCooldownSeconds = NotifyWhenFriendIsNearService.NormalizeCooldownSeconds(Configuration.NotifyWhenFriendIsNearCooldownSeconds);
+        NotifyWhenFriendIsNear.ApplyConfiguration(
+            Configuration.NotifyWhenFriendIsNearPatterns,
+            Configuration.NotifyWhenFriendIsNearCooldownSeconds);
+
+        if (save)
+            Configuration.Save();
+    }
+
+    internal void ApplyBetterCastBarConfiguration(bool save = true)
+    {
+        Configuration.BetterCastBarInterruptedTextSize = Math.Clamp(Configuration.BetterCastBarInterruptedTextSize, 1, 255);
+        Configuration.BetterCastBarActionNameSize = Math.Clamp(Configuration.BetterCastBarActionNameSize, 1, 255);
+        Configuration.BetterCastBarCastingTextSize = Math.Clamp(Configuration.BetterCastBarCastingTextSize, 1, 255);
+        Configuration.BetterCastBarCastTimeTextSize = Math.Clamp(Configuration.BetterCastBarCastTimeTextSize, 1, 255);
+        Configuration.BetterCastBarIconAlpha = Math.Clamp(Configuration.BetterCastBarIconAlpha, 0, 255);
+        Configuration.BetterCastBarIconScale = new Vector2(
+            Math.Clamp(Configuration.BetterCastBarIconScale.X, 0.1f, 5f),
+            Math.Clamp(Configuration.BetterCastBarIconScale.Y, 0.1f, 5f));
+        Configuration.BetterCastBarSlidecastMode = BetterCastBarService.NormalizeSlidecastMode(Configuration.BetterCastBarSlidecastMode);
+        Configuration.BetterCastBarSlidecastThresholdMs = Math.Clamp(Configuration.BetterCastBarSlidecastThresholdMs, 0, 5000);
+        Configuration.BetterCastBarSlidecastLineWidth = Math.Clamp(Configuration.BetterCastBarSlidecastLineWidth, 1, 20);
+        Configuration.BetterCastBarSlidecastLineHeight = Math.Clamp(Configuration.BetterCastBarSlidecastLineHeight, 0, 100);
+        Configuration.BetterCastBarSlidecastNotReadyColor = ClampVector4(Configuration.BetterCastBarSlidecastNotReadyColor);
+        Configuration.BetterCastBarSlidecastReadyColor = ClampVector4(Configuration.BetterCastBarSlidecastReadyColor);
+        BetterCastBar.ApplyConfiguration(Configuration);
+
+        if (save)
+            Configuration.Save();
+    }
+
     internal void ApplyBetterInventoryMoverConfiguration(bool save = true)
     {
         Configuration.BetterInventoryMoverQuickMoveModifier = BetterInventoryMoverService.NormalizeModifier(Configuration.BetterInventoryMoverQuickMoveModifier);
@@ -3074,6 +3623,18 @@ public sealed class Plugin : IDalamudPlugin
                 break;
             case "auto-display-ids":
                 ApplyAutoDisplayIdsConfiguration(save: false);
+                break;
+            case "display-network-latency":
+                ApplyAutoDisplayNetworkLatencyConfiguration(save: false);
+                break;
+            case "dalamud-notifications-suck":
+                ApplyDalamudNotificationsSuckConfiguration(save: false);
+                break;
+            case "notify-when-friend-is-near":
+                ApplyNotifyWhenFriendIsNearConfiguration(save: false);
+                break;
+            case "better-cast-bar":
+                ApplyBetterCastBarConfiguration(save: false);
                 break;
             case "better-inventory-mover":
                 ApplyBetterInventoryMoverConfiguration(save: false);
@@ -3235,14 +3796,36 @@ public sealed class Plugin : IDalamudPlugin
 
             return AutoDisplayIds.SetEnabled(true);
         }, applied => Configuration.AutoDisplayIdsEnabled = applied, () => AutoDisplayIds.StatusText);
+        yield return new("display-network-latency", "Display Network Latency", XAModsRestoreScope.Game, () => Configuration.AutoDisplayNetworkLatencyEnabled, value =>
+        {
+            ApplyAutoDisplayNetworkLatencyConfiguration(save: false);
+            return AutoDisplayNetworkLatency.SetEnabled(value);
+        }, applied => Configuration.AutoDisplayNetworkLatencyEnabled = applied, () => AutoDisplayNetworkLatency.StatusText);
         yield return new("custom-timestamp-format", "Custom Timestamp Format", XAModsRestoreScope.Game, () => Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.SetEnabled, applied => Configuration.CustomTimestampFormatEnabled = applied, () => ChatTimestampFormat.StatusText);
         yield return new("auto-skip-cutscenes", "Skip Cutscenes", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.SetEnabled, applied => Configuration.AutoSkipCutscenesEnabled = applied, () => AutoSkipCutscenes.StatusText);
         yield return new("auto-skip-cutscenes-feeding-chocobo", "Skip Cutscenes Feeding Chocobo", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesFeedingChocoboEnabled, BuddyFeedCutsceneSkip.SetEnabled, applied => Configuration.AutoSkipCutscenesFeedingChocoboEnabled = applied, () => BuddyFeedCutsceneSkip.StatusText);
         yield return new("auto-hide-unnecessary-popups", "Hide Unnecessary Popups", XAModsRestoreScope.Game, () => Configuration.AutoHideUnnecessaryPopupsEnabled, PopupCleaner.SetEnabled, applied => Configuration.AutoHideUnnecessaryPopupsEnabled = applied, () => PopupCleaner.StatusText);
+        yield return new("dalamud-notifications-suck", "Dalamud Notifications Suck", XAModsRestoreScope.Game, () => Configuration.DalamudNotificationsSuckEnabled, value =>
+        {
+            ApplyDalamudNotificationsSuckConfiguration(save: false);
+            return DalamudNotificationsSuck.SetEnabled(value);
+        }, applied => Configuration.DalamudNotificationsSuckEnabled = applied, () => DalamudNotificationsSuck.StatusText);
         yield return new("auto-prevent-game-exiting-from-lobby-errors", "Prevent Game Exiting From Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.SetPreventLobbyExitEnabled, applied => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled = applied, () => SystemWindowMods.PreventLobbyExitStatusText);
         yield return new("auto-close-lobby-errors", "Close Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoCloseLobbyErrorsEnabled, LobbyErrorAutoClose.SetEnabled, applied => Configuration.AutoCloseLobbyErrorsEnabled = applied, () => LobbyErrorAutoClose.StatusText);
         yield return new("bailout-esc-menu", "Bailout ESC Menu", XAModsRestoreScope.Game, () => Configuration.BailoutEscMenuEnabled, EscMenuBailout.SetEnabled, applied => Configuration.BailoutEscMenuEnabled = applied, () => EscMenuBailout.StatusText);
         yield return new("auto-skip-dialogue", "Skip Dialogue", XAModsRestoreScope.Game, () => Configuration.AutoSkipDialogueEnabled, DialogueSkip.SetEnabled, applied => Configuration.AutoSkipDialogueEnabled = applied, () => DialogueSkip.StatusText);
+        yield return new("lock-game-window-in-combat", "Lock Game Window In Combat", XAModsRestoreScope.Game, () => Configuration.LockGameWindowInCombatEnabled, AutoLockGameWindow.SetEnabled, applied => Configuration.LockGameWindowInCombatEnabled = applied, () => AutoLockGameWindow.StatusText);
+        yield return new("notify-when-friend-is-near", "Notify When Friend Is Near", XAModsRestoreScope.Game, () => Configuration.NotifyWhenFriendIsNearEnabled, value =>
+        {
+            ApplyNotifyWhenFriendIsNearConfiguration(save: false);
+            return NotifyWhenFriendIsNear.SetEnabled(value);
+        }, applied => Configuration.NotifyWhenFriendIsNearEnabled = applied, () => NotifyWhenFriendIsNear.StatusText);
+        yield return new("better-cast-bar", "Better Cast Bar", XAModsRestoreScope.Game, () => Configuration.BetterCastBarEnabled, value =>
+        {
+            ApplyBetterCastBarConfiguration(save: false);
+            return BetterCastBar.SetEnabled(value);
+        }, applied => Configuration.BetterCastBarEnabled = applied, () => BetterCastBar.StatusText);
+        yield return new("better-duty-finder", "Better Duty Finder", XAModsRestoreScope.Game, () => Configuration.BetterDutyFinderEnabled, BetterDutyFinder.SetEnabled, applied => Configuration.BetterDutyFinderEnabled = applied, () => BetterDutyFinder.StatusText);
         yield return new("display-actual-queue-position", "Display Actual Queue Position", XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusText);
         yield return new("target-command-fix", "Fix /target Command", XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusText);
         yield return new("copy-item-name-for-all", "Copy Item Name For All", XAModsRestoreScope.Game, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusText);
@@ -3400,6 +3983,10 @@ public sealed class Plugin : IDalamudPlugin
             case "ids":
                 definition = new("displayids", "/xa displayids on|off", GetXAModDefinition("auto-display-ids"));
                 return true;
+            case "latency":
+            case "networklatency":
+                definition = new("latency", "/xa latency on|off", GetXAModDefinition("display-network-latency"));
+                return true;
             case "timestampseconds":
             case "chattimestamps":
             case "timestampformat":
@@ -3415,6 +4002,11 @@ public sealed class Plugin : IDalamudPlugin
             case "hidepopups":
                 definition = new("hidepopups", "/xa hidepopups on|off", GetXAModDefinition("auto-hide-unnecessary-popups"));
                 return true;
+            case "dalamudnotifs":
+            case "dalamudnotifications":
+            case "notificationssuck":
+                definition = new("dalamudnotifs", "/xa dalamudnotifs on|off", GetXAModDefinition("dalamud-notifications-suck"));
+                return true;
             case "preventlobbyexit":
                 definition = new("preventlobbyexit", "/xa preventlobbyexit on|off", GetXAModDefinition("auto-prevent-game-exiting-from-lobby-errors"));
                 return true;
@@ -3423,6 +4015,20 @@ public sealed class Plugin : IDalamudPlugin
                 return true;
             case "skipdialogue":
                 definition = new("skipdialogue", "/xa skipdialogue on|off", GetXAModDefinition("auto-skip-dialogue"));
+                return true;
+            case "lockcombat":
+            case "lockwindowcombat":
+                definition = new("lockcombat", "/xa lockcombat on|off", GetXAModDefinition("lock-game-window-in-combat"));
+                return true;
+            case "friendnear":
+            case "friendnotify":
+                definition = new("friendnear", "/xa friendnear on|off", GetXAModDefinition("notify-when-friend-is-near"));
+                return true;
+            case "castbar":
+                definition = new("castbar", "/xa castbar on|off", GetXAModDefinition("better-cast-bar"));
+                return true;
+            case "dutyfinder":
+                definition = new("dutyfinder", "/xa dutyfinder on|off", GetXAModDefinition("better-duty-finder"));
                 return true;
             case "queueposition":
                 definition = new("queueposition", "/xa queueposition on|off", GetXAModDefinition("display-actual-queue-position"));
@@ -3791,5 +4397,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.30";
+    public const string Version = "0.0.0.31";
 }

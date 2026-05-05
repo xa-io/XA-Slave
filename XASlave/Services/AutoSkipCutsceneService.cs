@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Dalamud;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Hooking;
@@ -11,6 +12,9 @@ namespace XASlave.Services;
 
 public unsafe sealed class AutoSkipCutsceneService : IDisposable
 {
+    private const double StartupArmingStepDebugThresholdMilliseconds = 5.0;
+    private const double StartupArmingStepWarningThresholdMilliseconds = 200.0;
+
     private readonly ICondition condition;
     private readonly IFramework framework;
     private readonly ISigScanner sigScanner;
@@ -30,6 +34,8 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private bool initialized;
     private bool enabled;
     private bool frameworkSubscribed;
+    private bool startupArmingPending;
+    private int startupArmingStep;
     private int availableSurfaceCount;
     private DateTime lastPromptAttemptUtc = DateTime.MinValue;
 
@@ -49,11 +55,30 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
     public bool IsEnabled => enabled;
 
+    public bool IsStartupArmingPending => startupArmingPending;
+
     public string StatusText { get; private set; } = "Disabled";
+
+    public bool RestoreEnabledOnStartup()
+    {
+        if (enabled && startupArmingPending)
+            return true;
+
+        if (initialized)
+            return SetEnabled(true);
+
+        EnsureFrameworkSubscribed();
+        enabled = true;
+        startupArmingPending = true;
+        startupArmingStep = 0;
+        availableSurfaceCount = 0;
+        StatusText = "Arming - cutscene hook surfaces are initializing over upcoming frames.";
+        return true;
+    }
 
     public bool SetEnabled(bool value)
     {
-        if (value == enabled)
+        if (value == enabled && !startupArmingPending)
         {
             RefreshStatusText();
             return enabled;
@@ -66,13 +91,10 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             return false;
         }
 
-        if (!frameworkSubscribed)
-        {
-            framework.Update += OnFrameworkUpdate;
-            frameworkSubscribed = true;
-        }
-
+        EnsureFrameworkSubscribed();
         enabled = true;
+        startupArmingPending = false;
+        startupArmingStep = 0;
         EnsureInitializedForEnabledState();
         RefreshStatusText();
         return true;
@@ -92,12 +114,10 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private void Disable()
     {
         enabled = false;
+        startupArmingPending = false;
+        startupArmingStep = 0;
         availableSurfaceCount = 0;
-        if (frameworkSubscribed)
-        {
-            framework.Update -= OnFrameworkUpdate;
-            frameworkSubscribed = false;
-        }
+        UnsubscribeFramework();
 
         ToggleHook(cutsceneHandleInputHook, false, "CutsceneHandleInput");
         ToggleHook(playCutsceneHook, false, "PlayCutscene");
@@ -113,16 +133,17 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         if (initialized)
             return;
 
-        initialized = true;
-        cutsceneHandleInputHook = TryCreateHook<CutsceneHandleInputDelegate>(Sigs.CutsceneHandleInputSig, CutsceneHandleInputDetour, "CutsceneHandleInput");
-        playCutsceneHook = TryCreateHook<PlayCutsceneDelegate>(Sigs.PlayCutsceneSig, PlayCutsceneDetour, "PlayCutscene");
-        playCutsceneLuaHook = TryCreateHook<LuaFunctionDelegate>(Sigs.PlayCutsceneLuaSig, PlayCutsceneLuaDetour, "PlayCutsceneLua");
-        isCutsceneSeenHook = TryCreateHook<IsCutsceneSeenDelegate>(Sigs.IsCutsceneSeenSig, IsCutsceneSeenDetour, "IsCutsceneSeen");
-        playStaffRollHook = TryCreateHook<LuaFunctionDelegate>(Sigs.PlayStaffRollSig, PlayStaffRollDetour, "PlayStaffRoll");
-        playToBeContinuedHook = TryCreateHook<LuaFunctionDelegate>(Sigs.PlayToBeContinuedSig, PlayToBeContinuedDetour, "PlayToBeContinued");
+        cutsceneHandleInputHook ??= TryCreateHook<CutsceneHandleInputDelegate>(Sigs.CutsceneHandleInputSig, CutsceneHandleInputDetour, "CutsceneHandleInput");
+        playCutsceneHook ??= TryCreateHook<PlayCutsceneDelegate>(Sigs.PlayCutsceneSig, PlayCutsceneDetour, "PlayCutscene");
+        playCutsceneLuaHook ??= TryCreateHook<LuaFunctionDelegate>(Sigs.PlayCutsceneLuaSig, PlayCutsceneLuaDetour, "PlayCutsceneLua");
+        isCutsceneSeenHook ??= TryCreateHook<IsCutsceneSeenDelegate>(Sigs.IsCutsceneSeenSig, IsCutsceneSeenDetour, "IsCutsceneSeen");
+        playStaffRollHook ??= TryCreateHook<LuaFunctionDelegate>(Sigs.PlayStaffRollSig, PlayStaffRollDetour, "PlayStaffRoll");
+        playToBeContinuedHook ??= TryCreateHook<LuaFunctionDelegate>(Sigs.PlayToBeContinuedSig, PlayToBeContinuedDetour, "PlayToBeContinued");
 
-        if (!sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress))
+        if (cutsceneUnskippablePatchAddress == nint.Zero && !sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress))
             log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature.");
+
+        initialized = true;
     }
 
     private void EnsureInitializedForEnabledState()
@@ -160,6 +181,12 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         if (!enabled)
         {
             StatusText = "Disabled";
+            return;
+        }
+
+        if (startupArmingPending)
+        {
+            StatusText = "Arming - cutscene hook surfaces are initializing over upcoming frames.";
             return;
         }
 
@@ -233,6 +260,24 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         return 0;
     }
 
+    private void EnsureFrameworkSubscribed()
+    {
+        if (frameworkSubscribed)
+            return;
+
+        framework.Update += OnFrameworkUpdate;
+        frameworkSubscribed = true;
+    }
+
+    private void UnsubscribeFramework()
+    {
+        if (!frameworkSubscribed)
+            return;
+
+        framework.Update -= OnFrameworkUpdate;
+        frameworkSubscribed = false;
+    }
+
     private static void DisposeHook<T>(ref Hook<T>? hook)
         where T : Delegate
     {
@@ -288,6 +333,12 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
     private void OnFrameworkUpdate(IFramework _)
     {
+        if (startupArmingPending)
+        {
+            ProcessStartupArmingStep();
+            return;
+        }
+
         SyncCutscenePatchState();
         if (!enabled || !condition[ConditionFlag.OccupiedInCutSceneEvent])
             return;
@@ -299,6 +350,142 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         lastPromptAttemptUtc = now;
         if (AddonHelper.IsAddonReady("SelectString"))
             AddonHelper.FireCallbackAndClose("SelectString", 0);
+    }
+
+    private void ProcessStartupArmingStep()
+    {
+        var label = GetStartupArmingStepLabel(startupArmingStep);
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            switch (startupArmingStep)
+            {
+                case 0:
+                    cutsceneHandleInputHook ??= TryCreateHook<CutsceneHandleInputDelegate>(Sigs.CutsceneHandleInputSig, CutsceneHandleInputDetour, "CutsceneHandleInput");
+                    break;
+                case 1:
+                    playCutsceneHook ??= TryCreateHook<PlayCutsceneDelegate>(Sigs.PlayCutsceneSig, PlayCutsceneDetour, "PlayCutscene");
+                    break;
+                case 2:
+                    playCutsceneLuaHook ??= TryCreateHook<LuaFunctionDelegate>(Sigs.PlayCutsceneLuaSig, PlayCutsceneLuaDetour, "PlayCutsceneLua");
+                    break;
+                case 3:
+                    isCutsceneSeenHook ??= TryCreateHook<IsCutsceneSeenDelegate>(Sigs.IsCutsceneSeenSig, IsCutsceneSeenDetour, "IsCutsceneSeen");
+                    break;
+                case 4:
+                    playStaffRollHook ??= TryCreateHook<LuaFunctionDelegate>(Sigs.PlayStaffRollSig, PlayStaffRollDetour, "PlayStaffRoll");
+                    break;
+                case 5:
+                    playToBeContinuedHook ??= TryCreateHook<LuaFunctionDelegate>(Sigs.PlayToBeContinuedSig, PlayToBeContinuedDetour, "PlayToBeContinued");
+                    break;
+                case 6:
+                    if (cutsceneUnskippablePatchAddress == nint.Zero && !sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress))
+                        log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature.");
+                    initialized = true;
+                    break;
+                case 7:
+                    if (!HasAnyCutsceneSurface())
+                    {
+                        enabled = false;
+                        startupArmingPending = false;
+                        startupArmingStep = 0;
+                        StatusText = "Unavailable - cutscene signatures were not found.";
+                        UnsubscribeFramework();
+                        log.Warning("[XASlave] Auto Skip Cutscenes unavailable: no cutscene hook or patch signatures were found.");
+                        return;
+                    }
+
+                    availableSurfaceCount = 0;
+                    break;
+                case 8:
+                    availableSurfaceCount += ToggleHook(cutsceneHandleInputHook, true, "CutsceneHandleInput");
+                    break;
+                case 9:
+                    availableSurfaceCount += ToggleHook(playCutsceneHook, true, "PlayCutscene");
+                    break;
+                case 10:
+                    availableSurfaceCount += ToggleHook(playCutsceneLuaHook, true, "PlayCutsceneLua");
+                    break;
+                case 11:
+                    availableSurfaceCount += ToggleHook(isCutsceneSeenHook, true, "IsCutsceneSeen");
+                    break;
+                case 12:
+                    availableSurfaceCount += ToggleHook(playStaffRollHook, true, "PlayStaffRoll");
+                    break;
+                case 13:
+                    availableSurfaceCount += ToggleHook(playToBeContinuedHook, true, "PlayToBeContinued");
+                    break;
+                default:
+                    if (cutsceneUnskippablePatchAddress != nint.Zero)
+                        availableSurfaceCount++;
+
+                    if (availableSurfaceCount == 0)
+                    {
+                        enabled = false;
+                        StatusText = "Unavailable - cutscene hooks failed to enable.";
+                        UnsubscribeFramework();
+                        log.Warning("[XASlave] Auto Skip Cutscenes could not enable any hook or patch surfaces.");
+                    }
+                    else
+                    {
+                        startupArmingPending = false;
+                        SyncCutscenePatchState();
+                        RefreshStatusText();
+                    }
+
+                    startupArmingPending = false;
+                    startupArmingStep = 0;
+                    return;
+            }
+
+            startupArmingStep++;
+        }
+        catch (Exception ex)
+        {
+            startupArmingPending = false;
+            startupArmingStep = 0;
+            enabled = false;
+            StatusText = $"Unavailable - startup arming failed at {label}.";
+            UnsubscribeFramework();
+            log.Warning(ex, $"[XASlave] Auto Skip Cutscenes startup arming failed at {label}.");
+        }
+        finally
+        {
+            stopwatch.Stop();
+            LogStartupArmingStepDuration(label, stopwatch.Elapsed.TotalMilliseconds);
+        }
+    }
+
+    private static string GetStartupArmingStepLabel(int step)
+        => step switch
+        {
+            0 => "Create CutsceneHandleInput hook",
+            1 => "Create PlayCutscene hook",
+            2 => "Create PlayCutsceneLua hook",
+            3 => "Create IsCutsceneSeen hook",
+            4 => "Create PlayStaffRoll hook",
+            5 => "Create PlayToBeContinued hook",
+            6 => "Scan unskippable patch",
+            7 => "Validate surfaces",
+            8 => "Enable CutsceneHandleInput hook",
+            9 => "Enable PlayCutscene hook",
+            10 => "Enable PlayCutsceneLua hook",
+            11 => "Enable IsCutsceneSeen hook",
+            12 => "Enable PlayStaffRoll hook",
+            13 => "Enable PlayToBeContinued hook",
+            _ => "Finalize",
+        };
+
+    private void LogStartupArmingStepDuration(string label, double elapsedMilliseconds)
+    {
+        if (elapsedMilliseconds < StartupArmingStepDebugThresholdMilliseconds)
+            return;
+
+        var message = $"[XASlave] Auto Skip Cutscenes startup arming step '{label}' took {elapsedMilliseconds:F1}ms.";
+        if (elapsedMilliseconds >= StartupArmingStepWarningThresholdMilliseconds)
+            log.Warning(message);
+        else
+            log.Debug(message);
     }
 
     private byte CutsceneHandleInputDetour(nint a1, float a2)

@@ -23,6 +23,35 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.31 - 2026-05-04",
+            Lines =
+            [
+                "New XA Mods",
+                "- Added `Display Network Latency`, `Lock Game Window In Combat`, `Notify When Friend Is Near`, `Better Cast Bar`, and `Better Duty Finder` to XA Mods > Game Mods.",
+                "- Added `Dalamud Notifications Suck` to XA Mods > Game Mods for hiding selected Dalamud toast categories, including update alerts, plugin lifecycle chatter, plugin error/load alerts, mod-manager alerts, success/info notices, and warning/error notices.",
+                "- The new Game Mods can be saved in XA Mod lists, restored on startup, used as titlebar favourites, and toggled from chat commands.",
+                "",
+                "Smoother Startup",
+                "- Heavy startup work for chat timestamps, cutscene skipping, and custom sight distance now starts after the core plugin load instead of blocking the first load summary.",
+                "- Additional hook-backed restores, including queue position, object hiding, background rendering pause, trade refusal, and map reveal, now use the same post-load activation path.",
+                "- Cutscene and camera hooks now arm over several frames, with clearer logs showing what is still arming and when post-load activation is actually complete.",
+                "",
+                "Game Mod Polish",
+                "- `Display Network Latency` now starts safely even when the DTR bar entry has to be reacquired after reload.",
+                "- `Display Network Latency` now keeps its DTR updates on the framework tick path and shows when the entry is hidden in /xlsettings.",
+                "- `Notify When Friend Is Near` keeps the toast simple: Friend nearby plus the player's name. It does not send in-game chat messages.",
+                "- `Better Cast Bar` adds the local cast-bar restyle and slidecast marker controls.",
+                "- `Better Duty Finder` now shows its inline Contents Finder and Raid Finder buttons in two compact rows above the normal duty window controls.",
+                "- `Special Rendering Modes` now reports UI visibility and world fade support separately, and only disables world fade buttons when that helper is unavailable.",
+                "- Debug / Test > XA Abuse now includes `Dalamud Test Notifications`, with three-per-row buttons that create real Dalamud toasts for each notification suppression category.",
+                "",
+                "Shop Icons And Xagman",
+                "- `Enable Item Icon In Shops` now matches the current FreeShop layout and clamps reads and writes to the available AtkValue range.",
+                "- Xagman targeting now uses XA-owned target and focus handling, including direct focus assignment and target recovery while Xagman is running.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.30 - 2026-05-02",
             Lines =
             [

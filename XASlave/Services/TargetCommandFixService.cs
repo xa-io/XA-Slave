@@ -19,6 +19,7 @@ public sealed class TargetCommandFixService : IDisposable
     private readonly IPluginLog log;
 
     private bool enabled;
+    private bool requiredByXagman;
     private bool subscribed;
 
     public TargetCommandFixService(IChatGui chatGui, IPluginLog log)
@@ -31,27 +32,46 @@ public sealed class TargetCommandFixService : IDisposable
 
     public bool SetEnabled(bool value)
     {
-        if (value == enabled)
-            return enabled;
+        if (value != enabled)
+            enabled = value;
 
-        if (!value)
-        {
-            enabled = false;
-            Unsubscribe();
-            StatusText = "Disabled";
-            return false;
-        }
+        RefreshEffectiveState();
+        return enabled;
+    }
 
-        Subscribe();
-        enabled = true;
-        StatusText = "Enabled - failed /target lookups select the closest targetable matching actor.";
-        return true;
+    public void SetRequiredByXagman(bool value)
+    {
+        if (value == requiredByXagman)
+            return;
+
+        requiredByXagman = value;
+        RefreshEffectiveState();
     }
 
     public void Dispose()
     {
         enabled = false;
+        requiredByXagman = false;
         Unsubscribe();
+    }
+
+    private void RefreshEffectiveState()
+    {
+        var shouldEnable = enabled || requiredByXagman;
+        if (!shouldEnable)
+        {
+            Unsubscribe();
+            StatusText = "Disabled";
+            return;
+        }
+
+        Subscribe();
+
+        StatusText = requiredByXagman && !enabled
+            ? "Enabled for Xagman - failed /target lookups select the closest targetable matching actor even though the XA Mod toggle is off."
+            : requiredByXagman
+                ? "Enabled - failed /target lookups select the closest targetable matching actor; Xagman also requires this while running."
+                : "Enabled - failed /target lookups select the closest targetable matching actor.";
     }
 
     private void Subscribe()
@@ -74,7 +94,7 @@ public sealed class TargetCommandFixService : IDisposable
 
     private void OnChatMessageHandled(IHandleableChatMessage message)
     {
-        if (!enabled || message.IsHandled || message.LogKind != XivChatType.ErrorMessage)
+        if (!subscribed || message.IsHandled || message.LogKind != XivChatType.ErrorMessage)
             return;
 
         var requestedName = ExtractTargetName(message.Message.TextValue);

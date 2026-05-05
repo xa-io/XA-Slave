@@ -109,19 +109,37 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
 
         try
         {
+            const int FreeShopItemCountIndex = 76;
+            const int FreeShopItemIdStartIndex = 138;
+            const int FreeShopIconStartIndex = 199;
+
             var addon = (AtkUnitBase*)args.Addon.Address;
-            if (addon == null || addon->AtkValues == null || addon->AtkValuesCount <= 126)
+            if (addon == null || addon->AtkValues == null)
                 return;
 
-            var itemCount = addon->AtkValues[3].UInt;
-            var replacementCount = 0;
-            for (var index = 0; index < itemCount; index++)
+            var atkValuesCount = (int)addon->AtkValuesCount;
+            if (atkValuesCount <= FreeShopIconStartIndex)
+                return;
+
+            var itemCount = addon->AtkValues[FreeShopItemCountIndex].UInt;
+            if (itemCount == 0)
             {
-                var itemId = addon->AtkValues[65 + index].UInt;
+                RecordReplacement("FreeShop", 0);
+                return;
+            }
+
+            var maxReadableItems = atkValuesCount - FreeShopItemIdStartIndex;
+            var maxWritableItems = atkValuesCount - FreeShopIconStartIndex;
+            var safeItemCount = (int)Math.Min(itemCount, (uint)Math.Min(maxReadableItems, maxWritableItems));
+
+            var replacementCount = 0;
+            for (var index = 0; index < safeItemCount; index++)
+            {
+                var itemId = addon->AtkValues[FreeShopItemIdStartIndex + index].UInt;
                 if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
                     continue;
 
-                addon->AtkValues[126 + index].SetUInt(itemRow.Icon);
+                addon->AtkValues[FreeShopIconStartIndex + index].SetUInt(itemRow.Icon);
                 replacementCount++;
             }
 

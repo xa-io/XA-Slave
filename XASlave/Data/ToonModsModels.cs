@@ -78,6 +78,18 @@ public sealed class XAModPopupCleanerSettings
 }
 
 [Serializable]
+public sealed class XAModDalamudNotificationsSuckSettings
+{
+    public bool HideAll { get; set; }
+    public bool HideDalamudUpdates { get; set; }
+    public bool HidePluginLifecycle { get; set; }
+    public bool HidePluginErrors { get; set; }
+    public bool HideModManagerAlerts { get; set; }
+    public bool HideSuccessInfo { get; set; }
+    public bool HideWarningsErrors { get; set; }
+}
+
+[Serializable]
 public sealed class XAModCustomTimestampFormatSettings
 {
     public string Format { get; set; } = string.Empty;
@@ -91,6 +103,47 @@ public sealed class XAModAutoDisplayIdsSettings
     public bool ShowTargetDataId { get; set; }
     public bool ShowWeatherId { get; set; }
     public bool ShowZoneInfo { get; set; }
+}
+
+[Serializable]
+public sealed class XAModNetworkLatencySettings
+{
+    public string Format { get; set; } = "Ping: {0} ms";
+}
+
+[Serializable]
+public sealed class XAModNotifyWhenFriendIsNearSettings
+{
+    public List<string> Patterns { get; set; } = new();
+    public int CooldownSeconds { get; set; }
+}
+
+[Serializable]
+public sealed class XAModBetterCastBarSettings
+{
+    public float InterruptedTextX { get; set; }
+    public float InterruptedTextY { get; set; }
+    public int InterruptedTextSize { get; set; }
+    public float ActionNameTextX { get; set; }
+    public float ActionNameTextY { get; set; }
+    public int ActionNameTextSize { get; set; }
+    public float CastingTextX { get; set; }
+    public float CastingTextY { get; set; }
+    public int CastingTextSize { get; set; }
+    public float CastTimeTextX { get; set; }
+    public float CastTimeTextY { get; set; }
+    public int CastTimeTextSize { get; set; }
+    public int IconAlpha { get; set; }
+    public float IconX { get; set; }
+    public float IconY { get; set; }
+    public float IconScaleX { get; set; }
+    public float IconScaleY { get; set; }
+    public int SlidecastMode { get; set; }
+    public int SlidecastThresholdMs { get; set; }
+    public int SlidecastLineWidth { get; set; }
+    public int SlidecastLineHeight { get; set; }
+    public XAModColorSettings SlidecastNotReadyColor { get; set; } = new();
+    public XAModColorSettings SlidecastReadyColor { get; set; } = new();
 }
 
 [Serializable]

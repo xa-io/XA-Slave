@@ -2701,7 +2701,7 @@ public partial class SlaveWindow
         HaltAutoCollectionForPriorityTask("Xagman");
         plugin.TaskRunner.ClearLog();
         AutoOpenTaskLogIfVerbose(ref xagmanShowLog);
-        xagmanRunning = true;
+        SetXagmanRunning(true);
         xagmanActiveRole = XagmanRole.Tony;
         xagmanStatus = XagmanStatus.Paused;
         xagmanStatusText = "Standing by for Franchise Owner meetup relay.";
@@ -2774,7 +2774,7 @@ public partial class SlaveWindow
         if (!resumeFromStandby)
             plugin.TaskRunner.ClearLog();
         AutoOpenTaskLogIfVerbose(ref xagmanShowLog);
-        xagmanRunning = true;
+        SetXagmanRunning(true);
         xagmanActiveRole = XagmanRole.FranchiseOwner;
         xagmanStatus = XagmanStatus.Paused;
         xagmanStatusText = "Standing by for Tony meetup acknowledgement.";
@@ -2815,6 +2815,20 @@ public partial class SlaveWindow
         plugin.TaskRunner.TotalItems = GetXagmanLocalOwnerTotalCharacters();
         plugin.TaskRunner.CompletedItems = GetXagmanLocalOwnerCompletedCharacters();
         return true;
+    }
+
+    private void SetXagmanRunning(bool value)
+    {
+        if (xagmanRunning == value)
+        {
+            plugin.TargetCommandFix.SetRequiredByXagman(value);
+            return;
+        }
+
+        xagmanRunning = value;
+        plugin.TargetCommandFix.SetRequiredByXagman(value);
+        if (value)
+            plugin.TaskRunner.AddLog("Xagman: Fix /target Command is required while Xagman is running.");
     }
 
     private void OnXagmanFranchiseTaskFinished()
@@ -2918,7 +2932,7 @@ public partial class SlaveWindow
             xagmanStatus = XagmanStatus.Error;
             xagmanStatusText = message;
             runner.AddLog(message);
-            xagmanRunning = false;
+            SetXagmanRunning(false);
         }
 
         bool ShouldSkipTonyStartupPostTravel()
@@ -3061,7 +3075,8 @@ public partial class SlaveWindow
             plugin.TaskRunner.Cancel();
         ResetXagmanTonyMeetRetryState();
         TrySetXagmanDropboxAutoAccept(false);
-        xagmanRunning = false;
+        ClearXagmanFocusTarget();
+        SetXagmanRunning(false);
         xagmanActiveRole = plugin.Configuration.XagmanRole;
         xagmanStatus = XagmanStatus.Idle;
         xagmanStatusText = "Idle";
@@ -3322,7 +3337,7 @@ public partial class SlaveWindow
             ? MonthlyReloggerTask.GetCurrentCharacterNameWorld()
             : xagmanActiveCharacter;
         AutoOpenTaskLogIfVerbose(ref xagmanShowLog);
-        xagmanRunning = true;
+        SetXagmanRunning(true);
         xagmanActiveRole = role;
         xagmanStatus = XagmanStatus.Error;
         xagmanStatusText = reason;
@@ -3402,7 +3417,7 @@ public partial class SlaveWindow
             : xagmanActiveCharacter;
         var steps = new List<TaskStep>();
         AutoOpenTaskLogIfVerbose(ref xagmanShowLog);
-        xagmanRunning = true;
+        SetXagmanRunning(true);
         xagmanActiveRole = XagmanRole.FranchiseOwner;
         xagmanStatus = XagmanStatus.Completed;
         xagmanStatusText = reason;
@@ -3416,7 +3431,7 @@ public partial class SlaveWindow
                 var sentEscape = TryAbortXagmanTradeWindow();
                 ClearXagmanDropbox();
                 TrySetXagmanDropboxAutoAccept(false);
-                xagmanRunning = false;
+                SetXagmanRunning(false);
                 xagmanStatus = XagmanStatus.Completed;
                 xagmanStatusText = reason;
                 xagmanOwnerStartRequested = false;
@@ -3948,7 +3963,7 @@ public partial class SlaveWindow
                     {
                         if (ShouldSkipRepeatedTradeExecution())
                             return;
-                        FocusXagmanCurrentTarget();
+                        FocusXagmanCurrentTarget(GetCharacterNameFromKey(xagmanActiveTradePartner));
                     },
                     IsComplete = () => true,
                     TimeoutSec = 1f,
@@ -4359,7 +4374,7 @@ public partial class SlaveWindow
                 {
                     if (ShouldSkipOwnerCollectionTradeExecution())
                         return;
-                    FocusXagmanCurrentTarget();
+                    FocusXagmanCurrentTarget(GetCharacterNameFromKey(xagmanActiveTradePartner));
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -4529,7 +4544,7 @@ public partial class SlaveWindow
                 {
                     if (ShouldSkipRequestedTradeFlow())
                         return;
-                    FocusXagmanCurrentTarget();
+                    FocusXagmanCurrentTarget(GetCharacterNameFromKey(xagmanActiveTradePartner));
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -4642,6 +4657,7 @@ public partial class SlaveWindow
                 {
                     SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
                     xagmanQueueRequestedAtUtc = DateTime.MinValue;
+                    ClearXagmanFocusTarget();
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -4725,7 +4741,7 @@ public partial class SlaveWindow
             ShouldSkip = () => xagmanOwnerStandbyPending,
             OnEnter = () =>
             {
-                xagmanRunning = false;
+                SetXagmanRunning(false);
                 xagmanOwnerCurrentCharacterIndex = characters.Count;
                 xagmanStatus = XagmanStatus.Completed;
                 xagmanStatusText = runner.FailedCharacters.Count == 0
@@ -5282,6 +5298,7 @@ public partial class SlaveWindow
         }
         TrySetXagmanDropboxAutoAccept(false);
         ClearXagmanDropbox();
+        ClearXagmanFocusTarget();
         xagmanActiveTradePartner = string.Empty;
         xagmanActiveTradePartnerInstanceId = string.Empty;
         xagmanObservedDropboxBusy = false;
@@ -5351,7 +5368,7 @@ public partial class SlaveWindow
                 var warningLines = completedWithWarnings
                     ? BuildXagmanCompletionWarningSummaryLines(tonyCharacter)
                     : new List<string>();
-                xagmanRunning = false;
+                SetXagmanRunning(false);
                 xagmanActiveTradePartner = string.Empty;
                 xagmanActiveTradePartnerInstanceId = string.Empty;
                 xagmanObservedDropboxBusy = false;
@@ -5432,6 +5449,7 @@ public partial class SlaveWindow
         var hasAlternateTony = xagmanTonyRunList.Any(key => !key.Equals(activeTony, StringComparison.OrdinalIgnoreCase));
         TrySetXagmanDropboxAutoAccept(false);
         ClearXagmanDropbox();
+        ClearXagmanFocusTarget();
         xagmanObservedDropboxBusy = false;
         xagmanActiveTradePartner = string.Empty;
         xagmanActiveTradePartnerInstanceId = string.Empty;
@@ -5486,6 +5504,7 @@ public partial class SlaveWindow
                     runner.AddLog($"Xagman: sent ESC to close Trade after Tony trade failure with {partnerName}.");
             }
             TrySetXagmanDropboxAutoAccept(false);
+            ClearXagmanFocusTarget();
             xagmanObservedDropboxBusy = false;
             xagmanActiveTradePartner = string.Empty;
             xagmanActiveTradePartnerInstanceId = string.Empty;
@@ -5636,7 +5655,7 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     TryTargetCharacter(GetCurrentPartnerVisibleName());
-                    FocusXagmanCurrentTarget();
+                    FocusXagmanCurrentTarget(GetCurrentPartnerVisibleName());
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -5682,6 +5701,7 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     ClearXagmanDropbox();
+                    ClearXagmanFocusTarget();
                     ApplyXagmanTonyTradeProgressToTaskRunner(partnerName, ownerPeer);
                     xagmanObservedDropboxBusy = false;
                     xagmanActiveTradePartner = string.Empty;
@@ -6364,6 +6384,7 @@ public partial class SlaveWindow
          var sentEscape = TryAbortXagmanTradeWindow();
          ClearXagmanDropbox();
          TrySetXagmanDropboxAutoAccept(false);
+         ClearXagmanFocusTarget();
          xagmanObservedDropboxBusy = false;
 
          if (stoppedQueue)
@@ -7267,6 +7288,7 @@ public partial class SlaveWindow
         xagmanActiveTradePartnerInstanceId = string.Empty;
         xagmanObservedDropboxBusy = false;
         TrySetXagmanDropboxAutoAccept(false);
+        ClearXagmanFocusTarget();
         if (xagmanOwnerRequestedItems.Count > 0
             && HasXagmanOwnerCollectionItemsRemaining(plugin.Configuration.XagmanItems, characterNameWorld))
         {
@@ -7314,9 +7336,35 @@ public partial class SlaveWindow
         return true;
     }
 
-     private void FocusXagmanCurrentTarget()
+     private bool FocusXagmanCurrentTarget(string characterName)
      {
-         ChatHelper.SendMessage("/focustarget");
+         var visibleCharacterName = GetCharacterNameFromKey(characterName);
+         if (string.IsNullOrWhiteSpace(visibleCharacterName))
+             return false;
+
+         TryTargetCharacter(visibleCharacterName);
+
+         var target = Plugin.TargetManager.Target;
+         var targetName = target?.Name.ToString() ?? string.Empty;
+         if (target == null || !targetName.Equals(visibleCharacterName, StringComparison.OrdinalIgnoreCase))
+         {
+             var focusTargetName = Plugin.TargetManager.FocusTarget?.Name.ToString() ?? string.Empty;
+             if (!focusTargetName.Equals(visibleCharacterName, StringComparison.OrdinalIgnoreCase))
+                 ClearXagmanFocusTarget();
+
+             plugin.TaskRunner.AddLog(string.IsNullOrWhiteSpace(targetName)
+                 ? $"Xagman: could not focus {visibleCharacterName}; no current target was selected."
+                 : $"Xagman: could not focus {visibleCharacterName}; current target was {targetName}.");
+             return false;
+         }
+
+         Plugin.TargetManager.FocusTarget = target;
+         return true;
+     }
+
+     private static void ClearXagmanFocusTarget()
+     {
+         Plugin.TargetManager.FocusTarget = null;
      }
 
      private void TryTargetCharacter(string characterName)
@@ -7324,7 +7372,7 @@ public partial class SlaveWindow
          var visibleCharacterName = GetCharacterNameFromKey(characterName);
          if (string.IsNullOrWhiteSpace(visibleCharacterName))
              return;
-         ChatHelper.SendMessage($"/target \"{visibleCharacterName}\"");
+         AddonHelper.TargetByName(visibleCharacterName);
      }
      private bool TryPathToCurrentTarget(float stopDistance = 0.5f)
      {
@@ -7432,8 +7480,13 @@ public partial class SlaveWindow
      {
          if (string.IsNullOrWhiteSpace(value))
              return string.Empty;
-         var parts = value.Split('@');
-         return parts[0];
+         var atIndex = value.IndexOf('@');
+         var characterName = atIndex >= 0 ? value.Substring(0, atIndex) : value;
+         return characterName
+             .Trim()
+             .Replace("\\\"", "\"")
+             .Trim('"', '\u201c', '\u201d')
+             .Trim();
      }
      private static void ReindexSelectionSet(HashSet<int> selectedIndices, int removedIndex)
      {

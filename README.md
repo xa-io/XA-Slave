@@ -10,7 +10,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Save to XA Database** - Push data to XA Database with optional cadence-gated login collection and a built-in task log for collection/save debugging.
 - **Auto-Glam Weather** - Configure per-weather glamour plate lists, then randomly apply valid class/job and plate choices when the active weather changes.
 - **City Chat Flooder** - Send announcements across selected worlds and cities with looping and delay controls.
-- **Xagman** - Coordinate Tony / Franchise Owner FC trading across same-PC or LAN clients with `/xa db ...` Dropbox queueing, `Give` / `Take` / `Balance` / `TopUp` routing, supplier matching, role-aware trade recovery, and shared task completion actions. Includes item-list import/export, standby queue control, optional FC-return cleanup, and owner-side reconciliation so empty give passes are skipped, `Give N` retries do not loop, and owners are not sent home while give/request work remains. `TopUp` refills owners up to the configured amount without taking surplus back.
+- **Xagman** - Coordinate Tony / Franchise Owner FC trading across same-PC or LAN clients with `/xa db ...` Dropbox queueing, `Give` / `Take` / `Balance` / `TopUp` routing, supplier matching, role-aware trade recovery, and shared task completion actions. Includes item-list import/export, standby queue control, optional FC-return cleanup, and owner-side reconciliation so empty give passes are skipped, `Give N` retries do not loop, and owners are not sent home while give/request work remains. `TopUp` refills owners up to the configured amount without taking surplus back. While Xagman is running, XA Slave requires `Fix /target Command` internally so `/target` recovery works even when the XA Mods toggle is saved off or SimpleTweaks is unavailable, and Xagman sets/clears trade focus targets through Dalamud directly instead of `/focustarget`.
 - **Monthly Relogger** - Cycle through characters with AutoRetainer integration, XA Database-backed rank and personal-plot visibility, failure highlighting, optional per-character actions, and shared task completion actions.
 - **Shared Task Completion Options** - `Monthly Relogger`, `Prep Logistics`, `FC Permissions Updater`, `Check Duplicate Plots`, `Return Alts To Homeworlds`, `Refresh Sub/Bell/Chest`, and `Xagman` all share the same `Task Options on Complete` footer with `Logout`, `Kill Game`, and `Enable AR Multi Mode`. `Kill Game` always uses XA's hard logout + close-client flow even if `Instant Logout` is disabled in XA Mods.
 - **Prep Logistics** - Relog selected characters, see available main-inventory space, move them to a target world or location, and finish through the shared task completion actions.
@@ -32,14 +32,20 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
   | Display MSQ Progress | Custom Resolutions | Automate Expert Delivery | Force PeepingTom | Logogram Creator |
   | Disable Title Screen Movie | Disable Background Rendering | Refuse Trade Request |  |  |
   | Auto Display IDs | Low Resolution | Reveal Undiscovered Areas |  |  |
-  | Custom Timestamp Format | Special Rendering Modes | Clear Teleportation Lock |  |  |
-  | Fix /target Command |  | Auto Leave Duty |  |  |
-  | Skip Cutscenes |  | Auto Merge |  |  |
-  | Skip Cutscenes Feeding Chocobo |  | Custom Sight Distance |  |  |
-  | Hide Unnecessary Popups |  | Doze & Sit Anywhere |  |  |
-  | Prevent Game Exiting From Lobby Errors |  | Infinite Sprint |  |  |
-  | Close Lobby Errors |  | Item Commands |  |  |
-  | Bailout ESC Menu |  | XA Peep |  |  |
+  | Display Network Latency | Special Rendering Modes | Clear Teleportation Lock |  |  |
+  | Custom Timestamp Format |  | Auto Leave Duty |  |  |
+  | Lock Game Window In Combat |  | Auto Merge |  |  |
+  | Notify When Friend Is Near |  | Custom Sight Distance |  |  |
+  | Better Cast Bar |  | Doze & Sit Anywhere |  |  |
+  | Better Duty Finder |  | Infinite Sprint |  |  |
+  | Fix /target Command |  | Item Commands |  |  |
+  | Skip Cutscenes |  | XA Peep |  |  |
+  | Skip Cutscenes Feeding Chocobo |  |  |  |  |
+  | Hide Unnecessary Popups |  |  |  |  |
+  | Dalamud Notifications Suck |  |  |  |  |
+  | Prevent Game Exiting From Lobby Errors |  |  |  |  |
+  | Close Lobby Errors |  |  |  |  |
+  | Bailout ESC Menu |  |  |  |  |
   | Skip Dialogue |  |  |  |  |
   | Display Actual Queue Position |  |  |  |  |
   | Copy Item Name For All |  |  |  |  |
@@ -56,7 +62,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **IPC Calls Available** - Review the IPC integrations XA Slave can talk to, along with cached/live availability checks for supported plugins and the XA Slave provider channels other plugins can call, including `XASlave.ExecuteCommand` for the shipped `/xa` command surface plus simple direct-call examples such as `XASlave.ExecuteCommand("xamods")` shown directly in the XA Slave provider block.
 - **Commands** - Review the current XA slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, `Plugin Mods`, `Eureka Mods`, and more, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, `/xa equip` coverage behind `Item Commands`, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
 - **Priority Tasks** - Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
-- **XA Mods Native Hooks** - Adds XA-owned game and player QoL hooks for multi-instance handling, login and queue cleanup, menu and duty recovery, inventory and item actions, Return and logout shortcuts, rendering and camera controls, teleport-lock recovery, and other local client-side utility features.
+- **XA Mods Native Hooks** - Adds XA-owned game and player QoL hooks for multi-instance handling, login and queue cleanup, menu and duty recovery, inventory and item actions, Return and logout shortcuts, rendering and camera controls, teleport-lock recovery, and other local client-side utility features. Startup restore keeps lobby/safety hooks early while enabled heavier non-critical hooks such as `Custom Timestamp Format`, `Auto Skip Cutscenes`, and `Custom Sight Distance` run through a staggered post-load XA Mod activation phase to reduce reload hitches.
 
 ## Commands
 
@@ -89,12 +95,16 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa chocobocutscene on/off` | Toggle `Skip Cutscenes Feeding Chocobo`. |
 | `/xa closeerrors on/off` | Toggle `Close Lobby Errors` for supported disconnect and lobby error popups. |
 | `/xa copyitemname on/off` | Toggle `Copy Item Name For All`. |
+| `/xa castbar on/off` | Toggle `Better Cast Bar` and its slidecast marker. |
+| `/xa dalamudnotifs on/off` | Toggle `Dalamud Notifications Suck` for selected Dalamud toast categories. |
 | `/xa displayids on/off` | Toggle `Auto Display IDs` for item, action, target, weather, zone, and map IDs. |
-| `/xa fe <entry>` | Queue a supported Eureka `Field Operations Entry Command` entry, such as `/xa fe pagos`: Anemos, Pagos, Pyros, or Hydatos. |
-| `/xa fieldentrycommand on/off` | Toggle `Field Operations Entry Command`. |
+| `/xa dutyfinder on/off` | Toggle `Better Duty Finder` inline setting buttons. |
+| `/xa friendnear on/off` | Toggle `Notify When Friend Is Near`; alerts are local XA Slave system/toast messages only. |
 | `/xa gamerestore` | Disable the current Game Mods toggles. |
 | `/xa hidepopups on/off` | Toggle `Hide Unnecessary Popups`. |
 | `/xa inventorymover on/off` | Toggle `Better Inventory Mover`; the quick-move modifier is configurable in the XA Mods panel. |
+| `/xa latency on/off` | Toggle `Display Network Latency` in the DTR bar. |
+| `/xa lockcombat on/off` | Toggle `Lock Game Window In Combat`. |
 | `/xa logincooldown on/off` | Toggle `Cancel Login Cooldown`. |
 | `/xa mooglemail on/off` | Toggle `Auto Open Moogle Mail` Letter List actions. |
 | `/xa msqprogress on/off` | Toggle `Display MSQ Progress`. |
@@ -105,7 +115,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa shopicons on/off` | Toggle `Enable Item Icon In Shops`. |
 | `/xa skipcutscenes on/off` | Toggle `Skip Cutscenes`. |
 | `/xa skipdialogue on/off` | Toggle `Skip Dialogue`. |
-| `/xa targetfix on/off` | Toggle `Fix /target Command`. |
+| `/xa targetfix on/off` | Toggle `Fix /target Command`; Xagman temporarily requires this fallback while it is running. |
 | `/xa timestampseconds on/off` | Toggle `Custom Timestamp Format` for chat timestamp seconds. |
 | `/xa titlemovie on/off` | Toggle `Disable Title Screen Movie`. |
 
@@ -124,7 +134,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa res add <width>x<height>` | Add a saved custom-resolution button. |
 | `/xa res remove <width>x<height>` | Remove a saved custom-resolution button. |
 | `/xa resrestore` | Disable the current Graphic Mods toggles. |
-| `/xa specialrender on/off` | Toggle `Special Rendering Modes` (`Hide Chat` is blocked while AutoRetainer Multi Mode is active). |
+| `/xa specialrender on/off` | Toggle `Special Rendering Modes`; UI visibility controls remain available when the optional world-fade helper cannot be resolved, and `Hide Chat` is blocked while AutoRetainer Multi Mode is active. |
 
 ### Player Mods
 
@@ -164,6 +174,9 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | --- | --- |
 | `/xa eurekaid on/off` | Toggle the live `Instance ID` display surface and optional DTR output. Use `Field Operations` -> `Eureka Instance Hunter` for the farming loop. |
 | `/xa eurekarestore` | Disable the current Eureka Mods toggles. |
+| `/xa fe <entry>` | Queue a supported Eureka `Field Operations Entry Command` entry, such as `/xa fe pagos`: Anemos, Pagos, Pyros, or Hydatos. |
+| `/xa fieldentrycommand on/off` | Toggle `Field Operations Entry Command`. |
+
 
 ## Dependencies
 

@@ -39,6 +39,7 @@ public partial class SlaveWindow
     private int xaModsCustomResolutionWidth = 500;
     private int xaModsCustomResolutionHeight = 345;
     private string xaModsFieldEntryQuery = string.Empty;
+    private string notifyWhenFriendIsNearPatternInput = string.Empty;
     private static readonly JsonSerializerOptions toonModsListJsonOptions = ToonModsPresetSerialization.JsonOptions;
 
     private bool GetToonModsSectionExpanded(ToonModsSection section)
@@ -199,6 +200,21 @@ public partial class SlaveWindow
                 configuration.AutoHideGameObjectsUseOccultCrescentRules);
         }
 
+        void ApplyAutoDisplayNetworkLatencyConfiguration()
+        {
+            plugin.ApplyAutoDisplayNetworkLatencyConfiguration();
+        }
+
+        void ApplyNotifyWhenFriendIsNearConfiguration()
+        {
+            plugin.ApplyNotifyWhenFriendIsNearConfiguration();
+        }
+
+        void ApplyBetterCastBarConfiguration()
+        {
+            plugin.ApplyBetterCastBarConfiguration();
+        }
+
         void ApplyPlayerSearchConfiguration()
         {
             plugin.PlayerSearchContextMenu.ApplyConfiguration(
@@ -276,6 +292,11 @@ public partial class SlaveWindow
         void ApplyPopupCleanerConfiguration()
         {
             plugin.PopupCleaner.ApplyConfiguration(configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled);
+        }
+
+        void ApplyDalamudNotificationsSuckConfiguration()
+        {
+            plugin.ApplyDalamudNotificationsSuckConfiguration(save: false);
         }
 
         void DrawFeatureToggle(
@@ -854,6 +875,23 @@ public partial class SlaveWindow
         void DrawSpecialRenderModeTools()
         {
             var backgroundColor = GetSpecialRenderBackgroundColor();
+            var worldFadeAvailable = plugin.SystemWindowMods.IsSpecialRenderWorldFadeAvailable;
+
+            void DrawWorldFadeButton(string label, bool hidden)
+            {
+                if (!worldFadeAvailable)
+                    ImGui.BeginDisabled();
+
+                if (ImGui.Button(label))
+                    plugin.SystemWindowMods.SetSpecialRenderWorldHidden(hidden, backgroundColor);
+
+                if (!worldFadeAvailable)
+                {
+                    ImGui.EndDisabled();
+                    if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                        ImGui.SetTooltip("World fade is unavailable because the native fade helper could not be resolved. UI visibility toggles still work.");
+                }
+            }
 
             if (ImGui.ColorEdit4("Background color##SpecialRenderModes", ref backgroundColor))
             {
@@ -864,12 +902,9 @@ public partial class SlaveWindow
                 SaveConfiguration();
             }
 
-            if (ImGui.Button("Hide world / keep addons##SpecialRenderModes"))
-                plugin.SystemWindowMods.SetSpecialRenderWorldHidden(true, backgroundColor);
-
+            DrawWorldFadeButton("Hide world / keep addons##SpecialRenderModes", true);
             ImGui.SameLine();
-            if (ImGui.Button("Restore world##SpecialRenderModes"))
-                plugin.SystemWindowMods.SetSpecialRenderWorldHidden(false, backgroundColor);
+            DrawWorldFadeButton("Restore world##SpecialRenderModes", false);
 
             ImGui.SameLine();
             if (ImGui.Button("Restore all##SpecialRenderModes"))
@@ -1296,6 +1331,171 @@ public partial class SlaveWindow
             applyValue(updatedValue);
             plugin.ApplyAutoDisplayIdsConfiguration();
             SetToonModsStatus("XA Mods: Auto Display IDs options updated.");
+        }
+
+        void DrawAutoDisplayNetworkLatencyOptions()
+        {
+            var format = configuration.AutoDisplayNetworkLatencyFormat;
+            if (ImGui.InputTextWithHint("DTR format##NetworkLatencyFormat", "Ping: {0} ms", ref format, 128))
+            {
+                configuration.AutoDisplayNetworkLatencyFormat = format;
+                ApplyAutoDisplayNetworkLatencyConfiguration();
+                SetToonModsStatus("XA Mods: Display Network Latency format updated.");
+            }
+
+            ImGui.TextDisabled($"Current: {(plugin.AutoDisplayNetworkLatency.CurrentPing < 0 ? "--" : plugin.AutoDisplayNetworkLatency.CurrentPing)} ms");
+            ImGui.TextDisabled($"Average: {plugin.AutoDisplayNetworkLatency.AveragePing:F0} ms | Min: {plugin.AutoDisplayNetworkLatency.MinimumPing:F0} ms | Max: {plugin.AutoDisplayNetworkLatency.MaximumPing:F0} ms");
+            ImGui.TextDisabled($"Loss: {plugin.AutoDisplayNetworkLatency.LossRate:P0}");
+            ImGui.TextDisabled($"Endpoint: {plugin.AutoDisplayNetworkLatency.ServerEndpoint}");
+            ImGui.TextDisabled(plugin.AutoDisplayNetworkLatency.LastActionText);
+        }
+
+        void DrawNotifyWhenFriendIsNearOptions()
+        {
+            ImGui.InputTextWithHint(
+                "Friend pattern##NotifyWhenFriendNearPattern",
+                "Character Name or /regex/",
+                ref notifyWhenFriendIsNearPatternInput,
+                128);
+            ImGui.SameLine();
+            if (ImGui.Button("Add##NotifyWhenFriendNearAdd"))
+            {
+                var pattern = notifyWhenFriendIsNearPatternInput.Trim();
+                if (string.IsNullOrWhiteSpace(pattern))
+                {
+                    SetToonModsStatus("XA Mods: enter a friend name or /regex/ pattern.", true);
+                }
+                else if (configuration.NotifyWhenFriendIsNearPatterns.Any(existing => existing.Equals(pattern, StringComparison.OrdinalIgnoreCase)))
+                {
+                    SetToonModsStatus("XA Mods: that friend pattern is already configured.", true);
+                }
+                else
+                {
+                    configuration.NotifyWhenFriendIsNearPatterns.Add(pattern);
+                    notifyWhenFriendIsNearPatternInput = string.Empty;
+                    ApplyNotifyWhenFriendIsNearConfiguration();
+                    SetToonModsStatus($"XA Mods: added friend pattern '{pattern}'.");
+                }
+            }
+
+            var cooldown = configuration.NotifyWhenFriendIsNearCooldownSeconds;
+            if (ImGui.InputInt("Cooldown seconds##NotifyWhenFriendNearCooldown", ref cooldown))
+            {
+                configuration.NotifyWhenFriendIsNearCooldownSeconds = cooldown;
+                ApplyNotifyWhenFriendIsNearConfiguration();
+                SetToonModsStatus($"XA Mods: friend notification cooldown set to {configuration.NotifyWhenFriendIsNearCooldownSeconds} seconds.");
+            }
+
+            ImGui.TextDisabled("Alerts use only local XA Slave toast/chat output. No in-game chat command is sent.");
+            ImGui.TextDisabled($"Configured patterns: {plugin.NotifyWhenFriendIsNear.PatternCount}");
+            ImGui.TextDisabled($"Last matched player: {plugin.NotifyWhenFriendIsNear.LastMatchedPlayer}");
+
+            if (configuration.NotifyWhenFriendIsNearPatterns.Count == 0)
+            {
+                ImGui.TextDisabled("No friend patterns configured.");
+                return;
+            }
+
+            foreach (var pattern in configuration.NotifyWhenFriendIsNearPatterns.ToList())
+            {
+                if (ImGui.SmallButton($"Remove##NotifyWhenFriendNearRemove_{pattern}"))
+                {
+                    configuration.NotifyWhenFriendIsNearPatterns.Remove(pattern);
+                    ApplyNotifyWhenFriendIsNearConfiguration();
+                    SetToonModsStatus($"XA Mods: removed friend pattern '{pattern}'.");
+                }
+                ImGui.SameLine();
+                ImGui.TextUnformatted(pattern);
+            }
+        }
+
+        void DrawBetterCastBarOptions()
+        {
+            var slidecastMode = BetterCastBarService.NormalizeSlidecastMode(configuration.BetterCastBarSlidecastMode);
+            if (ImGui.BeginCombo("Slidecast mode##BetterCastBarMode", GetBetterCastBarModeLabel(slidecastMode)))
+            {
+                DrawBetterCastBarModeOption("None", BetterCastBarService.SlidecastModeNone, ref slidecastMode);
+                DrawBetterCastBarModeOption("Zone", BetterCastBarService.SlidecastModeZone, ref slidecastMode);
+                DrawBetterCastBarModeOption("Line", BetterCastBarService.SlidecastModeLine, ref slidecastMode);
+                ImGui.EndCombo();
+            }
+
+            var thresholdMs = configuration.BetterCastBarSlidecastThresholdMs;
+            if (ImGui.InputInt("Slidecast threshold ms##BetterCastBarThreshold", ref thresholdMs))
+            {
+                configuration.BetterCastBarSlidecastThresholdMs = thresholdMs;
+                ApplyBetterCastBarConfiguration();
+                SetToonModsStatus($"XA Mods: Better Cast Bar slidecast threshold set to {configuration.BetterCastBarSlidecastThresholdMs} ms.");
+            }
+
+            var lineWidth = configuration.BetterCastBarSlidecastLineWidth;
+            if (ImGui.InputInt("Marker width##BetterCastBarLineWidth", ref lineWidth))
+            {
+                configuration.BetterCastBarSlidecastLineWidth = lineWidth;
+                ApplyBetterCastBarConfiguration();
+                SetToonModsStatus($"XA Mods: Better Cast Bar marker width set to {configuration.BetterCastBarSlidecastLineWidth}.");
+            }
+
+            if (configuration.BetterCastBarSlidecastMode == BetterCastBarService.SlidecastModeLine)
+            {
+                var lineHeight = configuration.BetterCastBarSlidecastLineHeight;
+                if (ImGui.InputInt("Extra line height##BetterCastBarLineHeight", ref lineHeight))
+                {
+                    configuration.BetterCastBarSlidecastLineHeight = lineHeight;
+                    ApplyBetterCastBarConfiguration();
+                    SetToonModsStatus($"XA Mods: Better Cast Bar extra line height set to {configuration.BetterCastBarSlidecastLineHeight}.");
+                }
+            }
+
+            var readyColor = configuration.BetterCastBarSlidecastReadyColor;
+            if (ImGui.ColorEdit4("Ready color##BetterCastBarReadyColor", ref readyColor))
+            {
+                configuration.BetterCastBarSlidecastReadyColor = readyColor;
+                ApplyBetterCastBarConfiguration();
+                SetToonModsStatus("XA Mods: Better Cast Bar ready color updated.");
+            }
+
+            var standbyColor = configuration.BetterCastBarSlidecastNotReadyColor;
+            if (ImGui.ColorEdit4("Standby color##BetterCastBarStandbyColor", ref standbyColor))
+            {
+                configuration.BetterCastBarSlidecastNotReadyColor = standbyColor;
+                ApplyBetterCastBarConfiguration();
+                SetToonModsStatus("XA Mods: Better Cast Bar standby color updated.");
+            }
+
+            var iconAlpha = configuration.BetterCastBarIconAlpha;
+            if (ImGui.InputInt("Icon alpha##BetterCastBarIconAlpha", ref iconAlpha))
+            {
+                configuration.BetterCastBarIconAlpha = iconAlpha;
+                ApplyBetterCastBarConfiguration();
+                SetToonModsStatus($"XA Mods: Better Cast Bar icon alpha set to {configuration.BetterCastBarIconAlpha}.");
+            }
+
+            ImGui.TextDisabled($"Current cast: {plugin.BetterCastBar.CurrentCastName}");
+            ImGui.TextDisabled($"Cast remaining: {plugin.BetterCastBar.CurrentCastRemainingMs} ms / {plugin.BetterCastBar.CurrentCastTimeMs} ms");
+            ImGui.TextDisabled($"Slidecast ready: {(plugin.BetterCastBar.IsSlidecastReady ? "Yes" : "No")}");
+        }
+
+        void DrawBetterCastBarModeOption(string label, int value, ref int currentValue)
+        {
+            var isSelected = currentValue == value;
+            if (!ImGui.Selectable($"{label}##BetterCastBarMode_{value}", isSelected))
+                return;
+
+            configuration.BetterCastBarSlidecastMode = value;
+            currentValue = value;
+            ApplyBetterCastBarConfiguration();
+            SetToonModsStatus($"XA Mods: Better Cast Bar slidecast mode set to {label}.");
+        }
+
+        static string GetBetterCastBarModeLabel(int value)
+        {
+            return value switch
+            {
+                BetterCastBarService.SlidecastModeNone => "None",
+                BetterCastBarService.SlidecastModeLine => "Line",
+                _ => "Zone",
+            };
         }
 
         void DrawBetterInventoryMoverOptions()
@@ -1825,6 +2025,77 @@ public partial class SlaveWindow
                 plugin.XAPeep.PlayConfiguredSoundPreview();
         }
 
+        void DrawDalamudNotificationsSuckOptions()
+        {
+            ImGui.TextDisabled("Select which Dalamud toast categories XA should hide.");
+            ImGui.TextDisabled(plugin.DalamudNotificationsSuck.LastActionText);
+
+            DrawDalamudNotificationOption(
+                "Hide all Dalamud notifications##DalamudNotificationsSuck",
+                () => configuration.DalamudNotificationsSuckHideAll,
+                value => configuration.DalamudNotificationsSuckHideAll = value,
+                "Dismisses every notification found in Dalamud's active and pending notification queues.");
+
+            if (configuration.DalamudNotificationsSuckHideAll)
+                ImGui.BeginDisabled();
+
+            DrawDalamudNotificationOption(
+                "Hide Dalamud/plugin update alerts##DalamudNotificationsSuck",
+                () => configuration.DalamudNotificationsSuckHideDalamudUpdates,
+                value => configuration.DalamudNotificationsSuckHideDalamudUpdates = value,
+                "Targets update available, updating, update installed, and update failed notification text.");
+
+            DrawDalamudNotificationOption(
+                "Hide plugin lifecycle chatter##DalamudNotificationsSuck",
+                () => configuration.DalamudNotificationsSuckHidePluginLifecycle,
+                value => configuration.DalamudNotificationsSuckHidePluginLifecycle = value,
+                "Targets plugin installed, enabled, disabled, loaded, reloaded, and unloaded notifications that do not look like errors.");
+
+            DrawDalamudNotificationOption(
+                "Hide plugin error/load alerts##DalamudNotificationsSuck",
+                () => configuration.DalamudNotificationsSuckHidePluginErrors,
+                value => configuration.DalamudNotificationsSuckHidePluginErrors = value,
+                "Targets plugin error, load failure, reload failure, crash, and dev-plugin error notifications.");
+
+            DrawDalamudNotificationOption(
+                "Hide Penumbra/Glamourer/mod alerts##DalamudNotificationsSuck",
+                () => configuration.DalamudNotificationsSuckHideModManagerAlerts,
+                value => configuration.DalamudNotificationsSuckHideModManagerAlerts = value,
+                "Targets notifications mentioning Penumbra, Glamourer, Customize+, Mare, TexTools, or mod load failures.");
+
+            DrawDalamudNotificationOption(
+                "Hide success/info notifications##DalamudNotificationsSuck",
+                () => configuration.DalamudNotificationsSuckHideSuccessInfo,
+                value => configuration.DalamudNotificationsSuckHideSuccessInfo = value,
+                "Targets notifications whose Dalamud notification type is Success or Info.");
+
+            DrawDalamudNotificationOption(
+                "Hide warning/error notifications##DalamudNotificationsSuck",
+                () => configuration.DalamudNotificationsSuckHideWarningsErrors,
+                value => configuration.DalamudNotificationsSuckHideWarningsErrors = value,
+                "Targets notifications whose Dalamud notification type is Warning or Error.");
+
+            if (configuration.DalamudNotificationsSuckHideAll)
+                ImGui.EndDisabled();
+
+            DrawWarningText("Warning: this uses Dalamud internals and may stop working after a Dalamud update. Hiding warnings/errors can hide useful crash, plugin, or update alerts.");
+        }
+
+        void DrawDalamudNotificationOption(string label, Func<bool> getValue, Action<bool> setValue, string helpText)
+        {
+            var value = getValue();
+            if (ImGui.Checkbox(label, ref value))
+            {
+                setValue(value);
+                ApplyDalamudNotificationsSuckConfiguration();
+                SaveConfiguration();
+                SetToonModsStatus("XA Mods: Dalamud Notifications Suck options updated.");
+            }
+
+            ImGui.SameLine(0f, 6f);
+            DrawHelpMarker(helpText);
+        }
+
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-allow-multiple-game-instances",
@@ -1888,6 +2159,23 @@ public partial class SlaveWindow
             plugin.AutoDisplayIds.StatusText,
             searchTerms: ["tooltip", "skill id", "action id", "target data id", "weather id", "zone id", "map id"],
             drawOptions: DrawAutoDisplayIdsOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "display-network-latency",
+            "Display Network Latency",
+            () => configuration.AutoDisplayNetworkLatencyEnabled,
+            value =>
+            {
+                ApplyAutoDisplayNetworkLatencyConfiguration();
+                return plugin.AutoDisplayNetworkLatency.SetEnabled(value);
+            },
+            applied => configuration.AutoDisplayNetworkLatencyEnabled = applied,
+            "Shows the detected game-server ping in the DTR bar.",
+            "Detects the live game TCP endpoint for this process, resolves local loopback proxy hops when possible, pings the effective endpoint once per second, and displays the result in the server-info bar.",
+            plugin.AutoDisplayNetworkLatency.StatusText,
+            searchTerms: ["ping", "latency", "DTR", "server", "network"],
+            drawOptions: DrawAutoDisplayNetworkLatencyOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
@@ -1958,6 +2246,24 @@ public partial class SlaveWindow
             drawOptions: DrawHideUnnecessaryPopupsOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
+            "dalamud-notifications-suck",
+            "Dalamud Notifications Suck",
+            () => configuration.DalamudNotificationsSuckEnabled,
+            value =>
+            {
+                ApplyDalamudNotificationsSuckConfiguration();
+                return plugin.DalamudNotificationsSuck.SetEnabled(value);
+            },
+            applied => configuration.DalamudNotificationsSuckEnabled = applied,
+            "Hides selected Dalamud toast notification categories before they draw.",
+            "Best-effort suppression for Dalamud's internal ImGui notifications, including update notices, plugin lifecycle chatter, plugin error/load alerts, and Penumbra/Glamourer/mod-manager notifications.",
+            plugin.DalamudNotificationsSuck.StatusText,
+            warningText: "Uses Dalamud internals; if Dalamud changes this will report unavailable instead of crashing.",
+            searchTerms: ["Dalamud", "notification", "toast", "plugin error", "plugin load", "Penumbra", "Glamourer", "mod failed", "update alert"],
+            drawOptions: DrawDalamudNotificationsSuckOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
             "auto-prevent-game-exiting-from-lobby-errors",
             "Prevent Game Exiting From Lobby Errors",
             () => configuration.AutoPreventGameExitingFromLobbyErrorsEnabled,
@@ -2024,6 +2330,62 @@ public partial class SlaveWindow
             "Auto-clicks the standard `Talk` addon and also hooks the native Talk, SystemTalk, ShortTalk, leve, and guildleve dialogue surfaces when those signatures are available.",
             plugin.DialogueSkip.StatusText,
             searchTerms: ["Talk", "SystemTalk", "ShortTalk", "npc", "dialogue", "conversation", "leve", "guildleve"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "lock-game-window-in-combat",
+            "Lock Game Window In Combat",
+            () => configuration.LockGameWindowInCombatEnabled,
+            plugin.AutoLockGameWindow.SetEnabled,
+            applied => configuration.LockGameWindowInCombatEnabled = applied,
+            "Prevents the game window from being moved while the local character is in combat.",
+            "Subclasses the current FFXIV window while combat is active and forces position changes to keep the existing top-left coordinate. The lock is removed when combat ends or the mod is disabled.",
+            plugin.AutoLockGameWindow.StatusText,
+            searchTerms: ["window", "combat", "lock", "move", "position"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "notify-when-friend-is-near",
+            "Notify When Friend Is Near",
+            () => configuration.NotifyWhenFriendIsNearEnabled,
+            value =>
+            {
+                ApplyNotifyWhenFriendIsNearConfiguration();
+                return plugin.NotifyWhenFriendIsNear.SetEnabled(value);
+            },
+            applied => configuration.NotifyWhenFriendIsNearEnabled = applied,
+            "Shows a local XA Slave alert when a configured player appears nearby.",
+            "Scans visible player objects every two seconds for exact-name or `/regex/` patterns and prints only local XA Slave system/toast notifications. It never sends an in-game chat message.",
+            plugin.NotifyWhenFriendIsNear.StatusText,
+            searchTerms: ["friend", "near", "player", "notify", "regex", "system message"],
+            drawOptions: DrawNotifyWhenFriendIsNearOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "better-cast-bar",
+            "Better Cast Bar",
+            () => configuration.BetterCastBarEnabled,
+            value =>
+            {
+                ApplyBetterCastBarConfiguration();
+                return plugin.BetterCastBar.SetEnabled(value);
+            },
+            applied => configuration.BetterCastBarEnabled = applied,
+            "Restyles the local cast bar and adds a slidecast readiness marker.",
+            "Updates `_CastBar` node layout locally and draws a configurable slidecast zone or line over the cast-progress bar. Original node layout is restored when the cast bar finalizes or the mod is disabled.",
+            plugin.BetterCastBar.StatusText,
+            searchTerms: ["_CastBar", "slidecast", "cast", "casting", "marker", "spell"],
+            drawOptions: DrawBetterCastBarOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "better-duty-finder",
+            "Better Duty Finder",
+            () => configuration.BetterDutyFinderEnabled,
+            plugin.BetterDutyFinder.SetEnabled,
+            applied => configuration.BetterDutyFinderEnabled = applied,
+            "Adds inline duty-finder setting buttons to Contents Finder and Raid Finder.",
+            "Shows compact language, loot-rule, join-in-progress, unrestricted, level-sync, minimum-IL, echo, explorer, and limited-leveling-roulette controls over the supported duty finder windows.",
+            plugin.BetterDutyFinder.StatusText,
+            searchTerms: ["duty finder", "ContentsFinder", "RaidFinder", "unsync", "explorer", "loot", "language"]);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "display-actual-queue-position",

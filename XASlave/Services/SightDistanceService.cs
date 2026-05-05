@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Dalamud;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
@@ -10,6 +11,9 @@ namespace XASlave.Services;
 
 public unsafe sealed class SightDistanceService : IDisposable
 {
+    private const double StartupArmingStepDebugThresholdMilliseconds = 5.0;
+    private const double StartupArmingStepWarningThresholdMilliseconds = 200.0;
+
     private readonly IFramework framework;
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
@@ -22,6 +26,9 @@ public unsafe sealed class SightDistanceService : IDisposable
     private bool cameraCollisionPatchApplied;
     private bool initialized;
     private bool enabled;
+    private bool startupArmingPending;
+    private bool startupArmingSubscribed;
+    private int startupArmingStep;
 
     private float minDistance = 1.5f;
     private float maxDistance = 80f;
@@ -46,6 +53,24 @@ public unsafe sealed class SightDistanceService : IDisposable
 
     public string StatusText { get; private set; } = "Disabled";
 
+    public bool IsStartupArmingPending => startupArmingPending;
+
+    public bool RestoreEnabledOnStartup()
+    {
+        if (enabled && startupArmingPending)
+            return true;
+
+        if (initialized)
+            return SetEnabled(true);
+
+        enabled = true;
+        startupArmingPending = true;
+        startupArmingStep = 0;
+        SubscribeStartupArming();
+        StatusText = "Arming - camera hooks and patch surfaces are initializing over upcoming frames.";
+        return true;
+    }
+
     public void ApplyConfiguration(
         float maxDistance,
         float minDistance,
@@ -65,7 +90,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         this.currentFoV = currentFoV;
         this.ignoreCollision = ignoreCollision;
 
-        if (enabled)
+        if (enabled && !startupArmingPending)
         {
             UpdateCamera(CameraManager.Instance()->Camera);
             UpdateCollisionPatch();
@@ -74,11 +99,12 @@ public unsafe sealed class SightDistanceService : IDisposable
 
     public bool SetEnabled(bool value)
     {
-        if (value == enabled)
+        if (value == enabled && !startupArmingPending)
             return enabled;
 
         if (!value)
         {
+            CancelStartupArming();
             enabled = false;
             ToggleHook(cameraUpdateHook, false, "CameraUpdate");
             ToggleHook(cameraCurrentSightDistanceHook, false, "CameraCurrentSightDistance");
@@ -89,6 +115,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         }
 
         EnsureInitialized();
+        CancelStartupArming();
         if (cameraUpdateHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
         {
             StatusText = "Unavailable - camera hooks and patch surfaces are missing.";
@@ -106,6 +133,7 @@ public unsafe sealed class SightDistanceService : IDisposable
 
     public void Dispose()
     {
+        CancelStartupArming();
         enabled = false;
         RestoreCollisionPatch();
         ResetCameraDefaults();
@@ -118,10 +146,10 @@ public unsafe sealed class SightDistanceService : IDisposable
         if (initialized)
             return;
 
-        initialized = true;
-        cameraUpdateHook = TryCreateHook<CameraUpdateDelegate>(Sigs.CameraUpdateSig, CameraUpdateDetour, "CameraUpdate");
-        cameraCurrentSightDistanceHook = TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
+        cameraUpdateHook ??= TryCreateHook<CameraUpdateDelegate>(Sigs.CameraUpdateSig, CameraUpdateDetour, "CameraUpdate");
+        cameraCurrentSightDistanceHook ??= TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
         ScanPatchAddress(Sigs.CameraCollisionPatchSig, ref cameraCollisionPatchAddress, "CameraCollisionPatch");
+        initialized = true;
     }
 
     private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
@@ -245,6 +273,122 @@ public unsafe sealed class SightDistanceService : IDisposable
         {
             log.Warning(ex, $"[XASlave] Failed to restore {label} patch.");
         }
+    }
+
+    private void SubscribeStartupArming()
+    {
+        if (startupArmingSubscribed)
+            return;
+
+        framework.Update += OnStartupArmingFrameworkUpdate;
+        startupArmingSubscribed = true;
+    }
+
+    private void CancelStartupArming()
+    {
+        startupArmingPending = false;
+        startupArmingStep = 0;
+        if (!startupArmingSubscribed)
+            return;
+
+        framework.Update -= OnStartupArmingFrameworkUpdate;
+        startupArmingSubscribed = false;
+    }
+
+    private void OnStartupArmingFrameworkUpdate(IFramework _)
+    {
+        if (!startupArmingPending)
+        {
+            CancelStartupArming();
+            return;
+        }
+
+        ProcessStartupArmingStep();
+    }
+
+    private void ProcessStartupArmingStep()
+    {
+        var label = GetStartupArmingStepLabel(startupArmingStep);
+        var stopwatch = Stopwatch.StartNew();
+        try
+        {
+            switch (startupArmingStep)
+            {
+                case 0:
+                    cameraUpdateHook ??= TryCreateHook<CameraUpdateDelegate>(Sigs.CameraUpdateSig, CameraUpdateDetour, "CameraUpdate");
+                    break;
+                case 1:
+                    cameraCurrentSightDistanceHook ??= TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
+                    break;
+                case 2:
+                    ScanPatchAddress(Sigs.CameraCollisionPatchSig, ref cameraCollisionPatchAddress, "CameraCollisionPatch");
+                    initialized = true;
+                    break;
+                case 3:
+                    if (cameraUpdateHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
+                    {
+                        enabled = false;
+                        StatusText = "Unavailable - camera hooks and patch surfaces are missing.";
+                        CancelStartupArming();
+                        return;
+                    }
+
+                    break;
+                case 4:
+                    ToggleHook(cameraUpdateHook, true, "CameraUpdate");
+                    break;
+                case 5:
+                    ToggleHook(cameraCurrentSightDistanceHook, true, "CameraCurrentSightDistance");
+                    break;
+                case 6:
+                    UpdateCollisionPatch();
+                    break;
+                default:
+                    UpdateCamera(CameraManager.Instance()->Camera);
+                    StatusText = "Enabled - camera sight distance, angle, and FoV limits are overridden locally.";
+                    CancelStartupArming();
+                    return;
+            }
+
+            startupArmingStep++;
+        }
+        catch (Exception ex)
+        {
+            enabled = false;
+            StatusText = $"Unavailable - startup arming failed at {label}.";
+            CancelStartupArming();
+            log.Warning(ex, $"[XASlave] Custom Sight Distance startup arming failed at {label}.");
+        }
+        finally
+        {
+            stopwatch.Stop();
+            LogStartupArmingStepDuration(label, stopwatch.Elapsed.TotalMilliseconds);
+        }
+    }
+
+    private static string GetStartupArmingStepLabel(int step)
+        => step switch
+        {
+            0 => "Create CameraUpdate hook",
+            1 => "Create CameraCurrentSightDistance hook",
+            2 => "Scan CameraCollisionPatch",
+            3 => "Validate surfaces",
+            4 => "Enable CameraUpdate hook",
+            5 => "Enable CameraCurrentSightDistance hook",
+            6 => "Apply CameraCollisionPatch",
+            _ => "Finalize",
+        };
+
+    private void LogStartupArmingStepDuration(string label, double elapsedMilliseconds)
+    {
+        if (elapsedMilliseconds < StartupArmingStepDebugThresholdMilliseconds)
+            return;
+
+        var message = $"[XASlave] Custom Sight Distance startup arming step '{label}' took {elapsedMilliseconds:F1}ms.";
+        if (elapsedMilliseconds >= StartupArmingStepWarningThresholdMilliseconds)
+            log.Warning(message);
+        else
+            log.Debug(message);
     }
 
     private nint CameraUpdateDetour(Camera* camera)

@@ -34,7 +34,7 @@ public partial class SlaveWindow : Window, IDisposable
     private const float DefaultTaskMenuWidth = 100f;
     private const float MinTaskMenuWidth = 30f;
     private const float MaxTaskMenuWidth = DefaultTaskMenuWidth * 2f;
-    private const double FrameworkUpdateTimingDebugThresholdMilliseconds = 5.0;
+    private const double FrameworkUpdateTimingDebugThresholdMilliseconds = 10.0;
     private const double FrameworkUpdateTimingWarningThresholdMilliseconds = 25.0;
     private const float TaskLayoutColumnGap = 3f;
     private static float UiScale => ImGuiHelpers.GlobalScale;

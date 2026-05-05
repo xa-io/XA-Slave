@@ -30,7 +30,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private const int WindowExStyleIndex = -20;
     private const uint SetWindowPosNoZOrder = 0x0004;
     private const uint SetWindowPosNoActivate = 0x0010;
-    private const double FrameworkUpdateTimingDebugThresholdMilliseconds = 5.0;
+    private const double FrameworkUpdateTimingDebugThresholdMilliseconds = 10.0;
     private const double FrameworkUpdateTimingWarningThresholdMilliseconds = 25.0;
     private const float MinimumLowResolutionScale = 0.01f;
     private const float MaximumLowResolutionScale = 1.00f;
@@ -126,9 +126,27 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     public string DisableBackgroundRenderingStatusText { get; private set; } = "Disabled";
 
-    public string SpecialRenderModesStatusText => toggleFadeDelegate != null
-        ? "Ready - render and UI mode controls are available."
-        : "Unavailable - special render delegate is missing.";
+    public bool IsSpecialRenderWorldFadeAvailable
+    {
+        get
+        {
+            EnsureToggleFadeDelegateInitialized();
+            return toggleFadeDelegate != null;
+        }
+    }
+
+    public string SpecialRenderModesStatusText
+    {
+        get
+        {
+            if (UIModule.Instance() == null)
+                return "Unavailable - UI module surface missing.";
+
+            return IsSpecialRenderWorldFadeAvailable
+                ? "Ready - UI visibility and world fade controls are available."
+                : "Ready - UI visibility controls are available; world fade unavailable.";
+        }
+    }
 
     public static float ClampLowResolutionScale(float value)
     {
@@ -588,7 +606,13 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         try
         {
             if (sigScanner.TryScanText(Sigs.ToggleFadeSig, out var toggleFadeAddress) && toggleFadeAddress != nint.Zero)
+            {
                 toggleFadeDelegate = Marshal.GetDelegateForFunctionPointer<ToggleFadeDelegate>(toggleFadeAddress);
+            }
+            else
+            {
+                log.Debug("[XASlave] Special Rendering Modes world fade delegate is unavailable; UI visibility controls remain available.");
+            }
         }
         catch (Exception ex)
         {
