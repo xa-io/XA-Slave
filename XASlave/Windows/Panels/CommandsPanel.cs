@@ -24,6 +24,7 @@ public partial class SlaveWindow
         new("/xa db clear", "Clear the current Dropbox item queue.", "Used by Xagman cleanup and for manual queue resets without any extra wrapper command."),
         new("/xa db request <itemId:qty ...>", "Print the missing quantities still needed locally.", "Returns a ready-to-run `/xa db ...` command built from the requested amounts minus what this character already has."),
         new("/xa db <shortcut>", "Build missing crystal-fill commands.", "Shortcuts: `shards`, `crystals`, `clusters`, `shards+crystals`, `crystals+clusters`, and `shards+crystals+clusters`. Prints the equivalent `/xa db ...` request output."),
+        new("/xa debug", "Toggle the hidden Debug / Test menu.", "Support diagnostics remain hidden in public builds until this command is typed; once shown, the menu stays visible across reloads until this command is typed again."),
         new("/xa preset list", "List the currently saved XA Mods presets.", "Prints each saved preset name to chat."),
         new("/xa preset load <name>", "Load a saved XA Mods preset by name.", "Applies the saved mod-key set after clearing the current top-level toggles."),
         new("/xa preset save <name>", "Save the current XA Mods selection as a preset.", "Creates or overwrites a saved list without opening the panel."),
@@ -34,7 +35,7 @@ public partial class SlaveWindow
     {
         new("/xa anonymous on|off", "Toggle `Live Anonymous Mode`.", "Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases."),
         new("/xa companychest on|off", "Toggle `Better Company Chest`.", "Adds FC chest page defaults, right-click quick move, prompt confirmation, and panel value tracking."),
-        new("/xa chocobocutscene on|off", "Toggle `Skip Cutscenes Feeding Chocobo`.", "Only affects the companion-feeding cutscene surface."),
+        new("/xa chocobocutscene on|off", "Toggle `Skip Cutscenes` > `Skip Feeding Chocobo`.", "Only affects the companion-feeding cutscene surface."),
         new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "Auto-confirms supported disconnect and stuck-logout lobby Dialogue popups."),
         new("/xa copyitemname on|off", "Toggle `Copy Item Name For All`.", "Adds XA item-name copy actions to supported context menus."),
         new("/xa castbar on|off", "Toggle `Better Cast Bar`.", "Restyles `_CastBar` locally and adds the configured slidecast readiness marker."),
@@ -45,6 +46,7 @@ public partial class SlaveWindow
         new("/xa fieldentrycommand on|off", "Toggle `Field Operations Entry Command`.", "Arms or disarms the field-entry command runner used by `/xa fe`."),
         new("/xa friendnear on|off", "Toggle `Notify When Friend Is Near`.", "Scans nearby player objects for configured exact-name or `/regex/` friend patterns and prints local XA Slave notifications only."),
         new("/xa gamerestore", "Disable the current top-level Game Mods toggles.", "Turns off the current Game Mods section in one command."),
+        new("/xa highlighttargets on|off", "Toggle `Better Highlight Potential Targets`.", "Safety-gated: after enabling, waits about 5 seconds plus 30 stable frames and a brief stable hover before changing hovered potential targets from yellow to the selected native backend color."),
         new("/xa hidepopups on|off", "Toggle `Hide Unnecessary Popups`.", "Closes supported tutorial and recommendation popups."),
         new("/xa inventorymover on|off", "Toggle `Better Inventory Mover`.", "Hold the configured modifier while right-clicking for the first available move, or use the added destination-aware context-menu moves."),
         new("/xa latency on|off", "Toggle `Display Network Latency`.", "Shows the detected game-server ping in the DTR bar."),
@@ -100,6 +102,7 @@ public partial class SlaveWindow
         new("/xa sprint on|off", "Toggle `Infinite Sprint`.", "Controls XA's movement-gated Sprint recast surface."),
         new("/xa sprintdelay <seconds>", "Set the `Infinite Sprint` movement-start delay.", "Accepts values from `0.0` to `30.0` seconds."),
         new("/xa teleportlock on|off", "Toggle `Clear Teleportation Lock`.", "Uses XA's teleport-stuck recovery seam."),
+        new("/xa travelerworlds on|off", "Toggle `Show Traveler World Names`.", "Shows visible traveler and wanderer names as Name@HomeWorld on this client and hides the FC/travel tag."),
     };
 
     private static readonly CommandReferenceEntry[] PluginModsCommandEntries =
@@ -127,6 +130,19 @@ public partial class SlaveWindow
         new("/xa unlockexpert on|off", "Toggle `Unlock Expert Delivery`.", "Controls the local Grand Company rank spoof used to expose Expert Delivery."),
     };
 
+    private static readonly CommandReferenceEntry[] XaMovementCommandEntries =
+    {
+        new("/xa movingcheatersmart", "`MovingCheater (Smart)` action.", "Mounts, checks whether flight is unlocked in the current zone, then sends `/vnav flyflag` or `/vnav moveflag`."),
+        new("/xa movingcheaterfly", "`MovingCheater (Fly)` action.", "Mounts and sends `/vnav flyflag` when flight is unlocked, falling back to `/vnav moveflag` otherwise."),
+        new("/xa movingcheaterwalk", "`MovingCheater (Walk)` action.", "Mounts and sends `/vnav moveflag` for ground movement to the current map flag."),
+        new("/xa interact", "`Interact` action.", "Calls the same target interaction helper used by the Debug / Test movement button."),
+        new("/xa leaveduty", "`Leave Duty` action.", "No arguments leaves the current duty directly. `/xa leaveduty on|off` still controls the `Auto Leave Duty` XA Mod toggle."),
+        new("/xa recommendedgear", "Recommended-gear sequence.", "Uses Step1 open Character, Step2 open RecommendEquip, Step3 equip, then closes Character and RecommendEquip."),
+        new("/xa stopmovement", "`Vnav: Stop` action.", "Sends the same vnav stop request as the Debug / Test button."),
+        new("/xa pathtotargetinteract", "`PathToTargetThenInteract` action.", "Ground-paths to the current target and interacts once within range."),
+        new("/xa pathsmartinteract", "`PathSmartThenInteract` action.", "Mounts when useful, flies when available, dismounts near the target, then interacts."),
+    };
+
     private void DrawCommandsReference()
     {
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Commands");
@@ -148,6 +164,7 @@ public partial class SlaveWindow
         DrawFilteredCommandSection("Plugin Mods", PluginModsCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Eureka Mods", EurekaModsCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Illegal Shit You Shouldn't Use", IllegalModsCommandEntries, ref visibleSectionCount);
+        DrawFilteredCommandSection("XA Movement Commands", XaMovementCommandEntries, ref visibleSectionCount);
 
         if (visibleSectionCount == 0)
         {

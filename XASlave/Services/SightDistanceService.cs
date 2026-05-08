@@ -19,7 +19,7 @@ public unsafe sealed class SightDistanceService : IDisposable
     private readonly IGameInteropProvider interopProvider;
     private readonly IPluginLog log;
 
-    private Hook<CameraUpdateDelegate>? cameraUpdateHook;
+    private Hook<SetActiveCameraDelegate>? setActiveCameraHook;
     private Hook<CameraCurrentSightDistanceDelegate>? cameraCurrentSightDistanceHook;
     private nint cameraCollisionPatchAddress;
     private byte[]? cameraCollisionOriginalBytes;
@@ -106,7 +106,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         {
             CancelStartupArming();
             enabled = false;
-            ToggleHook(cameraUpdateHook, false, "CameraUpdate");
+            ToggleHook(setActiveCameraHook, false, "SetActiveCamera");
             ToggleHook(cameraCurrentSightDistanceHook, false, "CameraCurrentSightDistance");
             RestoreCollisionPatch();
             ResetCameraDefaults();
@@ -116,14 +116,14 @@ public unsafe sealed class SightDistanceService : IDisposable
 
         EnsureInitialized();
         CancelStartupArming();
-        if (cameraUpdateHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
+        if (setActiveCameraHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
         {
             StatusText = "Unavailable - camera hooks and patch surfaces are missing.";
             return false;
         }
 
         enabled = true;
-        ToggleHook(cameraUpdateHook, true, "CameraUpdate");
+        ToggleHook(setActiveCameraHook, true, "SetActiveCamera");
         ToggleHook(cameraCurrentSightDistanceHook, true, "CameraCurrentSightDistance");
         UpdateCollisionPatch();
         UpdateCamera(CameraManager.Instance()->Camera);
@@ -137,7 +137,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         enabled = false;
         RestoreCollisionPatch();
         ResetCameraDefaults();
-        DisposeHook(ref cameraUpdateHook);
+        DisposeHook(ref setActiveCameraHook);
         DisposeHook(ref cameraCurrentSightDistanceHook);
     }
 
@@ -146,7 +146,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         if (initialized)
             return;
 
-        cameraUpdateHook ??= TryCreateHook<CameraUpdateDelegate>(Sigs.CameraUpdateSig, CameraUpdateDetour, "CameraUpdate");
+        setActiveCameraHook ??= TryCreateHook<SetActiveCameraDelegate>(Sigs.SetActiveCameraSig, SetActiveCameraDetour, "SetActiveCamera");
         cameraCurrentSightDistanceHook ??= TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
         ScanPatchAddress(Sigs.CameraCollisionPatchSig, ref cameraCollisionPatchAddress, "CameraCollisionPatch");
         initialized = true;
@@ -315,7 +315,7 @@ public unsafe sealed class SightDistanceService : IDisposable
             switch (startupArmingStep)
             {
                 case 0:
-                    cameraUpdateHook ??= TryCreateHook<CameraUpdateDelegate>(Sigs.CameraUpdateSig, CameraUpdateDetour, "CameraUpdate");
+                    setActiveCameraHook ??= TryCreateHook<SetActiveCameraDelegate>(Sigs.SetActiveCameraSig, SetActiveCameraDetour, "SetActiveCamera");
                     break;
                 case 1:
                     cameraCurrentSightDistanceHook ??= TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
@@ -325,7 +325,7 @@ public unsafe sealed class SightDistanceService : IDisposable
                     initialized = true;
                     break;
                 case 3:
-                    if (cameraUpdateHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
+                    if (setActiveCameraHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
                     {
                         enabled = false;
                         StatusText = "Unavailable - camera hooks and patch surfaces are missing.";
@@ -335,7 +335,7 @@ public unsafe sealed class SightDistanceService : IDisposable
 
                     break;
                 case 4:
-                    ToggleHook(cameraUpdateHook, true, "CameraUpdate");
+                    ToggleHook(setActiveCameraHook, true, "SetActiveCamera");
                     break;
                 case 5:
                     ToggleHook(cameraCurrentSightDistanceHook, true, "CameraCurrentSightDistance");
@@ -369,11 +369,11 @@ public unsafe sealed class SightDistanceService : IDisposable
     private static string GetStartupArmingStepLabel(int step)
         => step switch
         {
-            0 => "Create CameraUpdate hook",
+            0 => "Create SetActiveCamera hook",
             1 => "Create CameraCurrentSightDistance hook",
             2 => "Scan CameraCollisionPatch",
             3 => "Validate surfaces",
-            4 => "Enable CameraUpdate hook",
+            4 => "Enable SetActiveCamera hook",
             5 => "Enable CameraCurrentSightDistance hook",
             6 => "Apply CameraCollisionPatch",
             _ => "Finalize",
@@ -391,13 +391,11 @@ public unsafe sealed class SightDistanceService : IDisposable
             log.Debug(message);
     }
 
-    private nint CameraUpdateDetour(Camera* camera)
+    private void SetActiveCameraDetour(CameraManager* manager, int cameraIndex, void* a3)
     {
-        var result = cameraUpdateHook?.Original(camera) ?? 0;
-        if (enabled)
-            UpdateCamera(camera);
-
-        return result;
+        setActiveCameraHook?.Original(manager, cameraIndex, a3);
+        if (enabled && manager != null)
+            UpdateCamera(manager->Camera);
     }
 
     private float CameraCurrentSightDistanceDetour(
@@ -471,7 +469,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         camera->FoV = 0.78f;
     }
 
-    private delegate nint CameraUpdateDelegate(Camera* camera);
+    private delegate void SetActiveCameraDelegate(CameraManager* manager, int cameraIndex, void* a3);
 
     private delegate float CameraCurrentSightDistanceDelegate(
         nint a1,

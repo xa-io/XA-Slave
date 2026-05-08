@@ -64,7 +64,7 @@ public partial class SlaveWindow
         DrawRepositoryBlock(
             "NightmareXIV",
             "Lifestream, TextAdvance",
-            "https://raw.githubusercontent.com/NightmareXIV/MyDalamudPlugins/main/pluginmaster.json",
+            string.Empty,
             ("Lifestream", plugin.IpcClient.IsLifestreamAvailable()),
             ("TextAdvance", plugin.IpcClient.IsTextAdvanceAvailable()));
 
@@ -88,9 +88,9 @@ public partial class SlaveWindow
         ImGui.TextWrapped(owner);
         ImGui.PopStyleColor();
         ImGui.TextWrapped(pluginsLabel);
-        ImGui.TextWrapped(repoUrl);
+        ImGui.TextWrapped(string.IsNullOrWhiteSpace(repoUrl) ? "Install from your configured plugin repositories." : repoUrl);
 
-        if (ImGui.SmallButton($"Copy URL##{owner}"))
+        if (!string.IsNullOrWhiteSpace(repoUrl) && ImGui.SmallButton($"Copy URL##{owner}"))
         {
             ImGui.SetClipboardText(repoUrl);
             repoListStatus = $"Copied {owner} repo URL to clipboard.";

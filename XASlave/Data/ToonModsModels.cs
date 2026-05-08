@@ -60,6 +60,35 @@ public sealed class XAModAutoHideGameObjectsSettings
 }
 
 [Serializable]
+public sealed class XAModAutoSkipCutscenesSettings
+{
+    public bool UseZoneWhitelist { get; set; }
+    public List<uint> WhitelistTerritories { get; set; } = new();
+    public List<uint> BlacklistTerritories { get; set; } = new();
+    public bool SkipNormalCutscenes { get; set; }
+    public bool SkipMsqRoulette { get; set; }
+    public bool AutoEnableMsqFourPlayer { get; set; }
+    public bool ExemptPraetorium { get; set; }
+    public bool ExemptCastrum { get; set; }
+    public bool ExemptPortaDecumana { get; set; }
+    public bool SkipMassivePc { get; set; }
+    public bool SkipGoldSaucer { get; set; }
+    public bool GoldSaucerMahjong { get; set; }
+    public bool GoldSaucerAirForceOne { get; set; }
+    public bool GoldSaucerChocoboRacing { get; set; }
+    public bool GoldSaucerLordOfVerminion { get; set; }
+    public bool GoldSaucerTripleTriad { get; set; }
+    public bool GoldSaucerBlunderville { get; set; }
+    public bool GoldSaucerFashionReport { get; set; }
+    public bool SkipCustomTalk { get; set; }
+    public bool SkipFeedBuddy { get; set; }
+    public bool SkipOceanFishing { get; set; }
+    public bool SkipCrystallineConflict { get; set; }
+    public bool SkipFrontlineRivalWings { get; set; }
+    public bool SkipInn { get; set; }
+}
+
+[Serializable]
 public sealed class XAModCustomResolutionsSettings
 {
     public List<XAModResolutionPreset> Presets { get; set; } = new();
@@ -87,6 +116,12 @@ public sealed class XAModDalamudNotificationsSuckSettings
     public bool HideModManagerAlerts { get; set; }
     public bool HideSuccessInfo { get; set; }
     public bool HideWarningsErrors { get; set; }
+}
+
+[Serializable]
+public sealed class XAModBetterHighlightPotentialTargetsSettings
+{
+    public int Color { get; set; } = 6;
 }
 
 [Serializable]

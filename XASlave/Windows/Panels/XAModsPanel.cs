@@ -188,6 +188,17 @@ public partial class SlaveWindow
             plugin.ChatTimestampFormat.ApplyConfiguration(configuration.CustomTimestampFormat);
         }
 
+        void ApplyAutoSkipCutscenesConfiguration()
+        {
+            plugin.AutoSkipCutscenes.ApplyConfiguration(configuration);
+            plugin.BuddyFeedCutsceneSkip.SetEnabled(configuration.AutoSkipCutscenesFeedingChocoboEnabled);
+        }
+
+        void ApplyBetterHighlightPotentialTargetsConfiguration()
+        {
+            plugin.ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
+        }
+
         void ApplyAutoHideGameObjectsConfiguration()
         {
             plugin.AutoHideGameObjects.ApplyConfiguration(
@@ -2096,6 +2107,197 @@ public partial class SlaveWindow
             DrawHelpMarker(helpText);
         }
 
+        void DrawBetterHighlightPotentialTargetsOptions()
+        {
+            ImGui.TextDisabled("Uses the game's native potential-target highlight backend.");
+
+            var selectedColor = BetterHighlightPotentialTargetsService.NormalizeHighlightColor(configuration.BetterHighlightPotentialTargetsColor);
+            if (ImGui.BeginCombo("Highlight color##BetterHighlightPotentialTargets", BetterHighlightPotentialTargetsService.GetColorLabel(selectedColor)))
+            {
+                foreach (var color in BetterHighlightPotentialTargetsService.SelectableHighlightColors)
+                {
+                    var isSelected = selectedColor == color;
+                    if (ImGui.Selectable($"{BetterHighlightPotentialTargetsService.GetColorLabel(color)}##BetterHighlightPotentialTargets_{color}", isSelected))
+                    {
+                        configuration.BetterHighlightPotentialTargetsColor = color;
+                        ApplyBetterHighlightPotentialTargetsConfiguration();
+                        SaveConfiguration();
+                        SetToonModsStatus($"XA Mods: Better Highlight Potential Targets color set to {BetterHighlightPotentialTargetsService.GetColorLabel(color)}.");
+                    }
+
+                    if (isSelected)
+                        ImGui.SetItemDefaultFocus();
+                }
+
+                ImGui.EndCombo();
+            }
+
+            ImGui.SameLine(0f, 6f);
+            DrawHelpMarker("Available colors are the fixed backend values exposed by the game: red, green, blue, orange, and magenta.");
+        }
+
+        void SaveAutoSkipCutsceneOptions(string message)
+        {
+            configuration.AutoSkipCutscenesWhitelistTerritories = NormalizeTerritoryList(configuration.AutoSkipCutscenesWhitelistTerritories);
+            configuration.AutoSkipCutscenesBlacklistTerritories = NormalizeTerritoryList(configuration.AutoSkipCutscenesBlacklistTerritories);
+            ApplyAutoSkipCutscenesConfiguration();
+            SaveConfiguration();
+            SetToonModsStatus(message);
+        }
+
+        List<uint> NormalizeTerritoryList(IEnumerable<uint>? territories)
+        {
+            return territories?
+                .Where(territory => territory > 0)
+                .Distinct()
+                .OrderBy(territory => territory)
+                .ToList()
+                ?? new List<uint>();
+        }
+
+        void AddCurrentTerritoryToList(List<uint> territories, string listName)
+        {
+            var territoryId = plugin.AutoSkipCutscenes.CurrentTerritoryId;
+            if (territoryId == 0)
+            {
+                SetToonModsStatus($"Skip Cutscenes: current territory is unknown, cannot add to {listName}.", true);
+                return;
+            }
+
+            if (!territories.Contains(territoryId))
+                territories.Add(territoryId);
+
+            SaveAutoSkipCutsceneOptions($"Skip Cutscenes: added current territory {territoryId} to {listName}.");
+        }
+
+        void RemoveCurrentTerritoryFromList(List<uint> territories, string listName)
+        {
+            var territoryId = plugin.AutoSkipCutscenes.CurrentTerritoryId;
+            if (territoryId == 0 || !territories.Remove(territoryId))
+            {
+                SetToonModsStatus($"Skip Cutscenes: current territory is not in {listName}.", true);
+                return;
+            }
+
+            SaveAutoSkipCutsceneOptions($"Skip Cutscenes: removed current territory {territoryId} from {listName}.");
+        }
+
+        void DrawTerritoryList(string title, List<uint> territories, string id)
+        {
+            ImGui.TextDisabled($"{title} ({territories.Count})");
+            if (territories.Count == 0)
+            {
+                ImGui.TextDisabled("None.");
+                return;
+            }
+
+            foreach (var territoryId in territories.OrderBy(territory => territory).ToList())
+            {
+                if (ImGui.SmallButton($"Remove##AutoSkipCutscenes{id}{territoryId}"))
+                {
+                    territories.RemoveAll(entry => entry == territoryId);
+                    SaveAutoSkipCutsceneOptions($"Skip Cutscenes: removed territory {territoryId} from {title}.");
+                }
+
+                ImGui.SameLine();
+                ImGui.TextUnformatted($"{territoryId} - {plugin.AutoSkipCutscenes.GetTerritoryName(territoryId)}");
+            }
+        }
+
+        void DrawAutoSkipCutsceneOption(string label, Func<bool> getValue, Action<bool> setValue, string helpText, string? warningText = null)
+        {
+            var value = getValue();
+            if (ImGui.Checkbox(label, ref value))
+            {
+                setValue(value);
+                SaveAutoSkipCutsceneOptions("Skip Cutscenes: options updated.");
+            }
+
+            ImGui.SameLine(0f, 6f);
+            DrawHelpMarker(helpText);
+            DrawWarningText(warningText ?? string.Empty);
+        }
+
+        void DrawAutoSkipCutsceneOptions()
+        {
+            configuration.AutoSkipCutscenesWhitelistTerritories ??= new List<uint>();
+            configuration.AutoSkipCutscenesBlacklistTerritories ??= new List<uint>();
+
+            var currentTerritory = plugin.AutoSkipCutscenes.CurrentTerritoryId;
+            var currentZone = plugin.AutoSkipCutscenes.CurrentTerritoryName;
+            var currentCategory = plugin.AutoSkipCutscenes.CurrentCategoryLabel;
+            var areaMode = configuration.AutoSkipCutscenesUseZoneWhitelist ? "Whitelist" : "Blacklist";
+            var areaAllowed = plugin.AutoSkipCutscenes.CurrentTerritoryAllowed;
+
+            ImGui.TextDisabled($"Current zone: {currentTerritory} - {currentZone}");
+            ImGui.TextDisabled($"Detected category: {currentCategory}");
+            ImGui.TextColored(
+                areaAllowed ? new Vector4(0.4f, 1.0f, 0.4f, 1.0f) : new Vector4(1.0f, 0.45f, 0.35f, 1.0f),
+                $"Area mode: {areaMode} | Current zone {(areaAllowed ? "allowed" : "blocked")}");
+
+            var useWhitelist = configuration.AutoSkipCutscenesUseZoneWhitelist;
+            if (ImGui.Checkbox("Use whitelist mode##AutoSkipCutscenesUseZoneWhitelist", ref useWhitelist))
+            {
+                configuration.AutoSkipCutscenesUseZoneWhitelist = useWhitelist;
+                SaveAutoSkipCutsceneOptions("Skip Cutscenes: area mode updated.");
+            }
+
+            ImGui.SameLine(0f, 6f);
+            DrawHelpMarker("Whitelist mode skips only territories in the whitelist. Blacklist mode skips everywhere except territories in the blacklist.");
+
+            if (ImGui.Button("Add Current to Whitelist##AutoSkipCutscenesAddWhitelist"))
+                AddCurrentTerritoryToList(configuration.AutoSkipCutscenesWhitelistTerritories, "whitelist");
+            ImGui.SameLine();
+            if (ImGui.Button("Remove Current from Whitelist##AutoSkipCutscenesRemoveWhitelist"))
+                RemoveCurrentTerritoryFromList(configuration.AutoSkipCutscenesWhitelistTerritories, "whitelist");
+
+            if (ImGui.Button("Add Current to Blacklist##AutoSkipCutscenesAddBlacklist"))
+                AddCurrentTerritoryToList(configuration.AutoSkipCutscenesBlacklistTerritories, "blacklist");
+            ImGui.SameLine();
+            if (ImGui.Button("Remove Current from Blacklist##AutoSkipCutscenesRemoveBlacklist"))
+                RemoveCurrentTerritoryFromList(configuration.AutoSkipCutscenesBlacklistTerritories, "blacklist");
+
+            ImGui.Indent();
+            DrawTerritoryList("Whitelist", configuration.AutoSkipCutscenesWhitelistTerritories, "Whitelist");
+            DrawTerritoryList("Blacklist", configuration.AutoSkipCutscenesBlacklistTerritories, "Blacklist");
+            ImGui.Unindent();
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.TextColored(new Vector4(0.6f, 0.9f, 1.0f, 1.0f), "Cutscene Categories");
+
+            DrawAutoSkipCutsceneOption("Skip normal cutscenes##AutoSkipCutscenesNormal", () => configuration.AutoSkipCutscenesSkipNormalCutscenes, value => configuration.AutoSkipCutscenesSkipNormalCutscenes = value, "Controls XA's generic cutscene hook, seen-cutscene hook, staff-roll surfaces, and the standard SelectString skip prompt.");
+            DrawAutoSkipCutsceneOption("Skip MSQ roulette/duties##AutoSkipCutscenesMsq", () => configuration.AutoSkipCutscenesSkipMsqRoulette, value => configuration.AutoSkipCutscenesSkipMsqRoulette = value, "Enables MSQ-duty skipping for Castrum Meridianum, Praetorium, and Porta Decumana territory checks.");
+            DrawAutoSkipCutsceneOption("Auto-enable MSQ skip for 4-player MSQ##AutoSkipCutscenesMsqAuto4", () => configuration.AutoSkipCutscenesAutoEnableMsqFourPlayer, value => configuration.AutoSkipCutscenesAutoEnableMsqFourPlayer = value, "Temporarily arms MSQ skipping when a direct MSQ duty or MSQ roulette pop matches the light-party criteria.");
+            DrawAutoSkipCutsceneOption("Exempt Praetorium##AutoSkipCutscenesPrae", () => configuration.AutoSkipCutscenesExemptPraetorium, value => configuration.AutoSkipCutscenesExemptPraetorium = value, "When MSQ skipping is on, leaves Praetorium unskipped. When MSQ skipping is off, this can be used as a Praetorium-only test toggle.");
+            DrawAutoSkipCutsceneOption("Exempt Castrum Meridianum##AutoSkipCutscenesCastrum", () => configuration.AutoSkipCutscenesExemptCastrum, value => configuration.AutoSkipCutscenesExemptCastrum = value, "When MSQ skipping is on, leaves Castrum Meridianum unskipped. When MSQ skipping is off, this can be used as a Castrum-only test toggle.");
+            DrawAutoSkipCutsceneOption("Exempt Porta Decumana##AutoSkipCutscenesPorta", () => configuration.AutoSkipCutscenesExemptPortaDecumana, value => configuration.AutoSkipCutscenesExemptPortaDecumana = value, "When MSQ skipping is on, leaves Porta Decumana unskipped. When MSQ skipping is off, this can be used as a Porta-only test toggle.");
+            DrawAutoSkipCutsceneOption("Skip Massive PC scenes##AutoSkipCutscenesMassivePc", () => configuration.AutoSkipCutscenesSkipMassivePc, value => configuration.AutoSkipCutscenesSkipMassivePc = value, "Arms the optional Massive PC content-director skip hook for category-aware cutscene handling.");
+            DrawAutoSkipCutsceneOption("Skip Custom Talk##AutoSkipCutscenesCustomTalk", () => configuration.AutoSkipCutscenesSkipCustomTalk, value => configuration.AutoSkipCutscenesSkipCustomTalk = value, "Arms the optional custom-talk content-director skip hook for category-aware cutscene handling.");
+            DrawAutoSkipCutsceneOption("Skip Feeding Chocobo##AutoSkipCutscenesFeedBuddy", () => configuration.AutoSkipCutscenesFeedingChocoboEnabled, value => configuration.AutoSkipCutscenesFeedingChocoboEnabled = value, "Uses XA's dedicated buddy-feed cutscene hook.");
+
+            ImGui.Spacing();
+            ImGui.TextColored(new Vector4(0.6f, 0.9f, 1.0f, 1.0f), "Gold Saucer");
+            DrawAutoSkipCutsceneOption("Skip all Gold Saucer cutscenes##AutoSkipCutscenesGoldSaucer", () => configuration.AutoSkipCutscenesSkipGoldSaucer, value => configuration.AutoSkipCutscenesSkipGoldSaucer = value, "When on, the mode toggles below become exemptions. When off, the mode toggles become specific skip targets.");
+
+            var goldSaucerModePrefix = configuration.AutoSkipCutscenesSkipGoldSaucer ? "Exempt" : "Skip";
+            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Mahjong##AutoSkipCutscenesGoldMahjong", () => configuration.AutoSkipCutscenesGoldSaucerMahjong, value => configuration.AutoSkipCutscenesGoldSaucerMahjong = value, "Controls Mahjong within the Gold Saucer category.");
+            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Air Force One##AutoSkipCutscenesGoldAirForce", () => configuration.AutoSkipCutscenesGoldSaucerAirForceOne, value => configuration.AutoSkipCutscenesGoldSaucerAirForceOne = value, "Controls Air Force One within the Gold Saucer category.");
+            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Chocobo Racing##AutoSkipCutscenesGoldChocobo", () => configuration.AutoSkipCutscenesGoldSaucerChocoboRacing, value => configuration.AutoSkipCutscenesGoldSaucerChocoboRacing = value, "Controls Chocobo Racing within the Gold Saucer category.");
+            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Lord of Verminion##AutoSkipCutscenesGoldVerminion", () => configuration.AutoSkipCutscenesGoldSaucerLordOfVerminion, value => configuration.AutoSkipCutscenesGoldSaucerLordOfVerminion = value, "Controls Lord of Verminion within the Gold Saucer category.");
+            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Triple Triad##AutoSkipCutscenesGoldTripleTriad", () => configuration.AutoSkipCutscenesGoldSaucerTripleTriad, value => configuration.AutoSkipCutscenesGoldSaucerTripleTriad = value, "Controls Triple Triad Battlehall, Open Tournament, and Invitational Parlor territory uses.");
+            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Blunderville/Fall Guys##AutoSkipCutscenesGoldBlunderville", () => configuration.AutoSkipCutscenesGoldSaucerBlunderville, value => configuration.AutoSkipCutscenesGoldSaucerBlunderville = value, "Controls Blunderville/Fall Guys Gold Saucer content.");
+            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Fashion Report##AutoSkipCutscenesGoldFashionReport", () => configuration.AutoSkipCutscenesGoldSaucerFashionReport, value => configuration.AutoSkipCutscenesGoldSaucerFashionReport = value, "Experimental Masked Rose/Fashion Report handling. XA checks FashionCheck/FashionCheckScoreGauge and matching SelectString/SelectYesno prompts in the Gold Saucer.", "Experimental: Fashion Report handling needs in-game verification.");
+
+            ImGui.Spacing();
+            ImGui.TextColored(new Vector4(0.6f, 0.9f, 1.0f, 1.0f), "Risky Areas");
+            DrawWarningText("Use at your own risk; these options are detectable.");
+            DrawAutoSkipCutsceneOption("Skip Ocean Fishing##AutoSkipCutscenesOceanFishing", () => configuration.AutoSkipCutscenesSkipOceanFishing, value => configuration.AutoSkipCutscenesSkipOceanFishing = value, "Allows cutscene skipping in Ocean Fishing areas.");
+            DrawAutoSkipCutsceneOption("Skip Crystalline Conflict##AutoSkipCutscenesCrystalline", () => configuration.AutoSkipCutscenesSkipCrystallineConflict, value => configuration.AutoSkipCutscenesSkipCrystallineConflict = value, "Allows cutscene skipping in Crystalline Conflict and custom-match territory uses.");
+            DrawAutoSkipCutsceneOption("Skip Frontline/Rival Wings##AutoSkipCutscenesFrontlineRivalWings", () => configuration.AutoSkipCutscenesSkipFrontlineRivalWings, value => configuration.AutoSkipCutscenesSkipFrontlineRivalWings = value, "Allows cutscene skipping in Frontline and Rival Wings instead of always exempting them.");
+            DrawAutoSkipCutsceneOption("Skip Inn sequence##AutoSkipCutscenesInn", () => configuration.AutoSkipCutscenesSkipInn, value => configuration.AutoSkipCutscenesSkipInn = value, "Arms the optional Inn content-director skip hook.");
+        }
+
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-allow-multiple-game-instances",
@@ -2207,21 +2409,18 @@ public partial class SlaveWindow
             "auto-skip-cutscenes",
             "Skip Cutscenes",
             () => configuration.AutoSkipCutscenesEnabled,
-            plugin.AutoSkipCutscenes.SetEnabled,
+            value =>
+            {
+                ApplyAutoSkipCutscenesConfiguration();
+                return plugin.AutoSkipCutscenes.SetEnabled(value);
+            },
             applied => configuration.AutoSkipCutscenesEnabled = applied,
-            "Skips standard cutscenes and clears the skip prompt when available.",
-            "Skips standard cutscene prompts, staff roll surfaces, and seen-cutscene checks when the native cutscene hooks are available.",
-            plugin.AutoSkipCutscenes.StatusText);
-        AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
-            "auto-skip-cutscenes-feeding-chocobo",
-            "Skip Cutscenes Feeding Chocobo",
-            () => configuration.AutoSkipCutscenesFeedingChocoboEnabled,
-            plugin.BuddyFeedCutsceneSkip.SetEnabled,
-            applied => configuration.AutoSkipCutscenesFeedingChocoboEnabled = applied,
-            "Suppresses the companion feeding cutscene.",
-            "Suppresses the buddy feeding scene only. This is a separate surface from normal event cutscene skipping and has no additional configuration.",
-            plugin.BuddyFeedCutsceneSkip.StatusText);
+            "Skips standard cutscenes and optional content categories, with per-zone allow/block controls.",
+            "Skips standard cutscene prompts, staff roll surfaces, seen-cutscene checks, MSQ/Gold Saucer category hooks, risky area opt-ins, and optional Fashion Report addon handling when the configured gates allow it.",
+            plugin.AutoSkipCutscenes.StatusText,
+            searchTerms: ["Whitelist", "Blacklist", "MSQ", "Praetorium", "Castrum", "Porta", "Massive PC", "Gold Saucer", "Mahjong", "Air Force One", "Chocobo Racing", "Lord of Verminion", "Triple Triad", "Blunderville", "Fashion Report", "Custom Talk", "Feed Buddy", "Ocean Fishing", "Crystalline Conflict", "Frontline", "Rival Wings", "Inn"],
+            drawOptions: DrawAutoSkipCutsceneOptions,
+            showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
             "auto-ignore-minimum-window-size",
@@ -2261,6 +2460,24 @@ public partial class SlaveWindow
             warningText: "Uses Dalamud internals; if Dalamud changes this will report unavailable instead of crashing.",
             searchTerms: ["Dalamud", "notification", "toast", "plugin error", "plugin load", "Penumbra", "Glamourer", "mod failed", "update alert"],
             drawOptions: DrawDalamudNotificationsSuckOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "better-highlight-potential-targets",
+            "Better Highlight Potential Targets",
+            () => configuration.BetterHighlightPotentialTargetsEnabled,
+            value =>
+            {
+                ApplyBetterHighlightPotentialTargetsConfiguration();
+                return plugin.BetterHighlightPotentialTargets.SetEnabled(value);
+            },
+            applied => configuration.BetterHighlightPotentialTargetsEnabled = applied,
+            "Changes the yellow potential-target hover highlight to a selected native backend color.",
+            "Reads Dalamud's mouse-over target and reapplies the game's built-in object highlight color after stable plugin/game load and stable hover checks. After enabling, it waits about 5 seconds plus 30 stable frames and a brief stable hover before repainting. Uses the native color enum instead of drawing a custom overlay. To remove the yellow flash before XA Slave replaces it, open FFXIV Character Configuration > Control Settings > Target and unselect Highlight Potential Targets.",
+            plugin.BetterHighlightPotentialTargets.StatusText,
+            warningText: "Safety-gated: this arms last after plugin load, waits about 5 seconds plus 30 stable frames and a brief stable hover after enable, and suspends during login, logout, territory changes, and unload. For no yellow pre-flash, unselect FFXIV Character Configuration > Control Settings > Target > Highlight Potential Targets.",
+            searchTerms: ["highlight", "target highlight", "mouseover", "mouse over", "hover", "yellow outline", "potential target", "ObjectHighlightColor"],
+            drawOptions: DrawBetterHighlightPotentialTargetsOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
@@ -2419,7 +2636,7 @@ public partial class SlaveWindow
             "Forces the live 3D resolution scale below the game's normal UI floor.",
             "Forces the live 3D resolution scale to the slider value between 0.01 and 1.00. If the current runtime scaler is DLSS, XA temporarily switches to AMD FSR while the feature is active and restores the previous mode on disable.",
             plugin.SystemWindowMods.LowResolutionStatusText,
-            searchTerms: ["3D resolution scale", "0.01", "1.00", "DLSS", "FSR", "GraphicsRezoScale", "GraphicsRezoUpscaleType"],
+            searchTerms: ["3D resolution scale", "resolution scale", "upscale type", "0.01", "1.00", "DLSS", "FSR"],
             drawOptions: DrawLowResolutionOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
@@ -2601,6 +2818,17 @@ public partial class SlaveWindow
             plugin.AutoRefuseTrade.StatusText,
             searchTerms: ["Show notification", "Send /e message", "Echo lines", "Commands after refusal", "<trader>", "<target>"],
             drawOptions: DrawTradeRefusalOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "show-traveler-world-names",
+            "Show Traveler World Names",
+            () => configuration.ShowTravelerWorldNamesEnabled,
+            plugin.NameplatePrivacy.SetShowTravelerWorldNamesEnabled,
+            applied => configuration.ShowTravelerWorldNamesEnabled = applied,
+            "Shows visible traveler and wanderer nameplates as Name@HomeWorld.",
+            "Appends @HomeWorld to the local nameplate name for visible players whose home world differs from their current world, then hides the FC/travel tag. This is local presentation only and does not alter server data. Live Anonymous Mode takes precedence and removes this label while it is masking nameplates.",
+            plugin.NameplatePrivacy.ShowTravelerWorldNamesStatusText,
+            searchTerms: ["traveler", "traveller", "wanderer", "world visit", "data center travel", "FC tag", "free company tag", "home world"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "auto-reveal-undiscovered-areas",
@@ -2854,18 +3082,23 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
 
-        DrawModSection(ToonModsSection.GameMods, "Game Mods");
-        DrawModSection(ToonModsSection.GraphicMods, "Graphic Mods");
-        DrawModSection(ToonModsSection.PlayerMods, "Player Mods");
-        DrawModSection(ToonModsSection.PluginMods, "Plugin Mods");
-        DrawModSection(ToonModsSection.EurekaMods, "Eureka");
-        DrawModSection(ToonModsSection.IllegalMods, "Illegal Shit You Shouldn't Use");
-
-        if (featureEntries.Count == 0)
+        if (ImGui.BeginChild("##XAModsSectionsScrollRegion", new Vector2(0f, 0f), false))
         {
-            ImGui.TextDisabled("No XA Mods matched the current filter.");
-            ImGui.TextDisabled("Filters apply the search text plus the optional enabled-only toggle.");
+            DrawModSection(ToonModsSection.GameMods, "Game Mods");
+            DrawModSection(ToonModsSection.GraphicMods, "Graphic Mods");
+            DrawModSection(ToonModsSection.PlayerMods, "Player Mods");
+            DrawModSection(ToonModsSection.PluginMods, "Plugin Mods");
+            DrawModSection(ToonModsSection.EurekaMods, "Eureka");
+            DrawModSection(ToonModsSection.IllegalMods, "Illegal Shit You Shouldn't Use");
+
+            if (featureEntries.Count == 0)
+            {
+                ImGui.TextDisabled("No XA Mods matched the current filter.");
+                ImGui.TextDisabled("Filters apply the search text plus the optional enabled-only toggle.");
+            }
         }
+
+        ImGui.EndChild();
     }
 
 }

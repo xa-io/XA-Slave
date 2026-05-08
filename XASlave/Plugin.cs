@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
 using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Agent;
 using Dalamud.Game.Command;
 using Dalamud.Game.Gui.ContextMenu;
 using Dalamud.IoC;
@@ -43,6 +44,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] public static ISigScanner SigScanner { get; private set; } = null!;
     [PluginService] public static IGameInteropProvider GameInterop { get; private set; } = null!;
     [PluginService] public static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
+    [PluginService] public static IAgentLifecycle AgentLifecycle { get; private set; } = null!;
     [PluginService] public static IContextMenu ContextMenu { get; private set; } = null!;
     [PluginService] public static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] public static INotificationManager NotificationManager { get; private set; } = null!;
@@ -122,6 +124,7 @@ public sealed class Plugin : IDalamudPlugin
     public BuddyFeedCutsceneSkipService BuddyFeedCutsceneSkip { get; init; }
     public PopupCleanerService PopupCleaner { get; init; }
     public DalamudNotificationSuppressorService DalamudNotificationsSuck { get; init; }
+    public BetterHighlightPotentialTargetsService BetterHighlightPotentialTargets { get; init; }
     public SystemWindowModsService SystemWindowMods { get; init; }
     public LobbyErrorAutoCloseService LobbyErrorAutoClose { get; init; }
     public QueuePositionDisplayService QueuePositionDisplay { get; init; }
@@ -298,10 +301,11 @@ public sealed class Plugin : IDalamudPlugin
         IpcProvider = new IpcProvider(PluginInterface, this, Log);
         ExternalTaskLoader = new ExternalTaskLoader(this, PluginInterface, Log);
         WindowRenamer = new WindowRenamerService(Log);
-        AutoSkipCutscenes = new AutoSkipCutsceneService(Condition, Framework, SigScanner, GameInterop, Log);
+        AutoSkipCutscenes = new AutoSkipCutsceneService(Condition, Framework, ClientState, DataManager, PartyList, SigScanner, GameInterop, AgentLifecycle, Log);
         BuddyFeedCutsceneSkip = new BuddyFeedCutsceneSkipService(SigScanner, GameInterop, ClientState, Log);
         PopupCleaner = new PopupCleanerService(AddonLifecycle, Log);
         DalamudNotificationsSuck = new DalamudNotificationSuppressorService(PluginInterface, Log);
+        BetterHighlightPotentialTargets = new BetterHighlightPotentialTargetsService(Framework, ObjectTable, TargetManager, ClientState, Log);
         SystemWindowMods = new SystemWindowModsService(SigScanner, GameInterop, Log, Framework, GameConfig, ClientState, () => IpcClient.AutoRetainerGetMultiModeEnabled());
         LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Log);
         QueuePositionDisplay = new QueuePositionDisplayService(SigScanner, GameInterop, Log);
@@ -315,7 +319,7 @@ public sealed class Plugin : IDalamudPlugin
         AutoLockGameWindow = new AutoLockGameWindowService(Condition, Log);
         NotifyWhenFriendIsNear = new NotifyWhenFriendIsNearService(Framework, ClientState, ObjectTable, ToastGui, ChatGui, Log);
         BetterCastBar = new BetterCastBarService(AddonLifecycle, ObjectTable, DataManager, Log);
-        BetterDutyFinder = new BetterDutyFinderSettingsService(SigScanner, GameConfig, Log);
+        BetterDutyFinder = new BetterDutyFinderSettingsService(AddonLifecycle, SigScanner, GameConfig, Log);
         CopyItemNameContextMenu = new CopyItemNameContextMenuService(ContextMenu, DataManager, Log);
         SightDistance = new SightDistanceService(Framework, SigScanner, GameInterop, Log);
         PlayerSearchContextMenu = new PlayerSearchContextMenuService(ContextMenu, DataManager, Log);
@@ -349,7 +353,12 @@ public sealed class Plugin : IDalamudPlugin
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
         XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubAddress, Configuration.XagmanHubPort, _ => { });
         if (Configuration.XagmanPeerConnectionsEnabled)
-            XagmanPeers.Start();
+        {
+            QueueDeferredStartupAction("XagmanPeerConnectionsEnabled", () =>
+            {
+                XagmanPeers.Start();
+            });
+        }
 
         var normalizedAutoLeaveDutyDelay = AutoLeaveDutyService.ClampDelaySeconds(Configuration.AutoLeaveDutyDelaySeconds);
         if (Configuration.AutoLeaveDutyDelaySeconds != normalizedAutoLeaveDutyDelay)
@@ -384,10 +393,18 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.CustomTimestampFormat = normalizedCustomTimestampFormat;
             Configuration.Save();
         }
+        var normalizedBetterHighlightColor = BetterHighlightPotentialTargetsService.NormalizeHighlightColor(Configuration.BetterHighlightPotentialTargetsColor);
+        if (Configuration.BetterHighlightPotentialTargetsColor != normalizedBetterHighlightColor)
+        {
+            Configuration.BetterHighlightPotentialTargetsColor = normalizedBetterHighlightColor;
+            Configuration.Save();
+        }
         ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
         ApplyAutoDisplayIdsConfiguration(save: false);
         ApplyAutoDisplayNetworkLatencyConfiguration(save: false);
+        AutoSkipCutscenes.ApplyConfiguration(Configuration);
         ApplyDalamudNotificationsSuckConfiguration(save: false);
+        ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
         ApplyNotifyWhenFriendIsNearConfiguration(save: false);
         ApplyBetterCastBarConfiguration(save: false);
         ApplyBetterCompanyChestConfiguration(save: false);
@@ -479,6 +496,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             QueuePostLoadXAModActivation("AutoSkipCutscenesEnabled", "Auto Skip Cutscenes", PostLoadXAModActivationInitialDelaySeconds + PostLoadXAModActivationSpacingSeconds, () =>
             {
+                ApplyStoredXAModConfiguration("auto-skip-cutscenes");
                 if (!AutoSkipCutscenes.RestoreEnabledOnStartup())
                 {
                     Configuration.AutoSkipCutscenesEnabled = false;
@@ -522,6 +540,19 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
+        if (Configuration.BetterHighlightPotentialTargetsEnabled)
+        {
+            QueuePostLoadXAModActivation("BetterHighlightPotentialTargetsEnabled", "Better Highlight Potential Targets", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 8), () =>
+            {
+                ApplyStoredXAModConfiguration("better-highlight-potential-targets");
+                ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
+                if (!BetterHighlightPotentialTargets.SetEnabled(true))
+                {
+                    Configuration.BetterHighlightPotentialTargetsEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction("AutoPreventGameExitingFromLobbyErrorsEnabled", () =>
         {
             if (Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled && !SystemWindowMods.SetPreventLobbyExitEnabled(true))
@@ -667,11 +698,22 @@ public sealed class Plugin : IDalamudPlugin
         });
         QueueDeferredStartupAction(() =>
         {
+            var changed = false;
+
             if (Configuration.LiveAnonymousModeEnabled && !NameplatePrivacy.SetAnonymousModeEnabled(true))
             {
                 Configuration.LiveAnonymousModeEnabled = false;
-                Configuration.Save();
+                changed = true;
             }
+
+            if (Configuration.ShowTravelerWorldNamesEnabled && !NameplatePrivacy.SetShowTravelerWorldNamesEnabled(true))
+            {
+                Configuration.ShowTravelerWorldNamesEnabled = false;
+                changed = true;
+            }
+
+            if (changed)
+                Configuration.Save();
         });
         QueueDeferredStartupAction(() =>
         {
@@ -782,14 +824,17 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction("QuickReturnEnabled", () =>
+        if (Configuration.QuickReturnEnabled)
         {
-            if (Configuration.QuickReturnEnabled && !QuickReturn.SetEnabled(true))
+            QueuePostLoadXAModActivation("QuickReturnEnabled", "Instant Return", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 9), () =>
             {
-                Configuration.QuickReturnEnabled = false;
-                Configuration.Save();
-            }
-        });
+                if (!QuickReturn.SetEnabled(true))
+                {
+                    Configuration.QuickReturnEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction(() =>
         {
             if (!Configuration.UnlockExpertDeliveryEnabled)
@@ -950,6 +995,10 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
+        QueueDeferredStartupAction("ExternalTaskLoader.LoadAll", () =>
+        {
+            ExternalTaskLoader.LoadAll();
+        });
 
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
@@ -1001,7 +1050,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, fe, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
+            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
         });
 
         PluginInterface.UiBuilder.Draw += UpdateEurekaLogogramCreatorOverlayWindows;
@@ -1250,7 +1299,8 @@ public sealed class Plugin : IDalamudPlugin
     private bool HasPendingStartupArming()
     {
         return IsStartupArmingPending(AutoSkipCutscenes.IsStartupArmingPending, AutoSkipCutscenes.StatusText)
-            || IsStartupArmingPending(SightDistance.IsStartupArmingPending, SightDistance.StatusText);
+            || IsStartupArmingPending(SightDistance.IsStartupArmingPending, SightDistance.StatusText)
+            || IsStartupArmingPending(BetterHighlightPotentialTargets.IsStartupArmingPending, BetterHighlightPotentialTargets.StatusText);
     }
 
     private string DescribePendingStartupArming()
@@ -1261,6 +1311,9 @@ public sealed class Plugin : IDalamudPlugin
 
         if (IsStartupArmingPending(SightDistance.IsStartupArmingPending, SightDistance.StatusText))
             pending.Add($"Custom Sight Distance: {SightDistance.StatusText}");
+
+        if (IsStartupArmingPending(BetterHighlightPotentialTargets.IsStartupArmingPending, BetterHighlightPotentialTargets.StatusText))
+            pending.Add($"Better Highlight Potential Targets: {BetterHighlightPotentialTargets.StatusText}");
 
         return pending.Count == 0 ? "None" : string.Join("; ", pending);
     }
@@ -1317,6 +1370,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Auto Display IDs", Configuration.AutoDisplayIdsEnabled, AutoDisplayIds.StatusText);
         yield return CreateStartupSurfaceStatus("Display Network Latency", Configuration.AutoDisplayNetworkLatencyEnabled, AutoDisplayNetworkLatency.StatusText);
         yield return CreateStartupSurfaceStatus("Custom Timestamp Format", Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.StatusText, "CustomTimestampFormatEnabled");
+        yield return CreateStartupSurfaceStatus("Better Highlight Potential Targets", Configuration.BetterHighlightPotentialTargetsEnabled, BetterHighlightPotentialTargets.StatusText, "BetterHighlightPotentialTargetsEnabled");
         yield return CreateStartupSurfaceStatus("Auto Hide Game Objects", Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.StatusText, "AutoHideGameObjectsEnabled");
         yield return CreateStartupSurfaceStatus("Skip Dialogue", Configuration.AutoSkipDialogueEnabled, DialogueSkip.StatusText);
         yield return CreateStartupSurfaceStatus("Lock Game Window In Combat", Configuration.LockGameWindowInCombatEnabled, AutoLockGameWindow.StatusText);
@@ -1325,8 +1379,9 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Better Duty Finder", Configuration.BetterDutyFinderEnabled, BetterDutyFinder.StatusText);
         yield return CreateStartupSurfaceStatus("Background Rendering Pause", Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.DisableBackgroundRenderingStatusText, "DisableBackgroundGameRenderingEnabled");
         yield return CreateStartupSurfaceStatus("Custom Sight Distance", Configuration.CustomSightDistanceEnabled, SightDistance.StatusText, "CustomSightDistanceEnabled");
-        yield return CreateStartupSurfaceStatus("Instant Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText);
+        yield return CreateStartupSurfaceStatus("Instant Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText, "QuickReturnEnabled");
         yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText, "AutoRefuseTradeRequestEnabled");
+        yield return CreateStartupSurfaceStatus("Show Traveler World Names", Configuration.ShowTravelerWorldNamesEnabled, NameplatePrivacy.ShowTravelerWorldNamesStatusText);
         yield return CreateStartupSurfaceStatus("Fix /target Command", Configuration.TargetCommandFixEnabled, TargetCommandFix.StatusText);
         yield return CreateStartupSurfaceStatus("Better Inventory Mover", Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.StatusText);
         yield return CreateStartupSurfaceStatus("Better Company Chest", Configuration.BetterCompanyChestEnabled, BetterCompanyChest.StatusText);
@@ -1404,6 +1459,11 @@ public sealed class Plugin : IDalamudPlugin
         TryCleanup("ClientState.Logout -= OnLogout", () => ClientState.Logout -= OnLogout);
         TryCleanup($"CommandManager.RemoveHandler({CommandName})", () => CommandManager.RemoveHandler(CommandName));
         TryCleanup("WindowSystem.RemoveAllWindows", WindowSystem.RemoveAllWindows);
+        TryCleanup("RestoreSpecialRenderModes", () =>
+        {
+            if (hasAppliedSpecialRenderUiFlags)
+                RestoreSpecialRenderModes(clearStoredUiToggles: false);
+        });
 
         TryDispose("SlaveWindow", SlaveWindow);
         TryCleanup("XagmanPeers.Stop", XagmanPeers.Stop);
@@ -1414,6 +1474,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("BuddyFeedCutsceneSkip", BuddyFeedCutsceneSkip);
         TryDispose("PopupCleaner", PopupCleaner);
         TryDispose("DalamudNotificationsSuck", DalamudNotificationsSuck);
+        TryDispose("BetterHighlightPotentialTargets", BetterHighlightPotentialTargets);
         TryDispose("SystemWindowMods", SystemWindowMods);
         TryDispose("LobbyErrorAutoClose", LobbyErrorAutoClose);
         TryDispose("QueuePositionDisplay", QueuePositionDisplay);
@@ -1617,6 +1678,12 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("debug", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(SlaveWindow.ToggleDebugMenu(out var message), message);
+            return;
+        }
+
         if (subcommand.Equals("updates", StringComparison.OrdinalIgnoreCase))
         {
             UpdatesWindow.Toggle();
@@ -1738,6 +1805,18 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (SlaveWindow.TryExecuteXaMovementCommand(subcommand, subcommandArgs, out var movementMessage, out var movementHandled))
+        {
+            PrintCommandResult(true, movementMessage);
+            return;
+        }
+
+        if (movementHandled)
+        {
+            PrintCommandResult(false, movementMessage);
+            return;
+        }
+
         if (TryHandleXAModToggleCommand(subcommand, subcommandArgs))
             return;
 
@@ -1804,6 +1883,9 @@ public sealed class Plugin : IDalamudPlugin
             message = "Opened Commands reference.";
             return true;
         }
+
+        if (subcommand.Equals("debug", StringComparison.OrdinalIgnoreCase))
+            return SlaveWindow.ToggleDebugMenu(out message);
 
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
             return TryHandleXAPeepCommand(subcommandArgs, out message);
@@ -1879,6 +1961,12 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("imlegit", StringComparison.OrdinalIgnoreCase))
             return RestoreXAModsSection(XAModsRestoreScope.Illegal, out message);
+
+        if (SlaveWindow.TryExecuteXaMovementCommand(subcommand, subcommandArgs, out message, out var movementHandled))
+            return true;
+
+        if (movementHandled)
+            return false;
 
         if (TryGetXAModToggleCommandDefinition(subcommand, out var commandDefinition))
         {
@@ -2248,6 +2336,35 @@ public sealed class Plugin : IDalamudPlugin
                     UseOccultCrescentRules = Configuration.AutoHideGameObjectsUseOccultCrescentRules,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "auto-skip-cutscenes":
+                snapshot = JsonSerializer.SerializeToElement(new XAModAutoSkipCutscenesSettings
+                {
+                    UseZoneWhitelist = Configuration.AutoSkipCutscenesUseZoneWhitelist,
+                    WhitelistTerritories = NormalizeTerritoryList(Configuration.AutoSkipCutscenesWhitelistTerritories),
+                    BlacklistTerritories = NormalizeTerritoryList(Configuration.AutoSkipCutscenesBlacklistTerritories),
+                    SkipNormalCutscenes = Configuration.AutoSkipCutscenesSkipNormalCutscenes,
+                    SkipMsqRoulette = Configuration.AutoSkipCutscenesSkipMsqRoulette,
+                    AutoEnableMsqFourPlayer = Configuration.AutoSkipCutscenesAutoEnableMsqFourPlayer,
+                    ExemptPraetorium = Configuration.AutoSkipCutscenesExemptPraetorium,
+                    ExemptCastrum = Configuration.AutoSkipCutscenesExemptCastrum,
+                    ExemptPortaDecumana = Configuration.AutoSkipCutscenesExemptPortaDecumana,
+                    SkipMassivePc = Configuration.AutoSkipCutscenesSkipMassivePc,
+                    SkipGoldSaucer = Configuration.AutoSkipCutscenesSkipGoldSaucer,
+                    GoldSaucerMahjong = Configuration.AutoSkipCutscenesGoldSaucerMahjong,
+                    GoldSaucerAirForceOne = Configuration.AutoSkipCutscenesGoldSaucerAirForceOne,
+                    GoldSaucerChocoboRacing = Configuration.AutoSkipCutscenesGoldSaucerChocoboRacing,
+                    GoldSaucerLordOfVerminion = Configuration.AutoSkipCutscenesGoldSaucerLordOfVerminion,
+                    GoldSaucerTripleTriad = Configuration.AutoSkipCutscenesGoldSaucerTripleTriad,
+                    GoldSaucerBlunderville = Configuration.AutoSkipCutscenesGoldSaucerBlunderville,
+                    GoldSaucerFashionReport = Configuration.AutoSkipCutscenesGoldSaucerFashionReport,
+                    SkipCustomTalk = Configuration.AutoSkipCutscenesSkipCustomTalk,
+                    SkipFeedBuddy = Configuration.AutoSkipCutscenesFeedingChocoboEnabled,
+                    SkipOceanFishing = Configuration.AutoSkipCutscenesSkipOceanFishing,
+                    SkipCrystallineConflict = Configuration.AutoSkipCutscenesSkipCrystallineConflict,
+                    SkipFrontlineRivalWings = Configuration.AutoSkipCutscenesSkipFrontlineRivalWings,
+                    SkipInn = Configuration.AutoSkipCutscenesSkipInn,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "custom-resolutions":
                 snapshot = JsonSerializer.SerializeToElement(new XAModCustomResolutionsSettings
                 {
@@ -2410,6 +2527,12 @@ public sealed class Plugin : IDalamudPlugin
                     HideWarningsErrors = Configuration.DalamudNotificationsSuckHideWarningsErrors,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "better-highlight-potential-targets":
+                snapshot = JsonSerializer.SerializeToElement(new XAModBetterHighlightPotentialTargetsSettings
+                {
+                    Color = BetterHighlightPotentialTargetsService.NormalizeHighlightColor(Configuration.BetterHighlightPotentialTargetsColor),
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "auto-leave-duty":
                 snapshot = JsonSerializer.SerializeToElement(new XAModAutoLeaveDutySettings
                 {
@@ -2546,6 +2669,37 @@ public sealed class Plugin : IDalamudPlugin
             }
         }
 
+        if (TryDeserializeXAModSettings(modSettings, "auto-skip-cutscenes", out XAModAutoSkipCutscenesSettings? autoSkipCutscenesSettings)
+            && autoSkipCutscenesSettings != null)
+        {
+            Configuration.AutoSkipCutscenesUseZoneWhitelist = autoSkipCutscenesSettings.UseZoneWhitelist;
+            Configuration.AutoSkipCutscenesWhitelistTerritories = NormalizeTerritoryList(autoSkipCutscenesSettings.WhitelistTerritories);
+            Configuration.AutoSkipCutscenesBlacklistTerritories = NormalizeTerritoryList(autoSkipCutscenesSettings.BlacklistTerritories);
+            Configuration.AutoSkipCutscenesSkipNormalCutscenes = autoSkipCutscenesSettings.SkipNormalCutscenes;
+            Configuration.AutoSkipCutscenesSkipMsqRoulette = autoSkipCutscenesSettings.SkipMsqRoulette;
+            Configuration.AutoSkipCutscenesAutoEnableMsqFourPlayer = autoSkipCutscenesSettings.AutoEnableMsqFourPlayer;
+            Configuration.AutoSkipCutscenesExemptPraetorium = autoSkipCutscenesSettings.ExemptPraetorium;
+            Configuration.AutoSkipCutscenesExemptCastrum = autoSkipCutscenesSettings.ExemptCastrum;
+            Configuration.AutoSkipCutscenesExemptPortaDecumana = autoSkipCutscenesSettings.ExemptPortaDecumana;
+            Configuration.AutoSkipCutscenesSkipMassivePc = autoSkipCutscenesSettings.SkipMassivePc;
+            Configuration.AutoSkipCutscenesSkipGoldSaucer = autoSkipCutscenesSettings.SkipGoldSaucer;
+            Configuration.AutoSkipCutscenesGoldSaucerMahjong = autoSkipCutscenesSettings.GoldSaucerMahjong;
+            Configuration.AutoSkipCutscenesGoldSaucerAirForceOne = autoSkipCutscenesSettings.GoldSaucerAirForceOne;
+            Configuration.AutoSkipCutscenesGoldSaucerChocoboRacing = autoSkipCutscenesSettings.GoldSaucerChocoboRacing;
+            Configuration.AutoSkipCutscenesGoldSaucerLordOfVerminion = autoSkipCutscenesSettings.GoldSaucerLordOfVerminion;
+            Configuration.AutoSkipCutscenesGoldSaucerTripleTriad = autoSkipCutscenesSettings.GoldSaucerTripleTriad;
+            Configuration.AutoSkipCutscenesGoldSaucerBlunderville = autoSkipCutscenesSettings.GoldSaucerBlunderville;
+            Configuration.AutoSkipCutscenesGoldSaucerFashionReport = autoSkipCutscenesSettings.GoldSaucerFashionReport;
+            Configuration.AutoSkipCutscenesSkipCustomTalk = autoSkipCutscenesSettings.SkipCustomTalk;
+            Configuration.AutoSkipCutscenesFeedingChocoboEnabled = autoSkipCutscenesSettings.SkipFeedBuddy;
+            Configuration.AutoSkipCutscenesSkipOceanFishing = autoSkipCutscenesSettings.SkipOceanFishing;
+            Configuration.AutoSkipCutscenesSkipCrystallineConflict = autoSkipCutscenesSettings.SkipCrystallineConflict;
+            Configuration.AutoSkipCutscenesSkipFrontlineRivalWings = autoSkipCutscenesSettings.SkipFrontlineRivalWings;
+            Configuration.AutoSkipCutscenesSkipInn = autoSkipCutscenesSettings.SkipInn;
+            AutoSkipCutscenes.ApplyConfiguration(Configuration);
+            BuddyFeedCutsceneSkip.SetEnabled(Configuration.AutoSkipCutscenesFeedingChocoboEnabled);
+        }
+
         if (TryDeserializeXAModSettings(modSettings, "auto-hide-unnecessary-popups", out XAModPopupCleanerSettings? popupCleanerSettings)
             && popupCleanerSettings != null)
         {
@@ -2564,6 +2718,13 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.DalamudNotificationsSuckHideSuccessInfo = dalamudNotificationSettings.HideSuccessInfo;
             Configuration.DalamudNotificationsSuckHideWarningsErrors = dalamudNotificationSettings.HideWarningsErrors;
             ApplyDalamudNotificationsSuckConfiguration(save: false);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "better-highlight-potential-targets", out XAModBetterHighlightPotentialTargetsSettings? betterHighlightSettings)
+            && betterHighlightSettings != null)
+        {
+            Configuration.BetterHighlightPotentialTargetsColor = BetterHighlightPotentialTargetsService.NormalizeHighlightColor(betterHighlightSettings.Color);
+            ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "custom-resolutions", out XAModCustomResolutionsSettings? customResolutionSettings)
@@ -2962,6 +3123,16 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         return normalized;
+    }
+
+    private static List<uint> NormalizeTerritoryList(IEnumerable<uint>? territories)
+    {
+        return territories?
+            .Where(territory => territory > 0)
+            .Distinct()
+            .OrderBy(territory => territory)
+            .ToList()
+            ?? new List<uint>();
     }
 
     private static XAModColorSettings CreateColorSettings(float r, float g, float b, float a)
@@ -3475,6 +3646,15 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
     }
 
+    internal void ApplyBetterHighlightPotentialTargetsConfiguration(bool save = true)
+    {
+        Configuration.BetterHighlightPotentialTargetsColor = BetterHighlightPotentialTargetsService.NormalizeHighlightColor(Configuration.BetterHighlightPotentialTargetsColor);
+        BetterHighlightPotentialTargets.ApplyConfiguration(Configuration.BetterHighlightPotentialTargetsColor);
+
+        if (save)
+            Configuration.Save();
+    }
+
     internal void ApplyNotifyWhenFriendIsNearConfiguration(bool save = true)
     {
         Configuration.NotifyWhenFriendIsNearPatterns = Configuration.NotifyWhenFriendIsNearPatterns
@@ -3604,6 +3784,9 @@ public sealed class Plugin : IDalamudPlugin
     {
         switch (key.ToLowerInvariant())
         {
+            case "auto-skip-cutscenes":
+                AutoSkipCutscenes.ApplyConfiguration(Configuration);
+                break;
             case "disable-background-game-rendering":
                 SystemWindowMods.SetDisableBackgroundRenderingOnlyWhenMinimized(Configuration.DisableBackgroundGameRenderingOnlyWhenMinimized);
                 SystemWindowMods.SetDisableBackgroundRenderingDisableWhenArMultiIsOn(Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn);
@@ -3629,6 +3812,9 @@ public sealed class Plugin : IDalamudPlugin
                 break;
             case "dalamud-notifications-suck":
                 ApplyDalamudNotificationsSuckConfiguration(save: false);
+                break;
+            case "better-highlight-potential-targets":
+                ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
                 break;
             case "notify-when-friend-is-near":
                 ApplyNotifyWhenFriendIsNearConfiguration(save: false);
@@ -3802,7 +3988,11 @@ public sealed class Plugin : IDalamudPlugin
             return AutoDisplayNetworkLatency.SetEnabled(value);
         }, applied => Configuration.AutoDisplayNetworkLatencyEnabled = applied, () => AutoDisplayNetworkLatency.StatusText);
         yield return new("custom-timestamp-format", "Custom Timestamp Format", XAModsRestoreScope.Game, () => Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.SetEnabled, applied => Configuration.CustomTimestampFormatEnabled = applied, () => ChatTimestampFormat.StatusText);
-        yield return new("auto-skip-cutscenes", "Skip Cutscenes", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.SetEnabled, applied => Configuration.AutoSkipCutscenesEnabled = applied, () => AutoSkipCutscenes.StatusText);
+        yield return new("auto-skip-cutscenes", "Skip Cutscenes", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesEnabled, value =>
+        {
+            AutoSkipCutscenes.ApplyConfiguration(Configuration);
+            return AutoSkipCutscenes.SetEnabled(value);
+        }, applied => Configuration.AutoSkipCutscenesEnabled = applied, () => AutoSkipCutscenes.StatusText);
         yield return new("auto-skip-cutscenes-feeding-chocobo", "Skip Cutscenes Feeding Chocobo", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesFeedingChocoboEnabled, BuddyFeedCutsceneSkip.SetEnabled, applied => Configuration.AutoSkipCutscenesFeedingChocoboEnabled = applied, () => BuddyFeedCutsceneSkip.StatusText);
         yield return new("auto-hide-unnecessary-popups", "Hide Unnecessary Popups", XAModsRestoreScope.Game, () => Configuration.AutoHideUnnecessaryPopupsEnabled, PopupCleaner.SetEnabled, applied => Configuration.AutoHideUnnecessaryPopupsEnabled = applied, () => PopupCleaner.StatusText);
         yield return new("dalamud-notifications-suck", "Dalamud Notifications Suck", XAModsRestoreScope.Game, () => Configuration.DalamudNotificationsSuckEnabled, value =>
@@ -3810,6 +4000,11 @@ public sealed class Plugin : IDalamudPlugin
             ApplyDalamudNotificationsSuckConfiguration(save: false);
             return DalamudNotificationsSuck.SetEnabled(value);
         }, applied => Configuration.DalamudNotificationsSuckEnabled = applied, () => DalamudNotificationsSuck.StatusText);
+        yield return new("better-highlight-potential-targets", "Better Highlight Potential Targets", XAModsRestoreScope.Game, () => Configuration.BetterHighlightPotentialTargetsEnabled, value =>
+        {
+            ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
+            return BetterHighlightPotentialTargets.SetEnabled(value);
+        }, applied => Configuration.BetterHighlightPotentialTargetsEnabled = applied, () => BetterHighlightPotentialTargets.StatusText);
         yield return new("auto-prevent-game-exiting-from-lobby-errors", "Prevent Game Exiting From Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.SetPreventLobbyExitEnabled, applied => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled = applied, () => SystemWindowMods.PreventLobbyExitStatusText);
         yield return new("auto-close-lobby-errors", "Close Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoCloseLobbyErrorsEnabled, LobbyErrorAutoClose.SetEnabled, applied => Configuration.AutoCloseLobbyErrorsEnabled = applied, () => LobbyErrorAutoClose.StatusText);
         yield return new("bailout-esc-menu", "Bailout ESC Menu", XAModsRestoreScope.Game, () => Configuration.BailoutEscMenuEnabled, EscMenuBailout.SetEnabled, applied => Configuration.BailoutEscMenuEnabled = applied, () => EscMenuBailout.StatusText);
@@ -3851,6 +4046,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("auto-merge", "Auto Merge", XAModsRestoreScope.Player, () => Configuration.AutoMergeEnabled, AutoMerge.SetEnabled, applied => Configuration.AutoMergeEnabled = applied, () => AutoMerge.StatusText);
         yield return new("quick-return", "Instant Return", XAModsRestoreScope.Illegal, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusText);
         yield return new("auto-refuse-trade-request", "Refuse Trade Request", XAModsRestoreScope.Player, () => Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.SetEnabled, applied => Configuration.AutoRefuseTradeRequestEnabled = applied, () => AutoRefuseTrade.StatusText);
+        yield return new("show-traveler-world-names", "Show Traveler World Names", XAModsRestoreScope.Player, () => Configuration.ShowTravelerWorldNamesEnabled, NameplatePrivacy.SetShowTravelerWorldNamesEnabled, applied => Configuration.ShowTravelerWorldNamesEnabled = applied, () => NameplatePrivacy.ShowTravelerWorldNamesStatusText);
         yield return new("auto-reveal-undiscovered-areas", "Reveal Undiscovered Areas", XAModsRestoreScope.Player, () => Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.SetRevealUndiscoveredAreasEnabled, applied => Configuration.AutoRevealUndiscoveredAreasEnabled = applied, () => SystemWindowMods.RevealUndiscoveredAreasStatusText);
         yield return new("auto-clear-teleportation-lock", "Clear Teleportation Lock", XAModsRestoreScope.Player, () => Configuration.AutoClearTeleportationLockEnabled, TeleportLockClear.SetEnabled, applied => Configuration.AutoClearTeleportationLockEnabled = applied, () => TeleportLockClear.StatusText);
         yield return new("custom-sight-distance", "Custom Sight Distance", XAModsRestoreScope.Player, () => Configuration.CustomSightDistanceEnabled, SightDistance.SetEnabled, applied => Configuration.CustomSightDistanceEnabled = applied, () => SightDistance.StatusText);
@@ -4007,6 +4203,11 @@ public sealed class Plugin : IDalamudPlugin
             case "notificationssuck":
                 definition = new("dalamudnotifs", "/xa dalamudnotifs on|off", GetXAModDefinition("dalamud-notifications-suck"));
                 return true;
+            case "highlighttargets":
+            case "betterhighlight":
+            case "targethighlight":
+                definition = new("highlighttargets", "/xa highlighttargets on|off", GetXAModDefinition("better-highlight-potential-targets"));
+                return true;
             case "preventlobbyexit":
                 definition = new("preventlobbyexit", "/xa preventlobbyexit on|off", GetXAModDefinition("auto-prevent-game-exiting-from-lobby-errors"));
                 return true;
@@ -4105,6 +4306,12 @@ public sealed class Plugin : IDalamudPlugin
                 return true;
             case "refusetrade":
                 definition = new("refusetrade", "/xa refusetrade on|off", GetXAModDefinition("auto-refuse-trade-request"));
+                return true;
+            case "travelerworlds":
+            case "travellerworlds":
+            case "travelerworldnames":
+            case "worldnames":
+                definition = new("travelerworlds", "/xa travelerworlds on|off", GetXAModDefinition("show-traveler-world-names"));
                 return true;
             case "revealmap":
                 definition = new("revealmap", "/xa revealmap on|off", GetXAModDefinition("auto-reveal-undiscovered-areas"));
@@ -4397,5 +4604,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.31";
+    public const string Version = "0.0.0.32";
 }

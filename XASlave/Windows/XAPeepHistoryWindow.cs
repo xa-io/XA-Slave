@@ -12,7 +12,7 @@ public sealed class XAPeepHistoryWindow : Window
 {
     private readonly Plugin plugin;
     private static float UiScale => ImGuiHelpers.GlobalScale;
-    private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
+    private static float UiScaleSafe => ImGuiHelpers.GlobalScale;
     private XAPeepHistorySortColumn sortColumn = XAPeepHistorySortColumn.LastSeen;
     private bool sortDescending = true;
     private int tableOpenSerial;

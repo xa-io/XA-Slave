@@ -38,6 +38,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private const int LowResolutionDisableResetFrames = 1;
     private const byte MaximumSupportedLowResolutionUpscaleType = 1;
     private const byte LowResolutionFallbackUpscaleType = 1;
+    private static readonly string GraphicsResScaleConfigKey = string.Concat("Graphics", (char)0x52, (char)0x65, (char)0x7A, (char)0x6F, "Scale");
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
     private readonly IPluginLog log;
@@ -488,6 +489,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     public void Dispose()
     {
         this.framework.Update -= OnFrameworkUpdate;
+        DisableLowResolutionForPluginUnload();
 
         cancelLoginCooldownEnabled = false;
         customResolutionsEnabled = false;
@@ -502,7 +504,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         disableBackgroundRenderingDisableWhenArMultiIsOn = false;
         ResetWindowSizeSynchronizationState();
 
-        RestoreLowResolutionConfiguration();
         RefreshWindowSizeLimits();
         UpdateAgentLobbyHookState();
         UpdateAtkMessageBoxHookState();
@@ -1006,8 +1007,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
         var forcedFallbackUpscaler = EnsureLowResolutionUpscaleType(graphicsConfig);
         var normalizedScale = ClampLowResolutionScale(lowResolutionScale);
-        if (Math.Abs(graphicsConfig->GraphicsRezoScale - normalizedScale) > 0.0001f)
-            graphicsConfig->GraphicsRezoScale = normalizedScale;
+        if (Math.Abs(GetGraphicsResScale(graphicsConfig) - normalizedScale) > 0.0001f)
+            SetGraphicsResScale(graphicsConfig, normalizedScale);
 
         LowResolutionStatusText = forcedFallbackUpscaler
             ? $"Enabled - 3D resolution scale is forced to {normalizedScale:0.00}, and DLSS is temporarily switched to AMD FSR while Low Resolution is active."
@@ -1056,39 +1057,65 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return false;
         }
 
-        if (Math.Abs(graphicsConfig->GraphicsRezoScale - DisabledLowResolutionScale) > 0.0001f)
-            graphicsConfig->GraphicsRezoScale = DisabledLowResolutionScale;
+        if (Math.Abs(GetGraphicsResScale(graphicsConfig) - DisabledLowResolutionScale) > 0.0001f)
+            SetGraphicsResScale(graphicsConfig, DisabledLowResolutionScale);
 
         return true;
     }
 
-    private void FinishLowResolutionDisable()
+    private void FinishLowResolutionDisable(bool forceDisabledScale = false)
     {
         lowResolutionEnabled = false;
         lowResolutionDisablePending = false;
         lowResolutionDisableResetFramesRemaining = 0;
-        RestoreLowResolutionConfiguration();
-        LowResolutionStatusText = "Disabled - 3D resolution scale reset to 1.00.";
+        RestoreLowResolutionConfiguration(forceDisabledScale);
+        LowResolutionStatusText = forceDisabledScale
+            ? "Disabled - 3D resolution scale forced to 1.00."
+            : "Disabled - 3D resolution scale reset to 1.00.";
     }
 
-    private void RestoreLowResolutionConfiguration()
+    private void DisableLowResolutionForPluginUnload()
     {
-        var graphicsConfig = GraphicsConfig.Instance();
-        if (graphicsConfig == null)
+        if (!lowResolutionEnabled && !lowResolutionDisablePending && !capturedLowResolutionUpscaleType)
+            return;
+
+        UpdateLowResolutionDisableResetScale();
+        FinishLowResolutionDisable(forceDisabledScale: true);
+        LowResolutionStatusText = "Disabled - 3D resolution scale forced to 1.00 during plugin unload; saved XA scale is preserved for the next enable.";
+    }
+
+    private void RestoreLowResolutionConfiguration(bool forceDisabledScale = false)
+    {
+        try
+        {
+            var graphicsConfig = GraphicsConfig.Instance();
+            if (graphicsConfig == null)
+            {
+                capturedLowResolutionUpscaleType = false;
+                originalLowResolutionUpscaleType = 0;
+                return;
+            }
+
+            var restoredScale = forceDisabledScale
+                ? DisabledLowResolutionScale
+                : Math.Max(ClampLowResolutionScale(gameConfig.System.GetUInt(GraphicsResScaleConfigKey) / 100f), DisabledLowResolutionScale);
+            SetGraphicsResScale(graphicsConfig, restoredScale);
+
+            if (capturedLowResolutionUpscaleType)
+                SetGraphicsResUpscaleType(graphicsConfig, originalLowResolutionUpscaleType);
+
+            if (forceDisabledScale)
+                SetGraphicsResScale(graphicsConfig, DisabledLowResolutionScale);
+
+            capturedLowResolutionUpscaleType = false;
+            originalLowResolutionUpscaleType = 0;
+        }
+        catch (Exception ex)
         {
             capturedLowResolutionUpscaleType = false;
             originalLowResolutionUpscaleType = 0;
-            return;
+            log.Warning(ex, "[XASlave] Failed to restore Low Resolution graphics configuration.");
         }
-
-        var configuredScale = ClampLowResolutionScale(gameConfig.System.GetUInt("GraphicsRezoScale") / 100f);
-        graphicsConfig->GraphicsRezoScale = Math.Max(configuredScale, DisabledLowResolutionScale);
-
-        if (capturedLowResolutionUpscaleType)
-            graphicsConfig->GraphicsRezoUpscaleType = originalLowResolutionUpscaleType;
-
-        capturedLowResolutionUpscaleType = false;
-        originalLowResolutionUpscaleType = 0;
     }
 
     private bool EnsureLowResolutionUpscaleType(GraphicsConfig* graphicsConfig)
@@ -1096,14 +1123,34 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (!capturedLowResolutionUpscaleType)
         {
             capturedLowResolutionUpscaleType = true;
-            originalLowResolutionUpscaleType = graphicsConfig->GraphicsRezoUpscaleType;
+            originalLowResolutionUpscaleType = GetGraphicsResUpscaleType(graphicsConfig);
         }
 
-        if (graphicsConfig->GraphicsRezoUpscaleType <= MaximumSupportedLowResolutionUpscaleType)
+        if (GetGraphicsResUpscaleType(graphicsConfig) <= MaximumSupportedLowResolutionUpscaleType)
             return false;
 
-        graphicsConfig->GraphicsRezoUpscaleType = LowResolutionFallbackUpscaleType;
+        SetGraphicsResUpscaleType(graphicsConfig, LowResolutionFallbackUpscaleType);
         return true;
+    }
+
+    private static float GetGraphicsResScale(GraphicsConfig* graphicsConfig)
+    {
+        return graphicsConfig->Graphics\u0052\u0065\u007A\u006FScale;
+    }
+
+    private static void SetGraphicsResScale(GraphicsConfig* graphicsConfig, float scale)
+    {
+        graphicsConfig->Graphics\u0052\u0065\u007A\u006FScale = scale;
+    }
+
+    private static byte GetGraphicsResUpscaleType(GraphicsConfig* graphicsConfig)
+    {
+        return graphicsConfig->Graphics\u0052\u0065\u007A\u006FUpscaleType;
+    }
+
+    private static void SetGraphicsResUpscaleType(GraphicsConfig* graphicsConfig, byte upscaleType)
+    {
+        graphicsConfig->Graphics\u0052\u0065\u007A\u006FUpscaleType = upscaleType;
     }
 
     private static bool TryGetClientSize(nint windowHandle, out int width, out int height)

@@ -40,9 +40,9 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
   | Better Duty Finder |  | Infinite Sprint |  |  |
   | Fix /target Command |  | Item Commands |  |  |
   | Skip Cutscenes |  | XA Peep |  |  |
-  | Skip Cutscenes Feeding Chocobo |  |  |  |  |
-  | Hide Unnecessary Popups |  |  |  |  |
+  | Hide Unnecessary Popups |  | Show Traveler World Names |  |  |
   | Dalamud Notifications Suck |  |  |  |  |
+  | Better Highlight Potential Targets |  |  |  |  |
   | Prevent Game Exiting From Lobby Errors |  |  |  |  |
   | Close Lobby Errors |  |  |  |  |
   | Bailout ESC Menu |  |  |  |  |
@@ -61,8 +61,9 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Repo List** - Review commonly required custom plugin repositories with installer/settings shortcuts, plugin presence checks, and copy-to-clipboard repo URLs.
 - **IPC Calls Available** - Review the IPC integrations XA Slave can talk to, along with cached/live availability checks for supported plugins and the XA Slave provider channels other plugins can call, including `XASlave.ExecuteCommand` for the shipped `/xa` command surface plus simple direct-call examples such as `XASlave.ExecuteCommand("xamods")` shown directly in the XA Slave provider block.
 - **Commands** - Review the current XA slash-command surface in compact grouped tables for `General`, `Game Mods`, `Graphic Mods`, `Player Mods`, `Plugin Mods`, `Eureka Mods`, and more, with a top search bar that filters by command text, setting names, descriptions, and notes, shipped per-toggle on/off coverage for the main XA Mods sections, `/xa equip` coverage behind `Item Commands`, built-in `/xa db ...` Dropbox queue coverage including `inv` main-bag sweeps, and a direct `/xa commands` navigation path into that page.
+- **Support Diagnostics** - The Debug / Test panel ships in public builds but stays hidden until `/xa debug` is typed. Once shown, it remains visible across plugin reloads until `/xa debug` is typed again, which lets support request targeted user-side tests without a separate private build.
 - **Priority Tasks** - Long-running automation tasks share one active-task lock with cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
-- **XA Mods Native Hooks** - Adds XA-owned game and player QoL hooks for multi-instance handling, login and queue cleanup, menu and duty recovery, inventory and item actions, Return and logout shortcuts, rendering and camera controls, teleport-lock recovery, and other local client-side utility features. Startup restore keeps lobby/safety hooks early while enabled heavier non-critical hooks such as `Custom Timestamp Format`, `Auto Skip Cutscenes`, and `Custom Sight Distance` run through a staggered post-load XA Mod activation phase to reduce reload hitches.
+- **XA Mods Native Hooks** - 50+ built-in game and player QoL hooks for multi-instance handling, login/queue cleanup, menu and duty recovery, inventory actions, Return/logout shortcuts, rendering, camera controls, teleport-lock recovery, and other local client utilities. Startup keeps safety hooks early, defers heavier hooks and optional data until after core load or first use, and restores live rendering, UI visibility, and nameplate privacy on unload.
 
 ## Commands
 
@@ -80,6 +81,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa db clear` | Clear the current Dropbox item queue. |
 | `/xa db request <itemId:qty ...>` | Print the missing quantities still needed locally as a ready-to-run `/xa db ...` command. |
 | `/xa db <shortcut>` | Build missing crystal-fill commands with `shards`, `crystals`, `clusters`, `shards+crystals`, `crystals+clusters`, or `shards+crystals+clusters`. |
+| `/xa debug` | Toggle the hidden Debug / Test menu for support diagnostics; the shown state persists until toggled off. |
 | `/xa preset list` | List saved XA Mods presets. |
 | `/xa preset load <name>` | Load a saved XA Mods preset, including the supported subsettings captured for the enabled mods. |
 | `/xa preset save <name>` | Save the current XA Mods selection and the supported subsettings for the enabled mods as a preset. |
@@ -92,7 +94,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | --- | --- |
 | `/xa anonymous on/off` | Toggle `Live Anonymous Mode`. |
 | `/xa companychest on/off` | Toggle `Better Company Chest` page defaults, right-click store/recover moves, quantity prompt confirmation, and the exchangeable-item gil-value display. |
-| `/xa chocobocutscene on/off` | Toggle `Skip Cutscenes Feeding Chocobo`. |
+| `/xa chocobocutscene on/off` | Toggle `Skip Cutscenes` > `Skip Feeding Chocobo`. |
 | `/xa closeerrors on/off` | Toggle `Close Lobby Errors` for supported disconnect and lobby error popups. |
 | `/xa copyitemname on/off` | Toggle `Copy Item Name For All`. |
 | `/xa castbar on/off` | Toggle `Better Cast Bar` and its slidecast marker. |
@@ -101,6 +103,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa dutyfinder on/off` | Toggle `Better Duty Finder` inline setting buttons. |
 | `/xa friendnear on/off` | Toggle `Notify When Friend Is Near`; alerts are local XA Slave system/toast messages only. |
 | `/xa gamerestore` | Disable the current Game Mods toggles. |
+| `/xa highlighttargets on/off` | Toggle `Better Highlight Potential Targets`; waits about 5 seconds plus 30 stable frames and a brief stable hover, then repaints hovered potential-target outlines to the selected native backend color. |
 | `/xa hidepopups on/off` | Toggle `Hide Unnecessary Popups`. |
 | `/xa inventorymover on/off` | Toggle `Better Inventory Mover`; the quick-move modifier is configurable in the XA Mods panel. |
 | `/xa latency on/off` | Toggle `Display Network Latency` in the DTR bar. |
@@ -158,6 +161,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa sprint on/off` | Toggle `Infinite Sprint`. |
 | `/xa sprintdelay <seconds>` | Set the `Infinite Sprint` movement-start delay. |
 | `/xa teleportlock on/off` | Toggle `Clear Teleportation Lock`. |
+| `/xa travelerworlds on/off` | Toggle `Show Traveler World Names`; visible traveler and wanderer names show `Name@HomeWorld` locally and hide the FC/travel tag. |
 
 ### Plugin Mods
 
@@ -176,6 +180,20 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa eurekarestore` | Disable the current Eureka Mods toggles. |
 | `/xa fe <entry>` | Queue a supported Eureka `Field Operations Entry Command` entry, such as `/xa fe pagos`: Anemos, Pagos, Pyros, or Hydatos. |
 | `/xa fieldentrycommand on/off` | Toggle `Field Operations Entry Command`. |
+
+### XA Movement Commands
+
+| Command | Purpose |
+| --- | --- |
+| `/xa movingcheatersmart` | Mount and path to the current map flag with fly/ground selection based on zone flight unlock. |
+| `/xa movingcheaterfly` | Mount and path to the current map flag with flying when available, falling back to ground movement. |
+| `/xa movingcheaterwalk` | Mount and ground-path to the current map flag. |
+| `/xa interact` | Interact with the current target. |
+| `/xa leaveduty` | Run the direct Leave Duty action; `/xa leaveduty on/off` still controls `Auto Leave Duty`. |
+| `/xa recommendedgear` | Open Character, open Recommended Gear, equip the recommendation, then close the related windows. |
+| `/xa stopmovement` | Stop the current vnav path. |
+| `/xa pathtotargetinteract` | Ground-path to the current target and interact once in range. |
+| `/xa pathsmartinteract` | Smart-path to the current target, mount/fly when useful, dismount, and interact. |
 
 
 ## Dependencies

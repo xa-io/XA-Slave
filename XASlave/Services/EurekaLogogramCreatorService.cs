@@ -169,6 +169,8 @@ namespace XASlave.Services
         private ulong nextLogosActionRefreshFrame;
         private int pendingLogosActionRefreshAttempts;
         private uint cachedLogogramTerritoryId;
+        private bool dataLoadAttempted;
+        private bool dataLoaded;
         private readonly Dictionary<int, long> logogramGilCostById = [];
         private readonly Dictionary<int, ulong> logogramSourceItemIdByLogogramId = [];
 
@@ -176,7 +178,6 @@ namespace XASlave.Services
         {
             Configuration = configuration;
             EnsureLogogramSourceCostsConfigured();
-            LoadData();
             FrameworkService.Update += OnFrameworkUpdate;
             ClientState.TerritoryChanged += OnTerritoryChanged;
 
@@ -185,7 +186,7 @@ namespace XASlave.Services
             AddonLifecycle.RegisterListener(AddonEvent.PostSetup, "EurekaMagiciteItemSynthesis", OnSynthesisSetup);
 
             SetStatus("Initialized");
-            Log.Information($"[XASlave] Eureka Logogram Creator initialized with {Logograms.Count} logograms and {LogosActions.Count} logos actions.");
+            Log.Information("[XASlave] Eureka Logogram Creator initialized; static data load deferred.");
         }
 
         public void Dispose()
@@ -200,6 +201,12 @@ namespace XASlave.Services
         private void OnFrameworkUpdate(DalamudFramework framework)
         {
             currentFrameworkFrame++;
+
+            if ((pendingFullStockScan || pendingLogosActionRefresh || IsProcessingQueue || SynthesisQueue.Count > 0)
+                && !dataLoaded)
+            {
+                EnsureDataLoaded();
+            }
 
             if (pendingFullStockScan && !IsProcessingQueue)
             {
@@ -223,6 +230,7 @@ namespace XASlave.Services
 
         private void OnShardListSetup(AddonEvent type, AddonArgs args)
         {
+            EnsureDataLoaded();
             SetStatus("Shard list opened");
             if (Configuration.AutoRefreshAllPagesOnOpen || !HasLogogramStockCache)
             {
@@ -232,12 +240,14 @@ namespace XASlave.Services
 
         private void OnAtherListSetup(AddonEvent type, AddonArgs args)
         {
+            EnsureDataLoaded();
             SetStatus("Logos actions opened");
             ScheduleLogosActionRefresh(LogosActionRefreshDelayFrames, resetAttempts: true);
         }
 
         private void OnSynthesisSetup(AddonEvent type, AddonArgs args)
         {
+            EnsureDataLoaded();
             SetStatus("Synthesis opened");
             if (SynthesisQueue.Count > 0 && !IsProcessingQueue)
             {
@@ -257,6 +267,7 @@ namespace XASlave.Services
 
         internal void RefreshKnownDataNow()
         {
+            EnsureDataLoaded();
             if (GetAddon("EurekaMagiciteItemShardList") != null)
             {
                 ScheduleFullStockScan();
@@ -461,8 +472,17 @@ namespace XASlave.Services
             SetStatus($"Logos Actions refreshed ({LogosActionSlotsUsed}/{LogosActionSlotCapacity} slots used)");
         }
 
+        internal void EnsureDataLoaded()
+        {
+            if (dataLoaded || dataLoadAttempted)
+                return;
+
+            LoadData();
+        }
+
         private void LoadData()
         {
+            dataLoadAttempted = true;
             try
             {
                 var dataDirectory = Path.Combine(
@@ -486,10 +506,13 @@ namespace XASlave.Services
                 var logosJson = File.ReadAllText(Path.Combine(dataDirectory, "logosActions.json"));
                 LogosActions = JsonSerializer.Deserialize<List<LogosAction>>(logosJson, jsonOptions) ?? [];
 
+                dataLoaded = true;
                 Log.Information($"Loaded {Logograms.Count} logograms, {LogosActions.Count} logos actions, and {logogramGilCostById.Count} gil-cost mappings");
             }
             catch (Exception ex)
             {
+                dataLoaded = false;
+                SetStatus("Data load failed");
                 Log.Error($"Failed to load data: {ex.Message}");
             }
         }

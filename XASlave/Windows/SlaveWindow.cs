@@ -38,7 +38,7 @@ public partial class SlaveWindow : Window, IDisposable
     private const double FrameworkUpdateTimingWarningThresholdMilliseconds = 25.0;
     private const float TaskLayoutColumnGap = 3f;
     private static float UiScale => ImGuiHelpers.GlobalScale;
-    private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
+    private static float UiScaleSafe => ImGuiHelpers.GlobalScale;
     private static Vector2 TitleBarIconOffset => ScaledVector(0f, 1f);
     private static readonly int[] CheckEveryHourOptions = { 0, 6, 12, 24, 48, 72, 168, 336, 720, 1440, 2160 };
 
@@ -68,9 +68,7 @@ public partial class SlaveWindow : Window, IDisposable
         PluginOperations,
         XAMods,
         // Reference
-#if XA_SLAVE_TESTING_BUILD
         DebugCommands,
-#endif
         ExportData,
         RepoList,
         IpcCallsAvailable,
@@ -127,9 +125,7 @@ public partial class SlaveWindow : Window, IDisposable
 
     private static readonly (SlaveTask Task, string Label)[] ReferenceItems =
     {
-#if XA_SLAVE_TESTING_BUILD
         (SlaveTask.DebugCommands, "Debug / Test"),
-#endif
         (SlaveTask.ExportData, "Export Data"),
         (SlaveTask.RepoList, "Repo List"),
         (SlaveTask.IpcCallsAvailable, "IPC Calls Available"),
@@ -138,6 +134,7 @@ public partial class SlaveWindow : Window, IDisposable
     };
 
     private SlaveTask? selectedTask;
+    private bool debugMenuVisible;
 
     private ITaskPanel? selectedExternalTask;
 
@@ -145,15 +142,14 @@ public partial class SlaveWindow : Window, IDisposable
         : base("XA Slave###SlaveWindow", ImGuiWindowFlags.None)
     {
         this.plugin = plugin;
+        debugMenuVisible = plugin.Configuration.DebugMenuVisible;
         UpdateSizeConstraints(UiScaleSafe);
         RestoreLastSelectedTaskSelection();
         Plugin.Framework.Update += OnFrameworkUpdate;
         Plugin.ClientState.Login += OnExportDataLogin;
         Plugin.ClientState.Logout += OnExportDataLogoutHandler;
-#if XA_SLAVE_TESTING_BUILD
         Plugin.NamePlateGui.OnDataUpdate += OnXaAbuseNamePlateUpdate;
         Plugin.PluginInterface.UiBuilder.Draw += DrawXaAbuseOverlay;
-#endif
 
         // Initialize Xagman peer event handlers for TCP task control
         InitializeXagmanPeerEventHandlers();
@@ -849,7 +845,10 @@ public partial class SlaveWindow : Window, IDisposable
 
         foreach (var (task, label) in ReferenceItems)
         {
-            if (string.Equals(label, menuLabel, StringComparison.OrdinalIgnoreCase))
+            if (!TryGetVisibleTaskLabel(task, label, out var visibleLabel))
+                continue;
+
+            if (string.Equals(visibleLabel, menuLabel, StringComparison.OrdinalIgnoreCase))
             {
                 IsOpen = true;
                 if (task == SlaveTask.SplashScreen)
@@ -884,6 +883,31 @@ public partial class SlaveWindow : Window, IDisposable
         SelectBuiltInTask(SlaveTask.CommandsReference);
     }
 
+    public bool ToggleDebugMenu(out string message)
+    {
+        debugMenuVisible = !debugMenuVisible;
+        if (plugin.Configuration.DebugMenuVisible != debugMenuVisible)
+        {
+            plugin.Configuration.DebugMenuVisible = debugMenuVisible;
+            plugin.Configuration.Save();
+        }
+
+        if (debugMenuVisible)
+        {
+            IsOpen = true;
+            SetMenuSectionExpanded(MenuSection.Reference, true);
+            SelectBuiltInTask(SlaveTask.DebugCommands);
+            message = "Debug / Test menu shown and will stay visible until `/xa debug` is typed again.";
+            return true;
+        }
+
+        if (selectedTask == SlaveTask.DebugCommands)
+            ClearTaskSelection();
+
+        message = "Debug / Test menu hidden.";
+        return true;
+    }
+
     public void Dispose()
     {
         CancelScheduledAutoCollection(true);
@@ -892,12 +916,10 @@ public partial class SlaveWindow : Window, IDisposable
         Plugin.Framework.Update -= OnFrameworkUpdate;
         Plugin.ClientState.Login -= OnExportDataLogin;
         Plugin.ClientState.Logout -= OnExportDataLogoutHandler;
-#if XA_SLAVE_TESTING_BUILD
         xaAbuseEnabled = false;
         Plugin.NamePlateGui.RequestRedraw();
         Plugin.NamePlateGui.OnDataUpdate -= OnXaAbuseNamePlateUpdate;
         Plugin.PluginInterface.UiBuilder.Draw -= DrawXaAbuseOverlay;
-#endif
     }
 
     private void RestoreLastSelectedTaskSelection()
@@ -1296,6 +1318,7 @@ public partial class SlaveWindow : Window, IDisposable
                             DrawEurekaInstanceHunterTask();
                             break;
                         case SlaveTask.EurekaLogogramCreator:
+                            plugin.EurekaLogogramCreator.EnsureDataLoaded();
                             DrawEurekaLogogramCreatorTask();
                             break;
                         case SlaveTask.WindowRenamer:
@@ -1307,11 +1330,9 @@ public partial class SlaveWindow : Window, IDisposable
                         case SlaveTask.XAMods:
                             DrawXAModsTask();
                             break;
-#if XA_SLAVE_TESTING_BUILD
                         case SlaveTask.DebugCommands:
                             DrawDebugCommands();
                             break;
-#endif
                         case SlaveTask.ExportData:
                             DrawExportData();
                             break;
@@ -1334,18 +1355,30 @@ public partial class SlaveWindow : Window, IDisposable
     // -----------------------------------------------
     //  Status Bar
     // -----------------------------------------------
-    private static bool TryGetVisibleTaskLabel(string rawLabel, out string visibleLabel)
+    private bool TryGetVisibleTaskLabel(SlaveTask task, string rawLabel, out string visibleLabel)
+    {
+        if (task == SlaveTask.DebugCommands && !debugMenuVisible)
+        {
+            visibleLabel = string.Empty;
+            return false;
+        }
+
+        return TryGetVisibleTaskLabel(rawLabel, out visibleLabel);
+    }
+
+    private bool TryGetVisibleTaskLabel(string rawLabel, out string visibleLabel)
     {
         const string testingMarker = "[IF=Testing]";
         if (rawLabel.StartsWith(testingMarker, StringComparison.OrdinalIgnoreCase))
         {
-#if XA_SLAVE_TESTING_BUILD
+            if (!debugMenuVisible)
+            {
+                visibleLabel = string.Empty;
+                return false;
+            }
+
             visibleLabel = rawLabel.Substring(testingMarker.Length).TrimStart();
             return true;
-#else
-            visibleLabel = string.Empty;
-            return false;
-#endif
         }
 
         visibleLabel = rawLabel;
@@ -1578,7 +1611,7 @@ public partial class SlaveWindow : Window, IDisposable
 
         foreach (var (task, label) in items)
         {
-            if (!TryGetVisibleTaskLabel(label, out var visibleLabel))
+            if (!TryGetVisibleTaskLabel(task, label, out var visibleLabel))
                 continue;
 
             var shouldPulse = ShouldPulseMenuTaskItem(task);

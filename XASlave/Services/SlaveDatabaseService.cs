@@ -16,6 +16,8 @@ public sealed class SlaveDatabaseService
 
     private readonly IPluginLog log;
     private readonly string dbPath;
+    private readonly object schemaLock = new();
+    private bool schemaInitialized;
 
     public string DbPath => dbPath;
 
@@ -26,8 +28,6 @@ public sealed class SlaveDatabaseService
         var configDir = pluginInterface.GetPluginConfigDirectory();
         Directory.CreateDirectory(configDir);
         dbPath = Path.Combine(configDir, "slave.db");
-
-        InitializeSchema();
     }
 
     public DateTime? GetLastSyncedToXaDbUtc(ulong contentId)
@@ -37,6 +37,7 @@ public sealed class SlaveDatabaseService
 
         try
         {
+            EnsureSchemaInitialized();
             using var conn = new SqliteConnection($"Data Source={dbPath}");
             conn.Open();
 
@@ -63,6 +64,7 @@ public sealed class SlaveDatabaseService
 
         try
         {
+            EnsureSchemaInitialized();
             using var conn = new SqliteConnection($"Data Source={dbPath}");
             conn.Open();
 
@@ -107,6 +109,7 @@ public sealed class SlaveDatabaseService
 
         try
         {
+            EnsureSchemaInitialized();
             using var conn = new SqliteConnection($"Data Source={dbPath}");
             conn.Open();
 
@@ -227,6 +230,7 @@ public sealed class SlaveDatabaseService
 
         try
         {
+            EnsureSchemaInitialized();
             using var conn = new SqliteConnection($"Data Source={dbPath}");
             conn.Open();
 
@@ -268,6 +272,7 @@ public sealed class SlaveDatabaseService
 
         try
         {
+            EnsureSchemaInitialized();
             using var conn = new SqliteConnection($"Data Source={dbPath}");
             conn.Open();
 
@@ -311,6 +316,7 @@ public sealed class SlaveDatabaseService
 
         try
         {
+            EnsureSchemaInitialized();
             using var conn = new SqliteConnection($"Data Source={dbPath}");
             conn.Open();
 
@@ -358,6 +364,7 @@ public sealed class SlaveDatabaseService
     {
         try
         {
+            EnsureSchemaInitialized();
             using var conn = new SqliteConnection($"Data Source={dbPath}");
             conn.Open();
 
@@ -382,6 +389,21 @@ public sealed class SlaveDatabaseService
         catch (Exception ex)
         {
             log.Warning($"[XASlave] XA Peep clear-history failed: {ex.Message}");
+        }
+    }
+
+    private void EnsureSchemaInitialized()
+    {
+        if (schemaInitialized)
+            return;
+
+        lock (schemaLock)
+        {
+            if (schemaInitialized)
+                return;
+
+            InitializeSchema();
+            schemaInitialized = true;
         }
     }
 

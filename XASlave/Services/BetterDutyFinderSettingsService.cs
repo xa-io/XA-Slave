@@ -2,6 +2,8 @@ using System;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Game.Config;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
@@ -14,7 +16,9 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
 {
     private const string SetContentsFinderSettingsInitSignature =
         "E8 ?? ?? ?? ?? 49 8B 06 45 33 FF 49 8B CE 45 89 7E 20 FF 50 28 B0 01";
-    private const float OverlayRaisedOffset = 25f;
+    private const string ContentsFinderAddonName = "ContentsFinder";
+    private const string RaidFinderAddonName = "RaidFinder";
+    private const float OverlayRaisedOffset = 28f;
     private const float OverlayButtonHeight = 24f;
     private const float OverlayButtonRounding = 4f;
     private const float OverlayButtonSpacing = 2f;
@@ -23,17 +27,23 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
     private const float OverlayLootButtonWidth = 70f;
     private const int OverlayRowCount = 2;
 
+    private readonly IAddonLifecycle addonLifecycle;
     private readonly ISigScanner sigScanner;
     private readonly IGameConfig gameConfig;
     private readonly IPluginLog log;
     private SetContentsFinderSettingsInitDelegate? setContentsFinderSettingsInit;
     private bool enabled;
+    private bool subscribed;
+    private nint contentsFinderAddress;
+    private nint raidFinderAddress;
 
     public BetterDutyFinderSettingsService(
+        IAddonLifecycle addonLifecycle,
         ISigScanner sigScanner,
         IGameConfig gameConfig,
         IPluginLog log)
     {
+        this.addonLifecycle = addonLifecycle;
         this.sigScanner = sigScanner;
         this.gameConfig = gameConfig;
         this.log = log;
@@ -51,6 +61,8 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
         if (!value)
         {
             enabled = false;
+            Unsubscribe();
+            ClearTrackedAddons();
             StatusText = "Disabled";
             return false;
         }
@@ -59,13 +71,17 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
             return false;
 
         enabled = true;
-        StatusText = "Enabled - ContentsFinder and RaidFinder expose live duty-finder setting buttons inline.";
+        Subscribe();
+        RefreshTrackedAddons();
+        StatusText = "Enabled - ContentsFinder and RaidFinder expose lifecycle-tracked duty-finder setting buttons inline.";
         return true;
     }
 
     public void Dispose()
     {
         enabled = false;
+        Unsubscribe();
+        ClearTrackedAddons();
     }
 
     public void DrawOverlay()
@@ -73,8 +89,8 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
         if (!enabled)
             return;
 
-        DrawOverlayForAddon("ContentsFinder", "ContentsFinder");
-        DrawOverlayForAddon("RaidFinder", "RaidFinder");
+        DrawOverlayForAddon(ContentsFinderAddonName, ContentsFinderAddonName);
+        DrawOverlayForAddon(RaidFinderAddonName, RaidFinderAddonName);
     }
 
     public bool TryApplyRegistrationMode(RegistrationMode mode)
@@ -107,11 +123,7 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
 
     private void DrawOverlayForAddon(string addonName, string overlayId)
     {
-        var addon = AddonHelper.GetAddon(addonName);
-        if (addon == null || !addon->IsVisible || !addon->IsReady || addon->RootNode == null)
-            return;
-
-        if (addon->AtkValues == null || addon->AtkValuesCount <= 1 || addon->AtkValues[1].Bool)
+        if (!TryGetDrawableAddon(addonName, out var addon))
             return;
 
         var anchorNode = addon->GetNodeById(6);
@@ -291,7 +303,7 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
 
             LastActionText = $"Last action: {action} at {DateTime.Now:HH:mm:ss}.";
             if (enabled)
-                StatusText = "Enabled - ContentsFinder and RaidFinder expose live duty-finder setting buttons inline.";
+                StatusText = "Enabled - ContentsFinder and RaidFinder expose lifecycle-tracked duty-finder setting buttons inline.";
             return true;
         }
         catch (Exception ex)
@@ -300,6 +312,134 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
             StatusText = "Unavailable - failed while applying the duty-finder setting update.";
             return false;
         }
+    }
+
+    private void Subscribe()
+    {
+        if (subscribed)
+            return;
+
+        addonLifecycle.RegisterListener(AddonEvent.PostDraw, ContentsFinderAddonName, OnDutyFinderAddon);
+        addonLifecycle.RegisterListener(AddonEvent.PostRefresh, ContentsFinderAddonName, OnDutyFinderAddon);
+        addonLifecycle.RegisterListener(AddonEvent.PreFinalize, ContentsFinderAddonName, OnDutyFinderAddon);
+        addonLifecycle.RegisterListener(AddonEvent.PostDraw, RaidFinderAddonName, OnDutyFinderAddon);
+        addonLifecycle.RegisterListener(AddonEvent.PostRefresh, RaidFinderAddonName, OnDutyFinderAddon);
+        addonLifecycle.RegisterListener(AddonEvent.PreFinalize, RaidFinderAddonName, OnDutyFinderAddon);
+        subscribed = true;
+    }
+
+    private void Unsubscribe()
+    {
+        if (!subscribed)
+            return;
+
+        addonLifecycle.UnregisterListener(OnDutyFinderAddon);
+        subscribed = false;
+    }
+
+    private void OnDutyFinderAddon(AddonEvent type, AddonArgs args)
+    {
+        try
+        {
+            if (type == AddonEvent.PreFinalize)
+            {
+                ClearTrackedAddon(args.AddonName);
+                return;
+            }
+
+            if (!enabled || args.Addon.IsNull)
+                return;
+
+            var addon = (AtkUnitBase*)args.Addon.Address;
+            if (IsDrawableAddon(addon))
+                TrackAddon(args.AddonName, args.Addon.Address);
+            else
+                ClearTrackedAddon(args.AddonName);
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Better Duty Finder failed while tracking the duty-finder addon lifecycle.");
+        }
+    }
+
+    private void RefreshTrackedAddons()
+    {
+        RefreshTrackedAddon(ContentsFinderAddonName);
+        RefreshTrackedAddon(RaidFinderAddonName);
+    }
+
+    private void RefreshTrackedAddon(string addonName)
+    {
+        var addon = AddonHelper.GetAddon(addonName);
+        if (IsDrawableAddon(addon))
+            TrackAddon(addonName, (nint)addon);
+        else
+            ClearTrackedAddon(addonName);
+    }
+
+    private bool TryGetDrawableAddon(string addonName, out AtkUnitBase* addon)
+    {
+        var trackedAddress = GetTrackedAddonAddress(addonName);
+        addon = trackedAddress == nint.Zero ? null : (AtkUnitBase*)trackedAddress;
+        if (IsDrawableAddon(addon))
+            return true;
+
+        addon = AddonHelper.GetAddon(addonName);
+        if (!IsDrawableAddon(addon))
+        {
+            ClearTrackedAddon(addonName);
+            return false;
+        }
+
+        TrackAddon(addonName, (nint)addon);
+        return true;
+    }
+
+    private static bool IsDrawableAddon(AtkUnitBase* addon)
+    {
+        return addon != null && addon->IsVisible && addon->IsReady && addon->RootNode != null;
+    }
+
+    private nint GetTrackedAddonAddress(string addonName)
+    {
+        return addonName switch
+        {
+            ContentsFinderAddonName => contentsFinderAddress,
+            RaidFinderAddonName => raidFinderAddress,
+            _ => nint.Zero,
+        };
+    }
+
+    private void TrackAddon(string addonName, nint address)
+    {
+        switch (addonName)
+        {
+            case ContentsFinderAddonName:
+                contentsFinderAddress = address;
+                break;
+            case RaidFinderAddonName:
+                raidFinderAddress = address;
+                break;
+        }
+    }
+
+    private void ClearTrackedAddon(string addonName)
+    {
+        switch (addonName)
+        {
+            case ContentsFinderAddonName:
+                contentsFinderAddress = nint.Zero;
+                break;
+            case RaidFinderAddonName:
+                raidFinderAddress = nint.Zero;
+                break;
+        }
+    }
+
+    private void ClearTrackedAddons()
+    {
+        contentsFinderAddress = nint.Zero;
+        raidFinderAddress = nint.Zero;
     }
 
     private byte[] BuildCurrentSettingArray()

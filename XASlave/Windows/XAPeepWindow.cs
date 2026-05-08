@@ -19,7 +19,7 @@ public sealed class XAPeepWindow : Window
     private readonly Plugin plugin;
     private readonly TitleBarButton lockButton;
     private static float UiScale => ImGuiHelpers.GlobalScale;
-    private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
+    private static float UiScaleSafe => ImGuiHelpers.GlobalScale;
     private bool focusPreviewCaptured;
     private ulong cachedFocusTargetId = ulong.MaxValue;
 

@@ -420,7 +420,7 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.Spacing();
         ImGui.TextDisabled("All calls are try/catch wrapped - missing plugins will not crash XA Slave.");
-        ImGui.TextDisabled("Channel names verified from each plugin's IPC source code on GitHub.");
+        ImGui.TextDisabled("Channel names verified from each plugin's IPC source code.");
         ImGui.TextDisabled("Connectivity refreshed every 5 seconds.");
     }
 

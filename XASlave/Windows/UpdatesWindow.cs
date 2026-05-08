@@ -15,12 +15,44 @@ public sealed class UpdatesWindow : Window
 {
     private const string UpdatesWindowTitle = "XA Slave - Updates";
     private static float UiScale => ImGuiHelpers.GlobalScale;
-    private static float UiScaleSafe => ImGuiHelpers.GlobalScaleSafe;
+    private static float UiScaleSafe => ImGuiHelpers.GlobalScale;
 
     private bool firstDraw = true;
 
     private readonly List<VersionEntry> versions = new()
     {
+        new VersionEntry
+        {
+            Header = "v0.0.0.32 - 2026-05-08",
+            Lines =
+            [
+                "Release Highlights",
+                "- Added `Better Highlight Potential Targets` with selectable native highlight colors and stable-client arming before repainting hovered potential targets.",
+                "- Added `Show Traveler World Names` so visible travelers and wanderers can show locally as Name@HomeWorld while home-world FC tags stay unchanged.",
+                "- Expanded `Skip Cutscenes` with category gates, territory whitelist/blacklist controls, MSQ light-party auto-enable, Gold Saucer, PvP, Ocean Fishing, Inn, Fashion Report, and buddy-feed options.",
+                "- Added public support access to Debug / Test through `/xa debug`, while keeping the menu hidden until support asks a user to toggle it.",
+                "- Added direct XA movement/support commands for selected Debug / Test actions.",
+                "",
+                "Cutscene, Camera, And Duty Fixes",
+                "- `Auto Skip Cutscenes` now resolves current Lua cutscene handlers before hooking `PlayCutScene`, `PlayStaffRoll`, and `PlayToBeContinued`.",
+                "- `Auto Skip Cutscenes` now handles PointMenu completion through the current agent lifecycle path.",
+                "- `Custom Sight Distance` now tracks active camera changes through `SetActiveCamera` while preserving the existing distance and collision controls.",
+                "- `Better Duty Finder` now tracks Contents Finder and Raid Finder through addon lifecycle draw, refresh, and finalize events, so its inline controls survive the current window lifecycle.",
+                "- `Better Duty Finder` no longer depends on the stale addon value guard that could hide the overlay on current builds.",
+                "",
+                "Debug / Test And Movement Commands",
+                "- `/xa debug` toggles the hidden Debug / Test menu in public builds and stays persistent across plugin reloads until toggled off again.",
+                "- Removed the placeholder `Braindead Functions` section from Debug / Test.",
+                "- Added `/xa movingcheatersmart`, `/xa movingcheaterfly`, `/xa movingcheaterwalk`, `/xa interact`, `/xa leaveduty`, `/xa recommendedgear`, `/xa stopmovement`, `/xa pathtotargetinteract`, and `/xa pathsmartinteract`.",
+                "- `/xa leaveduty` with no arguments runs the direct leave-duty action; `/xa leaveduty on|off` still controls the existing Auto Leave Duty XA Mod toggle.",
+                "",
+                "Startup, Reload, And Cleanup",
+                "- Xagman peer auto-start, local SQLite schema setup, Eureka Logogram data loading, and Instant Return restore now avoid blocking plugin construction.",
+                "- Plugin unload now restores live Low Resolution scale, Special Rendering Modes UI/world visibility, and nameplate privacy state before teardown.",
+                "- Remaining obsolete Dalamud scale warnings were cleaned up by moving affected windows to `ImGuiHelpers.GlobalScale`.",
+                "- Public text and metadata were cleaned up to use neutral built-in/plugin wording and the public Aethertek site.",
+            ],
+        },
         new VersionEntry
         {
             Header = "v0.0.0.31 - 2026-05-04",
@@ -47,7 +79,7 @@ public sealed class UpdatesWindow : Window
                 "",
                 "Shop Icons And Xagman",
                 "- `Enable Item Icon In Shops` now matches the current FreeShop layout and clamps reads and writes to the available AtkValue range.",
-                "- Xagman targeting now uses XA-owned target and focus handling, including direct focus assignment and target recovery while Xagman is running.",
+                "- Xagman targeting now uses built-in target and focus handling, including direct focus assignment and target recovery while Xagman is running.",
             ],
         },
         new VersionEntry

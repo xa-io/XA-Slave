@@ -18,8 +18,12 @@ public sealed class ExternalTaskLoader : IDisposable
     private readonly List<ITaskPanel> loadedTasks = new();
     private readonly List<AssemblyLoadContext> loadContexts = new();
     private readonly List<string> tempFiles = new();
+    private bool loadAttempted;
+    private bool isLoading;
 
     public IReadOnlyList<ITaskPanel> Tasks => loadedTasks;
+    public bool IsLoadAttempted => loadAttempted;
+    public bool IsLoading => isLoading;
 
     public ExternalTaskLoader(Plugin plugin, IDalamudPluginInterface pluginInterface, IPluginLog log)
     {
@@ -28,33 +32,43 @@ public sealed class ExternalTaskLoader : IDisposable
 
         var configDir = pluginInterface.GetPluginConfigDirectory();
         tasksFolder = Path.Combine(configDir, "tasks");
-
-        LoadAll();
     }
 
-    private void LoadAll()
+    public void LoadAll()
     {
-        if (!Directory.Exists(tasksFolder))
+        if (loadAttempted || isLoading)
             return;
 
-        var dllFiles = Directory.GetFiles(tasksFolder, "*.dll");
-        if (dllFiles.Length == 0)
-            return;
-
-        foreach (var dllPath in dllFiles)
+        isLoading = true;
+        try
         {
-            try
-            {
-                LoadDll(dllPath);
-            }
-            catch (Exception ex)
-            {
-                log.Error($"[XASlave] {Path.GetFileName(dllPath)}: {ex.Message}");
-            }
-        }
+            if (!Directory.Exists(tasksFolder))
+                return;
 
-        if (loadedTasks.Count > 0)
-            log.Information($"[XASlave] Loaded {loadedTasks.Count} task panel(s).");
+            var dllFiles = Directory.GetFiles(tasksFolder, "*.dll");
+            if (dllFiles.Length == 0)
+                return;
+
+            foreach (var dllPath in dllFiles)
+            {
+                try
+                {
+                    LoadDll(dllPath);
+                }
+                catch (Exception ex)
+                {
+                    log.Error($"[XASlave] {Path.GetFileName(dllPath)}: {ex.Message}");
+                }
+            }
+
+            if (loadedTasks.Count > 0)
+                log.Information($"[XASlave] Loaded {loadedTasks.Count} task panel(s).");
+        }
+        finally
+        {
+            loadAttempted = true;
+            isLoading = false;
+        }
     }
 
     private void LoadDll(string dllPath)
