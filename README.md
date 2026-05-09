@@ -40,8 +40,8 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
   | Better Duty Finder |  | Infinite Sprint |  |  |
   | Fix /target Command |  | Item Commands |  |  |
   | Skip Cutscenes |  | XA Peep |  |  |
-  | Hide Unnecessary Popups |  | Show Traveler World Names |  |  |
-  | Dalamud Notifications Suck |  |  |  |  |
+  | Hide Unnecessary Popups |  | Show Titles As Playernames |  |  |
+  | Dalamud Notifications Suck |  | Show Traveler World Names |  |  |
   | Better Highlight Potential Targets |  |  |  |  |
   | Prevent Game Exiting From Lobby Errors |  |  |  |  |
   | Close Lobby Errors |  |  |  |  |
@@ -161,7 +161,8 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa sprint on/off` | Toggle `Infinite Sprint`. |
 | `/xa sprintdelay <seconds>` | Set the `Infinite Sprint` movement-start delay. |
 | `/xa teleportlock on/off` | Toggle `Clear Teleportation Lock`. |
-| `/xa travelerworlds on/off` | Toggle `Show Traveler World Names`; visible traveler and wanderer names show `Name@HomeWorld` locally and hide the FC/travel tag. |
+| `/xa titlesasplayernames on/off` | Toggle `Show Titles As Playernames`; prefix titles move before the player name and suffix titles move after it. |
+| `/xa travelerworlds on/off` | Toggle `Show Traveler World Names`; visible traveler and wanderer names show `Name@HomeWorld` locally and hide the FC/travel tag, with an XA Mods option to disable in duties. |
 
 ### Plugin Mods
 

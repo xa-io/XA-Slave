@@ -700,6 +700,8 @@ public sealed class Plugin : IDalamudPlugin
         {
             var changed = false;
 
+            NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(Configuration.ShowTravelerWorldNamesDisableInDuties);
+
             if (Configuration.LiveAnonymousModeEnabled && !NameplatePrivacy.SetAnonymousModeEnabled(true))
             {
                 Configuration.LiveAnonymousModeEnabled = false;
@@ -709,6 +711,12 @@ public sealed class Plugin : IDalamudPlugin
             if (Configuration.ShowTravelerWorldNamesEnabled && !NameplatePrivacy.SetShowTravelerWorldNamesEnabled(true))
             {
                 Configuration.ShowTravelerWorldNamesEnabled = false;
+                changed = true;
+            }
+
+            if (Configuration.ShowTitlesAsPlayernamesEnabled && !NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled(true))
+            {
+                Configuration.ShowTitlesAsPlayernamesEnabled = false;
                 changed = true;
             }
 
@@ -1381,6 +1389,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Custom Sight Distance", Configuration.CustomSightDistanceEnabled, SightDistance.StatusText, "CustomSightDistanceEnabled");
         yield return CreateStartupSurfaceStatus("Instant Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText, "QuickReturnEnabled");
         yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText, "AutoRefuseTradeRequestEnabled");
+        yield return CreateStartupSurfaceStatus("Show Titles As Playernames", Configuration.ShowTitlesAsPlayernamesEnabled, NameplatePrivacy.ShowTitlesAsPlayernamesStatusText);
         yield return CreateStartupSurfaceStatus("Show Traveler World Names", Configuration.ShowTravelerWorldNamesEnabled, NameplatePrivacy.ShowTravelerWorldNamesStatusText);
         yield return CreateStartupSurfaceStatus("Fix /target Command", Configuration.TargetCommandFixEnabled, TargetCommandFix.StatusText);
         yield return CreateStartupSurfaceStatus("Better Inventory Mover", Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.StatusText);
@@ -2533,6 +2542,12 @@ public sealed class Plugin : IDalamudPlugin
                     Color = BetterHighlightPotentialTargetsService.NormalizeHighlightColor(Configuration.BetterHighlightPotentialTargetsColor),
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "show-traveler-world-names":
+                snapshot = JsonSerializer.SerializeToElement(new XAModShowTravelerWorldNamesSettings
+                {
+                    DisableInDuties = Configuration.ShowTravelerWorldNamesDisableInDuties,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "auto-leave-duty":
                 snapshot = JsonSerializer.SerializeToElement(new XAModAutoLeaveDutySettings
                 {
@@ -2725,6 +2740,13 @@ public sealed class Plugin : IDalamudPlugin
         {
             Configuration.BetterHighlightPotentialTargetsColor = BetterHighlightPotentialTargetsService.NormalizeHighlightColor(betterHighlightSettings.Color);
             ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "show-traveler-world-names", out XAModShowTravelerWorldNamesSettings? travelerWorldNamesSettings)
+            && travelerWorldNamesSettings != null)
+        {
+            Configuration.ShowTravelerWorldNamesDisableInDuties = travelerWorldNamesSettings.DisableInDuties;
+            NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(Configuration.ShowTravelerWorldNamesDisableInDuties);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "custom-resolutions", out XAModCustomResolutionsSettings? customResolutionSettings)
@@ -3816,6 +3838,9 @@ public sealed class Plugin : IDalamudPlugin
             case "better-highlight-potential-targets":
                 ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
                 break;
+            case "show-traveler-world-names":
+                NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(Configuration.ShowTravelerWorldNamesDisableInDuties);
+                break;
             case "notify-when-friend-is-near":
                 ApplyNotifyWhenFriendIsNearConfiguration(save: false);
                 break;
@@ -4046,7 +4071,12 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("auto-merge", "Auto Merge", XAModsRestoreScope.Player, () => Configuration.AutoMergeEnabled, AutoMerge.SetEnabled, applied => Configuration.AutoMergeEnabled = applied, () => AutoMerge.StatusText);
         yield return new("quick-return", "Instant Return", XAModsRestoreScope.Illegal, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusText);
         yield return new("auto-refuse-trade-request", "Refuse Trade Request", XAModsRestoreScope.Player, () => Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.SetEnabled, applied => Configuration.AutoRefuseTradeRequestEnabled = applied, () => AutoRefuseTrade.StatusText);
-        yield return new("show-traveler-world-names", "Show Traveler World Names", XAModsRestoreScope.Player, () => Configuration.ShowTravelerWorldNamesEnabled, NameplatePrivacy.SetShowTravelerWorldNamesEnabled, applied => Configuration.ShowTravelerWorldNamesEnabled = applied, () => NameplatePrivacy.ShowTravelerWorldNamesStatusText);
+        yield return new("show-titles-as-playernames", "Show Titles As Playernames", XAModsRestoreScope.Player, () => Configuration.ShowTitlesAsPlayernamesEnabled, NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled, applied => Configuration.ShowTitlesAsPlayernamesEnabled = applied, () => NameplatePrivacy.ShowTitlesAsPlayernamesStatusText);
+        yield return new("show-traveler-world-names", "Show Traveler World Names", XAModsRestoreScope.Player, () => Configuration.ShowTravelerWorldNamesEnabled, value =>
+        {
+            NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(Configuration.ShowTravelerWorldNamesDisableInDuties);
+            return NameplatePrivacy.SetShowTravelerWorldNamesEnabled(value);
+        }, applied => Configuration.ShowTravelerWorldNamesEnabled = applied, () => NameplatePrivacy.ShowTravelerWorldNamesStatusText);
         yield return new("auto-reveal-undiscovered-areas", "Reveal Undiscovered Areas", XAModsRestoreScope.Player, () => Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.SetRevealUndiscoveredAreasEnabled, applied => Configuration.AutoRevealUndiscoveredAreasEnabled = applied, () => SystemWindowMods.RevealUndiscoveredAreasStatusText);
         yield return new("auto-clear-teleportation-lock", "Clear Teleportation Lock", XAModsRestoreScope.Player, () => Configuration.AutoClearTeleportationLockEnabled, TeleportLockClear.SetEnabled, applied => Configuration.AutoClearTeleportationLockEnabled = applied, () => TeleportLockClear.StatusText);
         yield return new("custom-sight-distance", "Custom Sight Distance", XAModsRestoreScope.Player, () => Configuration.CustomSightDistanceEnabled, SightDistance.SetEnabled, applied => Configuration.CustomSightDistanceEnabled = applied, () => SightDistance.StatusText);
@@ -4306,6 +4336,12 @@ public sealed class Plugin : IDalamudPlugin
                 return true;
             case "refusetrade":
                 definition = new("refusetrade", "/xa refusetrade on|off", GetXAModDefinition("auto-refuse-trade-request"));
+                return true;
+            case "titlesasplayernames":
+            case "titleplayernames":
+            case "playertitles":
+            case "showtitles":
+                definition = new("titlesasplayernames", "/xa titlesasplayernames on|off", GetXAModDefinition("show-titles-as-playernames"));
                 return true;
             case "travelerworlds":
             case "travellerworlds":
@@ -4604,5 +4640,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.32";
+    public const string Version = "0.0.0.33";
 }

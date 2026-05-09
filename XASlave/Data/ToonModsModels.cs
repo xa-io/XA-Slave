@@ -125,6 +125,12 @@ public sealed class XAModBetterHighlightPotentialTargetsSettings
 }
 
 [Serializable]
+public sealed class XAModShowTravelerWorldNamesSettings
+{
+    public bool DisableInDuties { get; set; } = true;
+}
+
+[Serializable]
 public sealed class XAModCustomTimestampFormatSettings
 {
     public string Format { get; set; } = string.Empty;

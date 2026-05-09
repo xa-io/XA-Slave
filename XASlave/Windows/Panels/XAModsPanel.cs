@@ -199,6 +199,22 @@ public partial class SlaveWindow
             plugin.ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
         }
 
+        void ApplyShowTravelerWorldNamesConfiguration()
+        {
+            plugin.NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(configuration.ShowTravelerWorldNamesDisableInDuties);
+        }
+
+        bool SetShowTravelerWorldNamesEnabled(bool value)
+        {
+            ApplyShowTravelerWorldNamesConfiguration();
+            return plugin.NameplatePrivacy.SetShowTravelerWorldNamesEnabled(value);
+        }
+
+        bool SetShowTitlesAsPlayernamesEnabled(bool value)
+        {
+            return plugin.NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled(value);
+        }
+
         void ApplyAutoHideGameObjectsConfiguration()
         {
             plugin.AutoHideGameObjects.ApplyConfiguration(
@@ -2136,6 +2152,22 @@ public partial class SlaveWindow
             DrawHelpMarker("Available colors are the fixed backend values exposed by the game: red, green, blue, orange, and magenta.");
         }
 
+        void DrawShowTravelerWorldNamesOptions()
+        {
+            var disableInDuties = configuration.ShowTravelerWorldNamesDisableInDuties;
+            if (ImGui.Checkbox("Disable in duties##ShowTravelerWorldNames", ref disableInDuties))
+            {
+                configuration.ShowTravelerWorldNamesDisableInDuties = disableInDuties;
+                ApplyShowTravelerWorldNamesConfiguration();
+                SaveConfiguration();
+                SetToonModsStatus("XA Mods: Show Traveler World Names duty option updated.");
+            }
+
+            ImGui.TextDisabled(disableInDuties
+                ? "World name will be hidden."
+                : "World name will appear.");
+        }
+
         void SaveAutoSkipCutsceneOptions(string message)
         {
             configuration.AutoSkipCutscenesWhitelistTerritories = NormalizeTerritoryList(configuration.AutoSkipCutscenesWhitelistTerritories);
@@ -2820,15 +2852,27 @@ public partial class SlaveWindow
             drawOptions: DrawTradeRefusalOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
+            "show-titles-as-playernames",
+            "Show Titles As Playernames",
+            () => configuration.ShowTitlesAsPlayernamesEnabled,
+            SetShowTitlesAsPlayernamesEnabled,
+            applied => configuration.ShowTitlesAsPlayernamesEnabled = applied,
+            "Moves visible player titles into the player name line.",
+            "Moves prefix titles before the player name and suffix titles after the player name, then hides the native title line. If Show Traveler World Names is also enabled, @HomeWorld is appended after the title-adjusted name.",
+            plugin.NameplatePrivacy.ShowTitlesAsPlayernamesStatusText,
+            searchTerms: ["title", "titles", "player title", "prefix title", "suffix title", "nameplate", "playernames", "traveler"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
             "show-traveler-world-names",
             "Show Traveler World Names",
             () => configuration.ShowTravelerWorldNamesEnabled,
-            plugin.NameplatePrivacy.SetShowTravelerWorldNamesEnabled,
+            SetShowTravelerWorldNamesEnabled,
             applied => configuration.ShowTravelerWorldNamesEnabled = applied,
             "Shows visible traveler and wanderer nameplates as Name@HomeWorld.",
-            "Appends @HomeWorld to the local nameplate name for visible players whose home world differs from their current world, then hides the FC/travel tag. This is local presentation only and does not alter server data. Live Anonymous Mode takes precedence and removes this label while it is masking nameplates.",
+            "Appends @HomeWorld to the local nameplate name for visible players whose home world differs from their current world, then hides the FC/travel tag. The option below can leave duties untouched. This is local presentation only and does not alter server data. Live Anonymous Mode takes precedence and removes this label while it is masking nameplates.",
             plugin.NameplatePrivacy.ShowTravelerWorldNamesStatusText,
-            searchTerms: ["traveler", "traveller", "wanderer", "world visit", "data center travel", "FC tag", "free company tag", "home world"]);
+            searchTerms: ["traveler", "traveller", "wanderer", "world visit", "data center travel", "FC tag", "free company tag", "home world", "disable in duties", "duty"],
+            drawOptions: DrawShowTravelerWorldNamesOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "auto-reveal-undiscovered-areas",

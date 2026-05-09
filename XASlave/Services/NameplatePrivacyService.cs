@@ -4,6 +4,7 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Gui.NamePlate;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.Game;
 
 namespace XASlave.Services;
 
@@ -14,6 +15,8 @@ public sealed class NameplatePrivacyService : IDisposable
 
     private bool anonymousModeEnabled;
     private bool showTravelerWorldNamesEnabled;
+    private bool showTravelerWorldNamesDisableInDuties = true;
+    private bool showTitlesAsPlayernamesEnabled;
     private bool subscribed;
 
     public NameplatePrivacyService(INamePlateGui namePlateGui, IPluginLog log)
@@ -24,18 +27,45 @@ public sealed class NameplatePrivacyService : IDisposable
 
     public bool IsAnonymousModeEnabled => anonymousModeEnabled;
     public bool IsShowTravelerWorldNamesEnabled => showTravelerWorldNamesEnabled;
+    public bool IsShowTitlesAsPlayernamesEnabled => showTitlesAsPlayernamesEnabled;
 
     public string AnonymousModeStatusText =>
         anonymousModeEnabled
             ? "Enabled - visible player nameplates are masked locally with deterministic Firstname Lastname aliases."
             : "Disabled";
 
-    public string ShowTravelerWorldNamesStatusText =>
-        showTravelerWorldNamesEnabled && anonymousModeEnabled
-            ? "Enabled - hidden while Live Anonymous Mode is masking names and removing FC tags."
-            : showTravelerWorldNamesEnabled
-            ? "Enabled - visible traveler and wanderer nameplates show Name@HomeWorld and hide the FC/travel tag."
-            : "Disabled";
+    public string ShowTravelerWorldNamesStatusText
+    {
+        get
+        {
+            if (!showTravelerWorldNamesEnabled)
+                return "Disabled";
+
+            if (anonymousModeEnabled)
+                return "Enabled - hidden while Live Anonymous Mode is masking names and removing FC tags.";
+
+            if (IsTravelerWorldNamesDisabledInDuty())
+                return "Enabled - disabled while in duty content.";
+
+            return showTravelerWorldNamesDisableInDuties
+                ? "Enabled - visible traveler and wanderer nameplates show Name@HomeWorld and hide the FC/travel tag; disabled in duties."
+                : "Enabled - visible traveler and wanderer nameplates show Name@HomeWorld and hide the FC/travel tag.";
+        }
+    }
+
+    public string ShowTitlesAsPlayernamesStatusText
+    {
+        get
+        {
+            if (!showTitlesAsPlayernamesEnabled)
+                return "Disabled";
+
+            if (anonymousModeEnabled)
+                return "Enabled - hidden while Live Anonymous Mode is masking names and removing titles.";
+
+            return "Enabled - prefix titles move before the player name and suffix titles move after it.";
+        }
+    }
 
     public bool SetAnonymousModeEnabled(bool value)
     {
@@ -53,11 +83,30 @@ public sealed class NameplatePrivacyService : IDisposable
         return showTravelerWorldNamesEnabled;
     }
 
+    public bool SetShowTitlesAsPlayernamesEnabled(bool value)
+    {
+        showTitlesAsPlayernamesEnabled = value;
+        UpdateSubscription();
+        RequestRedraw();
+        return showTitlesAsPlayernamesEnabled;
+    }
+
+    public void ApplyShowTravelerWorldNamesConfiguration(bool disableInDuties)
+    {
+        if (showTravelerWorldNamesDisableInDuties == disableInDuties)
+            return;
+
+        showTravelerWorldNamesDisableInDuties = disableInDuties;
+        if (showTravelerWorldNamesEnabled)
+            RequestRedraw();
+    }
+
     public void Dispose()
     {
-        var wasEnabled = anonymousModeEnabled || showTravelerWorldNamesEnabled;
+        var wasEnabled = anonymousModeEnabled || showTravelerWorldNamesEnabled || showTitlesAsPlayernamesEnabled;
         anonymousModeEnabled = false;
         showTravelerWorldNamesEnabled = false;
+        showTitlesAsPlayernamesEnabled = false;
         if (subscribed)
             namePlateGui.OnDataUpdate -= OnNamePlateUpdate;
 
@@ -68,7 +117,7 @@ public sealed class NameplatePrivacyService : IDisposable
 
     private void UpdateSubscription()
     {
-        var shouldSubscribe = anonymousModeEnabled || showTravelerWorldNamesEnabled;
+        var shouldSubscribe = anonymousModeEnabled || showTravelerWorldNamesEnabled || showTitlesAsPlayernamesEnabled;
         if (shouldSubscribe == subscribed)
             return;
 
@@ -94,7 +143,9 @@ public sealed class NameplatePrivacyService : IDisposable
 
     private void OnNamePlateUpdate(INamePlateUpdateContext _, IReadOnlyList<INamePlateUpdateHandler> handlers)
     {
-        if (!anonymousModeEnabled && !showTravelerWorldNamesEnabled)
+        var applyTravelerWorldNames = showTravelerWorldNamesEnabled && !IsTravelerWorldNamesDisabledInDuty();
+        var applyTitlesAsPlayernames = showTitlesAsPlayernamesEnabled;
+        if (!anonymousModeEnabled && !applyTravelerWorldNames && !applyTitlesAsPlayernames)
             return;
 
         foreach (var handler in handlers)
@@ -114,9 +165,37 @@ public sealed class NameplatePrivacyService : IDisposable
                 continue;
             }
 
-            if (showTravelerWorldNamesEnabled)
-                ApplyTravelerWorldName(handler, playerCharacter);
+            var playerName = playerCharacter.Name.ToString().Trim();
+            if (string.IsNullOrWhiteSpace(playerName))
+                continue;
+
+            var displayName = playerName;
+            var changedName = false;
+
+            if (applyTitlesAsPlayernames && TryApplyTitleToPlayerName(handler, playerName, out displayName))
+            {
+                handler.RemoveTitle();
+                changedName = true;
+            }
+
+            if (applyTravelerWorldNames && TryAppendTravelerWorldName(playerCharacter, displayName, out displayName))
+            {
+                handler.RemoveFreeCompanyTag();
+                changedName = true;
+            }
+
+            if (changedName)
+                handler.Name = new SeStringBuilder().AddText(displayName).Build();
         }
+    }
+
+    private unsafe bool IsTravelerWorldNamesDisabledInDuty()
+    {
+        if (!showTravelerWorldNamesDisableInDuties)
+            return false;
+
+        var gameMain = GameMain.Instance();
+        return gameMain != null && gameMain->CurrentContentFinderConditionId != 0;
     }
 
     private string ResolveAlias(string originalName, string originalWorld, ulong stableId)
@@ -137,23 +216,59 @@ public sealed class NameplatePrivacyService : IDisposable
         return string.Empty;
     }
 
-    private static void ApplyTravelerWorldName(INamePlateUpdateHandler handler, IPlayerCharacter playerCharacter)
+    private static bool TryApplyTitleToPlayerName(INamePlateUpdateHandler handler, string playerName, out string displayName)
     {
+        displayName = playerName;
+
+        var title = StripTitleWrapper(handler.InfoView.Title.ToString());
+        if (string.IsNullOrWhiteSpace(title))
+            title = StripTitleWrapper(handler.Title.ToString());
+
+        if (string.IsNullOrWhiteSpace(title)
+            || title.Equals(playerName, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        displayName = handler.IsPrefixTitle
+            ? $"{title} {playerName}"
+            : $"{playerName} {title}";
+        return true;
+    }
+
+    private static bool TryAppendTravelerWorldName(IPlayerCharacter playerCharacter, string displayName, out string displayNameWithWorld)
+    {
+        displayNameWithWorld = displayName;
+
         if (playerCharacter.HomeWorld.RowId == 0
             || playerCharacter.CurrentWorld.RowId == 0
             || playerCharacter.HomeWorld.RowId == playerCharacter.CurrentWorld.RowId)
-            return;
+            return false;
 
         var homeWorld = playerCharacter.HomeWorld.ValueNullable?.Name.ToString()?.Trim();
         if (string.IsNullOrWhiteSpace(homeWorld))
-            return;
+            return false;
 
-        var playerName = playerCharacter.Name.ToString().Trim();
-        if (string.IsNullOrWhiteSpace(playerName))
-            return;
+        displayNameWithWorld = $"{displayName}@{homeWorld}";
+        return true;
+    }
 
-        handler.Name = new SeStringBuilder().AddText($"{playerName}@{homeWorld}").Build();
-        handler.RemoveFreeCompanyTag();
+    private static string StripTitleWrapper(string value)
+    {
+        var title = NormalizeIdentityPart(value);
+        while (title.Length >= 2 && IsTitleWrapperPair(title[0], title[^1]))
+            title = NormalizeIdentityPart(title[1..^1]);
+
+        return title;
+    }
+
+    private static bool IsTitleWrapperPair(char left, char right)
+    {
+        return (left == '<' && right == '>')
+            || (left == '\u300A' && right == '\u300B')
+            || (left == '\uFF1C' && right == '\uFF1E')
+            || (left == '\u2039' && right == '\u203A')
+            || (left == '\u00AB' && right == '\u00BB');
     }
 
     private static string NormalizeIdentityPart(string value)

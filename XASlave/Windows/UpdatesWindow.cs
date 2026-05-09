@@ -23,6 +23,18 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.33 - 2026-05-09",
+            Lines =
+            [
+                "Player Mods",
+                "- Added `Show Titles As Playernames` to move visible player titles into the name line without title brackets.",
+                "- Prefix titles now render before the player name; suffix titles render after the player name.",
+                "- `Show Traveler World Names` composes after title placement, so traveler labels append `@HomeWorld` to the title-adjusted name.",
+                "- Added `/xa titlesasplayernames on|off` plus XA Mods, Commands, README, and startup-status coverage.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.32 - 2026-05-08",
             Lines =
             [
