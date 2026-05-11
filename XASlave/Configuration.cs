@@ -317,6 +317,7 @@ public class Configuration : IPluginConfiguration
     public string AutoDisplayNetworkLatencyFormat { get; set; } = "Ping: {0} ms";
     public bool CustomTimestampFormatEnabled { get; set; } = false;
     public string CustomTimestampFormat { get; set; } = ChatTimestampFormatService.DefaultFormat;
+    public bool NoUiFadeEnabled { get; set; } = false;
     public bool AutoSkipCutscenesFeedingChocoboEnabled { get; set; } = false;
     public bool AutoIgnoreMinimumWindowSizeEnabled { get; set; } = false;
     public bool AutoHideUnnecessaryPopupsEnabled { get; set; } = false;
@@ -521,6 +522,7 @@ public class Configuration : IPluginConfiguration
     public bool MenuReferenceExpanded { get; set; } = true;
     public bool DebugMenuVisible { get; set; } = false;
     public bool ToonModsGameModsExpanded { get; set; } = true;
+    public bool ToonModsUiModsExpanded { get; set; } = true;
     public bool ToonModsGraphicModsExpanded { get; set; } = true;
     public bool ToonModsPlayerModsExpanded { get; set; } = true;
     public bool ToonModsIllegalModsExpanded { get; set; } = true;

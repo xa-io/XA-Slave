@@ -33,65 +33,69 @@ public partial class SlaveWindow
 
     private static readonly CommandReferenceEntry[] GameModsCommandEntries =
     {
-        new("/xa anonymous on|off", "Toggle `Live Anonymous Mode`.", "Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases."),
-        new("/xa companychest on|off", "Toggle `Better Company Chest`.", "Adds FC chest page defaults, right-click quick move, prompt confirmation, and panel value tracking."),
         new("/xa chocobocutscene on|off", "Toggle `Skip Cutscenes` > `Skip Feeding Chocobo`.", "Only affects the companion-feeding cutscene surface."),
         new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "Auto-confirms supported disconnect and stuck-logout lobby Dialogue popups."),
-        new("/xa copyitemname on|off", "Toggle `Copy Item Name For All`.", "Adds XA item-name copy actions to supported context menus."),
-        new("/xa castbar on|off", "Toggle `Better Cast Bar`.", "Restyles `_CastBar` locally and adds the configured slidecast readiness marker."),
-        new("/xa dalamudnotifs on|off", "Toggle `Dalamud Notifications Suck`.", "Hides the selected Dalamud toast notification categories before they draw."),
-        new("/xa displayids on|off", "Toggle `Auto Display IDs`.", "Shows selected item, action, target, weather, zone, and map IDs on supported UI surfaces."),
-        new("/xa dutyfinder on|off", "Toggle `Better Duty Finder`.", "Adds inline duty-finder setting buttons to Contents Finder and Raid Finder."),
-        new("/xa fe <entry>", "Run `Field Operations Entry Command`.", "Queues a supported Eureka entry: Anemos, Pagos, Pyros, or Hydatos."),
-        new("/xa fieldentrycommand on|off", "Toggle `Field Operations Entry Command`.", "Arms or disarms the field-entry command runner used by `/xa fe`."),
-        new("/xa friendnear on|off", "Toggle `Notify When Friend Is Near`.", "Scans nearby player objects for configured exact-name or `/regex/` friend patterns and prints local XA Slave notifications only."),
         new("/xa gamerestore", "Disable the current top-level Game Mods toggles.", "Turns off the current Game Mods section in one command."),
-        new("/xa highlighttargets on|off", "Toggle `Better Highlight Potential Targets`.", "Safety-gated: after enabling, waits about 5 seconds plus 30 stable frames and a brief stable hover before changing hovered potential targets from yellow to the selected native backend color."),
-        new("/xa hidepopups on|off", "Toggle `Hide Unnecessary Popups`.", "Closes supported tutorial and recommendation popups."),
-        new("/xa inventorymover on|off", "Toggle `Better Inventory Mover`.", "Hold the configured modifier while right-clicking for the first available move, or use the added destination-aware context-menu moves."),
-        new("/xa latency on|off", "Toggle `Display Network Latency`.", "Shows the detected game-server ping in the DTR bar."),
         new("/xa lockcombat on|off", "Toggle `Lock Game Window In Combat`.", "Locks the current game-window position while the local character is in combat."),
         new("/xa logincooldown on|off", "Toggle `Cancel Login Cooldown`.", "Clears the local temporary character-select cooldown."),
-        new("/xa mooglemail on|off", "Toggle `Auto Open Moogle Mail`.", "Exposes Letter List mail cleanup actions."),
-        new("/xa msqprogress on|off", "Toggle `Display MSQ Progress`.", "Expands Scenario Tree with remaining-count and completion details."),
         new("/xa multiinstance on|off", "Toggle `Allow Multiple Game Instances`.", "Also accepts `/xa multibox on|off` as an alias."),
-        new("/xa playersearch on|off", "Toggle `Expanded Player Right-Click Menu Search`.", "Adds XA search-provider shortcuts to supported player context menus."),
         new("/xa preventlobbyexit on|off", "Toggle `Prevent Game Exiting From Lobby Errors`.", "Overrides the local forced-shutdown countdown for the supported lobby dialog."),
         new("/xa queueposition on|off", "Toggle `Display Actual Queue Position`.", "Shows queue position and ETA details when available."),
-        new("/xa shopicons on|off", "Toggle `Enable Item Icon In Shops`.", "Replaces supported shop-row placeholder icons with actual item icons after shop setup."),
         new("/xa skipcutscenes on|off", "Toggle `Skip Cutscenes`.", "Controls XA's main cutscene-skip surface."),
         new("/xa skipdialogue on|off", "Toggle `Skip Dialogue`.", "Auto-advances the `Talk` addon and the broader native talk surfaces when available."),
         new("/xa targetfix on|off", "Toggle `Fix /target Command`.", "Repairs failed `/target` name lookups by selecting the closest targetable matching actor."),
+    };
+
+    private static readonly CommandReferenceEntry[] UiModsCommandEntries =
+    {
+        new("/xa anonymous on|off", "Toggle `Anonymous Mode`.", "Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases."),
+        new("/xa castbar on|off", "Toggle `Better Cast Bar`.", "Restyles `_CastBar` locally and adds the configured slidecast readiness marker."),
+        new("/xa copyitemname on|off", "Toggle `Copy Item Name For All`.", "Adds XA item-name copy actions to supported context menus."),
+        new("/xa dalamudnotifs on|off", "Toggle `Dalamud Notifications Suck`.", "Hides the selected Dalamud toast notification categories before they draw."),
+        new("/xa displayids on|off", "Toggle `Auto Display IDs`.", "Shows selected item, action, target, weather, zone, and map IDs on supported UI surfaces."),
+        new("/xa dutyfinder on|off", "Toggle `Better Duty Finder`.", "Adds inline duty-finder setting buttons to Contents Finder and Raid Finder."),
+        new("/xa highlighttargets on|off", "Toggle `Better Highlight Potential Targets`.", "Safety-gated: after enabling, waits about 5 seconds plus 30 stable frames and a brief stable hover before changing hovered potential targets from yellow to the selected native backend color."),
+        new("/xa latency on|off", "Toggle `Display Network Latency`.", "Shows the detected game-server ping in the DTR bar."),
+        new("/xa msqprogress on|off", "Toggle `Display MSQ Progress`.", "Expands Scenario Tree with remaining-count and completion details."),
+        new("/xa playersearch on|off", "Toggle `Expanded Player Right-Click Menu Search`.", "Adds XA search-provider shortcuts to supported player context menus."),
+        new("/xa shopicons on|off", "Toggle `Enable Item Icon In Shops`.", "Replaces supported shop-row placeholder icons with actual item icons after shop setup."),
         new("/xa timestampseconds on|off", "Toggle `Custom Timestamp Format`.", "Formats chat timestamps as `[HH:mm:ss]` by default so seconds are visible."),
-        new("/xa titlemovie on|off", "Toggle `Disable Title Screen Movie`.", "Keeps the title-screen idle movie timer reset while the lobby agent is active."),
+        new("/xa uirestore", "Disable the current top-level UI Mods toggles.", "Turns off the current UI Mods section in one command."),
     };
 
     private static readonly CommandReferenceEntry[] GraphicModsCommandEntries =
     {
         new("/xa bgpause on|off", "Toggle `Disable Background Rendering`.", "Arms or disarms the DX11 and nameplate background-render pause hooks."),
         new("/xa customres on|off", "Toggle `Custom Resolutions`.", "Enables or disables XA's custom-resolution control surface."),
+        new("/xa hidepopups on|off", "Toggle `Hide Unnecessary Popups`.", "Closes supported tutorial and recommendation popups."),
         new("/xa hideobjects on|off", "Toggle `Hide Game Objects`.", "Uses the XA object-hide seam with the current category filters plus the duty, island, and Occult Crescent options."),
         new("/xa lowres on", "Enable `Low Resolution`.", "Uses the saved panel scale."),
         new("/xa lowres <scale>", "Set and enable `Low Resolution` scale from chat.", "Accepts values from `0.01` to `1.00`, including inputs such as `1` and `0.01`."),
         new("/xa lowres off", "Disable `Low Resolution`.", "Forces one live 3D scale `1.00` render pass, then turns off the forced low-resolution scale and restores the previous runtime upscale mode."),
         new("/xa minwindow on|off", "Toggle `Ignore Minimum Window Size`.", "Lowers or restores XA's guarded local minimum-size floor and corrects undersized restore or maximize results after the window changes."),
+        new("/xa nouifade on|off", "Toggle `No UI Fade`.", "Suppresses common black, white, and event UI fade transitions while enabled."),
         new("/xa res <width>x<height>", "Apply a custom client resolution such as `/xa res 500x345`.", "Requires `Custom Resolutions` to be enabled in XA Mods."),
         new("/xa res add <width>x<height>", "Add a saved custom-resolution button.", "Stores a panel preset without needing to use the UI add-button flow."),
         new("/xa res remove <width>x<height>", "Remove a saved custom-resolution button.", "Deletes the matching saved preset when present."),
         new("/xa resrestore", "Disable the current top-level Graphic Mods toggles.", "Also runs the normal Special Rendering Modes world/UI restore behavior."),
         new("/xa specialrender on|off", "Toggle `Special Rendering Modes`.", "Shows or hides the Special Render tools, reapplies the stored UI-visibility toggles when turned on, and off restores XA-touched world/UI state. `Hide Chat` cannot be enabled while AutoRetainer Multi Mode is active."),
+        new("/xa titlemovie on|off", "Toggle `Disable Title Screen Movie`.", "Keeps the title-screen idle movie timer reset while the lobby agent is active."),
     };
 
     private static readonly CommandReferenceEntry[] PlayerModsCommandEntries =
     {
         new("/xa antiafk on|off", "Toggle `Anti-AFK`.", "Resets the local AFK timer roughly every 2 minutes while the mod stays enabled so the client stays ahead of the game's 10-minute AFK kick."),
         new("/xa dutycommence on|off", "Toggle `Auto Duty Commence`.", "Automatically confirms standard Contents Finder commence prompts."),
+        new("/xa companychest on|off", "Toggle `Better Company Chest`.", "Adds FC chest page defaults, right-click quick move, prompt confirmation, and panel value tracking."),
         new("/xa equip <itemId>", "Equip an item by ID.", "XA scans the main inventory and armory chest, then queues the matching equip move to the correct slot."),
         new("/xa doze", "Trigger Doze Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
         new("/xa expertdelivery on|off", "Toggle `Automate Expert Delivery`.", "Controls the hand-in automation feature, not the unlock bypass."),
+        new("/xa friendnear on|off", "Toggle `Notify When Friend Is Near`.", "Scans nearby player objects for configured exact-name or `/regex/` friend patterns and prints local XA Slave notifications only."),
+        new("/xa inventorymover on|off", "Toggle `Better Inventory Mover`.", "Hold the configured modifier while right-clicking for the first available move, or use the added destination-aware context-menu moves."),
         new("/xa itemcommands on|off", "Toggle `Item Commands`.", "Adds XA's `/xa equip <itemId>` command."),
         new("/xa leaveduty on|off", "Toggle `Auto Leave Duty`.", "Also accepts `/xa autoleaveduty on|off`. XA watches for duty completion, waits the configured delay, then opens the duty menu and confirms Leave Duty once combat and blocking duty UI states are clear."),
         new("/xa automerge on|off", "Toggle `Auto Merge`.", "Watches for the inventory window to open, then merges incomplete main-bag stacks together locally."),
+        new("/xa mooglemail on|off", "Toggle `Auto Open Moogle Mail`.", "Exposes Letter List mail cleanup actions."),
         new("/xa sit", "Trigger Sit Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
         new("/xa peep [on|off|clear]", "Open XA Peep or control its XA target tracker.", "Without arguments it toggles the XA Peep window. `on/off` enables or disables tracking, and `clear` wipes the stored XA Peep history."),
         new("/xa playerrestore", "Disable the current top-level Player Mods toggles.", "Useful for dropping movement, sprint, sit/doze, sight-distance, and other standard player-side XA Mods back to off."),
@@ -103,7 +107,7 @@ public partial class SlaveWindow
         new("/xa sprintdelay <seconds>", "Set the `Infinite Sprint` movement-start delay.", "Accepts values from `0.0` to `30.0` seconds."),
         new("/xa teleportlock on|off", "Toggle `Clear Teleportation Lock`.", "Uses XA's teleport-stuck recovery seam."),
         new("/xa titlesasplayernames on|off", "Toggle `Show Titles As Playernames`.", "Moves prefix titles before the player name and suffix titles after it."),
-        new("/xa travelerworlds on|off", "Toggle `Show Traveler World Names`.", "Shows visible traveler and wanderer names as Name@HomeWorld on this client and hides the FC/travel tag."),
+        new("/xa travelerworlds on|off", "Toggle `Show Traveler World Names`.", "Shows visible Wanderer, Traveler, and Voyager names as Name@HomeWorld on this client and hides the FC/travel tag."),
     };
 
     private static readonly CommandReferenceEntry[] PluginModsCommandEntries =
@@ -118,6 +122,8 @@ public partial class SlaveWindow
     {
         new("/xa eurekaid on|off", "Toggle `Instance ID`.", "Only enables or disables the live Eureka instance display surface and optional DTR output. Use `Field Operations` -> `Eureka Instance Hunter` for the actual Rodney `Start` / `Stop` farming loop."),
         new("/xa eurekarestore", "Disable the current top-level Eureka Mods toggles.", "Turns off the Eureka-only XA Mods section in one command."),
+        new("/xa fe <entry>", "Run `Field Operations Entry Command`.", "Queues a supported Eureka entry: Anemos, Pagos, Pyros, or Hydatos."),
+        new("/xa fieldentrycommand on|off", "Toggle `Field Operations Entry Command`.", "Arms or disarms the field-entry command runner used by `/xa fe`."),
     };
 
     private static readonly CommandReferenceEntry[] IllegalModsCommandEntries =
@@ -160,6 +166,7 @@ public partial class SlaveWindow
         var visibleSectionCount = 0;
         DrawFilteredCommandSection("General", GeneralCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Game Mods", GameModsCommandEntries, ref visibleSectionCount);
+        DrawFilteredCommandSection("UI Mods", UiModsCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Graphic Mods", GraphicModsCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Player Mods", PlayerModsCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Plugin Mods", PluginModsCommandEntries, ref visibleSectionCount);

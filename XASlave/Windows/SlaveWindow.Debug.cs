@@ -2579,7 +2579,7 @@ public partial class SlaveWindow
 
     private void DrawDalamudTestNotifications()
     {
-        ImGui.TextDisabled("Creates real Dalamud ImGui notifications for testing the Game Mods suppression categories.");
+        ImGui.TextDisabled("Creates real Dalamud ImGui notifications for testing the UI Mods suppression categories.");
         ImGui.TextDisabled($"Suppressor: {plugin.DalamudNotificationsSuck.StatusText}");
 
         var buttonSize = new Vector2(Scale(160f), 0f);

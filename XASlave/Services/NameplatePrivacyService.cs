@@ -10,6 +10,8 @@ namespace XASlave.Services;
 
 public sealed class NameplatePrivacyService : IDisposable
 {
+    private const string RemoteVisitorLabels = "wanderer, traveler, and voyager";
+
     private readonly INamePlateGui namePlateGui;
     private readonly IPluginLog log;
 
@@ -42,14 +44,14 @@ public sealed class NameplatePrivacyService : IDisposable
                 return "Disabled";
 
             if (anonymousModeEnabled)
-                return "Enabled - hidden while Live Anonymous Mode is masking names and removing FC tags.";
+                return "Enabled - hidden while Anonymous Mode is masking names and removing FC tags.";
 
             if (IsTravelerWorldNamesDisabledInDuty())
                 return "Enabled - disabled while in duty content.";
 
             return showTravelerWorldNamesDisableInDuties
-                ? "Enabled - visible traveler and wanderer nameplates show Name@HomeWorld and hide the FC/travel tag; disabled in duties."
-                : "Enabled - visible traveler and wanderer nameplates show Name@HomeWorld and hide the FC/travel tag.";
+                ? $"Enabled - visible {RemoteVisitorLabels} nameplates show Name@HomeWorld and hide the FC/travel tag; disabled in duties."
+                : $"Enabled - visible {RemoteVisitorLabels} nameplates show Name@HomeWorld and hide the FC/travel tag.";
         }
     }
 
@@ -61,7 +63,7 @@ public sealed class NameplatePrivacyService : IDisposable
                 return "Disabled";
 
             if (anonymousModeEnabled)
-                return "Enabled - hidden while Live Anonymous Mode is masking names and removing titles.";
+                return "Enabled - hidden while Anonymous Mode is masking names and removing titles.";
 
             return "Enabled - prefix titles move before the player name and suffix titles move after it.";
         }

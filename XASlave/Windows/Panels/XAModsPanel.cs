@@ -15,6 +15,7 @@ public partial class SlaveWindow
     private enum ToonModsSection
     {
         GameMods,
+        UiMods,
         GraphicMods,
         PlayerMods,
         PluginMods,
@@ -40,6 +41,8 @@ public partial class SlaveWindow
     private int xaModsCustomResolutionHeight = 345;
     private string xaModsFieldEntryQuery = string.Empty;
     private string notifyWhenFriendIsNearPatternInput = string.Empty;
+    private readonly Dictionary<ToonModsSection, (float StartY, float EndY, string Title)> toonModsSectionScrollRanges = new();
+    private float toonModsSectionsScrollY;
     private static readonly JsonSerializerOptions toonModsListJsonOptions = ToonModsPresetSerialization.JsonOptions;
 
     private bool GetToonModsSectionExpanded(ToonModsSection section)
@@ -47,6 +50,7 @@ public partial class SlaveWindow
         return section switch
         {
             ToonModsSection.GameMods => plugin.Configuration.ToonModsGameModsExpanded,
+            ToonModsSection.UiMods => plugin.Configuration.ToonModsUiModsExpanded,
             ToonModsSection.GraphicMods => plugin.Configuration.ToonModsGraphicModsExpanded,
             ToonModsSection.PlayerMods => plugin.Configuration.ToonModsPlayerModsExpanded,
             ToonModsSection.PluginMods => plugin.Configuration.ToonModsPluginModsExpanded,
@@ -71,6 +75,12 @@ public partial class SlaveWindow
                     return;
 
                 plugin.Configuration.ToonModsGraphicModsExpanded = expanded;
+                break;
+            case ToonModsSection.UiMods:
+                if (plugin.Configuration.ToonModsUiModsExpanded == expanded)
+                    return;
+
+                plugin.Configuration.ToonModsUiModsExpanded = expanded;
                 break;
             case ToonModsSection.PlayerMods:
                 if (plugin.Configuration.ToonModsPlayerModsExpanded == expanded)
@@ -108,6 +118,16 @@ public partial class SlaveWindow
         var configuration = plugin.Configuration;
         var featureEntries = new List<(ToonModsSection Section, string Label, Action Draw)>();
         var toonModDefinitions = new List<(string Key, Func<bool> GetCurrent, Func<bool, bool> Apply, Action<bool> Store)>();
+        var toonModsSectionOrder = new (ToonModsSection Section, string Title)[]
+        {
+            (ToonModsSection.GameMods, "Game Mods"),
+            (ToonModsSection.UiMods, "UI Mods"),
+            (ToonModsSection.GraphicMods, "Graphic Mods"),
+            (ToonModsSection.PlayerMods, "Player Mods"),
+            (ToonModsSection.PluginMods, "Plugin Mods"),
+            (ToonModsSection.EurekaMods, "Eureka Mods"),
+            (ToonModsSection.IllegalMods, "Illegal Shit You Shouldn't Use"),
+        };
 
         void SaveConfiguration()
         {
@@ -699,6 +719,8 @@ public partial class SlaveWindow
                 return;
             }
 
+            var sectionStartY = ImGui.GetCursorPosY();
+
             ImGui.Spacing();
             ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.6f, 0.9f, 1.0f, 1.0f));
             ImGui.SetNextItemOpen(GetToonModsSectionExpanded(section), ImGuiCond.Always);
@@ -709,13 +731,59 @@ public partial class SlaveWindow
                 SetToonModsSectionExpanded(section, isOpen);
 
             if (!isOpen)
+            {
+                toonModsSectionScrollRanges[section] = (sectionStartY, ImGui.GetCursorPosY(), title);
                 return;
+            }
 
             ImGui.Indent();
             foreach (var entry in sectionEntries)
                 entry.Draw();
 
             ImGui.Unindent();
+            toonModsSectionScrollRanges[section] = (sectionStartY, ImGui.GetCursorPosY(), title);
+        }
+
+        (ToonModsSection Section, string Title)? GetStickyToonModsSection()
+        {
+            if (!string.IsNullOrWhiteSpace(toonModsSearchText) || toonModsSectionsScrollY <= 0f)
+                return null;
+
+            var headerHeight = ImGui.GetFrameHeightWithSpacing();
+            foreach (var (section, title) in toonModsSectionOrder)
+            {
+                if (!GetToonModsSectionExpanded(section))
+                    continue;
+
+                if (!toonModsSectionScrollRanges.TryGetValue(section, out var range))
+                    continue;
+
+                if (toonModsSectionsScrollY >= range.StartY + headerHeight
+                    && toonModsSectionsScrollY < range.EndY - headerHeight)
+                    return (section, title);
+            }
+
+            return null;
+        }
+
+        void DrawStickyToonModsSectionHeader()
+        {
+            var stickySection = GetStickyToonModsSection();
+            if (stickySection is not { } sticky)
+                return;
+
+            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.12f, 0.24f, 0.30f, 1.0f));
+            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.16f, 0.34f, 0.42f, 1.0f));
+            ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.10f, 0.20f, 0.26f, 1.0f));
+            if (ImGui.Button($"{sticky.Title}  ^##ToonModsStickySection{sticky.Section}", new Vector2(ImGui.GetContentRegionAvail().X, 0f)))
+                SetToonModsSectionExpanded(sticky.Section, false);
+
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip($"Collapse {sticky.Title}");
+
+            ImGui.PopStyleColor();
+            ImGui.PopStyleColor();
+            ImGui.PopStyleColor();
         }
 
         void DisableFeature(Func<bool, bool> apply, Action<bool> store)
@@ -2250,6 +2318,21 @@ public partial class SlaveWindow
             DrawWarningText(warningText ?? string.Empty);
         }
 
+        void DrawAutoSkipCutsceneOptionGroup(string title, string id, Action drawContent)
+        {
+            ImGui.Spacing();
+            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.6f, 0.9f, 1.0f, 1.0f));
+            var isOpen = ImGui.CollapsingHeader($"{title}##{id}");
+            ImGui.PopStyleColor();
+
+            if (!isOpen)
+                return;
+
+            ImGui.Indent();
+            drawContent();
+            ImGui.Unindent();
+        }
+
         void DrawAutoSkipCutsceneOptions()
         {
             configuration.AutoSkipCutscenesWhitelistTerritories ??= new List<uint>();
@@ -2267,67 +2350,76 @@ public partial class SlaveWindow
                 areaAllowed ? new Vector4(0.4f, 1.0f, 0.4f, 1.0f) : new Vector4(1.0f, 0.45f, 0.35f, 1.0f),
                 $"Area mode: {areaMode} | Current zone {(areaAllowed ? "allowed" : "blocked")}");
 
-            var useWhitelist = configuration.AutoSkipCutscenesUseZoneWhitelist;
-            if (ImGui.Checkbox("Use whitelist mode##AutoSkipCutscenesUseZoneWhitelist", ref useWhitelist))
+            DrawAutoSkipCutsceneOptionGroup("Territory Gates", "AutoSkipCutscenesTerritoryGates", () =>
             {
-                configuration.AutoSkipCutscenesUseZoneWhitelist = useWhitelist;
-                SaveAutoSkipCutsceneOptions("Skip Cutscenes: area mode updated.");
-            }
+                var useWhitelist = configuration.AutoSkipCutscenesUseZoneWhitelist;
+                if (ImGui.Checkbox("Use whitelist mode##AutoSkipCutscenesUseZoneWhitelist", ref useWhitelist))
+                {
+                    configuration.AutoSkipCutscenesUseZoneWhitelist = useWhitelist;
+                    SaveAutoSkipCutsceneOptions("Skip Cutscenes: area mode updated.");
+                }
 
-            ImGui.SameLine(0f, 6f);
-            DrawHelpMarker("Whitelist mode skips only territories in the whitelist. Blacklist mode skips everywhere except territories in the blacklist.");
+                ImGui.SameLine(0f, 6f);
+                DrawHelpMarker("Whitelist mode skips only territories in the whitelist. Blacklist mode skips everywhere except territories in the blacklist.");
 
-            if (ImGui.Button("Add Current to Whitelist##AutoSkipCutscenesAddWhitelist"))
-                AddCurrentTerritoryToList(configuration.AutoSkipCutscenesWhitelistTerritories, "whitelist");
-            ImGui.SameLine();
-            if (ImGui.Button("Remove Current from Whitelist##AutoSkipCutscenesRemoveWhitelist"))
-                RemoveCurrentTerritoryFromList(configuration.AutoSkipCutscenesWhitelistTerritories, "whitelist");
+                if (ImGui.Button("Add Current to Whitelist##AutoSkipCutscenesAddWhitelist"))
+                    AddCurrentTerritoryToList(configuration.AutoSkipCutscenesWhitelistTerritories, "whitelist");
+                ImGui.SameLine();
+                if (ImGui.Button("Remove Current from Whitelist##AutoSkipCutscenesRemoveWhitelist"))
+                    RemoveCurrentTerritoryFromList(configuration.AutoSkipCutscenesWhitelistTerritories, "whitelist");
 
-            if (ImGui.Button("Add Current to Blacklist##AutoSkipCutscenesAddBlacklist"))
-                AddCurrentTerritoryToList(configuration.AutoSkipCutscenesBlacklistTerritories, "blacklist");
-            ImGui.SameLine();
-            if (ImGui.Button("Remove Current from Blacklist##AutoSkipCutscenesRemoveBlacklist"))
-                RemoveCurrentTerritoryFromList(configuration.AutoSkipCutscenesBlacklistTerritories, "blacklist");
+                if (ImGui.Button("Add Current to Blacklist##AutoSkipCutscenesAddBlacklist"))
+                    AddCurrentTerritoryToList(configuration.AutoSkipCutscenesBlacklistTerritories, "blacklist");
+                ImGui.SameLine();
+                if (ImGui.Button("Remove Current from Blacklist##AutoSkipCutscenesRemoveBlacklist"))
+                    RemoveCurrentTerritoryFromList(configuration.AutoSkipCutscenesBlacklistTerritories, "blacklist");
 
-            ImGui.Indent();
-            DrawTerritoryList("Whitelist", configuration.AutoSkipCutscenesWhitelistTerritories, "Whitelist");
-            DrawTerritoryList("Blacklist", configuration.AutoSkipCutscenesBlacklistTerritories, "Blacklist");
-            ImGui.Unindent();
+                ImGui.Indent();
+                DrawTerritoryList("Whitelist", configuration.AutoSkipCutscenesWhitelistTerritories, "Whitelist");
+                DrawTerritoryList("Blacklist", configuration.AutoSkipCutscenesBlacklistTerritories, "Blacklist");
+                ImGui.Unindent();
+            });
 
-            ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.TextColored(new Vector4(0.6f, 0.9f, 1.0f, 1.0f), "Cutscene Categories");
+            DrawAutoSkipCutsceneOptionGroup("Cutscene Categories", "AutoSkipCutscenesCategories", () =>
+            {
+                DrawAutoSkipCutsceneOption("Skip normal cutscenes##AutoSkipCutscenesNormal", () => configuration.AutoSkipCutscenesSkipNormalCutscenes, value => configuration.AutoSkipCutscenesSkipNormalCutscenes = value, "Controls XA's generic cutscene hook, seen-cutscene hook, staff-roll surfaces, and the standard SelectString skip prompt.");
+                DrawAutoSkipCutsceneOption("Skip MSQ roulette/duties##AutoSkipCutscenesMsq", () => configuration.AutoSkipCutscenesSkipMsqRoulette, value => configuration.AutoSkipCutscenesSkipMsqRoulette = value, "Enables MSQ-duty skipping for Castrum Meridianum, Praetorium, and Porta Decumana territory checks.");
+                DrawAutoSkipCutsceneOption("Auto-enable MSQ skip for 4-player MSQ##AutoSkipCutscenesMsqAuto4", () => configuration.AutoSkipCutscenesAutoEnableMsqFourPlayer, value => configuration.AutoSkipCutscenesAutoEnableMsqFourPlayer = value, "Temporarily arms MSQ skipping when a direct MSQ duty or MSQ roulette pop matches the light-party criteria.");
+                DrawAutoSkipCutsceneOption("Exempt Praetorium##AutoSkipCutscenesPrae", () => configuration.AutoSkipCutscenesExemptPraetorium, value => configuration.AutoSkipCutscenesExemptPraetorium = value, "When MSQ skipping is on, leaves Praetorium unskipped. When MSQ skipping is off, this can be used as a Praetorium-only test toggle.");
+                DrawAutoSkipCutsceneOption("Exempt Castrum Meridianum##AutoSkipCutscenesCastrum", () => configuration.AutoSkipCutscenesExemptCastrum, value => configuration.AutoSkipCutscenesExemptCastrum = value, "When MSQ skipping is on, leaves Castrum Meridianum unskipped. When MSQ skipping is off, this can be used as a Castrum-only test toggle.");
+                DrawAutoSkipCutsceneOption("Exempt Porta Decumana##AutoSkipCutscenesPorta", () => configuration.AutoSkipCutscenesExemptPortaDecumana, value => configuration.AutoSkipCutscenesExemptPortaDecumana = value, "When MSQ skipping is on, leaves Porta Decumana unskipped. When MSQ skipping is off, this can be used as a Porta-only test toggle.");
+                DrawAutoSkipCutsceneOption("Skip Massive PC scenes##AutoSkipCutscenesMassivePc", () => configuration.AutoSkipCutscenesSkipMassivePc, value => configuration.AutoSkipCutscenesSkipMassivePc = value, "Arms the optional Massive PC content-director skip hook for category-aware cutscene handling.");
+                DrawAutoSkipCutsceneOption("Skip Custom Talk##AutoSkipCutscenesCustomTalk", () => configuration.AutoSkipCutscenesSkipCustomTalk, value => configuration.AutoSkipCutscenesSkipCustomTalk = value, "Arms the optional custom-talk content-director skip hook for category-aware cutscene handling.");
+                DrawAutoSkipCutsceneOption("Skip Feeding Chocobo##AutoSkipCutscenesFeedBuddy", () => configuration.AutoSkipCutscenesFeedingChocoboEnabled, value => configuration.AutoSkipCutscenesFeedingChocoboEnabled = value, "Uses XA's dedicated buddy-feed cutscene hook.");
+            });
 
-            DrawAutoSkipCutsceneOption("Skip normal cutscenes##AutoSkipCutscenesNormal", () => configuration.AutoSkipCutscenesSkipNormalCutscenes, value => configuration.AutoSkipCutscenesSkipNormalCutscenes = value, "Controls XA's generic cutscene hook, seen-cutscene hook, staff-roll surfaces, and the standard SelectString skip prompt.");
-            DrawAutoSkipCutsceneOption("Skip MSQ roulette/duties##AutoSkipCutscenesMsq", () => configuration.AutoSkipCutscenesSkipMsqRoulette, value => configuration.AutoSkipCutscenesSkipMsqRoulette = value, "Enables MSQ-duty skipping for Castrum Meridianum, Praetorium, and Porta Decumana territory checks.");
-            DrawAutoSkipCutsceneOption("Auto-enable MSQ skip for 4-player MSQ##AutoSkipCutscenesMsqAuto4", () => configuration.AutoSkipCutscenesAutoEnableMsqFourPlayer, value => configuration.AutoSkipCutscenesAutoEnableMsqFourPlayer = value, "Temporarily arms MSQ skipping when a direct MSQ duty or MSQ roulette pop matches the light-party criteria.");
-            DrawAutoSkipCutsceneOption("Exempt Praetorium##AutoSkipCutscenesPrae", () => configuration.AutoSkipCutscenesExemptPraetorium, value => configuration.AutoSkipCutscenesExemptPraetorium = value, "When MSQ skipping is on, leaves Praetorium unskipped. When MSQ skipping is off, this can be used as a Praetorium-only test toggle.");
-            DrawAutoSkipCutsceneOption("Exempt Castrum Meridianum##AutoSkipCutscenesCastrum", () => configuration.AutoSkipCutscenesExemptCastrum, value => configuration.AutoSkipCutscenesExemptCastrum = value, "When MSQ skipping is on, leaves Castrum Meridianum unskipped. When MSQ skipping is off, this can be used as a Castrum-only test toggle.");
-            DrawAutoSkipCutsceneOption("Exempt Porta Decumana##AutoSkipCutscenesPorta", () => configuration.AutoSkipCutscenesExemptPortaDecumana, value => configuration.AutoSkipCutscenesExemptPortaDecumana = value, "When MSQ skipping is on, leaves Porta Decumana unskipped. When MSQ skipping is off, this can be used as a Porta-only test toggle.");
-            DrawAutoSkipCutsceneOption("Skip Massive PC scenes##AutoSkipCutscenesMassivePc", () => configuration.AutoSkipCutscenesSkipMassivePc, value => configuration.AutoSkipCutscenesSkipMassivePc = value, "Arms the optional Massive PC content-director skip hook for category-aware cutscene handling.");
-            DrawAutoSkipCutsceneOption("Skip Custom Talk##AutoSkipCutscenesCustomTalk", () => configuration.AutoSkipCutscenesSkipCustomTalk, value => configuration.AutoSkipCutscenesSkipCustomTalk = value, "Arms the optional custom-talk content-director skip hook for category-aware cutscene handling.");
-            DrawAutoSkipCutsceneOption("Skip Feeding Chocobo##AutoSkipCutscenesFeedBuddy", () => configuration.AutoSkipCutscenesFeedingChocoboEnabled, value => configuration.AutoSkipCutscenesFeedingChocoboEnabled = value, "Uses XA's dedicated buddy-feed cutscene hook.");
+            DrawAutoSkipCutsceneOptionGroup("Gold Saucer", "AutoSkipCutscenesGoldSaucerGroup", () =>
+            {
+                DrawAutoSkipCutsceneOption("Skip all Gold Saucer cutscenes##AutoSkipCutscenesGoldSaucer", () => configuration.AutoSkipCutscenesSkipGoldSaucer, value => configuration.AutoSkipCutscenesSkipGoldSaucer = value, "When on, the mode toggles below become exemptions. When off, the mode toggles become specific skip targets.");
 
-            ImGui.Spacing();
-            ImGui.TextColored(new Vector4(0.6f, 0.9f, 1.0f, 1.0f), "Gold Saucer");
-            DrawAutoSkipCutsceneOption("Skip all Gold Saucer cutscenes##AutoSkipCutscenesGoldSaucer", () => configuration.AutoSkipCutscenesSkipGoldSaucer, value => configuration.AutoSkipCutscenesSkipGoldSaucer = value, "When on, the mode toggles below become exemptions. When off, the mode toggles become specific skip targets.");
+                var goldSaucerModePrefix = configuration.AutoSkipCutscenesSkipGoldSaucer ? "Exempt" : "Skip";
+                DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Mahjong##AutoSkipCutscenesGoldMahjong", () => configuration.AutoSkipCutscenesGoldSaucerMahjong, value => configuration.AutoSkipCutscenesGoldSaucerMahjong = value, "Controls Mahjong within the Gold Saucer category.");
+                DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Air Force One##AutoSkipCutscenesGoldAirForce", () => configuration.AutoSkipCutscenesGoldSaucerAirForceOne, value => configuration.AutoSkipCutscenesGoldSaucerAirForceOne = value, "Controls Air Force One within the Gold Saucer category.");
+                DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Chocobo Racing##AutoSkipCutscenesGoldChocobo", () => configuration.AutoSkipCutscenesGoldSaucerChocoboRacing, value => configuration.AutoSkipCutscenesGoldSaucerChocoboRacing = value, "Controls Chocobo Racing within the Gold Saucer category.");
+                DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Lord of Verminion##AutoSkipCutscenesGoldVerminion", () => configuration.AutoSkipCutscenesGoldSaucerLordOfVerminion, value => configuration.AutoSkipCutscenesGoldSaucerLordOfVerminion = value, "Controls Lord of Verminion within the Gold Saucer category.");
+                DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Triple Triad##AutoSkipCutscenesGoldTripleTriad", () => configuration.AutoSkipCutscenesGoldSaucerTripleTriad, value => configuration.AutoSkipCutscenesGoldSaucerTripleTriad = value, "Controls Triple Triad Battlehall, Open Tournament, and Invitational Parlor territory uses.");
+                DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Blunderville/Fall Guys##AutoSkipCutscenesGoldBlunderville", () => configuration.AutoSkipCutscenesGoldSaucerBlunderville, value => configuration.AutoSkipCutscenesGoldSaucerBlunderville = value, "Controls Blunderville/Fall Guys Gold Saucer content.");
+            });
 
-            var goldSaucerModePrefix = configuration.AutoSkipCutscenesSkipGoldSaucer ? "Exempt" : "Skip";
-            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Mahjong##AutoSkipCutscenesGoldMahjong", () => configuration.AutoSkipCutscenesGoldSaucerMahjong, value => configuration.AutoSkipCutscenesGoldSaucerMahjong = value, "Controls Mahjong within the Gold Saucer category.");
-            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Air Force One##AutoSkipCutscenesGoldAirForce", () => configuration.AutoSkipCutscenesGoldSaucerAirForceOne, value => configuration.AutoSkipCutscenesGoldSaucerAirForceOne = value, "Controls Air Force One within the Gold Saucer category.");
-            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Chocobo Racing##AutoSkipCutscenesGoldChocobo", () => configuration.AutoSkipCutscenesGoldSaucerChocoboRacing, value => configuration.AutoSkipCutscenesGoldSaucerChocoboRacing = value, "Controls Chocobo Racing within the Gold Saucer category.");
-            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Lord of Verminion##AutoSkipCutscenesGoldVerminion", () => configuration.AutoSkipCutscenesGoldSaucerLordOfVerminion, value => configuration.AutoSkipCutscenesGoldSaucerLordOfVerminion = value, "Controls Lord of Verminion within the Gold Saucer category.");
-            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Triple Triad##AutoSkipCutscenesGoldTripleTriad", () => configuration.AutoSkipCutscenesGoldSaucerTripleTriad, value => configuration.AutoSkipCutscenesGoldSaucerTripleTriad = value, "Controls Triple Triad Battlehall, Open Tournament, and Invitational Parlor territory uses.");
-            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Blunderville/Fall Guys##AutoSkipCutscenesGoldBlunderville", () => configuration.AutoSkipCutscenesGoldSaucerBlunderville, value => configuration.AutoSkipCutscenesGoldSaucerBlunderville = value, "Controls Blunderville/Fall Guys Gold Saucer content.");
-            DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Fashion Report##AutoSkipCutscenesGoldFashionReport", () => configuration.AutoSkipCutscenesGoldSaucerFashionReport, value => configuration.AutoSkipCutscenesGoldSaucerFashionReport = value, "Experimental Masked Rose/Fashion Report handling. XA checks FashionCheck/FashionCheckScoreGauge and matching SelectString/SelectYesno prompts in the Gold Saucer.", "Experimental: Fashion Report handling needs in-game verification.");
+            DrawAutoSkipCutsceneOptionGroup("Detectable Skips", "AutoSkipCutscenesRiskyAreas", () =>
+            {
+                DrawWarningText("Use at your own risk; these options are detectable.");
+                if (plugin.Configuration.DebugMenuVisible)
+                {
+                    var goldSaucerModePrefix = configuration.AutoSkipCutscenesSkipGoldSaucer ? "Exempt" : "Skip";
+                    DrawAutoSkipCutsceneOption($"{goldSaucerModePrefix}: Fashion Report##AutoSkipCutscenesGoldFashionReport", () => configuration.AutoSkipCutscenesGoldSaucerFashionReport, value => configuration.AutoSkipCutscenesGoldSaucerFashionReport = value, "Experimental Masked Rose/Fashion Report handling. XA checks FashionCheck/FashionCheckScoreGauge and matching SelectString/SelectYesno prompts in the Gold Saucer.", "Experimental: Fashion Report handling needs in-game verification.");
+                }
 
-            ImGui.Spacing();
-            ImGui.TextColored(new Vector4(0.6f, 0.9f, 1.0f, 1.0f), "Risky Areas");
-            DrawWarningText("Use at your own risk; these options are detectable.");
-            DrawAutoSkipCutsceneOption("Skip Ocean Fishing##AutoSkipCutscenesOceanFishing", () => configuration.AutoSkipCutscenesSkipOceanFishing, value => configuration.AutoSkipCutscenesSkipOceanFishing = value, "Allows cutscene skipping in Ocean Fishing areas.");
-            DrawAutoSkipCutsceneOption("Skip Crystalline Conflict##AutoSkipCutscenesCrystalline", () => configuration.AutoSkipCutscenesSkipCrystallineConflict, value => configuration.AutoSkipCutscenesSkipCrystallineConflict = value, "Allows cutscene skipping in Crystalline Conflict and custom-match territory uses.");
-            DrawAutoSkipCutsceneOption("Skip Frontline/Rival Wings##AutoSkipCutscenesFrontlineRivalWings", () => configuration.AutoSkipCutscenesSkipFrontlineRivalWings, value => configuration.AutoSkipCutscenesSkipFrontlineRivalWings = value, "Allows cutscene skipping in Frontline and Rival Wings instead of always exempting them.");
-            DrawAutoSkipCutsceneOption("Skip Inn sequence##AutoSkipCutscenesInn", () => configuration.AutoSkipCutscenesSkipInn, value => configuration.AutoSkipCutscenesSkipInn = value, "Arms the optional Inn content-director skip hook.");
+                DrawAutoSkipCutsceneOption("Skip Ocean Fishing##AutoSkipCutscenesOceanFishing", () => configuration.AutoSkipCutscenesSkipOceanFishing, value => configuration.AutoSkipCutscenesSkipOceanFishing = value, "Allows cutscene skipping in Ocean Fishing areas.");
+                DrawAutoSkipCutsceneOption("Skip Crystalline Conflict##AutoSkipCutscenesCrystalline", () => configuration.AutoSkipCutscenesSkipCrystallineConflict, value => configuration.AutoSkipCutscenesSkipCrystallineConflict = value, "Allows cutscene skipping in Crystalline Conflict and custom-match territory uses.");
+                DrawAutoSkipCutsceneOption("Skip Frontline/Rival Wings##AutoSkipCutscenesFrontlineRivalWings", () => configuration.AutoSkipCutscenesSkipFrontlineRivalWings, value => configuration.AutoSkipCutscenesSkipFrontlineRivalWings = value, "Allows cutscene skipping in Frontline and Rival Wings instead of always exempting them.");
+                DrawAutoSkipCutsceneOption("Skip Inn sequence##AutoSkipCutscenesInn", () => configuration.AutoSkipCutscenesSkipInn, value => configuration.AutoSkipCutscenesSkipInn = value, "Arms the optional Inn content-director skip hook.");
+            });
         }
 
         AddSavedFeatureEntry(
@@ -2351,7 +2443,7 @@ public partial class SlaveWindow
             "Hooks the AgentLobby update path and clears the `TemporaryLocked` gate before and after the original update.",
             plugin.SystemWindowMods.CancelLoginCooldownStatusText);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "auto-display-msq-progress",
             "Display MSQ Progress",
             () => configuration.AutoDisplayMsqProgressEnabled,
@@ -2362,7 +2454,7 @@ public partial class SlaveWindow
             plugin.MsqProgressDisplay.StatusText,
             searchTerms: ["Scenario Tree", "main scenario", "remaining", "completion percentage"]);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.GraphicMods,
             "disable-title-screen-movie",
             "Disable Title Screen Movie",
             () => configuration.DisableTitleScreenMovieEnabled,
@@ -2373,7 +2465,7 @@ public partial class SlaveWindow
             plugin.SystemWindowMods.DisableTitleScreenMovieStatusText,
             searchTerms: ["title screen", "movie", "intro", "AgentLobby", "IdleTime"]);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "auto-display-ids",
             "Auto Display IDs",
             () => configuration.AutoDisplayIdsEnabled,
@@ -2395,7 +2487,7 @@ public partial class SlaveWindow
             drawOptions: DrawAutoDisplayIdsOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "display-network-latency",
             "Display Network Latency",
             () => configuration.AutoDisplayNetworkLatencyEnabled,
@@ -2412,7 +2504,7 @@ public partial class SlaveWindow
             drawOptions: DrawAutoDisplayNetworkLatencyOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "custom-timestamp-format",
             "Custom Timestamp Format",
             () => configuration.CustomTimestampFormatEnabled,
@@ -2426,6 +2518,18 @@ public partial class SlaveWindow
             drawOptions: DrawCustomTimestampFormatOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
+            ToonModsSection.GraphicMods,
+            "no-ui-fade",
+            "No UI Fade",
+            () => configuration.NoUiFadeEnabled,
+            plugin.NoUiFade.SetEnabled,
+            applied => configuration.NoUiFadeEnabled = applied,
+            "Suppresses common black, white, and event UI fade transitions.",
+            "Hooks the native middle-back draw, white fade in/out, and event fade in/out paths and returns without drawing or starting those fade transitions while enabled.",
+            plugin.NoUiFade.StatusText,
+            warningText: "Native hook-backed: if the current client signatures move, this reports unavailable instead of enabling.",
+            searchTerms: ["fade", "black fade", "white fade", "event fade", "screen fade", "transition", "UIOptimization"]);
+        AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "target-command-fix",
             "Fix /target Command",
@@ -2436,6 +2540,12 @@ public partial class SlaveWindow
             "Watches failed target-name errors and chooses the closest matching targetable actor from the object table. XA automation also uses the same direct lookup before falling back to the game command.",
             plugin.TargetCommandFix.StatusText,
             searchTerms: ["/target", "target fix", "Rodney", "NPC", "player"]);
+        var autoSkipCutsceneHelpText = plugin.Configuration.DebugMenuVisible
+            ? "Skips standard cutscene prompts, staff roll surfaces, seen-cutscene checks, MSQ/Gold Saucer category hooks, risky area opt-ins, and debug-only Fashion Report addon handling when the configured gates allow it."
+            : "Skips standard cutscene prompts, staff roll surfaces, seen-cutscene checks, MSQ/Gold Saucer category hooks, and risky area opt-ins when the configured gates allow it.";
+        var autoSkipCutsceneSearchTerms = plugin.Configuration.DebugMenuVisible
+            ? new[] { "Whitelist", "Blacklist", "MSQ", "Praetorium", "Castrum", "Porta", "Massive PC", "Gold Saucer", "Mahjong", "Air Force One", "Chocobo Racing", "Lord of Verminion", "Triple Triad", "Blunderville", "Fashion Report", "Custom Talk", "Feed Buddy", "Ocean Fishing", "Crystalline Conflict", "Frontline", "Rival Wings", "Inn" }
+            : new[] { "Whitelist", "Blacklist", "MSQ", "Praetorium", "Castrum", "Porta", "Massive PC", "Gold Saucer", "Mahjong", "Air Force One", "Chocobo Racing", "Lord of Verminion", "Triple Triad", "Blunderville", "Custom Talk", "Feed Buddy", "Ocean Fishing", "Crystalline Conflict", "Frontline", "Rival Wings", "Inn" };
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-skip-cutscenes",
@@ -2448,9 +2558,9 @@ public partial class SlaveWindow
             },
             applied => configuration.AutoSkipCutscenesEnabled = applied,
             "Skips standard cutscenes and optional content categories, with per-zone allow/block controls.",
-            "Skips standard cutscene prompts, staff roll surfaces, seen-cutscene checks, MSQ/Gold Saucer category hooks, risky area opt-ins, and optional Fashion Report addon handling when the configured gates allow it.",
+            autoSkipCutsceneHelpText,
             plugin.AutoSkipCutscenes.StatusText,
-            searchTerms: ["Whitelist", "Blacklist", "MSQ", "Praetorium", "Castrum", "Porta", "Massive PC", "Gold Saucer", "Mahjong", "Air Force One", "Chocobo Racing", "Lord of Verminion", "Triple Triad", "Blunderville", "Fashion Report", "Custom Talk", "Feed Buddy", "Ocean Fishing", "Crystalline Conflict", "Frontline", "Rival Wings", "Inn"],
+            searchTerms: autoSkipCutsceneSearchTerms,
             drawOptions: DrawAutoSkipCutsceneOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
@@ -2464,7 +2574,7 @@ public partial class SlaveWindow
             "Lowers the client-side minimum width and height limits, but keeps a guarded 250x200 floor because smaller values have been observed to crash the client. While this toggle is enabled, XA watches the real client size after restore or maximize operations and clamps undersized results back up so rendering can recover cleanly without subclassing the game window.",
             plugin.SystemWindowMods.IgnoreMinimumWindowSizeStatusText);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.GraphicMods,
             "auto-hide-unnecessary-popups",
             "Hide Unnecessary Popups",
             () => configuration.AutoHideUnnecessaryPopupsEnabled,
@@ -2476,7 +2586,7 @@ public partial class SlaveWindow
             searchTerms: ["HowToNotice", "HowTo", "PlayGuide", "RecommendList", "AchievementInfo"],
             drawOptions: DrawHideUnnecessaryPopupsOptions);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "dalamud-notifications-suck",
             "Dalamud Notifications Suck",
             () => configuration.DalamudNotificationsSuckEnabled,
@@ -2494,7 +2604,7 @@ public partial class SlaveWindow
             drawOptions: DrawDalamudNotificationsSuckOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "better-highlight-potential-targets",
             "Better Highlight Potential Targets",
             () => configuration.BetterHighlightPotentialTargetsEnabled,
@@ -2533,7 +2643,7 @@ public partial class SlaveWindow
             plugin.LobbyErrorAutoClose.StatusText,
             searchTerms: ["3088", "5006", "90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK"]);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "bailout-esc-menu",
             "Bailout ESC Menu",
             () => configuration.BailoutEscMenuEnabled,
@@ -2591,7 +2701,7 @@ public partial class SlaveWindow
             plugin.AutoLockGameWindow.StatusText,
             searchTerms: ["window", "combat", "lock", "move", "position"]);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.PlayerMods,
             "notify-when-friend-is-near",
             "Notify When Friend Is Near",
             () => configuration.NotifyWhenFriendIsNearEnabled,
@@ -2608,7 +2718,7 @@ public partial class SlaveWindow
             drawOptions: DrawNotifyWhenFriendIsNearOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "better-cast-bar",
             "Better Cast Bar",
             () => configuration.BetterCastBarEnabled,
@@ -2625,7 +2735,7 @@ public partial class SlaveWindow
             drawOptions: DrawBetterCastBarOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "better-duty-finder",
             "Better Duty Finder",
             () => configuration.BetterDutyFinderEnabled,
@@ -2671,7 +2781,7 @@ public partial class SlaveWindow
             searchTerms: ["3D resolution scale", "resolution scale", "upscale type", "0.01", "1.00", "DLSS", "FSR"],
             drawOptions: DrawLowResolutionOptions);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "copy-item-name-for-all",
             "Copy Item Name For All",
             () => configuration.CopyItemNameForAllEnabled,
@@ -2704,7 +2814,7 @@ public partial class SlaveWindow
                 "Hide nameplates"],
             drawOptions: DrawSpecialRenderModeTools);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "expanded-player-right-click-menu-search",
             "Expanded Player Right-Click Menu Search",
             () => configuration.ExpandedPlayerRightClickMenuSearchEnabled,
@@ -2716,9 +2826,9 @@ public partial class SlaveWindow
             searchTerms: ["FFLogs", "Lodestone", "Lalachievements", "Open All"],
             drawOptions: DrawPlayerSearchOptions);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "live-anonymous-mode",
-            "Live Anonymous Mode",
+            "Anonymous Mode",
             () => configuration.LiveAnonymousModeEnabled,
             plugin.NameplatePrivacy.SetAnonymousModeEnabled,
             applied => configuration.LiveAnonymousModeEnabled = applied,
@@ -2726,7 +2836,7 @@ public partial class SlaveWindow
             "Masks visible player nameplates locally with deterministic CLI/programming aliases such as `CLI Programming`, and removes titles or FC tags from the rewritten plates. The alias choice is keyed from the original character name and world so it stays stable across redraws. This only changes local presentation and does not change server data.",
             plugin.NameplatePrivacy.AnonymousModeStatusText);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.PlayerMods,
             "better-inventory-mover",
             "Better Inventory Mover",
             () => configuration.BetterInventoryMoverEnabled,
@@ -2738,7 +2848,7 @@ public partial class SlaveWindow
             searchTerms: ["inventory", "retainer", "saddlebag", "premium saddlebag", "move item", "context menu"],
             drawOptions: DrawBetterInventoryMoverOptions);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.PlayerMods,
             "better-company-chest",
             "Better Company Chest",
             () => configuration.BetterCompanyChestEnabled,
@@ -2751,7 +2861,7 @@ public partial class SlaveWindow
             drawOptions: DrawBetterCompanyChestOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.PlayerMods,
             "auto-open-moogle-mail",
             "Auto Open Moogle Mail",
             () => configuration.AutoOpenMoogleMailEnabled,
@@ -2764,7 +2874,7 @@ public partial class SlaveWindow
             drawOptions: DrawAutoOpenMoogleMailOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
-            ToonModsSection.GameMods,
+            ToonModsSection.UiMods,
             "enable-item-icon-in-shops",
             "Enable Item Icon In Shops",
             () => configuration.EnableItemIconInShopsEnabled,
@@ -2868,10 +2978,10 @@ public partial class SlaveWindow
             () => configuration.ShowTravelerWorldNamesEnabled,
             SetShowTravelerWorldNamesEnabled,
             applied => configuration.ShowTravelerWorldNamesEnabled = applied,
-            "Shows visible traveler and wanderer nameplates as Name@HomeWorld.",
-            "Appends @HomeWorld to the local nameplate name for visible players whose home world differs from their current world, then hides the FC/travel tag. The option below can leave duties untouched. This is local presentation only and does not alter server data. Live Anonymous Mode takes precedence and removes this label while it is masking nameplates.",
+            "Shows visible wanderer, traveler, and voyager nameplates as Name@HomeWorld.",
+            "Appends @HomeWorld to the local nameplate name for visible players whose home world differs from their current world, then hides Wanderer, Traveler, Voyager, or FC/travel tag framing. The option below can leave duties untouched. This is local presentation only and does not alter server data. Anonymous Mode takes precedence and removes this label while it is masking nameplates.",
             plugin.NameplatePrivacy.ShowTravelerWorldNamesStatusText,
-            searchTerms: ["traveler", "traveller", "wanderer", "world visit", "data center travel", "FC tag", "free company tag", "home world", "disable in duties", "duty"],
+            searchTerms: ["traveler", "traveller", "wanderer", "voyager", "world visit", "data center travel", "cross data center", "physical data center", "FC tag", "free company tag", "home world", "disable in duties", "duty"],
             drawOptions: DrawShowTravelerWorldNamesOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -3125,15 +3235,15 @@ public partial class SlaveWindow
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
+        DrawStickyToonModsSectionHeader();
 
         if (ImGui.BeginChild("##XAModsSectionsScrollRegion", new Vector2(0f, 0f), false))
         {
-            DrawModSection(ToonModsSection.GameMods, "Game Mods");
-            DrawModSection(ToonModsSection.GraphicMods, "Graphic Mods");
-            DrawModSection(ToonModsSection.PlayerMods, "Player Mods");
-            DrawModSection(ToonModsSection.PluginMods, "Plugin Mods");
-            DrawModSection(ToonModsSection.EurekaMods, "Eureka");
-            DrawModSection(ToonModsSection.IllegalMods, "Illegal Shit You Shouldn't Use");
+            toonModsSectionsScrollY = ImGui.GetScrollY();
+            toonModsSectionScrollRanges.Clear();
+
+            foreach (var (section, title) in toonModsSectionOrder)
+                DrawModSection(section, title);
 
             if (featureEntries.Count == 0)
             {

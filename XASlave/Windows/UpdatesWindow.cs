@@ -23,6 +23,37 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.34 - 2026-05-11",
+            Lines =
+            [
+                "Player Mods",
+                "- `Show Traveler World Names` now explicitly covers Wanderer, Traveler, and Voyager visitor labels.",
+                "- Voyager visitors follow the same local Name@HomeWorld presentation as existing Wanderer and Traveler labels.",
+                "- The runtime rewrite still uses home-world mismatch and preserves the existing Disable in duties behavior.",
+                "",
+                "XA Mods",
+                "- Added a dedicated `UI Mods` section for UI overlays, context-menu helpers, nameplate presentation, DTR display helpers, and UI text tweaks.",
+                "- Renamed `Live Anonymous Mode` to `Anonymous Mode` in visible UI and command/help surfaces while preserving the existing saved setting and preset key.",
+                "- Added `/xa uirestore` for disabling the current UI Mods section.",
+                "- Moved `Bailout ESC Menu` into UI Mods.",
+                "- XA Mods now shows a pinned current-section bar when a category header has scrolled out of view, so the open category can be collapsed without scrolling back to its original header.",
+                "",
+                "Game Mods",
+                "- Moved `Notify When Friend Is Near` from Game Mods to Player Mods.",
+                "- Moved `Auto Open Moogle Mail`, `Better Company Chest`, and `Better Inventory Mover` from Game Mods to Player Mods.",
+                "- `Skip Cutscenes` options are now grouped into collapsible Territory Gates, Cutscene Categories, Gold Saucer, and Detectable Skips sections.",
+                "",
+                "Graphic Mods",
+                "- Added `No UI Fade` under XA Mods > Graphic Mods.",
+                "- Moved `Disable Title Screen Movie` and `Hide Unnecessary Popups` into Graphic Mods.",
+                "- The toggle suppresses common middle-back, white fade in/out, and event fade in/out UI transitions through native hooks.",
+                "- Saved `No UI Fade` restores now run through the post-load XA Mod activation phase after the core startup pass instead of the immediate deferred startup queue.",
+                "- Added `/xa nouifade on|off`, startup restore, titlebar favourite, preset, Commands, README, and startup-status coverage.",
+
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.33 - 2026-05-09",
             Lines =
             [
@@ -41,7 +72,7 @@ public sealed class UpdatesWindow : Window
                 "Release Highlights",
                 "- Added `Better Highlight Potential Targets` with selectable native highlight colors and stable-client arming before repainting hovered potential targets.",
                 "- Added `Show Traveler World Names` so visible travelers and wanderers can show locally as Name@HomeWorld while home-world FC tags stay unchanged.",
-                "- Expanded `Skip Cutscenes` with category gates, territory whitelist/blacklist controls, MSQ light-party auto-enable, Gold Saucer, PvP, Ocean Fishing, Inn, Fashion Report, and buddy-feed options.",
+                "- Expanded `Skip Cutscenes` with category gates, territory whitelist/blacklist controls, MSQ light-party auto-enable, Gold Saucer, PvP, Ocean Fishing, Inn, and buddy-feed options.",
                 "- Added public support access to Debug / Test through `/xa debug`, while keeping the menu hidden until support asks a user to toggle it.",
                 "- Added direct XA movement/support commands for selected Debug / Test actions.",
                 "",

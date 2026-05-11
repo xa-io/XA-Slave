@@ -53,6 +53,7 @@ public sealed class Plugin : IDalamudPlugin
     private enum XAModsRestoreScope
     {
         Game,
+        Ui,
         Graphic,
         Player,
         Plugin,
@@ -90,7 +91,8 @@ public sealed class Plugin : IDalamudPlugin
         Action Activate,
         string Key,
         string DisplayName,
-        TimeSpan Delay);
+        TimeSpan Delay,
+        double? WarningThresholdMilliseconds);
 
     public readonly record struct TitleBarFavXAModInfo(
         string Key,
@@ -133,6 +135,7 @@ public sealed class Plugin : IDalamudPlugin
     public AutoDisplayIdsService AutoDisplayIds { get; init; }
     public AutoDisplayNetworkLatencyService AutoDisplayNetworkLatency { get; init; }
     public ChatTimestampFormatService ChatTimestampFormat { get; init; }
+    public NoUiFadeService NoUiFade { get; init; }
     public AutoHideGameObjectsService AutoHideGameObjects { get; init; }
     public DialogueSkipService DialogueSkip { get; init; }
     public AutoLockGameWindowService AutoLockGameWindow { get; init; }
@@ -192,6 +195,7 @@ public sealed class Plugin : IDalamudPlugin
     private const double DeferredStartupActionDebugThresholdMilliseconds = 5.0;
     private const double DeferredStartupActionWarningThresholdMilliseconds = 25.0;
     private const double PostLoadXAModActivationWarningThresholdMilliseconds = 200.0;
+    private const double NoUiFadePostLoadActivationWarningThresholdMilliseconds = 750.0;
     private DateTime deferredStartupSummaryPendingArmingSinceUtc = DateTime.MinValue;
     private DateTime postLoadXAModActivationCompletionPendingSinceUtc = DateTime.MinValue;
 
@@ -314,6 +318,7 @@ public sealed class Plugin : IDalamudPlugin
         AutoDisplayIds = new AutoDisplayIdsService(AddonLifecycle, Framework, ClientState, DataManager, TargetManager, DtrBar, Log);
         AutoDisplayNetworkLatency = new AutoDisplayNetworkLatencyService(Framework, ClientState, DtrBar, Log);
         ChatTimestampFormat = new ChatTimestampFormatService(SigScanner, GameInterop, Log);
+        NoUiFade = new NoUiFadeService(SigScanner, GameInterop, Log);
         AutoHideGameObjects = new AutoHideGameObjectsService(Framework, ClientState, Condition, TargetManager, SigScanner, GameInterop, Log);
         DialogueSkip = new DialogueSkipService(AddonLifecycle, SigScanner, GameInterop, Log);
         AutoLockGameWindow = new AutoLockGameWindowService(Condition, Log);
@@ -483,6 +488,17 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.Save();
                 }
             });
+        }
+        if (Configuration.NoUiFadeEnabled)
+        {
+            QueuePostLoadXAModActivation("NoUiFadeEnabled", "No UI Fade", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 2), () =>
+            {
+                if (!NoUiFade.SetEnabled(true))
+                {
+                    Configuration.NoUiFadeEnabled = false;
+                    Configuration.Save();
+                }
+            }, NoUiFadePostLoadActivationWarningThresholdMilliseconds);
         }
         QueueDeferredStartupAction(() =>
         {
@@ -1087,10 +1103,10 @@ public sealed class Plugin : IDalamudPlugin
         deferredStartupActions.Enqueue(new DeferredStartupAction(action, name, lineNumber));
     }
 
-    private void QueuePostLoadXAModActivation(string key, string displayName, double delaySeconds, Action action)
+    private void QueuePostLoadXAModActivation(string key, string displayName, double delaySeconds, Action action, double? warningThresholdMilliseconds = null)
     {
         pendingPostLoadXAModActivations.Add(key);
-        postLoadXAModActivations.Enqueue(new PostLoadXAModActivation(action, key, displayName, TimeSpan.FromSeconds(delaySeconds)));
+        postLoadXAModActivations.Enqueue(new PostLoadXAModActivation(action, key, displayName, TimeSpan.FromSeconds(delaySeconds), warningThresholdMilliseconds));
     }
 
     private void ScheduleDeferredStartupQueue()
@@ -1223,7 +1239,8 @@ public sealed class Plugin : IDalamudPlugin
             if (elapsedMilliseconds >= DeferredStartupActionDebugThresholdMilliseconds)
             {
                 var message = $"[XASlave] Post-load XA Mod activation '{activation.DisplayName}' took {elapsedMilliseconds:F1}ms.";
-                if (elapsedMilliseconds >= PostLoadXAModActivationWarningThresholdMilliseconds)
+                var warningThresholdMilliseconds = activation.WarningThresholdMilliseconds ?? PostLoadXAModActivationWarningThresholdMilliseconds;
+                if (elapsedMilliseconds >= warningThresholdMilliseconds)
                     Log.Warning(message);
                 else
                     Log.Debug(message);
@@ -1378,6 +1395,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Auto Display IDs", Configuration.AutoDisplayIdsEnabled, AutoDisplayIds.StatusText);
         yield return CreateStartupSurfaceStatus("Display Network Latency", Configuration.AutoDisplayNetworkLatencyEnabled, AutoDisplayNetworkLatency.StatusText);
         yield return CreateStartupSurfaceStatus("Custom Timestamp Format", Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.StatusText, "CustomTimestampFormatEnabled");
+        yield return CreateStartupSurfaceStatus("No UI Fade", Configuration.NoUiFadeEnabled, NoUiFade.StatusText, "NoUiFadeEnabled");
         yield return CreateStartupSurfaceStatus("Better Highlight Potential Targets", Configuration.BetterHighlightPotentialTargetsEnabled, BetterHighlightPotentialTargets.StatusText, "BetterHighlightPotentialTargetsEnabled");
         yield return CreateStartupSurfaceStatus("Auto Hide Game Objects", Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.StatusText, "AutoHideGameObjectsEnabled");
         yield return CreateStartupSurfaceStatus("Skip Dialogue", Configuration.AutoSkipDialogueEnabled, DialogueSkip.StatusText);
@@ -1492,6 +1510,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoDisplayIds", AutoDisplayIds);
         TryDispose("AutoDisplayNetworkLatency", AutoDisplayNetworkLatency);
         TryDispose("ChatTimestampFormat", ChatTimestampFormat);
+        TryDispose("NoUiFade", NoUiFade);
         TryDispose("AutoHideGameObjects", AutoHideGameObjects);
         TryDispose("DialogueSkip", DialogueSkip);
         TryDispose("AutoLockGameWindow", AutoLockGameWindow);
@@ -1790,6 +1809,12 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("uirestore", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(RestoreXAModsSection(XAModsRestoreScope.Ui, out var message), message);
+            return;
+        }
+
         if (subcommand.Equals("playerrestore", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(RestoreXAModsSection(XAModsRestoreScope.Player, out var message), message);
@@ -1958,6 +1983,9 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("gamerestore", StringComparison.OrdinalIgnoreCase))
             return RestoreXAModsSection(XAModsRestoreScope.Game, out message);
+
+        if (subcommand.Equals("uirestore", StringComparison.OrdinalIgnoreCase))
+            return RestoreXAModsSection(XAModsRestoreScope.Ui, out message);
 
         if (subcommand.Equals("playerrestore", StringComparison.OrdinalIgnoreCase))
             return RestoreXAModsSection(XAModsRestoreScope.Player, out message);
@@ -3995,9 +4023,9 @@ public sealed class Plugin : IDalamudPlugin
     {
         yield return new("auto-allow-multiple-game-instances", "Allow Multiple Game Instances", XAModsRestoreScope.Game, () => Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.SetAllowMultipleGameInstancesEnabled, applied => Configuration.AutoAllowMultipleGameInstancesEnabled = applied, () => SystemWindowMods.AllowMultipleGameInstancesStatusText);
         yield return new("auto-cancel-login-cooldown", "Cancel Login Cooldown", XAModsRestoreScope.Game, () => Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.SetCancelLoginCooldownEnabled, applied => Configuration.AutoCancelLoginCooldownEnabled = applied, () => SystemWindowMods.CancelLoginCooldownStatusText);
-        yield return new("auto-display-msq-progress", "Display MSQ Progress", XAModsRestoreScope.Game, () => Configuration.AutoDisplayMsqProgressEnabled, MsqProgressDisplay.SetEnabled, applied => Configuration.AutoDisplayMsqProgressEnabled = applied, () => MsqProgressDisplay.StatusText);
-        yield return new("disable-title-screen-movie", "Disable Title Screen Movie", XAModsRestoreScope.Game, () => Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.SetDisableTitleScreenMovieEnabled, applied => Configuration.DisableTitleScreenMovieEnabled = applied, () => SystemWindowMods.DisableTitleScreenMovieStatusText);
-        yield return new("auto-display-ids", "Auto Display IDs", XAModsRestoreScope.Game, () => Configuration.AutoDisplayIdsEnabled, value =>
+        yield return new("auto-display-msq-progress", "Display MSQ Progress", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayMsqProgressEnabled, MsqProgressDisplay.SetEnabled, applied => Configuration.AutoDisplayMsqProgressEnabled = applied, () => MsqProgressDisplay.StatusText);
+        yield return new("disable-title-screen-movie", "Disable Title Screen Movie", XAModsRestoreScope.Graphic, () => Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.SetDisableTitleScreenMovieEnabled, applied => Configuration.DisableTitleScreenMovieEnabled = applied, () => SystemWindowMods.DisableTitleScreenMovieStatusText);
+        yield return new("auto-display-ids", "Auto Display IDs", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayIdsEnabled, value =>
         {
             Configuration.AutoDisplayIdsEnabled = value;
             ApplyAutoDisplayIdsConfiguration(save: false);
@@ -4007,55 +4035,56 @@ public sealed class Plugin : IDalamudPlugin
 
             return AutoDisplayIds.SetEnabled(true);
         }, applied => Configuration.AutoDisplayIdsEnabled = applied, () => AutoDisplayIds.StatusText);
-        yield return new("display-network-latency", "Display Network Latency", XAModsRestoreScope.Game, () => Configuration.AutoDisplayNetworkLatencyEnabled, value =>
+        yield return new("display-network-latency", "Display Network Latency", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayNetworkLatencyEnabled, value =>
         {
             ApplyAutoDisplayNetworkLatencyConfiguration(save: false);
             return AutoDisplayNetworkLatency.SetEnabled(value);
         }, applied => Configuration.AutoDisplayNetworkLatencyEnabled = applied, () => AutoDisplayNetworkLatency.StatusText);
-        yield return new("custom-timestamp-format", "Custom Timestamp Format", XAModsRestoreScope.Game, () => Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.SetEnabled, applied => Configuration.CustomTimestampFormatEnabled = applied, () => ChatTimestampFormat.StatusText);
+        yield return new("custom-timestamp-format", "Custom Timestamp Format", XAModsRestoreScope.Ui, () => Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.SetEnabled, applied => Configuration.CustomTimestampFormatEnabled = applied, () => ChatTimestampFormat.StatusText);
+        yield return new("no-ui-fade", "No UI Fade", XAModsRestoreScope.Graphic, () => Configuration.NoUiFadeEnabled, NoUiFade.SetEnabled, applied => Configuration.NoUiFadeEnabled = applied, () => NoUiFade.StatusText);
         yield return new("auto-skip-cutscenes", "Skip Cutscenes", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesEnabled, value =>
         {
             AutoSkipCutscenes.ApplyConfiguration(Configuration);
             return AutoSkipCutscenes.SetEnabled(value);
         }, applied => Configuration.AutoSkipCutscenesEnabled = applied, () => AutoSkipCutscenes.StatusText);
         yield return new("auto-skip-cutscenes-feeding-chocobo", "Skip Cutscenes Feeding Chocobo", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesFeedingChocoboEnabled, BuddyFeedCutsceneSkip.SetEnabled, applied => Configuration.AutoSkipCutscenesFeedingChocoboEnabled = applied, () => BuddyFeedCutsceneSkip.StatusText);
-        yield return new("auto-hide-unnecessary-popups", "Hide Unnecessary Popups", XAModsRestoreScope.Game, () => Configuration.AutoHideUnnecessaryPopupsEnabled, PopupCleaner.SetEnabled, applied => Configuration.AutoHideUnnecessaryPopupsEnabled = applied, () => PopupCleaner.StatusText);
-        yield return new("dalamud-notifications-suck", "Dalamud Notifications Suck", XAModsRestoreScope.Game, () => Configuration.DalamudNotificationsSuckEnabled, value =>
+        yield return new("auto-hide-unnecessary-popups", "Hide Unnecessary Popups", XAModsRestoreScope.Graphic, () => Configuration.AutoHideUnnecessaryPopupsEnabled, PopupCleaner.SetEnabled, applied => Configuration.AutoHideUnnecessaryPopupsEnabled = applied, () => PopupCleaner.StatusText);
+        yield return new("dalamud-notifications-suck", "Dalamud Notifications Suck", XAModsRestoreScope.Ui, () => Configuration.DalamudNotificationsSuckEnabled, value =>
         {
             ApplyDalamudNotificationsSuckConfiguration(save: false);
             return DalamudNotificationsSuck.SetEnabled(value);
         }, applied => Configuration.DalamudNotificationsSuckEnabled = applied, () => DalamudNotificationsSuck.StatusText);
-        yield return new("better-highlight-potential-targets", "Better Highlight Potential Targets", XAModsRestoreScope.Game, () => Configuration.BetterHighlightPotentialTargetsEnabled, value =>
+        yield return new("better-highlight-potential-targets", "Better Highlight Potential Targets", XAModsRestoreScope.Ui, () => Configuration.BetterHighlightPotentialTargetsEnabled, value =>
         {
             ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
             return BetterHighlightPotentialTargets.SetEnabled(value);
         }, applied => Configuration.BetterHighlightPotentialTargetsEnabled = applied, () => BetterHighlightPotentialTargets.StatusText);
         yield return new("auto-prevent-game-exiting-from-lobby-errors", "Prevent Game Exiting From Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.SetPreventLobbyExitEnabled, applied => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled = applied, () => SystemWindowMods.PreventLobbyExitStatusText);
         yield return new("auto-close-lobby-errors", "Close Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoCloseLobbyErrorsEnabled, LobbyErrorAutoClose.SetEnabled, applied => Configuration.AutoCloseLobbyErrorsEnabled = applied, () => LobbyErrorAutoClose.StatusText);
-        yield return new("bailout-esc-menu", "Bailout ESC Menu", XAModsRestoreScope.Game, () => Configuration.BailoutEscMenuEnabled, EscMenuBailout.SetEnabled, applied => Configuration.BailoutEscMenuEnabled = applied, () => EscMenuBailout.StatusText);
+        yield return new("bailout-esc-menu", "Bailout ESC Menu", XAModsRestoreScope.Ui, () => Configuration.BailoutEscMenuEnabled, EscMenuBailout.SetEnabled, applied => Configuration.BailoutEscMenuEnabled = applied, () => EscMenuBailout.StatusText);
         yield return new("auto-skip-dialogue", "Skip Dialogue", XAModsRestoreScope.Game, () => Configuration.AutoSkipDialogueEnabled, DialogueSkip.SetEnabled, applied => Configuration.AutoSkipDialogueEnabled = applied, () => DialogueSkip.StatusText);
         yield return new("lock-game-window-in-combat", "Lock Game Window In Combat", XAModsRestoreScope.Game, () => Configuration.LockGameWindowInCombatEnabled, AutoLockGameWindow.SetEnabled, applied => Configuration.LockGameWindowInCombatEnabled = applied, () => AutoLockGameWindow.StatusText);
-        yield return new("notify-when-friend-is-near", "Notify When Friend Is Near", XAModsRestoreScope.Game, () => Configuration.NotifyWhenFriendIsNearEnabled, value =>
+        yield return new("notify-when-friend-is-near", "Notify When Friend Is Near", XAModsRestoreScope.Player, () => Configuration.NotifyWhenFriendIsNearEnabled, value =>
         {
             ApplyNotifyWhenFriendIsNearConfiguration(save: false);
             return NotifyWhenFriendIsNear.SetEnabled(value);
         }, applied => Configuration.NotifyWhenFriendIsNearEnabled = applied, () => NotifyWhenFriendIsNear.StatusText);
-        yield return new("better-cast-bar", "Better Cast Bar", XAModsRestoreScope.Game, () => Configuration.BetterCastBarEnabled, value =>
+        yield return new("better-cast-bar", "Better Cast Bar", XAModsRestoreScope.Ui, () => Configuration.BetterCastBarEnabled, value =>
         {
             ApplyBetterCastBarConfiguration(save: false);
             return BetterCastBar.SetEnabled(value);
         }, applied => Configuration.BetterCastBarEnabled = applied, () => BetterCastBar.StatusText);
-        yield return new("better-duty-finder", "Better Duty Finder", XAModsRestoreScope.Game, () => Configuration.BetterDutyFinderEnabled, BetterDutyFinder.SetEnabled, applied => Configuration.BetterDutyFinderEnabled = applied, () => BetterDutyFinder.StatusText);
+        yield return new("better-duty-finder", "Better Duty Finder", XAModsRestoreScope.Ui, () => Configuration.BetterDutyFinderEnabled, BetterDutyFinder.SetEnabled, applied => Configuration.BetterDutyFinderEnabled = applied, () => BetterDutyFinder.StatusText);
         yield return new("display-actual-queue-position", "Display Actual Queue Position", XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusText);
         yield return new("target-command-fix", "Fix /target Command", XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusText);
-        yield return new("copy-item-name-for-all", "Copy Item Name For All", XAModsRestoreScope.Game, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusText);
-        yield return new("expanded-player-right-click-menu-search", "Expanded Player Right-Click Menu Search", XAModsRestoreScope.Game, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusText);
-        yield return new("live-anonymous-mode", "Live Anonymous Mode", XAModsRestoreScope.Game, () => Configuration.LiveAnonymousModeEnabled, NameplatePrivacy.SetAnonymousModeEnabled, applied => Configuration.LiveAnonymousModeEnabled = applied, () => NameplatePrivacy.AnonymousModeStatusText);
-        yield return new("better-inventory-mover", "Better Inventory Mover", XAModsRestoreScope.Game, () => Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.SetEnabled, applied => Configuration.BetterInventoryMoverEnabled = applied, () => BetterInventoryMover.StatusText);
-        yield return new("better-company-chest", "Better Company Chest", XAModsRestoreScope.Game, () => Configuration.BetterCompanyChestEnabled, BetterCompanyChest.SetEnabled, applied => Configuration.BetterCompanyChestEnabled = applied, () => BetterCompanyChest.StatusText);
-        yield return new("auto-open-moogle-mail", "Auto Open Moogle Mail", XAModsRestoreScope.Game, () => Configuration.AutoOpenMoogleMailEnabled, AutoOpenMoogleMail.SetEnabled, applied => Configuration.AutoOpenMoogleMailEnabled = applied, () => AutoOpenMoogleMail.StatusText);
-        yield return new("enable-item-icon-in-shops", "Enable Item Icon In Shops", XAModsRestoreScope.Game, () => Configuration.EnableItemIconInShopsEnabled, EnableItemIconInShops.SetEnabled, applied => Configuration.EnableItemIconInShopsEnabled = applied, () => EnableItemIconInShops.StatusText);
-        yield return new("field-operations-entry-command", "Field Operations Entry Command", XAModsRestoreScope.Game, () => Configuration.FieldEntryCommandEnabled, FieldEntryCommand.SetEnabled, applied => Configuration.FieldEntryCommandEnabled = applied, () => FieldEntryCommand.StatusText);
+        yield return new("copy-item-name-for-all", "Copy Item Name For All", XAModsRestoreScope.Ui, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusText);
+        yield return new("expanded-player-right-click-menu-search", "Expanded Player Right-Click Menu Search", XAModsRestoreScope.Ui, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusText);
+        yield return new("live-anonymous-mode", "Anonymous Mode", XAModsRestoreScope.Ui, () => Configuration.LiveAnonymousModeEnabled, NameplatePrivacy.SetAnonymousModeEnabled, applied => Configuration.LiveAnonymousModeEnabled = applied, () => NameplatePrivacy.AnonymousModeStatusText);
+        yield return new("better-inventory-mover", "Better Inventory Mover", XAModsRestoreScope.Player, () => Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.SetEnabled, applied => Configuration.BetterInventoryMoverEnabled = applied, () => BetterInventoryMover.StatusText);
+        yield return new("better-company-chest", "Better Company Chest", XAModsRestoreScope.Player, () => Configuration.BetterCompanyChestEnabled, BetterCompanyChest.SetEnabled, applied => Configuration.BetterCompanyChestEnabled = applied, () => BetterCompanyChest.StatusText);
+        yield return new("auto-open-moogle-mail", "Auto Open Moogle Mail", XAModsRestoreScope.Player, () => Configuration.AutoOpenMoogleMailEnabled, AutoOpenMoogleMail.SetEnabled, applied => Configuration.AutoOpenMoogleMailEnabled = applied, () => AutoOpenMoogleMail.StatusText);
+        yield return new("enable-item-icon-in-shops", "Enable Item Icon In Shops", XAModsRestoreScope.Ui, () => Configuration.EnableItemIconInShopsEnabled, EnableItemIconInShops.SetEnabled, applied => Configuration.EnableItemIconInShopsEnabled = applied, () => EnableItemIconInShops.StatusText);
+        yield return new("field-operations-entry-command", "Field Operations Entry Command", XAModsRestoreScope.Eureka, () => Configuration.FieldEntryCommandEnabled, FieldEntryCommand.SetEnabled, applied => Configuration.FieldEntryCommandEnabled = applied, () => FieldEntryCommand.StatusText);
 
         yield return new("auto-ignore-minimum-window-size", "Ignore Minimum Window Size", XAModsRestoreScope.Graphic, () => Configuration.AutoIgnoreMinimumWindowSizeEnabled, SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled, applied => Configuration.AutoIgnoreMinimumWindowSizeEnabled = applied, () => SystemWindowMods.IgnoreMinimumWindowSizeStatusText);
         yield return new("auto-hide-game-objects", "Hide Game Objects", XAModsRestoreScope.Graphic, () => Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.SetEnabled, applied => Configuration.AutoHideGameObjectsEnabled = applied, () => AutoHideGameObjects.StatusText);
@@ -4218,6 +4247,11 @@ public sealed class Plugin : IDalamudPlugin
             case "timestampformat":
             case "customtimestamp":
                 definition = new("timestampseconds", "/xa timestampseconds on|off", GetXAModDefinition("custom-timestamp-format"));
+                return true;
+            case "nouifade":
+            case "nofade":
+            case "uifade":
+                definition = new("nouifade", "/xa nouifade on|off", GetXAModDefinition("no-ui-fade"));
                 return true;
             case "skipcutscenes":
                 definition = new("skipcutscenes", "/xa skipcutscenes on|off", GetXAModDefinition("auto-skip-cutscenes"));
@@ -4416,6 +4450,7 @@ public sealed class Plugin : IDalamudPlugin
         return scope switch
         {
             XAModsRestoreScope.Game => "Game Mods",
+            XAModsRestoreScope.Ui => "UI Mods",
             XAModsRestoreScope.Graphic => "Graphic Mods",
             XAModsRestoreScope.Player => "Player Mods",
             XAModsRestoreScope.Plugin => "Plugin Mods",
@@ -4640,5 +4675,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.33";
+    public const string Version = "0.0.0.34";
 }
