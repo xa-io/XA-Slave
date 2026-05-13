@@ -18,6 +18,7 @@ public sealed class NameplatePrivacyService : IDisposable
     private bool anonymousModeEnabled;
     private bool showTravelerWorldNamesEnabled;
     private bool showTravelerWorldNamesDisableInDuties = true;
+    private bool showTravelerWorldNamesAddSpacer;
     private bool showTitlesAsPlayernamesEnabled;
     private bool subscribed;
 
@@ -30,6 +31,8 @@ public sealed class NameplatePrivacyService : IDisposable
     public bool IsAnonymousModeEnabled => anonymousModeEnabled;
     public bool IsShowTravelerWorldNamesEnabled => showTravelerWorldNamesEnabled;
     public bool IsShowTitlesAsPlayernamesEnabled => showTitlesAsPlayernamesEnabled;
+
+    private string TravelerWorldNamesFormatLabel => showTravelerWorldNamesAddSpacer ? "Name @ HomeWorld" : "Name@HomeWorld";
 
     public string AnonymousModeStatusText =>
         anonymousModeEnabled
@@ -50,8 +53,8 @@ public sealed class NameplatePrivacyService : IDisposable
                 return "Enabled - disabled while in duty content.";
 
             return showTravelerWorldNamesDisableInDuties
-                ? $"Enabled - visible {RemoteVisitorLabels} nameplates show Name@HomeWorld and hide the FC/travel tag; disabled in duties."
-                : $"Enabled - visible {RemoteVisitorLabels} nameplates show Name@HomeWorld and hide the FC/travel tag.";
+                ? $"Enabled - visible {RemoteVisitorLabels} nameplates show {TravelerWorldNamesFormatLabel} and hide the FC/travel tag; disabled in duties."
+                : $"Enabled - visible {RemoteVisitorLabels} nameplates show {TravelerWorldNamesFormatLabel} and hide the FC/travel tag.";
         }
     }
 
@@ -93,12 +96,14 @@ public sealed class NameplatePrivacyService : IDisposable
         return showTitlesAsPlayernamesEnabled;
     }
 
-    public void ApplyShowTravelerWorldNamesConfiguration(bool disableInDuties)
+    public void ApplyShowTravelerWorldNamesConfiguration(bool disableInDuties, bool addSpacer)
     {
-        if (showTravelerWorldNamesDisableInDuties == disableInDuties)
+        if (showTravelerWorldNamesDisableInDuties == disableInDuties
+            && showTravelerWorldNamesAddSpacer == addSpacer)
             return;
 
         showTravelerWorldNamesDisableInDuties = disableInDuties;
+        showTravelerWorldNamesAddSpacer = addSpacer;
         if (showTravelerWorldNamesEnabled)
             RequestRedraw();
     }
@@ -180,7 +185,7 @@ public sealed class NameplatePrivacyService : IDisposable
                 changedName = true;
             }
 
-            if (applyTravelerWorldNames && TryAppendTravelerWorldName(playerCharacter, displayName, out displayName))
+            if (applyTravelerWorldNames && TryAppendTravelerWorldName(playerCharacter, displayName, showTravelerWorldNamesAddSpacer, out displayName))
             {
                 handler.RemoveFreeCompanyTag();
                 changedName = true;
@@ -238,7 +243,7 @@ public sealed class NameplatePrivacyService : IDisposable
         return true;
     }
 
-    private static bool TryAppendTravelerWorldName(IPlayerCharacter playerCharacter, string displayName, out string displayNameWithWorld)
+    private static bool TryAppendTravelerWorldName(IPlayerCharacter playerCharacter, string displayName, bool addSpacer, out string displayNameWithWorld)
     {
         displayNameWithWorld = displayName;
 
@@ -251,7 +256,9 @@ public sealed class NameplatePrivacyService : IDisposable
         if (string.IsNullOrWhiteSpace(homeWorld))
             return false;
 
-        displayNameWithWorld = $"{displayName}@{homeWorld}";
+        displayNameWithWorld = addSpacer
+            ? $"{displayName} @ {homeWorld}"
+            : $"{displayName}@{homeWorld}";
         return true;
     }
 

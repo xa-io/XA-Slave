@@ -23,6 +23,32 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.36 - 2026-05-13",
+            Lines =
+            [
+                "Player Mods",
+                "- Added `Show Blacklisted Playername In Party` under XA Mods > Player Mods.",
+                "- Blacklisted party-list `Unknown ##` rows can now show the matched blacklist name in red local text.",
+                "- Added `/xa blacklistedparty on|off`",
+                "- `Show Traveler World Names` now has an `Add spacer` suboption.",
+                "- Default output stays `Name@HomeWorld`; enabling `Add spacer` renders remote visitor names as `Name @ HomeWorld`.",
+                "- Saved XA Mods presets now preserve both `Disable in duties` and `Add spacer` for this feature.",
+            ],
+        },
+        new VersionEntry
+        {
+            Header = "v0.0.0.35 - 2026-05-13",
+            Lines =
+            [
+                "Dalamud Notifications Suck",
+                "- Fixed `Hide Penumbra/Glamourer/mod alerts` so hidden Penumbra import notifications no longer cancel active mod imports.",
+                "- Matching Penumbra/Glamourer/mod-manager notifications remain visually suppressed.",
+                "- Plugin-owned dismiss callbacks are scrubbed before XA suppresses matching notifications, so Penumbra import/upload flow can continue.",
+                "- Updated the XA Mods help text to call out that matching notifications are hidden without firing plugin-owned dismiss callbacks.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.34 - 2026-05-11",
             Lines =
             [

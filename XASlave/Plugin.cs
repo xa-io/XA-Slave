@@ -146,6 +146,7 @@ public sealed class Plugin : IDalamudPlugin
     public SightDistanceService SightDistance { get; init; }
     public PlayerSearchContextMenuService PlayerSearchContextMenu { get; init; }
     public NameplatePrivacyService NameplatePrivacy { get; init; }
+    public BlacklistedPartyNameService BlacklistedPartyName { get; init; }
     public AutoUnlockExpertDeliveryService AutoUnlockExpertDelivery { get; init; }
     public ExpertDeliveryUnlockService ExpertDeliveryUnlock { get; init; }
     public AutoRefuseTradeService AutoRefuseTrade { get; init; }
@@ -329,6 +330,7 @@ public sealed class Plugin : IDalamudPlugin
         SightDistance = new SightDistanceService(Framework, SigScanner, GameInterop, Log);
         PlayerSearchContextMenu = new PlayerSearchContextMenuService(ContextMenu, DataManager, Log);
         NameplatePrivacy = new NameplatePrivacyService(NamePlateGui, Log);
+        BlacklistedPartyName = new BlacklistedPartyNameService(Framework, Log);
         AutoUnlockExpertDelivery = new AutoUnlockExpertDeliveryService(Framework, DataManager, Log);
         ExpertDeliveryUnlock = new ExpertDeliveryUnlockService(GameInterop, Log);
         ExpertDeliveryUnlock.ApplyConfiguration(Configuration.UnlockExpertDeliveryForcedRankFloor);
@@ -716,7 +718,9 @@ public sealed class Plugin : IDalamudPlugin
         {
             var changed = false;
 
-            NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(Configuration.ShowTravelerWorldNamesDisableInDuties);
+            NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(
+                Configuration.ShowTravelerWorldNamesDisableInDuties,
+                Configuration.ShowTravelerWorldNamesAddSpacer);
 
             if (Configuration.LiveAnonymousModeEnabled && !NameplatePrivacy.SetAnonymousModeEnabled(true))
             {
@@ -733,6 +737,12 @@ public sealed class Plugin : IDalamudPlugin
             if (Configuration.ShowTitlesAsPlayernamesEnabled && !NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled(true))
             {
                 Configuration.ShowTitlesAsPlayernamesEnabled = false;
+                changed = true;
+            }
+
+            if (Configuration.ShowBlacklistedPlayernameInPartyEnabled && !BlacklistedPartyName.SetEnabled(true))
+            {
+                Configuration.ShowBlacklistedPlayernameInPartyEnabled = false;
                 changed = true;
             }
 
@@ -1408,6 +1418,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Instant Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText, "QuickReturnEnabled");
         yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText, "AutoRefuseTradeRequestEnabled");
         yield return CreateStartupSurfaceStatus("Show Titles As Playernames", Configuration.ShowTitlesAsPlayernamesEnabled, NameplatePrivacy.ShowTitlesAsPlayernamesStatusText);
+        yield return CreateStartupSurfaceStatus("Show Blacklisted Playername In Party", Configuration.ShowBlacklistedPlayernameInPartyEnabled, BlacklistedPartyName.StatusText);
         yield return CreateStartupSurfaceStatus("Show Traveler World Names", Configuration.ShowTravelerWorldNamesEnabled, NameplatePrivacy.ShowTravelerWorldNamesStatusText);
         yield return CreateStartupSurfaceStatus("Fix /target Command", Configuration.TargetCommandFixEnabled, TargetCommandFix.StatusText);
         yield return CreateStartupSurfaceStatus("Better Inventory Mover", Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.StatusText);
@@ -1521,6 +1532,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("SightDistance", SightDistance);
         TryDispose("PlayerSearchContextMenu", PlayerSearchContextMenu);
         TryDispose("NameplatePrivacy", NameplatePrivacy);
+        TryDispose("BlacklistedPartyName", BlacklistedPartyName);
         TryDispose("AutoUnlockExpertDelivery", AutoUnlockExpertDelivery);
         TryDispose("ExpertDeliveryUnlock", ExpertDeliveryUnlock);
         TryDispose("AutoRefuseTrade", AutoRefuseTrade);
@@ -2574,6 +2586,7 @@ public sealed class Plugin : IDalamudPlugin
                 snapshot = JsonSerializer.SerializeToElement(new XAModShowTravelerWorldNamesSettings
                 {
                     DisableInDuties = Configuration.ShowTravelerWorldNamesDisableInDuties,
+                    AddSpacer = Configuration.ShowTravelerWorldNamesAddSpacer,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
             case "auto-leave-duty":
@@ -2774,7 +2787,10 @@ public sealed class Plugin : IDalamudPlugin
             && travelerWorldNamesSettings != null)
         {
             Configuration.ShowTravelerWorldNamesDisableInDuties = travelerWorldNamesSettings.DisableInDuties;
-            NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(Configuration.ShowTravelerWorldNamesDisableInDuties);
+            Configuration.ShowTravelerWorldNamesAddSpacer = travelerWorldNamesSettings.AddSpacer;
+            NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(
+                Configuration.ShowTravelerWorldNamesDisableInDuties,
+                Configuration.ShowTravelerWorldNamesAddSpacer);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "custom-resolutions", out XAModCustomResolutionsSettings? customResolutionSettings)
@@ -3867,7 +3883,9 @@ public sealed class Plugin : IDalamudPlugin
                 ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
                 break;
             case "show-traveler-world-names":
-                NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(Configuration.ShowTravelerWorldNamesDisableInDuties);
+                NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(
+                    Configuration.ShowTravelerWorldNamesDisableInDuties,
+                    Configuration.ShowTravelerWorldNamesAddSpacer);
                 break;
             case "notify-when-friend-is-near":
                 ApplyNotifyWhenFriendIsNearConfiguration(save: false);
@@ -4101,9 +4119,12 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("quick-return", "Instant Return", XAModsRestoreScope.Illegal, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusText);
         yield return new("auto-refuse-trade-request", "Refuse Trade Request", XAModsRestoreScope.Player, () => Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.SetEnabled, applied => Configuration.AutoRefuseTradeRequestEnabled = applied, () => AutoRefuseTrade.StatusText);
         yield return new("show-titles-as-playernames", "Show Titles As Playernames", XAModsRestoreScope.Player, () => Configuration.ShowTitlesAsPlayernamesEnabled, NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled, applied => Configuration.ShowTitlesAsPlayernamesEnabled = applied, () => NameplatePrivacy.ShowTitlesAsPlayernamesStatusText);
+        yield return new("show-blacklisted-playername-in-party", "Show Blacklisted Playername In Party", XAModsRestoreScope.Player, () => Configuration.ShowBlacklistedPlayernameInPartyEnabled, BlacklistedPartyName.SetEnabled, applied => Configuration.ShowBlacklistedPlayernameInPartyEnabled = applied, () => BlacklistedPartyName.StatusText);
         yield return new("show-traveler-world-names", "Show Traveler World Names", XAModsRestoreScope.Player, () => Configuration.ShowTravelerWorldNamesEnabled, value =>
         {
-            NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(Configuration.ShowTravelerWorldNamesDisableInDuties);
+            NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(
+                Configuration.ShowTravelerWorldNamesDisableInDuties,
+                Configuration.ShowTravelerWorldNamesAddSpacer);
             return NameplatePrivacy.SetShowTravelerWorldNamesEnabled(value);
         }, applied => Configuration.ShowTravelerWorldNamesEnabled = applied, () => NameplatePrivacy.ShowTravelerWorldNamesStatusText);
         yield return new("auto-reveal-undiscovered-areas", "Reveal Undiscovered Areas", XAModsRestoreScope.Player, () => Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.SetRevealUndiscoveredAreasEnabled, applied => Configuration.AutoRevealUndiscoveredAreasEnabled = applied, () => SystemWindowMods.RevealUndiscoveredAreasStatusText);
@@ -4370,6 +4391,11 @@ public sealed class Plugin : IDalamudPlugin
                 return true;
             case "refusetrade":
                 definition = new("refusetrade", "/xa refusetrade on|off", GetXAModDefinition("auto-refuse-trade-request"));
+                return true;
+            case "blacklistedparty":
+            case "blacklistparty":
+            case "blacklistedplayername":
+                definition = new("blacklistedparty", "/xa blacklistedparty on|off", GetXAModDefinition("show-blacklisted-playername-in-party"));
                 return true;
             case "titlesasplayernames":
             case "titleplayernames":
@@ -4675,5 +4701,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.35";
+    public const string Version = "0.0.0.36";
 }

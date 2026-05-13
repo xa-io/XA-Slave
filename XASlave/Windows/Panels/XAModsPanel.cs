@@ -221,7 +221,9 @@ public partial class SlaveWindow
 
         void ApplyShowTravelerWorldNamesConfiguration()
         {
-            plugin.NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(configuration.ShowTravelerWorldNamesDisableInDuties);
+            plugin.NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(
+                configuration.ShowTravelerWorldNamesDisableInDuties,
+                configuration.ShowTravelerWorldNamesAddSpacer);
         }
 
         bool SetShowTravelerWorldNamesEnabled(bool value)
@@ -2231,9 +2233,19 @@ public partial class SlaveWindow
                 SetToonModsStatus("XA Mods: Show Traveler World Names duty option updated.");
             }
 
+            var addSpacer = configuration.ShowTravelerWorldNamesAddSpacer;
+            if (ImGui.Checkbox("Add spacer##ShowTravelerWorldNames", ref addSpacer))
+            {
+                configuration.ShowTravelerWorldNamesAddSpacer = addSpacer;
+                ApplyShowTravelerWorldNamesConfiguration();
+                SaveConfiguration();
+                SetToonModsStatus("XA Mods: Show Traveler World Names spacer option updated.");
+            }
+
+            var nameFormat = addSpacer ? "Name @ HomeWorld" : "Name@HomeWorld";
             ImGui.TextDisabled(disableInDuties
-                ? "World name will be hidden."
-                : "World name will appear.");
+                ? $"World name will be hidden in duties. Format: {nameFormat}."
+                : $"World name will appear in duties. Format: {nameFormat}.");
         }
 
         void SaveAutoSkipCutsceneOptions(string message)
@@ -2973,15 +2985,26 @@ public partial class SlaveWindow
             searchTerms: ["title", "titles", "player title", "prefix title", "suffix title", "nameplate", "playernames", "traveler"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
+            "show-blacklisted-playername-in-party",
+            "Show Blacklisted Playername In Party",
+            () => configuration.ShowBlacklistedPlayernameInPartyEnabled,
+            plugin.BlacklistedPartyName.SetEnabled,
+            applied => configuration.ShowBlacklistedPlayernameInPartyEnabled = applied,
+            "Shows blocked party-list Unknown names as the blocked player name.",
+            "Replaces local _PartyList Unknown ## text for blacklisted party members with the matching blacklist name from the client blacklist proxy and colors the row name red. This is local presentation only and does not change party data.",
+            plugin.BlacklistedPartyName.StatusText,
+            searchTerms: ["blacklist", "blacklisted", "block list", "blocked", "party list", "_PartyList", "Unknown 01", "Unknown", "account id", "red text"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
             "show-traveler-world-names",
             "Show Traveler World Names",
             () => configuration.ShowTravelerWorldNamesEnabled,
             SetShowTravelerWorldNamesEnabled,
             applied => configuration.ShowTravelerWorldNamesEnabled = applied,
             "Shows visible wanderer, traveler, and voyager nameplates as Name@HomeWorld.",
-            "Appends @HomeWorld to the local nameplate name for visible players whose home world differs from their current world, then hides Wanderer, Traveler, Voyager, or FC/travel tag framing. The option below can leave duties untouched. This is local presentation only and does not alter server data. Anonymous Mode takes precedence and removes this label while it is masking nameplates.",
+            "Appends @HomeWorld to the local nameplate name for visible players whose home world differs from their current world, then hides Wanderer, Traveler, Voyager, or FC/travel tag framing. The Add spacer option changes the local format to Name @ HomeWorld. The option below can leave duties untouched. This is local presentation only and does not alter server data. Anonymous Mode takes precedence and removes this label while it is masking nameplates.",
             plugin.NameplatePrivacy.ShowTravelerWorldNamesStatusText,
-            searchTerms: ["traveler", "traveller", "wanderer", "voyager", "world visit", "data center travel", "cross data center", "physical data center", "FC tag", "free company tag", "home world", "disable in duties", "duty"],
+            searchTerms: ["traveler", "traveller", "wanderer", "voyager", "world visit", "data center travel", "cross data center", "physical data center", "FC tag", "free company tag", "home world", "disable in duties", "duty", "spacer", "space", "Name @ HomeWorld"],
             drawOptions: DrawShowTravelerWorldNamesOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,

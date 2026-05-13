@@ -128,6 +128,7 @@ public sealed class XAModBetterHighlightPotentialTargetsSettings
 public sealed class XAModShowTravelerWorldNamesSettings
 {
     public bool DisableInDuties { get; set; } = true;
+    public bool AddSpacer { get; set; } = false;
 }
 
 [Serializable]

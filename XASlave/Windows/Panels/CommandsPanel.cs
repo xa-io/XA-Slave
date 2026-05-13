@@ -101,13 +101,14 @@ public partial class SlaveWindow
         new("/xa playerrestore", "Disable the current top-level Player Mods toggles.", "Useful for dropping movement, sprint, sit/doze, sight-distance, and other standard player-side XA Mods back to off."),
         new("/xa refusetrade on|off", "Toggle `Refuse Trade Request`.", "Uses the trade-window and status-update refusal surfaces plus the current local feedback and extra-command options."),
         new("/xa revealmap on|off", "Toggle `Reveal Undiscovered Areas`.", "Clears local map-discovery flags when the map agent refreshes."),
+        new("/xa blacklistedparty on|off", "Toggle `Show Blacklisted Playername In Party`.", "Replaces party-list `Unknown ##` rows for blacklisted party members with the matched blacklist name in red local text."),
         new("/xa sightdistance on|off", "Toggle `Custom Sight Distance`.", "Turns the current camera override profile on or off."),
         new("/xa sitdoze on|off", "Toggle `Doze & Sit Anywhere`.", "Controls the master emote hook used by `/xa sit`, `/xa doze`, and the panel/titlebar quick actions."),
         new("/xa sprint on|off", "Toggle `Infinite Sprint`.", "Controls XA's movement-gated Sprint recast surface."),
         new("/xa sprintdelay <seconds>", "Set the `Infinite Sprint` movement-start delay.", "Accepts values from `0.0` to `30.0` seconds."),
         new("/xa teleportlock on|off", "Toggle `Clear Teleportation Lock`.", "Uses XA's teleport-stuck recovery seam."),
         new("/xa titlesasplayernames on|off", "Toggle `Show Titles As Playernames`.", "Moves prefix titles before the player name and suffix titles after it."),
-        new("/xa travelerworlds on|off", "Toggle `Show Traveler World Names`.", "Shows visible Wanderer, Traveler, and Voyager names as Name@HomeWorld on this client and hides the FC/travel tag."),
+        new("/xa travelerworlds on|off", "Toggle `Show Traveler World Names`.", "Shows visible Wanderer, Traveler, and Voyager names as Name@HomeWorld on this client and hides the FC/travel tag; the XA Mods suboptions can disable it in duties or add Name @ HomeWorld spacing."),
     };
 
     private static readonly CommandReferenceEntry[] PluginModsCommandEntries =

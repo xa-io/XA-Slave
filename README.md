@@ -45,6 +45,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
   |  |  |  | Notify When Friend Is Near |  |  |
   |  |  |  | Refuse Trade Request |  |  |
   |  |  |  | Reveal Undiscovered Areas |  |  |
+  |  |  |  | Show Blacklisted Playername In Party |  |  |
   |  |  |  | Show Titles As Playernames |  |  |
   |  |  |  | Show Traveler World Names |  |  |
   |  |  |  | XA Peep |  |  |
@@ -170,6 +171,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa playerrestore` | Disable the current Player Mods toggles. |
 | `/xa refusetrade on/off` | Toggle `Refuse Trade Request`. |
 | `/xa revealmap on/off` | Toggle `Reveal Undiscovered Areas`. |
+| `/xa blacklistedparty on/off` | Toggle `Show Blacklisted Playername In Party`; blacklisted party-list `Unknown ##` rows show the matched blacklist name in red local text. |
 | `/xa sightdistance on/off` | Toggle `Custom Sight Distance`. |
 | `/xa sit` | Trigger Sit Anywhere while `Doze & Sit Anywhere` is enabled. |
 | `/xa sitdoze on/off` | Toggle the master `Doze & Sit Anywhere` hook. |
@@ -177,7 +179,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa sprintdelay <seconds>` | Set the `Infinite Sprint` movement-start delay. |
 | `/xa teleportlock on/off` | Toggle `Clear Teleportation Lock`. |
 | `/xa titlesasplayernames on/off` | Toggle `Show Titles As Playernames`; prefix titles move before the player name and suffix titles move after it. |
-| `/xa travelerworlds on/off` | Toggle `Show Traveler World Names`; visible Wanderer, Traveler, and Voyager names show `Name@HomeWorld` locally and hide the FC/travel tag, with an XA Mods option to disable in duties. |
+| `/xa travelerworlds on/off` | Toggle `Show Traveler World Names`; visible Wanderer, Traveler, and Voyager names show `Name@HomeWorld` locally and hide the FC/travel tag, with XA Mods options to disable in duties or add `Name @ HomeWorld` spacing. |
 
 </details>
 

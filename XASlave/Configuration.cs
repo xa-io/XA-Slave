@@ -402,7 +402,9 @@ public class Configuration : IPluginConfiguration
     public bool LiveAnonymousModeEnabled { get; set; } = false;
     public bool ShowTravelerWorldNamesEnabled { get; set; } = false;
     public bool ShowTravelerWorldNamesDisableInDuties { get; set; } = true;
+    public bool ShowTravelerWorldNamesAddSpacer { get; set; } = false;
     public bool ShowTitlesAsPlayernamesEnabled { get; set; } = false;
+    public bool ShowBlacklistedPlayernameInPartyEnabled { get; set; } = false;
     public bool BetterInventoryMoverEnabled { get; set; } = false;
     public BetterInventoryMoverModifierKey BetterInventoryMoverQuickMoveModifier { get; set; } = BetterInventoryMoverModifierKey.LeftShift;
     public bool BetterCompanyChestEnabled { get; set; } = false;
