@@ -2156,7 +2156,7 @@ public partial class SlaveWindow
                 "Hide Penumbra/Glamourer/mod alerts##DalamudNotificationsSuck",
                 () => configuration.DalamudNotificationsSuckHideModManagerAlerts,
                 value => configuration.DalamudNotificationsSuckHideModManagerAlerts = value,
-                "Targets notifications mentioning Penumbra, Glamourer, Customize+, Mare, TexTools, or mod load failures.");
+                "Targets notifications mentioning Penumbra, Glamourer, Customize+, Mare, TexTools, or mod load failures without firing plugin-owned dismiss callbacks.");
 
             DrawDalamudNotificationOption(
                 "Hide success/info notifications##DalamudNotificationsSuck",

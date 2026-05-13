@@ -150,6 +150,7 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
     private FieldInfo? pendingNotificationsField;
     private MethodInfo? dismissNowMethod;
     private MethodInfo? disposeInternalMethod;
+    private MethodInfo? removeNonDalamudInvocationsMethod;
     private PropertyInfo? titleProperty;
     private PropertyInfo? contentProperty;
     private PropertyInfo? minimizedTextProperty;
@@ -313,6 +314,7 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
 
     private void DismissAndDispose(object notification)
     {
+        removeNonDalamudInvocationsMethod?.Invoke(notification, null);
         dismissNowMethod?.Invoke(notification, null);
         disposeInternalMethod?.Invoke(notification, null);
     }
@@ -442,6 +444,7 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
             pendingNotificationsField = pendingField;
             dismissNowMethod = activeType.GetMethod("DismissNow", InstanceFlags, Type.EmptyTypes);
             disposeInternalMethod = activeType.GetMethod("DisposeInternal", InstanceFlags);
+            removeNonDalamudInvocationsMethod = activeType.GetMethod("RemoveNonDalamudInvocations", InstanceFlags, Type.EmptyTypes);
             titleProperty = activeType.GetProperty("Title", InstanceFlags);
             contentProperty = activeType.GetProperty("Content", InstanceFlags);
             minimizedTextProperty = activeType.GetProperty("MinimizedText", InstanceFlags);
