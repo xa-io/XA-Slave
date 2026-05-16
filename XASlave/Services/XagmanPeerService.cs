@@ -23,6 +23,7 @@ public sealed class XagmanPeerService : IDisposable
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         PropertyNameCaseInsensitive = true,
     };
+    private static readonly TimeSpan HubListenerRetryInterval = TimeSpan.FromSeconds(3);
 
     private readonly IPluginLog log;
     private readonly string localInstanceId;
@@ -30,6 +31,7 @@ public sealed class XagmanPeerService : IDisposable
     private readonly int hubPort;
     private readonly Action<IReadOnlyList<XagmanPeerPresence>> peersUpdated;
     private readonly object syncRoot = new();
+    private readonly object hubListenerLock = new();
     private readonly object hubLock = new();
     private readonly CancellationTokenSource cancellationTokenSource = new();
     private readonly SemaphoreSlim outboundWriteLock = new(1, 1);
@@ -59,6 +61,8 @@ public sealed class XagmanPeerService : IDisposable
     private XagmanPeerPresence? localPresence;
     private IReadOnlyList<XagmanPeerPresence> peers = Array.Empty<XagmanPeerPresence>();
     private string lastStatus = "Disconnected";
+    private string hubListenerStartError = string.Empty;
+    private DateTime nextHubListenerRetryUtc = DateTime.MinValue;
     private bool isHub;
     private bool isDisposed;
     private bool started;
@@ -181,16 +185,21 @@ public sealed class XagmanPeerService : IDisposable
         {
         }
 
-        try
+        lock (hubListenerLock)
         {
-            hubListener?.Stop();
-        }
-        catch
-        {
-        }
+            try
+            {
+                hubListener?.Stop();
+            }
+            catch
+            {
+            }
 
-        hubListener = null;
-        isHub = false;
+            hubListener = null;
+            isHub = false;
+            hubListenerStartError = string.Empty;
+            nextHubListenerRetryUtc = DateTime.MinValue;
+        }
 
         lock (hubLock)
         {
@@ -354,26 +363,107 @@ public sealed class XagmanPeerService : IDisposable
         cancellationTokenSource.Dispose();
     }
 
-    private void TryStartHubListener()
+    private bool TryStartHubListener()
     {
-        try
+        lock (hubListenerLock)
         {
-            var listenerAddress = GetHubListenerAddress();
-            if (listenerAddress == null)
-            {
-                isHub = false;
-                return;
-            }
+            if (hubListener != null)
+                return true;
 
-            hubListener = new TcpListener(listenerAddress, hubPort);
-            hubListener.Start();
-            isHub = true;
-            hubAcceptTask = Task.Run(() => AcceptHubClientsAsync(cancellationTokenSource.Token));
+            TcpListener? listener = null;
+            try
+            {
+                var listenerAddress = GetHubListenerAddress();
+                if (listenerAddress == null)
+                {
+                    isHub = false;
+                    hubListenerStartError = string.Empty;
+                    return false;
+                }
+
+                listener = new TcpListener(listenerAddress, hubPort);
+                listener.Start();
+                hubListener = listener;
+                isHub = true;
+                hubListenerStartError = string.Empty;
+                nextHubListenerRetryUtc = DateTime.MinValue;
+                hubAcceptTask = Task.Run(() => AcceptHubClientsAsync(cancellationTokenSource.Token));
+                return true;
+            }
+            catch (SocketException ex)
+            {
+                try
+                {
+                    listener?.Stop();
+                }
+                catch
+                {
+                }
+
+                hubListener = null;
+                isHub = false;
+                hubListenerStartError = $"local listener start failed with {ex.SocketErrorCode}";
+                return false;
+            }
+            catch (Exception ex)
+            {
+                try
+                {
+                    listener?.Stop();
+                }
+                catch
+                {
+                }
+
+                hubListener = null;
+                isHub = false;
+                hubListenerStartError = $"local listener start failed: {ex.Message}";
+                log.Warning(ex, "[XASlave] Xagman TCP hub listener failed to start.");
+                return false;
+            }
         }
-        catch (SocketException)
+    }
+
+    private void RetryStartHubListenerIfNeeded()
+    {
+        if (!started || isDisposed || isHub)
+            return;
+
+        var nowUtc = DateTime.UtcNow;
+        var shouldTry = false;
+        lock (hubListenerLock)
         {
-            isHub = false;
+            if (!isHub && hubListener == null && nowUtc >= nextHubListenerRetryUtc)
+            {
+                nextHubListenerRetryUtc = nowUtc + HubListenerRetryInterval;
+                shouldTry = true;
+            }
         }
+
+        if (shouldTry)
+            TryStartHubListener();
+    }
+
+    private string GetWaitingForHubStatus()
+    {
+        var listenerError = GetHubListenerStartError();
+        return string.IsNullOrWhiteSpace(listenerError)
+            ? $"Waiting for Xagman hub on {HubEndpoint}..."
+            : $"Waiting for Xagman hub on {HubEndpoint}; {listenerError}.";
+    }
+
+    private string GetHubConnectionUnavailableStatus()
+    {
+        var listenerError = GetHubListenerStartError();
+        return string.IsNullOrWhiteSpace(listenerError)
+            ? $"Xagman hub connection unavailable on {HubEndpoint}."
+            : $"Xagman hub connection unavailable on {HubEndpoint}; {listenerError}.";
+    }
+
+    private string GetHubListenerStartError()
+    {
+        lock (hubListenerLock)
+            return hubListenerStartError;
     }
 
     private async Task AcceptHubClientsAsync(CancellationToken cancellationToken)
@@ -647,6 +737,7 @@ public sealed class XagmanPeerService : IDisposable
 
             try
             {
+                RetryStartHubListenerIfNeeded();
                 tcpClient = new TcpClient();
                 var connectAddress = GetPreferredHubConnectAddress();
                 if (connectAddress != null)
@@ -693,7 +784,7 @@ public sealed class XagmanPeerService : IDisposable
             }
             catch (SocketException)
             {
-                SetStatus($"Waiting for Xagman hub on {HubEndpoint}...");
+                SetStatus(GetWaitingForHubStatus());
             }
             catch (IOException)
             {
@@ -820,7 +911,7 @@ public sealed class XagmanPeerService : IDisposable
             return false;
         if (!IsConnected && !await WaitForConnectionAsync(TimeSpan.FromSeconds(2), cancellationTokenSource.Token).ConfigureAwait(false))
         {
-            SetStatus($"Xagman hub connection unavailable on {HubEndpoint}.");
+            SetStatus(GetHubConnectionUnavailableStatus());
             return false;
         }
 
@@ -834,7 +925,7 @@ public sealed class XagmanPeerService : IDisposable
 
         if (writer == null)
         {
-            SetStatus($"Xagman hub connection unavailable on {HubEndpoint}.");
+            SetStatus(GetHubConnectionUnavailableStatus());
             return false;
         }
 
@@ -968,6 +1059,10 @@ public sealed class XagmanPeerService : IDisposable
             CurrentWorld = record.CurrentWorld,
             TerritoryId = record.TerritoryId,
             TerritoryName = record.TerritoryName,
+            LocalPositionAvailable = record.LocalPositionAvailable,
+            LocalPositionX = record.LocalPositionX,
+            LocalPositionY = record.LocalPositionY,
+            LocalPositionZ = record.LocalPositionZ,
             XagmanEnabled = record.XagmanEnabled,
             Role = record.Role,
             TonyMode = record.TonyMode,
@@ -988,6 +1083,12 @@ public sealed class XagmanPeerService : IDisposable
             MainInventoryFreeSlots = record.MainInventoryFreeSlots,
             Gil = record.Gil,
             TonyGilMinimum = record.TonyGilMinimum,
+            TonySellLocationActive = record.TonySellLocationActive,
+            TonySellLocationTerritoryId = record.TonySellLocationTerritoryId,
+            TonySellLocationName = record.TonySellLocationName,
+            TonySellLocationX = record.TonySellLocationX,
+            TonySellLocationY = record.TonySellLocationY,
+            TonySellLocationZ = record.TonySellLocationZ,
             ItemIds = record.ItemIds == null ? new List<uint>() : new List<uint>(record.ItemIds),
             RequestedItems = record.RequestedItems == null
                 ? new List<XagmanTradeRequestEntry>()

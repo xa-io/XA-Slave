@@ -23,6 +23,41 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.37 - 2026-05-15",
+            Lines =
+            [
+                "Xagman",
+                "- Added `Sell When Inventory Is Full` for Tony runs.",
+                "- When Tony fills inventory in a supported meet zone, XA paths Tony to the local vendor, sends `/ays itemsell`, waits for AutoRetainer item selling to finish, runs CharacterSafeWait, and resumes Xagman.",
+                "- After Tony sells items, resumed Franchise Owners path to Tony's vendor coordinate with vnav stop distance `2` before targeting Tony and starting the normal trade path.",
+                "- Standby owners stay visible in Tony's queue while moving to that vendor coordinate, so Tony can call the first owner that reaches the sell location.",
+                "- Owners now enter Queue Wait as soon as they reach Tony's sell coordinate, so they do not stay stuck as generic Traveling peers before Tony can call them.",
+                "- Owner-side Tony lookup now accepts Tony's active sell-location peer and includes queued Paused owners in Tony's first-come queue.",
+                "- Owners now publish their queue request before the pre-position approach finishes, so target/pathing delays do not keep ready clients out of Tony's normal first-come queue.",
+                "- Peer presence now publishes live coordinates, the peer list shows them, and owners path to randomized coordinates near Tony before targeting him and closing the final trade gap.",
+                "- After Tony calls an owner, the final live-coordinate approach tightens to `0.5` yalm and can repath by Tony's visible object if the current target is missing or stale.",
+                "- Tony's NPC sell route now randomizes the destination within `0.5` yalm of the configured vendor coordinate instead of stacking every run on the exact same point.",
+                "- Xagman peer connections now retry local hub listener startup while disconnected, so same-PC clients can recover from a transient listener gap instead of staying on `hub connection unavailable`.",
+                "- If NPC item selling hits the gil cap message, XA closes Shop with `callback Shop true -1` and falls back to the normal Tony full-inventory rotation/completion path.",
+                "- Supported vendor meet locations are listed one per line in the tooltip and shown in green in the meet-location dropdown.",
+                "- Selling is skipped at `990,000,000` gil or higher so Tony does not risk the `999,999,999` gil cap.",
+                "- Unsupported zones, unavailable AutoRetainer/vnav IPC, or sell-cleanup failures fall back to the normal full-inventory behavior: return home, relog the next Tony, or finish with warnings if no Tony remains.",
+                "",
+                "AutoRetainer IPC",
+                "- IPC Calls > AutoRetainer now shows the `AutoRetainer.PluginState.*` status-pull channels for busy state, retainer readiness, Multi Mode status, auto-login availability, RetainerSense, protected-item checks, and deployable readiness.",
+                "- Debug / Test > Punish > AutoRetainer now has matching PluginState status buttons.",
+                "- Added an `AR ItemSell` debug command button that sends `/ays itemsell`.",
+                "",
+                "Game Mods",
+                "- `Close Lobby Errors` now closes NoKillPlugin's `No Kill Plugin Panel` if that plugin opens its auth-error settings panel during a monitored lobby Dialogue flow.",
+                "- The NoKill panel close is scoped to the known `NoKillPlugin` / `No Kill Plugin` runtime instance and uses reflection to set `Gui.ConfigWindow.Visible` false.",
+                "- The Close Lobby Errors monitor now waits for addon:Dialogue to contain a supported lobby/networking marker such as `90002`, then opens a 10 second monitor window for popup confirmation and NoKill panel cleanup.",
+                "- The NoKill panel close runs on a throttled framework update during that Dialogue-triggered 10 second window, so it can catch the panel if it opens shortly after the lobby dialog appears.",
+                "- Debug / Test > XA Abuse > Lobby Test now shows whether Dialogue is visible, ready, supported, which marker/text was seen, whether `_TitleMenu` is visible, whether the 10 second monitor window is active, whether the NoKill window is active, and includes a manual close test button.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.36 - 2026-05-13",
             Lines =
             [

@@ -10,7 +10,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Save to XA Database** - Push character data into XA Database on demand or through cadence-gated login collection, with task logs for save/debug visibility.
 - **Auto-Glam Weather** - Pick valid glamour plates from per-weather lists and apply them automatically when the active weather changes.
 - **City Chat Flooder** - Send announcements across selected worlds and cities with loop and delay controls.
-- **Xagman** - Coordinate FC item trading between Tony and Franchise Owner clients on the same PC or LAN. Supports Dropbox queueing, `Give` / `Take` / `Balance` / `TopUp`, supplier matching, trade recovery, item-list import/export, standby queues, FC-return cleanup, and direct target/focus recovery while running.
+- **Xagman** - Coordinate FC item trading between Tony and Franchise Owner clients on the same PC or LAN. Supports Dropbox queueing, `Give` / `Take` / `Balance` / `TopUp`, supplier matching, trade recovery, item-list import/export, standby queues, queue-first owner handoffs, self-healing peer hub reconnects, live-coordinate Tony approach, optional Tony item selling when inventory fills in supported ARR city/hamlet zones with gil-cap fallback, FC-return cleanup, and direct target/focus recovery while running.
 - **Monthly Relogger** - Cycle through characters with AutoRetainer support, XA Database rank and plot visibility, failure highlighting, optional per-character actions, and shared completion actions.
 - **Shared Task Completion Options** - Major task panels share one completion footer for `Logout`, `Kill Game`, and `Enable AR Multi Mode`. `Kill Game` uses XA's hard logout and close-client flow even when `Instant Logout` is disabled.
 - **Prep Logistics** - Relog selected characters, check main-inventory space, move them to a target world or location, and finish with shared completion actions.
@@ -93,7 +93,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | Command | Purpose |
 | --- | --- |
 | `/xa chocobocutscene on/off` | Toggle `Skip Cutscenes` > `Skip Feeding Chocobo`. |
-| `/xa closeerrors on/off` | Toggle `Close Lobby Errors` for supported disconnect and lobby error popups. |
+| `/xa closeerrors on/off` | Toggle `Close Lobby Errors`. |
 | `/xa gamerestore` | Disable the current Game Mods toggles. |
 | `/xa lockcombat on/off` | Toggle `Lock Game Window In Combat`. |
 | `/xa logincooldown on/off` | Toggle `Cancel Login Cooldown`. |
@@ -102,7 +102,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa queueposition on/off` | Toggle `Display Actual Queue Position`. |
 | `/xa skipcutscenes on/off` | Toggle `Skip Cutscenes`. |
 | `/xa skipdialogue on/off` | Toggle `Skip Dialogue`. |
-| `/xa targetfix on/off` | Toggle `Fix /target Command`; Xagman temporarily requires this fallback while it is running. |
+| `/xa targetfix on/off` | Toggle `Fix /target Command`. |
 
 </details>
 

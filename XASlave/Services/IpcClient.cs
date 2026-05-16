@@ -17,7 +17,7 @@ namespace XASlave.Services;
 ///   XA Database    - Save, Refresh, IsReady, GetDbPath, GetVersion, GetCharacterName, GetGil,
 ///                    GetRetainerGil, GetFcInfo, GetPlotInfo, GetPersonalPlotInfo, SearchItems
 ///   vnavmesh       - Nav mesh pathfinding, movement, rebuild
-///   AutoRetainer   - Suppressed/busy check, multi mode toggle, character/retainer post-processing
+///   AutoRetainer   - Suppressed/busy/status checks, multi mode toggle, character/retainer post-processing
 ///   Lifestream     - IsBusy, Abort, ExecuteCommand, ChangeWorld, teleport shortcuts
 ///   YesAlready     - IsEnabled, SetEnabled, PausePlugin
 ///   Deliveroo      - GC turn-in running check
@@ -68,6 +68,14 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<bool, object> arSetSuppressedSubscriber;
     private readonly ICallGateSubscriber<bool> arGetMultiModeEnabledSubscriber;
     private readonly ICallGateSubscriber<bool, object> arSetMultiModeEnabledSubscriber;
+    private readonly ICallGateSubscriber<bool> arPluginStateIsBusySubscriber;
+    private readonly ICallGateSubscriber<bool> arPluginStateAreAnyRetainersAvailableForCurrentCharaSubscriber;
+    private readonly ICallGateSubscriber<bool> arPluginStateGetMultiModeStatusSubscriber;
+    private readonly ICallGateSubscriber<bool> arPluginStateCanAutoLoginSubscriber;
+    private readonly ICallGateSubscriber<bool> arPluginStateGetOptionRetainerSenseSubscriber;
+    private readonly ICallGateSubscriber<uint, bool> arPluginStateIsItemProtectedSubscriber;
+    private readonly ICallGateSubscriber<ulong, bool?> arPluginStateAreAnyEnabledVesselsNotDeployedSubscriber;
+    private readonly ICallGateSubscriber<ulong, bool?> arPluginStateAreAnyEnabledVesselsReadySubscriber;
     // Character post-processing - runs after all retainers done for a character, before relog
     private readonly ICallGateSubscriber<string, object> arRequestCharacterPostProcessSubscriber;
     private readonly ICallGateSubscriber<object> arFinishCharacterPostProcessSubscriber;
@@ -172,6 +180,14 @@ public sealed class IpcClient
         arSetSuppressedSubscriber = pluginInterface.GetIpcSubscriber<bool, object>("AutoRetainer.SetSuppressed");
         arGetMultiModeEnabledSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.GetMultiModeEnabled");
         arSetMultiModeEnabledSubscriber = pluginInterface.GetIpcSubscriber<bool, object>("AutoRetainer.SetMultiModeEnabled");
+        arPluginStateIsBusySubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.PluginState.IsBusy");
+        arPluginStateAreAnyRetainersAvailableForCurrentCharaSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.PluginState.AreAnyRetainersAvailableForCurrentChara");
+        arPluginStateGetMultiModeStatusSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.PluginState.GetMultiModeStatus");
+        arPluginStateCanAutoLoginSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.PluginState.CanAutoLogin");
+        arPluginStateGetOptionRetainerSenseSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.PluginState.GetOptionRetainerSense");
+        arPluginStateIsItemProtectedSubscriber = pluginInterface.GetIpcSubscriber<uint, bool>("AutoRetainer.PluginState.IsItemProtected");
+        arPluginStateAreAnyEnabledVesselsNotDeployedSubscriber = pluginInterface.GetIpcSubscriber<ulong, bool?>("AutoRetainer.PluginState.AreAnyEnabledVesselsNotDeployed");
+        arPluginStateAreAnyEnabledVesselsReadySubscriber = pluginInterface.GetIpcSubscriber<ulong, bool?>("AutoRetainer.PluginState.AreAnyEnabledVesselsReady");
         // Character post-processing (source: AutoRetainerAPI/ApiConsts.cs)
         arRequestCharacterPostProcessSubscriber = pluginInterface.GetIpcSubscriber<string, object>("AutoRetainer.RequestCharacterPostprocess");
         arFinishCharacterPostProcessSubscriber = pluginInterface.GetIpcSubscriber<object>("AutoRetainer.FinishCharacterPostprocessRequest");
@@ -522,6 +538,54 @@ public sealed class IpcClient
     {
         try { return arGetMultiModeEnabledSubscriber.InvokeFunc(); }
         catch { return false; }
+    }
+
+    public bool AutoRetainerPluginStateIsBusy()
+    {
+        try { return arPluginStateIsBusySubscriber.InvokeFunc(); }
+        catch { return false; }
+    }
+
+    public bool AutoRetainerPluginStateAreAnyRetainersAvailableForCurrentChara()
+    {
+        try { return arPluginStateAreAnyRetainersAvailableForCurrentCharaSubscriber.InvokeFunc(); }
+        catch { return false; }
+    }
+
+    public bool AutoRetainerPluginStateGetMultiModeStatus()
+    {
+        try { return arPluginStateGetMultiModeStatusSubscriber.InvokeFunc(); }
+        catch { return false; }
+    }
+
+    public bool AutoRetainerPluginStateCanAutoLogin()
+    {
+        try { return arPluginStateCanAutoLoginSubscriber.InvokeFunc(); }
+        catch { return false; }
+    }
+
+    public bool AutoRetainerPluginStateGetOptionRetainerSense()
+    {
+        try { return arPluginStateGetOptionRetainerSenseSubscriber.InvokeFunc(); }
+        catch { return false; }
+    }
+
+    public bool AutoRetainerPluginStateIsItemProtected(uint itemId)
+    {
+        try { return arPluginStateIsItemProtectedSubscriber.InvokeFunc(itemId); }
+        catch { return false; }
+    }
+
+    public bool? AutoRetainerPluginStateAreAnyEnabledVesselsNotDeployed(ulong contentId)
+    {
+        try { return arPluginStateAreAnyEnabledVesselsNotDeployedSubscriber.InvokeFunc(contentId); }
+        catch { return null; }
+    }
+
+    public bool? AutoRetainerPluginStateAreAnyEnabledVesselsReady(ulong contentId)
+    {
+        try { return arPluginStateAreAnyEnabledVesselsReadySubscriber.InvokeFunc(contentId); }
+        catch { return null; }
     }
 
     public bool AutoRetainerSetMultiModeEnabled(bool enabled)

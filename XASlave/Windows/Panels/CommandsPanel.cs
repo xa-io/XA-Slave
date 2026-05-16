@@ -34,7 +34,7 @@ public partial class SlaveWindow
     private static readonly CommandReferenceEntry[] GameModsCommandEntries =
     {
         new("/xa chocobocutscene on|off", "Toggle `Skip Cutscenes` > `Skip Feeding Chocobo`.", "Only affects the companion-feeding cutscene surface."),
-        new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "Auto-confirms supported disconnect and stuck-logout lobby Dialogue popups."),
+        new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "When addon:Dialogue contains a supported lobby/networking marker, auto-confirms the popup for up to 10 seconds and closes NoKillPlugin's `No Kill Plugin Panel` during that same window."),
         new("/xa gamerestore", "Disable the current top-level Game Mods toggles.", "Turns off the current Game Mods section in one command."),
         new("/xa lockcombat on|off", "Toggle `Lock Game Window In Combat`.", "Locks the current game-window position while the local character is in combat."),
         new("/xa logincooldown on|off", "Toggle `Cancel Login Cooldown`.", "Clears the local temporary character-select cooldown."),

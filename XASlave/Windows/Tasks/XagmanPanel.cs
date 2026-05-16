@@ -57,6 +57,10 @@ public partial class SlaveWindow
     private bool xagmanOwnerStartRequested;
     private bool xagmanOwnerStandbyPending;
     private bool xagmanOwnerPauseForTonyRotationRequested;
+    private bool xagmanTonySellLocationActive;
+    private uint xagmanTonySellLocationTerritoryId;
+    private string xagmanTonySellLocationName = string.Empty;
+    private Vector3 xagmanTonySellLocationPosition;
     private readonly Dictionary<string, int> xagmanTradeQuantitySnapshot = new(StringComparer.OrdinalIgnoreCase);
     private readonly List<XagmanTradeRequestEntry> xagmanOwnerRequestedItems = new();
     private DateTime xagmanQueueRequestedAtUtc = DateTime.MinValue;
@@ -106,11 +110,52 @@ public partial class SlaveWindow
         (XagmanTradeFailureKind.TradeCanceled, "Trade canceled"),
         (XagmanTradeFailureKind.TradeNotComplete, "Trade not complete"),
     };
+    private const int XagmanTonySellGilLimit = 990_000_000;
+    private const float XagmanTonySellVendorStopDistance = 0f;
+    private const float XagmanTonySellVendorRandomRadius = 0.5f;
+    private const float XagmanTonySellOwnerPreApproachStopDistance = 2f;
+    private const float XagmanTonyCalledCoordinateStopDistance = 0.5f;
+    private const float XagmanTonyLivePositionRandomRadius = 0.5f;
+    private const float XagmanTonySellDestinationArrivalTolerance = 1.5f;
+    private const string XagmanTonySellGilCapText = "Unable to complete transaction. You cannot carry any more gil.";
+    private static readonly Vector4 XagmanTonySellSupportedLocationColor = new(0.4f, 1.0f, 0.4f, 1.0f);
+    // Territory IDs mirror AetheryteData.AetheryteToZoneIdFallback for the supported meet aetherytes.
+    private static readonly Dictionary<uint, XagmanTonySellDestination> xagmanTonySellDestinationsByTerritoryId = new()
+    {
+        [129] = new("Limsa Lominsa Lower Decks", "Limsa Lominsa Lower Decks", "Bango Zango", new Vector3(-63.306f, 18.000f, 7.785f)),
+        [134] = new("Summerford Farms", "Middle La Noscea", "Merchant & Mender", new Vector3(198.881f, 98.496f, -205.225f)),
+        [135] = new("Moraby Drydocks", "Lower La Noscea", "Merchant & Mender", new Vector3(198.738f, 14.096f, 676.284f)),
+        [132] = new("New Gridania", "New Gridania", "Maisenta", new Vector3(11.118f, 0.100f, 3.024f)),
+        [148] = new("Bentbranch Meadows", "Central Shroud", "Merchant & Mender", new Vector3(16.428f, -8.012f, -12.510f)),
+        [152] = new("The Hawthorne Hut", "East Shroud", "Merchant & Mender", new Vector3(-211.940f, 2.209f, 298.551f)),
+        [130] = new("Ul'dah - Steps of Nald", "Ul'dah - Steps of Nald", "Rianne", new Vector3(-70.080f, 4.612f, -109.449f)),
+        [140] = new("Horizon", "Western Thanalan", "Independent Armorfitter", new Vector3(53.286f, 45.143f, -231.799f)),
+        [141] = new("Black Brush Station", "Central Thanalan", "Merchant & Mender", new Vector3(-10.591f, -2.048f, -151.254f)),
+    };
+    private static readonly IReadOnlyList<string> xagmanTonySellSupportedLocationNames = xagmanTonySellDestinationsByTerritoryId
+        .Values
+        .Select(destination => destination.LocationName)
+        .ToList();
     private sealed class XagmanItemSearchEntry
     {
         public uint ItemId { get; init; }
         public string ItemName { get; init; } = string.Empty;
         public bool IsHq { get; init; }
+    }
+    private sealed class XagmanTonySellDestination
+    {
+        public XagmanTonySellDestination(string locationName, string zoneName, string npcName, Vector3 position)
+        {
+            LocationName = locationName;
+            ZoneName = zoneName;
+            NpcName = npcName;
+            Position = position;
+        }
+
+        public string LocationName { get; }
+        public string ZoneName { get; }
+        public string NpcName { get; }
+        public Vector3 Position { get; }
     }
     private sealed class XagmanItemListPackage
     {
@@ -267,6 +312,22 @@ public partial class SlaveWindow
             {
                 cfg.XagmanTonyGilMinimum = Math.Max(0, tonyGilMinimum);
                 cfg.Save();
+            }
+            var sellWhenInventoryFull = cfg.XagmanSellWhenInventoryFull;
+            if (ImGui.Checkbox("Sell When Inventory Is Full##xagmanSellWhenInventoryFull", ref sellWhenInventoryFull))
+            {
+                cfg.XagmanSellWhenInventoryFull = sellWhenInventoryFull;
+                cfg.Save();
+            }
+            ImGui.SameLine();
+            ImGui.TextDisabled("(?)");
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip(
+                    "When Tony's inventory fills, XA can path Tony to a supported vendor and run /ays itemsell before resuming Xagman.\n" +
+                    "Supported meet locations:\n" +
+                    GetXagmanTonySellSupportedLocationTooltipText() + "\n" +
+                    "If Tony is anywhere else, or Tony has 990,000,000 gil or more, XA uses the normal Tony full-inventory behavior: return home, relog the next Tony, or stop if no Tony remains.");
             }
             ImGui.Spacing();
             if (!string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld))
@@ -1536,6 +1597,15 @@ public partial class SlaveWindow
             return "-";
         return $"{GetXagmanPeerCurrentCharacterNumber(peer)}/{total}";
     }
+
+    private static string GetXagmanPeerLocationText(XagmanPeerPresence peer)
+    {
+        var territory = string.IsNullOrWhiteSpace(peer.TerritoryName) ? "-" : peer.TerritoryName;
+        if (!peer.LocalPositionAvailable)
+            return territory;
+        return $"{territory} @ {peer.LocalPositionX:0.000}, {peer.LocalPositionY:0.000}, {peer.LocalPositionZ:0.000}";
+    }
+
     private void DrawXagmanPeersTable()
     {
         var peers = plugin.XagmanPeers.Peers;
@@ -1604,7 +1674,7 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 ImGui.TextDisabled(peer.CurrentWorld);
                 ImGui.TableNextColumn();
-                ImGui.TextDisabled(peer.TerritoryName);
+                ImGui.TextDisabled(GetXagmanPeerLocationText(peer));
                 ImGui.TableNextColumn();
                 ImGui.TextDisabled(peer.QueueNumber > 0 ? peer.QueueNumber.ToString(CultureInfo.InvariantCulture) : "-");
                 ImGui.TableNextColumn();
@@ -2047,6 +2117,18 @@ public partial class SlaveWindow
         }
         ImGui.EndPopup();
     }
+
+    private static bool IsXagmanTonySellSupportedLocation(string locationName)
+    {
+        return !string.IsNullOrWhiteSpace(locationName)
+            && xagmanTonySellSupportedLocationNames.Any(supportedLocation => supportedLocation.Equals(locationName, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string GetXagmanTonySellSupportedLocationTooltipText()
+    {
+        return string.Join("\n", xagmanTonySellSupportedLocationNames.Select(locationName => $"- {locationName}"));
+    }
+
     private void DrawXagmanAetheryteSelector(Configuration cfg)
     {
         if (string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld))
@@ -2072,7 +2154,13 @@ public partial class SlaveWindow
             if (!string.IsNullOrWhiteSpace(xagmanAetheryteFilter)
                 && !aetheryte.Contains(xagmanAetheryteFilter, StringComparison.OrdinalIgnoreCase))
                 continue;
-            if (!ImGui.Selectable(aetheryte, string.Equals(cfg.XagmanTargetAetheryte, aetheryte, StringComparison.OrdinalIgnoreCase)))
+            var supportedVendorLocation = IsXagmanTonySellSupportedLocation(aetheryte);
+            if (supportedVendorLocation)
+                ImGui.PushStyleColor(ImGuiCol.Text, XagmanTonySellSupportedLocationColor);
+            var selected = ImGui.Selectable(aetheryte, string.Equals(cfg.XagmanTargetAetheryte, aetheryte, StringComparison.OrdinalIgnoreCase));
+            if (supportedVendorLocation)
+                ImGui.PopStyleColor();
+            if (!selected)
                 continue;
             cfg.XagmanTargetAetheryte = aetheryte;
             cfg.Save();
@@ -2860,6 +2948,7 @@ public partial class SlaveWindow
         xagmanPreferredTonyCharacter = entry.CharacterNameWorld;
         xagmanTonyMode = entry.Mode;
         xagmanTonyObservedOwnerWork = false;
+        ResetXagmanTonySellLocation();
         ResetXagmanTonyMeetRetryState();
         SetXagmanActiveMeetDestination(string.Empty, string.Empty);
         xagmanTonyAllOwnersCompletedObservedAtUtc = DateTime.MinValue;
@@ -2874,6 +2963,64 @@ public partial class SlaveWindow
     {
         xagmanTonyMeetRetryCount = 0;
         xagmanTonyLastMeetRetryUtc = DateTime.MinValue;
+    }
+
+    private void SetXagmanTonySellLocation(XagmanTonySellDestination destination, Vector3 fallbackPosition)
+    {
+        var local = Plugin.ObjectTable.LocalPlayer;
+        xagmanTonySellLocationActive = true;
+        xagmanTonySellLocationTerritoryId = Plugin.ClientState.TerritoryType;
+        xagmanTonySellLocationName = $"{destination.NpcName} at {destination.LocationName}";
+        xagmanTonySellLocationPosition = local == null ? fallbackPosition : local.Position;
+    }
+
+    private void ResetXagmanTonySellLocation()
+    {
+        xagmanTonySellLocationActive = false;
+        xagmanTonySellLocationTerritoryId = 0;
+        xagmanTonySellLocationName = string.Empty;
+        xagmanTonySellLocationPosition = Vector3.Zero;
+    }
+
+    private static bool IsValidXagmanPosition(Vector3 position)
+    {
+        return !float.IsNaN(position.X) && !float.IsNaN(position.Y) && !float.IsNaN(position.Z)
+            && !float.IsInfinity(position.X) && !float.IsInfinity(position.Y) && !float.IsInfinity(position.Z);
+    }
+
+    private static Vector3 RandomizeXagmanPosition(Vector3 position, float radius)
+    {
+        if (radius <= 0f)
+            return position;
+        var angle = Random.Shared.NextDouble() * Math.PI * 2.0;
+        var distance = Math.Sqrt(Random.Shared.NextDouble()) * radius;
+        return new Vector3(
+            position.X + (float)(Math.Cos(angle) * distance),
+            position.Y,
+            position.Z + (float)(Math.Sin(angle) * distance));
+    }
+
+    private static Vector3 RandomizeXagmanPositionDeterministic(Vector3 position, float radius, string seed)
+    {
+        if (radius <= 0f || string.IsNullOrWhiteSpace(seed))
+            return position;
+
+        unchecked
+        {
+            var hash = 2166136261u;
+            foreach (var ch in seed)
+            {
+                hash ^= char.ToUpperInvariant(ch);
+                hash *= 16777619u;
+            }
+
+            var angle = (hash & 0xFFFF) / 65535.0 * Math.PI * 2.0;
+            var distance = Math.Sqrt(((hash >> 16) & 0xFFFF) / 65535.0) * radius;
+            return new Vector3(
+                position.X + (float)(Math.Cos(angle) * distance),
+                position.Y,
+                position.Z + (float)(Math.Sin(angle) * distance));
+        }
     }
 
     private void RememberXagmanRecentFcReturn(string characterNameWorld)
@@ -3097,6 +3244,7 @@ public partial class SlaveWindow
         xagmanOwnerTotalCharacters = 0;
         xagmanTonyCompletedCharacters = 0;
         xagmanTonyTotalCharacters = 0;
+        ResetXagmanTonySellLocation();
         xagmanTradeQuantitySnapshot.Clear();
         xagmanOwnerRequestedItems.Clear();
         xagmanQueueRequestedAtUtc = DateTime.MinValue;
@@ -3609,7 +3757,7 @@ public partial class SlaveWindow
                         tooFarAwayRetryCount++;
                         tooFarAwayLastRetryUtc = DateTime.UtcNow;
                         TryTargetCharacter(partnerName);
-                        TryPathToCurrentTarget(ownerTradeStopDistance);
+                        TryPathToCurrentTarget(ownerTradeStopDistance, partnerName);
                         runner.AddLog($"Xagman: owner {charName} detected '{matchedText}' during {tradeContextLabel}; retargeting Tony and repathing ({tooFarAwayRetryCount}/{maxOwnerTradeRangeRetries}).");
                         xagmanStatusText = $"Owner {charName} is moving back into trade range with Tony {partnerName} ({tooFarAwayRetryCount}/{maxOwnerTradeRangeRetries}).";
                         return false;
@@ -3698,6 +3846,27 @@ public partial class SlaveWindow
                 EnterXagmanOwnerStandby(charName, logMessage);
 
                 return true;
+            }
+
+            void EnterOwnerTonyQueue(bool logQueueEntry, string? statusTextOverride = null)
+            {
+                if (xagmanQueueRequestedAtUtc == DateTime.MinValue)
+                    xagmanQueueRequestedAtUtc = DateTime.UtcNow;
+                xagmanPreferredTonyCharacter = string.Empty;
+                if (xagmanStatus is not (XagmanStatus.Called or XagmanStatus.Trading))
+                    xagmanStatus = resumingStandbyOwner ? XagmanStatus.Standby : XagmanStatus.WaitingRoom;
+                xagmanStatusText = !string.IsNullOrWhiteSpace(statusTextOverride)
+                    ? statusTextOverride
+                    : resumingStandbyOwner
+                        ? $"Owner {charName} is on standby for the next Tony."
+                        : $"Owner {charName} is in Tony's waiting room.";
+                if (logQueueEntry)
+                {
+                    runner.AddLog(resumingStandbyOwner
+                        ? $"Xagman: standby owner {charName} is waiting for the next Tony to resume them."
+                        : $"Xagman: waiting for the next Tony to call {charName}.");
+                }
+                PublishXagmanPresence();
             }
 
             bool PollOwnerTradeWait()
@@ -3864,11 +4033,20 @@ public partial class SlaveWindow
                             return;
                         xagmanStatus = XagmanStatus.Called;
                         xagmanStatusText = $"Approaching Tony for {charName}.";
+                        if (!EnsureXagmanOwnerTonyCoordinateApproach(charName, XagmanTonyCalledCoordinateStopDistance, true))
+                            return;
                         var partnerName = GetCharacterNameFromKey(xagmanActiveTradePartner);
                         TryTargetCharacter(partnerName);
-                        TryPathToCurrentTarget(ownerTradeStopDistance);
+                        TryPathToCurrentTarget(ownerTradeStopDistance, partnerName);
                     },
-                    IsComplete = () => relogFailed || ShouldSkipRepeatedTradeFlow() || IsCurrentTargetWithinStopDistanceAndStopped(GetCharacterNameFromKey(xagmanActiveTradePartner), ownerTradeStopDistance),
+                    IsComplete = () =>
+                    {
+                        if (relogFailed || ShouldSkipRepeatedTradeFlow())
+                            return true;
+                        if (!EnsureXagmanOwnerTonyCoordinateApproach(charName, XagmanTonyCalledCoordinateStopDistance, false))
+                            return false;
+                        return IsCurrentTargetWithinStopDistanceAndStopped(GetCharacterNameFromKey(xagmanActiveTradePartner), ownerTradeStopDistance);
+                    },
                     TimeoutSec = 60f,
                     OnTimeout = () =>
                     {
@@ -4181,16 +4359,20 @@ public partial class SlaveWindow
                     if (relogFailed)
                         return;
                     var partnerName = GetCharacterNameFromKey(GetXagmanOwnerQueueTonyCharacter());
-                    xagmanStatus = string.IsNullOrWhiteSpace(partnerName)
-                        ? XagmanStatus.Paused
-                        : XagmanStatus.Traveling;
-                    xagmanStatusText = string.IsNullOrWhiteSpace(partnerName)
-                        ? $"Owner {charName} is waiting for Tony to become available at the meet spot."
-                        : $"Approaching Tony {partnerName} for {charName}.";
+                    EnterOwnerTonyQueue(
+                        false,
+                        string.IsNullOrWhiteSpace(partnerName)
+                            ? $"Owner {charName} is waiting for Tony to become available at the meet spot."
+                            : $"Owner {charName} is queued and moving into position near Tony {partnerName}.");
                     if (string.IsNullOrWhiteSpace(partnerName))
                         return;
+                    if (TryGetXagmanOwnerTonyApproachPosition(charName, out _, out _))
+                    {
+                        EnsureXagmanOwnerTonyCoordinateApproach(charName, XagmanTonySellOwnerPreApproachStopDistance, true);
+                        return;
+                    }
                     TryTargetCharacter(partnerName);
-                    TryPathToCurrentTarget(ownerTradeStopDistance);
+                    TryPathToCurrentTarget(ownerTradeStopDistance, partnerName);
                 },
                 IsComplete = () =>
                 {
@@ -4201,10 +4383,13 @@ public partial class SlaveWindow
                     var queueTony = GetXagmanOwnerQueueTonyCharacter();
                     if (string.IsNullOrWhiteSpace(queueTony))
                     {
-                        xagmanStatus = XagmanStatus.Paused;
-                        xagmanStatusText = $"Owner {charName} is waiting for Tony to become available at the meet spot.";
+                        EnterOwnerTonyQueue(false, $"Owner {charName} is waiting for Tony to become available at the meet spot.");
                         return false;
                     }
+                    if (IsXagmanOwnerCalled(charName))
+                        return true;
+                    if (TryGetXagmanOwnerTonyApproachPosition(charName, out _, out _))
+                        return EnsureXagmanOwnerTonyCoordinateApproach(charName, XagmanTonySellOwnerPreApproachStopDistance, false);
                     return IsCurrentTargetWithinStopDistanceAndStopped(GetCharacterNameFromKey(queueTony), ownerTradeStopDistance);
                 },
                 TimeoutSec = 600f,
@@ -4228,17 +4413,7 @@ public partial class SlaveWindow
                 {
                     if (relogFailed)
                         return;
-                    if (xagmanQueueRequestedAtUtc == DateTime.MinValue)
-                        xagmanQueueRequestedAtUtc = DateTime.UtcNow;
-                    xagmanPreferredTonyCharacter = string.Empty;
-                    xagmanStatus = resumingStandbyOwner ? XagmanStatus.Standby : XagmanStatus.WaitingRoom;
-                    xagmanStatusText = resumingStandbyOwner
-                        ? $"Owner {charName} is on standby for the next Tony."
-                        : $"Owner {charName} is in Tony's waiting room.";
-                    runner.AddLog(resumingStandbyOwner
-                        ? $"Xagman: standby owner {charName} is waiting for the next Tony to resume them."
-                        : $"Xagman: waiting for the next Tony to call {charName}.");
-                    PublishXagmanPresence();
+                    EnterOwnerTonyQueue(true);
                 },
                 IsComplete = () => relogFailed || IsXagmanOwnerCalled(charName),
                 TimeoutSec = 3600f,
@@ -4275,11 +4450,20 @@ public partial class SlaveWindow
                         return;
                     xagmanStatus = XagmanStatus.Called;
                     xagmanStatusText = $"Approaching Tony for {charName}.";
+                    if (!EnsureXagmanOwnerTonyCoordinateApproach(charName, XagmanTonyCalledCoordinateStopDistance, true))
+                        return;
                     var partnerName = GetCharacterNameFromKey(xagmanActiveTradePartner);
                     TryTargetCharacter(partnerName);
-                    TryPathToCurrentTarget(ownerTradeStopDistance);
+                    TryPathToCurrentTarget(ownerTradeStopDistance, partnerName);
                 },
-                IsComplete = () => relogFailed || ShouldSkipTradeFlow() || IsCurrentTargetWithinStopDistanceAndStopped(GetCharacterNameFromKey(xagmanActiveTradePartner), ownerTradeStopDistance),
+                IsComplete = () =>
+                {
+                    if (relogFailed || ShouldSkipTradeFlow())
+                        return true;
+                    if (!EnsureXagmanOwnerTonyCoordinateApproach(charName, XagmanTonyCalledCoordinateStopDistance, false))
+                        return false;
+                    return IsCurrentTargetWithinStopDistanceAndStopped(GetCharacterNameFromKey(xagmanActiveTradePartner), ownerTradeStopDistance);
+                },
                 TimeoutSec = 60f,
                 OnTimeout = () =>
                 {
@@ -5779,6 +5963,7 @@ public partial class SlaveWindow
         xagmanActiveTradePartner = string.Empty;
         xagmanActiveTradePartnerInstanceId = string.Empty;
         xagmanObservedDropboxBusy = false;
+        ResetXagmanTonySellLocation();
         TrySetXagmanDropboxAutoAccept(false);
         StartXagmanTonyStartup(nextEntry, true);
     }
@@ -5895,9 +6080,137 @@ public partial class SlaveWindow
             .FirstOrDefault();
     }
 
+    private XagmanPeerPresence? GetXagmanTonySellLocationPeerForOwner()
+    {
+        var territoryId = Plugin.ClientState.TerritoryType;
+        if (territoryId == 0)
+            return null;
+
+        var lockedTony = GetXagmanLockedTonyCharacter();
+        var livePreferredTony = xagmanPreferredTonyCharacter;
+        return plugin.XagmanPeers.Peers
+            .Where(peer => peer.XagmanEnabled)
+            .Where(peer => peer.Role == XagmanRole.Tony)
+            .Where(peer => IsXagmanPeerFresh(peer))
+            .Where(peer => peer.Status is XagmanStatus.AtMeetSpot or XagmanStatus.Called or XagmanStatus.Trading)
+            .Where(peer => !string.IsNullOrWhiteSpace(peer.ActiveCharacter))
+            .Where(peer => peer.TonySellLocationActive)
+            .Where(peer => peer.TonySellLocationTerritoryId == territoryId)
+            .Where(peer => !float.IsNaN(peer.TonySellLocationX) && !float.IsNaN(peer.TonySellLocationY) && !float.IsNaN(peer.TonySellLocationZ))
+            .Where(peer => !float.IsInfinity(peer.TonySellLocationX) && !float.IsInfinity(peer.TonySellLocationY) && !float.IsInfinity(peer.TonySellLocationZ))
+            .OrderByDescending(peer => !string.IsNullOrWhiteSpace(lockedTony)
+                && peer.ActiveCharacter.Equals(lockedTony, StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(peer => !string.IsNullOrWhiteSpace(livePreferredTony)
+                && peer.ActiveCharacter.Equals(livePreferredTony, StringComparison.OrdinalIgnoreCase))
+            .ThenByDescending(peer => peer.LastSeenUtc)
+            .ThenBy(peer => peer.ActiveCharacter, StringComparer.OrdinalIgnoreCase)
+            .ThenBy(peer => peer.ProcessId)
+            .FirstOrDefault();
+    }
+
     private string GetXagmanOwnerQueueTonyCharacter()
     {
-        return GetXagmanUsableMeetTonyPeerForOwner()?.ActiveCharacter ?? string.Empty;
+        return (GetXagmanUsableMeetTonyPeerForOwner() ?? GetXagmanTonySellLocationPeerForOwner())?.ActiveCharacter ?? string.Empty;
+    }
+
+    private bool TryGetXagmanOwnerTonyApproachPosition(string ownerCharacter, out Vector3 position, out string locationLabel)
+    {
+        position = Vector3.Zero;
+        locationLabel = string.Empty;
+        var tonyPeer = GetXagmanTonySellLocationPeerForOwner() ?? GetXagmanUsableMeetTonyPeerForOwner() ?? GetXagmanMeetTonyPeerForOwner();
+        if (tonyPeer == null)
+        {
+            return false;
+        }
+
+        var seed = $"{ownerCharacter}|{plugin.InstanceId}|{tonyPeer.InstanceId}|{tonyPeer.ActiveCharacter}|{xagmanQueueRequestedAtUtc.Ticks.ToString(CultureInfo.InvariantCulture)}";
+        if (tonyPeer.LocalPositionAvailable
+            && tonyPeer.TerritoryId != 0
+            && tonyPeer.TerritoryId == Plugin.ClientState.TerritoryType)
+        {
+            var livePosition = new Vector3(tonyPeer.LocalPositionX, tonyPeer.LocalPositionY, tonyPeer.LocalPositionZ);
+            if (IsValidXagmanPosition(livePosition))
+            {
+                position = RandomizeXagmanPositionDeterministic(livePosition, XagmanTonyLivePositionRandomRadius, seed);
+                locationLabel = string.IsNullOrWhiteSpace(tonyPeer.ActiveCharacter)
+                    ? "Tony's live position"
+                    : $"Tony {tonyPeer.ActiveCharacter} live position";
+                return true;
+            }
+        }
+
+        if (!tonyPeer.TonySellLocationActive
+            || tonyPeer.TonySellLocationTerritoryId == 0
+            || tonyPeer.TonySellLocationTerritoryId != Plugin.ClientState.TerritoryType)
+        {
+            return false;
+        }
+
+        var sellPosition = new Vector3(
+            tonyPeer.TonySellLocationX,
+            tonyPeer.TonySellLocationY,
+            tonyPeer.TonySellLocationZ);
+        if (!IsValidXagmanPosition(sellPosition))
+            return false;
+
+        position = RandomizeXagmanPositionDeterministic(sellPosition, XagmanTonyLivePositionRandomRadius, seed + "|sell");
+        locationLabel = string.IsNullOrWhiteSpace(tonyPeer.TonySellLocationName)
+            ? "Tony's last item-sell position"
+            : $"{tonyPeer.TonySellLocationName} near Tony's last item-sell position";
+        return true;
+    }
+
+    private bool EnsureXagmanOwnerTonyCoordinateApproach(string ownerCharacter, float stopDistance, bool logPathStart)
+    {
+        if (!TryGetXagmanOwnerTonyApproachPosition(ownerCharacter, out var position, out var locationLabel))
+            return true;
+
+        var local = Plugin.ObjectTable.LocalPlayer;
+        if (local == null)
+            return false;
+
+        if (Vector3.Distance(local.Position, position) <= stopDistance)
+        {
+            if (IsXagmanMovementActive())
+            {
+                plugin.IpcClient.VnavStop();
+                return false;
+            }
+
+            return true;
+        }
+
+        if (xagmanActiveRole == XagmanRole.FranchiseOwner && xagmanQueueRequestedAtUtc > DateTime.MinValue)
+        {
+            if (xagmanStatus is not (XagmanStatus.Standby or XagmanStatus.WaitingRoom or XagmanStatus.Queued or XagmanStatus.ReadyForQueue or XagmanStatus.Called or XagmanStatus.Trading))
+                xagmanStatus = XagmanStatus.Standby;
+        }
+        else
+        {
+            xagmanStatus = XagmanStatus.Traveling;
+        }
+        xagmanStatusText = $"Owner {ownerCharacter} is moving near {locationLabel}.";
+        if (!plugin.IpcClient.VnavIsReady())
+            return false;
+
+        if (!IsXagmanMovementActive())
+        {
+            if (plugin.IpcClient.VnavPathfindAndMoveCloseTo(position, false, stopDistance))
+            {
+                if (logPathStart)
+                {
+                    plugin.TaskRunner.AddLog(
+                        $"Xagman: owner {ownerCharacter} is pathing near {locationLabel} at randomized coords {FormatXagmanTonySellPosition(position)} with vnav stop distance {stopDistance:0.###} before targeting Tony.");
+                    PublishXagmanPresence();
+                }
+            }
+            else if (logPathStart)
+            {
+                plugin.TaskRunner.AddLog($"Xagman: vnavmesh did not accept the owner pre-approach path near {locationLabel}.");
+            }
+        }
+
+        return false;
     }
 
     private bool TryBindXagmanFranchiseTonyForMeetup()
@@ -6023,6 +6336,7 @@ public partial class SlaveWindow
         plugin.Configuration.ReloggerCharacterInfo.TryGetValue(activeKey, out var info);
         var currentWorld = local == null ? string.Empty : WorldData.GetById(local.CurrentWorld.RowId)?.Name ?? string.Empty;
         var homeWorld = local == null ? string.Empty : WorldData.GetById(local.HomeWorld.RowId)?.Name ?? string.Empty;
+        var localPositionAvailable = Plugin.PlayerState.IsLoaded && local != null && IsValidXagmanPosition(local.Position);
         var role = xagmanRunning ? xagmanActiveRole : plugin.Configuration.XagmanRole;
         var preferredTony = role == XagmanRole.FranchiseOwner && !IsXagmanOwnerTonyLocked()
             ? string.Empty
@@ -6063,6 +6377,10 @@ public partial class SlaveWindow
                 _ => 0,
             }
             : 0;
+        var publishTonySellLocation = xagmanRunning
+            && role == XagmanRole.Tony
+            && xagmanTonySellLocationActive
+            && xagmanTonySellLocationTerritoryId != 0;
 
         try
         {
@@ -6078,6 +6396,10 @@ public partial class SlaveWindow
                 CurrentWorld = currentWorld,
                 TerritoryId = Plugin.ClientState.TerritoryType,
                 TerritoryName = GetCurrentLocationName(),
+                LocalPositionAvailable = localPositionAvailable,
+                LocalPositionX = localPositionAvailable ? local!.Position.X : 0f,
+                LocalPositionY = localPositionAvailable ? local!.Position.Y : 0f,
+                LocalPositionZ = localPositionAvailable ? local!.Position.Z : 0f,
                 XagmanEnabled = xagmanRunning || role == XagmanRole.FranchiseOwner,
                 Role = role,
                 TonyMode = xagmanTonyMode,
@@ -6102,6 +6424,12 @@ public partial class SlaveWindow
                 MainInventoryFreeSlots = GetXagmanCharacterMainInventoryFreeSlots(activeKey),
                 Gil = GetXagmanCharacterGil(activeKey),
                 TonyGilMinimum = GetXagmanTonyGilMinimum(),
+                TonySellLocationActive = publishTonySellLocation,
+                TonySellLocationTerritoryId = publishTonySellLocation ? xagmanTonySellLocationTerritoryId : 0,
+                TonySellLocationName = publishTonySellLocation ? xagmanTonySellLocationName : string.Empty,
+                TonySellLocationX = publishTonySellLocation ? xagmanTonySellLocationPosition.X : 0f,
+                TonySellLocationY = publishTonySellLocation ? xagmanTonySellLocationPosition.Y : 0f,
+                TonySellLocationZ = publishTonySellLocation ? xagmanTonySellLocationPosition.Z : 0f,
                 ItemIds = items.Select(item => item.ItemId).Distinct().ToList(),
                 RequestedItems = requestedItems,
             });
@@ -6139,6 +6467,7 @@ public partial class SlaveWindow
             XagmanStatus.Standby => 0,
             XagmanStatus.WaitingRoom => 1,
             XagmanStatus.Queued => 1,
+            XagmanStatus.Paused => 1,
             XagmanStatus.ReadyForQueue => 2,
             _ => 10,
         };
@@ -6153,6 +6482,7 @@ public partial class SlaveWindow
             XagmanStatus.Standby => 0,
             XagmanStatus.WaitingRoom => 1,
             XagmanStatus.Queued => 1,
+            XagmanStatus.Paused => 1,
             XagmanStatus.ReadyForQueue => 2,
             _ => 10,
         };
@@ -6168,7 +6498,7 @@ public partial class SlaveWindow
              .Where(peer => string.IsNullOrWhiteSpace(tonyCharacter)
                  || string.IsNullOrWhiteSpace(peer.PreferredTonyCharacter)
                  || peer.PreferredTonyCharacter.Equals(tonyCharacter, StringComparison.OrdinalIgnoreCase))
-             .Where(peer => peer.Status is XagmanStatus.ReadyForQueue or XagmanStatus.WaitingRoom or XagmanStatus.Queued or XagmanStatus.Standby)
+             .Where(peer => peer.Status is XagmanStatus.ReadyForQueue or XagmanStatus.WaitingRoom or XagmanStatus.Queued or XagmanStatus.Standby or XagmanStatus.Paused)
              .OrderBy(peer => GetXagmanQueuePriority(peer.Status))
              .ThenBy(peer => peer.QueueRequestedAtUtc)
              .ThenBy(peer => peer.ActiveCharacter, StringComparer.OrdinalIgnoreCase)
@@ -6186,7 +6516,7 @@ public partial class SlaveWindow
                  || string.IsNullOrWhiteSpace(peer.PreferredTonyCharacter)
                  || peer.PreferredTonyCharacter.Equals(tonyCharacter, StringComparison.OrdinalIgnoreCase))
              .Where(peer => IsXagmanPeerFresh(peer))
-             .Where(peer => peer.Status is XagmanStatus.Standby or XagmanStatus.WaitingRoom or XagmanStatus.Queued or XagmanStatus.ReadyForQueue or XagmanStatus.Called or XagmanStatus.Trading)
+             .Where(peer => peer.Status is XagmanStatus.Standby or XagmanStatus.WaitingRoom or XagmanStatus.Queued or XagmanStatus.ReadyForQueue or XagmanStatus.Paused or XagmanStatus.Called or XagmanStatus.Trading)
              .OrderBy(peer => GetXagmanTradeTurnPriority(peer.Status))
              .ThenBy(peer => peer.QueueRequestedAtUtc)
              .ThenBy(peer => peer.ActiveCharacter, StringComparer.OrdinalIgnoreCase)
@@ -6227,7 +6557,7 @@ public partial class SlaveWindow
      {
          if (!xagmanRunning || xagmanActiveRole != XagmanRole.FranchiseOwner || xagmanQueueRequestedAtUtc == DateTime.MinValue)
              return 0;
-         if (xagmanStatus is not (XagmanStatus.Standby or XagmanStatus.WaitingRoom or XagmanStatus.Queued or XagmanStatus.ReadyForQueue))
+         if (xagmanStatus is not (XagmanStatus.Standby or XagmanStatus.WaitingRoom or XagmanStatus.Queued or XagmanStatus.ReadyForQueue or XagmanStatus.Paused))
              return 0;
          var tonyCharacter = xagmanPreferredTonyCharacter;
          var peers = GetXagmanQueueForTony(tonyCharacter)
@@ -6431,6 +6761,31 @@ public partial class SlaveWindow
         var firstMatch = GetXagmanTradeFailureMatches(AddonHelper.GetAddonTextEntries(addonName)).FirstOrDefault();
         matchedText = firstMatch.Text ?? string.Empty;
         return firstMatch.Kind;
+    }
+
+     private static bool TryGetXagmanTonySellGilCapTextError(out string matchedText)
+    {
+        matchedText = string.Empty;
+        if (!AddonHelper.IsAddonVisible(AddonHelper.TextErrorAddonName))
+            return false;
+
+        matchedText = AddonHelper.GetAddonTextEntries(AddonHelper.TextErrorAddonName)
+            .FirstOrDefault(text => !string.IsNullOrWhiteSpace(text)
+                && text.Contains(XagmanTonySellGilCapText, StringComparison.OrdinalIgnoreCase)) ?? string.Empty;
+        return !string.IsNullOrWhiteSpace(matchedText);
+    }
+
+     private static bool TryCloseXagmanShopAddonAfterTonySellGilCap()
+    {
+        const string shopAddonName = "Shop";
+        if (!AddonHelper.IsAddonVisible(shopAddonName))
+            return false;
+
+        if (AddonHelper.FireCallbackAndClose(shopAddonName, -1))
+            return true;
+
+        AddonHelper.CloseAddon(shopAddonName);
+        return !AddonHelper.IsAddonVisible(shopAddonName);
     }
 
      private static string GetXagmanOwnerStandbyRotationRequestKey(XagmanPeerPresence ownerPeer)
@@ -7303,6 +7658,338 @@ public partial class SlaveWindow
         PublishXagmanPresence();
     }
 
+     private bool TryGetXagmanTonySellDestination(out XagmanTonySellDestination destination)
+    {
+        var territoryId = Plugin.ClientState.TerritoryType;
+        if (xagmanTonySellDestinationsByTerritoryId.TryGetValue(territoryId, out var foundDestination))
+        {
+            destination = foundDestination;
+            return true;
+        }
+
+        destination = null!;
+        return false;
+    }
+
+     private static string FormatXagmanTonySellPosition(Vector3 position)
+    {
+        return $"{position.X:0.000}, {position.Y:0.000}, {position.Z:0.000}";
+    }
+
+     private bool IsXagmanLocalPlayerNearPosition(Vector3 position, float maxDistance)
+    {
+        var local = Plugin.ObjectTable.LocalPlayer;
+        if (local == null)
+            return false;
+        return Vector3.Distance(local.Position, position) <= maxDistance;
+    }
+
+     private bool TryStartXagmanTonySellWhenInventoryFull(string activePartner)
+    {
+        if (!plugin.Configuration.XagmanSellWhenInventoryFull)
+            return false;
+
+        var activeTony = xagmanActiveCharacter;
+        var currentGil = GetXagmanLiveLocalItemQuantity(1, false);
+        if (currentGil >= XagmanTonySellGilLimit)
+        {
+            plugin.TaskRunner.AddLog($"Xagman: Tony {activeTony} has {currentGil.ToString("N0", CultureInfo.InvariantCulture)} gil, so Sell When Inventory Is Full is skipping item selling and using normal Tony rotation to avoid the 999,999,999 gil cap.");
+            return false;
+        }
+
+        if (!TryGetXagmanTonySellDestination(out var destination))
+        {
+            var territoryId = Plugin.ClientState.TerritoryType;
+            var territoryName = GetCurrentLocationName();
+            plugin.TaskRunner.AddLog($"Xagman: Sell When Inventory Is Full is enabled, but territory {territoryId.ToString(CultureInfo.InvariantCulture)} ({territoryName}) is not supported; using normal Tony full-inventory behavior.");
+            return false;
+        }
+
+        if (!plugin.IpcClient.IsAutoRetainerAvailable())
+        {
+            plugin.TaskRunner.AddLog("Xagman: Sell When Inventory Is Full is enabled, but AutoRetainer IPC is not available; using normal Tony full-inventory behavior.");
+            return false;
+        }
+
+        if (!plugin.IpcClient.VnavIsReady())
+        {
+            plugin.TaskRunner.AddLog("Xagman: Sell When Inventory Is Full is enabled, but vnavmesh is not ready; using normal Tony full-inventory behavior.");
+            return false;
+        }
+
+        StartXagmanTonySellWhenInventoryFullTask(destination, activePartner, currentGil);
+        return true;
+    }
+
+     private void StartXagmanTonySellWhenInventoryFullTask(XagmanTonySellDestination destination, string activePartner, int currentGil)
+    {
+        var runner = plugin.TaskRunner;
+        var activeTony = xagmanActiveCharacter;
+        var sellFailed = false;
+        var sellSucceeded = false;
+        var pathStarted = false;
+        var arBusyObserved = false;
+        var nextArBusyPollUtc = DateTime.MinValue;
+        var destinationLabel = $"{destination.NpcName} at {destination.LocationName}";
+        var randomizedDestinationPosition = RandomizeXagmanPosition(destination.Position, XagmanTonySellVendorRandomRadius);
+        var sellFallbackReason = $"Xagman: Tony {activeTony} item-sell cleanup did not complete; using normal Tony full-inventory behavior.";
+
+        void MarkSellFailed(string message, string? fallbackReasonOverride = null)
+        {
+            if (sellFailed)
+                return;
+            sellFailed = true;
+            if (!string.IsNullOrWhiteSpace(fallbackReasonOverride))
+                sellFallbackReason = fallbackReasonOverride;
+            runner.AddLog(message);
+            xagmanStatus = XagmanStatus.Error;
+            xagmanStatusText = $"Tony {activeTony} item-sell cleanup failed; falling back to normal full-inventory handling.";
+        }
+
+        bool ShouldSkipSellStep() => sellFailed || !xagmanRunning || xagmanActiveRole != XagmanRole.Tony;
+
+        bool TryAbortSellForGilCap()
+        {
+            if (!TryGetXagmanTonySellGilCapTextError(out var matchedText))
+                return false;
+
+            var shopClosed = TryCloseXagmanShopAddonAfterTonySellGilCap();
+            MarkSellFailed(
+                shopClosed
+                    ? $"Xagman: Tony {activeTony} hit the gil cap while item selling ('{matchedText}'); fired callback Shop true -1 and is using normal Tony full-inventory behavior."
+                    : $"Xagman: Tony {activeTony} hit the gil cap while item selling ('{matchedText}'); attempted callback Shop true -1, but Shop was not visible or did not confirm closed. Using normal Tony full-inventory behavior.",
+                $"Xagman: Tony {activeTony} hit the gil cap while item selling; using normal Tony full-inventory behavior.");
+            return true;
+        }
+
+        var steps = new List<TaskStep>
+        {
+            new()
+            {
+                Name = $"Xagman Tony Sell Setup: {activeTony}",
+                OnEnter = () =>
+                {
+                    TrySetXagmanDropboxAutoAccept(false);
+                    ClearXagmanDropbox();
+                    ClearXagmanFocusTarget();
+                    xagmanStatus = XagmanStatus.Paused;
+                    xagmanStatusText = $"Tony {activeTony} is pausing to sell full-inventory items.";
+                    runner.AddLog($"Xagman: Tony {activeTony} inventory is full; Sell When Inventory Is Full is routing to randomized coords {FormatXagmanTonySellPosition(randomizedDestinationPosition)} within {XagmanTonySellVendorRandomRadius:0.###}y of {destinationLabel} ({destination.ZoneName}) with vnav stop distance {XagmanTonySellVendorStopDistance:0.###}.");
+                    runner.AddLog($"Xagman: Tony {activeTony} gil before selling is {currentGil.ToString("N0", CultureInfo.InvariantCulture)}; selling is disabled at {XagmanTonySellGilLimit.ToString("N0", CultureInfo.InvariantCulture)} or above.");
+                    PublishXagmanPresence();
+                },
+                IsComplete = () => true,
+                TimeoutSec = 1f,
+            },
+            new()
+            {
+                Name = $"Xagman Tony Sell Path: {destinationLabel}",
+                ShouldSkip = ShouldSkipSellStep,
+                OnEnter = () =>
+                {
+                    xagmanStatus = XagmanStatus.Traveling;
+                    xagmanStatusText = $"Tony {activeTony} is pathing to {destinationLabel}.";
+                    pathStarted = false;
+                    if (!plugin.IpcClient.VnavPathfindAndMoveCloseTo(randomizedDestinationPosition, false, XagmanTonySellVendorStopDistance))
+                        MarkSellFailed($"Xagman: vnavmesh did not accept the item-sell path to {destinationLabel}.");
+                },
+                IsComplete = () => true,
+                TimeoutSec = 2f,
+            },
+            new()
+            {
+                Name = $"Xagman Tony Sell Path Start: {destinationLabel}",
+                ShouldSkip = ShouldSkipSellStep,
+                IsComplete = () =>
+                {
+                    if (IsXagmanMovementActive())
+                    {
+                        pathStarted = true;
+                        return true;
+                    }
+                    if (IsXagmanLocalPlayerNearPosition(randomizedDestinationPosition, XagmanTonySellDestinationArrivalTolerance))
+                    {
+                        pathStarted = true;
+                        return true;
+                    }
+                    return false;
+                },
+                TimeoutSec = 15f,
+                OnTimeout = () => MarkSellFailed($"Xagman: vnavmesh did not start moving Tony {activeTony} toward {destinationLabel}."),
+            },
+            new()
+            {
+                Name = $"Xagman Tony Sell Arrive: {destinationLabel}",
+                ShouldSkip = ShouldSkipSellStep,
+                IsComplete = () =>
+                {
+                    if (!pathStarted)
+                        return false;
+                    if (IsXagmanMovementActive())
+                        return false;
+                    if (!IsXagmanLocalPlayerNearPosition(randomizedDestinationPosition, XagmanTonySellDestinationArrivalTolerance))
+                    {
+                        MarkSellFailed($"Xagman: Tony {activeTony} stopped before reaching {destinationLabel}; /ays itemsell was not sent.");
+                        return true;
+                    }
+                    return true;
+                },
+                TimeoutSec = 300f,
+                OnTimeout = () => MarkSellFailed($"Xagman: timed out waiting for Tony {activeTony} to finish pathing to {destinationLabel}."),
+            },
+            MonthlyReloggerTask.MakeDelay($"Xagman Tony Sell Settle: {activeTony}", 0.25f, ShouldSkipSellStep),
+            new()
+            {
+                Name = $"Xagman Tony Sell Command: {activeTony}",
+                ShouldSkip = ShouldSkipSellStep,
+                OnEnter = () =>
+                {
+                    xagmanStatus = XagmanStatus.Paused;
+                    xagmanStatusText = $"Tony {activeTony} is running /ays itemsell.";
+                    runner.AddLog($"Xagman: Tony {activeTony} reached {destinationLabel}; sending /ays itemsell.");
+                    ChatHelper.SendMessage("/ays itemsell");
+                    arBusyObserved = false;
+                    nextArBusyPollUtc = DateTime.UtcNow.AddSeconds(1);
+                },
+                IsComplete = () => true,
+                TimeoutSec = 1f,
+            },
+            new()
+            {
+                Name = $"Xagman Tony Sell Wait AutoRetainer: {activeTony}",
+                ShouldSkip = ShouldSkipSellStep,
+                OnEnter = () =>
+                {
+                    xagmanStatus = XagmanStatus.Paused;
+                    xagmanStatusText = $"Tony {activeTony} is waiting for AutoRetainer item selling.";
+                },
+                IsComplete = () =>
+                {
+                    if (DateTime.UtcNow < nextArBusyPollUtc)
+                        return false;
+
+                    var busy = plugin.IpcClient.AutoRetainerPluginStateIsBusy();
+                    nextArBusyPollUtc = DateTime.UtcNow.AddSeconds(1);
+                    if (busy)
+                    {
+                        arBusyObserved = true;
+                        if (TryAbortSellForGilCap())
+                            return true;
+                        return false;
+                    }
+
+                    if (TryAbortSellForGilCap())
+                        return true;
+
+                    if (arBusyObserved)
+                        runner.AddLog($"Xagman: AutoRetainer item selling finished for Tony {activeTony}.");
+                    else
+                        runner.AddLog($"Xagman: AutoRetainer did not report busy after /ays itemsell for Tony {activeTony}; continuing to CharacterSafeWait.");
+                    return true;
+                },
+                TimeoutSec = 900f,
+                OnTimeout = () => MarkSellFailed($"Xagman: timed out waiting for AutoRetainer item selling to finish for Tony {activeTony}."),
+            },
+        };
+
+        foreach (var safeWait in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"Xagman Tony ItemSell SafeWait: {activeTony}", 30f))
+        {
+            var originalComplete = safeWait.IsComplete;
+            steps.Add(new TaskStep
+            {
+                Name = safeWait.Name,
+                ShouldSkip = ShouldSkipSellStep,
+                OnEnter = safeWait.OnEnter,
+                IsComplete = () => ShouldSkipSellStep() || originalComplete(),
+                TimeoutSec = safeWait.TimeoutSec,
+                MaxRetries = safeWait.MaxRetries,
+                OnTimeout = () => MarkSellFailed($"Xagman: CharacterSafeWait timed out after item selling for Tony {activeTony}."),
+            });
+        }
+
+        steps.Add(new TaskStep
+        {
+            Name = $"Xagman Tony Sell Resume: {activeTony}",
+            ShouldSkip = ShouldSkipSellStep,
+            OnEnter = () =>
+            {
+                sellSucceeded = true;
+                SetXagmanTonySellLocation(destination, randomizedDestinationPosition);
+                xagmanStatus = XagmanStatus.AtMeetSpot;
+                xagmanStatusText = $"Tony {activeTony} sold full-inventory items and is ready for the next owner.";
+                xagmanLastTonyActionAtUtc = DateTime.UtcNow;
+                runner.AddLog($"Xagman: Tony {activeTony} finished item selling at {destinationLabel} and is resuming Xagman operations from that location.");
+                PublishXagmanPresence();
+                StartAllXagmanPeers();
+            },
+            IsComplete = () => true,
+            TimeoutSec = 1f,
+        });
+
+        runner.Start(
+            "Xagman",
+            steps,
+            onFinished: () =>
+            {
+                if (sellSucceeded)
+                {
+                    UpdateXagmanTonyTaskRunnerProgress();
+                    return;
+                }
+
+                ScheduleXagmanTonyFullInventoryFallback(activePartner, sellFallbackReason);
+            },
+            onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"),
+            suppressCompletionReport: true);
+    }
+
+     private void ScheduleXagmanTonyFullInventoryFallback(string activePartner, string fallbackReason)
+    {
+        _ = System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                await System.Threading.Tasks.Task.Delay(100).ConfigureAwait(false);
+                await Plugin.Framework.Run(() =>
+                {
+                    if (!xagmanRunning || xagmanActiveRole != XagmanRole.Tony || plugin.TaskRunner.IsRunning)
+                        return;
+                    StartXagmanTonyFullInventoryFallback(activePartner, fallbackReason);
+                }).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Error(ex, "[Xagman] Failed to schedule Tony full-inventory fallback after item selling.");
+            }
+        });
+    }
+
+     private void StartXagmanTonyFullInventoryFallback(string activePartner, string? fallbackReason = null)
+    {
+        ResetXagmanTonySellLocation();
+        if (!string.IsNullOrWhiteSpace(fallbackReason))
+            plugin.TaskRunner.AddLog(fallbackReason);
+
+        var hasAlternateTony = xagmanTonyRunList.Any(key => !key.Equals(xagmanActiveCharacter, StringComparison.OrdinalIgnoreCase));
+        if (!hasAlternateTony)
+        {
+            plugin.TaskRunner.AddLog(string.IsNullOrWhiteSpace(activePartner)
+                ? $"Xagman: Tony {xagmanActiveCharacter} has no alternate Tony remaining after a standby rotation request; finalizing with warning summary."
+                : $"Xagman: owner {activePartner} requested Tony rotation after trade failure, but Tony {xagmanActiveCharacter} has no alternate Tony remaining; finalizing with warning summary.");
+            StartXagmanTonyCompletionTask(string.Empty, autoDetectedNoRemainingOwners: false, completedWithWarnings: true, broadcastPeerCompletion: true);
+            return;
+        }
+
+        xagmanStatus = XagmanStatus.ReturningHome;
+        xagmanStatusText = string.IsNullOrWhiteSpace(activePartner)
+            ? $"Tony {xagmanActiveCharacter} is rotating to the next Tony."
+            : $"Tony {xagmanActiveCharacter} is rotating after {activePartner} entered standby.";
+        plugin.TaskRunner.AddLog(string.IsNullOrWhiteSpace(activePartner)
+            ? $"Xagman: Tony {xagmanActiveCharacter} is rotating after a standby request."
+            : $"Xagman: owner {activePartner} requested Tony rotation after trade failure; rotating Tony {xagmanActiveCharacter}.");
+        RotateXagmanTony();
+    }
+
      private bool TryRotateXagmanTonyForPendingOwnerStandbyRequest()
     {
         if (!xagmanTonyRotationRequestedByOwnerStandby || !xagmanRunning || xagmanActiveRole != XagmanRole.Tony || plugin.TaskRunner.IsRunning)
@@ -7315,24 +8002,10 @@ public partial class SlaveWindow
         xagmanActiveTradePartnerInstanceId = string.Empty;
         xagmanLastTonyActionAtUtc = DateTime.UtcNow;
 
-        var hasAlternateTony = xagmanTonyRunList.Any(key => !key.Equals(xagmanActiveCharacter, StringComparison.OrdinalIgnoreCase));
-        if (!hasAlternateTony)
-        {
-            plugin.TaskRunner.AddLog(string.IsNullOrWhiteSpace(activePartner)
-                ? $"Xagman: Tony {xagmanActiveCharacter} has no alternate Tony remaining after a standby rotation request; finalizing with warning summary."
-                : $"Xagman: owner {activePartner} requested Tony rotation after trade failure, but Tony {xagmanActiveCharacter} has no alternate Tony remaining; finalizing with warning summary.");
-            StartXagmanTonyCompletionTask(string.Empty, autoDetectedNoRemainingOwners: false, completedWithWarnings: true, broadcastPeerCompletion: true);
+        if (TryStartXagmanTonySellWhenInventoryFull(activePartner))
             return true;
-        }
 
-        xagmanStatus = XagmanStatus.ReturningHome;
-        xagmanStatusText = string.IsNullOrWhiteSpace(activePartner)
-            ? $"Tony {xagmanActiveCharacter} is rotating to the next Tony."
-            : $"Tony {xagmanActiveCharacter} is rotating after {activePartner} entered standby.";
-        plugin.TaskRunner.AddLog(string.IsNullOrWhiteSpace(activePartner)
-            ? $"Xagman: Tony {xagmanActiveCharacter} is rotating after a standby request."
-            : $"Xagman: owner {activePartner} requested Tony rotation after trade failure; rotating Tony {xagmanActiveCharacter}.");
-        RotateXagmanTony();
+        StartXagmanTonyFullInventoryFallback(activePartner);
         return true;
     }
 
@@ -7374,13 +8047,39 @@ public partial class SlaveWindow
              return;
          AddonHelper.TargetByName(visibleCharacterName);
      }
-     private bool TryPathToCurrentTarget(float stopDistance = 0.5f)
+     private bool TryPathToCurrentTarget(float stopDistance = 0.5f, string expectedCharacterName = "")
      {
          var local = Plugin.ObjectTable.LocalPlayer;
          var target = local?.TargetObject;
-         if (local == null || target == null || !plugin.IpcClient.VnavIsReady())
+         if (local == null || !plugin.IpcClient.VnavIsReady())
              return false;
+         var visibleExpectedName = GetCharacterNameFromKey(expectedCharacterName);
+         if (target == null)
+             return TryPathToVisibleCharacter(visibleExpectedName, stopDistance);
+         if (!string.IsNullOrWhiteSpace(visibleExpectedName)
+             && !target.Name.ToString().Equals(visibleExpectedName, StringComparison.OrdinalIgnoreCase))
+         {
+             return TryPathToVisibleCharacter(visibleExpectedName, stopDistance);
+         }
          return plugin.IpcClient.VnavPathfindAndMoveCloseTo(target.Position, false, stopDistance);
+     }
+
+     private bool TryPathToVisibleCharacter(string characterName, float stopDistance)
+     {
+         var visibleCharacterName = GetCharacterNameFromKey(characterName);
+         if (string.IsNullOrWhiteSpace(visibleCharacterName) || !plugin.IpcClient.VnavIsReady())
+             return false;
+
+         foreach (var gameObject in Plugin.ObjectTable)
+         {
+             if (gameObject == null)
+                 continue;
+             if (!gameObject.Name.ToString().Equals(visibleCharacterName, StringComparison.OrdinalIgnoreCase))
+                 continue;
+             return plugin.IpcClient.VnavPathfindAndMoveCloseTo(gameObject.Position, false, stopDistance);
+         }
+
+         return false;
      }
 
      private bool IsXagmanMovementActive()
@@ -7397,12 +8096,22 @@ public partial class SlaveWindow
              return false;
          var local = Plugin.ObjectTable.LocalPlayer;
          var target = local?.TargetObject;
-         if (local == null || target == null)
+         if (local == null)
              return false;
+         var movementActive = IsXagmanMovementActive();
+         if (target == null)
+         {
+             TryTargetCharacter(visibleCharacterName);
+             if (!movementActive)
+                 TryPathToVisibleCharacter(visibleCharacterName, stopDistance);
+             return false;
+         }
          var targetName = target.Name.ToString();
          if (!targetName.Equals(visibleCharacterName, StringComparison.OrdinalIgnoreCase))
          {
              TryTargetCharacter(visibleCharacterName);
+             if (!movementActive)
+                 TryPathToVisibleCharacter(visibleCharacterName, stopDistance);
              return false;
          }
          var dx = target.Position.X - local.Position.X;
@@ -7410,7 +8119,6 @@ public partial class SlaveWindow
          var dz = target.Position.Z - local.Position.Z;
          var centerDistance = MathF.Sqrt((dx * dx) + (dy * dy) + (dz * dz));
          var ringDistance = centerDistance - local.HitboxRadius - target.HitboxRadius;
-         var movementActive = IsXagmanMovementActive();
          if (ringDistance <= stopDistance)
          {
              if (movementActive)
@@ -7421,7 +8129,7 @@ public partial class SlaveWindow
              return true;
          }
          if (!movementActive)
-             TryPathToCurrentTarget(stopDistance);
+             TryPathToCurrentTarget(stopDistance, visibleCharacterName);
          return false;
      }
 

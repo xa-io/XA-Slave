@@ -89,6 +89,10 @@ public sealed class XagmanPeerPresence
     public string CurrentWorld { get; set; } = string.Empty;
     public uint TerritoryId { get; set; }
     public string TerritoryName { get; set; } = string.Empty;
+    public bool LocalPositionAvailable { get; set; }
+    public float LocalPositionX { get; set; }
+    public float LocalPositionY { get; set; }
+    public float LocalPositionZ { get; set; }
     public bool XagmanEnabled { get; set; }
     public XagmanRole Role { get; set; }
     public XagmanTonyMode TonyMode { get; set; }
@@ -109,6 +113,12 @@ public sealed class XagmanPeerPresence
     public int MainInventoryFreeSlots { get; set; }
     public int Gil { get; set; }
     public int TonyGilMinimum { get; set; } = -1;
+    public bool TonySellLocationActive { get; set; }
+    public uint TonySellLocationTerritoryId { get; set; }
+    public string TonySellLocationName { get; set; } = string.Empty;
+    public float TonySellLocationX { get; set; }
+    public float TonySellLocationY { get; set; }
+    public float TonySellLocationZ { get; set; }
     public List<uint> ItemIds { get; set; } = new();
     public List<XagmanTradeRequestEntry> RequestedItems { get; set; } = new();
 }

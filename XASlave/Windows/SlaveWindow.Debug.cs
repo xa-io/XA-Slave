@@ -29,6 +29,7 @@ public partial class SlaveWindow
     // -----------------------------------------------
     private string debugResult = string.Empty;
     private string debugTargetPlayerName = string.Empty;
+    private int debugAutoRetainerItemId;
     private DateTime debugResultExpiry = DateTime.MinValue;
     private bool debugXaFcChestCheckRunning;
     private const string XaAbuseDisplayName = "I Love XA!";
@@ -1848,6 +1849,12 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
+        if (ImGui.CollapsingHeader("Lobby Test##xaAbuse"))
+        {
+            DrawXaAbuseLobbyTest();
+            ImGui.Spacing();
+        }
+
         if (ImGui.CollapsingHeader("Dalamud Test Notifications##xaAbuse"))
         {
             DrawDalamudTestNotifications();
@@ -1885,10 +1892,10 @@ public partial class SlaveWindow
             SetDebugResult("Sent: AR Multi enabled (EnableARMultiXA)");
         }
         ImGui.SameLine();
-        if (ImGui.Button("AR IsBusy?"))
+        if (ImGui.Button("AR Suppressed?"))
         {
             var suppressed = plugin.IpcClient.AutoRetainerGetSuppressed();
-            SetDebugResult($"AR Suppressed/Busy: {suppressed}");
+            SetDebugResult($"AutoRetainer.GetSuppressed: {suppressed}");
         }
         ImGui.SameLine();
         if (ImGui.Button("AR Available?"))
@@ -1899,10 +1906,71 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
+        if (ImGui.Button("AR IsBusy?##arPluginStateBusy"))
+        {
+            var busy = plugin.IpcClient.AutoRetainerPluginStateIsBusy();
+            SetDebugResult($"AutoRetainer.PluginState.IsBusy: {busy}");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("AR Retainers Ready?##arPluginStateRetainers"))
+        {
+            var ready = plugin.IpcClient.AutoRetainerPluginStateAreAnyRetainersAvailableForCurrentChara();
+            SetDebugResult($"AutoRetainer.PluginState.AreAnyRetainersAvailableForCurrentChara: {ready}");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("AR Multi Status?##arPluginStateMulti"))
+        {
+            var enabled = plugin.IpcClient.AutoRetainerPluginStateGetMultiModeStatus();
+            SetDebugResult($"AutoRetainer.PluginState.GetMultiModeStatus: {enabled}");
+        }
+
+        if (ImGui.Button("AR Can Auto Login?##arPluginStateCanAutoLogin"))
+        {
+            var canAutoLogin = plugin.IpcClient.AutoRetainerPluginStateCanAutoLogin();
+            SetDebugResult($"AutoRetainer.PluginState.CanAutoLogin: {canAutoLogin}");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("AR RetainerSense?##arPluginStateRetainerSense"))
+        {
+            var retainerSense = plugin.IpcClient.AutoRetainerPluginStateGetOptionRetainerSense();
+            SetDebugResult($"AutoRetainer.PluginState.GetOptionRetainerSense: {retainerSense}");
+        }
+
+        ImGui.SetNextItemWidth(Scale(120f));
+        ImGui.InputInt("Item ID##arPluginStateItemProtectedId", ref debugAutoRetainerItemId);
+        ImGui.SameLine();
+        if (ImGui.Button("AR Item Protected?##arPluginStateItemProtected"))
+        {
+            var itemId = Math.Max(0, debugAutoRetainerItemId);
+            var protectedItem = plugin.IpcClient.AutoRetainerPluginStateIsItemProtected((uint)itemId);
+            SetDebugResult($"AutoRetainer.PluginState.IsItemProtected({itemId}): {protectedItem}");
+        }
+
+        var arLocalContentId = Plugin.PlayerState.ContentId;
+        if (ImGui.Button("AR Vessels Ready?##arPluginStateVesselsReady"))
+        {
+            var ready = plugin.IpcClient.AutoRetainerPluginStateAreAnyEnabledVesselsReady(arLocalContentId);
+            SetDebugResult($"AutoRetainer.PluginState.AreAnyEnabledVesselsReady({arLocalContentId}): {FormatNullableBool(ready)}");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("AR Vessels Not Deployed?##arPluginStateVesselsNotDeployed"))
+        {
+            var notDeployed = plugin.IpcClient.AutoRetainerPluginStateAreAnyEnabledVesselsNotDeployed(arLocalContentId);
+            SetDebugResult($"AutoRetainer.PluginState.AreAnyEnabledVesselsNotDeployed({arLocalContentId}): {FormatNullableBool(notDeployed)}");
+        }
+
+        ImGui.Spacing();
+
         if (ImGui.Button("ARDiscard"))
         {
             ChatHelper.SendMessage("/ays discard");
             SetDebugResult("Sent: /ays discard (ARDiscard)");
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("AR ItemSell"))
+        {
+            ChatHelper.SendMessage("/ays itemsell");
+            SetDebugResult("Sent: /ays itemsell (AR ItemSell)");
         }
 
         ImGui.Spacing();
@@ -2612,6 +2680,43 @@ public partial class SlaveWindow
         SetDebugResult($"Dalamud test notification queued: {definition.ResultLabel}");
     }
 
+    private void DrawXaAbuseLobbyTest()
+    {
+        var monitorStatus = plugin.LobbyErrorAutoClose.GetLobbyMonitorDebugStatus();
+        var status = plugin.LobbyErrorAutoClose.GetNoKillPluginPanelDebugStatus();
+        var monitorText = monitorStatus.ShouldMonitor ? "true" : "false";
+        var activeText = status.IsVisible ? "true" : "false";
+        var monitorColor = monitorStatus.ShouldMonitor
+            ? new Vector4(0.45f, 1.0f, 0.45f, 1.0f)
+            : new Vector4(0.82f, 0.82f, 0.82f, 1.0f);
+        var activeColor = status.IsVisible
+            ? new Vector4(0.45f, 1.0f, 0.45f, 1.0f)
+            : new Vector4(0.82f, 0.82f, 0.82f, 1.0f);
+
+        ImGui.TextDisabled("Close Lobby Errors NoKillPlugin panel diagnostics.");
+        ImGui.TextColored(monitorColor, $"Lobby monitor active: {monitorText}");
+        ImGui.TextDisabled($"Requested: {monitorStatus.MonitorRequested} | Dialogue listener: {monitorStatus.DialogueListenerSubscribed} | Framework: {monitorStatus.FrameworkSubscribed} | Logged in: {monitorStatus.ClientLoggedIn}");
+        ImGui.TextDisabled($"Dialogue visible: {monitorStatus.DialogueVisible} | Ready: {monitorStatus.DialogueReady} | Supported: {monitorStatus.DialogueSupported} | Match: {monitorStatus.DialogueMatch}");
+        ImGui.TextDisabled($"10s window active: {monitorStatus.DialogueWindowActive} | Remaining: {monitorStatus.SecondsRemaining:0.0}s | _TitleMenu visible: {monitorStatus.TitleMenuVisible}");
+        ImGui.TextWrapped($"Dialogue text: {monitorStatus.DialogueText}");
+        ImGui.TextDisabled(monitorStatus.Detail);
+        ImGui.TextColored(activeColor, $"Is No Kill plugin window active: {activeText}");
+        ImGui.TextDisabled($"Loaded: {status.PluginLoaded} | Instance: {status.RuntimeInstanceResolved} | Window: {status.ConfigWindowResolved} | Visible field: {status.VisibilityMemberResolved}");
+        ImGui.TextDisabled(status.Detail);
+        ImGui.Spacing();
+
+        if (ImGui.Button("Refresh NoKill Window Status##xaAbuseLobbyStatus"))
+            SetDebugResult($"Lobby monitor active: {monitorStatus.ShouldMonitor}. {monitorStatus.Detail} NoKill window active: {status.IsVisible}. {status.Detail}");
+
+        ImGui.SameLine();
+        if (ImGui.Button("Close NoKill Plugin Window##xaAbuseLobbyClose"))
+        {
+            var closed = plugin.LobbyErrorAutoClose.TryCloseNoKillPluginPanelForDebug(out var message);
+            var refreshedStatus = plugin.LobbyErrorAutoClose.GetNoKillPluginPanelDebugStatus();
+            SetDebugResult($"{(closed ? "NoKill close OK" : "NoKill close failed")}: {message} Active now: {refreshedStatus.IsVisible}. {refreshedStatus.Detail}");
+        }
+    }
+
     private string GetXaAbuseStatusText()
     {
         var nameStatus = !xaAbuseEnabled
@@ -2793,6 +2898,9 @@ public partial class SlaveWindow
         debugResultExpiry = DateTime.UtcNow.AddSeconds(15);
         Plugin.Log.Information($"[XASlave] Debug: {msg}");
     }
+
+    private static string FormatNullableBool(bool? value)
+        => value.HasValue ? value.Value ? "true" : "false" : "null";
 
     private void RunDebugSelectStringOption(int callbackIndex)
     {

@@ -56,6 +56,13 @@ public partial class SlaveWindow
             {
                 liveIpcValues["AutoRetainer.GetSuppressed"] = plugin.IpcClient.AutoRetainerGetSuppressed();
                 liveIpcValues["AutoRetainer.GetMultiModeEnabled"] = plugin.IpcClient.AutoRetainerGetMultiModeEnabled();
+                liveIpcValues["AutoRetainer.PluginState.IsBusy"] = plugin.IpcClient.AutoRetainerPluginStateIsBusy();
+                liveIpcValues["AutoRetainer.PluginState.AreAnyRetainersAvailableForCurrentChara"] = plugin.IpcClient.AutoRetainerPluginStateAreAnyRetainersAvailableForCurrentChara();
+                liveIpcValues["AutoRetainer.PluginState.GetMultiModeStatus"] = plugin.IpcClient.AutoRetainerPluginStateGetMultiModeStatus();
+                liveIpcValues["AutoRetainer.PluginState.CanAutoLogin"] = plugin.IpcClient.AutoRetainerPluginStateCanAutoLogin();
+                liveIpcValues["AutoRetainer.PluginState.GetOptionRetainerSense"] = plugin.IpcClient.AutoRetainerPluginStateGetOptionRetainerSense();
+                liveIpcValues["AutoRetainer.PluginState.AreAnyEnabledVesselsNotDeployed"] = plugin.IpcClient.AutoRetainerPluginStateAreAnyEnabledVesselsNotDeployed(Plugin.PlayerState.ContentId);
+                liveIpcValues["AutoRetainer.PluginState.AreAnyEnabledVesselsReady"] = plugin.IpcClient.AutoRetainerPluginStateAreAnyEnabledVesselsReady(Plugin.PlayerState.ContentId);
             }
 
             // Lifestream
@@ -233,15 +240,23 @@ public partial class SlaveWindow
 
         if (ImGui.BeginTable("IpcAR", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
         {
-            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(380f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             ImGui.TableSetupColumn("Description");
             if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
             DrawIpcRow("AutoRetainer.GetSuppressed", "bool", "True when AR is suppressed/paused", livePulls);
-            DrawIpcRow("AutoRetainer.SetSuppressed", "Action", "Set suppressed state (bool)", livePulls);
             DrawIpcRow("AutoRetainer.GetMultiModeEnabled", "bool", "Multi-mode enabled state", livePulls);
+            DrawIpcRow("AutoRetainer.PluginState.IsBusy", "bool", "True while AutoRetainer is busy through its task manager, AutoGC hand-in, or Lifestream travel", livePulls);
+            DrawIpcRow("AutoRetainer.PluginState.AreAnyRetainersAvailableForCurrentChara", "bool", "True when the current character has at least one enabled retainer with a venture ready inside AR's unsync window", livePulls);
+            DrawIpcRow("AutoRetainer.PluginState.GetMultiModeStatus", "bool", "Multi-mode enabled state from the PluginState namespace", livePulls);
+            DrawIpcRow("AutoRetainer.PluginState.CanAutoLogin", "bool", "True when AutoRetainer considers auto-login/relog possible now", livePulls);
+            DrawIpcRow("AutoRetainer.PluginState.GetOptionRetainerSense", "bool", "Current RetainerSense option state", livePulls);
+            DrawIpcRow("AutoRetainer.PluginState.IsItemProtected", "bool", "Takes item id; true when the current character's inventory-management protection list contains that item", livePulls);
+            DrawIpcRow("AutoRetainer.PluginState.AreAnyEnabledVesselsNotDeployed", "bool?", "For local CID: true if enabled deployables include an available vessel with no active deployment, null when AR has no data", livePulls);
+            DrawIpcRow("AutoRetainer.PluginState.AreAnyEnabledVesselsReady", "bool?", "For local CID: true if enabled deployables are ready inside AR's configured workshop advance timer, null when AR has no data", livePulls);
+            DrawIpcRow("AutoRetainer.SetSuppressed", "Action", "Set suppressed state (bool)", livePulls);
             DrawIpcRow("AutoRetainer.SetMultiModeEnabled", "Action", "Toggle multi-mode (bool)", livePulls);
 
             ImGui.EndTable();
@@ -447,9 +462,11 @@ public partial class SlaveWindow
         if (showValue)
         {
             ImGui.TableNextColumn();
-            if (type == "bool" && liveIpcValues.TryGetValue(channel, out var val) && val.HasValue)
+            if ((type == "bool" || type == "bool?") && liveIpcValues.TryGetValue(channel, out var val))
             {
-                if (val.Value)
+                if (!val.HasValue)
+                    ImGui.TextDisabled("null");
+                else if (val.Value)
                     ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "true");
                 else
                     ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), "false");

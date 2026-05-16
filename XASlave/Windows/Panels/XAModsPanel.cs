@@ -2650,10 +2650,10 @@ public partial class SlaveWindow
             () => configuration.AutoCloseLobbyErrorsEnabled,
             plugin.LobbyErrorAutoClose.SetEnabled,
             applied => configuration.AutoCloseLobbyErrorsEnabled = applied,
-            "Confirms disconnect and supported stuck-logout lobby Dialogue popups by pressing `OK` automatically.",
-            "Monitors the `Dialogue` addon for disconnect/lobby error markers such as `3088`, `5006`, `90002`, `3102`, `Connection with the server was lost.`, and `You are still logged into the game.`, then clicks the live `OK` button automatically. `Instant Logout` also arms this same monitor for 10 seconds even when this toggle is off.",
+            "Confirms supported lobby Dialogue popups and closes NoKillPlugin's auth-error panel automatically.",
+            "Waits for addon:Dialogue to show a supported lobby/networking marker. When `Dialogue` contains a marker such as `3088`, `5006`, `90002`, `3102`, `Connection with the server was lost.`, or `You are still logged into the game.`, XA opens a 10 second monitor window, clicks the live `OK` button automatically, and closes NoKillPlugin's `No Kill Plugin Panel` through reflection if it opens during that same window. The monitor is idle until a matching `Dialogue` appears. `Instant Logout` also enables this same Dialogue-triggered monitor briefly even when this toggle is off.",
             plugin.LobbyErrorAutoClose.StatusText,
-            searchTerms: ["3088", "5006", "90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK"]);
+            searchTerms: ["3088", "5006", "90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK", "NoKillPlugin", "nokill", "No Kill Plugin Panel", "auth error"]);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "bailout-esc-menu",

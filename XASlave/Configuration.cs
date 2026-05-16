@@ -211,6 +211,7 @@ public class Configuration : IPluginConfiguration
     public string XagmanTargetWorld { get; set; } = string.Empty;
     public string XagmanTargetAetheryte { get; set; } = string.Empty;
     public int XagmanTonyGilMinimum { get; set; } = 10000;
+    public bool XagmanSellWhenInventoryFull { get; set; } = false;
     public bool XagmanEnableArMultiOnComplete { get; set; } = true;
     public bool XagmanLogoutOnComplete { get; set; } = false;
     public bool XagmanKillGameOnComplete { get; set; } = false;

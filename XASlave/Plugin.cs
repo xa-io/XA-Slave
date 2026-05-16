@@ -312,7 +312,7 @@ public sealed class Plugin : IDalamudPlugin
         DalamudNotificationsSuck = new DalamudNotificationSuppressorService(PluginInterface, Log);
         BetterHighlightPotentialTargets = new BetterHighlightPotentialTargetsService(Framework, ObjectTable, TargetManager, ClientState, Log);
         SystemWindowMods = new SystemWindowModsService(SigScanner, GameInterop, Log, Framework, GameConfig, ClientState, () => IpcClient.AutoRetainerGetMultiModeEnabled());
-        LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Log);
+        LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Framework, ClientState, Log);
         QueuePositionDisplay = new QueuePositionDisplayService(SigScanner, GameInterop, Log);
         MsqProgressDisplay = new MsqProgressDisplayService(AddonLifecycle, DataManager, Log);
         TooltipItemId = new TooltipItemIdService(AddonLifecycle, GameGui, SigScanner, GameInterop, Log);
@@ -4701,5 +4701,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.36";
+    public const string Version = "0.0.0.37";
 }
