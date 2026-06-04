@@ -9,6 +9,8 @@ using Dalamud.Game.Gui.NamePlate;
 using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Plugin;
+using FFXIVClientStructs.FFXIV.Client.Game;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using Lumina.Excel.Sheets;
 using XASlave.Services;
 using XASlave.Services.Tasks;
@@ -29,9 +31,26 @@ public partial class SlaveWindow
     // -----------------------------------------------
     private string debugResult = string.Empty;
     private string debugTargetPlayerName = string.Empty;
+    private string debugCallbackAddonName = "SelectString";
+    private string debugCallbackValues = "0";
     private int debugAutoRetainerItemId;
+    private int debugAutoRetainerDepositGilKeepAmount = 1_000_000;
     private DateTime debugResultExpiry = DateTime.MinValue;
     private bool debugXaFcChestCheckRunning;
+    private bool debugAutoRetainerDepositGilActive;
+    private bool debugAutoRetainerDepositGilListTaskRequested;
+    private bool debugAutoRetainerDepositGilProcessingRetainer;
+    private bool debugAutoRetainerDepositGilSubscribed;
+    private bool debugAutoRetainerDepositGilOpeningRetainerList;
+    private bool debugAutoRetainerNonAutoInteractActive;
+    private int debugAutoRetainerDepositGilProcessedRetainers;
+    private long debugAutoRetainerDepositGilRequestedTotal;
+    private long debugAutoRetainerDepositGilActualTotal;
+    private DateTime debugAutoRetainerDepositGilStartedUtc = DateTime.MinValue;
+    private DateTime debugAutoRetainerDepositGilLastActivityUtc = DateTime.MinValue;
+    private DateTime debugAutoRetainerNonAutoInteractStartedUtc = DateTime.MinValue;
+    private const string DebugAutoRetainerDepositGilPluginName = "XASlave.DepositGilDebug";
+    private const int DebugAutoRetainerGilCap = 999_999_999;
     private const string XaAbuseDisplayName = "I Love XA!";
     private const string XaAbuseDefaultOverlayText = " ";
     private const string XaAbuseDefaultTexturePath = "ui/icon/084000/084209_hr1.tex";
@@ -53,6 +72,30 @@ public partial class SlaveWindow
         string Title,
         string Content,
         NotificationType Type);
+    private readonly record struct DebugAutoRetainerDepositGilResult(
+        long RequestedDeposit,
+        long ActualDeposit,
+        int RemainingGil,
+        bool ShouldStop,
+        bool IsFailure,
+        string Message);
+    private readonly record struct DebugAutoRetainerBellOpenResult(
+        bool Opened,
+        string Message);
+    private enum DebugCallbackValueKind
+    {
+        Null,
+        Int,
+        UInt,
+        Bool,
+    }
+
+    private readonly record struct DebugCallbackValue(
+        DebugCallbackValueKind Kind,
+        int IntValue,
+        uint UIntValue,
+        bool BoolValue,
+        string Display);
 
     private static readonly DalamudTestNotificationDefinition[] DalamudTestNotificationDefinitions =
     [
@@ -1377,12 +1420,13 @@ public partial class SlaveWindow
             sb.AppendLine($"  Artisan         = {plugin.IpcClient.IsArtisanAvailable()}");
             sb.AppendLine($"  Dropbox         = {plugin.IpcClient.IsDropboxAvailable()}");
             sb.AppendLine($"  Splatoon        = {plugin.IpcClient.IsSplatoonAvailable()}");
+            sb.AppendLine($"  Honorific       = {plugin.IpcClient.IsHonorificAvailable()}");
             var result = sb.ToString();
             ImGui.SetClipboardText(result);
             SetDebugResult("IPC status copied to clipboard");
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Checks all 11 IPC integrations and copies results to clipboard.\nEquivalent to dfunc GetInternalNamesIPC / GetIPCRegisteredTables");
+            ImGui.SetTooltip("Checks all 12 IPC integrations and copies results to clipboard.\nEquivalent to dfunc GetInternalNamesIPC / GetIPCRegisteredTables");
 
         ImGui.SameLine();
         if (ImGui.Button("Installed Plugins"))
@@ -1855,6 +1899,12 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
+        if (ImGui.CollapsingHeader("Callbacks##xaAbuse"))
+        {
+            DrawXaAbuseCallbacks();
+            ImGui.Spacing();
+        }
+
         if (ImGui.CollapsingHeader("Dalamud Test Notifications##xaAbuse"))
         {
             DrawDalamudTestNotifications();
@@ -1957,6 +2007,54 @@ public partial class SlaveWindow
         {
             var notDeployed = plugin.IpcClient.AutoRetainerPluginStateAreAnyEnabledVesselsNotDeployed(arLocalContentId);
             SetDebugResult($"AutoRetainer.PluginState.AreAnyEnabledVesselsNotDeployed({arLocalContentId}): {FormatNullableBool(notDeployed)}");
+        }
+
+        ImGui.Spacing();
+
+        if (ImGui.Button("Non-Auto Interact##arNonAutoInteract"))
+        {
+            StartDebugAutoRetainerNonAutoInteract();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Temporarily suppresses AutoRetainer, interacts with Summoning Bell, disables AR's bell auto-enable state, then releases suppression once RetainerList is active.");
+        if (debugAutoRetainerNonAutoInteractActive)
+        {
+            ImGui.SameLine();
+            ImGui.TextDisabled("Non-Auto Interact: opening RetainerList under temporary AR suppression");
+        }
+
+        ImGui.Spacing();
+
+        ImGui.SetNextItemWidth(Scale(150f));
+        if (ImGui.InputInt("Keep Gil##arDepositGilKeepAmount", ref debugAutoRetainerDepositGilKeepAmount, 100000, 1000000)
+            && debugAutoRetainerDepositGilKeepAmount < 0)
+        {
+            debugAutoRetainerDepositGilKeepAmount = 0;
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Deposit Gil##arDepositGil"))
+        {
+            StartDebugAutoRetainerDepositGil();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Opens Summoning Bell under temporary AutoRetainer suppression if RetainerList is not active, then arms AutoRetainer's retainer-list custom task.");
+
+        if (debugAutoRetainerDepositGilActive)
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Cancel##arDepositGilCancel"))
+            {
+                StopDebugAutoRetainerDepositGil("AR deposit gil debug task cancelled.", finishCurrentRetainer: false);
+            }
+
+            var state = debugAutoRetainerDepositGilProcessingRetainer
+                ? "processing retainer"
+                : debugAutoRetainerDepositGilListTaskRequested
+                    ? "AR task queued"
+                    : debugAutoRetainerDepositGilOpeningRetainerList
+                        ? "opening RetainerList"
+                    : "waiting for RetainerList";
+            ImGui.TextDisabled($"Deposit Gil: {state}, keep {Math.Max(0, debugAutoRetainerDepositGilKeepAmount):N0}, retainers {debugAutoRetainerDepositGilProcessedRetainers}, requested {debugAutoRetainerDepositGilRequestedTotal:N0}, actual {debugAutoRetainerDepositGilActualTotal:N0}");
         }
 
         ImGui.Spacing();
@@ -2645,6 +2743,29 @@ public partial class SlaveWindow
 
     }
 
+    private void DrawXaAbuseCallbacks()
+    {
+        ImGui.SetNextItemWidth(Scale(220f));
+        ImGui.InputText("Addon##xaAbuseCallbackAddon", ref debugCallbackAddonName, 96);
+        ImGui.SetNextItemWidth(-1f);
+        ImGui.InputText("Values##xaAbuseCallbackValues", ref debugCallbackValues, 256);
+
+        if (ImGui.Button("Fire Callback##xaAbuseCallbackFire"))
+            RunDebugRawAddonCallback();
+
+        ImGui.SameLine();
+        if (ImGui.Button("Addon Active?##xaAbuseCallbackAddonActive"))
+        {
+            var addonName = debugCallbackAddonName.Trim();
+            if (string.IsNullOrWhiteSpace(addonName))
+                SetDebugResult("Callback test: enter an addon name.");
+            else
+                SetDebugResult($"{addonName}: visible={AddonHelper.IsAddonVisible(addonName)}, ready={AddonHelper.IsAddonReady(addonName)}");
+        }
+
+        ImGui.TextDisabled("Examples: -1 true | true -1 | 0 3 | uint:999999999 | null");
+    }
+
     private void DrawDalamudTestNotifications()
     {
         ImGui.TextDisabled("Creates real Dalamud ImGui notifications for testing the UI Mods suppression categories.");
@@ -2892,6 +3013,740 @@ public partial class SlaveWindow
         return true;
     }
 
+    private void StartDebugAutoRetainerDepositGil()
+    {
+        if (debugAutoRetainerDepositGilActive)
+        {
+            SetDebugResult("AR deposit gil debug task is already armed.");
+            return;
+        }
+
+        if (!Plugin.PlayerState.IsLoaded)
+        {
+            SetDebugResult("AR deposit gil: character is not loaded.");
+            return;
+        }
+
+        if (!plugin.IpcClient.IsAutoRetainerAvailable())
+        {
+            SetDebugResult("AR deposit gil: AutoRetainer IPC is not available.");
+            return;
+        }
+
+        debugAutoRetainerDepositGilKeepAmount = Math.Max(0, debugAutoRetainerDepositGilKeepAmount);
+        var currentGil = GetDebugCurrentCharacterGil();
+        if (currentGil <= debugAutoRetainerDepositGilKeepAmount)
+        {
+            SetDebugResult($"AR deposit gil: current gil {currentGil:N0} is at or below keep amount {debugAutoRetainerDepositGilKeepAmount:N0}.");
+            return;
+        }
+
+        debugAutoRetainerDepositGilActive = true;
+        debugAutoRetainerDepositGilListTaskRequested = false;
+        debugAutoRetainerDepositGilProcessingRetainer = false;
+        debugAutoRetainerDepositGilOpeningRetainerList = false;
+        debugAutoRetainerDepositGilProcessedRetainers = 0;
+        debugAutoRetainerDepositGilRequestedTotal = 0;
+        debugAutoRetainerDepositGilActualTotal = 0;
+        debugAutoRetainerDepositGilStartedUtc = DateTime.UtcNow;
+        debugAutoRetainerDepositGilLastActivityUtc = debugAutoRetainerDepositGilStartedUtc;
+
+        try
+        {
+            plugin.IpcClient.AutoRetainerSubscribeRetainerListTaskButtonsDraw(OnDebugAutoRetainerDepositGilListTaskButtonsDraw);
+            plugin.IpcClient.AutoRetainerSubscribeRetainerAdditionalTask(OnDebugAutoRetainerDepositGilAdditionalTask);
+            plugin.IpcClient.AutoRetainerSubscribeRetainerPostProcess(OnDebugAutoRetainerDepositGilReadyForPostprocess);
+            debugAutoRetainerDepositGilSubscribed = true;
+        }
+        catch (Exception ex)
+        {
+            StopDebugAutoRetainerDepositGil($"AR deposit gil: failed to subscribe to AutoRetainer hooks - {ex.Message}.", finishCurrentRetainer: false);
+            return;
+        }
+
+        StartDebugAutoRetainerDepositGilMonitor(debugAutoRetainerDepositGilStartedUtc);
+        StartDebugAutoRetainerDepositGilRetainerListOpenTask(debugAutoRetainerDepositGilStartedUtc);
+
+        SetDebugResult(AddonHelper.IsAddonVisible("RetainerList")
+            ? $"AR deposit gil armed: keep {debugAutoRetainerDepositGilKeepAmount:N0}; requesting custom retainer-list task."
+            : $"AR deposit gil armed: keep {debugAutoRetainerDepositGilKeepAmount:N0}; targeting Summoning Bell.");
+    }
+
+    private void StartDebugAutoRetainerNonAutoInteract()
+    {
+        if (debugAutoRetainerNonAutoInteractActive)
+        {
+            SetDebugResult("AR non-auto interact is already opening RetainerList.");
+            return;
+        }
+
+        if (!Plugin.PlayerState.IsLoaded)
+        {
+            SetDebugResult("AR non-auto interact: character is not loaded.");
+            return;
+        }
+
+        if (!plugin.IpcClient.IsAutoRetainerAvailable())
+        {
+            SetDebugResult("AR non-auto interact: AutoRetainer IPC is not available.");
+            return;
+        }
+
+        debugAutoRetainerNonAutoInteractActive = true;
+        debugAutoRetainerNonAutoInteractStartedUtc = DateTime.UtcNow;
+        var runStartedUtc = debugAutoRetainerNonAutoInteractStartedUtc;
+
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            var result = await OpenDebugRetainerListWithoutAutoRetainerEnableAsync(
+                "AR non-auto interact",
+                () => debugAutoRetainerNonAutoInteractActive && debugAutoRetainerNonAutoInteractStartedUtc == runStartedUtc);
+
+            if (debugAutoRetainerNonAutoInteractStartedUtc != runStartedUtc)
+                return;
+
+            debugAutoRetainerNonAutoInteractActive = false;
+            SetDebugResult(result.Message);
+        });
+
+        SetDebugResult("AR non-auto interact: suppressing AutoRetainer and opening Summoning Bell.");
+    }
+
+    private void StopDebugAutoRetainerDepositGil(string message, bool finishCurrentRetainer)
+    {
+        if (debugAutoRetainerDepositGilSubscribed)
+        {
+            try { plugin.IpcClient.AutoRetainerUnsubscribeRetainerListTaskButtonsDraw(OnDebugAutoRetainerDepositGilListTaskButtonsDraw); } catch { }
+            try { plugin.IpcClient.AutoRetainerUnsubscribeRetainerAdditionalTask(OnDebugAutoRetainerDepositGilAdditionalTask); } catch { }
+            try { plugin.IpcClient.AutoRetainerUnsubscribeRetainerPostProcess(OnDebugAutoRetainerDepositGilReadyForPostprocess); } catch { }
+            debugAutoRetainerDepositGilSubscribed = false;
+        }
+
+        if (finishCurrentRetainer && debugAutoRetainerDepositGilProcessingRetainer)
+        {
+            plugin.IpcClient.AutoRetainerFinishRetainerPostProcess();
+        }
+
+        debugAutoRetainerDepositGilActive = false;
+        debugAutoRetainerDepositGilListTaskRequested = false;
+        debugAutoRetainerDepositGilProcessingRetainer = false;
+        debugAutoRetainerDepositGilOpeningRetainerList = false;
+        SetDebugResult(message);
+    }
+
+    private void CompleteDebugAutoRetainerDepositGil(string message, bool abortArTasks, bool closeRetainerList)
+    {
+        if (debugAutoRetainerDepositGilSubscribed)
+        {
+            try { plugin.IpcClient.AutoRetainerUnsubscribeRetainerListTaskButtonsDraw(OnDebugAutoRetainerDepositGilListTaskButtonsDraw); } catch { }
+            try { plugin.IpcClient.AutoRetainerUnsubscribeRetainerAdditionalTask(OnDebugAutoRetainerDepositGilAdditionalTask); } catch { }
+            try { plugin.IpcClient.AutoRetainerUnsubscribeRetainerPostProcess(OnDebugAutoRetainerDepositGilReadyForPostprocess); } catch { }
+            debugAutoRetainerDepositGilSubscribed = false;
+        }
+
+        if (abortArTasks)
+            plugin.IpcClient.AutoRetainerPluginStateAbortAllTasks();
+
+        debugAutoRetainerDepositGilActive = false;
+        debugAutoRetainerDepositGilListTaskRequested = false;
+        debugAutoRetainerDepositGilProcessingRetainer = false;
+        debugAutoRetainerDepositGilOpeningRetainerList = false;
+
+        if (closeRetainerList)
+        {
+            StartDebugRetainerListCancelRecovery(message);
+            SetDebugResult($"{message} Waiting 1s before RetainerList cancel check.");
+        }
+        else
+        {
+            SetDebugResult(message);
+        }
+    }
+
+    private void StartDebugRetainerListCancelRecovery(string completionMessage)
+    {
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                await System.Threading.Tasks.Task.Delay(1000);
+
+                const int maxAttempts = 8;
+                for (var attempt = 1; attempt <= maxAttempts; attempt++)
+                {
+                    var state = await Plugin.Framework.Run(GetDebugRetainerListCancelState);
+                    if (state.CharacterSafeWaitReady)
+                    {
+                        await SetDebugResultOnFrameworkAsync($"{completionMessage} RetainerList cleared; CharacterSafeWait is ready.");
+                        return;
+                    }
+
+                    if (state.RetainerListVisible)
+                    {
+                        var cancelled = await Plugin.Framework.Run(CancelDebugRetainerList);
+                        await System.Threading.Tasks.Task.Delay(1000);
+
+                        state = await Plugin.Framework.Run(GetDebugRetainerListCancelState);
+                        if (state.CharacterSafeWaitReady)
+                        {
+                            await SetDebugResultOnFrameworkAsync($"{completionMessage} RetainerList cancelled; CharacterSafeWait is ready.");
+                            return;
+                        }
+
+                        Plugin.Log.Information($"[XASlave] AR deposit gil: RetainerList cancel attempt {attempt}/{maxAttempts}, callback={cancelled}, visible={state.RetainerListVisible}, ready={state.RetainerListReady}, characterSafeWait={state.CharacterSafeWaitReady}.");
+                        continue;
+                    }
+
+                    if (attempt >= 3)
+                    {
+                        await Plugin.Framework.Run(() =>
+                        {
+                            KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
+                            return true;
+                        });
+                        Plugin.Log.Information($"[XASlave] AR deposit gil: CharacterSafeWait still false and RetainerList not visible; pressed ESC on recovery attempt {attempt}/{maxAttempts}.");
+                    }
+
+                    await System.Threading.Tasks.Task.Delay(1000);
+                }
+
+                var finalState = await Plugin.Framework.Run(GetDebugRetainerListCancelState);
+                if (!finalState.CharacterSafeWaitReady && finalState.RetainerListVisible)
+                {
+                    await Plugin.Framework.Run(CancelDebugRetainerList);
+                    await System.Threading.Tasks.Task.Delay(1000);
+                    finalState = await Plugin.Framework.Run(GetDebugRetainerListCancelState);
+                }
+
+                await SetDebugResultOnFrameworkAsync(finalState.CharacterSafeWaitReady
+                    ? $"{completionMessage} RetainerList recovery completed; CharacterSafeWait is ready."
+                    : $"{completionMessage} RetainerList recovery timed out; visible={finalState.RetainerListVisible}, ready={finalState.RetainerListReady}, CharacterSafeWait={finalState.CharacterSafeWaitReady}.");
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Error(ex, "[XASlave] AR deposit gil RetainerList cancel recovery failed.");
+                await SetDebugResultOnFrameworkAsync($"{completionMessage} RetainerList recovery failed - {ex.Message}");
+            }
+        });
+    }
+
+    private static (bool CharacterSafeWaitReady, bool RetainerListVisible, bool RetainerListReady) GetDebugRetainerListCancelState()
+    {
+        return (
+            CharacterSafetyHelper.IsCharacterSafeWaitReady(),
+            AddonHelper.IsAddonVisible("RetainerList"),
+            IsDebugAddonReady("RetainerList"));
+    }
+
+    private async System.Threading.Tasks.Task SetDebugResultOnFrameworkAsync(string message)
+    {
+        await Plugin.Framework.Run(() =>
+        {
+            SetDebugResult(message);
+            return true;
+        });
+    }
+
+    private static bool CancelDebugRetainerList()
+    {
+        if (AddonHelper.FireCallback("RetainerList", -1))
+        {
+            Plugin.Log.Information("[XASlave] AR deposit gil: sent RetainerList -1 cancel callback.");
+            return true;
+        }
+
+        Plugin.Log.Warning("[XASlave] AR deposit gil: failed to send RetainerList -1 cancel callback.");
+        return false;
+    }
+
+    private void OnDebugAutoRetainerDepositGilListTaskButtonsDraw()
+    {
+        if (!debugAutoRetainerDepositGilActive || debugAutoRetainerDepositGilListTaskRequested)
+            return;
+
+        var keepAmount = Math.Max(0, debugAutoRetainerDepositGilKeepAmount);
+        var currentGil = GetDebugCurrentCharacterGil();
+        if (currentGil <= keepAmount)
+        {
+            CompleteDebugAutoRetainerDepositGil(
+                $"AR deposit gil complete: current gil {currentGil:N0} is at or below keep {keepAmount:N0}.",
+                abortArTasks: true,
+                closeRetainerList: true);
+            return;
+        }
+
+        if (!plugin.IpcClient.AutoRetainerRequestRetainerListCustomTask(DebugAutoRetainerDepositGilPluginName))
+        {
+            StopDebugAutoRetainerDepositGil("AR deposit gil: failed to request AutoRetainer retainer-list custom task.", finishCurrentRetainer: false);
+            return;
+        }
+
+        debugAutoRetainerDepositGilListTaskRequested = true;
+        debugAutoRetainerDepositGilLastActivityUtc = DateTime.UtcNow;
+        SetDebugResult("AR deposit gil: AutoRetainer custom retainer-list task queued.");
+    }
+
+    private void OnDebugAutoRetainerDepositGilAdditionalTask(string retainerName)
+    {
+        if (!debugAutoRetainerDepositGilActive || !debugAutoRetainerDepositGilListTaskRequested)
+            return;
+
+        var keepAmount = Math.Max(0, debugAutoRetainerDepositGilKeepAmount);
+        var currentGil = GetDebugCurrentCharacterGil();
+        if (currentGil <= keepAmount)
+        {
+            CompleteDebugAutoRetainerDepositGil(
+                $"AR deposit gil complete before {retainerName}: current gil {currentGil:N0} is at or below keep {keepAmount:N0}.",
+                abortArTasks: true,
+                closeRetainerList: true);
+            return;
+        }
+
+        if (plugin.IpcClient.AutoRetainerRequestRetainerPostProcess(DebugAutoRetainerDepositGilPluginName))
+        {
+            debugAutoRetainerDepositGilLastActivityUtc = DateTime.UtcNow;
+            Plugin.Log.Information($"[XASlave] AR deposit gil: requested postprocess for retainer '{retainerName}'.");
+        }
+    }
+
+    private void OnDebugAutoRetainerDepositGilReadyForPostprocess(string pluginName, string retainerName)
+    {
+        if (!pluginName.Equals(DebugAutoRetainerDepositGilPluginName, StringComparison.Ordinal))
+            return;
+
+        if (!debugAutoRetainerDepositGilActive)
+        {
+            plugin.IpcClient.AutoRetainerFinishRetainerPostProcess();
+            return;
+        }
+
+        if (debugAutoRetainerDepositGilProcessingRetainer)
+        {
+            Plugin.Log.Warning($"[XASlave] AR deposit gil: received overlapping postprocess for '{retainerName}'.");
+            return;
+        }
+
+        debugAutoRetainerDepositGilProcessingRetainer = true;
+        debugAutoRetainerDepositGilLastActivityUtc = DateTime.UtcNow;
+        var keepAmount = Math.Max(0, debugAutoRetainerDepositGilKeepAmount);
+
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            var stopAfterCurrentRetainer = false;
+            var stopMessage = string.Empty;
+            try
+            {
+                var result = await RunDebugAutoRetainerDepositGilForRetainerAsync(retainerName, keepAmount);
+                debugAutoRetainerDepositGilProcessedRetainers++;
+                debugAutoRetainerDepositGilRequestedTotal += result.RequestedDeposit;
+                debugAutoRetainerDepositGilActualTotal += result.ActualDeposit;
+                SetDebugResult(result.Message);
+                stopAfterCurrentRetainer = result.ShouldStop;
+                stopMessage = result.Message;
+            }
+            catch (Exception ex)
+            {
+                stopAfterCurrentRetainer = true;
+                stopMessage = $"AR deposit gil: {retainerName} failed - {ex.Message}";
+                SetDebugResult(stopMessage);
+                Plugin.Log.Error(ex, $"[XASlave] AR deposit gil failed for retainer '{retainerName}'.");
+            }
+            finally
+            {
+                plugin.IpcClient.AutoRetainerFinishRetainerPostProcess();
+                debugAutoRetainerDepositGilProcessingRetainer = false;
+                debugAutoRetainerDepositGilLastActivityUtc = DateTime.UtcNow;
+
+                if (stopAfterCurrentRetainer)
+                {
+                    await System.Threading.Tasks.Task.Delay(100);
+                    await Plugin.Framework.Run(() =>
+                    {
+                        CompleteDebugAutoRetainerDepositGil(
+                            $"{stopMessage} Closing RetainerList.",
+                            abortArTasks: true,
+                            closeRetainerList: true);
+                        return true;
+                    });
+                }
+            }
+        });
+    }
+
+    private void StartDebugAutoRetainerDepositGilRetainerListOpenTask(DateTime runStartedUtc)
+    {
+        if (IsDebugAddonReady("RetainerList"))
+            return;
+
+        debugAutoRetainerDepositGilOpeningRetainerList = true;
+
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            var result = await OpenDebugRetainerListWithoutAutoRetainerEnableAsync(
+                "AR deposit gil",
+                () => debugAutoRetainerDepositGilActive && debugAutoRetainerDepositGilStartedUtc == runStartedUtc);
+
+            if (!debugAutoRetainerDepositGilActive || debugAutoRetainerDepositGilStartedUtc != runStartedUtc)
+                return;
+
+            debugAutoRetainerDepositGilOpeningRetainerList = false;
+            if (result.Opened)
+            {
+                debugAutoRetainerDepositGilLastActivityUtc = DateTime.UtcNow;
+                SetDebugResult("AR deposit gil: RetainerList active through non-auto interact; waiting for AutoRetainer custom-task hook.");
+                return;
+            }
+
+            StopDebugAutoRetainerDepositGil(result.Message, finishCurrentRetainer: false);
+        });
+    }
+
+    private async System.Threading.Tasks.Task<DebugAutoRetainerBellOpenResult> OpenDebugRetainerListWithoutAutoRetainerEnableAsync(string operationName, Func<bool> shouldContinue)
+    {
+        if (await Plugin.Framework.Run(() => IsDebugAddonReady("RetainerList")))
+        {
+            var alreadySuppressed = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerGetSuppressed());
+            if (alreadySuppressed)
+            {
+                var released = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerSetSuppressed(false));
+                if (!released)
+                    return new(false, $"{operationName}: RetainerList is already active but failed to release AutoRetainer suppression.");
+
+                await System.Threading.Tasks.Task.Delay(250);
+                return new(true, $"{operationName}: RetainerList is already active and ready; AutoRetainer suppression released for custom-task processing.");
+            }
+
+            return new(true, $"{operationName}: RetainerList is already active and ready.");
+        }
+
+        var suppressedByTask = false;
+        var wasSuppressedBeforeOpen = false;
+        var releasedSuppression = false;
+        try
+        {
+            var alreadySuppressed = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerGetSuppressed());
+            wasSuppressedBeforeOpen = alreadySuppressed;
+            if (!alreadySuppressed)
+            {
+                var suppressed = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerSetSuppressed(true));
+                if (!suppressed)
+                    return new(false, $"{operationName}: failed to suppress AutoRetainer before Summoning Bell interaction.");
+
+                suppressedByTask = true;
+                await System.Threading.Tasks.Task.Delay(250);
+            }
+
+            var started = Environment.TickCount64;
+            var interacted = false;
+            while (shouldContinue() && Environment.TickCount64 - started < 20000)
+            {
+                var opened = await Plugin.Framework.Run(() =>
+                {
+                    if (IsDebugAddonReady("RetainerList"))
+                        return true;
+
+                    if (AddonHelper.IsAddonVisible("RetainerList"))
+                        return false;
+
+                    var target = Plugin.TargetManager.Target;
+                    var targetName = target?.Name.TextValue ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(targetName)
+                        || !targetName.Contains("Summoning Bell", StringComparison.OrdinalIgnoreCase))
+                    {
+                        AddonHelper.TargetByName("Summoning Bell");
+                    }
+                    else
+                    {
+                        AddonHelper.InteractWithTarget();
+                        interacted = true;
+                    }
+
+                    return IsDebugAddonReady("RetainerList");
+                });
+
+                if (opened)
+                {
+                    await System.Threading.Tasks.Task.Delay(250);
+                    if (suppressedByTask || wasSuppressedBeforeOpen)
+                    {
+                        var released = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerSetSuppressed(false));
+                        if (!released)
+                            return new(false, $"{operationName}: RetainerList active but failed to release AutoRetainer suppression.");
+
+                        releasedSuppression = true;
+                        await System.Threading.Tasks.Task.Delay(250);
+                    }
+
+                    var suffix = (suppressedByTask || wasSuppressedBeforeOpen)
+                        ? "AutoRetainer suppression released for custom-task processing"
+                        : "AutoRetainer was not suppressed";
+                    return new(true, $"{operationName}: RetainerList active; {suffix}.");
+                }
+
+                await System.Threading.Tasks.Task.Delay(interacted ? 750 : 500);
+            }
+
+            return new(false, $"{operationName}: could not open RetainerList from Summoning Bell.");
+        }
+        catch (Exception ex)
+        {
+            return new(false, $"{operationName}: failed while opening RetainerList - {ex.Message}");
+        }
+        finally
+        {
+            if (suppressedByTask && !releasedSuppression)
+            {
+                try { await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerSetSuppressed(false)); } catch { }
+            }
+        }
+    }
+
+    private void StartDebugAutoRetainerDepositGilMonitor(DateTime runStartedUtc)
+    {
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            while (debugAutoRetainerDepositGilActive && debugAutoRetainerDepositGilStartedUtc == runStartedUtc)
+            {
+                await System.Threading.Tasks.Task.Delay(1000);
+
+                if (!debugAutoRetainerDepositGilActive || debugAutoRetainerDepositGilStartedUtc != runStartedUtc)
+                    return;
+
+                var now = DateTime.UtcNow;
+                var elapsed = now - runStartedUtc;
+                var idleFor = now - debugAutoRetainerDepositGilLastActivityUtc;
+
+                if (!debugAutoRetainerDepositGilListTaskRequested && elapsed > TimeSpan.FromMinutes(2))
+                {
+                    await Plugin.Framework.Run(() =>
+                    {
+                        CompleteDebugAutoRetainerDepositGil("AR deposit gil: timed out waiting for RetainerList.", abortArTasks: true, closeRetainerList: true);
+                        return true;
+                    });
+                    return;
+                }
+
+                if (elapsed > TimeSpan.FromMinutes(15))
+                {
+                    await Plugin.Framework.Run(() =>
+                    {
+                        CompleteDebugAutoRetainerDepositGil("AR deposit gil: timed out after 15 minutes.", abortArTasks: true, closeRetainerList: true);
+                        return true;
+                    });
+                    return;
+                }
+
+                if (!debugAutoRetainerDepositGilListTaskRequested || debugAutoRetainerDepositGilProcessingRetainer)
+                    continue;
+
+                if (debugAutoRetainerDepositGilProcessedRetainers == 0 && idleFor < TimeSpan.FromSeconds(10))
+                    continue;
+
+                var arBusy = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerPluginStateIsBusy());
+                if (!arBusy && idleFor > TimeSpan.FromSeconds(3))
+                {
+                    var remainingGil = await Plugin.Framework.Run(GetDebugCurrentCharacterGil);
+                    await Plugin.Framework.Run(() =>
+                    {
+                        CompleteDebugAutoRetainerDepositGil(
+                            $"AR deposit gil stopped: retainers {debugAutoRetainerDepositGilProcessedRetainers}, requested {debugAutoRetainerDepositGilRequestedTotal:N0}, actual {debugAutoRetainerDepositGilActualTotal:N0}, remaining {remainingGil:N0}.",
+                            abortArTasks: false,
+                            closeRetainerList: true);
+                        return true;
+                    });
+                    return;
+                }
+            }
+        });
+    }
+
+    private async System.Threading.Tasks.Task<DebugAutoRetainerDepositGilResult> RunDebugAutoRetainerDepositGilForRetainerAsync(string retainerName, int keepAmount)
+    {
+        var beforeGil = await Plugin.Framework.Run(GetDebugCurrentCharacterGil);
+        var requestedDeposit = Math.Max(0, beforeGil - keepAmount);
+        if (requestedDeposit <= 0)
+        {
+            return new(0, 0, beforeGil, true, false, $"AR deposit gil: {retainerName} skipped; current gil {beforeGil:N0} is at or below keep {keepAmount:N0}.");
+        }
+
+        if (!await WaitForDebugFrameworkConditionAsync(() => IsDebugAddonReady("SelectString"), 5000))
+            return new(0, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; SelectString did not become ready.");
+
+        if (!await Plugin.Framework.Run(SelectDebugAutoRetainerGilMenu))
+            return new(0, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; could not select gil menu.");
+
+        if (!await WaitForDebugFrameworkConditionAsync(() => IsDebugAddonReady("Bank"), 5000))
+            return new(0, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; Bank did not become ready.");
+
+        await System.Threading.Tasks.Task.Delay(500);
+
+        if (!await Plugin.Framework.Run(() => FireDebugBankSwapDepositMode()))
+            return new(0, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; could not switch Bank to deposit mode.");
+
+        await System.Threading.Tasks.Task.Delay(500);
+
+        beforeGil = await Plugin.Framework.Run(GetDebugCurrentCharacterGil);
+        requestedDeposit = Math.Max(0, beforeGil - keepAmount);
+        if (requestedDeposit <= 0)
+        {
+            await Plugin.Framework.Run(() => FireDebugBankProcessOrCancel(forceCancel: true));
+            return new(0, 0, beforeGil, true, false, $"AR deposit gil: {retainerName} skipped after bank opened; gil {beforeGil:N0}, keep {keepAmount:N0}.");
+        }
+
+        var depositAmount = (uint)Math.Min(requestedDeposit, uint.MaxValue);
+        if (!await Plugin.Framework.Run(() => FireDebugBankSetDepositAmount(depositAmount)))
+            return new(requestedDeposit, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; could not set deposit amount {requestedDeposit:N0}.");
+
+        await System.Threading.Tasks.Task.Delay(250);
+
+        if (!await Plugin.Framework.Run(() => FireDebugBankProcessOrCancel(forceCancel: false)))
+            return new(requestedDeposit, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; could not process Bank deposit.");
+
+        await System.Threading.Tasks.Task.Delay(1000);
+
+        var afterGil = await Plugin.Framework.Run(GetDebugCurrentCharacterGil);
+        var actualDeposit = Math.Max(0, beforeGil - afterGil);
+        var shouldStop = afterGil <= keepAmount;
+        var capDetail = !shouldStop && actualDeposit < requestedDeposit
+            ? $" {retainerName} may be at/near the {DebugAutoRetainerGilCap:N0} gil cap; continuing to next retainer."
+            : string.Empty;
+        return new(
+            requestedDeposit,
+            actualDeposit,
+            afterGil,
+            shouldStop,
+            false,
+            $"AR deposit gil: {retainerName} requested {requestedDeposit:N0}, actual {actualDeposit:N0}, remaining {afterGil:N0}.{capDetail}");
+    }
+
+    private static async System.Threading.Tasks.Task<bool> WaitForDebugFrameworkConditionAsync(Func<bool> condition, int timeoutMs, int pollMs = 100)
+    {
+        var started = Environment.TickCount64;
+        while (Environment.TickCount64 - started < timeoutMs)
+        {
+            if (await Plugin.Framework.Run(condition))
+                return true;
+
+            await System.Threading.Tasks.Task.Delay(pollMs);
+        }
+
+        return false;
+    }
+
+    private static bool IsDebugAddonReady(string addonName)
+    {
+        unsafe { return AddonHelper.IsAddonReady(addonName); }
+    }
+
+    private static int GetDebugCurrentCharacterGil()
+    {
+        unsafe
+        {
+            var inventoryManager = InventoryManager.Instance();
+            return inventoryManager == null ? 0 : inventoryManager->GetInventoryItemCount(1);
+        }
+    }
+
+    private static bool SelectDebugAutoRetainerGilMenu()
+    {
+        unsafe
+        {
+            var localizedText = GetDebugAutoRetainerGilMenuText();
+            if (string.IsNullOrWhiteSpace(localizedText))
+            {
+                return AddonHelper.SelectFirstAddonListText(
+                    "SelectString",
+                    out _,
+                    out _,
+                    ("Entrust or withdraw gil", true));
+            }
+
+            return AddonHelper.SelectFirstAddonListText(
+                "SelectString",
+                out _,
+                out _,
+                (localizedText, true),
+                ("Entrust or withdraw gil", true));
+        }
+    }
+
+    private static string GetDebugAutoRetainerGilMenuText()
+    {
+        try
+        {
+            return Plugin.DataManager.GetExcelSheet<Addon>().GetRow(2379).Text.ToString();
+        }
+        catch
+        {
+            return "Entrust or withdraw gil.";
+        }
+    }
+
+    private static unsafe bool FireDebugBankSwapDepositMode()
+    {
+        var addon = AddonHelper.GetAddon("Bank");
+        if (addon == null || !addon->IsVisible || !addon->IsReady)
+            return false;
+
+        var values = stackalloc AtkValue[2];
+        values[0] = default;
+        values[0].Type = AtkValueType.Int;
+        values[0].Int = 2;
+        values[1] = default;
+        addon->FireCallback(2, values);
+        Plugin.Log.Information("[XASlave] AR deposit gil: Bank swapped to deposit mode.");
+        return true;
+    }
+
+    private static unsafe bool FireDebugBankSetDepositAmount(uint amount)
+    {
+        var addon = AddonHelper.GetAddon("Bank");
+        if (addon == null || !addon->IsVisible || !addon->IsReady || amount == 0)
+            return false;
+
+        var values = stackalloc AtkValue[2];
+        values[0] = default;
+        values[0].Type = AtkValueType.Int;
+        values[0].Int = 3;
+        values[1] = default;
+        values[1].Type = AtkValueType.UInt;
+        values[1].UInt = amount;
+        addon->FireCallback(2, values);
+        Plugin.Log.Information($"[XASlave] AR deposit gil: Bank deposit amount set to {amount:N0}.");
+        return true;
+    }
+
+    private static unsafe bool FireDebugBankProcessOrCancel(bool forceCancel)
+    {
+        var addon = AddonHelper.GetAddon("Bank");
+        if (addon == null || !addon->IsVisible || !addon->IsReady)
+            return false;
+
+        var nodeIndex = forceCancel ? 2 : 3;
+        if (addon->UldManager.NodeListCount <= nodeIndex)
+            return false;
+
+        var node = addon->UldManager.NodeList[nodeIndex];
+        if (node == null || !node->IsVisible())
+            return false;
+
+        var button = (AtkComponentButton*)node->GetComponent();
+        if (button == null || !button->IsEnabled)
+            return false;
+
+        var values = stackalloc AtkValue[2];
+        values[0] = default;
+        values[0].Type = AtkValueType.Int;
+        values[0].Int = forceCancel ? 1 : 0;
+        values[1] = default;
+        addon->FireCallback(2, values);
+        addon->Close(true);
+        Plugin.Log.Information(forceCancel
+            ? "[XASlave] AR deposit gil: Bank cancelled."
+            : "[XASlave] AR deposit gil: Bank deposit processed.");
+        return true;
+    }
+
     private void SetDebugResult(string msg)
     {
         debugResult = $"[{DateTime.Now:HH:mm:ss}] {msg}";
@@ -2901,6 +3756,129 @@ public partial class SlaveWindow
 
     private static string FormatNullableBool(bool? value)
         => value.HasValue ? value.Value ? "true" : "false" : "null";
+
+    private void RunDebugRawAddonCallback()
+    {
+        var addonName = debugCallbackAddonName.Trim();
+        if (string.IsNullOrWhiteSpace(addonName))
+        {
+            SetDebugResult("Callback test: enter an addon name.");
+            return;
+        }
+
+        if (!TryParseDebugCallbackValues(debugCallbackValues, out var values, out var error))
+        {
+            SetDebugResult($"Callback test parse error: {error}");
+            return;
+        }
+
+        var ok = FireDebugRawAddonCallback(addonName, values);
+        SetDebugResult(ok
+            ? $"Callback test: fired {addonName}({string.Join(", ", values.Select(value => value.Display))})."
+            : $"Callback test: failed to fire {addonName}; addon may be hidden or not ready.");
+    }
+
+    private static bool TryParseDebugCallbackValues(string rawValues, out List<DebugCallbackValue> values, out string error)
+    {
+        values = new List<DebugCallbackValue>();
+        error = string.Empty;
+
+        if (string.IsNullOrWhiteSpace(rawValues))
+            return true;
+
+        var tokens = rawValues.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        foreach (var token in tokens)
+        {
+            if (token.Equals("null", StringComparison.OrdinalIgnoreCase))
+            {
+                values.Add(new DebugCallbackValue(DebugCallbackValueKind.Null, 0, 0, false, "null"));
+                continue;
+            }
+
+            if (bool.TryParse(token, out var boolValue))
+            {
+                values.Add(new DebugCallbackValue(DebugCallbackValueKind.Bool, boolValue ? 1 : 0, 0, boolValue, boolValue ? "true" : "false"));
+                continue;
+            }
+
+            if (token.StartsWith("uint:", StringComparison.OrdinalIgnoreCase)
+                || token.StartsWith("u:", StringComparison.OrdinalIgnoreCase))
+            {
+                var separatorIndex = token.IndexOf(':');
+                var uintText = separatorIndex >= 0 ? token[(separatorIndex + 1)..] : string.Empty;
+                if (uint.TryParse(uintText, out var uintValue))
+                {
+                    values.Add(new DebugCallbackValue(DebugCallbackValueKind.UInt, 0, uintValue, false, $"uint:{uintValue}"));
+                    continue;
+                }
+
+                error = $"'{token}' is not a valid uint token.";
+                return false;
+            }
+
+            if (int.TryParse(token, out var intValue))
+            {
+                values.Add(new DebugCallbackValue(DebugCallbackValueKind.Int, intValue, 0, false, intValue.ToString()));
+                continue;
+            }
+
+            error = $"Unsupported token '{token}'. Use signed integers, true/false, null, or uint:<value>.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private static unsafe bool FireDebugRawAddonCallback(string addonName, IReadOnlyList<DebugCallbackValue> values)
+    {
+        var addon = AddonHelper.GetAddon(addonName);
+        if (addon == null || !addon->IsVisible || !addon->IsReady)
+            return false;
+
+        try
+        {
+            if (values.Count == 0)
+            {
+                addon->FireCallback(0, null);
+                Plugin.Log.Information($"[XASlave] Callback test: fired {addonName} with no values.");
+                return true;
+            }
+
+            var atkValues = stackalloc AtkValue[values.Count];
+            for (var index = 0; index < values.Count; index++)
+            {
+                atkValues[index] = default;
+                var value = values[index];
+                switch (value.Kind)
+                {
+                    case DebugCallbackValueKind.Bool:
+                        atkValues[index].Type = AtkValueType.Bool;
+                        atkValues[index].Int = value.BoolValue ? 1 : 0;
+                        break;
+                    case DebugCallbackValueKind.UInt:
+                        atkValues[index].Type = AtkValueType.UInt;
+                        atkValues[index].UInt = value.UIntValue;
+                        break;
+                    case DebugCallbackValueKind.Int:
+                        atkValues[index].Type = AtkValueType.Int;
+                        atkValues[index].Int = value.IntValue;
+                        break;
+                    default:
+                        atkValues[index].Type = 0;
+                        break;
+                }
+            }
+
+            addon->FireCallback((uint)values.Count, atkValues);
+            Plugin.Log.Information($"[XASlave] Callback test: fired {addonName} with [{string.Join(", ", values.Select(value => value.Display))}].");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error(ex, $"[XASlave] Callback test failed for '{addonName}'.");
+            return false;
+        }
+    }
 
     private void RunDebugSelectStringOption(int callbackIndex)
     {

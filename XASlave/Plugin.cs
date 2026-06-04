@@ -313,13 +313,13 @@ public sealed class Plugin : IDalamudPlugin
         BetterHighlightPotentialTargets = new BetterHighlightPotentialTargetsService(Framework, ObjectTable, TargetManager, ClientState, Log);
         SystemWindowMods = new SystemWindowModsService(SigScanner, GameInterop, Log, Framework, GameConfig, ClientState, () => IpcClient.AutoRetainerGetMultiModeEnabled());
         LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Framework, ClientState, Log);
-        QueuePositionDisplay = new QueuePositionDisplayService(SigScanner, GameInterop, Log);
+        QueuePositionDisplay = new QueuePositionDisplayService(Framework, SigScanner, GameInterop, Log);
         MsqProgressDisplay = new MsqProgressDisplayService(AddonLifecycle, DataManager, Log);
         TooltipItemId = new TooltipItemIdService(AddonLifecycle, GameGui, SigScanner, GameInterop, Log);
         AutoDisplayIds = new AutoDisplayIdsService(AddonLifecycle, Framework, ClientState, DataManager, TargetManager, DtrBar, Log);
         AutoDisplayNetworkLatency = new AutoDisplayNetworkLatencyService(Framework, ClientState, DtrBar, Log);
-        ChatTimestampFormat = new ChatTimestampFormatService(SigScanner, GameInterop, Log);
-        NoUiFade = new NoUiFadeService(SigScanner, GameInterop, Log);
+        ChatTimestampFormat = new ChatTimestampFormatService(Framework, SigScanner, GameInterop, Log);
+        NoUiFade = new NoUiFadeService(Framework, SigScanner, GameInterop, Log);
         AutoHideGameObjects = new AutoHideGameObjectsService(Framework, ClientState, Condition, TargetManager, SigScanner, GameInterop, Log);
         DialogueSkip = new DialogueSkipService(AddonLifecycle, SigScanner, GameInterop, Log);
         AutoLockGameWindow = new AutoLockGameWindowService(Condition, Log);
@@ -329,7 +329,7 @@ public sealed class Plugin : IDalamudPlugin
         CopyItemNameContextMenu = new CopyItemNameContextMenuService(ContextMenu, DataManager, Log);
         SightDistance = new SightDistanceService(Framework, SigScanner, GameInterop, Log);
         PlayerSearchContextMenu = new PlayerSearchContextMenuService(ContextMenu, DataManager, Log);
-        NameplatePrivacy = new NameplatePrivacyService(NamePlateGui, Log);
+        NameplatePrivacy = new NameplatePrivacyService(NamePlateGui, IpcClient, Log);
         BlacklistedPartyName = new BlacklistedPartyNameService(Framework, Log);
         AutoUnlockExpertDelivery = new AutoUnlockExpertDeliveryService(Framework, DataManager, Log);
         ExpertDeliveryUnlock = new ExpertDeliveryUnlockService(GameInterop, Log);
@@ -407,6 +407,9 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
         }
         ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
+        if (Configuration.CustomTimestampFormatEnabled)
+            ChatTimestampFormat.PrepareHookDuringPluginLoad();
+
         ApplyAutoDisplayIdsConfiguration(save: false);
         ApplyAutoDisplayNetworkLatencyConfiguration(save: false);
         AutoSkipCutscenes.ApplyConfiguration(Configuration);
@@ -419,14 +422,11 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.DozeSitAnywhereAllowDoze,
             Configuration.DozeSitAnywhereAllowSit);
         TeleportHelper.ApplyConfiguration(Configuration.TeleportHelperSelectYes);
-        QueueDeferredStartupAction("AutoAllowMultipleGameInstancesEnabled", () =>
+        if (Configuration.AutoAllowMultipleGameInstancesEnabled && !SystemWindowMods.RestoreAllowMultipleGameInstancesOnStartup())
         {
-            if (Configuration.AutoAllowMultipleGameInstancesEnabled && !SystemWindowMods.SetAllowMultipleGameInstancesEnabled(true))
-            {
-                Configuration.AutoAllowMultipleGameInstancesEnabled = false;
-                Configuration.Save();
-            }
-        });
+            Configuration.AutoAllowMultipleGameInstancesEnabled = false;
+            Configuration.Save();
+        }
         QueueDeferredStartupAction("AutoCancelLoginCooldownEnabled", () =>
         {
             if (Configuration.AutoCancelLoginCooldownEnabled && !SystemWindowMods.SetCancelLoginCooldownEnabled(true))
@@ -484,7 +484,7 @@ public sealed class Plugin : IDalamudPlugin
             QueuePostLoadXAModActivation("CustomTimestampFormatEnabled", "Custom Timestamp Format", PostLoadXAModActivationInitialDelaySeconds, () =>
             {
                 ChatTimestampFormat.ApplyConfiguration(Configuration.CustomTimestampFormat);
-                if (!ChatTimestampFormat.SetEnabled(true))
+                if (!ChatTimestampFormat.RestoreEnabledOnStartup())
                 {
                     Configuration.CustomTimestampFormatEnabled = false;
                     Configuration.Save();
@@ -495,7 +495,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             QueuePostLoadXAModActivation("NoUiFadeEnabled", "No UI Fade", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 2), () =>
             {
-                if (!NoUiFade.SetEnabled(true))
+                if (!NoUiFade.RestoreEnabledOnStartup())
                 {
                     Configuration.NoUiFadeEnabled = false;
                     Configuration.Save();
@@ -591,7 +591,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             QueuePostLoadXAModActivation("DisplayActualQueuePositionEnabled", "Display Actual Queue Position", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 3), () =>
             {
-                if (!QueuePositionDisplay.SetEnabled(true))
+                if (!QueuePositionDisplay.RestoreEnabledOnStartup())
                 {
                     Configuration.DisplayActualQueuePositionEnabled = false;
                     Configuration.Save();
@@ -721,6 +721,8 @@ public sealed class Plugin : IDalamudPlugin
             NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(
                 Configuration.ShowTravelerWorldNamesDisableInDuties,
                 Configuration.ShowTravelerWorldNamesAddSpacer);
+            NameplatePrivacy.ApplyShowTitlesAsPlayernamesConfiguration(
+                Configuration.ShowTitlesAsPlayernamesHonorificSupportEnabled);
 
             if (Configuration.LiveAnonymousModeEnabled && !NameplatePrivacy.SetAnonymousModeEnabled(true))
             {
@@ -1334,6 +1336,12 @@ public sealed class Plugin : IDalamudPlugin
     private bool HasPendingStartupArming()
     {
         return IsStartupArmingPending(AutoSkipCutscenes.IsStartupArmingPending, AutoSkipCutscenes.StatusText)
+            || IsStartupArmingPending(SystemWindowMods.IsAllowMultipleGameInstancesStartupPending, SystemWindowMods.AllowMultipleGameInstancesStatusText)
+            || IsStartupArmingPending(SystemWindowMods.IsCancelLoginCooldownStartupArmingPending, SystemWindowMods.CancelLoginCooldownStatusText)
+            || IsStartupArmingPending(SystemWindowMods.IsPreventLobbyExitStartupArmingPending, SystemWindowMods.PreventLobbyExitStatusText)
+            || IsStartupArmingPending(ChatTimestampFormat.IsStartupArmingPending, ChatTimestampFormat.StatusText)
+            || IsStartupArmingPending(NoUiFade.IsStartupArmingPending, NoUiFade.StatusText)
+            || IsStartupArmingPending(QueuePositionDisplay.IsStartupArmingPending, QueuePositionDisplay.StatusText)
             || IsStartupArmingPending(SightDistance.IsStartupArmingPending, SightDistance.StatusText)
             || IsStartupArmingPending(BetterHighlightPotentialTargets.IsStartupArmingPending, BetterHighlightPotentialTargets.StatusText);
     }
@@ -1343,6 +1351,24 @@ public sealed class Plugin : IDalamudPlugin
         var pending = new List<string>();
         if (IsStartupArmingPending(AutoSkipCutscenes.IsStartupArmingPending, AutoSkipCutscenes.StatusText))
             pending.Add($"Auto Skip Cutscenes: {AutoSkipCutscenes.StatusText}");
+
+        if (IsStartupArmingPending(SystemWindowMods.IsAllowMultipleGameInstancesStartupPending, SystemWindowMods.AllowMultipleGameInstancesStatusText))
+            pending.Add($"Allow Multiple Game Instances: {SystemWindowMods.AllowMultipleGameInstancesStatusText}");
+
+        if (IsStartupArmingPending(SystemWindowMods.IsCancelLoginCooldownStartupArmingPending, SystemWindowMods.CancelLoginCooldownStatusText))
+            pending.Add($"Cancel Login Cooldown: {SystemWindowMods.CancelLoginCooldownStatusText}");
+
+        if (IsStartupArmingPending(SystemWindowMods.IsPreventLobbyExitStartupArmingPending, SystemWindowMods.PreventLobbyExitStatusText))
+            pending.Add($"Prevent Lobby Exit: {SystemWindowMods.PreventLobbyExitStatusText}");
+
+        if (IsStartupArmingPending(ChatTimestampFormat.IsStartupArmingPending, ChatTimestampFormat.StatusText))
+            pending.Add($"Custom Timestamp Format: {ChatTimestampFormat.StatusText}");
+
+        if (IsStartupArmingPending(NoUiFade.IsStartupArmingPending, NoUiFade.StatusText))
+            pending.Add($"No UI Fade: {NoUiFade.StatusText}");
+
+        if (IsStartupArmingPending(QueuePositionDisplay.IsStartupArmingPending, QueuePositionDisplay.StatusText))
+            pending.Add($"Queue Position Display: {QueuePositionDisplay.StatusText}");
 
         if (IsStartupArmingPending(SightDistance.IsStartupArmingPending, SightDistance.StatusText))
             pending.Add($"Custom Sight Distance: {SightDistance.StatusText}");
@@ -1397,6 +1423,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private IEnumerable<StartupSurfaceStatus> GetStartupSurfaceStatuses()
     {
+        yield return CreateStartupSurfaceStatus("Allow Multiple Game Instances", Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.AllowMultipleGameInstancesStatusText);
         yield return CreateStartupSurfaceStatus("Cancel Login Cooldown", Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.CancelLoginCooldownStatusText);
         yield return CreateStartupSurfaceStatus("Auto Skip Cutscenes", Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.StatusText, "AutoSkipCutscenesEnabled");
         yield return CreateStartupSurfaceStatus("Prevent Lobby Exit", Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.PreventLobbyExitStatusText);
@@ -2589,6 +2616,12 @@ public sealed class Plugin : IDalamudPlugin
                     AddSpacer = Configuration.ShowTravelerWorldNamesAddSpacer,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "show-titles-as-playernames":
+                snapshot = JsonSerializer.SerializeToElement(new XAModShowTitlesAsPlayernamesSettings
+                {
+                    HonorificSupport = Configuration.ShowTitlesAsPlayernamesHonorificSupportEnabled,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "auto-leave-duty":
                 snapshot = JsonSerializer.SerializeToElement(new XAModAutoLeaveDutySettings
                 {
@@ -2791,6 +2824,13 @@ public sealed class Plugin : IDalamudPlugin
             NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(
                 Configuration.ShowTravelerWorldNamesDisableInDuties,
                 Configuration.ShowTravelerWorldNamesAddSpacer);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "show-titles-as-playernames", out XAModShowTitlesAsPlayernamesSettings? titlesAsPlayernamesSettings)
+            && titlesAsPlayernamesSettings != null)
+        {
+            Configuration.ShowTitlesAsPlayernamesHonorificSupportEnabled = titlesAsPlayernamesSettings.HonorificSupport;
+            NameplatePrivacy.ApplyShowTitlesAsPlayernamesConfiguration(Configuration.ShowTitlesAsPlayernamesHonorificSupportEnabled);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "custom-resolutions", out XAModCustomResolutionsSettings? customResolutionSettings)
@@ -3887,6 +3927,10 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.ShowTravelerWorldNamesDisableInDuties,
                     Configuration.ShowTravelerWorldNamesAddSpacer);
                 break;
+            case "show-titles-as-playernames":
+                NameplatePrivacy.ApplyShowTitlesAsPlayernamesConfiguration(
+                    Configuration.ShowTitlesAsPlayernamesHonorificSupportEnabled);
+                break;
             case "notify-when-friend-is-near":
                 ApplyNotifyWhenFriendIsNearConfiguration(save: false);
                 break;
@@ -4134,7 +4178,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("infinite-sprint", "Infinite Sprint", XAModsRestoreScope.Player, () => Configuration.InfiniteSprintEnabled, PlayerMods.SetInfiniteSprintEnabled, applied => Configuration.InfiniteSprintEnabled = applied, () => PlayerMods.InfiniteSprintStatusText);
         yield return new("instant-logout", "Instant Logout", XAModsRestoreScope.Illegal, () => Configuration.InstantLogoutEnabled, InstantLogout.SetEnabled, applied => Configuration.InstantLogoutEnabled = applied, () => InstantLogout.StatusText);
         yield return new("item-commands", "Item Commands", XAModsRestoreScope.Player, () => Configuration.ItemCommandsEnabled, ItemCommands.SetEnabled, applied => Configuration.ItemCommandsEnabled = applied, () => ItemCommands.StatusText);
-        yield return new("xa-peep", "XA Peep", XAModsRestoreScope.Player, () => Configuration.XAPeepEnabled, XAPeep.SetEnabled, applied => Configuration.XAPeepEnabled = applied, () => XAPeep.StatusText);
+        yield return new("xa-peep", "XA Peep", XAModsRestoreScope.Player, () => Configuration.XAPeepEnabled, SetXAPeepEnabled, applied => Configuration.XAPeepEnabled = applied, () => XAPeep.StatusText);
 
         yield return new(
             "anonymize-character-lists",
@@ -4183,6 +4227,28 @@ public sealed class Plugin : IDalamudPlugin
 
         PrintCommandResult(SetXAModEnabled(commandDefinition.Definition, enabled, out message), message);
         return true;
+    }
+
+    internal bool SetXAPeepEnabled(bool value)
+    {
+        var applied = XAPeep.SetEnabled(value);
+        if (!applied)
+            HideXAPeepWindowIfOpen();
+
+        return applied;
+    }
+
+    private void HideXAPeepWindowIfOpen()
+    {
+        if (!XAPeepWindow.IsOpen && !Configuration.XAPeepWindowOpen)
+            return;
+
+        XAPeepWindow.IsOpen = false;
+        if (!Configuration.XAPeepWindowOpen)
+            return;
+
+        Configuration.XAPeepWindowOpen = false;
+        Configuration.Save();
     }
 
     private bool SetXAModEnabled(XAModCommandDefinition definition, bool enabled, out string message)
@@ -4701,5 +4767,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.37";
+    public const string Version = "0.0.0.38";
 }

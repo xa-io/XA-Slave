@@ -13,6 +13,7 @@ public sealed class NameplatePrivacyService : IDisposable
     private const string RemoteVisitorLabels = "wanderer, traveler, and voyager";
 
     private readonly INamePlateGui namePlateGui;
+    private readonly IpcClient ipcClient;
     private readonly IPluginLog log;
 
     private bool anonymousModeEnabled;
@@ -20,11 +21,13 @@ public sealed class NameplatePrivacyService : IDisposable
     private bool showTravelerWorldNamesDisableInDuties = true;
     private bool showTravelerWorldNamesAddSpacer;
     private bool showTitlesAsPlayernamesEnabled;
+    private bool showTitlesAsPlayernamesHonorificSupportEnabled = true;
     private bool subscribed;
 
-    public NameplatePrivacyService(INamePlateGui namePlateGui, IPluginLog log)
+    public NameplatePrivacyService(INamePlateGui namePlateGui, IpcClient ipcClient, IPluginLog log)
     {
         this.namePlateGui = namePlateGui;
+        this.ipcClient = ipcClient;
         this.log = log;
     }
 
@@ -68,7 +71,9 @@ public sealed class NameplatePrivacyService : IDisposable
             if (anonymousModeEnabled)
                 return "Enabled - hidden while Anonymous Mode is masking names and removing titles.";
 
-            return "Enabled - prefix titles move before the player name and suffix titles move after it.";
+            return showTitlesAsPlayernamesHonorificSupportEnabled
+                ? "Enabled - Honorific custom titles are used when available, with native title fallback."
+                : "Enabled - prefix titles move before the player name and suffix titles move after it.";
         }
     }
 
@@ -105,6 +110,16 @@ public sealed class NameplatePrivacyService : IDisposable
         showTravelerWorldNamesDisableInDuties = disableInDuties;
         showTravelerWorldNamesAddSpacer = addSpacer;
         if (showTravelerWorldNamesEnabled)
+            RequestRedraw();
+    }
+
+    public void ApplyShowTitlesAsPlayernamesConfiguration(bool honorificSupportEnabled)
+    {
+        if (showTitlesAsPlayernamesHonorificSupportEnabled == honorificSupportEnabled)
+            return;
+
+        showTitlesAsPlayernamesHonorificSupportEnabled = honorificSupportEnabled;
+        if (showTitlesAsPlayernamesEnabled)
             RequestRedraw();
     }
 
@@ -179,7 +194,7 @@ public sealed class NameplatePrivacyService : IDisposable
             var displayName = playerName;
             var changedName = false;
 
-            if (applyTitlesAsPlayernames && TryApplyTitleToPlayerName(handler, playerName, out displayName))
+            if (applyTitlesAsPlayernames && TryApplyTitleToPlayerName(handler, playerCharacter, playerName, out displayName))
             {
                 handler.RemoveTitle();
                 changedName = true;
@@ -223,9 +238,15 @@ public sealed class NameplatePrivacyService : IDisposable
         return string.Empty;
     }
 
-    private static bool TryApplyTitleToPlayerName(INamePlateUpdateHandler handler, string playerName, out string displayName)
+    private bool TryApplyTitleToPlayerName(INamePlateUpdateHandler handler, IPlayerCharacter playerCharacter, string playerName, out string displayName)
     {
         displayName = playerName;
+
+        if (showTitlesAsPlayernamesHonorificSupportEnabled
+            && TryApplyHonorificTitleToPlayerName(playerCharacter, playerName, out displayName))
+        {
+            return true;
+        }
 
         var title = StripTitleWrapper(handler.InfoView.Title.ToString());
         if (string.IsNullOrWhiteSpace(title))
@@ -238,6 +259,26 @@ public sealed class NameplatePrivacyService : IDisposable
         }
 
         displayName = handler.IsPrefixTitle
+            ? $"{title} {playerName}"
+            : $"{playerName} {title}";
+        return true;
+    }
+
+    private bool TryApplyHonorificTitleToPlayerName(IPlayerCharacter playerCharacter, string playerName, out string displayName)
+    {
+        displayName = playerName;
+
+        if (!ipcClient.TryGetHonorificCharacterTitle((int)playerCharacter.ObjectIndex, out var titleInfo))
+            return false;
+
+        var title = StripTitleWrapper(titleInfo.Title);
+        if (string.IsNullOrWhiteSpace(title))
+            return true;
+
+        if (title.Equals(playerName, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        displayName = titleInfo.IsPrefix
             ? $"{title} {playerName}"
             : $"{playerName} {title}";
         return true;

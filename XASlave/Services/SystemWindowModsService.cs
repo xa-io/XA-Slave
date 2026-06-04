@@ -46,6 +46,9 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private readonly IGameConfig gameConfig;
     private readonly IClientState clientState;
     private readonly Func<bool> isAutoRetainerMultiModeEnabled;
+    private readonly object allowMultipleGameInstancesStartupLock = new();
+    private readonly object cancelLoginCooldownStartupArmingLock = new();
+    private readonly object preventLobbyExitStartupArmingLock = new();
 
     private Hook<AgentLobbyUpdateDelegate>? agentLobbyUpdateHook;
     private Hook<AtkMessageBoxReceiveEventDelegate>? atkMessageBoxReceiveEventHook;
@@ -80,6 +83,10 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private bool cachedAutoRetainerMultiModeEnabled;
     private bool hasObservedClientSize;
     private bool pendingWindowSizeSynchronization;
+    private bool allowMultipleGameInstancesStartupPending;
+    private bool cancelLoginCooldownStartupArmingPending;
+    private bool preventLobbyExitStartupArmingPending;
+    private bool disposed;
     private int lastObservedClientWidth;
     private int lastObservedClientHeight;
     private int lastSynchronizedClientWidth;
@@ -90,6 +97,9 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private int lowResolutionDisableResetFramesRemaining;
     private byte originalLowResolutionUpscaleType;
     private float lowResolutionScale = 0.25f;
+    private System.Threading.Tasks.Task<int>? allowMultipleGameInstancesStartupTask;
+    private System.Threading.Tasks.Task<Hook<AgentLobbyUpdateDelegate>?>? cancelLoginCooldownStartupHookTask;
+    private System.Threading.Tasks.Task<Hook<AtkMessageBoxReceiveEventDelegate>?>? preventLobbyExitStartupHookTask;
     public SystemWindowModsService(
         ISigScanner sigScanner,
         IGameInteropProvider interopProvider,
@@ -111,7 +121,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     public string AllowMultipleGameInstancesStatusText { get; private set; } = "Disabled";
 
+    public bool IsAllowMultipleGameInstancesStartupPending => allowMultipleGameInstancesStartupPending;
+
     public string CancelLoginCooldownStatusText { get; private set; } = "Disabled";
+
+    public bool IsCancelLoginCooldownStartupArmingPending => cancelLoginCooldownStartupArmingPending;
 
     public string CustomResolutionsStatusText { get; private set; } = "Disabled";
 
@@ -122,6 +136,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     public string LowResolutionStatusText { get; private set; } = "Disabled";
 
     public string PreventLobbyExitStatusText { get; private set; } = "Disabled";
+
+    public bool IsPreventLobbyExitStartupArmingPending => preventLobbyExitStartupArmingPending;
 
     public string RevealUndiscoveredAreasStatusText { get; private set; } = "Disabled";
 
@@ -179,9 +195,13 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     {
         if (!value)
         {
+            CancelAllowMultipleGameInstancesStartupCleanup();
             AllowMultipleGameInstancesStatusText = "Disabled";
             return false;
         }
+
+        if (allowMultipleGameInstancesStartupPending)
+            return true;
 
         try
         {
@@ -199,16 +219,31 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         }
     }
 
+    public bool RestoreAllowMultipleGameInstancesOnStartup()
+    {
+        if (allowMultipleGameInstancesStartupPending)
+            return true;
+
+        AllowMultipleGameInstancesStatusText = "Arming - multi-instance launch lock cleanup is running outside the startup queue.";
+        StartAllowMultipleGameInstancesStartupCleanup();
+        return true;
+    }
+
     public bool SetCancelLoginCooldownEnabled(bool value)
     {
         if (!value)
         {
             cancelLoginCooldownEnabled = false;
+            CancelCancelLoginCooldownStartupArming(disposeCompletedResult: true);
             UpdateAgentLobbyHookState();
             CancelLoginCooldownStatusText = "Disabled";
             return false;
         }
 
+        if (cancelLoginCooldownStartupArmingPending)
+            return true;
+
+        CancelCancelLoginCooldownStartupArming(disposeCompletedResult: true);
         cancelLoginCooldownEnabled = true;
         if (clientState.IsLoggedIn)
         {
@@ -216,7 +251,13 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return true;
         }
 
-        EnsureAgentLobbyHookInitialized();
+        if (!agentLobbyHookInitialized)
+        {
+            CancelLoginCooldownStatusText = "Arming - login cooldown hook is initializing outside the framework tick.";
+            StartCancelLoginCooldownStartupHookCreation();
+            return true;
+        }
+
         if (agentLobbyUpdateHook == null)
         {
             cancelLoginCooldownEnabled = false;
@@ -341,11 +382,16 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (!value)
         {
             preventLobbyExitEnabled = false;
+            CancelPreventLobbyExitStartupArming(disposeCompletedResult: true);
             UpdateAtkMessageBoxHookState();
             PreventLobbyExitStatusText = "Disabled";
             return false;
         }
 
+        if (preventLobbyExitStartupArmingPending)
+            return true;
+
+        CancelPreventLobbyExitStartupArming(disposeCompletedResult: true);
         preventLobbyExitEnabled = true;
         if (clientState.IsLoggedIn)
         {
@@ -353,7 +399,13 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return true;
         }
 
-        EnsureAtkMessageBoxHookInitialized();
+        if (!atkMessageBoxHookInitialized)
+        {
+            PreventLobbyExitStatusText = "Arming - lobby error hook is initializing outside the framework tick.";
+            StartPreventLobbyExitStartupHookCreation();
+            return true;
+        }
+
         if (atkMessageBoxReceiveEventHook == null)
         {
             preventLobbyExitEnabled = false;
@@ -488,7 +540,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     public void Dispose()
     {
+        disposed = true;
         this.framework.Update -= OnFrameworkUpdate;
+        CancelAllowMultipleGameInstancesStartupCleanup();
+        CancelCancelLoginCooldownStartupArming(disposeCompletedResult: true);
+        CancelPreventLobbyExitStartupArming(disposeCompletedResult: true);
         DisableLowResolutionForPluginUnload();
 
         cancelLoginCooldownEnabled = false;
@@ -555,6 +611,79 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             : "Enabled - DX11 and nameplate hooks pause rendering while inactive.";
     }
 
+    private void StartAllowMultipleGameInstancesStartupCleanup()
+    {
+        lock (allowMultipleGameInstancesStartupLock)
+        {
+            allowMultipleGameInstancesStartupPending = true;
+            allowMultipleGameInstancesStartupTask ??= System.Threading.Tasks.Task.Run(ReleaseMultipleGameInstanceHandles);
+        }
+    }
+
+    private void CancelAllowMultipleGameInstancesStartupCleanup()
+    {
+        lock (allowMultipleGameInstancesStartupLock)
+        {
+            allowMultipleGameInstancesStartupPending = false;
+            allowMultipleGameInstancesStartupTask = null;
+        }
+    }
+
+    private void ProcessAllowMultipleGameInstancesStartupCleanup()
+    {
+        System.Threading.Tasks.Task<int>? task;
+        lock (allowMultipleGameInstancesStartupLock)
+            task = allowMultipleGameInstancesStartupTask;
+
+        if (task == null)
+        {
+            CancelAllowMultipleGameInstancesStartupCleanup();
+            return;
+        }
+
+        if (!task.IsCompleted)
+            return;
+
+        var completed = false;
+        var closedHandles = 0;
+        try
+        {
+            if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+            {
+                completed = true;
+                closedHandles = task.Result;
+            }
+            else if (task.IsFaulted && task.Exception != null)
+            {
+                log.Warning(task.Exception.GetBaseException(), "[XASlave] Failed to clear the multi-instance launch lock during startup.");
+            }
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Failed to complete multi-instance launch lock startup cleanup.");
+        }
+
+        lock (allowMultipleGameInstancesStartupLock)
+        {
+            allowMultipleGameInstancesStartupPending = false;
+            allowMultipleGameInstancesStartupTask = null;
+        }
+
+        if (disposed)
+            return;
+
+        if (completed)
+        {
+            AllowMultipleGameInstancesStatusText = closedHandles > 0
+                ? $"Enabled - cleared {closedHandles} multi-instance launch lock handle(s) for this client process."
+                : "Enabled - no additional multi-instance launch lock handle was present in this client process.";
+        }
+        else
+        {
+            AllowMultipleGameInstancesStatusText = "Unavailable - failed while clearing the multi-instance launch lock.";
+        }
+    }
+
     private void EnsureAgentLobbyHookInitialized()
     {
         if (agentLobbyHookInitialized)
@@ -564,6 +693,108 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         agentLobbyUpdateHook = TryCreateHook<AgentLobbyUpdateDelegate>(Sigs.AgentLobbyUpdateSig, AgentLobbyUpdateDetour, "AgentLobbyUpdate");
     }
 
+    private Hook<AgentLobbyUpdateDelegate>? CreateAgentLobbyHook()
+    {
+        return TryCreateHook<AgentLobbyUpdateDelegate>(Sigs.AgentLobbyUpdateSig, AgentLobbyUpdateDetour, "AgentLobbyUpdate");
+    }
+
+    private void StartCancelLoginCooldownStartupHookCreation()
+    {
+        lock (cancelLoginCooldownStartupArmingLock)
+        {
+            cancelLoginCooldownStartupArmingPending = true;
+            cancelLoginCooldownStartupHookTask ??= System.Threading.Tasks.Task.Run(CreateAgentLobbyHook);
+        }
+    }
+
+    private void CancelCancelLoginCooldownStartupArming(bool disposeCompletedResult)
+    {
+        System.Threading.Tasks.Task<Hook<AgentLobbyUpdateDelegate>?>? task;
+        lock (cancelLoginCooldownStartupArmingLock)
+        {
+            cancelLoginCooldownStartupArmingPending = false;
+            task = cancelLoginCooldownStartupHookTask;
+            cancelLoginCooldownStartupHookTask = null;
+        }
+
+        if (!disposeCompletedResult || task == null)
+            return;
+
+        DisposeCancelLoginCooldownStartupHookTaskResult(task);
+    }
+
+    private static void DisposeCancelLoginCooldownStartupHookTaskResult(System.Threading.Tasks.Task<Hook<AgentLobbyUpdateDelegate>?> task)
+    {
+        if (task.IsCompleted)
+        {
+            if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                DisposeHook(task.Result);
+            return;
+        }
+
+        task.ContinueWith(
+            completedTask =>
+            {
+                if (completedTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                    DisposeHook(completedTask.Result);
+            },
+            System.Threading.Tasks.TaskScheduler.Default);
+    }
+
+    private void ProcessCancelLoginCooldownStartupArming()
+    {
+        System.Threading.Tasks.Task<Hook<AgentLobbyUpdateDelegate>?>? task;
+        lock (cancelLoginCooldownStartupArmingLock)
+            task = cancelLoginCooldownStartupHookTask;
+
+        if (task == null)
+        {
+            CancelCancelLoginCooldownStartupArming(disposeCompletedResult: false);
+            return;
+        }
+
+        if (!task.IsCompleted)
+            return;
+
+        Hook<AgentLobbyUpdateDelegate>? createdHook = null;
+        try
+        {
+            if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                createdHook = task.Result;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Cancel Login Cooldown startup hook initialization failed.");
+        }
+
+        lock (cancelLoginCooldownStartupArmingLock)
+        {
+            cancelLoginCooldownStartupHookTask = null;
+            cancelLoginCooldownStartupArmingPending = false;
+        }
+
+        agentLobbyHookInitialized = true;
+
+        if (disposed || !cancelLoginCooldownEnabled)
+        {
+            DisposeHook(createdHook);
+            return;
+        }
+
+        agentLobbyUpdateHook = createdHook;
+        if (agentLobbyUpdateHook == null)
+        {
+            cancelLoginCooldownEnabled = false;
+            CancelLoginCooldownStatusText = "Unavailable - AgentLobby update hook missing.";
+            return;
+        }
+
+        UpdateAgentLobbyHookState();
+        CancelLoginCooldownStatusText = agentLobbyUpdateHook.IsEnabled
+            ? "Enabled - character-select login cooldown is cleared locally."
+            : "Unavailable - AgentLobby update hook could not be enabled.";
+    }
+
     private void EnsureAtkMessageBoxHookInitialized()
     {
         if (atkMessageBoxHookInitialized)
@@ -571,6 +802,108 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
         atkMessageBoxHookInitialized = true;
         atkMessageBoxReceiveEventHook = TryCreateHook<AtkMessageBoxReceiveEventDelegate>(Sigs.AtkMessageBoxReceiveEventSig, AtkMessageBoxReceiveEventDetour, "AtkMessageBoxReceiveEvent");
+    }
+
+    private Hook<AtkMessageBoxReceiveEventDelegate>? CreateAtkMessageBoxHook()
+    {
+        return TryCreateHook<AtkMessageBoxReceiveEventDelegate>(Sigs.AtkMessageBoxReceiveEventSig, AtkMessageBoxReceiveEventDetour, "AtkMessageBoxReceiveEvent");
+    }
+
+    private void StartPreventLobbyExitStartupHookCreation()
+    {
+        lock (preventLobbyExitStartupArmingLock)
+        {
+            preventLobbyExitStartupArmingPending = true;
+            preventLobbyExitStartupHookTask ??= System.Threading.Tasks.Task.Run(CreateAtkMessageBoxHook);
+        }
+    }
+
+    private void CancelPreventLobbyExitStartupArming(bool disposeCompletedResult)
+    {
+        System.Threading.Tasks.Task<Hook<AtkMessageBoxReceiveEventDelegate>?>? task;
+        lock (preventLobbyExitStartupArmingLock)
+        {
+            preventLobbyExitStartupArmingPending = false;
+            task = preventLobbyExitStartupHookTask;
+            preventLobbyExitStartupHookTask = null;
+        }
+
+        if (!disposeCompletedResult || task == null)
+            return;
+
+        DisposePreventLobbyExitStartupHookTaskResult(task);
+    }
+
+    private static void DisposePreventLobbyExitStartupHookTaskResult(System.Threading.Tasks.Task<Hook<AtkMessageBoxReceiveEventDelegate>?> task)
+    {
+        if (task.IsCompleted)
+        {
+            if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                DisposeHook(task.Result);
+            return;
+        }
+
+        task.ContinueWith(
+            completedTask =>
+            {
+                if (completedTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                    DisposeHook(completedTask.Result);
+            },
+            System.Threading.Tasks.TaskScheduler.Default);
+    }
+
+    private void ProcessPreventLobbyExitStartupArming()
+    {
+        System.Threading.Tasks.Task<Hook<AtkMessageBoxReceiveEventDelegate>?>? task;
+        lock (preventLobbyExitStartupArmingLock)
+            task = preventLobbyExitStartupHookTask;
+
+        if (task == null)
+        {
+            CancelPreventLobbyExitStartupArming(disposeCompletedResult: false);
+            return;
+        }
+
+        if (!task.IsCompleted)
+            return;
+
+        Hook<AtkMessageBoxReceiveEventDelegate>? createdHook = null;
+        try
+        {
+            if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                createdHook = task.Result;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Prevent Lobby Exit startup hook initialization failed.");
+        }
+
+        lock (preventLobbyExitStartupArmingLock)
+        {
+            preventLobbyExitStartupHookTask = null;
+            preventLobbyExitStartupArmingPending = false;
+        }
+
+        atkMessageBoxHookInitialized = true;
+
+        if (disposed || !preventLobbyExitEnabled)
+        {
+            DisposeHook(createdHook);
+            return;
+        }
+
+        atkMessageBoxReceiveEventHook = createdHook;
+        if (atkMessageBoxReceiveEventHook == null)
+        {
+            preventLobbyExitEnabled = false;
+            PreventLobbyExitStatusText = "Unavailable - lobby error hook missing.";
+            return;
+        }
+
+        UpdateAtkMessageBoxHookState();
+        PreventLobbyExitStatusText = atkMessageBoxReceiveEventHook.IsEnabled
+            ? "Enabled - lobby shutdown timeout is overridden."
+            : "Unavailable - lobby error hook could not be enabled.";
     }
 
     private void EnsureAgentMapHookInitialized()
@@ -716,33 +1049,57 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         hook = null;
     }
 
+    private static void DisposeHook<T>(Hook<T>? hook)
+        where T : Delegate
+    {
+        if (hook is { IsDisposed: false })
+            hook.Dispose();
+    }
+
     private void OnFrameworkUpdate(IFramework _)
     {
         var totalStopwatch = Stopwatch.StartNew();
+        if (allowMultipleGameInstancesStartupPending)
+            MeasureFrameworkUpdateStep("SystemWindowMods.AllowMultipleGameInstancesStartupCleanup", ProcessAllowMultipleGameInstancesStartupCleanup);
+
+        if (cancelLoginCooldownStartupArmingPending)
+            MeasureFrameworkUpdateStep("SystemWindowMods.CancelLoginCooldownStartupArming", ProcessCancelLoginCooldownStartupArming);
+
+        if (preventLobbyExitStartupArmingPending)
+            MeasureFrameworkUpdateStep("SystemWindowMods.PreventLobbyExitStartupArming", ProcessPreventLobbyExitStartupArming);
+
         if (cancelLoginCooldownEnabled
             && !clientState.IsLoggedIn
             && (agentLobbyUpdateHook == null || agentLobbyUpdateHook.IsDisposed || !agentLobbyUpdateHook.IsEnabled))
         {
-            MeasureFrameworkUpdateStep("SystemWindowMods.CancelLoginCooldownLobbyArm", () =>
+            if (!agentLobbyHookInitialized)
             {
-                EnsureAgentLobbyHookInitialized();
-                UpdateAgentLobbyHookState();
-            });
-            if (agentLobbyUpdateHook != null && !agentLobbyUpdateHook.IsDisposed && agentLobbyUpdateHook.IsEnabled)
-                CancelLoginCooldownStatusText = "Enabled - character-select login cooldown is cleared locally.";
+                CancelLoginCooldownStatusText = "Arming - login cooldown hook is initializing outside the framework tick.";
+                StartCancelLoginCooldownStartupHookCreation();
+            }
+            else
+            {
+                MeasureFrameworkUpdateStep("SystemWindowMods.CancelLoginCooldownLobbyArm", UpdateAgentLobbyHookState);
+                if (agentLobbyUpdateHook != null && !agentLobbyUpdateHook.IsDisposed && agentLobbyUpdateHook.IsEnabled)
+                    CancelLoginCooldownStatusText = "Enabled - character-select login cooldown is cleared locally.";
+            }
         }
 
         if (preventLobbyExitEnabled
             && !clientState.IsLoggedIn
             && (atkMessageBoxReceiveEventHook == null || atkMessageBoxReceiveEventHook.IsDisposed || !atkMessageBoxReceiveEventHook.IsEnabled))
         {
-            MeasureFrameworkUpdateStep("SystemWindowMods.PreventLobbyExitLobbyArm", () =>
+            if (!atkMessageBoxHookInitialized)
             {
-                EnsureAtkMessageBoxHookInitialized();
-                UpdateAtkMessageBoxHookState();
-            });
-            if (atkMessageBoxReceiveEventHook != null && !atkMessageBoxReceiveEventHook.IsDisposed && atkMessageBoxReceiveEventHook.IsEnabled)
-                PreventLobbyExitStatusText = "Enabled - lobby shutdown timeout is overridden.";
+                PreventLobbyExitStatusText = "Arming - lobby error hook is initializing outside the framework tick.";
+                StartPreventLobbyExitStartupHookCreation();
+            }
+            else
+            {
+                MeasureFrameworkUpdateStep("SystemWindowMods.PreventLobbyExitLobbyArm", UpdateAtkMessageBoxHookState);
+                if (atkMessageBoxReceiveEventHook != null && !atkMessageBoxReceiveEventHook.IsDisposed && atkMessageBoxReceiveEventHook.IsEnabled)
+                    PreventLobbyExitStatusText = "Enabled - lobby shutdown timeout is overridden.";
+            }
         }
 
         if (ShouldSynchronizeWindowSize())

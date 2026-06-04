@@ -1,5 +1,6 @@
 using System;
 using System.Diagnostics;
+using System.Threading.Tasks;
 using Dalamud;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
@@ -18,6 +19,7 @@ public unsafe sealed class SightDistanceService : IDisposable
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
     private readonly IPluginLog log;
+    private readonly object startupArmingLock = new();
 
     private Hook<SetActiveCameraDelegate>? setActiveCameraHook;
     private Hook<CameraCurrentSightDistanceDelegate>? cameraCurrentSightDistanceHook;
@@ -28,7 +30,9 @@ public unsafe sealed class SightDistanceService : IDisposable
     private bool enabled;
     private bool startupArmingPending;
     private bool startupArmingSubscribed;
+    private bool disposed;
     private int startupArmingStep;
+    private System.Threading.Tasks.Task<StartupHookResult>? startupHookTask;
 
     private float minDistance = 1.5f;
     private float maxDistance = 80f;
@@ -66,8 +70,9 @@ public unsafe sealed class SightDistanceService : IDisposable
         enabled = true;
         startupArmingPending = true;
         startupArmingStep = 0;
+        StartStartupHookCreation();
         SubscribeStartupArming();
-        StatusText = "Arming - camera hooks and patch surfaces are initializing over upcoming frames.";
+        StatusText = "Arming - camera hooks and patch surfaces are initializing outside the framework tick.";
         return true;
     }
 
@@ -102,9 +107,12 @@ public unsafe sealed class SightDistanceService : IDisposable
         if (value == enabled && !startupArmingPending)
             return enabled;
 
+        if (value && startupArmingPending)
+            return true;
+
         if (!value)
         {
-            CancelStartupArming();
+            CancelStartupArming(disposeCompletedResult: true);
             enabled = false;
             ToggleHook(setActiveCameraHook, false, "SetActiveCamera");
             ToggleHook(cameraCurrentSightDistanceHook, false, "CameraCurrentSightDistance");
@@ -115,7 +123,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         }
 
         EnsureInitialized();
-        CancelStartupArming();
+        CancelStartupArming(disposeCompletedResult: true);
         if (setActiveCameraHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
         {
             StatusText = "Unavailable - camera hooks and patch surfaces are missing.";
@@ -133,7 +141,8 @@ public unsafe sealed class SightDistanceService : IDisposable
 
     public void Dispose()
     {
-        CancelStartupArming();
+        disposed = true;
+        CancelStartupArming(disposeCompletedResult: true);
         enabled = false;
         RestoreCollisionPatch();
         ResetCameraDefaults();
@@ -148,8 +157,16 @@ public unsafe sealed class SightDistanceService : IDisposable
 
         setActiveCameraHook ??= TryCreateHook<SetActiveCameraDelegate>(Sigs.SetActiveCameraSig, SetActiveCameraDetour, "SetActiveCamera");
         cameraCurrentSightDistanceHook ??= TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
-        ScanPatchAddress(Sigs.CameraCollisionPatchSig, ref cameraCollisionPatchAddress, "CameraCollisionPatch");
+        cameraCollisionPatchAddress = TryScanPatchAddress(Sigs.CameraCollisionPatchSig, "CameraCollisionPatch");
         initialized = true;
+    }
+
+    private StartupHookResult CreateStartupHookResult()
+    {
+        return new StartupHookResult(
+            TryCreateHook<SetActiveCameraDelegate>(Sigs.SetActiveCameraSig, SetActiveCameraDetour, "SetActiveCamera"),
+            TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance"),
+            TryScanPatchAddress(Sigs.CameraCollisionPatchSig, "CameraCollisionPatch"));
     }
 
     private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
@@ -175,7 +192,22 @@ public unsafe sealed class SightDistanceService : IDisposable
         if (address != nint.Zero)
             return;
 
-        sigScanner.TryScanText(signature, out address);
+        address = TryScanPatchAddress(signature, label);
+    }
+
+    private nint TryScanPatchAddress(ProtectedSig signature, string label)
+    {
+        try
+        {
+            return sigScanner.TryScanText(signature, out var address)
+                ? address
+                : nint.Zero;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, $"[XASlave] Failed to scan {label} patch surface.");
+            return nint.Zero;
+        }
     }
 
     private void UpdateCollisionPatch()
@@ -284,15 +316,55 @@ public unsafe sealed class SightDistanceService : IDisposable
         startupArmingSubscribed = true;
     }
 
-    private void CancelStartupArming()
+    private void StartStartupHookCreation()
     {
+        lock (startupArmingLock)
+        {
+            startupHookTask ??= System.Threading.Tasks.Task.Run(CreateStartupHookResult);
+        }
+    }
+
+    private void CancelStartupArming(bool disposeCompletedResult = false)
+    {
+        System.Threading.Tasks.Task<StartupHookResult>? task;
+        lock (startupArmingLock)
+        {
+            task = startupHookTask;
+            startupHookTask = null;
+        }
+
         startupArmingPending = false;
         startupArmingStep = 0;
         if (!startupArmingSubscribed)
+        {
+            if (disposeCompletedResult && task != null)
+                DisposeStartupHookTaskResult(task);
             return;
+        }
 
         framework.Update -= OnStartupArmingFrameworkUpdate;
         startupArmingSubscribed = false;
+
+        if (disposeCompletedResult && task != null)
+            DisposeStartupHookTaskResult(task);
+    }
+
+    private static void DisposeStartupHookTaskResult(System.Threading.Tasks.Task<StartupHookResult> task)
+    {
+        if (task.IsCompleted)
+        {
+            if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                task.Result.DisposeHooks();
+            return;
+        }
+
+        task.ContinueWith(
+            completedTask =>
+            {
+                if (completedTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                    completedTask.Result.DisposeHooks();
+            },
+            System.Threading.Tasks.TaskScheduler.Default);
     }
 
     private void OnStartupArmingFrameworkUpdate(IFramework _)
@@ -308,6 +380,9 @@ public unsafe sealed class SightDistanceService : IDisposable
 
     private void ProcessStartupArmingStep()
     {
+        if (startupArmingStep == 0 && !TryApplyStartupHookResult())
+            return;
+
         var label = GetStartupArmingStepLabel(startupArmingStep);
         var stopwatch = Stopwatch.StartNew();
         try
@@ -315,16 +390,8 @@ public unsafe sealed class SightDistanceService : IDisposable
             switch (startupArmingStep)
             {
                 case 0:
-                    setActiveCameraHook ??= TryCreateHook<SetActiveCameraDelegate>(Sigs.SetActiveCameraSig, SetActiveCameraDetour, "SetActiveCamera");
                     break;
                 case 1:
-                    cameraCurrentSightDistanceHook ??= TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
-                    break;
-                case 2:
-                    ScanPatchAddress(Sigs.CameraCollisionPatchSig, ref cameraCollisionPatchAddress, "CameraCollisionPatch");
-                    initialized = true;
-                    break;
-                case 3:
                     if (setActiveCameraHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
                     {
                         enabled = false;
@@ -334,13 +401,13 @@ public unsafe sealed class SightDistanceService : IDisposable
                     }
 
                     break;
-                case 4:
+                case 2:
                     ToggleHook(setActiveCameraHook, true, "SetActiveCamera");
                     break;
-                case 5:
+                case 3:
                     ToggleHook(cameraCurrentSightDistanceHook, true, "CameraCurrentSightDistance");
                     break;
-                case 6:
+                case 4:
                     UpdateCollisionPatch();
                     break;
                 default:
@@ -366,16 +433,61 @@ public unsafe sealed class SightDistanceService : IDisposable
         }
     }
 
+    private bool TryApplyStartupHookResult()
+    {
+        System.Threading.Tasks.Task<StartupHookResult>? task;
+        lock (startupArmingLock)
+            task = startupHookTask;
+
+        if (task == null)
+        {
+            StartStartupHookCreation();
+            return false;
+        }
+
+        if (!task.IsCompleted)
+            return false;
+
+        StartupHookResult? result = null;
+        try
+        {
+            if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
+                result = task.Result;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Custom Sight Distance startup hook initialization failed.");
+        }
+
+        lock (startupArmingLock)
+            startupHookTask = null;
+
+        if (disposed || !enabled)
+        {
+            result?.DisposeHooks();
+            CancelStartupArming();
+            return false;
+        }
+
+        if (result != null)
+        {
+            setActiveCameraHook = result.SetActiveCameraHook;
+            cameraCurrentSightDistanceHook = result.CameraCurrentSightDistanceHook;
+            cameraCollisionPatchAddress = result.CameraCollisionPatchAddress;
+        }
+
+        initialized = true;
+        return true;
+    }
+
     private static string GetStartupArmingStepLabel(int step)
         => step switch
         {
-            0 => "Create SetActiveCamera hook",
-            1 => "Create CameraCurrentSightDistance hook",
-            2 => "Scan CameraCollisionPatch",
-            3 => "Validate surfaces",
-            4 => "Enable SetActiveCamera hook",
-            5 => "Enable CameraCurrentSightDistance hook",
-            6 => "Apply CameraCollisionPatch",
+            0 => "Apply prepared camera hook surfaces",
+            1 => "Validate surfaces",
+            2 => "Enable SetActiveCamera hook",
+            3 => "Enable CameraCurrentSightDistance hook",
+            4 => "Apply CameraCollisionPatch",
             _ => "Finalize",
         };
 
@@ -480,4 +592,23 @@ public unsafe sealed class SightDistanceService : IDisposable
         int mode,
         float currentValue,
         float targetValue);
+
+    private sealed record StartupHookResult(
+        Hook<SetActiveCameraDelegate>? SetActiveCameraHook,
+        Hook<CameraCurrentSightDistanceDelegate>? CameraCurrentSightDistanceHook,
+        nint CameraCollisionPatchAddress)
+    {
+        public void DisposeHooks()
+        {
+            DisposeHook(SetActiveCameraHook);
+            DisposeHook(CameraCurrentSightDistanceHook);
+        }
+
+        private static void DisposeHook<T>(Hook<T>? hook)
+            where T : Delegate
+        {
+            if (hook is { IsDisposed: false })
+                hook.Dispose();
+        }
+    }
 }

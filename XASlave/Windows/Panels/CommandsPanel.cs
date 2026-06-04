@@ -107,7 +107,7 @@ public partial class SlaveWindow
         new("/xa sprint on|off", "Toggle `Infinite Sprint`.", "Controls XA's movement-gated Sprint recast surface."),
         new("/xa sprintdelay <seconds>", "Set the `Infinite Sprint` movement-start delay.", "Accepts values from `0.0` to `30.0` seconds."),
         new("/xa teleportlock on|off", "Toggle `Clear Teleportation Lock`.", "Uses XA's teleport-stuck recovery seam."),
-        new("/xa titlesasplayernames on|off", "Toggle `Show Titles As Playernames`.", "Moves prefix titles before the player name and suffix titles after it."),
+        new("/xa titlesasplayernames on|off", "Toggle `Show Titles As Playernames`.", "Moves prefix titles before the player name and suffix titles after it. The XA Mods suboption can use Honorific custom titles when Honorific is available."),
         new("/xa travelerworlds on|off", "Toggle `Show Traveler World Names`.", "Shows visible Wanderer, Traveler, and Voyager names as Name@HomeWorld on this client and hides the FC/travel tag; the XA Mods suboptions can disable it in duties or add Name @ HomeWorld spacing."),
     };
 

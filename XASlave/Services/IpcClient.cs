@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Numerics;
+using System.Text.Json;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
@@ -8,6 +9,8 @@ using Dalamud.Plugin.Services;
 // List<Vector3> needed for vnavmesh.Path.MoveTo IPC
 
 namespace XASlave.Services;
+
+public readonly record struct HonorificTitleInfo(string Title, bool IsPrefix, bool IsOriginal);
 
 /// <summary>
 /// IPC client for XA Slave - provides access to XA Database and all external plugin IPC channels.
@@ -26,9 +29,14 @@ namespace XASlave.Services;
 ///   TextAdvance    - IsEnabled, IsBusy, IsPaused, Stop
 ///   Artisan        - IsBusy, endurance, crafting lists, stop request
 ///   Splatoon       - IsLoaded check
+///   Honorific      - ApiVersion, resolved custom title lookup
 /// </summary>
 public sealed class IpcClient
 {
+    private const uint HonorificSupportedMajorVersion = 3;
+    private const uint HonorificSupportedMinorVersion = 2;
+    private static readonly TimeSpan HonorificAvailabilityCacheDuration = TimeSpan.FromSeconds(5);
+
     private readonly IPluginLog log;
 
     // -- XA Database --
@@ -73,6 +81,7 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<bool> arPluginStateGetMultiModeStatusSubscriber;
     private readonly ICallGateSubscriber<bool> arPluginStateCanAutoLoginSubscriber;
     private readonly ICallGateSubscriber<bool> arPluginStateGetOptionRetainerSenseSubscriber;
+    private readonly ICallGateSubscriber<object> arPluginStateAbortAllTasksSubscriber;
     private readonly ICallGateSubscriber<uint, bool> arPluginStateIsItemProtectedSubscriber;
     private readonly ICallGateSubscriber<ulong, bool?> arPluginStateAreAnyEnabledVesselsNotDeployedSubscriber;
     private readonly ICallGateSubscriber<ulong, bool?> arPluginStateAreAnyEnabledVesselsReadySubscriber;
@@ -86,6 +95,8 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<object> arFinishRetainerPostProcessSubscriber;
     private readonly ICallGateSubscriber<string, string, object> arOnRetainerReadyForPostprocessSubscriber;
     private readonly ICallGateSubscriber<string, object> arOnRetainerAdditionalTaskSubscriber;
+    private readonly ICallGateSubscriber<string, object> arOnRetainerListCustomTaskSubscriber;
+    private readonly ICallGateSubscriber<object> arOnRetainerListTaskButtonsDrawSubscriber;
 
     // -- Lifestream (source: Lifestream/IPC/IPCProvider.cs - EzIPC prefix "Lifestream.") --
     private readonly ICallGateSubscriber<bool> lsIsBusySubscriber;
@@ -139,6 +150,14 @@ public sealed class IpcClient
     // -- Splatoon (source: Splatoon/Modules/SplatoonIPC.cs - explicit channel names) --
     private readonly ICallGateSubscriber<bool> splatIsLoadedSubscriber;
 
+    // -- Honorific (source: Honorific/IpcProvider.cs - explicit "Honorific." channel names) --
+    private readonly ICallGateSubscriber<(uint, uint)> honorificApiVersionSubscriber;
+    private readonly ICallGateSubscriber<int, string> honorificGetCharacterTitleSubscriber;
+
+    private DateTime honorificAvailabilityLastCheckedUtc = DateTime.MinValue;
+    private bool honorificAvailable;
+    private (uint Major, uint Minor) honorificApiVersion;
+
     public IpcClient(IDalamudPluginInterface pluginInterface, IPluginLog log)
     {
         this.log = log;
@@ -185,6 +204,7 @@ public sealed class IpcClient
         arPluginStateGetMultiModeStatusSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.PluginState.GetMultiModeStatus");
         arPluginStateCanAutoLoginSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.PluginState.CanAutoLogin");
         arPluginStateGetOptionRetainerSenseSubscriber = pluginInterface.GetIpcSubscriber<bool>("AutoRetainer.PluginState.GetOptionRetainerSense");
+        arPluginStateAbortAllTasksSubscriber = pluginInterface.GetIpcSubscriber<object>("AutoRetainer.PluginState.AbortAllTasks");
         arPluginStateIsItemProtectedSubscriber = pluginInterface.GetIpcSubscriber<uint, bool>("AutoRetainer.PluginState.IsItemProtected");
         arPluginStateAreAnyEnabledVesselsNotDeployedSubscriber = pluginInterface.GetIpcSubscriber<ulong, bool?>("AutoRetainer.PluginState.AreAnyEnabledVesselsNotDeployed");
         arPluginStateAreAnyEnabledVesselsReadySubscriber = pluginInterface.GetIpcSubscriber<ulong, bool?>("AutoRetainer.PluginState.AreAnyEnabledVesselsReady");
@@ -198,6 +218,8 @@ public sealed class IpcClient
         arFinishRetainerPostProcessSubscriber = pluginInterface.GetIpcSubscriber<object>("AutoRetainer.FinishPostprocessRequest");
         arOnRetainerReadyForPostprocessSubscriber = pluginInterface.GetIpcSubscriber<string, string, object>("AutoRetainer.OnRetainerReadyForPostprocess");
         arOnRetainerAdditionalTaskSubscriber = pluginInterface.GetIpcSubscriber<string, object>("AutoRetainer.OnRetainerAdditionalTask");
+        arOnRetainerListCustomTaskSubscriber = pluginInterface.GetIpcSubscriber<string, object>("AutoRetainer.OnRetainerListCustomTask");
+        arOnRetainerListTaskButtonsDrawSubscriber = pluginInterface.GetIpcSubscriber<object>("AutoRetainer.OnRetainerListTaskButtonsDraw");
 
         // Lifestream - EzIPC prefix "Lifestream." + method name
         lsIsBusySubscriber = pluginInterface.GetIpcSubscriber<bool>("Lifestream.IsBusy");
@@ -251,6 +273,9 @@ public sealed class IpcClient
         // Splatoon - explicit channel names
         splatIsLoadedSubscriber = pluginInterface.GetIpcSubscriber<bool>("Splatoon.IsLoaded");
 
+        // Honorific - explicit channel names in IpcProvider.Init()
+        honorificApiVersionSubscriber = pluginInterface.GetIpcSubscriber<(uint, uint)>("Honorific.ApiVersion");
+        honorificGetCharacterTitleSubscriber = pluginInterface.GetIpcSubscriber<int, string>("Honorific.GetCharacterTitle");
     }
 
     // ═══════════════════════════════════════════════════
@@ -322,6 +347,116 @@ public sealed class IpcClient
     {
         try { splatIsLoadedSubscriber.InvokeFunc(); return true; }
         catch { return false; }
+    }
+
+    public bool IsHonorificAvailable()
+        => RefreshHonorificAvailability();
+
+    public bool TryGetHonorificCharacterTitle(int objectIndex, out HonorificTitleInfo title)
+    {
+        title = default;
+
+        if (!RefreshHonorificAvailability())
+            return false;
+
+        try
+        {
+            var json = honorificGetCharacterTitleSubscriber.InvokeFunc(objectIndex);
+            return TryParseHonorificTitleJson(json, out title);
+        }
+        catch
+        {
+            honorificAvailable = false;
+            honorificAvailabilityLastCheckedUtc = DateTime.UtcNow;
+            return false;
+        }
+    }
+
+    private bool RefreshHonorificAvailability()
+    {
+        var now = DateTime.UtcNow;
+        if (now - honorificAvailabilityLastCheckedUtc < HonorificAvailabilityCacheDuration)
+            return honorificAvailable;
+
+        honorificAvailabilityLastCheckedUtc = now;
+        try
+        {
+            var version = honorificApiVersionSubscriber.InvokeFunc();
+            honorificApiVersion = (version.Item1, version.Item2);
+            honorificAvailable =
+                honorificApiVersion.Major == HonorificSupportedMajorVersion
+                && honorificApiVersion.Minor >= HonorificSupportedMinorVersion;
+            return honorificAvailable;
+        }
+        catch
+        {
+            honorificApiVersion = default;
+            honorificAvailable = false;
+            return false;
+        }
+    }
+
+    private static bool TryParseHonorificTitleJson(string json, out HonorificTitleInfo title)
+    {
+        title = default;
+
+        if (string.IsNullOrWhiteSpace(json))
+            return false;
+
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            if (root.ValueKind != JsonValueKind.Object)
+                return false;
+
+            if (!root.TryGetProperty("Title", out var titleElement))
+                return false;
+
+            string titleText;
+            if (titleElement.ValueKind == JsonValueKind.Null)
+            {
+                titleText = string.Empty;
+            }
+            else if (titleElement.ValueKind == JsonValueKind.String)
+            {
+                titleText = titleElement.GetString() ?? string.Empty;
+            }
+            else
+            {
+                return false;
+            }
+
+            if (ContainsControlCharacter(titleText))
+                return false;
+
+            var isPrefix = TryGetBool(root, "IsPrefix");
+            var isOriginal = TryGetBool(root, "IsOriginal");
+            title = new HonorificTitleInfo(titleText, isPrefix, isOriginal);
+            return true;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
+    }
+
+    private static bool TryGetBool(JsonElement root, string propertyName)
+    {
+        return root.TryGetProperty(propertyName, out var property)
+            && property.ValueKind is JsonValueKind.True or JsonValueKind.False
+            && property.GetBoolean();
+    }
+
+    private static bool ContainsControlCharacter(string value)
+    {
+        foreach (var character in value)
+        {
+            if (char.IsControl(character))
+                return true;
+        }
+
+        return false;
     }
 
     // ═══════════════════════════════════════════════════
@@ -570,6 +705,12 @@ public sealed class IpcClient
         catch { return false; }
     }
 
+    public bool AutoRetainerPluginStateAbortAllTasks()
+    {
+        try { arPluginStateAbortAllTasksSubscriber.InvokeAction(); return true; }
+        catch (Exception ex) { log.Error($"[XASlave] IPC: AR.PluginState.AbortAllTasks failed - {ex.Message}"); return false; }
+    }
+
     public bool AutoRetainerPluginStateIsItemProtected(uint itemId)
     {
         try { return arPluginStateIsItemProtectedSubscriber.InvokeFunc(itemId); }
@@ -668,6 +809,39 @@ public sealed class IpcClient
     }
 
     // ═══════════════════════════════════════════════════
+    /// <summary>Subscribe to OnRetainerAdditionalTask. AR fires this for each retainer before
+    /// checking which plugins requested retainer post-processing.</summary>
+    public void AutoRetainerSubscribeRetainerAdditionalTask(Action<string> callback)
+    {
+        arOnRetainerAdditionalTaskSubscriber.Subscribe(callback);
+    }
+
+    /// <summary>Unsubscribe from OnRetainerAdditionalTask.</summary>
+    public void AutoRetainerUnsubscribeRetainerAdditionalTask(Action<string> callback)
+    {
+        arOnRetainerAdditionalTaskSubscriber.Unsubscribe(callback);
+    }
+
+    /// <summary>Ask AR's retainer-list overlay to process only this plugin's custom list task.
+    /// This must be invoked while AR is firing OnRetainerListTaskButtonsDraw.</summary>
+    public bool AutoRetainerRequestRetainerListCustomTask(string pluginName)
+    {
+        try { arOnRetainerListCustomTaskSubscriber.InvokeAction(pluginName); return true; }
+        catch (Exception ex) { log.Error($"[XASlave] IPC: AR.OnRetainerListCustomTask failed - {ex.Message}"); return false; }
+    }
+
+    /// <summary>Subscribe to AR's retainer-list custom-task draw hook.</summary>
+    public void AutoRetainerSubscribeRetainerListTaskButtonsDraw(Action callback)
+    {
+        arOnRetainerListTaskButtonsDrawSubscriber.Subscribe(callback);
+    }
+
+    /// <summary>Unsubscribe from AR's retainer-list custom-task draw hook.</summary>
+    public void AutoRetainerUnsubscribeRetainerListTaskButtonsDraw(Action callback)
+    {
+        arOnRetainerListTaskButtonsDrawSubscriber.Unsubscribe(callback);
+    }
+
     //  Lifestream
     // ═══════════════════════════════════════════════════
 

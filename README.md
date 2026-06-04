@@ -54,7 +54,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 
 - **Plugin Operations** - Manage startup behavior, verbose logging, titlebar favourites, version display, update history, and quick actions such as presets, rendering presets, Sit/Doze, All XA Mods Off, task stop, Xagman disconnect, and Kill Game.
 - **Export Data** - Export AutoRetainer, Lifestream, and XA Database tables to timestamped TSV/CSV files or overwrite a fixed path for automation.
-- **Repo List** - Review common plugin repositories with installer/settings shortcuts, plugin presence checks, and copy-to-clipboard URLs.
+- **Repo List** - Review all plugins from the referenced repositories in one sortable table with group, author, plugin status, installer/settings shortcuts, and copy-to-clipboard repo actions.
 - **IPC Calls Available** - Check supported IPC integrations, live/cached plugin availability, XA Slave provider channels, and direct examples such as `XASlave.ExecuteCommand("xamods")`.
 - **Commands** - Browse the current `/xa` command surface in searchable grouped tables for general commands, XA Mods categories, Dropbox queueing, movement helpers, and item commands.
 - **Support Diagnostics** - `/xa debug` reveals the hidden Debug / Test panel for support-guided checks and keeps it visible across reloads until toggled off.
@@ -167,7 +167,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa leaveduty on/off` | Toggle `Auto Leave Duty` (`/xa autoleaveduty` is also accepted). |
 | `/xa automerge on/off` | Toggle `Auto Merge`. |
 | `/xa mooglemail on/off` | Toggle `Auto Open Moogle Mail` Letter List actions. |
-| `/xa peep [on/off/clear]` | Open XA Peep's small list, toggle its tracker, or clear its stored history; its history window can sort by count, player, last seen, or total time. |
+| `/xa peep [on/off/clear]` | Open XA Peep's small list, toggle its tracker, or clear its stored history; turning XA Peep off also hides the compact window if it is open. Its history window can sort by count, player, last seen, or total time. |
 | `/xa playerrestore` | Disable the current Player Mods toggles. |
 | `/xa refusetrade on/off` | Toggle `Refuse Trade Request`. |
 | `/xa revealmap on/off` | Toggle `Reveal Undiscovered Areas`. |
@@ -178,7 +178,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | `/xa sprint on/off` | Toggle `Infinite Sprint`. |
 | `/xa sprintdelay <seconds>` | Set the `Infinite Sprint` movement-start delay. |
 | `/xa teleportlock on/off` | Toggle `Clear Teleportation Lock`. |
-| `/xa titlesasplayernames on/off` | Toggle `Show Titles As Playernames`; prefix titles move before the player name and suffix titles move after it. |
+| `/xa titlesasplayernames on/off` | Toggle `Show Titles As Playernames`; prefix titles move before the player name and suffix titles move after it, with optional Honorific custom-title support in XA Mods. |
 | `/xa travelerworlds on/off` | Toggle `Show Traveler World Names`; visible Wanderer, Traveler, and Voyager names show `Name@HomeWorld` locally and hide the FC/travel tag, with XA Mods options to disable in duties or add `Name @ HomeWorld` spacing. |
 
 </details>

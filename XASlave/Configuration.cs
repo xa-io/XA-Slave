@@ -405,6 +405,7 @@ public class Configuration : IPluginConfiguration
     public bool ShowTravelerWorldNamesDisableInDuties { get; set; } = true;
     public bool ShowTravelerWorldNamesAddSpacer { get; set; } = false;
     public bool ShowTitlesAsPlayernamesEnabled { get; set; } = false;
+    public bool ShowTitlesAsPlayernamesHonorificSupportEnabled { get; set; } = true;
     public bool ShowBlacklistedPlayernameInPartyEnabled { get; set; } = false;
     public bool BetterInventoryMoverEnabled { get; set; } = false;
     public BetterInventoryMoverModifierKey BetterInventoryMoverQuickMoveModifier { get; set; } = BetterInventoryMoverModifierKey.LeftShift;

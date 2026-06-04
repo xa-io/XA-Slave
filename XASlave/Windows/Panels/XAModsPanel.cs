@@ -226,6 +226,12 @@ public partial class SlaveWindow
                 configuration.ShowTravelerWorldNamesAddSpacer);
         }
 
+        void ApplyShowTitlesAsPlayernamesConfiguration()
+        {
+            plugin.NameplatePrivacy.ApplyShowTitlesAsPlayernamesConfiguration(
+                configuration.ShowTitlesAsPlayernamesHonorificSupportEnabled);
+        }
+
         bool SetShowTravelerWorldNamesEnabled(bool value)
         {
             ApplyShowTravelerWorldNamesConfiguration();
@@ -234,6 +240,7 @@ public partial class SlaveWindow
 
         bool SetShowTitlesAsPlayernamesEnabled(bool value)
         {
+            ApplyShowTitlesAsPlayernamesConfiguration();
             return plugin.NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled(value);
         }
 
@@ -2248,6 +2255,18 @@ public partial class SlaveWindow
                 : $"World name will appear in duties. Format: {nameFormat}.");
         }
 
+        void DrawShowTitlesAsPlayernamesOptions()
+        {
+            var honorificSupport = configuration.ShowTitlesAsPlayernamesHonorificSupportEnabled;
+            if (ImGui.Checkbox("Support Honorific##ShowTitlesAsPlayernamesHonorific", ref honorificSupport))
+            {
+                configuration.ShowTitlesAsPlayernamesHonorificSupportEnabled = honorificSupport;
+                ApplyShowTitlesAsPlayernamesConfiguration();
+                SaveConfiguration();
+                SetToonModsStatus("XA Mods: Show Titles As Playernames Honorific support updated.");
+            }
+        }
+
         void SaveAutoSkipCutsceneOptions(string message)
         {
             configuration.AutoSkipCutscenesWhitelistTerritories = NormalizeTerritoryList(configuration.AutoSkipCutscenesWhitelistTerritories);
@@ -2980,9 +2999,11 @@ public partial class SlaveWindow
             SetShowTitlesAsPlayernamesEnabled,
             applied => configuration.ShowTitlesAsPlayernamesEnabled = applied,
             "Moves visible player titles into the player name line.",
-            "Moves prefix titles before the player name and suffix titles after the player name, then hides the native title line. If Show Traveler World Names is also enabled, @HomeWorld is appended after the title-adjusted name.",
+            "Moves prefix titles before the player name and suffix titles after the player name, then hides the native title line. If Support Honorific is enabled, XA uses Honorific's resolved custom title when available before falling back to the native title. If Show Traveler World Names is also enabled, @HomeWorld is appended after the title-adjusted name.",
             plugin.NameplatePrivacy.ShowTitlesAsPlayernamesStatusText,
-            searchTerms: ["title", "titles", "player title", "prefix title", "suffix title", "nameplate", "playernames", "traveler"]);
+            searchTerms: ["title", "titles", "player title", "prefix title", "suffix title", "nameplate", "playernames", "Honorific", "custom title", "traveler"],
+            drawOptions: DrawShowTitlesAsPlayernamesOptions,
+            showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "show-blacklisted-playername-in-party",
@@ -3127,7 +3148,7 @@ public partial class SlaveWindow
             "xa-peep",
             "XA Peep",
             () => configuration.XAPeepEnabled,
-            plugin.XAPeep.SetEnabled,
+            plugin.SetXAPeepEnabled,
             applied => configuration.XAPeepEnabled = applied,
             "XA target tracker with a small cached list and full history window.",
             "Tracks players targeting you in all areas, including PvP, keeps the small XA Peep list and the separate history window available through logout, records cumulative per-player counts in XA Slave's local database, and can show purple cards, lines, dots, center-screen notifications, prefixed chat notifications, and selectable XA alert sounds that still play even if the game's own sound channel is muted. XA Peep can be filtered to skip party, alliance, in-combat, or in-duty targeters, can auto-open its compact window on plugin load, and lets you lock or unlock window resizing from the title bar. Use `/xa peep` to open the small window or `/xa peep on|off` to toggle tracking from chat.",

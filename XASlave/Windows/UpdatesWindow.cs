@@ -23,6 +23,29 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.38 - 2026-06-03",
+            Lines =
+            [
+                "Player Mods",
+                "- Added optional Honorific support to `Show Titles As Playernames`.",
+                "- The new `Support Honorific` sub-option is enabled by default and reads Honorific's resolved custom title through IPC before falling back to the native title line.",
+                "- Empty Honorific titles stay empty, so XA does not re-add the default game title when Honorific is hiding or overriding the title.",
+                "- Turning off XA Peep now also hides the compact XA Peep window if it is open.",
+                "- IPC Calls Available and Debug `Check All IPC` now include Honorific availability.",
+                "",
+                "Dalamud API 15.0.2",
+                "- Updated Eureka logogram addon text cleanup to use `AtkValueType.ConstString` instead of the obsolete `String8` alias.",
+                "- Export Data automatic writes now run in the background so the framework tick does not perform synchronous JSON, SQLite, and file-output work.",
+                "- Saved startup restore for hook-heavy XA Mods now prepares Custom Timestamp Format, No UI Fade, Queue Position Display, Auto Skip Cutscenes, and Custom Sight Distance hook surfaces outside the framework tick.",
+                "- Custom Timestamp Format now prepares its saved-startup hook during plugin load so the first post-load activation tick only enables an already-created hook.",
+                "- Allow Multiple Game Instances now runs its launch-lock handle cleanup outside the deferred startup queue.",
+                "- Cancel Login Cooldown now prepares its lobby hook outside the deferred startup framework tick before enabling it.",
+                "- Prevent Game Exiting From Lobby Errors now prepares its lobby error hook outside the deferred startup framework tick before enabling it.",
+                "- Reload validation confirmed the XA deferred startup warnings for Allow Multiple Game Instances, Cancel Login Cooldown, and Auto Skip Cutscenes no longer appear.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.37 - 2026-05-15",
             Lines =
             [

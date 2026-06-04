@@ -2440,7 +2440,7 @@ namespace XASlave.Services
                 var value = &addon->AtkValues[32];
                 var warningText = value->Type switch
                 {
-                    AtkValueType.String or AtkValueType.String8 or AtkValueType.ManagedString => CleanAddonText(value->String.ToString()),
+                    AtkValueType.String or AtkValueType.ConstString or AtkValueType.ManagedString => CleanAddonText(value->String.ToString()),
                     _ => string.Empty,
                 };
 
@@ -2551,7 +2551,7 @@ namespace XASlave.Services
                 var value = &addon->AtkValues[36];
                 return value->Type switch
                 {
-                    AtkValueType.String or AtkValueType.String8 or AtkValueType.ManagedString => CleanAddonText(value->String.ToString()),
+                    AtkValueType.String or AtkValueType.ConstString or AtkValueType.ManagedString => CleanAddonText(value->String.ToString()),
                     _ => string.Empty,
                 };
             }

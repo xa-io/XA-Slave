@@ -132,6 +132,12 @@ public sealed class XAModShowTravelerWorldNamesSettings
 }
 
 [Serializable]
+public sealed class XAModShowTitlesAsPlayernamesSettings
+{
+    public bool HonorificSupport { get; set; } = true;
+}
+
+[Serializable]
 public sealed class XAModCustomTimestampFormatSettings
 {
     public string Format { get; set; } = string.Empty;

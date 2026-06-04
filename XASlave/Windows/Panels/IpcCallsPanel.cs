@@ -13,7 +13,7 @@ public partial class SlaveWindow
     // Cached IPC connectivity - refreshed every 5 seconds to avoid HITCH warnings
     private DateTime ipcCacheExpiry = DateTime.MinValue;
     private bool cachedArAvail, cachedLsAvail, cachedYaAvail, cachedDelAvail, cachedPbAvail, cachedDbxAvail;
-    private bool cachedTaAvail, cachedArtAvail, cachedSplatAvail;
+    private bool cachedTaAvail, cachedArtAvail, cachedSplatAvail, cachedHonorificAvail;
 
     // Live IPC bool polling
     private DateTime liveIpcExpiry = DateTime.MinValue;
@@ -32,6 +32,7 @@ public partial class SlaveWindow
         cachedTaAvail = plugin.IpcClient.IsTextAdvanceAvailable();
         cachedArtAvail = plugin.IpcClient.IsArtisanAvailable();
         cachedSplatAvail = plugin.IpcClient.IsSplatoonAvailable();
+        cachedHonorificAvail = plugin.IpcClient.IsHonorificAvailable();
     }
 
     private void RefreshLiveIpcValues()
@@ -427,6 +428,26 @@ public partial class SlaveWindow
             ImGui.TableHeadersRow();
 
             DrawIpcRow("Splatoon.IsLoaded", "bool", "True when Splatoon is loaded", livePulls);
+
+            ImGui.EndTable();
+        }
+
+        ImGui.Spacing();
+
+        // -- Honorific --
+        DrawIpcPluginStatus("Honorific", cachedHonorificAvail, cachedHonorificAvail ? "API 3.2+" : null);
+
+        if (ImGui.BeginTable("IpcHonorific", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        {
+            ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
+            ImGui.TableSetupColumn("Description");
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
+            ImGui.TableHeadersRow();
+
+            DrawIpcRow("Honorific.ApiVersion", "(uint,uint)", "Compatibility check; XA uses API 3.2 or newer.", livePulls);
+            DrawIpcRow("Honorific.GetCharacterTitle", "string", "Resolved active title JSON for a visible object index.", livePulls);
+            DrawIpcRow("Honorific.GetCharacterTitleList", "TitleData[]", "Configured default/custom title list for a character name and world id.", livePulls);
 
             ImGui.EndTable();
         }

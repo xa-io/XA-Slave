@@ -7,6 +7,7 @@ using System.Numerics;
 using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
+using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
 using Microsoft.Data.Sqlite;
 using XASlave.Data;
@@ -81,6 +82,9 @@ public partial class SlaveWindow
     private DateTime exportLastFrameworkTickUtc = DateTime.MinValue;
     private ulong exportLastAlwaysOnRunContentId;
     private string exportPluginConfigsBasePath = string.Empty;
+    private readonly object exportBackgroundLock = new();
+    private bool exportWriteInProgress;
+    private ExportWriteResult? exportCompletedWrite;
     private bool exportInitialized;
 
     // -----------------------------------------------
@@ -144,6 +148,8 @@ public partial class SlaveWindow
 
     private void OnExportDataFrameworkTick()
     {
+        ExportApplyCompletedWrite();
+
         if (!plugin.Configuration.ExportDataAlwaysOn || DateTime.UtcNow < exportNextAutomaticAttemptUtc)
             return;
 
@@ -152,7 +158,7 @@ public partial class SlaveWindow
 
         exportLastFrameworkTickUtc = DateTime.UtcNow;
 
-        if (!Plugin.PlayerState.IsLoaded || string.IsNullOrWhiteSpace(plugin.Configuration.ExportDataOutputPath) || !File.Exists(GetExportAutoRetainerConfigPath()))
+        if (ExportIsWriteInProgress() || !Plugin.PlayerState.IsLoaded || string.IsNullOrWhiteSpace(plugin.Configuration.ExportDataOutputPath) || !File.Exists(GetExportAutoRetainerConfigPath()))
             return;
 
         var runEveryHours = plugin.Configuration.ExportDataRunEveryHours;
@@ -162,9 +168,7 @@ public partial class SlaveWindow
             if (contentId == 0 || contentId == exportLastAlwaysOnRunContentId)
                 return;
 
-            if (ExportTryWriteSnapshot("Always"))
-                exportLastAlwaysOnRunContentId = contentId;
-
+            ExportTryQueueSnapshot("Always");
             exportNextAutomaticAttemptUtc = DateTime.UtcNow.AddSeconds(30);
             return;
         }
@@ -173,7 +177,7 @@ public partial class SlaveWindow
         if (lastRunUtc.HasValue && DateTime.UtcNow - lastRunUtc.Value < TimeSpan.FromHours(runEveryHours))
             return;
 
-        ExportTryWriteSnapshot("Scheduled");
+        ExportTryQueueSnapshot("Scheduled");
         exportNextAutomaticAttemptUtc = DateTime.UtcNow.AddMinutes(1);
     }
 
@@ -194,6 +198,7 @@ public partial class SlaveWindow
     private void DrawExportData()
     {
         InitializeExportData();
+        ExportApplyCompletedWrite();
 
         var cyan = new Vector4(0.4f, 0.8f, 1.0f, 1.0f);
         var green = new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
@@ -270,12 +275,13 @@ public partial class SlaveWindow
         ImGui.TextDisabled(@"Example: E:\gil\pre_{timestamp}_post.tsv");
         ImGui.TextDisabled("Overwrite only applies to fixed file paths. Folder targets and tokenized names still create a new file.");
 
-        var canWriteNow = arConfigExists && !string.IsNullOrWhiteSpace(cfg.ExportDataOutputPath);
+        var writeInProgress = ExportIsWriteInProgress();
+        var canWriteNow = arConfigExists && !writeInProgress && !string.IsNullOrWhiteSpace(cfg.ExportDataOutputPath);
         if (!canWriteNow)
             ImGui.BeginDisabled();
 
         if (ImGui.Button("Write Export Now"))
-            ExportTryWriteSnapshot("Manual");
+            ExportTryQueueSnapshot("Manual");
 
         if (!canWriteNow)
             ImGui.EndDisabled();
@@ -319,6 +325,8 @@ public partial class SlaveWindow
         ImGui.TextDisabled(cfg.ExportDataRunEveryHours == 0
             ? "Interval 0 behaves as an always-on login/session export instead of a repeating per-frame write."
             : $"Automatic writes trigger when the last successful {ExportTaskName} export is older than {ExportFormatIntervalLabel(cfg.ExportDataRunEveryHours)}.");
+        if (writeInProgress)
+            ImGui.TextDisabled("Export write is running in the background.");
         ImGui.TextDisabled("leveA prefers XA Database Journal data from currencies_json and falls back to persisted AutoRetainer fields.");
 
         if (!string.IsNullOrEmpty(exportStatusMessage) && DateTime.UtcNow < exportStatusExpiryUtc)
@@ -331,8 +339,19 @@ public partial class SlaveWindow
     // -----------------------------------------------
     //  Export Data - snapshot write
     // -----------------------------------------------
-    private bool ExportTryWriteSnapshot(string trigger)
+    private bool ExportTryQueueSnapshot(string trigger)
     {
+        ExportApplyCompletedWrite();
+
+        lock (exportBackgroundLock)
+        {
+            if (exportWriteInProgress)
+            {
+                ExportSetStatus($"{ExportTaskName} is already writing in the background.", new Vector4(1.0f, 0.8f, 0.3f, 1.0f));
+                return false;
+            }
+        }
+
         try
         {
             var cfg = plugin.Configuration;
@@ -342,43 +361,152 @@ public partial class SlaveWindow
                 return false;
             }
 
-            var rows = ExportBuildRows();
-            if (rows.Count == 0)
+            var autoRetainerConfigPath = GetExportAutoRetainerConfigPath();
+            if (!File.Exists(autoRetainerConfigPath))
             {
-                ExportSetStatus($"{ExportTaskName} found no characters to export from AutoRetainer DefaultConfig.json.", new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
+                ExportSetStatus($"{ExportTaskName} could not start because AutoRetainer DefaultConfig.json was not found.", new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
                 return false;
             }
 
-            var outputFilePath = ExportBuildOutputFilePath(cfg.ExportDataOutputPath, DateTime.UtcNow, cfg.ExportDataOverwriteFile);
-            var delimiter = string.Equals(Path.GetExtension(outputFilePath), ".csv", StringComparison.OrdinalIgnoreCase) ? "," : "\t";
-            var payload = ExportBuildDelimitedOutput(rows, delimiter);
+            var xaDatabasePath = string.Empty;
+            if (plugin.IpcClient.IsXaDatabaseAvailable())
+            {
+                var dbPath = plugin.IpcClient.GetDbPath();
+                if (!string.IsNullOrWhiteSpace(dbPath) && File.Exists(dbPath))
+                    xaDatabasePath = dbPath;
+            }
 
-            File.WriteAllText(outputFilePath, payload, new UTF8Encoding(false));
+            var request = new ExportWriteRequest(
+                trigger,
+                cfg.ExportDataOutputPath.Trim(),
+                cfg.ExportDataOverwriteFile,
+                cfg.ExportDataRunEveryHours,
+                Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ContentId : 0,
+                Plugin.PluginInterface.GetPluginConfigDirectory(),
+                autoRetainerConfigPath,
+                GetExportLifestreamConfigPath(),
+                xaDatabasePath);
 
-            cfg.ExportDataLastSuccessfulRunUtc = DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture);
-            cfg.Save();
+            lock (exportBackgroundLock)
+            {
+                exportWriteInProgress = true;
+                exportCompletedWrite = null;
+            }
 
-            if (Plugin.PlayerState.IsLoaded && cfg.ExportDataRunEveryHours == 0)
-                exportLastAlwaysOnRunContentId = Plugin.PlayerState.ContentId;
+            ExportSetStatus($"{ExportTaskName} {trigger} write started in the background.", new Vector4(0.4f, 0.8f, 1.0f, 1.0f));
+            _ = Task.Run(() => ExportWriteSnapshotInBackground(request))
+                .ContinueWith(
+                    task =>
+                    {
+                        var result = task.IsFaulted
+                            ? new ExportWriteResult(
+                                request,
+                                false,
+                                $"{ExportTaskName} export failed: {task.Exception?.GetBaseException().Message ?? "Unknown error"}",
+                                new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
+                                DateTime.UtcNow)
+                            : task.Result;
 
-            ExportSetStatus($"{ExportTaskName} {trigger} write complete: {rows.Count} row(s) -> {outputFilePath}", new Vector4(0.4f, 1.0f, 0.4f, 1.0f));
+                        lock (exportBackgroundLock)
+                        {
+                            exportCompletedWrite = result;
+                        }
+                    },
+                    TaskScheduler.Default);
+
             return true;
         }
         catch (Exception ex)
         {
             ExportSetStatus($"{ExportTaskName} export failed: {ex.Message}", new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
+            lock (exportBackgroundLock)
+            {
+                exportWriteInProgress = false;
+                exportCompletedWrite = null;
+            }
+
             return false;
         }
+    }
+
+    private ExportWriteResult ExportWriteSnapshotInBackground(ExportWriteRequest request)
+    {
+        try
+        {
+            var rows = ExportBuildRows(request);
+            if (rows.Count == 0)
+            {
+                return new ExportWriteResult(
+                    request,
+                    false,
+                    $"{ExportTaskName} found no characters to export from AutoRetainer DefaultConfig.json.",
+                    new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
+                    DateTime.UtcNow);
+            }
+
+            var outputFilePath = ExportBuildOutputFilePath(request.OutputPath, DateTime.UtcNow, request.OverwriteFile, request.PluginConfigDirectory);
+            var delimiter = string.Equals(Path.GetExtension(outputFilePath), ".csv", StringComparison.OrdinalIgnoreCase) ? "," : "\t";
+            var payload = ExportBuildDelimitedOutput(rows, delimiter);
+
+            File.WriteAllText(outputFilePath, payload, new UTF8Encoding(false));
+
+            return new ExportWriteResult(
+                request,
+                true,
+                $"{ExportTaskName} {request.Trigger} write complete: {rows.Count} row(s) -> {outputFilePath}",
+                new Vector4(0.4f, 1.0f, 0.4f, 1.0f),
+                DateTime.UtcNow);
+        }
+        catch (Exception ex)
+        {
+            return new ExportWriteResult(
+                request,
+                false,
+                $"{ExportTaskName} export failed: {ex.Message}",
+                new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
+                DateTime.UtcNow);
+        }
+    }
+
+    private void ExportApplyCompletedWrite()
+    {
+        ExportWriteResult? result;
+        lock (exportBackgroundLock)
+        {
+            result = exportCompletedWrite;
+            if (result == null)
+                return;
+
+            exportCompletedWrite = null;
+            exportWriteInProgress = false;
+        }
+
+        if (result.Success)
+        {
+            plugin.Configuration.ExportDataLastSuccessfulRunUtc = result.CompletedUtc.ToString("O", CultureInfo.InvariantCulture);
+            plugin.Configuration.Save();
+
+            if (result.Request.RunEveryHours == 0 && result.Request.ContentId != 0)
+                exportLastAlwaysOnRunContentId = result.Request.ContentId;
+        }
+
+        ExportSetStatus(result.Message, result.Color);
+    }
+
+    private bool ExportIsWriteInProgress()
+    {
+        lock (exportBackgroundLock)
+            return exportWriteInProgress;
     }
 
     // -----------------------------------------------
     //  Export Data - row building
     // -----------------------------------------------
-    private List<ExportRow> ExportBuildRows()
+    private List<ExportRow> ExportBuildRows(ExportWriteRequest request)
     {
-        var autoRetainerCharacters = ExportLoadAutoRetainerCharacters();
-        var housingMap = ExportLoadLifestreamHousing();
-        var snapshotMap = ExportLoadXaSnapshotSupplements();
+        var autoRetainerCharacters = ExportLoadAutoRetainerCharacters(request.AutoRetainerConfigPath);
+        var housingMap = ExportLoadLifestreamHousing(request.LifestreamConfigPath);
+        var snapshotMap = ExportLoadXaSnapshotSupplements(request.XaDatabasePath);
 
         return autoRetainerCharacters
             .OrderBy(character => WorldData.GetSortKey(character.World))
@@ -433,9 +561,8 @@ public partial class SlaveWindow
     // -----------------------------------------------
     //  Export Data - AutoRetainer loader
     // -----------------------------------------------
-    private List<ExportAutoRetainerCharacter> ExportLoadAutoRetainerCharacters()
+    private List<ExportAutoRetainerCharacter> ExportLoadAutoRetainerCharacters(string path)
     {
-        var path = GetExportAutoRetainerConfigPath();
         if (!File.Exists(path))
             return new List<ExportAutoRetainerCharacter>();
 
@@ -484,9 +611,8 @@ public partial class SlaveWindow
     // -----------------------------------------------
     //  Export Data - Lifestream loader
     // -----------------------------------------------
-    private Dictionary<long, ExportCharacterHousing> ExportLoadLifestreamHousing()
+    private Dictionary<long, ExportCharacterHousing> ExportLoadLifestreamHousing(string path)
     {
-        var path = GetExportLifestreamConfigPath();
         var result = new Dictionary<long, ExportCharacterHousing>();
         if (!File.Exists(path))
             return result;
@@ -534,13 +660,9 @@ public partial class SlaveWindow
     // -----------------------------------------------
     //  Export Data - XA Database snapshot loader
     // -----------------------------------------------
-    private Dictionary<long, ExportSnapshotSupplement> ExportLoadXaSnapshotSupplements()
+    private Dictionary<long, ExportSnapshotSupplement> ExportLoadXaSnapshotSupplements(string dbPath)
     {
         var result = new Dictionary<long, ExportSnapshotSupplement>();
-        if (!plugin.IpcClient.IsXaDatabaseAvailable())
-            return result;
-
-        var dbPath = plugin.IpcClient.GetDbPath();
         if (string.IsNullOrWhiteSpace(dbPath) || !File.Exists(dbPath))
             return result;
 
@@ -665,7 +787,7 @@ public partial class SlaveWindow
         return Path.GetDirectoryName(trimmed);
     }
 
-    private string ExportBuildOutputFilePath(string configuredPath, DateTime nowUtc, bool overwriteFixedFile)
+    private string ExportBuildOutputFilePath(string configuredPath, DateTime nowUtc, bool overwriteFixedFile, string fallbackDirectory)
     {
         var trimmed = configuredPath.Trim();
         var timestamp = nowUtc.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture);
@@ -681,7 +803,7 @@ public partial class SlaveWindow
             var tokenResolvedPath = ExportTimestampTokenRegex.Replace(trimmed, timestamp);
             var tokenResolvedDirectory = Path.GetDirectoryName(tokenResolvedPath);
             if (string.IsNullOrWhiteSpace(tokenResolvedDirectory))
-                tokenResolvedDirectory = Plugin.PluginInterface.GetPluginConfigDirectory();
+                tokenResolvedDirectory = fallbackDirectory;
 
             Directory.CreateDirectory(tokenResolvedDirectory);
             return Path.IsPathRooted(tokenResolvedPath)
@@ -691,7 +813,7 @@ public partial class SlaveWindow
 
         var directory = Path.GetDirectoryName(trimmed);
         if (string.IsNullOrWhiteSpace(directory))
-            directory = Plugin.PluginInterface.GetPluginConfigDirectory();
+            directory = fallbackDirectory;
 
         Directory.CreateDirectory(directory);
 
@@ -1268,6 +1390,24 @@ public partial class SlaveWindow
     }
 
     private sealed record ExportFcLookup(long FcId, string Name, int Points);
+
+    private sealed record ExportWriteRequest(
+        string Trigger,
+        string OutputPath,
+        bool OverwriteFile,
+        int RunEveryHours,
+        ulong ContentId,
+        string PluginConfigDirectory,
+        string AutoRetainerConfigPath,
+        string LifestreamConfigPath,
+        string XaDatabasePath);
+
+    private sealed record ExportWriteResult(
+        ExportWriteRequest Request,
+        bool Success,
+        string Message,
+        Vector4 Color,
+        DateTime CompletedUtc);
 
     private sealed class ExportCharacterHousing
     {
