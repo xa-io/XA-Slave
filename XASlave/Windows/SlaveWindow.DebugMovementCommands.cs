@@ -97,23 +97,23 @@ public partial class SlaveWindow
     {
         try
         {
-            if (!plugin.IpcClient.VnavIsReady())
-            {
-                SetDebugResult("vnavmesh not ready, cannot navigate");
+            if (!TryStartMovingCheaterMountStep(out var alreadyMounted))
                 return;
-            }
 
-            ChatHelper.SendMessage("/gaction \"Mount Roulette\"");
             var canFly = HasFlightUnlocked();
             if (canFly)
             {
                 ChatHelper.SendMessage("/vnav flyflag");
-                SetDebugResult("Smart: Mount + /vnav flyflag (flying unlocked in zone)");
+                SetDebugResult(alreadyMounted
+                    ? "Smart: Already mounted + /vnav flyflag (flying unlocked in zone)"
+                    : "Smart: Mount + /vnav flyflag (flying unlocked in zone)");
             }
             else
             {
                 ChatHelper.SendMessage("/vnav moveflag");
-                SetDebugResult("Smart: Mount + /vnav moveflag (flying NOT unlocked, ground pathfind)");
+                SetDebugResult(alreadyMounted
+                    ? "Smart: Already mounted + /vnav moveflag (flying NOT unlocked, ground pathfind)"
+                    : "Smart: Mount + /vnav moveflag (flying NOT unlocked, ground pathfind)");
             }
         }
         catch (Exception ex)
@@ -126,23 +126,23 @@ public partial class SlaveWindow
     {
         try
         {
-            if (!plugin.IpcClient.VnavIsReady())
-            {
-                SetDebugResult("vnavmesh not ready, cannot navigate");
+            if (!TryStartMovingCheaterMountStep(out var alreadyMounted))
                 return;
-            }
 
-            ChatHelper.SendMessage("/gaction \"Mount Roulette\"");
             var canFly = HasFlightUnlocked();
             if (canFly)
             {
                 ChatHelper.SendMessage("/vnav flyflag");
-                SetDebugResult("Sent: Mount + /vnav flyflag (flying unlocked)");
+                SetDebugResult(alreadyMounted
+                    ? "Sent: already mounted + /vnav flyflag (flying unlocked)"
+                    : "Sent: Mount + /vnav flyflag (flying unlocked)");
             }
             else
             {
                 ChatHelper.SendMessage("/vnav moveflag");
-                SetDebugResult("Sent: Mount + /vnav moveflag (flight NOT unlocked, fallback to ground)");
+                SetDebugResult(alreadyMounted
+                    ? "Sent: already mounted + /vnav moveflag (flight NOT unlocked, fallback to ground)"
+                    : "Sent: Mount + /vnav moveflag (flight NOT unlocked, fallback to ground)");
             }
         }
         catch (Exception ex)
@@ -155,20 +155,34 @@ public partial class SlaveWindow
     {
         try
         {
-            if (!plugin.IpcClient.VnavIsReady())
-            {
-                SetDebugResult("vnavmesh not ready, cannot navigate");
+            if (!TryStartMovingCheaterMountStep(out var alreadyMounted))
                 return;
-            }
 
-            ChatHelper.SendMessage("/gaction \"Mount Roulette\"");
             ChatHelper.SendMessage("/vnav moveflag");
-            SetDebugResult("Sent: Mount + /vnav moveflag (force ground)");
+            SetDebugResult(alreadyMounted
+                ? "Sent: already mounted + /vnav moveflag (force ground)"
+                : "Sent: Mount + /vnav moveflag (force ground)");
         }
         catch (Exception ex)
         {
             SetDebugResult($"MovingCheater error: {ex.Message}");
         }
+    }
+
+    private bool TryStartMovingCheaterMountStep(out bool alreadyMounted)
+    {
+        alreadyMounted = false;
+        if (!plugin.IpcClient.VnavIsReady())
+        {
+            SetDebugResult("vnavmesh not ready, cannot navigate");
+            return false;
+        }
+
+        alreadyMounted = IsMounted();
+        if (!alreadyMounted)
+            ChatHelper.SendMessage("/gaction \"Mount Roulette\"");
+
+        return true;
     }
 
     private void RunDebugPathToTargetThenInteract()

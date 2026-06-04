@@ -23,6 +23,17 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.39 - 2026-06-04",
+            Lines =
+            [
+                "Movement Commands",
+                "- `/xa movingcheatersmart`, `/xa movingcheaterfly`, and `/xa movingcheaterwalk` now check whether the player is already mounted before sending Mount Roulette.",
+                "- Already-mounted players now path directly to the current map flag instead of being dismounted before `/vnav flyflag` or `/vnav moveflag` runs.",
+                "- Debug `MovingCheater` buttons now use the same command methods as the matching `/xa movingcheater*` commands.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.38 - 2026-06-03",
             Lines =
             [

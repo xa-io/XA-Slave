@@ -212,9 +212,9 @@ The in-plugin `References > Commands` page is the full index for command descrip
 
 | Command | Purpose |
 | --- | --- |
-| `/xa movingcheatersmart` | Mount and path to the current map flag with fly/ground selection based on zone flight unlock. |
-| `/xa movingcheaterfly` | Mount and path to the current map flag with flying when available, falling back to ground movement. |
-| `/xa movingcheaterwalk` | Mount and ground-path to the current map flag. |
+| `/xa movingcheatersmart` | Mount only when needed and path to the current map flag with fly/ground selection based on zone flight unlock. |
+| `/xa movingcheaterfly` | Mount only when needed and path to the current map flag with flying when available, falling back to ground movement. |
+| `/xa movingcheaterwalk` | Mount only when needed and ground-path to the current map flag. |
 | `/xa interact` | Interact with the current target. |
 | `/xa leaveduty` | Run the direct Leave Duty action; `/xa leaveduty on/off` still controls `Auto Leave Duty`. |
 | `/xa recommendedgear` | Open Character, open Recommended Gear, equip the recommendation, then close the related windows. |

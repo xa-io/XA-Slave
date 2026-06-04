@@ -140,9 +140,9 @@ public partial class SlaveWindow
 
     private static readonly CommandReferenceEntry[] XaMovementCommandEntries =
     {
-        new("/xa movingcheatersmart", "`MovingCheater (Smart)` action.", "Mounts, checks whether flight is unlocked in the current zone, then sends `/vnav flyflag` or `/vnav moveflag`."),
-        new("/xa movingcheaterfly", "`MovingCheater (Fly)` action.", "Mounts and sends `/vnav flyflag` when flight is unlocked, falling back to `/vnav moveflag` otherwise."),
-        new("/xa movingcheaterwalk", "`MovingCheater (Walk)` action.", "Mounts and sends `/vnav moveflag` for ground movement to the current map flag."),
+        new("/xa movingcheatersmart", "`MovingCheater (Smart)` action.", "Mounts only when needed, checks whether flight is unlocked in the current zone, then sends `/vnav flyflag` or `/vnav moveflag`."),
+        new("/xa movingcheaterfly", "`MovingCheater (Fly)` action.", "Mounts only when needed and sends `/vnav flyflag` when flight is unlocked, falling back to `/vnav moveflag` otherwise."),
+        new("/xa movingcheaterwalk", "`MovingCheater (Walk)` action.", "Mounts only when needed and sends `/vnav moveflag` for ground movement to the current map flag."),
         new("/xa interact", "`Interact` action.", "Calls the same target interaction helper used by the Debug / Test movement button."),
         new("/xa leaveduty", "`Leave Duty` action.", "No arguments leaves the current duty directly. `/xa leaveduty on|off` still controls the `Auto Leave Duty` XA Mod toggle."),
         new("/xa recommendedgear", "Recommended-gear sequence.", "Uses Step1 open Character, Step2 open RecommendEquip, Step3 equip, then closes Character and RecommendEquip."),

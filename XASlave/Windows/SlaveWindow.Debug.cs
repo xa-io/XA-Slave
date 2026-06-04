@@ -20,7 +20,7 @@ namespace XASlave.Windows;
 
 /// <summary>
 /// Debug / Test Commands panel, partial class split from SlaveWindow.cs.
-/// Contains DrawDebugCommands(), SetDebugResult(), HasFlightUnlocked(), CanMount(), InSanctuary().
+/// Contains DrawDebugCommands(), SetDebugResult(), IsMounted(), HasFlightUnlocked(), CanMount(), InSanctuary().
 /// </summary>
 public partial class SlaveWindow
 {
@@ -678,74 +678,26 @@ public partial class SlaveWindow
 
         if (ImGui.Button("MovingCheater (Smart)"))
         {
-            try
-            {
-                if (plugin.IpcClient.VnavIsReady())
-                {
-                    ChatHelper.SendMessage("/gaction \"Mount Roulette\"");
-                    var canFly = HasFlightUnlocked();
-                    if (canFly)
-                    {
-                        ChatHelper.SendMessage("/vnav flyflag");
-                        SetDebugResult("Smart: Mount + /vnav flyflag (flying unlocked in zone)");
-                    }
-                    else
-                    {
-                        ChatHelper.SendMessage("/vnav moveflag");
-                        SetDebugResult("Smart: Mount + /vnav moveflag (flying NOT unlocked, ground pathfind)");
-                    }
-                }
-                else SetDebugResult("vnavmesh not ready, cannot navigate");
-            }
-            catch (Exception ex) { SetDebugResult($"MovingCheater error: {ex.Message}"); }
+            RunDebugMovingCheaterSmart();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Mounts + auto-detects flight: uses flyflag if flying unlocked, moveflag otherwise.\nMirrors DoNavFlySequenceXA logic from xafunc (Player.CanFly check).");
+            ImGui.SetTooltip("Mounts if needed + auto-detects flight: uses flyflag if flying unlocked, moveflag otherwise.\nMirrors DoNavFlySequenceXA logic from xafunc (Player.CanFly check).");
 
         ImGui.SameLine();
         if (ImGui.Button("MovingCheater (Fly)"))
         {
-            try
-            {
-                if (plugin.IpcClient.VnavIsReady())
-                {
-                    ChatHelper.SendMessage("/gaction \"Mount Roulette\"");
-                    var canFly = HasFlightUnlocked();
-                    if (canFly)
-                    {
-                        ChatHelper.SendMessage("/vnav flyflag");
-                        SetDebugResult("Sent: Mount + /vnav flyflag (flying unlocked)");
-                    }
-                    else
-                    {
-                        ChatHelper.SendMessage("/vnav moveflag");
-                        SetDebugResult("Sent: Mount + /vnav moveflag (flight NOT unlocked, fallback to ground)");
-                    }
-                }
-                else SetDebugResult("vnavmesh not ready, cannot navigate");
-            }
-            catch (Exception ex) { SetDebugResult($"MovingCheater error: {ex.Message}"); }
+            RunDebugMovingCheaterFly();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Fly to flag: Mounts + /vnav flyflag. Falls back to ground if flying not unlocked.");
+            ImGui.SetTooltip("Fly to flag: mounts if needed + /vnav flyflag. Falls back to ground if flying not unlocked.");
 
         ImGui.SameLine();
         if (ImGui.Button("MovingCheater (Walk)"))
         {
-            try
-            {
-                if (plugin.IpcClient.VnavIsReady())
-                {
-                    ChatHelper.SendMessage("/gaction \"Mount Roulette\"");
-                    ChatHelper.SendMessage("/vnav moveflag");
-                    SetDebugResult("Sent: Mount + /vnav moveflag (force ground)");
-                }
-                else SetDebugResult("vnavmesh not ready, cannot navigate");
-            }
-            catch (Exception ex) { SetDebugResult($"MovingCheater error: {ex.Message}"); }
+            RunDebugMovingCheaterWalk();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Force ground: Mounts + /vnav moveflag. Works everywhere including towns.");
+            ImGui.SetTooltip("Force ground: mounts if needed + /vnav moveflag. Works everywhere including towns.");
 
         ImGui.Spacing();
 
@@ -1269,7 +1221,7 @@ public partial class SlaveWindow
 
         if (ImGui.Button("IsMounted?"))
         {
-            var mounted = Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion];
+            var mounted = IsMounted();
             SetDebugResult($"IsMounted: {mounted}");
         }
         ImGui.SameLine();
@@ -4270,6 +4222,14 @@ public partial class SlaveWindow
         }
 
         return false;
+    }
+
+    /// <summary>
+    /// Checks if the player is mounted or riding pillion.
+    /// </summary>
+    private static bool IsMounted()
+    {
+        return Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion];
     }
 
     /// <summary>
