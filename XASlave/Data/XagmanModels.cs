@@ -80,6 +80,7 @@ public sealed class XagmanTradeRequestEntry
 public sealed class XagmanPeerPresence
 {
     public string InstanceId { get; set; } = string.Empty;
+    public string PluginVersion { get; set; } = string.Empty;
     public int ProcessId { get; set; }
     public DateTime LastSeenUtc { get; set; }
     public bool IsLoggedIn { get; set; }

@@ -119,6 +119,14 @@ public class Configuration : IPluginConfiguration
 {
     public int Version { get; set; } = 0;
     public bool OpenPluginOnLoad { get; set; } = false;
+
+    // Force the game window to a custom resolution when the plugin loads.
+    // Reuses the XA Mods custom-resolution machinery (SystemWindowModsService).
+    public bool CustomResolutionOnLoadEnabled { get; set; } = false;
+    public int CustomResolutionOnLoadWidth { get; set; } = 500;
+    public int CustomResolutionOnLoadHeight { get; set; } = 345;
+    public bool CustomResolutionOnLoadIgnoreMinimumWindowSize { get; set; } = true;
+
     public bool VerboseTaskLogging { get; set; } = false;
     public bool ShowVersionInUpdatesTitle { get; set; } = true;
     public bool ShowVersionInWindowTitleDefaultApplied { get; set; } = false;
@@ -217,7 +225,7 @@ public class Configuration : IPluginConfiguration
     public bool XagmanKillGameOnComplete { get; set; } = false;
     public bool XagmanUsePreflightOnFirstCharacter { get; set; } = true;
     public bool XagmanAutoReturnToFc { get; set; } = true;
-    public bool XagmanIgnoreGilInMatchingSelection { get; set; } = true;
+    public bool XagmanIgnoreGilInMatchingSelection { get; set; } = false;
     public bool XagmanWarningDetailsExpanded { get; set; } = true;
     public bool XagmanRoleInstructionsExpanded { get; set; } = true;
     public string XagmanRegionFilter { get; set; } = "All";
@@ -415,6 +423,7 @@ public class Configuration : IPluginConfiguration
     public bool BetterCompanyChestAutoConfirmNumericInput { get; set; } = true;
     public bool BetterCompanyChestShowExchangeableValue { get; set; } = true;
     public bool AutoOpenMoogleMailEnabled { get; set; } = false;
+    public bool AutoOpenMoogleMailDeleteAllWhenFinished { get; set; } = false;
     public bool EnableItemIconInShopsEnabled { get; set; } = false;
     public bool FieldEntryCommandEnabled { get; set; } = false;
     public bool AutoUnlockExpertDeliveryEnabled { get; set; } = false;

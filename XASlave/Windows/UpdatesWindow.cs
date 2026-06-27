@@ -23,6 +23,34 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.40 - 2026-06-27",
+            Lines =
+            [
+                "Plugin Operations",
+                "- New `Custom Resolution on Plugin Load` option (under `Open Plugin on Load`) force-resizes the game window to a saved width and height each time the plugin loads.",
+                "- The width, height, and the `Ignore Minimum Window Size` sub-option stay greyed out until the feature is enabled; the sub-option lowers the client minimum so sizes below 1024x720 hold instead of snapping back.",
+                "- Reuses the same custom-resolution engine as XA Mods, so the on-load resize works without separately enabling Custom Resolutions in XA Mods.",
+                "",
+                "Game Mods",
+                "- `Skip Dialogue` now also skips Craft Leve turn-in dialogue by hooking the `CraftLeveTalk` Lua handler alongside the existing Talk, SystemTalk, ShortTalk, and Guildleve handlers.",
+                "- `Close Lobby Errors` now catches lobby error `2021` (`World data could not be obtained. Please try logging in later.`).",
+                "- `Auto Open Moogle Mail` now reports busy through `XASlave.IsBusy` while it claims attachments, so external automation can wait for mail collection to finish.",
+                "- `Auto Open Moogle Mail` adds a `Delete all when finished` sub-option that automatically deletes all opened letters once Claim Attachments finishes collecting everything.",
+                "",
+                "Xagman",
+                "- Franchise Owners now begin relogging and travelling to the meet location as soon as Tony advertises it, instead of waiting for Tony to reach the spot first, so they are already standing nearby when Tony calls ready.",
+                "- When every Franchise Owner is relogging and none are ready to trade, Tony now uses the idle window to sell its inventory (when `Sell When Inventory Is Full` is enabled). If Tony hits the gil cap during idle selling, it runs the normal full-inventory rotation: return home (if selected), relog the next Tony, travel back to the meet location, and resume.",
+                "- `Select Matching Items` now accounts for gil: Balance selects characters above or below the target, Give selects characters holding at least 1 gil when a give amount is set, Take selects characters when a non-zero amount is set, and TopUp selects only characters below the target. Gil is no longer ignored by default.",
+                "- Connected Xagman clients now share which XA Slave version they are running as part of their peer presence.",
+                "- If a connected, active Xagman client is running a different XA Slave version, the local Xagman run now halts automatically so out-of-sync clients do not trade against each other.",
+                "",
+                "Dalamud 15.0.2.2 Compatibility",
+                "- Updated `Microsoft.Data.Sqlite` to `10.0.9` with an explicit `SQLitePCLRaw.bundle_e_sqlite3` `3.0.3` reference so strict builds no longer report a vulnerable SQLite transitive package.",
+                "- Eureka Logogram Creator favorites and automation overlays now keep Atk collision inhibition enabled so their invisible buttons no longer click through to the native UI behind them.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.39 - 2026-06-04",
             Lines =
             [

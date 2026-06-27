@@ -1715,7 +1715,7 @@ public partial class SlaveWindow
 
             if (ImGui.Button("Claim Attachments##AutoOpenMoogleMail"))
             {
-                var success = plugin.AutoOpenMoogleMail.QueueClaimAttachments();
+                var success = plugin.AutoOpenMoogleMail.QueueClaimAttachments(configuration.AutoOpenMoogleMailDeleteAllWhenFinished);
                 SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
             }
 
@@ -1742,6 +1742,15 @@ public partial class SlaveWindow
 
             if (!enabledForActions)
                 ImGui.EndDisabled();
+
+            var deleteAllWhenFinished = configuration.AutoOpenMoogleMailDeleteAllWhenFinished;
+            if (ImGui.Checkbox("Delete all when finished##AutoOpenMoogleMailDeleteAll", ref deleteAllWhenFinished))
+            {
+                configuration.AutoOpenMoogleMailDeleteAllWhenFinished = deleteAllWhenFinished;
+                SaveConfiguration();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("After Claim Attachments finishes collecting everything, automatically delete all opened letters.");
 
             ImGui.TextDisabled($"Queue state: {plugin.AutoOpenMoogleMail.PendingOperationText}");
             ImGui.TextDisabled($"Known letters: {plugin.AutoOpenMoogleMail.KnownLetterCount}");

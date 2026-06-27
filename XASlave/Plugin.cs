@@ -666,6 +666,34 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
+        QueueDeferredStartupAction(() =>
+        {
+            if (!Configuration.CustomResolutionOnLoadEnabled)
+                return;
+
+            // Custom resolutions must be active in the service before a size can be applied.
+            if (!SystemWindowMods.SetCustomResolutionsEnabled(true))
+            {
+                Log.Warning("[CustomResolutionOnLoad] Could not enable custom resolutions; skipping on-load resize.");
+                return;
+            }
+
+            // Lower the client minimum window size first so sizes below 1024x720 stick instead of snapping back.
+            if (Configuration.CustomResolutionOnLoadIgnoreMinimumWindowSize)
+                SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled(true);
+
+            if (SystemWindowMods.TryApplyCustomResolution(
+                    Configuration.CustomResolutionOnLoadWidth,
+                    Configuration.CustomResolutionOnLoadHeight,
+                    out var customResolutionOnLoadMessage))
+            {
+                Log.Info($"[CustomResolutionOnLoad] {customResolutionOnLoadMessage}");
+            }
+            else
+            {
+                Log.Warning($"[CustomResolutionOnLoad] {customResolutionOnLoadMessage}");
+            }
+        });
         if (Configuration.DisableBackgroundGameRenderingEnabled)
         {
             QueuePostLoadXAModActivation("DisableBackgroundGameRenderingEnabled", "Disable Background Rendering", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 5), () =>
@@ -1086,7 +1114,8 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands."
+            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands.",
+            AllowedInMacros = true,
         });
 
         PluginInterface.UiBuilder.Draw += UpdateEurekaLogogramCreatorOverlayWindows;
@@ -4767,5 +4796,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.39";
+    public const string Version = "0.0.0.40";
 }

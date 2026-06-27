@@ -1029,6 +1029,8 @@ public sealed class XagmanPeerService : IDisposable
         }
     }
 
+    private bool versionMismatchHalted;
+
     private void UpdatePeers(IReadOnlyList<XagmanPeerPresence> updatedPeers)
     {
         var clones = updatedPeers.Select(ClonePresence).ToList();
@@ -1036,7 +1038,38 @@ public sealed class XagmanPeerService : IDisposable
         lock (syncRoot)
             peers = clones;
 
+        CheckPeerVersionCompatibility(clones);
+
         peersUpdated(clones);
+    }
+
+    private void CheckPeerVersionCompatibility(IReadOnlyList<XagmanPeerPresence> currentPeers)
+    {
+        var localVersion = BuildInfo.Version;
+        var versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { localVersion };
+        foreach (var peer in currentPeers)
+        {
+            if (peer.XagmanEnabled && !string.IsNullOrWhiteSpace(peer.PluginVersion))
+                versions.Add(peer.PluginVersion.Trim());
+        }
+
+        if (versions.Count <= 1)
+        {
+            versionMismatchHalted = false;
+            return;
+        }
+
+        if (versionMismatchHalted)
+            return;
+
+        versionMismatchHalted = true;
+        var detail = string.Join(", ", currentPeers
+            .Where(peer => peer.XagmanEnabled
+                && !string.IsNullOrWhiteSpace(peer.PluginVersion)
+                && !string.Equals(peer.PluginVersion.Trim(), localVersion, StringComparison.OrdinalIgnoreCase))
+            .Select(peer => $"{(string.IsNullOrWhiteSpace(peer.CharacterName) ? peer.InstanceId : peer.CharacterName)} v{peer.PluginVersion.Trim()}"));
+        Plugin.Log.Warning($"[XagmanPeerService] XA Slave version mismatch detected (local v{localVersion}). Halting Xagman to avoid out-of-sync behaviour. Out-of-sync peers: {detail}");
+        TriggerXagmanTaskStop();
     }
 
     private void SetStatus(string value)
@@ -1050,6 +1083,7 @@ public sealed class XagmanPeerService : IDisposable
         return new XagmanPeerPresence
         {
             InstanceId = record.InstanceId,
+            PluginVersion = record.PluginVersion,
             ProcessId = record.ProcessId,
             LastSeenUtc = record.LastSeenUtc,
             IsLoggedIn = record.IsLoggedIn,

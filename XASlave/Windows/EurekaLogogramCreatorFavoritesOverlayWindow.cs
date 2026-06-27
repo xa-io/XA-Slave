@@ -29,6 +29,7 @@ public sealed class EurekaLogogramCreatorFavoritesOverlayWindow : Window
     {
         this.plugin = plugin;
         RespectCloseHotkey = false;
+        InhibitAtkCollision = true;
     }
 
     public override void PreDraw()

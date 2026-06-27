@@ -35,7 +35,7 @@ public sealed class IpcProvider : IDisposable
         this.plugin = plugin;
         this.log = log;
 
-        // XASlave.IsBusy - returns true when TaskRunner or AutoCollector is running
+        // XASlave.IsBusy - returns true when TaskRunner, AutoCollector, or Auto Open Moogle Mail is running
         isBusyProvider = pluginInterface.GetIpcProvider<bool>("XASlave.IsBusy");
         isBusyProvider.RegisterFunc(IsBusy);
 
@@ -51,7 +51,7 @@ public sealed class IpcProvider : IDisposable
 
     private bool IsBusy()
     {
-        return plugin.TaskRunner.IsRunning || plugin.AutoCollector.IsRunning;
+        return plugin.TaskRunner.IsRunning || plugin.AutoCollector.IsRunning || plugin.AutoOpenMoogleMail.IsProcessing;
     }
 
     private void RunTask(string taskName)

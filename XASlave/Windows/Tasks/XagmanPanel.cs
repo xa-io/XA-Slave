@@ -50,6 +50,7 @@ public partial class SlaveWindow
     private string xagmanActiveTradePartner = string.Empty;
     private string xagmanActiveTradePartnerInstanceId = string.Empty;
     private bool xagmanRunning;
+    private bool xagmanTonyOpportunisticSellArmed = true;
     private bool xagmanObservedDropboxBusy;
     private bool xagmanTonyObservedOwnerWork;
     private bool xagmanTonyRotationRequestedByOwnerStandby;
@@ -2364,7 +2365,7 @@ public partial class SlaveWindow
             return;
         }
 
-        var selectAllVisible = items.Any(item => item.Mode == XagmanItemMode.Take);
+        var selectAllVisible = items.Any(item => item.Mode == XagmanItemMode.Take && (!IsXagmanGilItem(item.ItemId) || item.Quantity != 0));
         xagmanFranchiseSelectedIndices.Clear();
         var selectedCount = 0;
         foreach (var index in visibleIndices)
@@ -2390,22 +2391,29 @@ public partial class SlaveWindow
                 continue;
 
             var currentQuantity = GetXagmanCharacterItemQuantity(characterNameWorld, item.ItemId, item.IsHq, item.ItemName);
+            var isGil = IsXagmanGilItem(item.ItemId);
             switch (item.Mode)
             {
                 case XagmanItemMode.Give:
-                    if (currentQuantity > 0)
+                    // Gil Give selects anyone holding at least 1 gil, but only when a give amount of 1+ is set.
+                    if (isGil ? (item.Quantity >= 1 && currentQuantity >= 1) : currentQuantity > 0)
                         return true;
                     break;
                 case XagmanItemMode.Balance:
+                    // Balance selects characters that have more or less than the target amount.
                     if (currentQuantity != Math.Max(0, item.Quantity))
                         return true;
                     break;
                 case XagmanItemMode.TopUp:
+                    // TopUp selects only characters that are below the target amount.
                     if (currentQuantity < Math.Max(0, item.Quantity))
                         return true;
                     break;
                 case XagmanItemMode.Take:
-                    return true;
+                    // Gil Take selects the character only when a non-zero take amount is set.
+                    if (!isGil || item.Quantity != 0)
+                        return true;
+                    break;
             }
         }
 
@@ -5337,6 +5345,33 @@ public partial class SlaveWindow
             xagmanStatus = XagmanStatus.AtMeetSpot;
             xagmanStatusText = $"Tony {xagmanActiveCharacter} is ready for the next owner.";
         }
+        var allOwnersReloggingIdle = string.IsNullOrWhiteSpace(xagmanActiveTradePartner)
+            && xagmanTonyObservedOwnerWork
+            && queue.Count == 0
+            && liveRelevantOwnerPeers.Count > 0
+            && liveRelevantOwnerPeers.All(peer => peer.Status == XagmanStatus.Relogging);
+        if (!allOwnersReloggingIdle)
+        {
+            xagmanTonyOpportunisticSellArmed = true;
+        }
+        else if (xagmanTonyOpportunisticSellArmed)
+        {
+            // All Franchise Owners are relogging with none ready to trade; use the idle window to sell Tony's inventory.
+            xagmanTonyOpportunisticSellArmed = false;
+            if (plugin.Configuration.XagmanSellWhenInventoryFull)
+            {
+                if (GetXagmanLiveLocalItemQuantity(1, false) >= XagmanTonySellGilLimit)
+                {
+                    // Already at the gil cap during idle selling: run the same return-home/relog-next-Tony rotation the
+                    // normal Sell When Inventory Is Full flow uses (the next Tony then travels back to the meet spot and resumes).
+                    StartXagmanTonyFullInventoryFallback(string.Empty, $"Xagman: Tony {xagmanActiveCharacter} is at the gil cap during idle selling; using normal Tony full-inventory behavior to rotate to the next Tony.");
+                    return;
+                }
+                // Mid-sell gil cap is handled inside the sell task, which routes through the same full-inventory rotation fallback.
+                if (TryStartXagmanTonySellWhenInventoryFull(string.Empty))
+                    return;
+            }
+        }
         if (!string.IsNullOrWhiteSpace(xagmanActiveTradePartner))
         {
             var activePartnerPeer = plugin.XagmanPeers.Peers
@@ -6279,7 +6314,11 @@ public partial class SlaveWindow
             return false;
         if (!TryResolveXagmanMeetDestinationForOwner())
             return false;
-        if (GetXagmanReadyMeetTonyPeerForOwner() == null)
+        // Franchise Owners begin relog/travel as soon as a Tony peer is advertising the meet destination;
+        // they no longer wait for Tony to physically reach the meet spot, so by the time Tony calls ready
+        // the owners are already standing nearby. Trading is still Tony-gated (Tony only calls owners from
+        // its queue once it is AtMeetSpot), and the owner travel flow already waits/retries if Tony is absent.
+        if (GetXagmanMeetTonyPeerForOwner() == null)
             return false;
         return TryBindXagmanFranchiseTonyForMeetup();
     }
@@ -6387,6 +6426,7 @@ public partial class SlaveWindow
             plugin.XagmanPeers.PublishPresence(new XagmanPeerPresence
             {
                 InstanceId = plugin.InstanceId,
+                PluginVersion = BuildInfo.Version,
                 ProcessId = plugin.ProcessId,
                 LastSeenUtc = DateTime.UtcNow,
                 IsLoggedIn = Plugin.PlayerState.IsLoaded && local != null,

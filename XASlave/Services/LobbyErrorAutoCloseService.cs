@@ -37,6 +37,8 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
         "3088",
         "3102",
         "5006",
+        "2021",
+        "World data could not be obtained. Please try logging in later.",
         "Connection with the server was lost.",
         "You are still logged into the game.",
         "Please allow a few moments for the logout process to complete.",

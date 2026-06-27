@@ -23,6 +23,7 @@ public unsafe sealed class DialogueSkipService : IDisposable
     private Hook<LuaFunctionDelegate>? logMessageNoSkipHook;
     private Hook<TalkDelegate>? shortTalkHook;
     private Hook<TalkDelegate>? shortTalkWithLineVoiceHook;
+    private Hook<LuaFunctionDelegate>? craftLeveTalkHook;
     private Hook<LuaFunctionDelegate>? guildleveAssignmentTalkHook;
 
     private bool initialized;
@@ -77,6 +78,7 @@ public unsafe sealed class DialogueSkipService : IDisposable
         DisposeHook(ref logMessageNoSkipHook);
         DisposeHook(ref shortTalkHook);
         DisposeHook(ref shortTalkWithLineVoiceHook);
+        DisposeHook(ref craftLeveTalkHook);
         DisposeHook(ref guildleveAssignmentTalkHook);
     }
 
@@ -98,6 +100,9 @@ public unsafe sealed class DialogueSkipService : IDisposable
         var talkBase2 = TryScanBaseAddress(Sigs.TalkBaseSig2, "TalkBase2");
         shortTalkHook = TryCreateLuaHook<TalkDelegate>(talkBase2, "ShortTalk", TalkDetour, "ShortTalk");
         shortTalkWithLineVoiceHook = TryCreateLuaHook<TalkDelegate>(talkBase2, "ShortTalkWithLineVoice", TalkDetour, "ShortTalkWithLineVoice");
+
+        var talkBase3 = TryScanBaseAddress(Sigs.TalkBaseSig3, "TalkBase3");
+        craftLeveTalkHook = TryCreateLuaHook<LuaFunctionDelegate>(talkBase3, "CraftLeveTalk", LuaStateTalkDetour, "CraftLeveTalk");
 
         var talkBase4 = TryScanBaseAddress(Sigs.TalkBaseSig4, "TalkBase4");
         guildleveAssignmentTalkHook = TryCreateLuaHook<LuaFunctionDelegate>(talkBase4, "GuildleveAssignmentTalk", LuaStateTalkDetour, "GuildleveAssignmentTalk");
@@ -133,6 +138,7 @@ public unsafe sealed class DialogueSkipService : IDisposable
         count += logMessageNoSkipHook != null ? 1 : 0;
         count += shortTalkHook != null ? 1 : 0;
         count += shortTalkWithLineVoiceHook != null ? 1 : 0;
+        count += craftLeveTalkHook != null ? 1 : 0;
         count += guildleveAssignmentTalkHook != null ? 1 : 0;
         return count;
     }
@@ -145,6 +151,7 @@ public unsafe sealed class DialogueSkipService : IDisposable
         ToggleHook(logMessageNoSkipHook, targetEnabled, "LogMessageNoSkip");
         ToggleHook(shortTalkHook, targetEnabled, "ShortTalk");
         ToggleHook(shortTalkWithLineVoiceHook, targetEnabled, "ShortTalkWithLineVoice");
+        ToggleHook(craftLeveTalkHook, targetEnabled, "CraftLeveTalk");
         ToggleHook(guildleveAssignmentTalkHook, targetEnabled, "GuildleveAssignmentTalk");
     }
 

@@ -61,6 +61,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
     public int LastProcessedLetterCount { get; private set; }
     public bool CanQueueManualOperation => enabled && pendingOperation == null;
     public bool CanStopPendingOperation => enabled && pendingOperation != null;
+    public bool IsProcessing => pendingOperation != null;
 
     public bool SetEnabled(bool value)
     {
@@ -153,13 +154,14 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
             letter => letter.Timestamp != 0 && letter.SenderContentId < NonPlayerSenderThreshold && !HasAttachments(letter));
     }
 
-    public bool QueueClaimAttachments()
+    public bool QueueClaimAttachments(bool deleteAllWhenFinished = false)
     {
         return QueueLetterOperation(
             PendingOperationKind.ClaimAttachments,
             "Claiming all letter attachments",
             HasAttachments,
-            sortDescending: false);
+            sortDescending: false,
+            deleteAllWhenFinished: deleteAllWhenFinished);
     }
 
     public bool QueueRequestDelivery()
@@ -665,7 +667,8 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         PendingOperationKind kind,
         string label,
         Predicate<InfoProxyLetter.Letter> predicate,
-        bool sortDescending)
+        bool sortDescending,
+        bool deleteAllWhenFinished = false)
     {
         if (!enabled)
             return RejectDisabledManualAction($"'{label}' was not queued");
@@ -686,7 +689,10 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
             ? indices.OrderByDescending(value => value).ToList()
             : indices.OrderBy(value => value).ToList();
 
-        pendingOperation = new PendingOperation(kind, label, orderedIndices);
+        pendingOperation = new PendingOperation(kind, label, orderedIndices)
+        {
+            DeleteAllWhenFinished = deleteAllWhenFinished,
+        };
         LastProcessedLetterCount = 0;
         LastActionText = $"Last action: queued '{label}' for {orderedIndices.Count} letters at {DateTime.Now:HH:mm:ss}.";
         return true;
@@ -798,7 +804,11 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         CompletedOperationCount++;
         LastProcessedLetterCount = pendingOperation.ProcessedCount;
         LastActionText = $"Last action: completed {pendingOperation.Label.ToLowerInvariant()} for {pendingOperation.ProcessedCount} letters at {DateTime.Now:HH:mm:ss}.";
+        var deleteAllWhenFinished = pendingOperation.Kind == PendingOperationKind.ClaimAttachments && pendingOperation.DeleteAllWhenFinished;
         pendingOperation = null;
+
+        if (deleteAllWhenFinished)
+            QueueDeleteAllLetters();
     }
 
     private static bool HasAttachments(InfoProxyLetter.Letter letter)
@@ -875,6 +885,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         public PendingOperationKind Kind { get; }
         public string Label { get; }
         public List<int> TargetIndices { get; }
+        public bool DeleteAllWhenFinished { get; set; }
         public PendingOperationStage Stage { get; set; } = PendingOperationStage.SelectingLetter;
         public DateTime ExecuteAtUtc { get; set; }
         public int Position { get; set; }

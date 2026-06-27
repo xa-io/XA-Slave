@@ -144,6 +144,48 @@ public partial class SlaveWindow
 
         ImGui.TextDisabled("Opens XA Slave when the plugin loads and when the character logs in.");
 
+        ImGui.Spacing();
+
+        var customResolutionOnLoad = cfg.CustomResolutionOnLoadEnabled;
+        if (ImGui.Checkbox("Custom Resolution on Plugin Load", ref customResolutionOnLoad))
+        {
+            cfg.CustomResolutionOnLoadEnabled = customResolutionOnLoad;
+            cfg.Save();
+        }
+
+        ImGui.TextDisabled("Force-resizes the game window to a custom resolution when the plugin loads (same engine as XA Mods → Custom Resolutions).");
+
+        ImGui.BeginDisabled(!cfg.CustomResolutionOnLoadEnabled);
+        ImGui.Indent();
+
+        var customResWidth = cfg.CustomResolutionOnLoadWidth;
+        ImGui.SetNextItemWidth(Scale(160f));
+        if (ImGui.InputInt("Width##CustomResolutionOnLoadWidth", ref customResWidth))
+        {
+            cfg.CustomResolutionOnLoadWidth = Math.Clamp(customResWidth, 250, 16384);
+            cfg.Save();
+        }
+
+        var customResHeight = cfg.CustomResolutionOnLoadHeight;
+        ImGui.SetNextItemWidth(Scale(160f));
+        if (ImGui.InputInt("Height##CustomResolutionOnLoadHeight", ref customResHeight))
+        {
+            cfg.CustomResolutionOnLoadHeight = Math.Clamp(customResHeight, 200, 16384);
+            cfg.Save();
+        }
+
+        var customResIgnoreMin = cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize;
+        if (ImGui.Checkbox("Ignore Minimum Window Size##CustomResolutionOnLoad", ref customResIgnoreMin))
+        {
+            cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize = customResIgnoreMin;
+            cfg.Save();
+        }
+
+        ImGui.TextDisabled("Lowers the client minimum window size so resolutions below 1024x720 stick instead of snapping back. Recommended on for small resolutions.");
+
+        ImGui.Unindent();
+        ImGui.EndDisabled();
+
         var showVersionInTitle = cfg.ShowVersionInUpdatesTitle;
         if (ImGui.Checkbox("Show Version in Window Title", ref showVersionInTitle))
         {
