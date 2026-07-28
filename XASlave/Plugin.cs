@@ -91,8 +91,7 @@ public sealed class Plugin : IDalamudPlugin
         Action Activate,
         string Key,
         string DisplayName,
-        TimeSpan Delay,
-        double? WarningThresholdMilliseconds);
+        TimeSpan Delay);
 
     public readonly record struct TitleBarFavXAModInfo(
         string Key,
@@ -126,8 +125,10 @@ public sealed class Plugin : IDalamudPlugin
     public BuddyFeedCutsceneSkipService BuddyFeedCutsceneSkip { get; init; }
     public PopupCleanerService PopupCleaner { get; init; }
     public DalamudNotificationSuppressorService DalamudNotificationsSuck { get; init; }
+    public DalamudLogDisablerService DalamudLogDisabler { get; init; }
     public BetterHighlightPotentialTargetsService BetterHighlightPotentialTargets { get; init; }
     public SystemWindowModsService SystemWindowMods { get; init; }
+    public ReplaceUnownedMountHotbarsService ReplaceUnownedMountHotbars { get; init; }
     public LobbyErrorAutoCloseService LobbyErrorAutoClose { get; init; }
     public QueuePositionDisplayService QueuePositionDisplay { get; init; }
     public MsqProgressDisplayService MsqProgressDisplay { get; init; }
@@ -140,6 +141,7 @@ public sealed class Plugin : IDalamudPlugin
     public DialogueSkipService DialogueSkip { get; init; }
     public AutoLockGameWindowService AutoLockGameWindow { get; init; }
     public NotifyWhenFriendIsNearService NotifyWhenFriendIsNear { get; init; }
+    public AlertWhenTypingInCombatService AlertWhenTypingInCombat { get; init; }
     public BetterCastBarService BetterCastBar { get; init; }
     public BetterDutyFinderSettingsService BetterDutyFinder { get; init; }
     public CopyItemNameContextMenuService CopyItemNameContextMenu { get; init; }
@@ -171,6 +173,7 @@ public sealed class Plugin : IDalamudPlugin
     public EscMenuBailoutService EscMenuBailout { get; init; }
     public XAPeepService XAPeep { get; init; }
     public PeepingTomIntegrationService PeepingTomIntegration { get; init; }
+    public ARealmRecordedIntegrationService ARealmRecordedIntegration { get; init; }
     public TeleportHelperService TeleportHelper { get; init; }
     public ArPostProcessService ArPostProcessor { get; init; }
     public SlaveDatabaseService SlaveDatabase { get; init; }
@@ -194,9 +197,7 @@ public sealed class Plugin : IDalamudPlugin
     private const double PostLoadXAModActivationSpacingSeconds = 0.5;
     private const double DeferredStartupSummaryPendingArmingTimeoutSeconds = 10.0;
     private const double DeferredStartupActionDebugThresholdMilliseconds = 5.0;
-    private const double DeferredStartupActionWarningThresholdMilliseconds = 25.0;
-    private const double PostLoadXAModActivationWarningThresholdMilliseconds = 200.0;
-    private const double NoUiFadePostLoadActivationWarningThresholdMilliseconds = 750.0;
+    private static readonly TimeSpan ExternalTaskLoadDelay = TimeSpan.FromSeconds(1);
     private DateTime deferredStartupSummaryPendingArmingSinceUtc = DateTime.MinValue;
     private DateTime postLoadXAModActivationCompletionPendingSinceUtc = DateTime.MinValue;
 
@@ -310,8 +311,10 @@ public sealed class Plugin : IDalamudPlugin
         BuddyFeedCutsceneSkip = new BuddyFeedCutsceneSkipService(SigScanner, GameInterop, ClientState, Log);
         PopupCleaner = new PopupCleanerService(AddonLifecycle, Log);
         DalamudNotificationsSuck = new DalamudNotificationSuppressorService(PluginInterface, Log);
+        DalamudLogDisabler = new DalamudLogDisablerService(PluginInterface, Framework, Log);
         BetterHighlightPotentialTargets = new BetterHighlightPotentialTargetsService(Framework, ObjectTable, TargetManager, ClientState, Log);
         SystemWindowMods = new SystemWindowModsService(SigScanner, GameInterop, Log, Framework, GameConfig, ClientState, () => IpcClient.AutoRetainerGetMultiModeEnabled());
+        ReplaceUnownedMountHotbars = new ReplaceUnownedMountHotbarsService(GameInterop, Log);
         LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Framework, ClientState, Log);
         QueuePositionDisplay = new QueuePositionDisplayService(Framework, SigScanner, GameInterop, Log);
         MsqProgressDisplay = new MsqProgressDisplayService(AddonLifecycle, DataManager, Log);
@@ -324,6 +327,7 @@ public sealed class Plugin : IDalamudPlugin
         DialogueSkip = new DialogueSkipService(AddonLifecycle, SigScanner, GameInterop, Log);
         AutoLockGameWindow = new AutoLockGameWindowService(Condition, Log);
         NotifyWhenFriendIsNear = new NotifyWhenFriendIsNearService(Framework, ClientState, ObjectTable, ToastGui, ChatGui, Log);
+        AlertWhenTypingInCombat = new AlertWhenTypingInCombatService(Framework, ClientState, Condition, ToastGui, Log);
         BetterCastBar = new BetterCastBarService(AddonLifecycle, ObjectTable, DataManager, Log);
         BetterDutyFinder = new BetterDutyFinderSettingsService(AddonLifecycle, SigScanner, GameConfig, Log);
         CopyItemNameContextMenu = new CopyItemNameContextMenuService(ContextMenu, DataManager, Log);
@@ -356,6 +360,7 @@ public sealed class Plugin : IDalamudPlugin
         EscMenuBailout = new EscMenuBailoutService(Framework, Log);
         XAPeep = new XAPeepService(Framework, ClientState, Condition, ObjectTable, GameGui, Log, SlaveDatabase, Configuration);
         PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, Log);
+        ARealmRecordedIntegration = new ARealmRecordedIntegrationService(PluginInterface, Framework, ClientState, Condition, DataManager, Log);
         TeleportHelper = new TeleportHelperService(Framework, ClientState, PlayerState, Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
         XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubAddress, Configuration.XagmanHubPort, _ => { });
@@ -416,6 +421,7 @@ public sealed class Plugin : IDalamudPlugin
         ApplyDalamudNotificationsSuckConfiguration(save: false);
         ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
         ApplyNotifyWhenFriendIsNearConfiguration(save: false);
+        ApplyAlertWhenTypingInCombatConfiguration(save: false);
         ApplyBetterCastBarConfiguration(save: false);
         ApplyBetterCompanyChestConfiguration(save: false);
         DozeSitAnywhere.ApplyConfiguration(
@@ -500,7 +506,7 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.NoUiFadeEnabled = false;
                     Configuration.Save();
                 }
-            }, NoUiFadePostLoadActivationWarningThresholdMilliseconds);
+            });
         }
         QueueDeferredStartupAction(() =>
         {
@@ -555,6 +561,18 @@ public sealed class Plugin : IDalamudPlugin
             if (!DalamudNotificationsSuck.SetEnabled(true))
             {
                 Configuration.DalamudNotificationsSuckEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("DalamudLogDisablerEnabled", () =>
+        {
+            DalamudLogDisabler.ApplyConfiguration(Configuration.DalamudLogDisablerBlockedPlugins, Configuration.DalamudLogDisablerMinimumKeptLevel);
+            if (!Configuration.DalamudLogDisablerEnabled)
+                return;
+
+            if (!DalamudLogDisabler.SetEnabled(true))
+            {
+                Configuration.DalamudLogDisablerEnabled = false;
                 Configuration.Save();
             }
         });
@@ -635,6 +653,18 @@ public sealed class Plugin : IDalamudPlugin
             if (!NotifyWhenFriendIsNear.SetEnabled(true))
             {
                 Configuration.NotifyWhenFriendIsNearEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AlertWhenTypingInCombatEnabled", () =>
+        {
+            if (!Configuration.AlertWhenTypingInCombatEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("alert-when-typing-in-combat");
+            if (!AlertWhenTypingInCombat.SetEnabled(true))
+            {
+                Configuration.AlertWhenTypingInCombatEnabled = false;
                 Configuration.Save();
             }
         });
@@ -899,6 +929,17 @@ public sealed class Plugin : IDalamudPlugin
                 }
             });
         }
+        if (Configuration.ReplaceUnownedMountHotbarsEnabled)
+        {
+            QueuePostLoadXAModActivation("ReplaceUnownedMountHotbarsEnabled", "Replace Unowned Mount Hotbars", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 10), () =>
+            {
+                if (!ReplaceUnownedMountHotbars.SetEnabled(true))
+                {
+                    Configuration.ReplaceUnownedMountHotbarsEnabled = false;
+                    Configuration.Save();
+                }
+            });
+        }
         QueueDeferredStartupAction(() =>
         {
             if (!Configuration.UnlockExpertDeliveryEnabled)
@@ -1047,6 +1088,17 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
+        QueueDeferredStartupAction(() =>
+        {
+            ARealmRecordedIntegration.ApplyConfiguration(
+                Configuration.ARealmRecordedAllZonesAllContentTypes,
+                Configuration.ARealmRecordedAllZonesSelectedContentTypes);
+            if (Configuration.ARealmRecordedAllZonesEnabled && !ARealmRecordedIntegration.SetForceEnabled(true))
+            {
+                Configuration.ARealmRecordedAllZonesEnabled = false;
+                Configuration.Save();
+            }
+        });
         QueueDeferredStartupAction("TeleportHelperEnabled", () =>
         {
             if (!Configuration.TeleportHelperEnabled)
@@ -1059,11 +1111,6 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
-        QueueDeferredStartupAction("ExternalTaskLoader.LoadAll", () =>
-        {
-            ExternalTaskLoader.LoadAll();
-        });
-
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
 
@@ -1132,6 +1179,7 @@ public sealed class Plugin : IDalamudPlugin
         ClientState.Logout += OnLogout;
 
         ScheduleDeferredStartupQueue();
+        ScheduleExternalTaskLoad();
     }
 
     private void QueueDeferredStartupAction(Action action, [CallerLineNumber] int lineNumber = 0)
@@ -1144,10 +1192,10 @@ public sealed class Plugin : IDalamudPlugin
         deferredStartupActions.Enqueue(new DeferredStartupAction(action, name, lineNumber));
     }
 
-    private void QueuePostLoadXAModActivation(string key, string displayName, double delaySeconds, Action action, double? warningThresholdMilliseconds = null)
+    private void QueuePostLoadXAModActivation(string key, string displayName, double delaySeconds, Action action)
     {
         pendingPostLoadXAModActivations.Add(key);
-        postLoadXAModActivations.Enqueue(new PostLoadXAModActivation(action, key, displayName, TimeSpan.FromSeconds(delaySeconds), warningThresholdMilliseconds));
+        postLoadXAModActivations.Enqueue(new PostLoadXAModActivation(action, key, displayName, TimeSpan.FromSeconds(delaySeconds)));
     }
 
     private void ScheduleDeferredStartupQueue()
@@ -1157,6 +1205,35 @@ public sealed class Plugin : IDalamudPlugin
 
         deferredStartupQueueScheduled = true;
         Framework.RunOnTick(ProcessDeferredStartupQueue, delayTicks: 1);
+    }
+
+    private void ScheduleExternalTaskLoad()
+    {
+        Framework.RunOnTick(LoadExternalTasksAfterStartupDelay, delay: ExternalTaskLoadDelay);
+    }
+
+    private void LoadExternalTasksAfterStartupDelay()
+    {
+        if (isDisposed)
+            return;
+
+        try
+        {
+            if (!Configuration.VerboseTaskLogging)
+            {
+                ExternalTaskLoader.LoadAll();
+                return;
+            }
+
+            var stopwatch = Stopwatch.StartNew();
+            ExternalTaskLoader.LoadAll();
+            stopwatch.Stop();
+            Log.Debug($"[XASlave] Delayed external task loading took {stopwatch.Elapsed.TotalMilliseconds:F1}ms.");
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[XASlave] Delayed external task loading failed.");
+        }
     }
 
     private void ProcessDeferredStartupQueue()
@@ -1185,16 +1262,13 @@ public sealed class Plugin : IDalamudPlugin
                 processedCount++;
 
                 var elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
-                if (elapsedMilliseconds >= DeferredStartupActionDebugThresholdMilliseconds)
+                if (Configuration.VerboseTaskLogging
+                    && elapsedMilliseconds >= DeferredStartupActionDebugThresholdMilliseconds)
                 {
                     var label = string.IsNullOrWhiteSpace(deferredAction.Name)
                         ? $"Plugin.cs:{deferredAction.LineNumber}"
                         : deferredAction.Name;
-                    var message = $"[XASlave] Deferred startup action '{label}' took {elapsedMilliseconds:F1}ms.";
-                    if (elapsedMilliseconds >= DeferredStartupActionWarningThresholdMilliseconds)
-                        Log.Warning(message);
-                    else
-                        Log.Debug(message);
+                    Log.Debug($"[XASlave] Deferred startup action '{label}' took {elapsedMilliseconds:F1}ms.");
                 }
             }
             catch (Exception ex)
@@ -1277,15 +1351,9 @@ public sealed class Plugin : IDalamudPlugin
             completed = true;
 
             var elapsedMilliseconds = stopwatch.Elapsed.TotalMilliseconds;
-            if (elapsedMilliseconds >= DeferredStartupActionDebugThresholdMilliseconds)
-            {
-                var message = $"[XASlave] Post-load XA Mod activation '{activation.DisplayName}' took {elapsedMilliseconds:F1}ms.";
-                var warningThresholdMilliseconds = activation.WarningThresholdMilliseconds ?? PostLoadXAModActivationWarningThresholdMilliseconds;
-                if (elapsedMilliseconds >= warningThresholdMilliseconds)
-                    Log.Warning(message);
-                else
-                    Log.Debug(message);
-            }
+            if (Configuration.VerboseTaskLogging
+                && elapsedMilliseconds >= DeferredStartupActionDebugThresholdMilliseconds)
+                Log.Debug($"[XASlave] Post-load XA Mod activation '{activation.DisplayName}' took {elapsedMilliseconds:F1}ms.");
         }
         catch (Exception ex)
         {
@@ -1457,6 +1525,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Auto Skip Cutscenes", Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.StatusText, "AutoSkipCutscenesEnabled");
         yield return CreateStartupSurfaceStatus("Prevent Lobby Exit", Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.PreventLobbyExitStatusText);
         yield return CreateStartupSurfaceStatus("Queue Position Display", Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.StatusText, "DisplayActualQueuePositionEnabled");
+        yield return CreateStartupSurfaceStatus("Replace Unowned Mount Hotbars", Configuration.ReplaceUnownedMountHotbarsEnabled, ReplaceUnownedMountHotbars.StatusText, "ReplaceUnownedMountHotbarsEnabled");
         yield return CreateStartupSurfaceStatus("Disable Title Screen Movie", Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.DisableTitleScreenMovieStatusText);
         yield return CreateStartupSurfaceStatus("Auto Display IDs", Configuration.AutoDisplayIdsEnabled, AutoDisplayIds.StatusText);
         yield return CreateStartupSurfaceStatus("Display Network Latency", Configuration.AutoDisplayNetworkLatencyEnabled, AutoDisplayNetworkLatency.StatusText);
@@ -1467,6 +1536,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Skip Dialogue", Configuration.AutoSkipDialogueEnabled, DialogueSkip.StatusText);
         yield return CreateStartupSurfaceStatus("Lock Game Window In Combat", Configuration.LockGameWindowInCombatEnabled, AutoLockGameWindow.StatusText);
         yield return CreateStartupSurfaceStatus("Notify When Friend Is Near", Configuration.NotifyWhenFriendIsNearEnabled, NotifyWhenFriendIsNear.StatusText);
+        yield return CreateStartupSurfaceStatus("Alert When Typing In Combat", Configuration.AlertWhenTypingInCombatEnabled, AlertWhenTypingInCombat.StatusText);
         yield return CreateStartupSurfaceStatus("Better Cast Bar", Configuration.BetterCastBarEnabled, BetterCastBar.StatusText);
         yield return CreateStartupSurfaceStatus("Better Duty Finder", Configuration.BetterDutyFinderEnabled, BetterDutyFinder.StatusText);
         yield return CreateStartupSurfaceStatus("Background Rendering Pause", Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.DisableBackgroundRenderingStatusText, "DisableBackgroundGameRenderingEnabled");
@@ -1568,8 +1638,10 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("BuddyFeedCutsceneSkip", BuddyFeedCutsceneSkip);
         TryDispose("PopupCleaner", PopupCleaner);
         TryDispose("DalamudNotificationsSuck", DalamudNotificationsSuck);
+        TryDispose("DalamudLogDisabler", DalamudLogDisabler);
         TryDispose("BetterHighlightPotentialTargets", BetterHighlightPotentialTargets);
         TryDispose("SystemWindowMods", SystemWindowMods);
+        TryDispose("ReplaceUnownedMountHotbars", ReplaceUnownedMountHotbars);
         TryDispose("LobbyErrorAutoClose", LobbyErrorAutoClose);
         TryDispose("QueuePositionDisplay", QueuePositionDisplay);
         TryDispose("MsqProgressDisplay", MsqProgressDisplay);
@@ -1582,6 +1654,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("DialogueSkip", DialogueSkip);
         TryDispose("AutoLockGameWindow", AutoLockGameWindow);
         TryDispose("NotifyWhenFriendIsNear", NotifyWhenFriendIsNear);
+        TryDispose("AlertWhenTypingInCombat", AlertWhenTypingInCombat);
         TryDispose("BetterCastBar", BetterCastBar);
         TryDispose("BetterDutyFinder", BetterDutyFinder);
         TryDispose("CopyItemNameContextMenu", CopyItemNameContextMenu);
@@ -1613,12 +1686,14 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("EscMenuBailout", EscMenuBailout);
         TryDispose("XAPeep", XAPeep);
         TryDispose("PeepingTomIntegration", PeepingTomIntegration);
+        TryDispose("ARealmRecordedIntegration", ARealmRecordedIntegration);
         TryDispose("TeleportHelper", TeleportHelper);
         TryDispose("ArPostProcessor", ArPostProcessor);
         TryDispose("WindowRenamer", WindowRenamer);
         TryDispose("IpcProvider", IpcProvider);
         TryDispose("ExternalTaskLoader", ExternalTaskLoader);
         TryDispose("XagmanPeers", XagmanPeers);
+        TryDispose("SlaveDatabase", SlaveDatabase);
     }
 
     private void TryDispose(string label, IDisposable? disposable)
@@ -1707,13 +1782,20 @@ public sealed class Plugin : IDalamudPlugin
         if (Configuration.WindowRenamerEnabled && Configuration.WindowRenamerShowCurrentCharacter)
             WindowRenamer.ApplyFromConfig(Configuration, string.Empty);
 
-        // Cancel any running task on logout BUT skip if relogger suppresses it
-        // (logout is expected during /ays relog character switches)
-        if (TaskRunner.IsRunning && !TaskRunner.SuppressLogoutCancel)
+        // Xagman owns a narrower expected-logout window than the task runner's broad
+        // relog suppression, so always let it distinguish expected from unexpected logout.
+        var xagmanHandledLogout = SlaveWindow.HandleUnexpectedXagmanLogout(contentId);
+
+        if (TaskRunner.IsRunning && !TaskRunner.SuppressLogoutCancel && !xagmanHandledLogout)
         {
             Log.Information("[XASlave] Character logged out, cancelling running task.");
             TaskRunner.AddLog("EVENT: Character logged out, cancelling running task.");
             TaskRunner.Cancel();
+        }
+        else if (TaskRunner.IsRunning && xagmanHandledLogout)
+        {
+            Log.Information("[XASlave] Character logged out during a handled Xagman operation, not cancelling.");
+            TaskRunner.AddLog("EVENT: Character logged out during a handled Xagman operation, not cancelling.");
         }
         else if (TaskRunner.IsRunning)
         {
@@ -2429,6 +2511,20 @@ public sealed class Plugin : IDalamudPlugin
                     DisableWhenArMultiIsOn = Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "arealmrecorded-all-zones":
+                snapshot = JsonSerializer.SerializeToElement(new XAModARealmRecordedAllZonesSettings
+                {
+                    AllContentTypes = Configuration.ARealmRecordedAllZonesAllContentTypes,
+                    SelectedContentTypes = Configuration.ARealmRecordedAllZonesSelectedContentTypes.ToList(),
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "dalamud-log-disabler":
+                snapshot = JsonSerializer.SerializeToElement(new XAModDalamudLogDisablerSettings
+                {
+                    BlockedPlugins = Configuration.DalamudLogDisablerBlockedPlugins.ToList(),
+                    MinimumKeptLevel = Configuration.DalamudLogDisablerMinimumKeptLevel,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "auto-hide-game-objects":
                 snapshot = JsonSerializer.SerializeToElement(new XAModAutoHideGameObjectsSettings
                 {
@@ -2515,6 +2611,15 @@ public sealed class Plugin : IDalamudPlugin
                 {
                     Patterns = Configuration.NotifyWhenFriendIsNearPatterns.ToList(),
                     CooldownSeconds = Configuration.NotifyWhenFriendIsNearCooldownSeconds,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "alert-when-typing-in-combat":
+                snapshot = JsonSerializer.SerializeToElement(new XAModAlertWhenTypingInCombatSettings
+                {
+                    CooldownSeconds = Configuration.AlertWhenTypingInCombatCooldownSeconds,
+                    ToneId = Configuration.AlertWhenTypingInCombatToneId,
+                    BeepCount = Configuration.AlertWhenTypingInCombatBeepCount,
+                    SoundVolume = Configuration.AlertWhenTypingInCombatSoundVolume,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
             case "better-cast-bar":
@@ -2764,6 +2869,28 @@ public sealed class Plugin : IDalamudPlugin
             }
         }
 
+        if (TryDeserializeXAModSettings(modSettings, "arealmrecorded-all-zones", out XAModARealmRecordedAllZonesSettings? aRealmRecordedSettings)
+            && aRealmRecordedSettings != null)
+        {
+            Configuration.ARealmRecordedAllZonesAllContentTypes = aRealmRecordedSettings.AllContentTypes;
+            Configuration.ARealmRecordedAllZonesSelectedContentTypes = aRealmRecordedSettings.SelectedContentTypes?.Distinct().ToList() ?? new List<uint>();
+            ARealmRecordedIntegration.ApplyConfiguration(
+                Configuration.ARealmRecordedAllZonesAllContentTypes,
+                Configuration.ARealmRecordedAllZonesSelectedContentTypes);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "dalamud-log-disabler", out XAModDalamudLogDisablerSettings? dalamudLogDisablerSettings)
+            && dalamudLogDisablerSettings != null)
+        {
+            Configuration.DalamudLogDisablerBlockedPlugins = dalamudLogDisablerSettings.BlockedPlugins?
+                .Where(name => !string.IsNullOrWhiteSpace(name))
+                .Select(name => name.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList() ?? new List<string>();
+            Configuration.DalamudLogDisablerMinimumKeptLevel = dalamudLogDisablerSettings.MinimumKeptLevel;
+            DalamudLogDisabler.ApplyConfiguration(Configuration.DalamudLogDisablerBlockedPlugins, Configuration.DalamudLogDisablerMinimumKeptLevel);
+        }
+
         if (TryDeserializeXAModSettings(modSettings, "auto-hide-game-objects", out XAModAutoHideGameObjectsSettings? autoHideSettings)
             && autoHideSettings != null)
         {
@@ -2914,6 +3041,20 @@ public sealed class Plugin : IDalamudPlugin
             NotifyWhenFriendIsNear.ApplyConfiguration(
                 Configuration.NotifyWhenFriendIsNearPatterns,
                 Configuration.NotifyWhenFriendIsNearCooldownSeconds);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "alert-when-typing-in-combat", out XAModAlertWhenTypingInCombatSettings? typingCombatSettings)
+            && typingCombatSettings != null)
+        {
+            Configuration.AlertWhenTypingInCombatCooldownSeconds = AlertWhenTypingInCombatService.NormalizeCooldownSeconds(typingCombatSettings.CooldownSeconds);
+            Configuration.AlertWhenTypingInCombatToneId = AlertWhenTypingInCombatService.NormalizeToneId(typingCombatSettings.ToneId);
+            Configuration.AlertWhenTypingInCombatBeepCount = AlertWhenTypingInCombatService.NormalizeBeepCount(typingCombatSettings.BeepCount);
+            Configuration.AlertWhenTypingInCombatSoundVolume = AlertWhenTypingInCombatService.NormalizeVolume(typingCombatSettings.SoundVolume);
+            AlertWhenTypingInCombat.ApplyConfiguration(
+                Configuration.AlertWhenTypingInCombatCooldownSeconds,
+                Configuration.AlertWhenTypingInCombatToneId,
+                Configuration.AlertWhenTypingInCombatBeepCount,
+                Configuration.AlertWhenTypingInCombatSoundVolume);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "better-cast-bar", out XAModBetterCastBarSettings? betterCastBarSettings)
@@ -3806,6 +3947,22 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
     }
 
+    internal void ApplyAlertWhenTypingInCombatConfiguration(bool save = true)
+    {
+        Configuration.AlertWhenTypingInCombatCooldownSeconds = AlertWhenTypingInCombatService.NormalizeCooldownSeconds(Configuration.AlertWhenTypingInCombatCooldownSeconds);
+        Configuration.AlertWhenTypingInCombatToneId = AlertWhenTypingInCombatService.NormalizeToneId(Configuration.AlertWhenTypingInCombatToneId);
+        Configuration.AlertWhenTypingInCombatBeepCount = AlertWhenTypingInCombatService.NormalizeBeepCount(Configuration.AlertWhenTypingInCombatBeepCount);
+        Configuration.AlertWhenTypingInCombatSoundVolume = AlertWhenTypingInCombatService.NormalizeVolume(Configuration.AlertWhenTypingInCombatSoundVolume);
+        AlertWhenTypingInCombat.ApplyConfiguration(
+            Configuration.AlertWhenTypingInCombatCooldownSeconds,
+            Configuration.AlertWhenTypingInCombatToneId,
+            Configuration.AlertWhenTypingInCombatBeepCount,
+            Configuration.AlertWhenTypingInCombatSoundVolume);
+
+        if (save)
+            Configuration.Save();
+    }
+
     internal void ApplyBetterCastBarConfiguration(bool save = true)
     {
         Configuration.BetterCastBarInterruptedTextSize = Math.Clamp(Configuration.BetterCastBarInterruptedTextSize, 1, 255);
@@ -3962,6 +4119,9 @@ public sealed class Plugin : IDalamudPlugin
                 break;
             case "notify-when-friend-is-near":
                 ApplyNotifyWhenFriendIsNearConfiguration(save: false);
+                break;
+            case "alert-when-typing-in-combat":
+                ApplyAlertWhenTypingInCombatConfiguration(save: false);
                 break;
             case "better-cast-bar":
                 ApplyBetterCastBarConfiguration(save: false);
@@ -4145,6 +4305,11 @@ public sealed class Plugin : IDalamudPlugin
             ApplyDalamudNotificationsSuckConfiguration(save: false);
             return DalamudNotificationsSuck.SetEnabled(value);
         }, applied => Configuration.DalamudNotificationsSuckEnabled = applied, () => DalamudNotificationsSuck.StatusText);
+        yield return new("dalamud-log-disabler", "Dalamud Log Disabler", XAModsRestoreScope.Game, () => Configuration.DalamudLogDisablerEnabled, value =>
+        {
+            DalamudLogDisabler.ApplyConfiguration(Configuration.DalamudLogDisablerBlockedPlugins, Configuration.DalamudLogDisablerMinimumKeptLevel);
+            return DalamudLogDisabler.SetEnabled(value);
+        }, applied => Configuration.DalamudLogDisablerEnabled = applied, () => DalamudLogDisabler.StatusText);
         yield return new("better-highlight-potential-targets", "Better Highlight Potential Targets", XAModsRestoreScope.Ui, () => Configuration.BetterHighlightPotentialTargetsEnabled, value =>
         {
             ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
@@ -4160,6 +4325,11 @@ public sealed class Plugin : IDalamudPlugin
             ApplyNotifyWhenFriendIsNearConfiguration(save: false);
             return NotifyWhenFriendIsNear.SetEnabled(value);
         }, applied => Configuration.NotifyWhenFriendIsNearEnabled = applied, () => NotifyWhenFriendIsNear.StatusText);
+        yield return new("alert-when-typing-in-combat", "Alert When Typing In Combat", XAModsRestoreScope.Player, () => Configuration.AlertWhenTypingInCombatEnabled, value =>
+        {
+            ApplyAlertWhenTypingInCombatConfiguration(save: false);
+            return AlertWhenTypingInCombat.SetEnabled(value);
+        }, applied => Configuration.AlertWhenTypingInCombatEnabled = applied, () => AlertWhenTypingInCombat.StatusText);
         yield return new("better-cast-bar", "Better Cast Bar", XAModsRestoreScope.Ui, () => Configuration.BetterCastBarEnabled, value =>
         {
             ApplyBetterCastBarConfiguration(save: false);
@@ -4167,6 +4337,7 @@ public sealed class Plugin : IDalamudPlugin
         }, applied => Configuration.BetterCastBarEnabled = applied, () => BetterCastBar.StatusText);
         yield return new("better-duty-finder", "Better Duty Finder", XAModsRestoreScope.Ui, () => Configuration.BetterDutyFinderEnabled, BetterDutyFinder.SetEnabled, applied => Configuration.BetterDutyFinderEnabled = applied, () => BetterDutyFinder.StatusText);
         yield return new("display-actual-queue-position", "Display Actual Queue Position", XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusText);
+        yield return new("replace-unowned-mount-hotbars", "Replace Unowned Mount Hotbars", XAModsRestoreScope.Game, () => Configuration.ReplaceUnownedMountHotbarsEnabled, ReplaceUnownedMountHotbars.SetEnabled, applied => Configuration.ReplaceUnownedMountHotbarsEnabled = applied, () => ReplaceUnownedMountHotbars.StatusText);
         yield return new("target-command-fix", "Fix /target Command", XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusText);
         yield return new("copy-item-name-for-all", "Copy Item Name For All", XAModsRestoreScope.Ui, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusText);
         yield return new("expanded-player-right-click-menu-search", "Expanded Player Right-Click Menu Search", XAModsRestoreScope.Ui, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusText);
@@ -4224,6 +4395,13 @@ public sealed class Plugin : IDalamudPlugin
                 ? "Enabled - character-list tables and duplicate summaries use deterministic aliases for screenshot-safe local views."
                 : "Disabled");
         yield return new("force-peepingtom", "Force PeepingTom", XAModsRestoreScope.Plugin, () => Configuration.ForcePeepingTomEnabled, PeepingTomIntegration.SetForceEnabled, applied => Configuration.ForcePeepingTomEnabled = applied, () => PeepingTomIntegration.StatusText);
+        yield return new("arealmrecorded-all-zones", "ARealmRecorded All Zones", XAModsRestoreScope.Plugin, () => Configuration.ARealmRecordedAllZonesEnabled, value =>
+        {
+            ARealmRecordedIntegration.ApplyConfiguration(
+                Configuration.ARealmRecordedAllZonesAllContentTypes,
+                Configuration.ARealmRecordedAllZonesSelectedContentTypes);
+            return ARealmRecordedIntegration.SetForceEnabled(value);
+        }, applied => Configuration.ARealmRecordedAllZonesEnabled = applied, () => ARealmRecordedIntegration.StatusText);
         yield return new("teleport-helper", "Teleport Helper", XAModsRestoreScope.Plugin, () => Configuration.TeleportHelperEnabled, value =>
         {
             TeleportHelper.ApplyConfiguration(Configuration.TeleportHelperSelectYes);
@@ -4405,6 +4583,11 @@ public sealed class Plugin : IDalamudPlugin
             case "friendnotify":
                 definition = new("friendnear", "/xa friendnear on|off", GetXAModDefinition("notify-when-friend-is-near"));
                 return true;
+            case "typingcombat":
+            case "combattype":
+            case "typingalert":
+                definition = new("typingcombat", "/xa typingcombat on|off", GetXAModDefinition("alert-when-typing-in-combat"));
+                return true;
             case "castbar":
                 definition = new("castbar", "/xa castbar on|off", GetXAModDefinition("better-cast-bar"));
                 return true;
@@ -4529,6 +4712,16 @@ public sealed class Plugin : IDalamudPlugin
             case "peepingtom":
                 definition = new("peepingtom", "/xa peepingtom on|off", GetXAModDefinition("force-peepingtom"));
                 return true;
+            case "recordallzones":
+            case "arrallzones":
+            case "arealmrecorded":
+                definition = new("recordallzones", "/xa recordallzones on|off", GetXAModDefinition("arealmrecorded-all-zones"));
+                return true;
+            case "disablelogs":
+            case "logdisabler":
+            case "muteplugin":
+                definition = new("disablelogs", "/xa disablelogs on|off", GetXAModDefinition("dalamud-log-disabler"));
+                return true;
             case "teleporthelper":
             case "tickethelper":
             case "ticket":
@@ -4602,7 +4795,10 @@ public sealed class Plugin : IDalamudPlugin
 
     private bool ClearUnsafeSpecialRenderHideChatSetting(bool notifyUser)
     {
-        if (!IsAutoRetainerMultiModeEnabled() || !Configuration.SpecialRenderHideChatEnabled)
+        // Check the cheap local config flag first: this runs on every Framework tick, and
+        // IsAutoRetainerMultiModeEnabled() is a cross-plugin IPC call that throws/catches when
+        // AutoRetainer is absent. Short-circuiting on the config bool avoids a per-tick exception.
+        if (!Configuration.SpecialRenderHideChatEnabled || !IsAutoRetainerMultiModeEnabled())
             return false;
 
         Configuration.SpecialRenderHideChatEnabled = false;
@@ -4779,22 +4975,42 @@ public sealed class Plugin : IDalamudPlugin
     {
         return sources
             .SelectMany(source => source)
-            .Where(item => item.ItemId > 0 && !string.IsNullOrWhiteSpace(item.ItemName))
-            .GroupBy(item => new { item.ItemId, item.IsHq })
+            .Where(item => item.SelectorKind == XagmanItemSelectorKind.ExactItem
+                ? item.ItemId > 0 && !string.IsNullOrWhiteSpace(item.ItemName)
+                : item.SelectorKind is XagmanItemSelectorKind.GreenItemGcSeals
+                    or XagmanItemSelectorKind.GreenItemFcCreditsRankProgress)
+            .GroupBy(item => new
+            {
+                item.SelectorKind,
+                ItemId = item.SelectorKind == XagmanItemSelectorKind.ExactItem ? item.ItemId : 0u,
+                IsHq = item.SelectorKind == XagmanItemSelectorKind.ExactItem && item.IsHq,
+                item.Applicability,
+            })
             .Select(group => new XagmanItemEntry
             {
+                SelectorKind = group.Key.SelectorKind,
                 ItemId = group.Key.ItemId,
-                ItemName = group.First().ItemName,
+                ItemName = group.Key.SelectorKind switch
+                {
+                    XagmanItemSelectorKind.GreenItemGcSeals => "Green Item GC Seals",
+                    XagmanItemSelectorKind.GreenItemFcCreditsRankProgress => "Green Item FC Credits / Rank Progress",
+                    _ => group.First().ItemName,
+                },
                 IsHq = group.Key.IsHq,
-                Mode = group.First().Mode,
+                Mode = group.Key.SelectorKind == XagmanItemSelectorKind.ExactItem
+                    ? group.First().Mode
+                    : XagmanItemMode.TopUp,
+                Applicability = group.Key.Applicability,
                 Quantity = Math.Max(0, group.First().Quantity),
             })
-            .OrderBy(item => item.ItemId)
+            .OrderBy(item => item.SelectorKind)
+            .ThenBy(item => item.ItemId)
+            .ThenBy(item => item.Applicability)
             .ToList();
     }
 }
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.40";
+    public const string Version = "0.0.0.41";
 }

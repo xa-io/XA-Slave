@@ -27,6 +27,8 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
     private bool initialized;
     private bool enabled;
+    private bool allowDoze = true;
+    private bool allowSit = true;
     private bool suppressedSnap;
     private Vector3? savedSitPosition;
     private float? savedSitRotation;
@@ -49,6 +51,8 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
     public void ApplyConfiguration(bool allowDoze, bool allowSit)
     {
+        this.allowDoze = allowDoze;
+        this.allowSit = allowSit;
         RefreshStatusText();
     }
 
@@ -88,6 +92,9 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
     public bool RequestDoze()
     {
+        if (!allowDoze)
+            return false;
+
         if (enabled && !initialized)
         {
             EnsureInitialized();
@@ -119,6 +126,9 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
     public bool RequestSit()
     {
+        if (!allowSit)
+            return false;
+
         if (enabled && !initialized)
         {
             EnsureInitialized();

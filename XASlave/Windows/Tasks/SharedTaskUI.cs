@@ -191,26 +191,121 @@ public partial class SlaveWindow
         return clicked;
     }
 
+    // Processing-list status colors (shared with the relogger last-run snapshot).
+    // Mirrors the Xagman order-list scheme: red = failed, purple = incomplete/skipped,
+    // green = completed, yellow = in progress.
+    private static readonly Vector4 ProcessingFailedColor = new(1.0f, 0.4f, 0.4f, 1.0f);    // RED - failed to log in
+    private static readonly Vector4 ProcessingIncompleteColor = new(0.72f, 0.45f, 1.0f, 1.0f); // PURPLE - logged in, did not finish
+    private static readonly Vector4 ProcessingCompletedColor = new(0.4f, 1.0f, 0.4f, 1.0f);  // GREEN - completed
+    private static readonly Vector4 ProcessingActiveColor = new(1.0f, 0.8f, 0.3f, 1.0f);     // YELLOW - in progress
+
     /// <summary>Draw the processing list shown during a running task.</summary>
     private void DrawProcessingList(Services.TaskRunner runner)
     {
-        if (reloggerRunList.Count > 0)
+        if (reloggerRunList.Count == 0)
+            return;
+
+        ImGui.Spacing();
+        var eta = GetReloggerEtaLabel(reloggerRunList, runner.ItemDurations);
+        if (!string.IsNullOrWhiteSpace(eta))
+            ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), eta);
+        DrawReloggerProcessingList(reloggerRunList, runner.CompletedItems, runner.FailedCharacters, runner.IncompleteCharacters, runner.ItemDurations);
+    }
+
+    /// <summary>
+    /// Renders a relogger processing/order list with per-character status colors, processing
+    /// timers, and a "(not found in AR)" marker. Used both live (during a run) and for the
+    /// persisted last-run snapshot.
+    /// </summary>
+    private void DrawReloggerProcessingList(
+        IReadOnlyList<string> runList,
+        int completed,
+        IReadOnlyCollection<string> failed,
+        IReadOnlyCollection<string> incomplete,
+        IReadOnlyDictionary<string, double>? durations = null)
+    {
+        if (runList.Count == 0)
+            return;
+
+        var safeCompleted = Math.Clamp(completed, 0, runList.Count);
+        ImGui.TextDisabled($"Processing Order ({safeCompleted}/{runList.Count}):");
+        for (int ci = 0; ci < runList.Count; ci++)
         {
-            ImGui.Spacing();
-            ImGui.TextDisabled($"Processing Order ({runner.CompletedItems}/{reloggerRunList.Count}):");
-            for (int ci = 0; ci < reloggerRunList.Count; ci++)
+            var ch = runList[ci];
+            var timeSuffix = durations != null && durations.TryGetValue(ch, out var secs)
+                ? $"  ({FormatReloggerDuration(secs)})"
+                : string.Empty;
+
+            if (ProcessingListContains(failed, ch))
+                ImGui.TextColored(ProcessingFailedColor, $"  ✗ {ci + 1}. {ch}{timeSuffix}");
+            else if (ProcessingListContains(incomplete, ch))
+                ImGui.TextColored(ProcessingIncompleteColor, $"  ~ {ci + 1}. {ch}{timeSuffix}");
+            else if (ci < safeCompleted)
+                ImGui.TextColored(ProcessingCompletedColor, $"  ✓ {ci + 1}. {ch}{timeSuffix}");
+            else if (ci == safeCompleted)
+                ImGui.TextColored(ProcessingActiveColor, $"  → {ci + 1}. {ch}{timeSuffix}");
+            else
+                ImGui.TextDisabled($"     {ci + 1}. {ch}{timeSuffix}");
+
+            // Flag characters AutoRetainer has no data for - the likely cause of a login failure.
+            if (IsReloggerCharNotFoundInAr(ch))
             {
-                var ch = reloggerRunList[ci];
-                if (runner.FailedCharacters.Contains(ch))
-                    ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), $"  ✗ {ci + 1}. {ch}");
-                else if (ci < runner.CompletedItems)
-                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"  ✓ {ci + 1}. {ch}");
-                else if (ci == runner.CompletedItems)
-                    ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"  → {ci + 1}. {ch}");
-                else
-                    ImGui.TextDisabled($"     {ci + 1}. {ch}");
+                ImGui.SameLine();
+                ImGui.TextColored(ProcessingFailedColor, "(not found in AR)");
             }
         }
+    }
+
+    private static bool ProcessingListContains(IReadOnlyCollection<string> keys, string character)
+    {
+        if (keys == null || keys.Count == 0)
+            return false;
+        foreach (var key in keys)
+        {
+            if (key.Equals(character, StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+
+        return false;
+    }
+
+    /// <summary>True if AutoRetainer's last import/refresh had no data for this character.</summary>
+    private bool IsReloggerCharNotFoundInAr(string characterNameWorld)
+    {
+        return plugin.Configuration.ReloggerCharacterInfo.TryGetValue(characterNameWorld, out var data)
+            && data.FoundInAutoRetainer == false;
+    }
+
+    /// <summary>Formats a processing duration (seconds) as a compact human string.</summary>
+    private static string FormatReloggerDuration(double seconds)
+    {
+        var total = (int)Math.Round(Math.Max(0, seconds));
+        if (total < 60)
+            return $"{total}s";
+        var minutes = total / 60;
+        var secs = total % 60;
+        if (minutes < 60)
+            return $"{minutes}m {secs:00}s";
+        var hours = minutes / 60;
+        minutes %= 60;
+        return $"{hours}h {minutes:00}m";
+    }
+
+    /// <summary>
+    /// Rolling completion estimate: average processed-character time, count remaining, and an ETA
+    /// (average x remaining). Returns empty until at least one character has finished.
+    /// </summary>
+    private static string GetReloggerEtaLabel(IReadOnlyList<string> runList, IReadOnlyDictionary<string, double> durations)
+    {
+        if (runList == null || runList.Count == 0 || durations == null || durations.Count == 0)
+            return string.Empty;
+
+        var avg = durations.Values.Average();
+        var processed = durations.Count;
+        var remaining = Math.Max(0, runList.Count - processed);
+        if (remaining == 0)
+            return $"Avg {FormatReloggerDuration(avg)}/char.";
+        return $"Avg {FormatReloggerDuration(avg)}/char, {remaining} remaining, ETA ~{FormatReloggerDuration(avg * remaining)}.";
     }
 
     /// <summary>

@@ -63,6 +63,12 @@ public unsafe sealed class DialogueSkipService : IDisposable
 
         enabled = true;
         UpdateSubscription(true);
+        // Re-arm the native dialogue hooks on re-enable. They are created and enabled the first
+        // time OnTalkAddon runs (guarded by !initialized), but after a disable/enable cycle
+        // `initialized` is already true, so without this the hooks would stay disabled and only
+        // the synthetic Talk-click fallback would work.
+        if (initialized)
+            UpdateHookState(true);
         RefreshStatusText();
         return true;
     }

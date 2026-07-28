@@ -9,6 +9,13 @@ using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 
 namespace XASlave.Services;
 
+public enum XagmanTradeRefusalOverride
+{
+    Inactive,
+    IdleDemand,
+    DropboxAutoAcceptSuppression,
+}
+
 public unsafe sealed class AutoRefuseTradeService : IDisposable
 {
     private const string RefusedTradeMessage = "XA Slave: Refused incoming trade request.";
@@ -23,7 +30,9 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     private Hook<InventoryManager.Delegates.SendTradeRequest>? sendTradeRequestHook;
     private Hook<TradeStatusUpdateDelegate>? tradeStatusUpdateHook;
     private bool initialized;
+    private bool manualEnabled;
     private bool enabled;
+    private XagmanTradeRefusalOverride xagmanOverride;
     private bool showNotification = true;
     private bool sendEcho;
     private string extraCommands = string.Empty;
@@ -44,6 +53,10 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
     public bool IsEnabled => enabled;
 
+    public bool IsManuallyEnabled => manualEnabled;
+
+    public XagmanTradeRefusalOverride XagmanOverride => xagmanOverride;
+
     public string StatusText { get; private set; } = "Disabled";
 
     public void ApplyConfiguration(bool showNotification, bool sendEcho, string extraCommands)
@@ -56,34 +69,43 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
     public bool SetEnabled(bool value)
     {
-        if (value == enabled)
-            return enabled;
-
-        if (!value)
+        if (value && xagmanOverride != XagmanTradeRefusalOverride.DropboxAutoAcceptSuppression)
         {
-            enabled = false;
-            DisableHooks();
-            StatusText = "Disabled";
+            EnsureInitialized();
+            if (!HasRequiredHooks)
+            {
+                manualEnabled = false;
+                enabled = false;
+                DisableHooks();
+                StatusText = "Unavailable - trade refusal hooks are missing.";
+                return false;
+            }
+        }
+
+        manualEnabled = value;
+        var applied = RefreshEffectiveState();
+        if (value
+            && xagmanOverride != XagmanTradeRefusalOverride.DropboxAutoAcceptSuppression
+            && !applied)
+        {
+            manualEnabled = false;
+            RefreshEffectiveState();
             return false;
         }
 
-        EnsureInitialized();
-        if (sendTradeRequestHook == null || (tradeStatusUpdateHook == null && tradeAgentShowHook == null))
-        {
-            StatusText = "Unavailable - trade refusal hooks are missing.";
-            return false;
-        }
+        return manualEnabled;
+    }
 
-        sendTradeRequestHook.Enable();
-        tradeStatusUpdateHook?.Enable();
-        tradeAgentShowHook?.Enable();
-        enabled = true;
-        RefreshStatusText();
-        return true;
+    public bool SetXagmanOverride(XagmanTradeRefusalOverride value)
+    {
+        xagmanOverride = value;
+        return RefreshEffectiveState();
     }
 
     public void Dispose()
     {
+        manualEnabled = false;
+        xagmanOverride = XagmanTradeRefusalOverride.Inactive;
         enabled = false;
         DisableHooks();
 
@@ -99,14 +121,93 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         tradeStatusUpdateHook = null;
     }
 
-    private void DisableHooks()
+    private bool HasRequiredHooks =>
+        sendTradeRequestHook != null
+        && (tradeStatusUpdateHook != null || tradeAgentShowHook != null);
+
+    private bool RefreshEffectiveState()
     {
-        if (tradeAgentShowHook is { IsDisposed: false, IsEnabled: true })
-            tradeAgentShowHook.Disable();
-        if (sendTradeRequestHook is { IsDisposed: false, IsEnabled: true })
-            sendTradeRequestHook.Disable();
-        if (tradeStatusUpdateHook is { IsDisposed: false, IsEnabled: true })
-            tradeStatusUpdateHook.Disable();
+        var shouldEnable = xagmanOverride != XagmanTradeRefusalOverride.DropboxAutoAcceptSuppression
+            && (manualEnabled || xagmanOverride == XagmanTradeRefusalOverride.IdleDemand);
+        if (!shouldEnable)
+        {
+            enabled = false;
+            var disabled = DisableHooks();
+            RefreshStatusText();
+            return disabled;
+        }
+
+        if (enabled)
+        {
+            RefreshStatusText();
+            return true;
+        }
+
+        EnsureInitialized();
+        if (!HasRequiredHooks)
+        {
+            enabled = false;
+            DisableHooks();
+            StatusText = "Unavailable - trade refusal hooks are missing.";
+            return false;
+        }
+
+        try
+        {
+            sendTradeRequestHook!.Enable();
+            tradeStatusUpdateHook?.Enable();
+            tradeAgentShowHook?.Enable();
+            enabled = true;
+            RefreshStatusText();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            enabled = false;
+            DisableHooks();
+            StatusText = "Unavailable - trade refusal hooks could not be enabled.";
+            log.Warning(ex, "[XASlave] Auto Refuse Trade failed to enable its hooks.");
+            return false;
+        }
+    }
+
+    private bool DisableHooks()
+    {
+        var success = true;
+        try
+        {
+            if (tradeAgentShowHook is { IsDisposed: false, IsEnabled: true })
+                tradeAgentShowHook.Disable();
+        }
+        catch (Exception ex)
+        {
+            success = false;
+            log.Warning(ex, "[XASlave] Auto Refuse Trade failed to disable AgentTradeShow.");
+        }
+
+        try
+        {
+            if (sendTradeRequestHook is { IsDisposed: false, IsEnabled: true })
+                sendTradeRequestHook.Disable();
+        }
+        catch (Exception ex)
+        {
+            success = false;
+            log.Warning(ex, "[XASlave] Auto Refuse Trade failed to disable SendTradeRequest.");
+        }
+
+        try
+        {
+            if (tradeStatusUpdateHook is { IsDisposed: false, IsEnabled: true })
+                tradeStatusUpdateHook.Disable();
+        }
+        catch (Exception ex)
+        {
+            success = false;
+            log.Warning(ex, "[XASlave] Auto Refuse Trade failed to disable TradeStatusUpdate.");
+        }
+
+        return success;
     }
 
     private void EnsureInitialized()
@@ -195,9 +296,17 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
     private void RefreshStatusText()
     {
+        if (xagmanOverride == XagmanTradeRefusalOverride.DropboxAutoAcceptSuppression)
+        {
+            StatusText = "Temporarily suspended by Xagman - Dropbox auto-accept may be active; the saved manual preference is unchanged.";
+            return;
+        }
+
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = xagmanOverride == XagmanTradeRefusalOverride.IdleDemand
+                ? "Unavailable - Xagman idle refusal could not enable the required trade hooks."
+                : "Disabled";
             return;
         }
 
@@ -218,8 +327,14 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
             1 => "1 extra message/command",
             var count => $"{count} extra messages/commands"
         };
+        var ownerLabel = (manualEnabled, xagmanOverride == XagmanTradeRefusalOverride.IdleDemand) switch
+        {
+            (true, true) => "manual + Xagman idle",
+            (false, true) => "Xagman idle",
+            _ => "manual",
+        };
 
-        StatusText = $"Enabled - incoming trades are refused automatically ({feedbackMode}, {surfaceCount} surfaces, {extraCommandLabel}).";
+        StatusText = $"Enabled - incoming trades are refused automatically ({ownerLabel}; {feedbackMode}, {surfaceCount} surfaces, {extraCommandLabel}).";
     }
 
     private void SendTradeRequestDetour(InventoryManager* manager, uint entityId)

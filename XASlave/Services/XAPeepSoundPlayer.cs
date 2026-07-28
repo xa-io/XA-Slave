@@ -12,6 +12,9 @@ internal static class XAPeepSoundPlayer
 {
     private const int SampleRate = 44100;
     private const float ToneAmplitude = 0.90f;
+    private static readonly object TonePlaybackSync = new();
+    private static readonly SemaphoreSlim TonePlaybackGate = new(1, 1);
+    private static CancellationTokenSource? activeTonePlaybackCancellation;
     private static readonly float[] BaseFrequencies =
     {
         392.00f,
@@ -61,6 +64,86 @@ internal static class XAPeepSoundPlayer
         }
     }
 
+    public static bool TryPlayTone(
+        int toneId,
+        int beepCount,
+        float volume,
+        Dalamud.Plugin.Services.IPluginLog log,
+        Action? onPlaybackFailure = null)
+    {
+        toneId = Math.Clamp(toneId, 1, BaseFrequencies.Length);
+        beepCount = Math.Clamp(beepCount, 1, 10);
+
+        var clampedVolume = Math.Clamp(volume, 0f, 1f);
+        StopTonePlayback();
+        if (clampedVolume <= 0f)
+            return true;
+
+        try
+        {
+            var soundDevice = DirectSoundOut.Devices.FirstOrDefault();
+            if (soundDevice == null)
+                return false;
+
+            var wavData = BuildToneWaveData(toneId, beepCount);
+            var playbackCancellation = new CancellationTokenSource();
+            var worker = new Thread(() => PlayToneInternal(
+                soundDevice.Guid,
+                wavData,
+                clampedVolume,
+                playbackCancellation,
+                log,
+                onPlaybackFailure))
+            {
+                IsBackground = true,
+                Name = "XACombatTypingSound",
+            };
+
+            lock (TonePlaybackSync)
+            {
+                activeTonePlaybackCancellation = playbackCancellation;
+            }
+
+            try
+            {
+                worker.Start();
+            }
+            catch
+            {
+                lock (TonePlaybackSync)
+                {
+                    if (ReferenceEquals(activeTonePlaybackCancellation, playbackCancellation))
+                        activeTonePlaybackCancellation = null;
+                }
+
+                playbackCancellation.Dispose();
+                throw;
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Alert When Typing In Combat could not prepare its direct alert sound.");
+            return false;
+        }
+    }
+
+    public static void StopTonePlayback()
+    {
+        lock (TonePlaybackSync)
+        {
+            activeTonePlaybackCancellation?.Cancel();
+            activeTonePlaybackCancellation = null;
+        }
+    }
+
+    public static string GetToneLabel(int toneId)
+    {
+        var clampedId = Math.Clamp(toneId, 1, BaseFrequencies.Length);
+        return $"Tone {clampedId} ({BaseFrequencies[clampedId - 1]:0.##} Hz)";
+    }
+
     private static void PlayAlertInternal(Guid deviceGuid, byte[] wavData, float volume, Dalamud.Plugin.Services.IPluginLog log)
     {
         try
@@ -85,6 +168,73 @@ internal static class XAPeepSoundPlayer
         }
     }
 
+    private static void PlayToneInternal(
+        Guid deviceGuid,
+        byte[] wavData,
+        float volume,
+        CancellationTokenSource playbackCancellation,
+        Dalamud.Plugin.Services.IPluginLog log,
+        Action? onPlaybackFailure)
+    {
+        var ownsPlaybackGate = false;
+        try
+        {
+            TonePlaybackGate.Wait(playbackCancellation.Token);
+            ownsPlaybackGate = true;
+
+            if (playbackCancellation.IsCancellationRequested)
+                return;
+
+            using var stream = new MemoryStream(wavData, writable: false);
+            using var reader = new WaveFileReader(stream);
+            using var channel = new WaveChannel32(reader)
+            {
+                Volume = volume,
+                PadWithZeroes = false,
+            };
+            using var output = new DirectSoundOut(deviceGuid);
+            output.Init(channel);
+            output.Play();
+
+            while (output.PlaybackState == PlaybackState.Playing && !playbackCancellation.IsCancellationRequested)
+                Thread.Sleep(25);
+
+            if (playbackCancellation.IsCancellationRequested && output.PlaybackState == PlaybackState.Playing)
+                output.Stop();
+        }
+        catch (OperationCanceledException) when (playbackCancellation.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            if (!playbackCancellation.IsCancellationRequested)
+            {
+                log.Warning(ex, "[XASlave] Alert When Typing In Combat direct alert playback failed.");
+                try
+                {
+                    onPlaybackFailure?.Invoke();
+                }
+                catch (Exception callbackEx)
+                {
+                    log.Warning(callbackEx, "[XASlave] Alert When Typing In Combat could not queue fallback playback.");
+                }
+            }
+        }
+        finally
+        {
+            if (ownsPlaybackGate)
+                TonePlaybackGate.Release();
+
+            lock (TonePlaybackSync)
+            {
+                if (ReferenceEquals(activeTonePlaybackCancellation, playbackCancellation))
+                    activeTonePlaybackCancellation = null;
+            }
+
+            playbackCancellation.Dispose();
+        }
+    }
+
     private static byte[] BuildAlertWaveData(int alertId)
     {
         var clampedId = Math.Clamp(alertId, 1, BaseFrequencies.Length);
@@ -95,6 +245,23 @@ internal static class XAPeepSoundPlayer
             {
                 WriteTone(writer, segment.Frequency, segment.DurationMs);
                 WriteSilence(writer, 35);
+            }
+        }
+
+        return stream.ToArray();
+    }
+
+    private static byte[] BuildToneWaveData(int toneId, int beepCount)
+    {
+        var frequency = BaseFrequencies[Math.Clamp(toneId, 1, BaseFrequencies.Length) - 1];
+        using var stream = new MemoryStream();
+        using (var writer = new WaveFileWriter(stream, new WaveFormat(SampleRate, 16, 1)))
+        {
+            for (var index = 0; index < beepCount; index++)
+            {
+                WriteTone(writer, frequency, 160);
+                if (index + 1 < beepCount)
+                    WriteSilence(writer, 120);
             }
         }
 

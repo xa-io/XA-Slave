@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
+using System.Text;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.ClientState.Conditions;
@@ -66,6 +67,7 @@ public partial class SlaveWindow
     private Vector4 xaAbuseOverlayShadowColor = XaAbuseDefaultOverlayShadowColor;
     private Vector4 xaAbuseOverlayFillColor = XaAbuseDefaultOverlayFillColor;
     private DateTime xaAbuseOverlayEnabledAtUtc = DateTime.MinValue;
+    private string xaDbIpcTestReport = string.Empty;
     private readonly record struct DalamudTestNotificationDefinition(
         string ButtonLabel,
         string ResultLabel,
@@ -1863,6 +1865,12 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
+        if (ImGui.CollapsingHeader("XA Database##xaAbuse"))
+        {
+            DrawXaAbuseXaDatabaseIpcTests();
+            ImGui.Spacing();
+        }
+
         ImGui.Spacing();
         ImGui.TreePop();
         }
@@ -2345,6 +2353,16 @@ public partial class SlaveWindow
             {
                 SetDebugResult($"Dropbox: Error disabling auto-accept - {ex.Message}");
             }
+        }
+
+        if (ImGui.Button("Begin Trading"))
+        {
+            RunDebugDropboxBeginTrading(focusCurrentTargetFirst: false);
+        }
+        ImGui.SameLine();
+        if (ImGui.Button("Focus Target + Begin Trading"))
+        {
+            RunDebugDropboxBeginTrading(focusCurrentTargetFirst: true);
         }
 
         if (ImGui.Button("Stop Item Trade Queue"))
@@ -2862,6 +2880,147 @@ public partial class SlaveWindow
         xaAbuseOverlayEnabledAtUtc = DateTime.MinValue;
         Plugin.NamePlateGui.RequestRedraw();
         SetDebugResult(wasEnabled ? "XA Abuse reset, restored normal nameplate / overlay" : "XA Abuse already reset");
+    }
+
+    private void DrawXaAbuseXaDatabaseIpcTests()
+    {
+        ImGui.TextDisabled("Pulls every XA.Database.* IPC channel in one pass and copies the results to the clipboard.");
+        ImGui.TextDisabled("Covers all 21 channels from the XA Database [?] IPC reference tab (2 actions + 19 queries).");
+        ImGui.Spacing();
+
+        if (ImGui.Button("Run All IPC Tests + Copy Results##xaAbuseDbIpcRun"))
+        {
+            RunXaDatabaseIpcClipboardTest();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Runs IsReady/GetVersion/GetDbPath, then Refresh + Save (fresh snapshot),\nthen every remaining query including the item-search channels,\nand copies the full result report to the clipboard.");
+
+        if (!string.IsNullOrEmpty(xaDbIpcTestReport))
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Copy Last Report##xaAbuseDbIpcCopy"))
+            {
+                ImGui.SetClipboardText(xaDbIpcTestReport);
+                SetDebugResult("XA Database IPC report copied to clipboard again");
+            }
+
+            ImGui.Spacing();
+            ImGui.BeginChild("##xaAbuseDbIpcReport", new Vector2(0f, Scale(220f)), true);
+            ImGui.TextUnformatted(xaDbIpcTestReport);
+            ImGui.EndChild();
+        }
+    }
+
+    private void RunXaDatabaseIpcClipboardTest()
+    {
+        const string SearchQuery = "potion";
+        var ipc = plugin.IpcClient;
+        var report = new StringBuilder();
+        report.AppendLine("XA Database IPC Test Report");
+        report.AppendLine($"Generated: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+
+        if (!ipc.IsXaDatabaseAvailable())
+        {
+            report.AppendLine("[FAIL] XA Database IPC unavailable - is the XA Database plugin installed and loaded?");
+            xaDbIpcTestReport = report.ToString();
+            ImGui.SetClipboardText(xaDbIpcTestReport);
+            SetDebugResult("XA Database IPC unavailable, failure report copied to clipboard");
+            return;
+        }
+
+        var tested = 0;
+        var returnedData = 0;
+
+        void Append(string channel, string type, string value, bool hasData)
+        {
+            tested++;
+            if (hasData)
+                returnedData++;
+
+            if (value.Contains('\n'))
+            {
+                report.AppendLine($"{channel} ({type}):");
+                var lines = value.Split('\n');
+                const int MaxLines = 25;
+                for (var i = 0; i < lines.Length && i < MaxLines; i++)
+                    report.AppendLine($"    {lines[i].TrimEnd('\r')}");
+                if (lines.Length > MaxLines)
+                    report.AppendLine($"    ... (+{lines.Length - MaxLines} more lines)");
+            }
+            else
+            {
+                report.AppendLine($"{channel} ({type}): {(string.IsNullOrEmpty(value) ? "(empty)" : value)}");
+            }
+        }
+
+        report.AppendLine($"XA Database version: {ipc.GetVersion()}");
+        report.AppendLine(new string('-', 72));
+
+        Append("XA.Database.IsReady", "bool", ipc.IsReady().ToString(), true);
+        Append("XA.Database.GetVersion", "string", ipc.GetVersion(), !string.IsNullOrEmpty(ipc.GetVersion()));
+
+        var dbPath = ipc.GetDbPath();
+        Append("XA.Database.GetDbPath", "string", dbPath, !string.IsNullOrEmpty(dbPath));
+
+        // Actions run before the remaining queries so their results reflect a fresh snapshot.
+        var refreshOk = ipc.Refresh();
+        Append("XA.Database.Refresh", "action", refreshOk ? "invoked OK" : "FAILED", refreshOk);
+        var saveOk = plugin.SaveToXaDatabaseAndRecordSync();
+        Append("XA.Database.Save", "action", saveOk ? "invoked OK (snapshot saved + sync recorded)" : "FAILED", saveOk);
+
+        var characterName = ipc.GetCharacterName();
+        Append("XA.Database.GetCharacterName", "string", characterName, !string.IsNullOrEmpty(characterName));
+        Append("XA.Database.GetGil", "int", $"{ipc.GetGil():N0}", true);
+        Append("XA.Database.GetRetainerGil", "long", $"{ipc.GetRetainerGil():N0}", true);
+
+        var fcInfo = ipc.GetFcInfo();
+        Append("XA.Database.GetFcInfo", "string", fcInfo, !string.IsNullOrEmpty(fcInfo));
+        var fcName = ipc.GetFcName();
+        Append("XA.Database.GetFcName", "string", fcName, !string.IsNullOrEmpty(fcName));
+        var fcTag = ipc.GetFcTag();
+        Append("XA.Database.GetFcTag", "string", fcTag, !string.IsNullOrEmpty(fcTag));
+        Append("XA.Database.GetFcPoints", "int", $"{ipc.GetFcPoints():N0}", true);
+
+        var plotInfo = ipc.GetPlotInfo();
+        Append("XA.Database.GetPlotInfo", "string", plotInfo, !string.IsNullOrEmpty(plotInfo));
+        var personalPlotInfo = ipc.GetPersonalPlotInfo();
+        Append("XA.Database.GetPersonalPlotInfo", "string", personalPlotInfo, !string.IsNullOrEmpty(personalPlotInfo));
+        var apartment = ipc.GetApartment();
+        Append("XA.Database.GetApartment", "string", apartment, !string.IsNullOrEmpty(apartment));
+
+        var summaryJson = ipc.GetCharacterSummaryJson();
+        Append("XA.Database.GetCharacterSummaryJson", "string", summaryJson, !string.IsNullOrEmpty(summaryJson));
+        var accountRosterJson = ipc.GetAccountCharacterListJson();
+        Append("XA.Database.GetAccountCharacterListJson", "string", accountRosterJson, !string.IsNullOrEmpty(accountRosterJson));
+        var snapshotJson = ipc.GetLastSnapshotResultJson();
+        Append("XA.Database.GetLastSnapshotResultJson", "string", snapshotJson, !string.IsNullOrEmpty(snapshotJson));
+
+        var searchRaw = ipc.SearchItems(SearchQuery);
+        Append($"XA.Database.SearchItems(\"{SearchQuery}\")", "string", searchRaw, !string.IsNullOrEmpty(searchRaw));
+
+        // Derive itemId:isHq keys from the search results so the match channel gets a realistic payload.
+        var itemKeys = (searchRaw ?? string.Empty)
+            .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(line => line.Split('|'))
+            .Where(parts => parts.Length >= 7 && uint.TryParse(parts[4], out _) && bool.TryParse(parts[6], out _))
+            .Select(parts => $"{parts[4]}:{(bool.Parse(parts[6]) ? 1 : 0)}")
+            .Distinct()
+            .Take(3)
+            .ToList();
+        var itemKeysPayload = itemKeys.Count > 0 ? string.Join(",", itemKeys) : "1:0";
+        var matchOk = ipc.TryGetMatchingCharactersForItems(itemKeysPayload, out var matchRaw);
+        Append($"XA.Database.GetMatchingCharactersForItems(\"{itemKeysPayload}\")", "string",
+            matchOk ? matchRaw : "FAILED", matchOk && !string.IsNullOrEmpty(matchRaw));
+
+        var currentCharJson = ipc.SearchCurrentCharacterItemsJson(SearchQuery);
+        Append($"XA.Database.SearchCurrentCharacterItemsJson(\"{SearchQuery}\")", "string", currentCharJson, !string.IsNullOrEmpty(currentCharJson));
+
+        report.AppendLine(new string('-', 72));
+        report.AppendLine($"Tested {tested} IPC channels, {returnedData} returned data. Empty values can be legitimate (no FC, no plot, no search hits).");
+
+        xaDbIpcTestReport = report.ToString();
+        ImGui.SetClipboardText(xaDbIpcTestReport);
+        SetDebugResult($"XA Database IPC test: {tested} channels tested, {returnedData} returned data, report copied to clipboard");
     }
 
     private void OnXaAbuseNamePlateUpdate(INamePlateUpdateContext context, IReadOnlyList<INamePlateUpdateHandler> handlers)
@@ -3887,6 +4046,45 @@ public partial class SlaveWindow
         SetDebugResult(previous == null
             ? "FocusTarget was already clear."
             : $"FocusTarget cleared through Dalamud TargetManager: {previous.Name}");
+    }
+
+    // Dropbox's BeginTradingQueue IPC silently ignores the call unless its TaskManager is idle AND the
+    // focus target is a player; ItemQueueUI.BeginTrading() then trades the persisted item queue with them.
+    private void RunDebugDropboxBeginTrading(bool focusCurrentTargetFirst)
+    {
+        if (!plugin.IpcClient.IsDropboxAvailable())
+        {
+            SetDebugResult("Dropbox Begin Trading: Dropbox is not available.");
+            return;
+        }
+
+        if (plugin.IpcClient.DropboxIsBusy())
+        {
+            SetDebugResult("Dropbox Begin Trading: Dropbox is busy; it ignores BeginTradingQueue while a task runs.");
+            return;
+        }
+
+        if (focusCurrentTargetFirst && Plugin.TargetManager.FocusTarget is not IPlayerCharacter)
+        {
+            if (Plugin.TargetManager.Target is not IPlayerCharacter target)
+            {
+                SetDebugResult("Dropbox Begin Trading: no player focus target and the current target is not a player; target the trade partner first.");
+                return;
+            }
+
+            Plugin.TargetManager.FocusTarget = target;
+        }
+
+        if (Plugin.TargetManager.FocusTarget is not IPlayerCharacter focus)
+        {
+            SetDebugResult("Dropbox Begin Trading: no player focus target; Dropbox ignores BeginTradingQueue without one. Use \"Focus Target + Begin Trading\" or /focustarget the partner.");
+            return;
+        }
+
+        var invoked = plugin.IpcClient.DropboxBeginTrading();
+        var busyAfter = plugin.IpcClient.DropboxIsBusy();
+        SetDebugResult($"Dropbox Begin Trading: IPC invoked={invoked}, focus={focus.Name}, busy after={busyAfter}" +
+                       (busyAfter ? " - trading started." : " - nothing started (is the Dropbox item queue empty?)."));
     }
 
     private string GetSelectStringDebugStatus()

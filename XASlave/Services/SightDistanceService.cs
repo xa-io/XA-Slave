@@ -13,7 +13,6 @@ namespace XASlave.Services;
 public unsafe sealed class SightDistanceService : IDisposable
 {
     private const double StartupArmingStepDebugThresholdMilliseconds = 5.0;
-    private const double StartupArmingStepWarningThresholdMilliseconds = 200.0;
 
     private readonly IFramework framework;
     private readonly ISigScanner sigScanner;
@@ -86,6 +85,9 @@ public unsafe sealed class SightDistanceService : IDisposable
         float currentFoV,
         bool ignoreCollision)
     {
+        if (disposed)
+            return;
+
         this.maxDistance = maxDistance;
         this.minDistance = minDistance;
         this.maxRotation = maxRotation;
@@ -97,13 +99,21 @@ public unsafe sealed class SightDistanceService : IDisposable
 
         if (enabled && !startupArmingPending)
         {
-            UpdateCamera(CameraManager.Instance()->Camera);
+            if (!TryUpdateActiveCamera())
+                StatusText = "Enabled - waiting for an active camera after a transition.";
+
             UpdateCollisionPatch();
         }
     }
 
     public bool SetEnabled(bool value)
     {
+        if (disposed)
+        {
+            StatusText = "Unavailable - Custom Sight Distance has been disposed.";
+            return false;
+        }
+
         if (value == enabled && !startupArmingPending)
             return enabled;
 
@@ -134,13 +144,17 @@ public unsafe sealed class SightDistanceService : IDisposable
         ToggleHook(setActiveCameraHook, true, "SetActiveCamera");
         ToggleHook(cameraCurrentSightDistanceHook, true, "CameraCurrentSightDistance");
         UpdateCollisionPatch();
-        UpdateCamera(CameraManager.Instance()->Camera);
-        StatusText = "Enabled - camera sight distance, angle, and FoV limits are overridden locally.";
+        StatusText = TryUpdateActiveCamera()
+            ? "Enabled - camera sight distance, angle, and FoV limits are overridden locally."
+            : "Enabled - waiting for an active camera after a transition.";
         return true;
     }
 
     public void Dispose()
     {
+        if (disposed)
+            return;
+
         disposed = true;
         CancelStartupArming(disposeCompletedResult: true);
         enabled = false;
@@ -229,10 +243,11 @@ public unsafe sealed class SightDistanceService : IDisposable
     private static void DisposeHook<T>(ref Hook<T>? hook)
         where T : Delegate
     {
-        if (hook is { IsDisposed: false })
-            hook.Dispose();
-
+        var hookToDispose = hook;
         hook = null;
+
+        if (hookToDispose is { IsDisposed: false })
+            hookToDispose.Dispose();
     }
 
     private void ToggleHook<T>(Hook<T>? hook, bool targetEnabled, string label)
@@ -411,8 +426,9 @@ public unsafe sealed class SightDistanceService : IDisposable
                     UpdateCollisionPatch();
                     break;
                 default:
-                    UpdateCamera(CameraManager.Instance()->Camera);
-                    StatusText = "Enabled - camera sight distance, angle, and FoV limits are overridden locally.";
+                    StatusText = TryUpdateActiveCamera()
+                        ? "Enabled - camera sight distance, angle, and FoV limits are overridden locally."
+                        : "Enabled - waiting for an active camera after a transition.";
                     CancelStartupArming();
                     return;
             }
@@ -493,14 +509,11 @@ public unsafe sealed class SightDistanceService : IDisposable
 
     private void LogStartupArmingStepDuration(string label, double elapsedMilliseconds)
     {
-        if (elapsedMilliseconds < StartupArmingStepDebugThresholdMilliseconds)
+        if (!(Plugin.Instance?.Configuration.VerboseTaskLogging ?? false)
+            || elapsedMilliseconds < StartupArmingStepDebugThresholdMilliseconds)
             return;
 
-        var message = $"[XASlave] Custom Sight Distance startup arming step '{label}' took {elapsedMilliseconds:F1}ms.";
-        if (elapsedMilliseconds >= StartupArmingStepWarningThresholdMilliseconds)
-            log.Warning(message);
-        else
-            log.Debug(message);
+        log.Debug($"[XASlave] Custom Sight Distance startup arming step '{label}' took {elapsedMilliseconds:F1}ms.");
     }
 
     private void SetActiveCameraDetour(CameraManager* manager, int cameraIndex, void* a3)
@@ -566,10 +579,18 @@ public unsafe sealed class SightDistanceService : IDisposable
         camera->FoV = currentFoV;
     }
 
+    private bool TryUpdateActiveCamera()
+    {
+        if (!TryGetActiveCamera(out var camera))
+            return false;
+
+        UpdateCamera(camera);
+        return true;
+    }
+
     private void ResetCameraDefaults()
     {
-        var camera = CameraManager.Instance()->Camera;
-        if (camera == null)
+        if (!TryGetActiveCamera(out var camera))
             return;
 
         camera->MinDistance = 1.5f;
@@ -579,6 +600,18 @@ public unsafe sealed class SightDistanceService : IDisposable
         camera->MinFoV = 0.69f;
         camera->MaxFoV = 0.78f;
         camera->FoV = 0.78f;
+    }
+
+    private static bool TryGetActiveCamera(out Camera* camera)
+    {
+        camera = null;
+
+        var manager = CameraManager.Instance();
+        if (manager == null || manager->Camera == null)
+            return false;
+
+        camera = manager->Camera;
+        return true;
     }
 
     private delegate void SetActiveCameraDelegate(CameraManager* manager, int cameraIndex, void* a3);

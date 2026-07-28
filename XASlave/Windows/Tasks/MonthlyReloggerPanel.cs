@@ -27,6 +27,14 @@ public partial class SlaveWindow
     private bool reloggerShowLog;
     private List<string> reloggerRunList = new(); // full ordered char list for current run
 
+    // -- Last-run snapshot (kept after the task finishes so failed/incomplete chars stay reviewable) --
+    private readonly List<string> reloggerLastRunList = new();
+    private readonly List<string> reloggerLastRunFailed = new();
+    private readonly List<string> reloggerLastRunIncomplete = new();
+    private readonly Dictionary<string, double> reloggerLastRunDurations = new(StringComparer.OrdinalIgnoreCase);
+    private int reloggerLastRunCompleted;
+    private bool reloggerHasLastRunSnapshot;
+
     private string arImportStatus = string.Empty;
     private DateTime arImportStatusExpiry = DateTime.MinValue;
 
@@ -104,6 +112,10 @@ public partial class SlaveWindow
         // -- Run controls --
         if (runner.IsRunning && runner.CurrentTaskName == "Monthly Relogger")
         {
+            // Continuously snapshot the live run so failed (red) / incomplete (purple) characters
+            // remain reviewable after the task finishes, until the user clears results.
+            CaptureReloggerSnapshot(runner);
+
             var progress = runner.TotalItems > 0 ? (float)runner.CompletedItems / runner.TotalItems : 0f;
             ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"Running: {runner.StatusText}");
             ImGui.ProgressBar(progress, new Vector2(-1, 0), $"{runner.CompletedItems}/{runner.TotalItems}");
@@ -118,6 +130,8 @@ public partial class SlaveWindow
         }
         else
         {
+            DrawReloggerLastRunSnapshot();
+
             var selectedChars = GetSelectedReloggerCharacters();
             var ipc = plugin.IpcClient;
             var requiresXaDb = plugin.Configuration.ReloggerDoCollectPersonalPlotInfo || plugin.Configuration.ReloggerDoParseForXaDatabase;
@@ -334,6 +348,15 @@ public partial class SlaveWindow
                     ImGui.EndTooltip();
                 }
 
+                // Mark characters AutoRetainer has no data for - they cannot be relogged.
+                if (info != null && info.FoundInAutoRetainer == false)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), "(not found in AR)");
+                    if (ImGui.IsItemHovered())
+                        ImGui.SetTooltip("AutoRetainer has no data for this character (manually added or unknown).\nIt cannot be relogged with /ays relog and will fail to log in.\nRe-run \"Import from AutoRetainer\" / \"Refresh AR Data\" after fixing it in AutoRetainer.");
+                }
+
                 // Region / DC
                 ImGui.TableNextColumn();
                 ImGui.TextDisabled(regionDc);
@@ -513,11 +536,66 @@ public partial class SlaveWindow
         if (runner.CurrentTaskName == "Monthly Relogger" && runner.StatusText == "Complete")
         {
             ImGui.Spacing();
-            if (runner.FailedCharacters.Count > 0)
-                ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"Relogger completed with {runner.FailedCharacters.Count} failed character(s).");
+            var failedCount = runner.FailedCharacters.Count;
+            var incompleteCount = runner.IncompleteCharacters.Count;
+            if (failedCount > 0 || incompleteCount > 0)
+                ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
+                    $"Relogger completed: {failedCount} failed (red), {incompleteCount} incomplete (purple).");
             else
                 ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Relogger completed successfully.");
         }
+    }
+
+    /// <summary>Snapshot the current relogger run state so it persists after the task finishes.</summary>
+    private void CaptureReloggerSnapshot(Services.TaskRunner runner)
+    {
+        reloggerLastRunList.Clear();
+        reloggerLastRunList.AddRange(reloggerRunList);
+        reloggerLastRunFailed.Clear();
+        reloggerLastRunFailed.AddRange(runner.FailedCharacters);
+        reloggerLastRunIncomplete.Clear();
+        reloggerLastRunIncomplete.AddRange(runner.IncompleteCharacters);
+        reloggerLastRunDurations.Clear();
+        foreach (var entry in runner.ItemDurations)
+            reloggerLastRunDurations[entry.Key] = entry.Value;
+        reloggerLastRunCompleted = runner.CompletedItems;
+        reloggerHasLastRunSnapshot = reloggerLastRunList.Count > 0;
+    }
+
+    /// <summary>
+    /// Draws the last completed relogger run (kept until the user clears results) so failed (red)
+    /// and incomplete (purple) characters stay reviewable after logout / completion tasks run.
+    /// </summary>
+    private void DrawReloggerLastRunSnapshot()
+    {
+        if (!reloggerHasLastRunSnapshot || reloggerLastRunList.Count == 0)
+            return;
+
+        ImGui.Spacing();
+        ImGui.TextDisabled("Last relogger run (kept until you clear results):");
+        var eta = GetReloggerEtaLabel(reloggerLastRunList, reloggerLastRunDurations);
+        if (!string.IsNullOrWhiteSpace(eta))
+            ImGui.TextDisabled(eta);
+        DrawReloggerProcessingList(reloggerLastRunList, reloggerLastRunCompleted, reloggerLastRunFailed, reloggerLastRunIncomplete, reloggerLastRunDurations);
+
+        var failedCount = reloggerLastRunFailed.Count;
+        var incompleteCount = reloggerLastRunIncomplete.Count;
+        if (failedCount > 0 || incompleteCount > 0)
+            ImGui.TextDisabled($"{failedCount} failed (red), {incompleteCount} incomplete (purple) still need another pass.");
+
+        if (ImGui.Button("Clear results##reloggerClearResults"))
+        {
+            reloggerHasLastRunSnapshot = false;
+            reloggerLastRunList.Clear();
+            reloggerLastRunFailed.Clear();
+            reloggerLastRunIncomplete.Clear();
+            reloggerLastRunDurations.Clear();
+            reloggerLastRunCompleted = 0;
+        }
+
+        ImGui.Spacing();
+        ImGui.Separator();
+        ImGui.Spacing();
     }
 
     /// <summary>Get the selected character names in sorted order.</summary>
@@ -663,6 +741,9 @@ public partial class SlaveWindow
             // Migrate legacy CID-based LastSeen into ReloggerCharacterInfo
             MigrateLegacyLastSeen(cfg, arChars);
 
+            // Flag any list characters AutoRetainer has no data for (manually added / unknown)
+            MarkAutoRetainerPresence(cfg, arChars);
+
             cfg.Save();
 
             arImportStatus = added > 0
@@ -700,9 +781,14 @@ public partial class SlaveWindow
             }
 
             MigrateLegacyLastSeen(cfg, arChars);
+            MarkAutoRetainerPresence(cfg, arChars);
             cfg.Save();
 
-            arImportStatus = $"Refreshed {updated} characters";
+            var notFound = cfg.ReloggerCharacters.Count(k =>
+                cfg.ReloggerCharacterInfo.TryGetValue(k, out var d) && d.FoundInAutoRetainer == false);
+            arImportStatus = notFound > 0
+                ? $"Refreshed {updated} characters ({notFound} not in AR)"
+                : $"Refreshed {updated} characters";
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
         }
         catch (Exception ex)
@@ -729,7 +815,31 @@ public partial class SlaveWindow
         data.CurrentWorld = ar.CurrentWorld;
         data.RetainerCount = ar.RetainerCount;
         data.SubmarineCount = ar.SubmarineCount;
+        data.FoundInAutoRetainer = true;
         cfg.ReloggerCharacterInfo[key] = data;
+    }
+
+    /// <summary>
+    /// Records, for every character in the relogger list, whether AutoRetainer's config
+    /// currently has data for it. Characters NOT present in AR cannot be relogged via
+    /// /ays relog (they will fail to log in), so they are flagged for a "(not found in AR)"
+    /// marker. Must be called after the AR characters have been processed.
+    /// </summary>
+    private static void MarkAutoRetainerPresence(Configuration cfg, List<AutoRetainerConfigReader.ArCharacterInfo> arChars)
+    {
+        var arKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var c in arChars)
+            arKeys.Add($"{c.Name}@{c.World}");
+
+        foreach (var key in cfg.ReloggerCharacters)
+        {
+            if (!cfg.ReloggerCharacterInfo.TryGetValue(key, out var data))
+            {
+                data = new ReloggerCharacterData();
+                cfg.ReloggerCharacterInfo[key] = data;
+            }
+            data.FoundInAutoRetainer = arKeys.Contains(key);
+        }
     }
 
     /// <summary>
@@ -778,13 +888,15 @@ public partial class SlaveWindow
         }
 
         MigrateLegacyLastSeen(cfg, arChars);
+        MarkAutoRetainerPresence(cfg, arChars);
         cfg.Save();
         return (added, arChars.Count);
     }
 
     /// <summary>
     /// Pull character data from XA Database SQLite file.
-    /// Updates ReloggerCharacterInfo with Lv, Gil, FC, and Last Logged In for all known characters.
+    /// Updates ReloggerCharacterInfo with Lv, Gil, FC, Last Logged In, treasure value,
+    /// and repair kit / ceruleum tank counts for all known characters.
     /// Uses the DB path from XA.Database.GetDbPath IPC, then reads SQLite directly.
     /// </summary>
     private void PullXaDatabaseInfo()
@@ -816,7 +928,10 @@ public partial class SlaveWindow
                        retainer_count,
                        free_company_json,
                        fc_members_json,
-                       inventory_summaries_json
+                       inventory_summaries_json,
+                       items_json,
+                       listings_json,
+                       retainer_items_json
                 FROM xa_characters
                 ORDER BY character_name";
 
@@ -839,8 +954,7 @@ public partial class SlaveWindow
                     data.HighestLevel = dbLevel;
 
                 var dbGil = Convert.ToInt32(reader["gil"]);
-                if (dbGil > 0)
-                    data.Gil = dbGil;
+                data.Gil = Math.Max(0, dbGil);
 
                 var fcName = reader["fc_name"].ToString() ?? "";
                 if (!string.IsNullOrEmpty(fcName))
@@ -860,6 +974,10 @@ public partial class SlaveWindow
                 data.MainInventoryUsedSlots = 0;
                 data.MainInventoryTotalSlots = 0;
                 data.MainInventoryFreeSlots = 0;
+                data.XaDatabaseSnapshotUpdatedUtc = DateTime.MinValue;
+                data.TreasureValue = 0;
+                data.MagitekRepairKits = 0;
+                data.CeruleumTanks = 0;
 
                 var dbRetainerCount = Convert.ToInt32(reader["retainer_count"]);
                 if (dbRetainerCount > 0)
@@ -868,11 +986,16 @@ public partial class SlaveWindow
                 UpdateCharacterFcMemberRank(data, name, world, reader["fc_members_json"]?.ToString() ?? "");
                 UpdateCharacterFreeCompanyRank(data, reader["free_company_json"]?.ToString() ?? "");
                 UpdateCharacterInventorySummary(data, reader["inventory_summaries_json"]?.ToString() ?? "");
+                UpdateCharacterItemHoldings(data,
+                    reader["items_json"]?.ToString() ?? "",
+                    reader["listings_json"]?.ToString() ?? "",
+                    reader["retainer_items_json"]?.ToString() ?? "");
 
                 var lastSeenStr = reader["updated_utc"].ToString() ?? "";
                 if (DateTime.TryParse(lastSeenStr, null, System.Globalization.DateTimeStyles.AssumeUniversal, out var lastSeen))
                 {
                     lastSeen = lastSeen.ToUniversalTime();
+                    data.XaDatabaseSnapshotUpdatedUtc = lastSeen;
                     if (lastSeen > data.LastLoggedIn)
                         data.LastLoggedIn = lastSeen;
                 }
@@ -1015,6 +1138,79 @@ public partial class SlaveWindow
             }
 
             data.MainInventoryFreeSlots = Math.Max(0, data.MainInventoryTotalSlots - data.MainInventoryUsedSlots);
+        }
+        catch
+        {
+        }
+    }
+
+    private const uint CeruleumTankItemId = 10155;
+    private const uint MagitekRepairMaterialsItemId = 10373;
+
+    /// <summary>
+    /// Update treasure value and submarine consumable counts from XA Database item snapshots.
+    /// Treasure value follows the Export Data TRS rules (character items + market listings + retainer items);
+    /// Magitek Repair Kits and Ceruleum Tanks count only items the character itself is holding.
+    /// </summary>
+    private static void UpdateCharacterItemHoldings(ReloggerCharacterData data, string itemsJson, string listingsJson, string retainerItemsJson)
+    {
+        long treasureValue = 0;
+        long repairKits = 0;
+        long ceruleumTanks = 0;
+
+        ForEachItemSnapshotEntry(itemsJson, (itemId, quantity) =>
+        {
+            if (ExportTreasureValues.TryGetValue(itemId, out var itemValue))
+                treasureValue += (long)quantity * itemValue;
+            else if (itemId == MagitekRepairMaterialsItemId)
+                repairKits += quantity;
+            else if (itemId == CeruleumTankItemId)
+                ceruleumTanks += quantity;
+        });
+        ForEachItemSnapshotEntry(listingsJson, (itemId, quantity) =>
+        {
+            if (ExportTreasureValues.TryGetValue(itemId, out var itemValue))
+                treasureValue += (long)quantity * itemValue;
+        });
+        ForEachItemSnapshotEntry(retainerItemsJson, (itemId, quantity) =>
+        {
+            if (ExportTreasureValues.TryGetValue(itemId, out var itemValue))
+                treasureValue += (long)quantity * itemValue;
+        });
+
+        data.TreasureValue = treasureValue > int.MaxValue ? int.MaxValue : (int)treasureValue;
+        data.MagitekRepairKits = repairKits > int.MaxValue ? int.MaxValue : (int)repairKits;
+        data.CeruleumTanks = ceruleumTanks > int.MaxValue ? int.MaxValue : (int)ceruleumTanks;
+    }
+
+    private static void ForEachItemSnapshotEntry(string itemSnapshotJson, Action<uint, int> onEntry)
+    {
+        if (string.IsNullOrWhiteSpace(itemSnapshotJson))
+            return;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(itemSnapshotJson);
+            if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                return;
+
+            foreach (var entry in doc.RootElement.EnumerateArray())
+            {
+                if (entry.ValueKind != JsonValueKind.Object)
+                    continue;
+
+                if (!entry.TryGetProperty("ItemId", out var itemIdElement)
+                    || !TryGetJsonInt64(itemIdElement, out var itemId)
+                    || itemId <= 0 || itemId > uint.MaxValue)
+                    continue;
+
+                if (!entry.TryGetProperty("Quantity", out var quantityElement)
+                    || !TryGetJsonInt32(quantityElement, out var quantity)
+                    || quantity <= 0)
+                    continue;
+
+                onEntry((uint)itemId, quantity);
+            }
         }
         catch
         {

@@ -241,6 +241,15 @@ public sealed class AutoLeaveDutyService : IDisposable
     {
         try
         {
+            // Only confirm a SelectYesno that actually looks like the leave-duty prompt. Once
+            // pendingLeave is armed, blindly clicking Yes on any visible yes/no dialog could
+            // auto-accept an unrelated prompt (loot roll, gear-drop, etc.) that appears first.
+            if (!AddonHelper.AddonHasText("SelectYesno", "duty", contains: true)
+                && !AddonHelper.AddonHasText("SelectYesno", "leave", contains: true))
+            {
+                return;
+            }
+
             if (!AddonHelper.ClickYesNo(true))
                 return;
 

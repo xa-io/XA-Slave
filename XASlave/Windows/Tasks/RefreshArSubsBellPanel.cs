@@ -519,7 +519,13 @@ public partial class SlaveWindow
                     try
                     {
                         if (!Plugin.PlayerState.IsLoaded) return false;
-                        return MonthlyReloggerTask.IsNamePlateReady() && MonthlyReloggerTask.IsPlayerAvailable();
+                        if (!MonthlyReloggerTask.IsNamePlateReady() || !MonthlyReloggerTask.IsPlayerAvailable())
+                            return false;
+                        // Verify we actually landed on the intended character before running the
+                        // downstream sequence; a silently-failed /ays relog would otherwise leave the
+                        // previous character logged in and run everything against the wrong one.
+                        return MonthlyReloggerTask.GetCurrentCharacterNameWorld()
+                            .Equals(charName, StringComparison.OrdinalIgnoreCase);
                     }
                     catch { return false; }
                 },
@@ -531,6 +537,10 @@ public partial class SlaveWindow
                     runner.AddLog($"FAILED: Could not relog to {charName}. Leaving the character checked.");
                 },
             });
+
+            // Everything until the Complete step must run only on the correct character; the
+            // downstream range is guarded behind relog success below.
+            var downstreamStart = steps.Count;
 
             // SafeWait 3-pass
             foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"SafeWait ({charName})"))
@@ -636,6 +646,12 @@ public partial class SlaveWindow
             {
                 steps.Add(sw);
             }
+
+            // Guard every downstream step behind relog success: if the relog failed (wrong
+            // character or timed out), skip the teleport/workshop/sub/bell/chest actions instead of
+            // running them against whoever is currently logged in.
+            for (var s = downstreamStart; s < steps.Count; s++)
+                steps[s] = MonthlyReloggerTask.WithSkip(steps[s], () => relogState.Failed);
 
             // Mark complete
             var capturedIndex = charIndex;

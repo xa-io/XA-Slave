@@ -559,22 +559,55 @@ namespace XASlave.Services
             }
         }
 
+        private unsafe bool TryGetNumberArray(int index, out NumberArrayData* numberArray)
+        {
+            numberArray = null;
+
+            try
+            {
+                var framework = Framework.Instance();
+                if (framework == null)
+                {
+                    return false;
+                }
+
+                var uiModule = framework->GetUIModule();
+                if (uiModule == null)
+                {
+                    return false;
+                }
+
+                var raptureAtkModule = uiModule->GetRaptureAtkModule();
+                if (raptureAtkModule == null)
+                {
+                    return false;
+                }
+
+                numberArray = raptureAtkModule->AtkModule.AtkArrayDataHolder.NumberArrays[index];
+                return numberArray != null && numberArray->IntArray != null;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Failed to read RaptureAtkModule NumberArray[{index}]: {ex.Message}");
+                numberArray = null;
+                return false;
+            }
+        }
+
         public unsafe void ReadLogogramStock()
         {
-            var framework = Framework.Instance();
-            if (framework == null)
-            {
-                return;
-            }
-
-            var arrayData = framework->GetUIModule()->GetRaptureAtkModule()->AtkModule.AtkArrayDataHolder;
-            var numberArray = arrayData.NumberArrays[137];
-            if (numberArray == null || numberArray->IntArray == null)
+            if (!TryGetNumberArray(137, out var numberArray))
             {
                 return;
             }
 
             var count = numberArray->IntArray[0];
+            if (count < 0 || count > 200)
+            {
+                Log.Warning($"Ignored invalid logogram shard-list count: {count}");
+                return;
+            }
+
             Log.Debug($"Reading {count} logograms from shard list");
 
             for (var i = 1; i <= count; i++)
@@ -587,15 +620,7 @@ namespace XASlave.Services
 
         public unsafe bool ReadLogosActionStock()
         {
-            var framework = Framework.Instance();
-            if (framework == null)
-            {
-                return false;
-            }
-
-            var arrayData = framework->GetUIModule()->GetRaptureAtkModule()->AtkModule.AtkArrayDataHolder;
-            var numberArray = arrayData.NumberArrays[138];
-            if (numberArray == null || numberArray->IntArray == null)
+            if (!TryGetNumberArray(138, out var numberArray))
             {
                 return false;
             }

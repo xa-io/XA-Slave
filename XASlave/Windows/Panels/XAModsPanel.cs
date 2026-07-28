@@ -40,6 +40,8 @@ public partial class SlaveWindow
     private int xaModsCustomResolutionWidth = 500;
     private int xaModsCustomResolutionHeight = 345;
     private string xaModsFieldEntryQuery = string.Empty;
+    private string dalamudLogDisablerAddInput = string.Empty;
+    private string dalamudLogDisablerFilter = string.Empty;
     private string notifyWhenFriendIsNearPatternInput = string.Empty;
     private readonly Dictionary<ToonModsSection, (float StartY, float EndY, string Title)> toonModsSectionScrollRanges = new();
     private float toonModsSectionsScrollY;
@@ -264,6 +266,11 @@ public partial class SlaveWindow
         void ApplyNotifyWhenFriendIsNearConfiguration()
         {
             plugin.ApplyNotifyWhenFriendIsNearConfiguration();
+        }
+
+        void ApplyAlertWhenTypingInCombatConfiguration()
+        {
+            plugin.ApplyAlertWhenTypingInCombatConfiguration();
         }
 
         void ApplyBetterCastBarConfiguration()
@@ -1513,6 +1520,81 @@ public partial class SlaveWindow
             }
         }
 
+        void DrawAlertWhenTypingInCombatOptions()
+        {
+            var cooldown = configuration.AlertWhenTypingInCombatCooldownSeconds;
+            if (ImGui.InputInt("Cooldown seconds##AlertWhenTypingInCombat", ref cooldown, 30, 300))
+                configuration.AlertWhenTypingInCombatCooldownSeconds = cooldown;
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
+            {
+                ApplyAlertWhenTypingInCombatConfiguration();
+                SetToonModsStatus($"XA Mods: combat typing alert cooldown set to {configuration.AlertWhenTypingInCombatCooldownSeconds} seconds.");
+            }
+
+            ImGui.TextDisabled($"Use +/- for 30-second steps or type an exact value ({AlertWhenTypingInCombatService.MinimumCooldownSeconds}-{AlertWhenTypingInCombatService.MaximumCooldownSeconds}s).");
+
+            var toneId = AlertWhenTypingInCombatService.NormalizeToneId(configuration.AlertWhenTypingInCombatToneId);
+            if (ImGui.BeginCombo("Tone / pitch##AlertWhenTypingInCombat", XAPeepSoundPlayer.GetToneLabel(toneId)))
+            {
+                for (var option = 1; option <= XAPeepData.MaxSoundEffectId; option++)
+                {
+                    var selected = toneId == option;
+                    if (ImGui.Selectable(XAPeepSoundPlayer.GetToneLabel(option), selected))
+                    {
+                        configuration.AlertWhenTypingInCombatToneId = option;
+                        ApplyAlertWhenTypingInCombatConfiguration();
+                        plugin.AlertWhenTypingInCombat.PreviewSound();
+                        toneId = option;
+                    }
+
+                    if (selected)
+                        ImGui.SetItemDefaultFocus();
+                }
+
+                ImGui.EndCombo();
+            }
+
+            var beepCount = configuration.AlertWhenTypingInCombatBeepCount;
+            if (ImGui.InputInt("Number of beeps##AlertWhenTypingInCombat", ref beepCount, 1, 5))
+                configuration.AlertWhenTypingInCombatBeepCount = beepCount;
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
+            {
+                ApplyAlertWhenTypingInCombatConfiguration();
+                plugin.AlertWhenTypingInCombat.PreviewSound();
+                SetToonModsStatus($"XA Mods: combat typing alert set to {configuration.AlertWhenTypingInCombatBeepCount} beep(s).");
+            }
+
+            var volumePercent = Math.Clamp(configuration.AlertWhenTypingInCombatSoundVolume, 0f, 1f) * 100f;
+            if (ImGui.SliderFloat("Alert volume##AlertWhenTypingInCombat", ref volumePercent, 0f, 100f, "%.0f%%"))
+                configuration.AlertWhenTypingInCombatSoundVolume = Math.Clamp(volumePercent / 100f, 0f, 1f);
+
+            if (ImGui.IsItemDeactivatedAfterEdit())
+            {
+                ApplyAlertWhenTypingInCombatConfiguration();
+                plugin.AlertWhenTypingInCombat.PreviewSound();
+            }
+
+            ImGui.TextDisabled("Selected pitch and volume use direct output; fallback uses the matching game alert slot and game volume while preserving beep count.");
+
+            if (ImGui.Button("Test sound + toast##AlertWhenTypingInCombat"))
+            {
+                ApplyAlertWhenTypingInCombatConfiguration();
+                plugin.AlertWhenTypingInCombat.PreviewAlert();
+                SetToonModsStatus("XA Mods: combat typing alert preview played.");
+            }
+
+            ImGui.TextDisabled("Triggers only while ConditionFlag.InCombat is active and ChatLog is the focused game window.");
+            ImGui.TextDisabled(configuration.AlertWhenTypingInCombatEnabled
+                ? $"Live check: In combat = {(plugin.AlertWhenTypingInCombat.IsInCombat ? "Yes" : "No")} | ChatLog focused = {(plugin.AlertWhenTypingInCombat.IsChatLogFocused ? "Yes" : "No")}"
+                : "Live check: paused while the feature is disabled.");
+            ImGui.TextDisabled(plugin.AlertWhenTypingInCombat.CooldownRemainingSeconds > 0
+                ? $"Cooldown remaining: {plugin.AlertWhenTypingInCombat.CooldownRemainingSeconds}s"
+                : "Cooldown: Ready");
+            ImGui.TextDisabled(plugin.AlertWhenTypingInCombat.LastActionText);
+        }
+
         void DrawBetterCastBarOptions()
         {
             var slidecastMode = BetterCastBarService.NormalizeSlidecastMode(configuration.BetterCastBarSlidecastMode);
@@ -2758,6 +2840,23 @@ public partial class SlaveWindow
             drawOptions: DrawNotifyWhenFriendIsNearOptions,
             showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "alert-when-typing-in-combat",
+            "Alert When Typing In Combat",
+            () => configuration.AlertWhenTypingInCombatEnabled,
+            value =>
+            {
+                ApplyAlertWhenTypingInCombatConfiguration();
+                return plugin.AlertWhenTypingInCombat.SetEnabled(value);
+            },
+            applied => configuration.AlertWhenTypingInCombatEnabled = applied,
+            "Plays a local sound and toast when ChatLog is focused during combat.",
+            "Checks ConditionFlag.InCombat and the focused ChatLog addon on the framework thread. A configurable cooldown suppresses repeated warnings, while the tone, volume, and beep count can be previewed locally without sending chat.",
+            plugin.AlertWhenTypingInCombat.StatusText,
+            searchTerms: ["combat", "typing", "ChatLog", "chat box", "toast", "sound", "tone", "pitch", "beeps", "cooldown", "/xa typingcombat"],
+            drawOptions: DrawAlertWhenTypingInCombatOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "better-cast-bar",
             "Better Cast Bar",
@@ -2796,6 +2895,17 @@ public partial class SlaveWindow
             "Shows queue position, elapsed time, and an ETA on supported queue displays.",
             plugin.QueuePositionDisplay.StatusText,
             searchTerms: ["ETA", "elapsed", "queue position", "wait time"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "replace-unowned-mount-hotbars",
+            "Replace Unowned Mount Hotbars",
+            () => configuration.ReplaceUnownedMountHotbarsEnabled,
+            plugin.ReplaceUnownedMountHotbars.SetEnabled,
+            applied => configuration.ReplaceUnownedMountHotbarsEnabled = applied,
+            "Uses Mount Roulette in native Mount hotbar slots whose mount is not unlocked on the current character.",
+            "Replaces the slot's displayed action and execution only while the assigned mount is unowned. Owned mounts and non-Mount slots stay unchanged, and XA never writes or saves the hotbar.",
+            plugin.ReplaceUnownedMountHotbars.StatusText,
+            searchTerms: ["mount roulette", "unowned mount", "hotbar", "cross hotbar", "missing mount"]);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
             "disable-background-game-rendering",
@@ -3226,6 +3336,380 @@ public partial class SlaveWindow
             "Keeps Peeping Tom target tracking active in PvP by bypassing its local PvP runtime gate. Peeping Tom still controls what markers or windows it shows.",
             plugin.PeepingTomIntegration.StatusText,
             searchTerms: ["PvP", "Peeping Tom"]);
+        void ApplyARealmRecordedAllZonesConfiguration()
+        {
+            plugin.ARealmRecordedIntegration.ApplyConfiguration(
+                configuration.ARealmRecordedAllZonesAllContentTypes,
+                configuration.ARealmRecordedAllZonesSelectedContentTypes);
+        }
+
+        void ApplyDalamudLogDisablerConfiguration()
+        {
+            plugin.DalamudLogDisabler.ApplyConfiguration(
+                configuration.DalamudLogDisablerBlockedPlugins,
+                configuration.DalamudLogDisablerMinimumKeptLevel);
+        }
+
+        bool IsPluginLogBlocked(string internalName, string name)
+        {
+            return configuration.DalamudLogDisablerBlockedPlugins.Any(entry =>
+                entry.Equals(internalName, StringComparison.OrdinalIgnoreCase)
+                || entry.Equals(name, StringComparison.OrdinalIgnoreCase));
+        }
+
+        void SetPluginLogBlocked(string internalName, string name, bool blocked)
+        {
+            if (blocked)
+            {
+                var key = string.IsNullOrWhiteSpace(internalName) ? name : internalName;
+                if (!string.IsNullOrWhiteSpace(key) && !configuration.DalamudLogDisablerBlockedPlugins.Contains(key, StringComparer.OrdinalIgnoreCase))
+                    configuration.DalamudLogDisablerBlockedPlugins.Add(key);
+            }
+            else
+            {
+                configuration.DalamudLogDisablerBlockedPlugins.RemoveAll(entry =>
+                    entry.Equals(internalName, StringComparison.OrdinalIgnoreCase)
+                    || entry.Equals(name, StringComparison.OrdinalIgnoreCase));
+            }
+
+            ApplyDalamudLogDisablerConfiguration();
+            SaveConfiguration();
+        }
+
+        void DrawDalamudLogDisablerOptions()
+        {
+            ImGui.TextDisabled("Tick a plugin to filter its output to Dalamud's log (/xllog window and the log file). Uses Dalamud's per-plugin log level; the plugin keeps working, only its logging is filtered.");
+
+            var levelOptions = plugin.DalamudLogDisabler.GetLevelOptions();
+            if (levelOptions.Count > 0)
+            {
+                var currentLevel = configuration.DalamudLogDisablerMinimumKeptLevel;
+                var currentOption = levelOptions.FirstOrDefault(option => option.Value == currentLevel);
+                if (currentOption.Label == null)
+                    currentOption = levelOptions[levelOptions.Count - 1];
+
+                ImGui.SetNextItemWidth(Scale(320f));
+                if (ImGui.BeginCombo("Levels to keep##DalamudLogDisablerLevel", currentOption.Label))
+                {
+                    foreach (var option in levelOptions)
+                    {
+                        var selected = option.Value == currentLevel;
+                        if (ImGui.Selectable($"{option.Label}##DalamudLogDisablerLevel{option.Value}", selected)
+                            && option.Value != currentLevel)
+                        {
+                            configuration.DalamudLogDisablerMinimumKeptLevel = option.Value;
+                            ApplyDalamudLogDisablerConfiguration();
+                            SaveConfiguration();
+                        }
+
+                        if (ImGui.IsItemHovered() && !string.IsNullOrEmpty(option.Blocked))
+                            ImGui.SetTooltip($"Blacklists: {option.Blocked}");
+
+                        if (selected)
+                            ImGui.SetItemDefaultFocus();
+                    }
+
+                    ImGui.EndCombo();
+                }
+
+                ImGui.SameLine(0f, 6f);
+                DrawHelpMarker("Dalamud's per-plugin log level is a single threshold. Picking a level keeps that level and everything more severe, and blacklists everything below it. Example: 'Allow Warning and above' keeps Warning/Error/Fatal and blacklists Information/Debug/Verbose. 'Block all logs' mutes the plugin completely.");
+
+                if (!string.IsNullOrEmpty(currentOption.Blocked))
+                    ImGui.TextDisabled($"Blacklisting: {currentOption.Blocked}.");
+            }
+
+            ImGui.Spacing();
+            ImGui.SetNextItemWidth(Scale(220f));
+            ImGui.InputTextWithHint("##DalamudLogDisablerAdd", "Plugin name to mute...", ref dalamudLogDisablerAddInput, 128);
+            ImGui.SameLine();
+            if (ImGui.Button("Add##DalamudLogDisablerAdd"))
+            {
+                var trimmed = dalamudLogDisablerAddInput.Trim();
+                if (!string.IsNullOrWhiteSpace(trimmed) && !configuration.DalamudLogDisablerBlockedPlugins.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+                {
+                    configuration.DalamudLogDisablerBlockedPlugins.Add(trimmed);
+                    ApplyDalamudLogDisablerConfiguration();
+                    SaveConfiguration();
+                }
+
+                dalamudLogDisablerAddInput = string.Empty;
+            }
+
+            var loadedPlugins = plugin.DalamudLogDisabler.GetLoadedPlugins();
+            var loadedKeys = new HashSet<string>(
+                loadedPlugins.SelectMany(entry => new[] { entry.InternalName, entry.Name }),
+                StringComparer.OrdinalIgnoreCase);
+
+            var blockedNotLoaded = configuration.DalamudLogDisablerBlockedPlugins
+                .Where(entry => !loadedKeys.Contains(entry))
+                .OrderBy(entry => entry, StringComparer.OrdinalIgnoreCase)
+                .ToList();
+            if (blockedNotLoaded.Count > 0)
+            {
+                ImGui.Spacing();
+                ImGui.TextDisabled("Muted but not currently loaded:");
+                foreach (var entry in blockedNotLoaded)
+                {
+                    ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.5f, 0.5f, 1.0f));
+                    if (ImGui.SmallButton($"X##DalamudLogDisablerRemove{entry}"))
+                    {
+                        configuration.DalamudLogDisablerBlockedPlugins.RemoveAll(e => e.Equals(entry, StringComparison.OrdinalIgnoreCase));
+                        ApplyDalamudLogDisablerConfiguration();
+                        SaveConfiguration();
+                        ImGui.PopStyleColor();
+                        break;
+                    }
+
+                    ImGui.PopStyleColor();
+                    ImGui.SameLine();
+                    ImGui.TextUnformatted(entry);
+                }
+            }
+
+            ImGui.Spacing();
+            ImGui.SetNextItemWidth(Scale(220f));
+            ImGui.InputTextWithHint("##DalamudLogDisablerFilter", "Filter loaded plugins...", ref dalamudLogDisablerFilter, 128);
+
+            if (loadedPlugins.Count == 0)
+            {
+                ImGui.TextDisabled("No loaded plugins found.");
+                return;
+            }
+
+            var visiblePlugins = loadedPlugins
+                .Where(entry => string.IsNullOrWhiteSpace(dalamudLogDisablerFilter)
+                    || entry.Name.Contains(dalamudLogDisablerFilter, StringComparison.OrdinalIgnoreCase)
+                    || entry.InternalName.Contains(dalamudLogDisablerFilter, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+
+            var filterActive = !string.IsNullOrWhiteSpace(dalamudLogDisablerFilter);
+            if (ImGui.SmallButton($"Check all{(filterActive ? " (filtered)" : string.Empty)}##DalamudLogDisablerCheckAll") && visiblePlugins.Count > 0)
+            {
+                var changed = false;
+                foreach (var (internalName, name) in visiblePlugins)
+                {
+                    if (IsPluginLogBlocked(internalName, name))
+                        continue;
+
+                    var key = string.IsNullOrWhiteSpace(internalName) ? name : internalName;
+                    if (!string.IsNullOrWhiteSpace(key) && !configuration.DalamudLogDisablerBlockedPlugins.Contains(key, StringComparer.OrdinalIgnoreCase))
+                    {
+                        configuration.DalamudLogDisablerBlockedPlugins.Add(key);
+                        changed = true;
+                    }
+                }
+
+                if (changed)
+                {
+                    ApplyDalamudLogDisablerConfiguration();
+                    SaveConfiguration();
+                }
+            }
+
+            ImGui.SameLine();
+            if (ImGui.SmallButton($"Uncheck all{(filterActive ? " (filtered)" : string.Empty)}##DalamudLogDisablerUncheckAll") && visiblePlugins.Count > 0)
+            {
+                var changed = false;
+                foreach (var (internalName, name) in visiblePlugins)
+                {
+                    changed |= configuration.DalamudLogDisablerBlockedPlugins.RemoveAll(entry =>
+                        entry.Equals(internalName, StringComparison.OrdinalIgnoreCase)
+                        || entry.Equals(name, StringComparison.OrdinalIgnoreCase)) > 0;
+                }
+
+                if (changed)
+                {
+                    ApplyDalamudLogDisablerConfiguration();
+                    SaveConfiguration();
+                }
+            }
+
+            ImGui.Indent();
+            foreach (var (internalName, name) in visiblePlugins)
+            {
+                var blocked = IsPluginLogBlocked(internalName, name);
+                var label = string.Equals(internalName, name, StringComparison.Ordinal) || string.IsNullOrWhiteSpace(internalName)
+                    ? name
+                    : $"{name} ({internalName})";
+                if (ImGui.Checkbox($"{label}##DalamudLogDisabler{internalName}", ref blocked))
+                    SetPluginLogBlocked(internalName, name, blocked);
+            }
+
+            ImGui.Unindent();
+        }
+
+        void DrawARealmRecordedStateOptions()
+        {
+            if (configuration.ARealmRecordedAllZonesEnabled)
+            {
+                var allContentTypes = configuration.ARealmRecordedAllZonesAllContentTypes;
+                if (ImGui.Checkbox("Record all content types##ARealmRecordedAllContentTypes", ref allContentTypes))
+                {
+                    configuration.ARealmRecordedAllZonesAllContentTypes = allContentTypes;
+                    if (!allContentTypes && configuration.ARealmRecordedAllZonesSelectedContentTypes.Count == 0)
+                    {
+                        configuration.ARealmRecordedAllZonesSelectedContentTypes = plugin.ARealmRecordedIntegration
+                            .GetSelectableContentTypes()
+                            .Where(entry => !entry.IsStock)
+                            .Select(entry => entry.Id)
+                            .ToList();
+                    }
+
+                    ApplyARealmRecordedAllZonesConfiguration();
+                    SaveConfiguration();
+                }
+
+                if (!allContentTypes)
+                {
+                    ImGui.TextDisabled("Tick the content types ARealmRecorded may additionally record. Stock types are always recorded by the plugin itself.");
+                    ImGui.Indent();
+                    foreach (var entry in plugin.ARealmRecordedIntegration.GetSelectableContentTypes())
+                    {
+                        if (entry.IsStock)
+                        {
+                            var alwaysOn = true;
+                            ImGui.BeginDisabled();
+                            ImGui.Checkbox($"{entry.Name} (stock)##ARealmRecordedContentType{entry.Id}", ref alwaysOn);
+                            ImGui.EndDisabled();
+                            continue;
+                        }
+
+                        var selected = configuration.ARealmRecordedAllZonesSelectedContentTypes.Contains(entry.Id);
+                        if (!ImGui.Checkbox($"{entry.Name}##ARealmRecordedContentType{entry.Id}", ref selected))
+                            continue;
+
+                        if (selected)
+                        {
+                            if (!configuration.ARealmRecordedAllZonesSelectedContentTypes.Contains(entry.Id))
+                                configuration.ARealmRecordedAllZonesSelectedContentTypes.Add(entry.Id);
+                        }
+                        else
+                        {
+                            configuration.ARealmRecordedAllZonesSelectedContentTypes.RemoveAll(id => id == entry.Id);
+                        }
+
+                        ApplyARealmRecordedAllZonesConfiguration();
+                        SaveConfiguration();
+                    }
+
+                    ImGui.Unindent();
+                }
+
+                ImGui.Spacing();
+            }
+
+            var state = plugin.ARealmRecordedIntegration.GetLiveState();
+            if (!state.PluginLoaded)
+            {
+                ImGui.TextDisabled($"Plugin state: {state.Description}");
+                return;
+            }
+
+            if (!state.StateAvailable)
+            {
+                ImGui.TextDisabled($"Plugin state: {state.Description}");
+                return;
+            }
+
+            var color = state.IsRecording
+                ? new Vector4(1.0f, 0.35f, 0.35f, 1.0f)
+                : state.IsArmed
+                    ? new Vector4(1.0f, 0.7f, 0.25f, 1.0f)
+                    : state.InPlayback
+                        ? new Vector4(0.6f, 0.9f, 1.0f, 1.0f)
+                        : new Vector4(0.55f, 0.9f, 0.55f, 1.0f);
+
+            ImGui.TextUnformatted("Plugin state:");
+            ImGui.SameLine();
+            ImGui.TextColored(color, state.Description);
+            ImGui.TextDisabled($"Duty Recorder status 0x{state.StatusByte:X2} ({state.StatusBitsText}), playback controls 0x{state.PlaybackControls:X2}.");
+            ImGui.TextDisabled("Recording = status & 0x74 == 0x74, the same check behind ARealmRecorded's DTR icon.");
+
+            var canForceStart = state.StateAvailable && !state.IsRecording && !state.InPlayback;
+            if (!canForceStart)
+                ImGui.BeginDisabled();
+
+            if (ImGui.Button("Force Start Recording##ARealmRecordedForceStart"))
+                plugin.ARealmRecordedIntegration.RequestForceStartRecording();
+
+            if (!canForceStart)
+                ImGui.EndDisabled();
+
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            {
+                ImGui.BeginTooltip();
+                ImGui.PushTextWrapPos(Scale(360f));
+                ImGui.TextUnformatted(canForceStart
+                    ? "Runs ARealmRecorded's own recording initialization for the CURRENT zone - use this when the plugin never attempted to record (entered before enabling the mod, event content, stuck Armed state). If the zone has no ContentFinderCondition, XA spoofs one into the recorder (preferring a duty matched to this territory, otherwise any whitelisted duty). WARNING: force-started recordings can end up with a FALSE location in the replay list, and such recordings may be UNPLAYABLE. The replay starts from this moment; anything earlier is not captured."
+                    : "Force start is only available while the recorder is not already recording or playing back.");
+                ImGui.PopTextWrapPos();
+                ImGui.EndTooltip();
+            }
+
+            ImGui.SameLine();
+
+            var canForceStop = state.IsRecording || state.IsArmed;
+            if (!canForceStop)
+                ImGui.BeginDisabled();
+
+            if (ImGui.Button("Force Stop Recording##ARealmRecordedForceStop"))
+                plugin.ARealmRecordedIntegration.RequestForceStopRecording();
+
+            if (!canForceStop)
+                ImGui.EndDisabled();
+
+            if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            {
+                ImGui.BeginTooltip();
+                ImGui.PushTextWrapPos(Scale(360f));
+                ImGui.TextUnformatted(canForceStop
+                    ? "Invokes the game's native EndRecording on the Duty Recorder module (via ARealmRecorded's Hypostasis). Use this to clear a stuck Armed/Recording state before re-entering a zone. Stopping an active recording finalizes it immediately."
+                    : "The recorder is idle; there is nothing to stop.");
+                ImGui.PopTextWrapPos();
+                ImGui.EndTooltip();
+            }
+
+            var lastForceAction = plugin.ARealmRecordedIntegration.LastForceActionMessage;
+            if (!string.IsNullOrEmpty(lastForceAction))
+                ImGui.TextDisabled($"Last action: {lastForceAction}");
+        }
+
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "dalamud-log-disabler",
+            "Dalamud Log Disabler",
+            () => configuration.DalamudLogDisablerEnabled,
+            value =>
+            {
+                ApplyDalamudLogDisablerConfiguration();
+                return plugin.DalamudLogDisabler.SetEnabled(value);
+            },
+            applied => configuration.DalamudLogDisablerEnabled = applied,
+            "Filters selected plugins' output to Dalamud's log (/xllog window and the on-disk log file) by log level.",
+            "Pick plugins whose log spam you want gone, and choose which levels to keep. XA sets the chosen plugin's Dalamud per-plugin log level, which is a single threshold - keeping the selected level and everything more severe while blacklisting everything below it. 'Allow Warning and above' keeps Warning/Error/Fatal and blacklists Information/Debug/Verbose; 'Block all logs' mutes completely. The plugin keeps running normally - only its logging is filtered - and the original level is restored when you untick it or turn this mod off. Reloaded plugins are re-applied automatically. Plugins that log through means other than Dalamud's IPluginLog cannot be filtered this way.",
+            plugin.DalamudLogDisabler.StatusText,
+            searchTerms: ["Dalamud", "log", "logging", "xllog", "logger", "serilog", "mute", "silence", "spam", "verbose", "debug", "warning", "error", "fatal", "level", "disable logs", "blacklist"],
+            drawOptions: DrawDalamudLogDisablerOptions,
+            showOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.PluginMods,
+            "arealmrecorded-all-zones",
+            "ARealmRecorded All Zones",
+            () => configuration.ARealmRecordedAllZonesEnabled,
+            value =>
+            {
+                ApplyARealmRecordedAllZonesConfiguration();
+                return plugin.ARealmRecordedIntegration.SetForceEnabled(value);
+            },
+            applied => configuration.ARealmRecordedAllZonesEnabled = applied,
+            "Lets ARealmRecorded start Duty Recorder recordings in restricted content types (Event, Eureka, Masked Carnivale, ...) - all of them, or only the ones you tick.",
+            "ARealmRecorded only starts recordings for content types on its internal whitelist (dungeons, trials, raids, and similar). While this mod is on, XA injects extra ContentType ids into that whitelist - either every content type (default) or, with `Record all content types` unticked, only the ones you select in the list below; deselected types are removed again on the fly. The stock whitelist is restored when the mod is turned off. Zones without a Duty Finder entry (open world, housing) still cannot be recorded - that is a game limitation, not a whitelist one. Field operations never run the normal duty-end path, so the recorder can stay stuck Armed after you leave; XA auto-invokes the game's native EndRecording once you are out of the duty (after a few seconds), and the Force Stop Recording button below does the same on demand.",
+            plugin.ARealmRecordedIntegration.StatusText,
+            warningText: "Forcing the Duty Recorder in field operations is unsupported by the game. If a zone-in bounces you back to town or force-logs you, make sure the plugin state below shows Idle (use Force Stop Recording if it is stuck Armed) before re-entering. Force-started recordings can carry a false location and may be unplayable.",
+            searchTerms: ["ARealmRecorded", "A Realm Recorded", "duty recorder", "replay", "recording", "Eureka", "Carnivale", "Bozja", "whitelist", "bounce", "zone-in", "plugin state"],
+            drawOptions: DrawARealmRecordedStateOptions,
+            showOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
             ToonModsSection.EurekaMods,
             "eureka-instance-id",

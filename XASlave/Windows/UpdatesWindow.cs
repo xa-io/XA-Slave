@@ -23,6 +23,53 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.41 - 2026-07-28",
+            Lines =
+            [
+                "Patch 7.55 Beta",
+                "- Eureka Logogram Creator now validates Framework, UIModule, RaptureAtkModule, NumberArrayData, IntArray, and shard counts before reading Logogram or Logos Action stock. Unavailable native state fails closed inside the feature.",
+                "",
+                "Game & Player Mods",
+                "- Added default-off Replace Unowned Mount Hotbars: unowned native Mount slots display and execute Mount Roulette after native action-status checks, while owned mounts, non-Mount slots, and saved hotbar data remain unchanged.",
+                "- Added opt-in Alert When Typing In Combat for the focused ChatLog: local multi-beep and toast alerts with 30-second/exact cooldown controls, 16 pitches, volume, 1-10 beeps, preview, saved-list/startup restore, and `/xa typingcombat on|off`; it sends no chat.",
+                "- Hardened Lock Game Window In Combat, Auto Hide Game Objects, and shop-icon overlays; every supported shop layout is item-count bounded. Skip Dialogue re-arms after toggles, Doze & Sit Anywhere honors both action switches, Auto Leave Duty verifies its prompt, and the disabled chat-render feature no longer polls AutoRetainer every frame.",
+                "",
+                "Xagman Policies & Coordination",
+                "- Shared Item policies now cover Give, Take, Balance, and TopUp with ordinary, if Subs, and if Retainers applicability. Resolution is Subs > Retainers > fallback; unknown AutoRetainer registration fails closed and tradable stock remains Inventory 1-4 only.",
+                "- Added Green Item GC Seals and Green Item FC Credits / Rank Progress targets. Safe green gear must pass trade, binding, collectability, glamour, materia, gearset, AutoRetainer, container, and peer checks; seals use expert-delivery rewards, while FC value is item level x1.5 NQ or x3 HQ.",
+                "- Green targets share one physical Tony pool, reserve exact-item supply first, contribute one transfer to both value targets, persist in schema 3, migrate schema 1/2 exact rows safely, require same-protocol peers, and are refused by Outside Network Helper. (needs further testing, this currently doesn't work as intended with the current implementation.)",
+                "- Franchise Owner-owned Prioritize Characters Giving Items First negotiates protocol 2 before run creation. All Off keeps the legacy flow; unanimous valid On freezes the FO cohort/forecast, runs Give/Balance surplus collection, waits at the global barrier, resets the full Tony/world sweep, runs Take/Balance deficit/TopUp, and requires final cleanup acknowledgements.",
+                "- Mixed, missing, stale, stopped, cancelled, invalid-policy, or old-build peers fail closed and never advance a collection/restock barrier. The Peers table shows Priority state, while the frozen forecast distinguishes Stock Now/After Collect and Short Now/After.",
+                "- Ctrl+click either character table relogs the exact saved character through `/ays relog` only while Xagman and the shared task runner are safe and idle; anonymization never changes the command key.",
+                "- Select Matching Items uses Inventory 1-4 only. Retainers Only, Subs Only, Without Retainers, and Without Subs refresh AutoRetainer registration and preserve the established item-need, Region, Search, and Tony visibility rules without counting retainer stock.",
+                "- Default-off Refuse Trades When Idle coordinates the existing Refuse Trade Request service around Dropbox auto-accept with reflection readback, manual-preference preservation, fail-closed unknown writes, and safe cleanup across normal, Server Matching, ONH, stop, failure, and logout paths.",
+                "",
+                "Xagman Inventory, Forecasts & Results",
+                "- Stop All Clients and Results stops local and connected clients and clears retained orders; Stop All Peers remains stop-only. Add Item searches the current tradeable Lumina Item sheet, with HQ selected by the existing row checkbox.",
+                "- Tony and Franchise Owner tables gained saved optional columns with clear chooser labels plus sortable Treasure, Kits, Tanks, Retainers, and Submarines values; hiding columns is presentation-only.",
+                "- Pull XA Database Info performs logged-in Refresh + Save before rereading committed snapshots, while logged-out pulls use saved data. Unavailable, skipped, failed, pending, malformed, or wrong-character saves are reported and never labeled fresh.",
+                "- Connected capacity forecasts separate Server Matching regions or use one fixed-world pool, calculate stack size/partial-stack headroom, distinguish single-item exact capacity from multi-item shared slots, retain low-incoming and unknown/stale warnings, and require real snapshots no more than 45 days old.",
+                "- Franchise Owner Give, Balance, and Take forecasts keep pooled Give targets, per-owner Balance deficits, finite-Take receive capacity, cached pre-connection/ONH views, and conservative unknown handling without changing runtime queues.",
+                "- Finite Take N now keeps one run-scoped owner/item/HQ baseline-to-target ledger, reconciles partial deliveries, survives published-row removal and Tony rotation, completes once at baseline + N, and logs owner/Tony quantities. Take 0, Balance, TopUp, and green-value behavior remain unchanged.",
+                "- Tony supply is labeled Need from Tony Pool with per-Tony availability. Normal terminal Tony completion sends pending peer completion, returns FC when configured, then disconnects before logout/kill/AR actions; collection-first stays connected unless every frozen FO acknowledges cleanup.",
+                "",
+                "Xagman Travel & Server Matching",
+                "- Server Matching adds per-data-center meet worlds and a shared location, sweeps Aether/Crystal/Dynamis/Primal then NA/EU/JP/OCE, rotates multiple Tonys within a region, keeps owners on world travel only, marks exhausted-region owners skipped, retains results, and requires the same XA Slave version.",
+                "- Collection, Resupply, and mixed handoffs share the active data-center scope and one exact owner/Tony instance. A depleted replacement rotates immediately; a stocked replacement publishes its live coordinates and waits up to 600 seconds for the owner, including recovery from missed one-shot starts.",
+                "- Server Matching stays latched to a fresh complete committed destination. Owners wait up to 600 seconds without premature IPC, pin each attempt, and use busy observation, three-pass CharacterSafeWait, final world/aetheryte verification, and stable wrong-character/wrong-destination evidence before failing or advancing.",
+                "- Compound World-plus-aetheryte commands remain in flight through early idle, casting, loading, zoning, and missing player state: Tony gets up to 600 seconds for the world followed by a fresh 60-second local-teleport window without overlapping retries.",
+                "- Route guards use the planned home world: NA/EU/JP can travel within region or to OCE, OCE stays in OCE, and unknown mappings fail closed. Fixed/Server Matching/ONH destinations are snapshotted, peer selection rejects Error/malformed/mismatched/unreachable routes, and collection-first blocks on stale or unacknowledged FO frontiers.",
+                "- Expected-logout markers now cover opted-in cross-data-center meetup/reissue/FC-return paths, bind the outgoing identity and command context, require matching Content ID plus Lifestream-busy evidence, refresh only on successful dispatch, and remain separate from `/ays relog` and completion logout.",
+                "- Unresolved owners now finish with accurate skipped summaries instead of misleading Tony-finished lines; same-Tony return after selling can be accepted once the old call clears.",
+                "",
+                "Monthly Relogger, Tasks & Diagnostics",
+                "- Monthly Relogger adds a 300-second login timeout, safe pre-flight recovery, red login failures, purple incomplete processing, persistent results with Clear results, AutoRetainer not-found markers, per-character duration, rolling average, remaining count, and ETA.",
+                "- Refresh Sub/Bell/Chest and FC Permissions verify the intended character after relog; failed relogs cannot run against the wrong character. Task progress/counts are accurate and the slave.db handle is released on unload.",
+                "- Xagman peer networking size-limits and validates incoming messages, ignores malformed versions, and contains bad JSON per message; authenticated LAN hub handshakes remain a documented follow-up.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.40 - 2026-06-27",
             Lines =
             [

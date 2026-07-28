@@ -9,7 +9,7 @@ using XASlave.Data;
 
 namespace XASlave.Services;
 
-public sealed class SlaveDatabaseService
+public sealed class SlaveDatabaseService : IDisposable
 {
     private const string TimestampFormat = "yyyy-MM-dd HH:mm:ss";
     private const int XAPeepSessionHistoryLimit = 500;
@@ -28,6 +28,22 @@ public sealed class SlaveDatabaseService
         var configDir = pluginInterface.GetPluginConfigDirectory();
         Directory.CreateDirectory(configDir);
         dbPath = Path.Combine(configDir, "slave.db");
+    }
+
+    public void Dispose()
+    {
+        // Microsoft.Data.Sqlite pools connections by default: a `using` block returns the
+        // connection to the pool rather than closing the native handle, so slave.db stays
+        // locked for the game process after the first write. Clearing the pools on unload
+        // releases those handles so a plugin reload/update does not leave the file locked.
+        try
+        {
+            SqliteConnection.ClearAllPools();
+        }
+        catch (Exception ex)
+        {
+            log.Warning($"[XASlave] Slave DB pool clear failed: {ex.Message}");
+        }
     }
 
     public DateTime? GetLastSyncedToXaDbUtc(ulong contentId)

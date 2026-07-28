@@ -3,6 +3,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
@@ -42,7 +43,24 @@ public sealed class DropboxQueueService
         InventoryType.Currency,
     };
 
-    private const string UsageText = "Usage: /xa db <itemId:qty ...> | inv | clear | request <itemId:qty ...> | shards | crystals | clusters | shards+crystals | crystals+clusters | shards+crystals+clusters";
+    private const string UsageText = "Usage: /xa db <itemId:qty ...> | inv | clear | begin | request <itemId:qty ...> | shards | crystals | clusters | shards+crystals | crystals+clusters | shards+crystals+clusters | subloot";
+
+    // /xa db subloot expands to the eight subaquatic loot items (22500-22507), each at 99999.
+    private static readonly string SublootArguments =
+        string.Join(" ", Enumerable.Range(22500, 8).Select(itemId => $"{itemId}:99999"));
+
+    // Vendor sale value per subaquatic salvage item; queued totals report the summed gil value.
+    private static readonly Dictionary<uint, long> SublootValues = new()
+    {
+        [22500] = 8_000,    // Salvaged Ring
+        [22501] = 9_000,    // Salvaged Bracelet
+        [22502] = 10_000,   // Salvaged Earring
+        [22503] = 13_000,   // Salvaged Necklace
+        [22504] = 27_000,   // Extravagant Salvaged Ring
+        [22505] = 28_500,   // Extravagant Salvaged Bracelet
+        [22506] = 30_000,   // Extravagant Salvaged Earring
+        [22507] = 34_500,   // Extravagant Salvaged Necklace
+    };
 
     private readonly record struct NeededItem(uint ItemId, int Needed)
     {
@@ -95,12 +113,16 @@ public sealed class DropboxQueueService
             case "*scx":
             case "shards+crystals+clusters":
                 return TryBuildRequest(BuildCrystalRequestArguments(2, 18), out message);
+            case "subloot":
+                return TryAddToQueue(SublootArguments, out message);
             case "request":
                 return TryBuildRequest(subcommandArgs, out message);
             case "inv":
                 return TryQueueMainInventory(out message);
             case "clear":
                 return TryClearQueue(out message);
+            case "begin":
+                return TryBeginTrading(out message);
             default:
                 return TryAddToQueue(trimmed, out message);
         }
@@ -182,6 +204,7 @@ public sealed class DropboxQueueService
         var itemCounts = GetItemCounts();
         var queuedEntries = 0;
         var queuedTotal = 0;
+        var queuedValue = 0L;
 
         foreach (var item in parsed)
         {
@@ -210,18 +233,18 @@ public sealed class DropboxQueueService
             }
 
             if (nqQuantity > 0 || hqQuantity > 0)
+            {
                 itemCounts[item.ItemId] = new ItemCount(count.NormalQualityQuantity - nqQuantity, count.HighQualityQuantity - hqQuantity);
+                if (SublootValues.TryGetValue(item.ItemId, out var unitValue))
+                    queuedValue += unitValue * (nqQuantity + hqQuantity);
+            }
         }
 
-        if (!ipcClient.DropboxBeginTrading())
-        {
-            message = "Failed to start the Dropbox trading queue.";
-            return false;
-        }
-
+        var startResult = TryStartTrading(out _);
+        log.Debug($"[XASlave] Dropbox trade start after queueing: {startResult}.");
         message = queuedEntries > 0
-            ? $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s) and started trading."
-            : "Queued no matching local items, but still started Dropbox trading.";
+            ? $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s){FormatQueuedValue(queuedValue)}."
+            : "Queued no matching local items.";
         return true;
     }
 
@@ -242,6 +265,7 @@ public sealed class DropboxQueueService
 
         var queuedEntries = 0;
         var queuedTotal = 0;
+        var queuedValue = 0L;
 
         foreach (var entry in itemCounts.OrderBy(entry => entry.Key))
         {
@@ -262,16 +286,20 @@ public sealed class DropboxQueueService
                 queuedEntries++;
                 queuedTotal += entry.Value.HighQualityQuantity;
             }
+
+            if (SublootValues.TryGetValue(entry.Key, out var unitValue))
+                queuedValue += unitValue * (entry.Value.NormalQualityQuantity + entry.Value.HighQualityQuantity);
         }
 
-        if (!ipcClient.DropboxBeginTrading())
-        {
-            message = "Failed to start the Dropbox trading queue.";
-            return false;
-        }
-
-        message = $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s) from Inventory1-4 and started trading.";
+        var startResult = TryStartTrading(out _);
+        log.Debug($"[XASlave] Dropbox trade start after queueing Inventory1-4: {startResult}.");
+        message = $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s) from Inventory1-4{FormatQueuedValue(queuedValue)}.";
         return true;
+    }
+
+    public bool TryEnqueueXagmanItem(uint itemId, bool isHq, int quantity, out string message)
+    {
+        return TryEnqueueItem(itemId, isHq, quantity, out message);
     }
 
     private bool TryEnqueueItem(uint itemId, bool isHq, int quantity, out string message)
@@ -294,6 +322,62 @@ public sealed class DropboxQueueService
 
         message = string.Empty;
         return true;
+    }
+
+    private enum TradeStartResult
+    {
+        Started,
+        AlreadyTrading,
+        NoPartner,
+        NotStarted,
+    }
+
+    // Dropbox's BeginTradingQueue IPC silently no-ops unless its task manager is idle AND the focus
+    // target is a player, so promote the current target to focus target before invoking it and read
+    // the busy flag back to learn whether trading really started.
+    private TradeStartResult TryStartTrading(out string partnerName)
+    {
+        partnerName = string.Empty;
+
+        if (ipcClient.DropboxIsBusy())
+            return TradeStartResult.AlreadyTrading;
+
+        if (Plugin.TargetManager.FocusTarget is not IPlayerCharacter
+            && Plugin.TargetManager.Target is IPlayerCharacter currentTarget)
+        {
+            Plugin.TargetManager.FocusTarget = currentTarget;
+        }
+
+        if (Plugin.TargetManager.FocusTarget is not IPlayerCharacter focus)
+            return TradeStartResult.NoPartner;
+
+        partnerName = focus.Name.ToString();
+        ipcClient.DropboxBeginTrading();
+        return ipcClient.DropboxIsBusy() ? TradeStartResult.Started : TradeStartResult.NotStarted;
+    }
+
+    public bool TryBeginTrading(out string message)
+    {
+        if (!ipcClient.IsDropboxAvailable())
+        {
+            message = "Dropbox is not available.";
+            return false;
+        }
+
+        var result = TryStartTrading(out var partnerName);
+        message = result switch
+        {
+            TradeStartResult.Started => $"Started Dropbox trading with {partnerName}.",
+            TradeStartResult.AlreadyTrading => "Dropbox is already trading.",
+            TradeStartResult.NoPartner => "Target or focus target your trade partner first.",
+            _ => "Dropbox did not start trading (is the item queue empty?).",
+        };
+        return result == TradeStartResult.Started || result == TradeStartResult.AlreadyTrading;
+    }
+
+    private static string FormatQueuedValue(long queuedValue)
+    {
+        return queuedValue > 0 ? $", valued at {queuedValue:N0} gil" : string.Empty;
     }
 
     private static string BuildCrystalRequestArguments(int startItemId, int count)

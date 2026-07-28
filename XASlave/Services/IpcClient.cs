@@ -56,9 +56,11 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<int> xaGetFcPointsSubscriber;
     private readonly ICallGateSubscriber<string> xaGetApartmentSubscriber;
     private readonly ICallGateSubscriber<string> xaGetCharacterSummaryJsonSubscriber;
+    private readonly ICallGateSubscriber<string> xaGetAccountCharacterListJsonSubscriber;
     private readonly ICallGateSubscriber<string> xaGetLastSnapshotResultJsonSubscriber;
     private readonly ICallGateSubscriber<string, string> xaSearchItemsSubscriber;
     private readonly ICallGateSubscriber<string, string> xaGetMatchingCharactersForItemsSubscriber;
+    private readonly ICallGateSubscriber<string, string> xaSearchCurrentCharacterItemsJsonSubscriber;
 
     // -- vnavmesh (source: vnavmesh/IPCProvider.cs - prefixes "vnavmesh." + name) --
     private readonly ICallGateSubscriber<bool> vnavIsReadySubscriber;
@@ -179,9 +181,11 @@ public sealed class IpcClient
         xaGetFcPointsSubscriber = pluginInterface.GetIpcSubscriber<int>("XA.Database.GetFcPoints");
         xaGetApartmentSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetApartment");
         xaGetCharacterSummaryJsonSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetCharacterSummaryJson");
+        xaGetAccountCharacterListJsonSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetAccountCharacterListJson");
         xaGetLastSnapshotResultJsonSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetLastSnapshotResultJson");
         xaSearchItemsSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.SearchItems");
         xaGetMatchingCharactersForItemsSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.GetMatchingCharactersForItems");
+        xaSearchCurrentCharacterItemsJsonSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.SearchCurrentCharacterItemsJson");
 
         // vnavmesh - channel names from RegisterFunc/RegisterAction("X") → "vnavmesh.X"
         vnavIsReadySubscriber = pluginInterface.GetIpcSubscriber<bool>("vnavmesh.Nav.IsReady");
@@ -559,6 +563,12 @@ public sealed class IpcClient
         catch { return string.Empty; }
     }
 
+    public string GetAccountCharacterListJson()
+    {
+        try { return xaGetAccountCharacterListJsonSubscriber.InvokeFunc(); }
+        catch { return string.Empty; }
+    }
+
     public string GetLastSnapshotResultJson()
     {
         try { return xaGetLastSnapshotResultJsonSubscriber.InvokeFunc(); }
@@ -567,8 +577,24 @@ public sealed class IpcClient
 
     public string SearchItems(string query)
     {
-        try { return xaSearchItemsSubscriber.InvokeFunc(query); }
-        catch { return string.Empty; }
+        return TrySearchItems(query, out var result) ? result : string.Empty;
+    }
+
+    public bool TrySearchItems(string query, out string result)
+    {
+        try
+        {
+            result = xaSearchItemsSubscriber.InvokeFunc(query);
+            // XA Database currently returns an empty string for both a legitimate no-match result
+            // and a provider-side search failure. Treat either case as unknown for capacity
+            // forecasting rather than allowing a failure to become confirmed zero stock.
+            return !string.IsNullOrWhiteSpace(result);
+        }
+        catch
+        {
+            result = string.Empty;
+            return false;
+        }
     }
 
     public bool TryGetMatchingCharactersForItems(string itemKeysPayload, out string result)
@@ -583,6 +609,12 @@ public sealed class IpcClient
             result = string.Empty;
             return false;
         }
+    }
+
+    public string SearchCurrentCharacterItemsJson(string query)
+    {
+        try { return xaSearchCurrentCharacterItemsJsonSubscriber.InvokeFunc(query); }
+        catch { return string.Empty; }
     }
 
     // ═══════════════════════════════════════════════════
@@ -713,8 +745,23 @@ public sealed class IpcClient
 
     public bool AutoRetainerPluginStateIsItemProtected(uint itemId)
     {
-        try { return arPluginStateIsItemProtectedSubscriber.InvokeFunc(itemId); }
-        catch { return false; }
+        return TryAutoRetainerPluginStateIsItemProtected(itemId, out var isProtected)
+            && isProtected;
+    }
+
+    public bool TryAutoRetainerPluginStateIsItemProtected(uint itemId, out bool isProtected)
+    {
+        try
+        {
+            isProtected = arPluginStateIsItemProtectedSubscriber.InvokeFunc(itemId);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            isProtected = false;
+            log.Error($"[XASlave] IPC: AR.PluginState.IsItemProtected failed - {ex.Message}");
+            return false;
+        }
     }
 
     public bool? AutoRetainerPluginStateAreAnyEnabledVesselsNotDeployed(ulong contentId)

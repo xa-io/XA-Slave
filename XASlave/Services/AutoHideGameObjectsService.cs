@@ -29,6 +29,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
 
     private bool initialized;
     private bool enabled;
+    private bool detourFaulted;
     private bool subscribed;
     private bool hidePlayer = true;
     private bool hideUnimportantEnpc = true;
@@ -236,7 +237,23 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             original = updateObjectArraysHook.Original(objectManager);
 
         if (enabled)
-            UpdateAllObjects(objectManager);
+        {
+            try
+            {
+                UpdateAllObjects(objectManager);
+            }
+            catch (Exception ex)
+            {
+                // This detour runs inside the game's native object-array update. A managed
+                // exception escaping into the native caller would crash the client, so swallow it
+                // and keep the original result. Log only once to avoid per-tick log spam.
+                if (!detourFaulted)
+                {
+                    detourFaulted = true;
+                    log.Error(ex, "[XASlave] AutoHideGameObjects object update faulted; suppressing further updates' errors this session.");
+                }
+            }
+        }
 
         return original;
     }

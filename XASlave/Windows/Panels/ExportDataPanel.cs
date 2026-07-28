@@ -28,6 +28,7 @@ public partial class SlaveWindow
     private static readonly string[] ExportIntervalLabels = { "Always", "6 hours", "12 hours", "24 hours", "48 hours", "72 hours" };
     private const string ExportTaskName = "Export Data";
     private const string ExportTimestampToken = "{timestamp}";
+    private const string ExportRuntimeStateFileName = "ExportData.runtime.json";
     private const uint ExportVentureCofferItemId = 32161;
 
     private static readonly string[] ExportBaseHeaderColumns =
@@ -101,6 +102,7 @@ public partial class SlaveWindow
 
         // Migrate legacy separate-file settings into Configuration if output path is still empty
         MigrateExportDataLegacySettings();
+        ExportLoadRuntimeState(configDir);
 
         exportInitialized = true;
     }
@@ -148,6 +150,7 @@ public partial class SlaveWindow
 
     private void OnExportDataFrameworkTick()
     {
+        InitializeExportData();
         ExportApplyCompletedWrite();
 
         if (!plugin.Configuration.ExportDataAlwaysOn || DateTime.UtcNow < exportNextAutomaticAttemptUtc)
@@ -449,13 +452,20 @@ public partial class SlaveWindow
             var payload = ExportBuildDelimitedOutput(rows, delimiter);
 
             File.WriteAllText(outputFilePath, payload, new UTF8Encoding(false));
+            var completedUtc = DateTime.UtcNow;
+            var runtimeStatePersisted = ExportPersistRuntimeState(request.PluginConfigDirectory, completedUtc);
 
             return new ExportWriteResult(
                 request,
                 true,
-                $"{ExportTaskName} {request.Trigger} write complete: {rows.Count} row(s) -> {outputFilePath}",
-                new Vector4(0.4f, 1.0f, 0.4f, 1.0f),
-                DateTime.UtcNow);
+                runtimeStatePersisted
+                    ? $"{ExportTaskName} {request.Trigger} write complete: {rows.Count} row(s) -> {outputFilePath}"
+                    : $"{ExportTaskName} wrote {rows.Count} row(s), but the schedule checkpoint could not be saved; it will retry.",
+                runtimeStatePersisted
+                    ? new Vector4(0.4f, 1.0f, 0.4f, 1.0f)
+                    : new Vector4(1.0f, 0.75f, 0.25f, 1.0f),
+                completedUtc,
+                runtimeStatePersisted);
         }
         catch (Exception ex)
         {
@@ -481,16 +491,74 @@ public partial class SlaveWindow
             exportWriteInProgress = false;
         }
 
-        if (result.Success)
+        if (result.Success && result.RuntimeStatePersisted)
         {
             plugin.Configuration.ExportDataLastSuccessfulRunUtc = result.CompletedUtc.ToString("O", CultureInfo.InvariantCulture);
-            plugin.Configuration.Save();
 
             if (result.Request.RunEveryHours == 0 && result.Request.ContentId != 0)
                 exportLastAlwaysOnRunContentId = result.Request.ContentId;
         }
 
         ExportSetStatus(result.Message, result.Color);
+    }
+
+    private void ExportLoadRuntimeState(string configDirectory)
+    {
+        try
+        {
+            var path = Path.Combine(configDirectory, ExportRuntimeStateFileName);
+            if (!File.Exists(path))
+                return;
+
+            var state = JsonSerializer.Deserialize<ExportRuntimeState>(File.ReadAllText(path), exportJsonOptions);
+            var persistedUtc = ExportParseUtc(state?.LastSuccessfulRunUtc ?? string.Empty);
+            var configuredUtc = ExportParseUtc(plugin.Configuration.ExportDataLastSuccessfulRunUtc);
+            if (persistedUtc.HasValue
+                && (!configuredUtc.HasValue || persistedUtc.Value > configuredUtc.Value))
+            {
+                plugin.Configuration.ExportDataLastSuccessfulRunUtc =
+                    persistedUtc.Value.ToString("O", CultureInfo.InvariantCulture);
+            }
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, $"[{ExportTaskName}] Could not load the export runtime state.");
+        }
+    }
+
+    private bool ExportPersistRuntimeState(string configDirectory, DateTime completedUtc)
+    {
+        var path = Path.Combine(configDirectory, ExportRuntimeStateFileName);
+        var tempPath = $"{path}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            Directory.CreateDirectory(configDirectory);
+            var state = new ExportRuntimeState
+            {
+                LastSuccessfulRunUtc = completedUtc.ToString("O", CultureInfo.InvariantCulture),
+            };
+            var payload = JsonSerializer.Serialize(state, exportJsonOptions);
+            File.WriteAllText(tempPath, payload, new UTF8Encoding(false));
+            File.Move(tempPath, path, true);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, $"[{ExportTaskName}] Export completed, but its runtime state could not be saved.");
+            return false;
+        }
+        finally
+        {
+            try
+            {
+                if (File.Exists(tempPath))
+                    File.Delete(tempPath);
+            }
+            catch
+            {
+                // Best effort: a stale temp file does not invalidate the completed export.
+            }
+        }
     }
 
     private bool ExportIsWriteInProgress()
@@ -1407,7 +1475,13 @@ public partial class SlaveWindow
         bool Success,
         string Message,
         Vector4 Color,
-        DateTime CompletedUtc);
+        DateTime CompletedUtc,
+        bool RuntimeStatePersisted = false);
+
+    private sealed class ExportRuntimeState
+    {
+        public string LastSuccessfulRunUtc { get; init; } = string.Empty;
+    }
 
     private sealed class ExportCharacterHousing
     {

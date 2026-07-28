@@ -31,7 +31,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private const uint SetWindowPosNoZOrder = 0x0004;
     private const uint SetWindowPosNoActivate = 0x0010;
     private const double FrameworkUpdateTimingDebugThresholdMilliseconds = 10.0;
-    private const double FrameworkUpdateTimingWarningThresholdMilliseconds = 25.0;
     private const float MinimumLowResolutionScale = 0.01f;
     private const float MaximumLowResolutionScale = 1.00f;
     private const float DisabledLowResolutionScale = 1.00f;
@@ -1058,7 +1057,9 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private void OnFrameworkUpdate(IFramework _)
     {
-        var totalStopwatch = Stopwatch.StartNew();
+        var totalStopwatch = (Plugin.Instance?.Configuration.VerboseTaskLogging ?? false)
+            ? Stopwatch.StartNew()
+            : null;
         if (allowMultipleGameInstancesStartupPending)
             MeasureFrameworkUpdateStep("SystemWindowMods.AllowMultipleGameInstancesStartupCleanup", ProcessAllowMultipleGameInstancesStartupCleanup);
 
@@ -1123,12 +1124,21 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             DisableBackgroundRenderingStatusText = GetBackgroundRenderingStatusText();
         }
 
-        totalStopwatch.Stop();
-        LogFrameworkUpdateStepDuration("SystemWindowMods.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
+        if (totalStopwatch != null)
+        {
+            totalStopwatch.Stop();
+            LogFrameworkUpdateStepDuration("SystemWindowMods.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
+        }
     }
 
     private void MeasureFrameworkUpdateStep(string label, Action action)
     {
+        if (!(Plugin.Instance?.Configuration.VerboseTaskLogging ?? false))
+        {
+            action();
+            return;
+        }
+
         var stopwatch = Stopwatch.StartNew();
         action();
         stopwatch.Stop();
@@ -1137,6 +1147,9 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private bool MeasureFrameworkUpdateStep(string label, Func<bool> func)
     {
+        if (!(Plugin.Instance?.Configuration.VerboseTaskLogging ?? false))
+            return func();
+
         var stopwatch = Stopwatch.StartNew();
         var result = func();
         stopwatch.Stop();
@@ -1146,14 +1159,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private void LogFrameworkUpdateStepDuration(string label, double elapsedMilliseconds)
     {
-        if (elapsedMilliseconds < FrameworkUpdateTimingDebugThresholdMilliseconds)
+        if (!(Plugin.Instance?.Configuration.VerboseTaskLogging ?? false)
+            || elapsedMilliseconds < FrameworkUpdateTimingDebugThresholdMilliseconds)
             return;
 
-        var message = $"[XASlave] Framework tick step '{label}' took {elapsedMilliseconds:F1}ms.";
-        if (elapsedMilliseconds >= FrameworkUpdateTimingWarningThresholdMilliseconds)
-            log.Warning(message);
-        else
-            log.Debug(message);
+        log.Debug($"[XASlave] Framework tick step '{label}' took {elapsedMilliseconds:F1}ms.");
     }
 
     private bool RefreshAutoRetainerMultiModeCache(bool force)

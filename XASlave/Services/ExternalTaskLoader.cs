@@ -62,7 +62,7 @@ public sealed class ExternalTaskLoader : IDisposable
             }
 
             if (loadedTasks.Count > 0)
-                log.Information($"[XASlave] Loaded {loadedTasks.Count} task panel(s).");
+                log.Debug($"[XASlave] Loaded {loadedTasks.Count} external task panel(s).");
         }
         finally
         {

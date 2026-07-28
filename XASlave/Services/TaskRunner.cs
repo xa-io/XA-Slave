@@ -52,8 +52,34 @@ public sealed class TaskRunner : IDisposable
     public IReadOnlyList<string> LogMessages => logMessages;
     private const int MaxLogMessages = 8000;
 
-    // Characters that failed to relog - for summary at end of task
+    // Characters that failed to relog (could not log in) - marked RED in the processing list.
     public List<string> FailedCharacters { get; } = new();
+
+    // Characters that logged in successfully but could not complete the per-character process
+    // (e.g. stuck in a duty that could not be left) - marked PURPLE in the processing list.
+    public List<string> IncompleteCharacters { get; } = new();
+
+    // Per-item active-processing timers (seconds). Started when an item begins processing and
+    // recorded when it finishes (completed/failed/incomplete) - used for per-character timers + ETA.
+    private readonly Dictionary<string, DateTime> itemStartTimes = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, double> itemDurations = new(StringComparer.OrdinalIgnoreCase);
+    public IReadOnlyDictionary<string, double> ItemDurations => itemDurations;
+
+    /// <summary>Begin the active-processing timer for an item (idempotent per item).</summary>
+    public void RecordItemStart(string item)
+    {
+        if (!string.IsNullOrWhiteSpace(item))
+            itemStartTimes[item] = DateTime.UtcNow;
+    }
+
+    /// <summary>Record the elapsed processing time for a finished item (first finish wins).</summary>
+    public void RecordItemEnd(string item)
+    {
+        if (string.IsNullOrWhiteSpace(item))
+            return;
+        if (itemStartTimes.TryGetValue(item, out var start) && !itemDurations.ContainsKey(item))
+            itemDurations[item] = Math.Max(0, (DateTime.UtcNow - start).TotalSeconds);
+    }
 
     public TaskRunner(ICondition condition, IFramework framework, IPluginLog log, IDtrBar dtrBar, IToastGui toastGui)
     {
@@ -77,10 +103,16 @@ public sealed class TaskRunner : IDisposable
         this.suppressCompletionReport = suppressCompletionReport;
         CurrentTaskName = taskName;
         CompletedItems = 0;
-        TotalItems = 0;
+        // NOTE: TotalItems is set by the step builder (which knows the character/item count)
+        // *before* Start runs, so resetting it here would make every list task's progress read
+        // 0 (DTR "x/y" and the completion toast). It is cleared on idle transitions
+        // (Cancel/Finish) instead, so a later task that never sets it starts clean.
         CurrentItemLabel = string.Empty;
         logMessages.Clear();
         FailedCharacters.Clear();
+        IncompleteCharacters.Clear();
+        itemStartTimes.Clear();
+        itemDurations.Clear();
 
         steps.Clear();
         steps.AddRange(taskSteps);
@@ -120,8 +152,14 @@ public sealed class TaskRunner : IDisposable
         StatusText = "Cancelled";
         SuppressLogoutCancel = false;
         suppressCompletionReport = false;
+        TotalItems = 0;
         AddLog($"[{CurrentTaskName}] Cancelled.");
         log.Information($"[XASlave] TaskRunner: '{CurrentTaskName}' cancelled.");
+        // NOTE: onFinished is intentionally NOT invoked on cancellation. Some callers register a
+        // *continuation* as onFinished (e.g. the Xagman Tony item-sell task schedules a
+        // full-inventory fallback that can broadcast peer completion), which must run only on
+        // natural completion — never when a run is cancelled or auto-cancelled by logout.
+        // Callers that need cleanup on cancel perform it in their own stop path.
         SetDtrIdle();
     }
 
@@ -321,11 +359,18 @@ public sealed class TaskRunner : IDisposable
                 var completed = CompletedItems;
                 var total = TotalItems;
                 var failCount = FailedCharacters.Count;
+                var incompleteCount = IncompleteCharacters.Count;
                 framework.Run(() =>
                 {
-                    var msg = failCount > 0
-                        ? $"XA Slave: {taskName} complete ({completed}/{total}, {failCount} failed)"
-                        : $"XA Slave: {taskName} complete ({completed}/{total})";
+                    string msg;
+                    if (failCount > 0 && incompleteCount > 0)
+                        msg = $"XA Slave: {taskName} complete ({completed}/{total}, {failCount} failed, {incompleteCount} incomplete)";
+                    else if (failCount > 0)
+                        msg = $"XA Slave: {taskName} complete ({completed}/{total}, {failCount} failed)";
+                    else if (incompleteCount > 0)
+                        msg = $"XA Slave: {taskName} complete ({completed}/{total}, {incompleteCount} incomplete)";
+                    else
+                        msg = $"XA Slave: {taskName} complete ({completed}/{total})";
                     toastGui.ShowNormal(msg);
                 });
             }
@@ -334,7 +379,7 @@ public sealed class TaskRunner : IDisposable
 
         try { onFinished?.Invoke(); }
         catch (Exception ex) { log.Error($"[XASlave] TaskRunner onFinished error: {ex.Message}"); }
-        finally { suppressCompletionReport = false; }
+        finally { suppressCompletionReport = false; TotalItems = 0; }
     }
 
     /// <summary>Initialize DTR bar entry - always visible, shows "Idle" by default.</summary>

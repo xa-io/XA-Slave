@@ -48,6 +48,20 @@ public sealed class XAModDisableBackgroundRenderingSettings
 }
 
 [Serializable]
+public sealed class XAModARealmRecordedAllZonesSettings
+{
+    public bool AllContentTypes { get; set; } = true;
+    public List<uint> SelectedContentTypes { get; set; } = new();
+}
+
+[Serializable]
+public sealed class XAModDalamudLogDisablerSettings
+{
+    public List<string> BlockedPlugins { get; set; } = new();
+    public int MinimumKeptLevel { get; set; } = 6;
+}
+
+[Serializable]
 public sealed class XAModAutoHideGameObjectsSettings
 {
     public bool HidePlayer { get; set; }
@@ -164,6 +178,15 @@ public sealed class XAModNotifyWhenFriendIsNearSettings
 {
     public List<string> Patterns { get; set; } = new();
     public int CooldownSeconds { get; set; }
+}
+
+[Serializable]
+public sealed class XAModAlertWhenTypingInCombatSettings
+{
+    public int CooldownSeconds { get; set; } = 300;
+    public int ToneId { get; set; } = 2;
+    public int BeepCount { get; set; } = 3;
+    public float SoundVolume { get; set; } = 0.45f;
 }
 
 [Serializable]

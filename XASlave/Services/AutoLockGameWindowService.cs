@@ -163,20 +163,43 @@ public sealed class AutoLockGameWindowService : IDisposable
 
         private static nint WindowProc(nint hWnd, uint message, nint wParam, nint lParam)
         {
-            if (message == WmWindowPosChanging)
+            // Resolve the saved original proc under the lock. UnlockCurrentWindow/Cleanup can
+            // remove this entry while a window message is still in flight; indexing the dictionary
+            // directly (the old code) would then throw a KeyNotFoundException *inside a native
+            // window procedure*, which terminates the game process.
+            nint originalProc;
+            lock (SyncRoot)
             {
-                var windowPos = Marshal.PtrToStructure<WindowPos>(lParam);
-                if ((windowPos.Flags & SwpNoMove) == 0)
-                {
-                    GetWindowRect(hWnd, out var rect);
-                    windowPos.X = rect.Left;
-                    windowPos.Y = rect.Top;
-                    windowPos.Flags |= SwpNoMove;
-                    Marshal.StructureToPtr(windowPos, lParam, true);
-                }
+                if (!OriginalWindowProcs.TryGetValue(hWnd, out originalProc))
+                    originalProc = nint.Zero;
             }
 
-            return CallWindowProc(OriginalWindowProcs[hWnd], hWnd, message, wParam, lParam);
+            try
+            {
+                if (message == WmWindowPosChanging)
+                {
+                    var windowPos = Marshal.PtrToStructure<WindowPos>(lParam);
+                    if ((windowPos.Flags & SwpNoMove) == 0)
+                    {
+                        GetWindowRect(hWnd, out var rect);
+                        windowPos.X = rect.Left;
+                        windowPos.Y = rect.Top;
+                        windowPos.Flags |= SwpNoMove;
+                        Marshal.StructureToPtr(windowPos, lParam, true);
+                    }
+                }
+            }
+            catch
+            {
+                // Never let a managed exception escape into the native window procedure.
+            }
+
+            if (originalProc != nint.Zero)
+                return CallWindowProc(originalProc, hWnd, message, wParam, lParam);
+
+            // The window was un-subclassed while this message was in flight and we no longer have
+            // the original proc; hand the message to the default handler instead of crashing.
+            return DefWindowProc(hWnd, message, wParam, lParam);
         }
 
         [DllImport("user32.dll", SetLastError = true)]
@@ -184,6 +207,9 @@ public sealed class AutoLockGameWindowService : IDisposable
 
         [DllImport("user32.dll")]
         private static extern nint CallWindowProc(nint lpPrevWndFunc, nint hWnd, uint message, nint wParam, nint lParam);
+
+        [DllImport("user32.dll")]
+        private static extern nint DefWindowProc(nint hWnd, uint message, nint wParam, nint lParam);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]

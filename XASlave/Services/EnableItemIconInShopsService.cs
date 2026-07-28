@@ -165,8 +165,16 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
             if (type == AddonEvent.PostRefresh)
             {
                 collectablesShopItemDatas.Clear();
-                var itemCount = addon->AtkValues[20].UInt;
-                for (var index = 0; index < itemCount; index++)
+                // Read AtkValues[20] only when it is in range, and clamp the strided read
+                // (34+11*index) to AtkValuesCount so a large reported count cannot read past the array.
+                var atkValuesCount = (int)addon->AtkValuesCount;
+                var safeItemCount = 0;
+                if (atkValuesCount > 34)
+                {
+                    var itemCount = addon->AtkValues[20].UInt;
+                    safeItemCount = (int)Math.Min(itemCount, (uint)((atkValuesCount - 34) / 11));
+                }
+                for (var index = 0; index < safeItemCount; index++)
                 {
                     var itemId = addon->AtkValues[34 + 11 * index].UInt % 500000;
                     if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
@@ -195,8 +203,11 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
                 return;
 
             var replacementCount = 0;
+            var nodeListCount = (int)listComponent->Component->UldManager.NodeListCount;
             for (var index = 0; index < 15; index++)
             {
+                if (16 + index >= nodeListCount)
+                    break;
                 var listItemComponent = (AtkComponentNode*)listComponent->Component->UldManager.NodeList[16 + index];
                 if (listItemComponent == null || listItemComponent->Component == null)
                     continue;
@@ -240,8 +251,12 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
                 return;
 
             var itemCount = addon->AtkValues[4].UInt;
+            // The addon-reported item count is not trusted for bounds: the highest slot read is
+            // 1064+index, so clamp the loop to the available AtkValue range (matches OnFreeShop).
+            var atkValuesCount = (int)addon->AtkValuesCount;
+            var safeItemCount = (int)Math.Min(itemCount, (uint)Math.Max(0, atkValuesCount - 1064));
             var replacementCount = 0;
-            for (var index = 0; index < itemCount; index++)
+            for (var index = 0; index < safeItemCount; index++)
             {
                 var itemId = addon->AtkValues[1064 + index].UInt;
                 if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
@@ -271,8 +286,11 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
                 return;
 
             var itemCount = addon->AtkValues[1].UInt;
+            // Clamp to the available AtkValue range; highest slot read is 317+index.
+            var atkValuesCount = (int)addon->AtkValuesCount;
+            var safeItemCount = (int)Math.Min(itemCount, (uint)Math.Max(0, atkValuesCount - 317));
             var replacementCount = 0;
-            for (var index = 0; index < itemCount; index++)
+            for (var index = 0; index < safeItemCount; index++)
             {
                 var itemId = addon->AtkValues[317 + index].UInt;
                 if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
@@ -302,8 +320,13 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
                 return;
 
             var itemCount = addon->AtkValues[298].UInt;
+            // Clamp to the available AtkValue range; highest slot touched is the icon write at
+            // 301+index*18, so the largest safe item count keeps that index within AtkValuesCount.
+            var atkValuesCount = (int)addon->AtkValuesCount;
+            var maxItems = (atkValuesCount - 302) / 18 + 1;
+            var safeItemCount = (int)Math.Min(itemCount, (uint)Math.Max(0, maxItems));
             var replacementCount = 0;
-            for (var index = 0; index < itemCount; index++)
+            for (var index = 0; index < safeItemCount; index++)
             {
                 var itemId = addon->AtkValues[300 + index * 18].UInt;
                 if (itemId == 0 || !TryGetItem(itemId, out var itemRow))

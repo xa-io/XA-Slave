@@ -35,7 +35,6 @@ public partial class SlaveWindow : Window, IDisposable
     private const float MinTaskMenuWidth = 30f;
     private const float MaxTaskMenuWidth = DefaultTaskMenuWidth * 2f;
     private const double FrameworkUpdateTimingDebugThresholdMilliseconds = 10.0;
-    private const double FrameworkUpdateTimingWarningThresholdMilliseconds = 25.0;
     private const float TaskLayoutColumnGap = 3f;
     private static float UiScale => ImGuiHelpers.GlobalScale;
     private static float UiScaleSafe => ImGuiHelpers.GlobalScale;
@@ -752,6 +751,7 @@ public partial class SlaveWindow : Window, IDisposable
             || glamWeatherRunning
             || fcFloaterRunning
             || xagmanRunning
+            || xagmanTradeSafetySessionActive
             || plugin.XagmanPeers.IsStarted;
     }
 
@@ -779,7 +779,7 @@ public partial class SlaveWindow : Window, IDisposable
 
         ReleaseRefreshSubsArSuppression();
 
-        if (xagmanRunning)
+        if (xagmanRunning || xagmanTradeSafetySessionActive)
             StopXagmanTask();
 
         if (plugin.XagmanPeers.IsStarted)
@@ -1077,7 +1077,9 @@ public partial class SlaveWindow : Window, IDisposable
 
     private void OnFrameworkUpdate(IFramework framework)
     {
-        var totalStopwatch = Stopwatch.StartNew();
+        var totalStopwatch = plugin.Configuration.VerboseTaskLogging
+            ? Stopwatch.StartNew()
+            : null;
         MeasureFrameworkUpdateStep("SlaveWindow.EnforceSpecialRenderSafety", plugin.EnforceSpecialRenderSafetyOnFrameworkTick);
         MeasureFrameworkUpdateStep("SlaveWindow.UpdatePriorityTaskMonitors", UpdatePriorityTaskMonitors);
         MeasureFrameworkUpdateStep("SlaveWindow.UpdatePriorityTaskExternalStatus", UpdatePriorityTaskExternalStatus);
@@ -1086,16 +1088,14 @@ public partial class SlaveWindow : Window, IDisposable
 
         if (!autoCollectScheduledAt.HasValue || !Plugin.PlayerState.IsLoaded || plugin.AutoCollector.IsRunning)
         {
-            totalStopwatch.Stop();
-            LogFrameworkUpdateStepDuration("SlaveWindow.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
+            CompleteFrameworkUpdateTiming(totalStopwatch);
             return;
         }
 
         var delay = (float)(DateTime.UtcNow - autoCollectScheduledAt.Value).TotalSeconds;
         if (delay < autoCollectScheduledDelaySeconds || !plugin.AutoCollector.IsNormalCondition())
         {
-            totalStopwatch.Stop();
-            LogFrameworkUpdateStepDuration("SlaveWindow.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
+            CompleteFrameworkUpdateTiming(totalStopwatch);
             return;
         }
 
@@ -1113,8 +1113,7 @@ public partial class SlaveWindow : Window, IDisposable
             autoCollectSkipPending = false;
             autoCollectSkipMessage = string.Empty;
             autoCollectResumeArOnCompletion = false;
-            totalStopwatch.Stop();
-            LogFrameworkUpdateStepDuration("SlaveWindow.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
+            CompleteFrameworkUpdateTiming(totalStopwatch);
             return;
         }
 
@@ -1124,12 +1123,26 @@ public partial class SlaveWindow : Window, IDisposable
         autoCollectSkipMessage = string.Empty;
         autoCollectResumeArOnCompletion = false;
         MeasureFrameworkUpdateStep("SlaveWindow.RunAutoCollection", () => RunAutoCollection(resumeArAfterCollection));
-        totalStopwatch.Stop();
-        LogFrameworkUpdateStepDuration("SlaveWindow.OnFrameworkUpdate", totalStopwatch.Elapsed.TotalMilliseconds);
+        CompleteFrameworkUpdateTiming(totalStopwatch);
+    }
+
+    private void CompleteFrameworkUpdateTiming(Stopwatch? stopwatch)
+    {
+        if (stopwatch == null)
+            return;
+
+        stopwatch.Stop();
+        LogFrameworkUpdateStepDuration("SlaveWindow.OnFrameworkUpdate", stopwatch.Elapsed.TotalMilliseconds);
     }
 
     private void MeasureFrameworkUpdateStep(string label, System.Action action)
     {
+        if (!plugin.Configuration.VerboseTaskLogging)
+        {
+            action();
+            return;
+        }
+
         var stopwatch = Stopwatch.StartNew();
         action();
         stopwatch.Stop();
@@ -1138,14 +1151,11 @@ public partial class SlaveWindow : Window, IDisposable
 
     private void LogFrameworkUpdateStepDuration(string label, double elapsedMilliseconds)
     {
-        if (elapsedMilliseconds < FrameworkUpdateTimingDebugThresholdMilliseconds)
+        if (!plugin.Configuration.VerboseTaskLogging
+            || elapsedMilliseconds < FrameworkUpdateTimingDebugThresholdMilliseconds)
             return;
 
-        var message = $"[XASlave] Framework tick step '{label}' took {elapsedMilliseconds:F1}ms.";
-        if (elapsedMilliseconds >= FrameworkUpdateTimingWarningThresholdMilliseconds)
-            Plugin.Log.Warning(message);
-        else
-            Plugin.Log.Debug(message);
+        Plugin.Log.Debug($"[XASlave] Framework tick step '{label}' took {elapsedMilliseconds:F1}ms.");
     }
 
     private void UpdatePriorityTaskMonitors()
@@ -1502,7 +1512,7 @@ public partial class SlaveWindow : Window, IDisposable
             return true;
         }
 
-        if (xagmanRunning)
+        if (xagmanRunning || xagmanTradeSafetySessionActive)
         {
             task = SlaveTask.Xagman;
             label = GetPriorityTaskLabel(task);

@@ -87,11 +87,23 @@ public static class CharacterSafetyHelper
 
     public static bool IsCharacterSafeWaitReady()
     {
-        return IsNamePlateReady() && IsPlayerAvailable();
+        return IsNamePlateReady() && IsPlayerAvailable() && IsNotCasting();
     }
 
     public static bool IsCharacterSafeWaitReadyInDuty()
     {
-        return IsNamePlateReady() && IsPlayerAvailableInDuty();
+        return IsNamePlateReady() && IsPlayerAvailableInDuty() && IsNotCasting();
+    }
+
+    private static bool IsNotCasting()
+    {
+        try
+        {
+            return !Plugin.Condition[ConditionFlag.Casting];
+        }
+        catch
+        {
+            return false;
+        }
     }
 }

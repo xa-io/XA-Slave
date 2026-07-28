@@ -33,6 +33,18 @@ public class ReloggerCharacterData
     public int MainInventoryUsedSlots { get; set; }
     public int MainInventoryTotalSlots { get; set; }
     public int MainInventoryFreeSlots { get; set; }
+    public DateTime XaDatabaseSnapshotUpdatedUtc { get; set; } = DateTime.MinValue;
+    public int TreasureValue { get; set; }
+    public int MagitekRepairKits { get; set; }
+    public int CeruleumTanks { get; set; }
+
+    /// <summary>
+    /// Tri-state result of the last AutoRetainer import/refresh:
+    /// null = never checked against AutoRetainer, true = present in AR config,
+    /// false = NOT present in AR config (manually added or AR has no data for it).
+    /// A character not found in AR cannot be relogged by /ays relog and will fail to log in.
+    /// </summary>
+    public bool? FoundInAutoRetainer { get; set; }
 }
 
 [Serializable]
@@ -226,6 +238,8 @@ public class Configuration : IPluginConfiguration
     public bool XagmanUsePreflightOnFirstCharacter { get; set; } = true;
     public bool XagmanAutoReturnToFc { get; set; } = true;
     public bool XagmanIgnoreGilInMatchingSelection { get; set; } = false;
+    public bool XagmanPrioritizeCharactersGivingItemsFirst { get; set; } = false;
+    public bool XagmanRefuseTradesWhenIdle { get; set; } = false;
     public bool XagmanWarningDetailsExpanded { get; set; } = true;
     public bool XagmanRoleInstructionsExpanded { get; set; } = true;
     public string XagmanRegionFilter { get; set; } = "All";
@@ -234,6 +248,23 @@ public class Configuration : IPluginConfiguration
     public string XagmanHubAddress { get; set; } = XagmanPeerService.DefaultHubAddress;
     public int XagmanHubPort { get; set; } = 45215;
     public bool XagmanPeerConnectionsEnabled { get; set; } = false;
+
+    // -- Xagman Outside Network Helper (ONH) --
+    // Two different players on different machines (no shared peer hub) transfer items using in-game
+    // proximity + 1-gil trade handshakes instead of peer messages. Franchise Owner gives, Tony receives.
+    // Friend rosters are shared via clipboard export/import: a Tony holds the partner's Franchise Owner
+    // characters; a Franchise Owner holds the partner's Tony characters.
+    public bool XagmanOutsideNetworkHelper { get; set; } = false;
+    public List<string> XagmanOnhFriendFoCharacters { get; set; } = new();
+    public List<string> XagmanOnhFriendTonyCharacters { get; set; } = new();
+
+    // -- Xagman Server Matching --
+    // When enabled, the Tony meet world is chosen per server (data center) instead of one fixed world,
+    // and the Tony sweeps server-by-server within a region so Franchise Owners only world-travel
+    // (never DC travel). XagmanTargetAetheryte is reused as the single shared meet location.
+    public bool XagmanServerMatchingEnabled { get; set; } = false;
+    // Key = data center / server name (e.g. "Aether"), value = selected meet world name (e.g. "Siren").
+    public Dictionary<string, string> XagmanServerMeetWorlds { get; set; } = new();
 
     // -- FC Permissions Updater --
     public List<string> FcPermsCharacters { get; set; } = new();
@@ -344,6 +375,7 @@ public class Configuration : IPluginConfiguration
     public bool AutoPreventGameExitingFromLobbyErrorsEnabled { get; set; } = false;
     public bool AutoCloseLobbyErrorsEnabled { get; set; } = false;
     public bool DisplayActualQueuePositionEnabled { get; set; } = false;
+    public bool ReplaceUnownedMountHotbarsEnabled { get; set; } = false;
     public bool DisableBackgroundGameRenderingEnabled { get; set; } = false;
     public bool DisableBackgroundGameRenderingOnlyWhenMinimized { get; set; } = false;
     public bool DisableBackgroundGameRenderingDisableWhenArMultiIsOn { get; set; } = false;
@@ -360,6 +392,11 @@ public class Configuration : IPluginConfiguration
     public bool NotifyWhenFriendIsNearEnabled { get; set; } = false;
     public List<string> NotifyWhenFriendIsNearPatterns { get; set; } = new();
     public int NotifyWhenFriendIsNearCooldownSeconds { get; set; } = 300;
+    public bool AlertWhenTypingInCombatEnabled { get; set; } = false;
+    public int AlertWhenTypingInCombatCooldownSeconds { get; set; } = AlertWhenTypingInCombatService.DefaultCooldownSeconds;
+    public int AlertWhenTypingInCombatToneId { get; set; } = AlertWhenTypingInCombatService.DefaultToneId;
+    public int AlertWhenTypingInCombatBeepCount { get; set; } = AlertWhenTypingInCombatService.DefaultBeepCount;
+    public float AlertWhenTypingInCombatSoundVolume { get; set; } = AlertWhenTypingInCombatService.DefaultVolume;
     public bool BetterCastBarEnabled { get; set; } = false;
     public Vector2 BetterCastBarInterruptedTextPosition { get; set; } = new(0f, 11f);
     public int BetterCastBarInterruptedTextSize { get; set; } = 18;
@@ -505,6 +542,13 @@ public class Configuration : IPluginConfiguration
     public bool MoveableAfterDeathEnabled { get; set; } = false;
     public List<ToonModSavedList> ToonModsSavedLists { get; set; } = new();
     public bool ForcePeepingTomEnabled { get; set; } = false;
+    public bool ARealmRecordedAllZonesEnabled { get; set; } = false;
+    public bool ARealmRecordedAllZonesAllContentTypes { get; set; } = true;
+    public List<uint> ARealmRecordedAllZonesSelectedContentTypes { get; set; } = new();
+    public bool DalamudLogDisablerEnabled { get; set; } = false;
+    public List<string> DalamudLogDisablerBlockedPlugins { get; set; } = new();
+    // Serilog LogEventLevel minimum kept for filtered plugins: 0=Verbose..5=Fatal, 6=block all. Default full mute.
+    public int DalamudLogDisablerMinimumKeptLevel { get; set; } = 6;
     public bool TeleportHelperEnabled { get; set; } = false;
     public bool TeleportHelperSelectYes { get; set; } = false;
 

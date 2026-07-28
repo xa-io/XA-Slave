@@ -38,10 +38,11 @@ public sealed class XagmanPeerService : IDisposable
     private readonly Dictionary<string, HubClientSession> hubSessions = new(StringComparer.OrdinalIgnoreCase);
 
     // Event handlers for task control
-    public event Action? OnTaskStartRequested;
+    public event Action<XagmanPeerMessage>? OnTaskStartRequested;
     public event Action? OnTaskStopRequested;
+    public event Action? OnTaskStopAndClearResultsRequested;
     public event Action? OnTaskRecallRequested;
-    public event Action? OnTaskCompleteRequested;
+    public event Action<XagmanPeerMessage>? OnTaskCompleteRequested;
 
     // Sequential ping scheduling to prevent message overlap
     private readonly object pingScheduleLock = new();
@@ -50,6 +51,9 @@ public sealed class XagmanPeerService : IDisposable
     private bool isPingSchedulerRunning;
     private DateTime lastPingSent = DateTime.MinValue;
     private const int PingIntervalMs = 100; // 100ms between pings to prevent overlap while staying fast
+    // Peer-list messages can contain compact selection forecasts from several FO clients. Keep a
+    // bounded ceiling while leaving enough room for several hundred selected owners per client.
+    private const int MaxInboundLineLength = 512 * 1024;
     private int registerSendRequested;
     private int registerSendRunning;
 
@@ -518,7 +522,22 @@ public sealed class XagmanPeerService : IDisposable
                 if (string.IsNullOrWhiteSpace(line))
                     break;
 
-                var message = JsonSerializer.Deserialize<XagmanPeerMessage>(line, JsonOptions);
+                if (line.Length > MaxInboundLineLength)
+                {
+                    log.Warning($"[XASlave] Xagman hub dropped an oversized inbound message ({line.Length} chars).");
+                    break;
+                }
+
+                XagmanPeerMessage? message;
+                try
+                {
+                    message = JsonSerializer.Deserialize<XagmanPeerMessage>(line, JsonOptions);
+                }
+                catch (JsonException)
+                {
+                    continue; // one malformed line must not drop the whole session
+                }
+
                 if (message == null)
                     continue;
 
@@ -554,6 +573,8 @@ public sealed class XagmanPeerService : IDisposable
                     return;
 
                 var presence = ClonePresence(message.Presence);
+                if (string.IsNullOrWhiteSpace(presence.InstanceId))
+                    return; // reject register messages with no instance id (would NRE the hub session map)
                 presence.LastSeenUtc = DateTime.UtcNow;
                 session.Presence = presence;
 
@@ -600,8 +621,11 @@ public sealed class XagmanPeerService : IDisposable
                 .ToList();
         }
 
+        // The combined cleanup must also reach idle Tony clients, which intentionally advertise
+        // XagmanEnabled=false. Ordinary task-control messages retain the active-Xagman filter.
+        var stopAndClearResults = message.MessageType == XagmanPeerMessageTypes.StopTask && message.ClearResults;
         var targets = recipients
-            .Where(entry => entry.Presence.XagmanEnabled)
+            .Where(entry => stopAndClearResults || entry.Presence.XagmanEnabled)
             .Where(entry => !entry.Presence.InstanceId.Equals(message.SenderInstanceId, StringComparison.OrdinalIgnoreCase))
             .Where(entry => string.IsNullOrWhiteSpace(message.TargetInstanceId)
                 || entry.Presence.InstanceId.Equals(message.TargetInstanceId, StringComparison.OrdinalIgnoreCase))
@@ -615,6 +639,15 @@ public sealed class XagmanPeerService : IDisposable
                 SenderInstanceId = message.SenderInstanceId,
                 TargetInstanceId = targetPresence.InstanceId,
                 SentAtUtc = DateTime.UtcNow,
+                ClearResults = message.ClearResults,
+                CoordinationProtocolRevision = message.CoordinationProtocolRevision,
+                GreenValueProtocolRevision = message.GreenValueProtocolRevision,
+                RunId = message.RunId,
+                CollectionFirstEnabled = message.CollectionFirstEnabled,
+                RunPhase = message.RunPhase,
+                ExpectedFranchiseOwnerInstanceIds = message.ExpectedFranchiseOwnerInstanceIds == null
+                    ? new List<string>()
+                    : new List<string>(message.ExpectedFranchiseOwnerInstanceIds),
             }, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -711,9 +744,16 @@ public sealed class XagmanPeerService : IDisposable
         var targetRecipient = recipients.FirstOrDefault(r => r.Presence.InstanceId.Equals(targetInstanceId, StringComparison.OrdinalIgnoreCase));
         if (targetRecipient.Session == null) return;
 
+        var includeTradeCapacityForecasts = targetRecipient.Presence.Role == XagmanRole.Tony;
         var peerList = recipients
             .Where(entry => !entry.Presence.InstanceId.Equals(targetInstanceId, StringComparison.OrdinalIgnoreCase))
-            .Select(entry => ClonePresence(entry.Presence))
+            .Select(entry =>
+            {
+                var cloned = ClonePresence(entry.Presence);
+                if (!includeTradeCapacityForecasts)
+                    cloned.TradeCapacityForecast = null;
+                return cloned;
+            })
             .OrderBy(entry => entry.CharacterName, StringComparer.OrdinalIgnoreCase)
             .ThenBy(entry => entry.ProcessId)
             .ToList();
@@ -769,7 +809,22 @@ public sealed class XagmanPeerService : IDisposable
                             if (string.IsNullOrWhiteSpace(line))
                                 break;
 
-                            var message = JsonSerializer.Deserialize<XagmanPeerMessage>(line, JsonOptions);
+                            if (line.Length > MaxInboundLineLength)
+                            {
+                                log.Warning($"[XASlave] Xagman client dropped an oversized inbound message ({line.Length} chars).");
+                                break;
+                            }
+
+                            XagmanPeerMessage? message;
+                            try
+                            {
+                                message = JsonSerializer.Deserialize<XagmanPeerMessage>(line, JsonOptions);
+                            }
+                            catch (JsonException)
+                            {
+                                continue; // one malformed line must not drop the whole session
+                            }
+
                             if (message == null)
                                 continue;
 
@@ -841,13 +896,21 @@ public sealed class XagmanPeerService : IDisposable
             case XagmanPeerMessageTypes.StartTask:
                 Plugin.Log.Information($"[XagmanPeerService] Received start task command from {message.SenderInstanceId}");
                 // Trigger Xagman task start on this client
-                TriggerXagmanTaskStart();
+                TriggerXagmanTaskStart(message);
                 break;
 
             case XagmanPeerMessageTypes.StopTask:
-                Plugin.Log.Information($"[XagmanPeerService] Received stop task command from {message.SenderInstanceId}");
-                // Trigger Xagman task stop on this client
-                TriggerXagmanTaskStop();
+                if (message.ClearResults)
+                {
+                    Plugin.Log.Information($"[XagmanPeerService] Received stop task and clear results command from {message.SenderInstanceId}");
+                    TriggerXagmanTaskStopAndClearResults();
+                }
+                else
+                {
+                    Plugin.Log.Information($"[XagmanPeerService] Received stop task command from {message.SenderInstanceId}");
+                    // Trigger Xagman task stop on this client
+                    TriggerXagmanTaskStop();
+                }
                 break;
 
             case XagmanPeerMessageTypes.RecallTask:
@@ -857,15 +920,15 @@ public sealed class XagmanPeerService : IDisposable
 
             case XagmanPeerMessageTypes.CompleteTask:
                 Plugin.Log.Information($"[XagmanPeerService] Received complete task command from {message.SenderInstanceId}");
-                TriggerXagmanTaskComplete();
+                TriggerXagmanTaskComplete(message);
                 break;
         }
     }
 
-    private void TriggerXagmanTaskStart()
+    private void TriggerXagmanTaskStart(XagmanPeerMessage message)
     {
         Plugin.Log.Information("[XagmanPeerService] Triggering Xagman task start");
-        OnTaskStartRequested?.Invoke();
+        OnTaskStartRequested?.Invoke(message);
     }
 
     private void TriggerXagmanTaskStop()
@@ -874,16 +937,22 @@ public sealed class XagmanPeerService : IDisposable
         OnTaskStopRequested?.Invoke();
     }
 
+    private void TriggerXagmanTaskStopAndClearResults()
+    {
+        Plugin.Log.Information("[XagmanPeerService] Triggering Xagman task stop and result clear");
+        OnTaskStopAndClearResultsRequested?.Invoke();
+    }
+
     private void TriggerXagmanTaskRecall()
     {
         Plugin.Log.Information("[XagmanPeerService] Triggering Xagman task recall");
         OnTaskRecallRequested?.Invoke();
     }
 
-    private void TriggerXagmanTaskComplete()
+    private void TriggerXagmanTaskComplete(XagmanPeerMessage message)
     {
         Plugin.Log.Information("[XagmanPeerService] Triggering Xagman task completion");
-        OnTaskCompleteRequested?.Invoke();
+        OnTaskCompleteRequested?.Invoke(message);
     }
 
     private async Task SendRegisterAsync()
@@ -1049,8 +1118,12 @@ public sealed class XagmanPeerService : IDisposable
         var versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { localVersion };
         foreach (var peer in currentPeers)
         {
-            if (peer.XagmanEnabled && !string.IsNullOrWhiteSpace(peer.PluginVersion))
+            if (peer.XagmanEnabled
+                && !string.IsNullOrWhiteSpace(peer.PluginVersion)
+                && IsWellFormedVersion(peer.PluginVersion.Trim()))
+            {
                 versions.Add(peer.PluginVersion.Trim());
+            }
         }
 
         if (versions.Count <= 1)
@@ -1070,6 +1143,15 @@ public sealed class XagmanPeerService : IDisposable
             .Select(peer => $"{(string.IsNullOrWhiteSpace(peer.CharacterName) ? peer.InstanceId : peer.CharacterName)} v{peer.PluginVersion.Trim()}"));
         Plugin.Log.Warning($"[XagmanPeerService] XA Slave version mismatch detected (local v{localVersion}). Halting Xagman to avoid out-of-sync behaviour. Out-of-sync peers: {detail}");
         TriggerXagmanTaskStop();
+    }
+
+    private static bool IsWellFormedVersion(string value)
+    {
+        // Only a well-formed x.x.x.x string counts as a real version mismatch, so a malformed or
+        // garbage PluginVersion from an (unauthenticated) peer cannot halt the local Xagman run.
+        // Full protection against a spoofed-but-valid version requires the hub auth handshake
+        // (tracked as a follow-up).
+        return Version.TryParse(value, out _);
     }
 
     private void SetStatus(string value)
@@ -1102,10 +1184,25 @@ public sealed class XagmanPeerService : IDisposable
             TonyMode = record.TonyMode,
             Status = record.Status,
             StatusText = record.StatusText,
+            CoordinationProtocolRevision = record.CoordinationProtocolRevision,
+            GreenValueProtocolRevision = record.GreenValueProtocolRevision,
+            RunId = record.RunId,
+            CollectionFirstEnabled = record.CollectionFirstEnabled,
+            CollectionFirstRequested = record.CollectionFirstRequested,
+            HasConditionalItemPolicies = record.HasConditionalItemPolicies,
+            RunPhase = record.RunPhase,
+            PhaseTotalCharacters = record.PhaseTotalCharacters,
+            PhaseResolvedCharacters = record.PhaseResolvedCharacters,
+            PhaseComplete = record.PhaseComplete,
+            CompletionDirectiveAcknowledged = record.CompletionDirectiveAcknowledged,
             ActiveCharacter = record.ActiveCharacter,
             PreferredTonyCharacter = record.PreferredTonyCharacter,
             MeetWorld = record.MeetWorld,
             MeetAetheryte = record.MeetAetheryte,
+            ServerMatchingEnabled = record.ServerMatchingEnabled,
+            ServerMatchingSweepOrdinal = record.ServerMatchingSweepOrdinal,
+            ServerMatchingActiveDataCenter = record.ServerMatchingActiveDataCenter,
+            ServerMatchingPendingDataCenter = record.ServerMatchingPendingDataCenter,
             QueueRequestedAtUtc = record.QueueRequestedAtUtc,
             TonyCompletionRequestedAtUtc = record.TonyCompletionRequestedAtUtc,
             TotalCharacters = record.TotalCharacters,
@@ -1127,15 +1224,100 @@ public sealed class XagmanPeerService : IDisposable
             RequestedItems = record.RequestedItems == null
                 ? new List<XagmanTradeRequestEntry>()
                 : record.RequestedItems
-                    .Select(entry => new XagmanTradeRequestEntry
+                    .Select(CloneTradeRequest)
+                    .ToList(),
+            GreenValueSnapshot = CloneGreenValueSnapshot(record.GreenValueSnapshot),
+            TradeCapacityForecast = CloneTradeCapacityForecast(record.TradeCapacityForecast),
+        };
+    }
+
+    private static XagmanTradeRequestEntry CloneTradeRequest(XagmanTradeRequestEntry? entry)
+    {
+        if (entry == null)
+        {
+            return new XagmanTradeRequestEntry
+            {
+                SelectorKind = (XagmanItemSelectorKind)(-1),
+                Mode = (XagmanItemMode)(-1),
+                GreenScanComplete = false,
+                GreenScanError = "Malformed null request entry.",
+            };
+        }
+
+        return new XagmanTradeRequestEntry
+        {
+            SelectorKind = entry.SelectorKind,
+            ItemId = entry.ItemId,
+            ItemName = entry.ItemName,
+            IsHq = entry.IsHq,
+            Mode = entry.Mode,
+            Quantity = entry.Quantity,
+            TargetQuantity = entry.TargetQuantity,
+            CurrentQuantity = entry.CurrentQuantity,
+            GreenValueProtocolRevision = entry.GreenValueProtocolRevision,
+            TargetValueScaled2 = entry.TargetValueScaled2,
+            CurrentValueScaled2 = entry.CurrentValueScaled2,
+            ValueDeficitScaled2 = entry.ValueDeficitScaled2,
+            GreenScanComplete = entry.GreenScanComplete,
+            GreenScanError = entry.GreenScanError,
+        };
+    }
+
+    private static XagmanGreenValueSnapshot? CloneGreenValueSnapshot(XagmanGreenValueSnapshot? snapshot)
+    {
+        if (snapshot == null)
+            return null;
+
+        return new XagmanGreenValueSnapshot
+        {
+            GeneratedAtUtc = snapshot.GeneratedAtUtc,
+            Revision = snapshot.Revision,
+            Complete = snapshot.Complete,
+            Error = snapshot.Error,
+            GcSealsScaled2 = snapshot.GcSealsScaled2,
+            FcCreditsScaled2 = snapshot.FcCreditsScaled2,
+            GcSealsTargetScaled2 = snapshot.GcSealsTargetScaled2,
+            FcCreditsTargetScaled2 = snapshot.FcCreditsTargetScaled2,
+            DropboxGcSealsScaled2 = snapshot.DropboxGcSealsScaled2,
+            DropboxFcCreditsScaled2 = snapshot.DropboxFcCreditsScaled2,
+            SafeItemCount = snapshot.SafeItemCount,
+            DropboxSafeItemCount = snapshot.DropboxSafeItemCount,
+            ExcludedItemCount = snapshot.ExcludedItemCount,
+            BlockedKeyCount = snapshot.BlockedKeyCount,
+        };
+    }
+
+    private static XagmanTradeCapacityForecast? CloneTradeCapacityForecast(XagmanTradeCapacityForecast? forecast)
+    {
+        if (forecast == null)
+            return null;
+
+        return new XagmanTradeCapacityForecast
+        {
+            GeneratedAtUtc = forecast.GeneratedAtUtc,
+            Revision = forecast.Revision,
+            SelectedOwnerCount = forecast.SelectedOwnerCount,
+            KnownOwnerCount = forecast.KnownOwnerCount,
+            UnknownOwnerCount = forecast.UnknownOwnerCount,
+            IsTruncated = forecast.IsTruncated,
+            SelectedOwnerKeys = forecast.SelectedOwnerKeys == null
+                ? new List<string>()
+                : new List<string>(forecast.SelectedOwnerKeys),
+            Items = forecast.Items == null
+                ? new List<XagmanTradeCapacityForecastItem>()
+                : forecast.Items
+                    .Select(item => new XagmanTradeCapacityForecastItem
                     {
-                        ItemId = entry.ItemId,
-                        ItemName = entry.ItemName,
-                        IsHq = entry.IsHq,
-                        Mode = entry.Mode,
-                        Quantity = entry.Quantity,
-                        TargetQuantity = entry.TargetQuantity,
-                        CurrentQuantity = entry.CurrentQuantity,
+                        GroupKey = item.GroupKey,
+                        ItemId = item.ItemId,
+                        ItemName = item.ItemName,
+                        IsHq = item.IsHq,
+                        StackSize = item.StackSize,
+                        IncomingToTonyQuantity = item.IncomingToTonyQuantity,
+                        NeededFromTonyQuantity = item.NeededFromTonyQuantity,
+                        AllAvailableRequestCount = item.AllAvailableRequestCount,
+                        KnownOwnerCount = item.KnownOwnerCount,
+                        UnknownOwnerCount = item.UnknownOwnerCount,
                     })
                     .ToList(),
         };
@@ -1239,7 +1421,14 @@ public sealed class XagmanPeerService : IDisposable
         public XagmanPeerPresence? Presence { get; set; }
     }
 
-    public async Task<bool> SendStartTaskToAllPeersAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> SendStartTaskToAllPeersAsync(
+        string runId,
+        bool collectionFirstEnabled,
+        XagmanRunPhase runPhase,
+        int coordinationProtocolRevision,
+        int greenValueProtocolRevision,
+        IReadOnlyCollection<string>? expectedFranchiseOwnerInstanceIds,
+        CancellationToken cancellationToken = default)
     {
         if (!started)
             return false;
@@ -1250,6 +1439,14 @@ public sealed class XagmanPeerService : IDisposable
             SenderInstanceId = localInstanceId,
             TargetInstanceId = string.Empty,
             SentAtUtc = DateTime.UtcNow,
+            CoordinationProtocolRevision = coordinationProtocolRevision,
+            GreenValueProtocolRevision = greenValueProtocolRevision,
+            RunId = runId ?? string.Empty,
+            CollectionFirstEnabled = collectionFirstEnabled,
+            RunPhase = runPhase,
+            ExpectedFranchiseOwnerInstanceIds = expectedFranchiseOwnerInstanceIds == null
+                ? new List<string>()
+                : new List<string>(expectedFranchiseOwnerInstanceIds),
         }).ConfigureAwait(false);
     }
 
@@ -1267,6 +1464,21 @@ public sealed class XagmanPeerService : IDisposable
         }).ConfigureAwait(false);
     }
 
+    public async Task<bool> SendStopTaskAndClearResultsToAllClientsAsync(CancellationToken cancellationToken = default)
+    {
+        if (!started)
+            return false;
+
+        return await SendToHubAsync(new XagmanPeerMessage
+        {
+            MessageType = XagmanPeerMessageTypes.StopTask,
+            SenderInstanceId = localInstanceId,
+            TargetInstanceId = string.Empty,
+            SentAtUtc = DateTime.UtcNow,
+            ClearResults = true,
+        }).ConfigureAwait(false);
+    }
+
     public async Task<bool> SendRecallTaskToAllPeersAsync(CancellationToken cancellationToken = default)
     {
         if (!started)
@@ -1281,7 +1493,13 @@ public sealed class XagmanPeerService : IDisposable
         }).ConfigureAwait(false);
     }
 
-    public async Task<bool> SendCompleteTaskToAllPeersAsync(CancellationToken cancellationToken = default)
+    public async Task<bool> SendCompleteTaskToAllPeersAsync(
+        string runId = "",
+        bool collectionFirstEnabled = false,
+        XagmanRunPhase runPhase = XagmanRunPhase.Legacy,
+        int coordinationProtocolRevision = 0,
+        IReadOnlyCollection<string>? expectedFranchiseOwnerInstanceIds = null,
+        CancellationToken cancellationToken = default)
     {
         if (!started)
             return false;
@@ -1292,6 +1510,13 @@ public sealed class XagmanPeerService : IDisposable
             SenderInstanceId = localInstanceId,
             TargetInstanceId = string.Empty,
             SentAtUtc = DateTime.UtcNow,
+            CoordinationProtocolRevision = coordinationProtocolRevision,
+            RunId = runId ?? string.Empty,
+            CollectionFirstEnabled = collectionFirstEnabled,
+            RunPhase = runPhase,
+            ExpectedFranchiseOwnerInstanceIds = expectedFranchiseOwnerInstanceIds == null
+                ? new List<string>()
+                : new List<string>(expectedFranchiseOwnerInstanceIds),
         }).ConfigureAwait(false);
     }
 }

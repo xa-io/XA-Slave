@@ -101,6 +101,7 @@ public sealed class MonthlyReloggerTask
                 Name = $"[{charIndex}/{charTotal}] {charName}",
                 OnEnter = () =>
                 {
+                    runner.RecordItemStart(charName); // begin active-processing timer for this character
                     runner.CurrentItemLabel = $"[{charIndex}/{charTotal}] {charName}";
                     runner.AddLog($"-- Processing {charName} ({charIndex}/{charTotal}) --");
                 },
@@ -111,6 +112,10 @@ public sealed class MonthlyReloggerTask
             // Relog if needed (with retry logic)
             var relogState = new RelogState();
             steps.AddRange(BuildRelogSteps(charName, runner, relogState));
+
+            // Failsafe: if the relog wait timed out (deleted/unavailable character),
+            // re-run the pre-flight checklist to recover a safe state before moving on.
+            steps.AddRange(BuildRelogTimeoutRecoverySteps(charName, runner, relogState));
 
             steps.AddRange(BuildDutyGuardSteps(charName, runner, relogState));
             steps.AddRange(BuildHomeworldCheckSteps(charName, runner, relogState));
@@ -128,18 +133,18 @@ public sealed class MonthlyReloggerTask
                 steps.Add(new TaskStep
                 {
                     Name = action.Name,
-                    ShouldSkip = () => relogState.Failed || (origSkip?.Invoke() ?? false),
+                    ShouldSkip = () => relogState.ShouldHalt || (origSkip?.Invoke() ?? false),
                     OnEnter = () =>
                     {
-                        if (relogState.Failed) return;
+                        if (relogState.ShouldHalt) return;
                         origEnter?.Invoke();
                     },
-                    IsComplete = () => relogState.Failed || origComplete(),
+                    IsComplete = () => relogState.ShouldHalt || origComplete(),
                     TimeoutSec = action.TimeoutSec,
                     MaxRetries = origMaxRetries,
                     OnTimeout = () =>
                     {
-                        if (relogState.Failed) return;
+                        if (relogState.ShouldHalt) return;
                         origOnTimeout?.Invoke();
                     },
                 });
@@ -153,6 +158,7 @@ public sealed class MonthlyReloggerTask
                 Name = $"Complete: {capturedCharName}",
                 OnEnter = () =>
                 {
+                    runner.RecordItemEnd(capturedCharName); // stop the active-processing timer (any outcome)
                     runner.CompletedItems = capturedCharIndex;
                     if (relogState.Failed)
                     {
@@ -160,19 +166,19 @@ public sealed class MonthlyReloggerTask
                         return;
                     }
 
+                    if (relogState.Incomplete)
+                    {
+                        // Logged in but the process could not finish - record the login (the relog
+                        // goal was met) but leave the character selected so it can be re-run.
+                        runner.AddLog($"Incomplete {capturedCharName} ({capturedCharIndex}/{charTotal}) - logged in but the process did not finish");
+                        RecordReloggerLastLoggedIn(capturedCharName);
+                        return;
+                    }
+
                     runner.AddLog($"Finished {capturedCharName} ({capturedCharIndex}/{charTotal})");
 
                     // Record last-logged-in timestamp in persistent ReloggerCharacterInfo
-                    try
-                    {
-                        var cfg = plugin.Configuration;
-                        if (!cfg.ReloggerCharacterInfo.TryGetValue(capturedCharName, out var data))
-                            data = new ReloggerCharacterData();
-                        data.LastLoggedIn = DateTime.UtcNow;
-                        cfg.ReloggerCharacterInfo[capturedCharName] = data;
-                        cfg.Save();
-                    }
-                    catch { /* non-critical */ }
+                    RecordReloggerLastLoggedIn(capturedCharName);
 
                     // Deselect completed character from relogger checkbox list
                     try
@@ -260,6 +266,9 @@ public sealed class MonthlyReloggerTask
                         return;
                     }
 
+                    if (capturedAttempt == 1 && IsCharacterMissingFromAutoRetainer(charName))
+                        runner.AddLog($"Note: {charName} is not in AutoRetainer's data (not found in AR) - /ays relog may fail to find it.");
+
                     runner.SuppressLogoutCancel = true;
                     var actionLabel = capturedAttempt == 1 ? "Relogging" : "Retrying relog";
                     runner.AddLog($"{actionLabel} to {charName} (attempt {capturedAttempt}/{MaxRelogAttempts})...");
@@ -324,11 +333,21 @@ public sealed class MonthlyReloggerTask
                         return relogState.SawTransition;
                     }
                 },
-                TimeoutSec = 600f,
+                TimeoutSec = RelogWaitTimeoutSec,
                 OnTimeout = () =>
                 {
-                    if (!relogState.Failed && !(relogState.Confirmed && relogState.Attempt != capturedAttempt))
-                        runner.AddLog($"Relog attempt {capturedAttempt}/{MaxRelogAttempts} timed out waiting for relog to complete.");
+                    if (relogState.Failed || relogState.Confirmed)
+                        return;
+
+                    // A full RelogWaitTimeoutSec window elapsed without the character loading.
+                    // The target is almost certainly deleted/unavailable and AutoRetainer is stuck
+                    // (typically parked on character select). Fail this character immediately rather
+                    // than burning additional timeout windows, flag it for pre-flight recovery, and
+                    // let the failsafe return the game to a safe state for the next character.
+                    runner.AddLog($"Relog attempt {capturedAttempt}/{MaxRelogAttempts} for {charName} exceeded the {RelogWaitTimeoutSec:0}s login timeout - character may be deleted or unavailable.");
+                    relogState.TimedOut = true;
+                    RecordRelogFailure(runner, relogState, charName,
+                        $"FAILED: {charName} - login timed out after {RelogWaitTimeoutSec:0}s (character may have been deleted).");
                 },
             });
 
@@ -376,13 +395,27 @@ public sealed class MonthlyReloggerTask
 
     private const int MaxRelogAttempts = 3;
 
+    /// <summary>
+    /// Hard cap on how long a single /ays relog login attempt may run before the
+    /// failsafe kicks in. If the character never loads within this window it is
+    /// almost certainly deleted/unavailable (AutoRetainer gets stuck on character
+    /// select), so we fail it, run a pre-flight recovery, and move on.
+    /// </summary>
+    private const float RelogWaitTimeoutSec = 300f;
+
     /// <summary>Tracks state across relog retry steps via closure.</summary>
     private class RelogState
     {
         public int Attempt;
         public bool Confirmed;
-        public bool Failed;
+        public bool Failed;        // could not log in as the target character (RED)
+        public bool TimedOut;      // login wait hit RelogWaitTimeoutSec -> needs pre-flight recovery
+        public bool Incomplete;    // logged in OK but the per-character process could not finish (PURPLE)
         public bool SawTransition;
+
+        /// <summary>True once this character has reached a terminal outcome and the
+        /// remaining per-character steps should be skipped.</summary>
+        public bool ShouldHalt => Failed || Incomplete;
     }
 
     private static void RecordRelogFailure(TaskRunner runner, RelogState relogState, string charName, string message)
@@ -391,6 +424,137 @@ public sealed class MonthlyReloggerTask
         if (!runner.FailedCharacters.Contains(charName))
             runner.FailedCharacters.Add(charName);
         relogState.Failed = true;
+    }
+
+    /// <summary>
+    /// Marks a character that logged in but could not complete its per-character
+    /// process. Rendered PURPLE in the processing list (distinct from RED failures
+    /// that never logged in). The remaining steps for the character are skipped.
+    /// </summary>
+    private static void RecordRelogIncomplete(TaskRunner runner, RelogState relogState, string charName, string message)
+    {
+        runner.AddLog(message);
+        if (!runner.IncompleteCharacters.Contains(charName))
+            runner.IncompleteCharacters.Add(charName);
+        relogState.Incomplete = true;
+    }
+
+    /// <summary>
+    /// True if the last AutoRetainer import/refresh found no data for this character.
+    /// Such characters cannot be relogged with /ays relog and are expected to fail.
+    /// </summary>
+    private bool IsCharacterMissingFromAutoRetainer(string charName)
+    {
+        try
+        {
+            return plugin.Configuration.ReloggerCharacterInfo.TryGetValue(charName, out var data)
+                && data.FoundInAutoRetainer == false;
+        }
+        catch { return false; }
+    }
+
+    /// <summary>Records the last-logged-in timestamp for a character (best effort).</summary>
+    private void RecordReloggerLastLoggedIn(string charName)
+    {
+        try
+        {
+            var cfg = plugin.Configuration;
+            if (!cfg.ReloggerCharacterInfo.TryGetValue(charName, out var data))
+                data = new ReloggerCharacterData();
+            data.LastLoggedIn = DateTime.UtcNow;
+            cfg.ReloggerCharacterInfo[charName] = data;
+            cfg.Save();
+        }
+        catch { /* non-critical */ }
+    }
+
+    /// <summary>
+    /// Failsafe recovery that runs ONLY when a relog wait timed out (relogState.TimedOut),
+    /// i.e. the target character was deleted/unavailable and AutoRetainer is stuck (typically
+    /// parked on character select). Re-runs the pre-flight checklist to return the game to a
+    /// safe state (main menu) so the next character can be processed. All steps are gated by
+    /// relogState.TimedOut and skip instantly when no timeout occurred.
+    /// </summary>
+    private List<TaskStep> BuildRelogTimeoutRecoverySteps(string charName, TaskRunner runner, RelogState relogState)
+    {
+        var steps = new List<TaskStep>();
+        var recovery = new PreFlightState();
+        Func<bool> skip = () => !relogState.TimedOut;
+
+        // Re-run the pre-flight state detection (same checks as the initial pre-flight).
+        steps.Add(new TaskStep
+        {
+            Name = $"Recovery: Detect State ({charName})",
+            ShouldSkip = skip,
+            OnEnter = () =>
+            {
+                if (skip()) return;
+
+                runner.AddLog($"Login-timeout failsafe: re-running pre-flight to recover a safe state after {charName}...");
+                recovery.OnMovie = false;
+                recovery.OnCharaSelect = false;
+                recovery.OnMainMenu = false;
+
+                if (AddonHelper.IsAddonVisible("MovieStaffList"))
+                {
+                    runner.AddLog("Recovery: main menu movie playing - will press ESC.");
+                    recovery.OnMovie = true;
+                    return;
+                }
+
+                if (AddonHelper.IsAddonVisible("CharaSelect") || AddonHelper.IsAddonVisible("_CharaSelectListMenu"))
+                {
+                    runner.AddLog("Recovery: on character select - will exit to main menu.");
+                    recovery.OnCharaSelect = true;
+                    return;
+                }
+
+                if (AddonHelper.IsAddonVisible("_TitleLogo") || AddonHelper.IsAddonVisible("_TitleMenu"))
+                {
+                    runner.AddLog("Recovery: already on main menu - ready to proceed.");
+                    recovery.OnMainMenu = true;
+                    return;
+                }
+
+                runner.AddLog("Recovery: not on a title screen - proceeding to the next character.");
+            },
+            IsComplete = () => true,
+            TimeoutSec = 5f,
+        });
+
+        // Exit character select back to the main menu.
+        steps.Add(new TaskStep
+        {
+            Name = $"Recovery: Exit CharaSelect ({charName})",
+            ShouldSkip = () => skip() || !recovery.OnCharaSelect,
+            OnEnter = () =>
+            {
+                runner.AddLog("Recovery: clicking Exit to return to main menu...");
+                AddonHelper.ClickAddonButton("_CharaSelectReturn", 1);
+            },
+            IsComplete = () => AddonHelper.IsAddonVisible("_TitleLogo") || AddonHelper.IsAddonVisible("_TitleMenu"),
+            TimeoutSec = 15f,
+            OnTimeout = () => runner.AddLog("Recovery: timeout waiting for main menu after CharaSelect exit - proceeding anyway."),
+        });
+
+        // Skip the main menu movie if one started playing.
+        steps.Add(new TaskStep
+        {
+            Name = $"Recovery: ESC Movie ({charName})",
+            ShouldSkip = () => skip() || !recovery.OnMovie,
+            OnEnter = () =>
+            {
+                runner.AddLog("Recovery: pressing ESC to skip movie...");
+                KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
+            },
+            IsComplete = () => AddonHelper.IsAddonVisible("_TitleLogo") || AddonHelper.IsAddonVisible("_TitleMenu"),
+            TimeoutSec = 10f,
+            OnTimeout = () => runner.AddLog("Recovery: timeout waiting for title screen after ESC - proceeding anyway."),
+        });
+
+        steps.Add(MakeDelay($"Recovery: Settle ({charName})", 1.0f, skip));
+
+        return steps;
     }
 
     /// <summary>
@@ -1279,14 +1443,15 @@ public sealed class MonthlyReloggerTask
     /// <summary>
     /// Builds homeworld check steps. If the character is not on their homeworld,
     /// uses Lifestream to travel back. Always-on - cannot be disabled.
-    /// Gated by relogState.Failed.
+    /// Gated by relogState.ShouldHalt (skipped if the character failed to log in or was
+    /// already marked incomplete).
     /// </summary>
     private List<TaskStep> BuildHomeworldCheckSteps(string charName, TaskRunner runner, RelogState relogState)
     {
         var steps = new List<TaskStep>();
         var needsReturn = false;
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Homeworld Pre-SafeWait ({charName})", 30f, runner, () => relogState.Failed);
+        AddLoggedCharacterSafeWait3Pass(steps, $"Homeworld Pre-SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt);
 
         // Check if on homeworld
         steps.Add(new TaskStep
@@ -1294,7 +1459,7 @@ public sealed class MonthlyReloggerTask
             Name = $"Homeworld Check: {charName}",
             OnEnter = () =>
             {
-                if (relogState.Failed) return;
+                if (relogState.ShouldHalt) return;
                 try
                 {
                     var local = Plugin.ObjectTable.LocalPlayer;
@@ -1329,7 +1494,7 @@ public sealed class MonthlyReloggerTask
             Name = $"Homeworld Return: {charName}",
             OnEnter = () =>
             {
-                if (relogState.Failed || !needsReturn) return;
+                if (relogState.ShouldHalt || !needsReturn) return;
                 try
                 {
                     var local = Plugin.ObjectTable.LocalPlayer;
@@ -1343,7 +1508,7 @@ public sealed class MonthlyReloggerTask
                     runner.AddLog($"Homeworld return error: {ex.Message}");
                 }
             },
-            IsComplete = () => relogState.Failed || !needsReturn || true,
+            IsComplete = () => relogState.ShouldHalt || !needsReturn || true,
             TimeoutSec = 3f,
         });
 
@@ -1355,7 +1520,7 @@ public sealed class MonthlyReloggerTask
             Name = $"Homeworld Return: Wait Start ({charName})",
             IsComplete = () =>
             {
-                if (relogState.Failed || !needsReturn) return true;
+                if (relogState.ShouldHalt || !needsReturn) return true;
                 try { return plugin.IpcClient.LifestreamIsBusy(); }
                 catch { return true; }
             },
@@ -1368,7 +1533,7 @@ public sealed class MonthlyReloggerTask
             Name = $"Homeworld Return: Wait Complete ({charName})",
             IsComplete = () =>
             {
-                if (relogState.Failed || !needsReturn) return true;
+                if (relogState.ShouldHalt || !needsReturn) return true;
                 try { return !plugin.IpcClient.LifestreamIsBusy(); }
                 catch { return true; }
             },
@@ -1385,7 +1550,7 @@ public sealed class MonthlyReloggerTask
                 OnEnter = () => { confirmCount = 0; lastCheck = DateTime.UtcNow; },
                 IsComplete = () =>
                 {
-                    if (relogState.Failed || !needsReturn) return true;
+                    if (relogState.ShouldHalt || !needsReturn) return true;
                     try
                     {
                         if ((DateTime.UtcNow - lastCheck).TotalSeconds < 1.0) return false;
@@ -1404,7 +1569,7 @@ public sealed class MonthlyReloggerTask
             });
         }
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Homeworld Return: SafeWait ({charName})", 30f, runner, () => relogState.Failed || !needsReturn);
+        AddLoggedCharacterSafeWait3Pass(steps, $"Homeworld Return: SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt || !needsReturn);
 
         // Verify we're on homeworld now
         steps.Add(new TaskStep
@@ -1412,7 +1577,7 @@ public sealed class MonthlyReloggerTask
             Name = $"Homeworld Verify: {charName}",
             OnEnter = () =>
             {
-                if (relogState.Failed || !needsReturn) return;
+                if (relogState.ShouldHalt || !needsReturn) return;
                 try
                 {
                     var local = Plugin.ObjectTable.LocalPlayer;
@@ -1449,7 +1614,7 @@ public sealed class MonthlyReloggerTask
         var steps = new List<TaskStep>();
         var dutyDetected = false;
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Pre-SafeWait ({charName})", 30f, runner, () => relogState.Failed);
+        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Pre-SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt);
 
         // Check if in duty
         steps.Add(new TaskStep
@@ -1457,7 +1622,7 @@ public sealed class MonthlyReloggerTask
             Name = $"Duty Check: {charName}",
             OnEnter = () =>
             {
-                if (relogState.Failed) return;
+                if (relogState.ShouldHalt) return;
                 dutyDetected = Plugin.Condition[ConditionFlag.BoundByDuty];
                 if (dutyDetected)
                     runner.AddLog($"WARNING: {charName} is in a duty - attempting to leave...");
@@ -1468,7 +1633,7 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 3f,
         });
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Duty SafeWait ({charName})", 30f, runner, () => relogState.Failed || !dutyDetected);
+        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Duty SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt || !dutyDetected);
 
         // Wait for combat to end
         steps.Add(new TaskStep
@@ -1476,13 +1641,13 @@ public sealed class MonthlyReloggerTask
             Name = $"Duty Guard: Wait Combat ({charName})",
             OnEnter = () =>
             {
-                if (relogState.Failed || !dutyDetected) return;
+                if (relogState.ShouldHalt || !dutyDetected) return;
                 if (Plugin.Condition[ConditionFlag.InCombat])
                     runner.AddLog($"Duty Guard: {charName} is in combat, waiting to leave duty...");
                 else
                     runner.AddLog($"Duty Guard: {charName} is not in combat.");
             },
-            IsComplete = () => relogState.Failed || !dutyDetected || !Plugin.Condition[ConditionFlag.InCombat],
+            IsComplete = () => relogState.ShouldHalt || !dutyDetected || !Plugin.Condition[ConditionFlag.InCombat],
             TimeoutSec = 35f,
         });
 
@@ -1492,11 +1657,11 @@ public sealed class MonthlyReloggerTask
             Name = $"Duty Guard: Open Menu ({charName})",
             OnEnter = () =>
             {
-                if (relogState.Failed || !dutyDetected) return;
+                if (relogState.ShouldHalt || !dutyDetected) return;
                 runner.AddLog($"Duty Guard: pressing U to open duty menu...");
                 KeyInputHelper.PressKey(0x55);
             },
-            IsComplete = () => relogState.Failed || !dutyDetected || AddonHelper.IsAddonVisible("ContentsFinderMenu"),
+            IsComplete = () => relogState.ShouldHalt || !dutyDetected || AddonHelper.IsAddonVisible("ContentsFinderMenu"),
             TimeoutSec = 10f,
             MaxRetries = 5,
         });
@@ -1509,11 +1674,11 @@ public sealed class MonthlyReloggerTask
             Name = $"Duty Guard: Click Leave ({charName})",
             OnEnter = () =>
             {
-                if (relogState.Failed || !dutyDetected) return;
+                if (relogState.ShouldHalt || !dutyDetected) return;
                 runner.AddLog($"Duty Guard: clicking Leave button...");
                 AddonHelper.ClickAddonButton("ContentsFinderMenu", 43);
             },
-            IsComplete = () => relogState.Failed || !dutyDetected || true,
+            IsComplete = () => relogState.ShouldHalt || !dutyDetected || true,
             TimeoutSec = 3f,
         });
 
@@ -1525,22 +1690,24 @@ public sealed class MonthlyReloggerTask
             Name = $"Duty Guard: Confirm Leave ({charName})",
             OnEnter = () =>
             {
-                if (relogState.Failed || !dutyDetected) return;
+                if (relogState.ShouldHalt || !dutyDetected) return;
                 runner.AddLog($"Duty Guard: confirming Yes to leave...");
                 AddonHelper.ClickYesNo(true);
             },
-            IsComplete = () => relogState.Failed || !dutyDetected || !Plugin.Condition[ConditionFlag.BoundByDuty],
+            IsComplete = () => relogState.ShouldHalt || !dutyDetected || !Plugin.Condition[ConditionFlag.BoundByDuty],
             TimeoutSec = 45f,
             OnTimeout = () =>
             {
-                if (!relogState.Failed && dutyDetected && Plugin.Condition[ConditionFlag.BoundByDuty])
+                if (!relogState.ShouldHalt && dutyDetected && Plugin.Condition[ConditionFlag.BoundByDuty])
                 {
-                    RecordRelogFailure(runner, relogState, charName, $"FAILED: {charName} - unable to leave duty, halting.");
+                    // Logged in OK but cannot leave the duty - mark PURPLE (incomplete) and halt
+                    // the rest of this character's steps so the run moves on to the next character.
+                    RecordRelogIncomplete(runner, relogState, charName, $"INCOMPLETE: {charName} - logged in but unable to leave duty, skipping remaining steps.");
                 }
             },
         });
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Post-SafeWait ({charName})", 30f, runner, () => relogState.Failed || !dutyDetected);
+        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Post-SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt || !dutyDetected);
 
         return steps;
     }
@@ -1621,6 +1788,7 @@ public sealed class MonthlyReloggerTask
         {
             var condition = Plugin.Condition;
             if (condition[ConditionFlag.InCombat]) blockers.Add(nameof(ConditionFlag.InCombat));
+            if (condition[ConditionFlag.Casting]) blockers.Add(nameof(ConditionFlag.Casting));
             if (condition[ConditionFlag.BoundByDuty]) blockers.Add(nameof(ConditionFlag.BoundByDuty));
             if (condition[ConditionFlag.WatchingCutscene]) blockers.Add(nameof(ConditionFlag.WatchingCutscene));
             if (condition[ConditionFlag.OccupiedInCutSceneEvent]) blockers.Add(nameof(ConditionFlag.OccupiedInCutSceneEvent));
@@ -1657,7 +1825,7 @@ public sealed class MonthlyReloggerTask
     }
 
     /// <summary>
-    /// CharacterSafeWait equivalent - waits for NamePlate addon + player available + not zoning.
+    /// CharacterSafeWait equivalent - waits for NamePlate addon + player available + not zoning or casting.
     /// </summary>
     public static TaskStep BuildCharacterSafeWait(string name, float timeoutSec)
     {
@@ -1828,6 +1996,27 @@ public sealed class MonthlyReloggerTask
             return $"{name}@{worldName}";
         }
         catch { return string.Empty; }
+    }
+
+    /// <summary>
+    /// Returns a copy of <paramref name="step"/> whose ShouldSkip also returns true when
+    /// <paramref name="extraSkip"/> does. Lets a caller gate a run of already-built steps (for
+    /// example a per-character downstream sequence) behind a runtime condition such as "relog
+    /// failed" without threading the condition into every individual step builder.
+    /// </summary>
+    public static TaskStep WithSkip(TaskStep step, Func<bool> extraSkip)
+    {
+        var inner = step.ShouldSkip;
+        return new TaskStep
+        {
+            Name = step.Name,
+            OnEnter = step.OnEnter,
+            IsComplete = step.IsComplete,
+            ShouldSkip = inner == null ? extraSkip : () => extraSkip() || inner(),
+            TimeoutSec = step.TimeoutSec,
+            MaxRetries = step.MaxRetries,
+            OnTimeout = step.OnTimeout,
+        };
     }
 
     /// <summary>

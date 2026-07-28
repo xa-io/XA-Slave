@@ -431,6 +431,7 @@ public partial class SlaveWindow
 
             // Relog
             var relogReady = false;
+            var relogFailed = false;
             steps.Add(new TaskStep
             {
                 Name = $"Relog: {charName}",
@@ -461,12 +462,27 @@ public partial class SlaveWindow
                     try
                     {
                         if (!Plugin.PlayerState.IsLoaded) return false;
-                        return MonthlyReloggerTask.IsNamePlateReady() && MonthlyReloggerTask.IsPlayerAvailable();
+                        if (!MonthlyReloggerTask.IsNamePlateReady() || !MonthlyReloggerTask.IsPlayerAvailable())
+                            return false;
+                        // Verify the intended character is actually loaded before applying FC
+                        // permission edits; a silently-failed /ays relog would otherwise apply the
+                        // destructive rank changes to whichever character is still logged in.
+                        return MonthlyReloggerTask.GetCurrentCharacterNameWorld()
+                            .Equals(charName, StringComparison.OrdinalIgnoreCase);
                     }
                     catch { return false; }
                 },
                 TimeoutSec = 600f,
+                OnTimeout = () =>
+                {
+                    relogFailed = true;
+                    runner.FailedCharacters.Add(charName);
+                    runner.AddLog($"FAILED: Could not relog to {charName}. Skipping FC permission edits for this character.");
+                },
             });
+
+            // Guard the whole downstream FC-permission sequence behind relog success.
+            var downstreamStart = steps.Count;
 
             // SafeWait 3-pass
             foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"SafeWait ({charName})"))
@@ -604,6 +620,11 @@ public partial class SlaveWindow
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Close 2: {charName}", 0.5f));
 
+            // If the relog failed (wrong character or timed out), skip every FC-permission step
+            // above so the rank edits never run against the wrong character.
+            for (var s = downstreamStart; s < steps.Count; s++)
+                steps[s] = MonthlyReloggerTask.WithSkip(steps[s], () => relogFailed);
+
             // Mark complete
             var capturedIndex = charIndex;
             var capturedName = charName;
@@ -613,6 +634,13 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     runner.CompletedItems = capturedIndex;
+                    // Read the live relogFailed (set by the Wait Relog OnTimeout at runtime), not a
+                    // build-time snapshot, so a failed character is reported as skipped.
+                    if (relogFailed)
+                    {
+                        runner.AddLog($"Skipped {capturedName} ({capturedIndex}/{charTotal}) - relog failed");
+                        return;
+                    }
                     runner.AddLog($"Finished {capturedName} ({capturedIndex}/{charTotal})");
                 },
                 IsComplete = () => true,

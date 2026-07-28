@@ -5,6 +5,7 @@ obj/
 # IDE
 .vs/
 .windsurf/
+.claude-octopus
 *.user
 *.suo
 *.cache
