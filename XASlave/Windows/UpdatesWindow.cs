@@ -23,6 +23,16 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.42 - 2026-07-28",
+            Lines =
+            [
+                "Eureka Logogram Creator",
+                "- Fixed release preparation and final upload checks so normal and stable/testing packages preserve the three required static catalog JSON files and stop before release when required catalog content is missing, invalid, or empty.",
+                "- Added separate Static Catalog readiness and load-error reporting. Recipes and Logos Actions no longer look silently empty after a catalog failure, and Refresh All Pages or Retry Catalog Load can retry without restarting XA Slave.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.41 - 2026-07-28",
             Lines =
             [

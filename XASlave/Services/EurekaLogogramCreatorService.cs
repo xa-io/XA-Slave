@@ -97,6 +97,12 @@ namespace XASlave.Services
         internal Queue<PlateQueueRequest> SynthesisQueue = new();
         internal bool IsProcessingQueue = false;
         internal string LastStatus { get; private set; } = "Idle";
+        internal bool IsStaticCatalogReady => dataLoaded;
+        internal bool StaticCatalogLoadFailed => dataLoadAttempted && !dataLoaded;
+        internal string StaticCatalogState => dataLoaded
+            ? $"Ready ({Logograms.Count} logograms / {LogosActions.Count} actions)"
+            : dataLoadAttempted ? "Failed" : "Not loaded";
+        internal string StaticCatalogError { get; private set; } = string.Empty;
         internal int LogosActionSlotCapacity { get; private set; } = 3;
         internal int LogosActionSlotsUsed { get; private set; }
         internal bool IsMagiaBoardFull => LogosActionSlotCapacity > 0 && LogosActionSlotsUsed >= LogosActionSlotCapacity;
@@ -267,7 +273,7 @@ namespace XASlave.Services
 
         internal void RefreshKnownDataNow()
         {
-            EnsureDataLoaded();
+            EnsureDataLoaded(retryFailed: true);
             if (GetAddon("EurekaMagiciteItemShardList") != null)
             {
                 ScheduleFullStockScan();
@@ -462,25 +468,41 @@ namespace XASlave.Services
             {
                 pendingLogosActionRefreshAttempts++;
                 ScheduleLogosActionRefresh(LogosActionRefreshDelayFrames, resetAttempts: false);
+                SetStatus($"Waiting for visible Logos Action rows ({pendingLogosActionRefreshAttempts}/{MaxDeferredLogosActionRefreshAttempts})");
                 Log.Debug($"Visible Logos Action rows were not ready yet; scheduled retry {pendingLogosActionRefreshAttempts}/{MaxDeferredLogosActionRefreshAttempts}");
             }
             else if (usedVisibleRows)
             {
                 pendingLogosActionRefreshAttempts = 0;
+                SetStatus($"Logos Actions refreshed ({LogosActionSlotsUsed}/{LogosActionSlotCapacity} slots used)");
+            }
+            else
+            {
+                SetStatus("Could not refresh visible Logos Action rows");
+            }
+        }
+
+        internal bool EnsureDataLoaded(bool retryFailed = false)
+        {
+            if (dataLoaded)
+            {
+                return true;
             }
 
-            SetStatus($"Logos Actions refreshed ({LogosActionSlotsUsed}/{LogosActionSlotCapacity} slots used)");
+            if (dataLoadAttempted && !retryFailed)
+            {
+                return false;
+            }
+
+            return LoadData();
         }
 
-        internal void EnsureDataLoaded()
+        internal bool RetryStaticCatalogLoad()
         {
-            if (dataLoaded || dataLoadAttempted)
-                return;
-
-            LoadData();
+            return EnsureDataLoaded(retryFailed: true);
         }
 
-        private void LoadData()
+        private bool LoadData()
         {
             dataLoadAttempted = true;
             try
@@ -495,26 +517,223 @@ namespace XASlave.Services
                 };
 
                 var logogramJson = File.ReadAllText(Path.Combine(dataDirectory, "logograms.json"));
-                var logos = JsonSerializer.Deserialize<List<Logogram>>(logogramJson, jsonOptions);
-                Logograms = logos?.ToDictionary(l => l.Id, l => l) ?? [];
+                var parsedLogograms = JsonSerializer.Deserialize<List<Logogram>>(logogramJson, jsonOptions) ?? [];
 
                 var itemJson = File.ReadAllText(Path.Combine(dataDirectory, "itemContents.json"));
-                var items = JsonSerializer.Deserialize<List<LogogramItem>>(itemJson, jsonOptions);
-                LogogramItems = items?.ToDictionary(i => i.Id, i => i) ?? [];
-                RebuildLogogramGilCosts();
+                var parsedItems = JsonSerializer.Deserialize<List<LogogramItem>>(itemJson, jsonOptions) ?? [];
 
                 var logosJson = File.ReadAllText(Path.Combine(dataDirectory, "logosActions.json"));
-                LogosActions = JsonSerializer.Deserialize<List<LogosAction>>(logosJson, jsonOptions) ?? [];
+                var parsedLogosActions = JsonSerializer.Deserialize<List<LogosAction>>(logosJson, jsonOptions) ?? [];
 
+                ValidateStaticCatalog(parsedLogograms, parsedItems, parsedLogosActions);
+
+                var parsedLogogramsById = parsedLogograms.ToDictionary(logogram => logogram.Id);
+                var parsedItemsById = parsedItems.ToDictionary(item => item.Id);
+
+                Logograms = parsedLogogramsById;
+                LogogramItems = parsedItemsById;
+                LogosActions = parsedLogosActions;
+                RebuildLogogramGilCosts();
                 dataLoaded = true;
+                StaticCatalogError = string.Empty;
+                SetStatus("Static catalog loaded");
                 Log.Information($"Loaded {Logograms.Count} logograms, {LogosActions.Count} logos actions, and {logogramGilCostById.Count} gil-cost mappings");
+                return true;
             }
             catch (Exception ex)
             {
                 dataLoaded = false;
+                ClearStaticCatalogData();
+                StaticCatalogError = GetSanitizedCatalogLoadError(ex);
                 SetStatus("Data load failed");
-                Log.Error($"Failed to load data: {ex.Message}");
+                Log.Error(ex, "[XASlave] Failed to load Eureka Logogram Creator static catalog.");
+                return false;
             }
+        }
+
+        private static void ValidateStaticCatalog(
+            IReadOnlyList<Logogram> logograms,
+            IReadOnlyList<LogogramItem> items,
+            IReadOnlyList<LogosAction> logosActions)
+        {
+            if (logograms.Count == 0)
+            {
+                throw new InvalidDataException("logograms.json contains no entries.");
+            }
+
+            var knownLogogramIds = new HashSet<int>();
+            for (var logogramIndex = 0; logogramIndex < logograms.Count; logogramIndex++)
+            {
+                var logogram = logograms[logogramIndex];
+                if (logogram is null)
+                {
+                    throw new InvalidDataException($"logograms.json entry {logogramIndex + 1} is null.");
+                }
+
+                if (logogram.Id <= 0)
+                {
+                    throw new InvalidDataException($"logograms.json entry {logogramIndex + 1} has a non-positive ID.");
+                }
+
+                if (!knownLogogramIds.Add(logogram.Id))
+                {
+                    throw new InvalidDataException($"logograms.json contains duplicate logogram ID {logogram.Id}.");
+                }
+
+                if (string.IsNullOrWhiteSpace(logogram.Name))
+                {
+                    throw new InvalidDataException($"logograms.json logogram {logogram.Id} has an empty name.");
+                }
+            }
+
+            if (items.Count == 0)
+            {
+                throw new InvalidDataException("itemContents.json contains no entries.");
+            }
+
+            var knownSourceItemIds = new HashSet<ulong>();
+            for (var itemIndex = 0; itemIndex < items.Count; itemIndex++)
+            {
+                var item = items[itemIndex];
+                if (item is null)
+                {
+                    throw new InvalidDataException($"itemContents.json entry {itemIndex + 1} is null.");
+                }
+
+                if (item.Id == 0)
+                {
+                    throw new InvalidDataException($"itemContents.json entry {itemIndex + 1} has a non-positive source item ID.");
+                }
+
+                if (!knownSourceItemIds.Add(item.Id))
+                {
+                    throw new InvalidDataException($"itemContents.json contains duplicate source item ID {item.Id}.");
+                }
+
+                if (item.Contents == null || item.Contents.Count == 0)
+                {
+                    throw new InvalidDataException($"itemContents.json source item {item.Id} has no contents.");
+                }
+
+                for (var contentIndex = 0; contentIndex < item.Contents.Count; contentIndex++)
+                {
+                    var logogramId = item.Contents[contentIndex];
+                    if (logogramId <= 0)
+                    {
+                        throw new InvalidDataException($"itemContents.json source item {item.Id} content {contentIndex + 1} has a non-positive logogram ID.");
+                    }
+
+                    if (!knownLogogramIds.Contains(logogramId))
+                    {
+                        throw new InvalidDataException($"itemContents.json source item {item.Id} references unknown logogram ID {logogramId}.");
+                    }
+                }
+            }
+
+            if (logosActions.Count == 0)
+            {
+                throw new InvalidDataException("logosActions.json contains no entries.");
+            }
+
+            var knownLogosActionIds = new HashSet<uint>();
+            for (var actionIndex = 0; actionIndex < logosActions.Count; actionIndex++)
+            {
+                var action = logosActions[actionIndex];
+                if (action is null)
+                {
+                    throw new InvalidDataException($"logosActions.json entry {actionIndex + 1} is null.");
+                }
+
+                if (action.Id == 0)
+                {
+                    throw new InvalidDataException($"logosActions.json entry {actionIndex + 1} has a non-positive action ID.");
+                }
+
+                if (!knownLogosActionIds.Add(action.Id))
+                {
+                    throw new InvalidDataException($"logosActions.json contains duplicate action ID {action.Id}.");
+                }
+
+                if (action.IconID == 0)
+                {
+                    throw new InvalidDataException($"logosActions.json action {action.Id} has a non-positive icon ID.");
+                }
+
+                if (action.Recipes == null || action.Recipes.Count == 0)
+                {
+                    throw new InvalidDataException($"logosActions.json action {action.Id} has no recipes.");
+                }
+
+                for (var recipeIndex = 0; recipeIndex < action.Recipes.Count; recipeIndex++)
+                {
+                    var recipe = action.Recipes[recipeIndex];
+                    if (recipe == null || recipe.Count == 0)
+                    {
+                        throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} has no ingredients.");
+                    }
+
+                    for (var ingredientIndex = 0; ingredientIndex < recipe.Count; ingredientIndex++)
+                    {
+                        var ingredient = recipe[ingredientIndex];
+                        if (ingredient is null)
+                        {
+                            throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} ingredient {ingredientIndex + 1} is null.");
+                        }
+
+                        if (ingredient.LogogramID <= 0)
+                        {
+                            throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} ingredient {ingredientIndex + 1} has a non-positive logogram ID.");
+                        }
+
+                        if (!knownLogogramIds.Contains(ingredient.LogogramID))
+                        {
+                            throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} references unknown logogram ID {ingredient.LogogramID}.");
+                        }
+
+                        if (ingredient.Quantity <= 0)
+                        {
+                            throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} ingredient {ingredientIndex + 1} has a non-positive quantity.");
+                        }
+                    }
+                }
+            }
+        }
+
+        private void ClearStaticCatalogData()
+        {
+            LogosActions = [];
+            Logograms = [];
+            LogogramItems = [];
+            logogramGilCostById.Clear();
+            logogramSourceItemIdByLogogramId.Clear();
+        }
+
+        private static string GetSanitizedCatalogLoadError(Exception exception)
+        {
+            if (exception is DirectoryNotFoundException)
+            {
+                return "Data/EurekaLogogramCreator folder is missing.";
+            }
+
+            if (exception is FileNotFoundException fileNotFoundException)
+            {
+                var fileName = Path.GetFileName(fileNotFoundException.FileName);
+                return string.IsNullOrWhiteSpace(fileName)
+                    ? "A required catalog file is missing."
+                    : $"Missing required catalog file: {fileName}.";
+            }
+
+            if (exception is JsonException)
+            {
+                return "A static catalog JSON file is invalid.";
+            }
+
+            if (exception is InvalidDataException invalidDataException)
+            {
+                return invalidDataException.Message;
+            }
+
+            return "Static catalog files could not be loaded. See /xllog for details.";
         }
 
         private void EnsureLogogramSourceCostsConfigured()

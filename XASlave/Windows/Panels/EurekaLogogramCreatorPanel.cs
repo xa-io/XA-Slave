@@ -20,6 +20,7 @@ public partial class SlaveWindow
     private void DrawEurekaLogogramCreatorTask()
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
+        logogramCreator.EnsureDataLoaded();
         var fontScaling = ImGui.GetFontSize() / 17f;
         var isInManipulator = logogramCreator.IsManipulatorVisible();
 
@@ -109,7 +110,25 @@ public partial class SlaveWindow
 
             if (ImGui.IsItemHovered())
             {
-                ImGui.SetTooltip("Scans the currently open manipulator pages for stock and logos-action usage.");
+                ImGui.SetTooltip("Retries the static catalog when needed, then scans the currently open manipulator pages for stock and logos-action usage.");
+            }
+        }
+
+        if (logogramCreator.StaticCatalogLoadFailed)
+        {
+            if (isInManipulator)
+            {
+                ImGui.SameLine();
+            }
+
+            if (ImGui.Button("Retry Catalog Load"))
+            {
+                logogramCreator.RetryStaticCatalogLoad();
+            }
+
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.SetTooltip("Retries the packaged Data/EurekaLogogramCreator JSON files without requiring the manipulator to be open.");
             }
         }
 
@@ -169,6 +188,17 @@ public partial class SlaveWindow
             }
         }
 
+        var staticCatalogColor = logogramCreator.IsStaticCatalogReady
+            ? new Vector4(0.2f, 0.9f, 0.4f, 1.0f)
+            : logogramCreator.StaticCatalogLoadFailed
+                ? new Vector4(1.0f, 0.35f, 0.25f, 1.0f)
+                : new Vector4(1.0f, 0.6f, 0.2f, 1.0f);
+        ImGui.TextColored(staticCatalogColor, $"Static Catalog: {logogramCreator.StaticCatalogState}");
+        if (logogramCreator.StaticCatalogLoadFailed && !string.IsNullOrWhiteSpace(logogramCreator.StaticCatalogError))
+        {
+            ImGui.TextColored(staticCatalogColor, logogramCreator.StaticCatalogError);
+        }
+
         var logosActionsColor = logogramCreator.IsMagiaBoardFull
             ? new Vector4(1.0f, 0.55f, 0.2f, 1.0f)
             : new Vector4(0.7f, 0.7f, 0.7f, 1.0f);
@@ -178,11 +208,25 @@ public partial class SlaveWindow
             ? new Vector4(0.2f, 0.9f, 0.4f, 1.0f)
             : new Vector4(1.0f, 0.6f, 0.2f, 1.0f);
         ImGui.SameLine();
-        ImGui.TextColored(cacheColor, logogramCreator.HasLogogramStockCache ? "Stock Cache: Ready" : "Stock Cache: Missing");
+        ImGui.TextColored(cacheColor, logogramCreator.HasLogogramStockCache ? "Live Stock Cache: Ready" : "Live Stock Cache: Missing");
 
         ImGui.Separator();
         ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), logogramCreator.LastStatus);
         ImGui.Separator();
+    }
+
+    private static void DrawEurekaLogogramCreatorCatalogNotReady(EurekaLogogramCreatorService logogramCreator)
+    {
+        var color = logogramCreator.StaticCatalogLoadFailed
+            ? new Vector4(1.0f, 0.35f, 0.25f, 1.0f)
+            : new Vector4(1.0f, 0.6f, 0.2f, 1.0f);
+        ImGui.TextColored(color, $"Static Catalog: {logogramCreator.StaticCatalogState}");
+        if (logogramCreator.StaticCatalogLoadFailed && !string.IsNullOrWhiteSpace(logogramCreator.StaticCatalogError))
+        {
+            ImGui.TextColored(color, logogramCreator.StaticCatalogError);
+        }
+
+        ImGui.TextDisabled("Use Retry Catalog Load above before viewing catalog-backed actions or recipes.");
     }
 
     private void DrawEurekaLogogramCreatorPlateBuilder(float fontScaling)
@@ -442,6 +486,12 @@ public partial class SlaveWindow
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
 
+        if (!logogramCreator.IsStaticCatalogReady)
+        {
+            DrawEurekaLogogramCreatorCatalogNotReady(logogramCreator);
+            return;
+        }
+
         DrawEurekaLogogramCreatorPlateBuilder(fontScaling);
 
         ImGui.PushItemWidth(320 * fontScaling);
@@ -579,6 +629,12 @@ public partial class SlaveWindow
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
         var automaticRecipeModeLabel = EurekaLogogramCreatorService.AutomaticRecipeModeLabel;
+
+        if (!logogramCreator.IsStaticCatalogReady)
+        {
+            DrawEurekaLogogramCreatorCatalogNotReady(logogramCreator);
+            return;
+        }
 
         ImGui.TextDisabled("Lock a specific synthesis recipe per action. Automatic mode uses Cheapest By Gil and the source-logogram prices from the Costs tab.");
         ImGui.PushItemWidth(320 * fontScaling);

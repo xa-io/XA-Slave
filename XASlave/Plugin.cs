@@ -5012,5 +5012,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.41";
+    public const string Version = "0.0.0.42";
 }
