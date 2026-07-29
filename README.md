@@ -10,8 +10,103 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Save to XA Database** - Push character data into XA Database on demand or through cadence-gated login collection, with task logs for save/debug visibility.
 - **Auto-Glam Weather** - Pick valid glamour plates from per-weather lists and apply them automatically when the active weather changes.
 - **City Chat Flooder** - Send announcements across selected worlds and cities with loop and delay controls.
-- **Xagman** - Coordinate automated item transfers between Tony collectors/suppliers and Franchise Owner characters. Supports fixed-world, Server Matching, and Outside Network Helper runs, item policies, forecasts, peer coordination, recovery, and Dropbox trade reconciliation. See [Xagman](#xagman).
-- **Monthly Relogger** - Cycle through characters with AutoRetainer support, XA Database rank and plot visibility, optional per-character actions, and shared completion actions. A 300-second per-character login timeout failsafe handles deleted/unavailable characters: if a `/ays relog` never loads within 300s the run re-runs the pre-flight checklist to recover a safe state (back to the main menu) and moves on instead of getting stuck. The processing order highlights each character - red for failed to log in, purple for logged in but the process could not finish - shows each character's processing time plus a rolling `Avg/char, remaining, ETA` estimate, and persists as a reviewable "Last relogger run" snapshot after completion until you press `Clear results`. Importing or refreshing from AutoRetainer flags any character AutoRetainer has no data for (manually added or unknown) with a red `(not found in AR)` marker - these cannot be relogged and are a common cause of login failures.
+- **Xagman** - Coordinate automated item transfers between Tony collectors/suppliers and Franchise Owner characters. Supports fixed-world, Server Matching, and Outside Network Helper runs, item policies, forecasts, peer coordination, recovery, and Dropbox trade reconciliation.
+
+   <details>
+   <summary>How to use Xagman</summary>
+
+   Open `XA Slave > FC Relations > Xagman` to coordinate repeatable item transfers between
+   Franchise Owner characters and one or more Tony characters. Xagman handles relogging, travel,
+   partner selection, Dropbox trade queues, inventory reconciliation, Tony rotation, and retained
+   results.
+
+   > **Beta:** Do not leave Xagman unmonitored.
+
+   Xagman requires AutoRetainer, Lifestream, XA Database, Dropbox, and vnavmesh.
+
+   ### Roles and item policies
+
+   | Role | Responsibility |
+   | --- | --- |
+   | **Tony** | Receives owner surplus, supplies owner shortages, and rotates when stock or inventory space runs out. |
+   | **Franchise Owner** | Runs the configured Shared Item List against each selected owner character. |
+
+   Ordinary exact-item work treats NQ and HQ separately and uses only `Inventory 1` through
+   `Inventory 4`. Retainer, saddlebag, market, equipped, Armoury, and other stored quantities do not
+   become ordinary tradable stock.
+
+   | Policy | Amount greater than zero | Amount `0` |
+   | --- | --- | --- |
+   | `Give` | Give up to that amount from each applicable owner. | Give all matching owner stock. |
+   | `Take` | Receive one additional batch of that amount during the run. | Take all matching supply the active Tony can safely offer. |
+   | `Balance` | Give or receive until the owner ends at that amount. | Give all matching owner stock. |
+   | `TopUp` | Receive only the shortage needed to reach at least that amount; never return surplus. | Do nothing. |
+
+   The same Item ID and quality can have ordinary, `if Subs`, and `if Retainers` policies. A matching
+   submarine policy wins first, then a matching retainer policy, then the ordinary fallback. These
+   conditions use AutoRetainer registration only; they do not make retainer-held items tradable.
+   Unknown registration skips that conditional item group instead of applying a potentially unsafe
+   fallback.
+
+   Connected-peer runs can also use `Green Item GC Seals` and
+   `Green Item FC Credits / Rank Progress` as aggregate `TopUp` targets. These targets apply stricter
+   gear, container, gearset, binding, glamour, materia, and AutoRetainer protection checks and remain
+   unavailable in Outside Network Helper.
+
+   ### Run types
+
+   | Run type | Use it when |
+   | --- | --- |
+   | **Fixed world** | Selected participating clients use one configured meetup world and location. |
+   | **Server Matching** | Owners span multiple data centers. Configure one meet world per data center (called a server in the Xagman UI) plus one shared location; Tony sweeps the required routes while each owner stays within its own data center. |
+   | **Outside Network Helper** | Two different players on separate machines cannot share the peer network. Exchange selected rosters by clipboard and coordinate the owner-to-Tony transfer through the in-game one-gil start/done handshake. This mode supports `Give` and `Balance` surplus only; it does not supply owners or use collection-first scheduling. |
+
+   Multiple Tonys can rotate as they fill or deplete. Connected Server Matching keeps replacement
+   Tonys within the active region, while fixed-world runs use the combined selected pool. Optional
+   Tony selling-when-full is limited to supported ARR city or hamlet routes; normal rotation remains
+   the fallback.
+
+   ### Basic connected workflow
+
+   1. Assign each client the Tony or Franchise Owner role, then connect the participating peers.
+   2. Select the characters and configure either a fixed meetup or Server Matching destination.
+   3. Configure the Franchise Owner Shared Item List and, when useful, the Tony Search Item List.
+   4. Use `Pull XA Database Info`, then `Select Matching Items` or select the characters manually.
+   5. Start Tony with `Start Tony (N)`. At the meetup, Tony signals the connected owners to begin;
+      `Start All Peers` can rebroadcast the current run when needed.
+   6. Use the peer controls to stop the run or clear retained results, then review the Tony Order and
+      Franchise Owner Order output.
+
+   `Prioritize Characters Giving Items First` is an optional, default-off Franchise Owner setting that
+   appears with conditional policies. When every participating Franchise Owner client enables it and
+   advertises compatible conditional-policy support, Xagman completes one global
+   `Give`/`Balance`-surplus collection pass before restarting the roster for
+   `Take`/`Balance`-deficit/`TopUp` restocking. All owners off keeps the normal combined flow. Mixed
+   preferences, missing conditional policies, or incompatible protocols block startup; a frozen run
+   stops safely if an expected peer disappears or goes stale.
+
+   ### Planning, controls, and safety
+
+   - `Pull XA Database Info` refreshes and saves the logged-in character before reloading snapshots.
+   While logged out, it uses the last saved data.
+   - Forecasts show expected collection space, stock, and shortages. They are advisory; live
+   inventory changes and reconciliation decide whether a trade completed.
+   - `Add Item` searches the current tradeable Lumina Item sheet. XA Database supplies character
+   ownership, stock, AutoRetainer registration, matching, and forecast data.
+   - Ctrl+click a character name to send `/ays relog FirstLast@World` for that saved row while Xagman
+   and the shared task runner are idle.
+   - `Refuse Trades When Idle` optionally reuses XA's Refuse Trade Request protection while preserving
+   the saved manual preference around Dropbox auto-accept windows.
+   - The normal Xagman `Stop` control stops one client. `Stop All Peers` stops connected clients and
+   preserves their results. `Stop All Clients and Results` also clears retained Tony and Franchise
+   Owner orders.
+   - Routes, destinations, participating peers, and collection-first phases are pinned for the active
+   run. Unknown, stale, unreachable, mismatched, or unsafe state fails closed instead of silently
+   advancing, rerouting, or treating a coordination message as proof of a trade.
+
+   </details>
+
+- **Monthly Relogger** - Cycle through characters with AutoRetainer support, XA Database rank and plot visibility, optional per-character actions, and shared completion actions. A 300-second login timeout recovers safely and continues if a character cannot load. Results flag failed or unfinished characters, show timing and ETA, and remain available until cleared. Characters missing AutoRetainer data are marked `(not found in AR)` and skipped.
 - **Shared Task Completion Options** - Major task panels share one completion footer for `Logout`, `Kill Game`, and `Enable AR Multi Mode`. `Kill Game` uses XA's hard logout and close-client flow even when `Instant Logout` is disabled.
 - **Prep Logistics** - Relog selected characters, check main-inventory space, move them to a target world or location, and finish with shared completion actions.
 - **Auto-Accept FC Invites** - Accept FC invitations automatically, wait for a configured period, and optionally leave again through the floater-assist flow.
@@ -19,7 +114,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Check Duplicate Plots** - Scan characters for duplicate housing plots and optionally rerun follow-up actions with the shared completion flow.
 - **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared task action flow.
 - **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with prep actions, region filters, bell-only mode, safer menu recovery, optional Company Chest gil sync, and shared completion actions.
-- **Field Operations** - Eureka tools for instance tracking and Logos Manipulator automation. `Instance Hunter` handles per-zone InstanceID, Rodney controls, duty-ready commence, alerts, and rollover until new instances are found; `Logogram Creator` adds favorites, recipe locks, queue automation, overlays, and a floating cancel control.
+- **Field Operations** - Eureka tools for instance tracking and Logos Manipulator automation. `Instance Hunter` handles per-zone InstanceID, Rodney controls, duty-ready commence, alerts, and rollover until new instances are found. `Logogram Creator` adds favorites, recipe selection, stock scanning, queue and extraction automation, overlays, a floating cancel control, separate `Static Catalog` and `Live Stock Cache` status, and a `Retry Catalog Load` action when packaged catalog data cannot load.
 - **Window Renamer** - Rename the FFXIV game window with a custom title, process-ID prefix, or current-character suffix.
 - **Auto Open Moogle Mail** - Queue Letter List actions for taking attachments, deleting opened letters, deleting opened NPC letters, and requesting delivery, with cleanup between letters and an in-window Stop control.
 - **XA Mods** - Searchable mod manager with categorized sections, persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation.
@@ -51,10 +146,6 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
   |  |  |  | Show Traveler World Names |  |  |
   |  |  |  | XA Peep |  |  |
 
-  `Replace Unowned Mount Hotbars` is default-off. For native Mount-type slots whose assigned mount is
-  not unlocked on the current character, it displays and executes the game's current Mount Roulette
-  action. Owned mounts and non-Mount slots remain native, and XA does not rewrite or save hotbar data.
-
   </details>
 
 - **Plugin Operations** - Manage startup behavior (including Open Plugin on Load and Custom Resolution on Plugin Load, which force-resizes the game window to a saved width/height with an optional Ignore Minimum Window Size sub-option), verbose logging, titlebar favourites, version display, update history, and quick actions such as presets, rendering presets, Sit/Doze, All XA Mods Off, task stop, Xagman disconnect, and Kill Game.
@@ -66,92 +157,9 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Priority Tasks** - Long-running automation tasks share one active-task lock, cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
 - **XA Mods Native Hooks** - 50+ local QoL hooks cover multi-instance handling, login/queue cleanup, menu and duty recovery, inventory actions, return/logout shortcuts, rendering, camera controls, teleport-lock recovery, and other client utilities. Startup prioritizes safety hooks, defers heavier work, and restores live rendering, UI visibility, and nameplate privacy on unload.
 
-## Xagman
-
-Open `XA Slave > Automated Tasks > Xagman` to coordinate repeatable item transfers between
-Franchise Owner characters and one or more Tony characters. Xagman handles relogging, travel,
-partner selection, Dropbox trade queues, inventory reconciliation, Tony rotation, and retained
-results.
-
-### Roles and item policies
-
-| Role | Responsibility |
-| --- | --- |
-| **Tony** | Receives owner surplus, supplies owner shortages, and rotates when stock or inventory space runs out. |
-| **Franchise Owner** | Runs the configured Shared Item List against each selected owner character. |
-
-Ordinary exact-item work treats NQ and HQ separately and uses only `Inventory 1` through
-`Inventory 4`. Retainer, saddlebag, market, equipped, Armoury, and other stored quantities do not
-become ordinary tradable stock.
-
-| Policy | Amount greater than zero | Amount `0` |
-| --- | --- | --- |
-| `Give` | Give up to that amount from each applicable owner. | Give all matching owner stock. |
-| `Take` | Receive one additional batch of that amount during the run. | Take all matching supply the active Tony can safely offer. |
-| `Balance` | Give or receive until the owner ends at that amount. | Give all matching owner stock. |
-| `TopUp` | Receive only the shortage needed to reach at least that amount; never return surplus. | Do nothing. |
-
-The same Item ID and quality can have ordinary, `if Subs`, and `if Retainers` policies. A matching
-submarine policy wins first, then a matching retainer policy, then the ordinary fallback. These
-conditions use AutoRetainer registration only; they do not make retainer-held items tradable.
-Unknown registration skips that conditional item group instead of applying a potentially unsafe
-fallback.
-
-Connected-peer runs can also use `Green Item GC Seals` and
-`Green Item FC Credits / Rank Progress` as aggregate `TopUp` targets. These targets apply stricter
-gear, container, gearset, binding, glamour, materia, and AutoRetainer protection checks and remain
-unavailable in Outside Network Helper.
-
-### Run types
-
-| Run type | Use it when |
-| --- | --- |
-| **Fixed world** | All connected clients can meet at one configured world and location. |
-| **Server Matching** | Owners span multiple data centers. Configure one meet world per data center (called a server in the Xagman UI) plus one shared location; Tony sweeps the required routes while each owner stays within its own data center. |
-| **Outside Network Helper** | Two different players on separate machines cannot share the peer network. Exchange selected rosters by clipboard and coordinate the owner-to-Tony transfer through the in-game one-gil start/done handshake. This mode supports `Give` and `Balance` surplus only; it does not supply owners or use collection-first scheduling. |
-
-Multiple Tonys can rotate as they fill or deplete. Connected Server Matching keeps replacement
-Tonys within the active region, while fixed-world runs use the combined selected pool. Optional
-Tony selling-when-full is limited to supported ARR city or hamlet routes; normal rotation remains
-the fallback.
-
-### Basic connected workflow
-
-1. Assign each client the Tony or Franchise Owner role, then connect the participating peers.
-2. Select the characters and configure either a fixed meetup or Server Matching destination.
-3. Configure the Franchise Owner Shared Item List and, when useful, the Tony Search Item List.
-4. Use `Pull XA Database Info`, then `Select Matching Items` or select the characters manually.
-5. Start Tony with `Start Tony (N)`, then use `Start All Peers`.
-6. Review the Tony Order and Franchise Owner Order results when the run finishes.
-
-`Prioritize Characters Giving Items First` is an optional, default-off Franchise Owner setting that
-appears with conditional policies. When every participating owner enables it on a compatible build,
-Xagman completes one global `Give`/`Balance`-surplus collection pass before restarting the roster
-for `Take`/`Balance`-deficit/`TopUp` restocking. All owners off keeps the normal combined flow.
-Mixed, invalid, stale, or incompatible peer state is refused before the coordinated run starts.
-
-### Planning, controls, and safety
-
-- `Pull XA Database Info` refreshes and saves the logged-in character before reloading snapshots.
-  While logged out, it uses the last saved data.
-- Forecasts show expected collection space, stock, and shortages. They are advisory; live
-  inventory changes and reconciliation decide whether a trade completed.
-- `Add Item` searches the current tradeable Lumina Item sheet. XA Database supplies character
-  ownership, stock, AutoRetainer registration, matching, and forecast data.
-- Ctrl+click a character name to send `/ays relog FirstLast@World` for that saved row while Xagman
-  and the shared task runner are idle.
-- `Refuse Trades When Idle` optionally reuses XA's Refuse Trade Request protection while preserving
-  the saved manual preference around Dropbox auto-accept windows.
-- The normal Xagman `Stop` control stops one client. `Stop All Peers` stops connected clients and
-  preserves their results. `Stop All Clients and Results` also clears retained Tony and Franchise
-  Owner orders.
-- Routes, destinations, participating peers, and collection-first phases are pinned for the active
-  run. Unknown, stale, unreachable, mismatched, or unsafe state fails closed instead of silently
-  advancing, rerouting, or treating a coordination message as proof of a trade.
-
 ## Commands
 
-The in-plugin `References > Commands` page is the full index for command descriptions and notes. The same XA command surface can also be used over IPC through `XASlave.ExecuteCommand`.
+The in-plugin `Reference > Commands` page is the full index for command descriptions and notes. The same XA command surface can also be used over IPC through `XASlave.ExecuteCommand`.
 
 <details>
 <summary>General</summary>
@@ -160,7 +168,7 @@ The in-plugin `References > Commands` page is the full index for command descrip
 | --- | --- |
 | `/xa` | Toggle the XA Slave window. |
 | `/xa allrestore` | Disable every top-level XA Mod toggle. |
-| `/xa commands` | Open `References > Commands`. |
+| `/xa commands` | Open `Reference > Commands`. |
 | `/xa db <itemId:qty ...>` | Queue Dropbox trade items from local inventory and start trading. |
 | `/xa db inv` | Queue all eligible items from `Inventory1` through `Inventory4` and start trading. |
 | `/xa db clear` | Clear the current Dropbox item queue. |
@@ -317,10 +325,10 @@ The in-plugin `References > Commands` page is the full index for command descrip
 
 </details>
 
-
 ## Dependencies
 
-- **Optional:** [XA Database](https://github.com/xa-io/XA-Database) - Provides snapshots for Save to XA Database, IPC collection, and Xagman's character ownership, stock matching, AutoRetainer data, and forecasts. Xagman item lookup itself uses Lumina.
+- **Xagman requires:** AutoRetainer, Lifestream, XA Database, Dropbox, and vnavmesh.
+- **XA Database:** [XA Database](https://github.com/xa-io/XA-Database) provides snapshots for Save to XA Database, IPC collection, and Xagman's character ownership, stock matching, AutoRetainer data, and forecasts. Xagman item lookup itself uses Lumina.
 
 ## This Plugin is in Development
 
