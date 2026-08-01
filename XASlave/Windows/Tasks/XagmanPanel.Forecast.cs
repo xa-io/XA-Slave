@@ -32,6 +32,14 @@ public partial class SlaveWindow
         InventoryType.Inventory4,
     };
 
+    private static readonly InventoryType[] XagmanCrystalInventoryTypes =
+    {
+        InventoryType.Crystals,
+    };
+
+    private const uint XagmanFirstElementalCrystalItemId = 2;
+    private const uint XagmanLastElementalCrystalItemId = 19;
+
     private DateTime xagmanTradeCapacityNextRefreshUtc = DateTime.MinValue;
     private DateTime xagmanTradeCapacityNextInventoryRefreshUtc = DateTime.MinValue;
     private readonly DateTime xagmanTradeCapacityStartupNotBeforeUtc =
@@ -100,7 +108,11 @@ public partial class SlaveWindow
 
         public long GetPartialStackHeadroom(XagmanForecastItemKey key, int stackSize)
         {
-            if (stackSize <= 1 || !Stacks.TryGetValue(key, out var quantities))
+            if (stackSize <= 1)
+                return 0L;
+            if (IsXagmanElementalCrystalItem(key.ItemId))
+                return Math.Max(0L, stackSize - GetQuantity(key));
+            if (!Stacks.TryGetValue(key, out var quantities))
                 return 0L;
             return quantities.Sum(quantity => (long)Math.Max(0, stackSize - Math.Max(0, quantity)));
         }
@@ -143,6 +155,7 @@ public partial class SlaveWindow
         public long KnownTakeRequiredSlots { get; init; }
         public long KnownTakeFreeSlots { get; init; }
         public long KnownTakeShortSlots { get; init; }
+        public long KnownTakeCrystalCapacityShortQuantity { get; init; }
         public bool HasFiniteTakeGil { get; init; }
         public List<XagmanOwnerGiveForecastViewItem> GiveItems { get; init; } = new();
         public List<XagmanOwnerBalanceForecastViewItem> BalanceItems { get; init; } = new();
@@ -196,6 +209,8 @@ public partial class SlaveWindow
         public int UnknownOwnerCount { get; init; }
         public long KnownPartialFitQuantity { get; init; }
         public long KnownNewSlotsRequired { get; init; }
+        public bool UsesCrystalPouch { get; init; }
+        public long KnownCrystalCapacityShortQuantity { get; init; }
     }
 
     private sealed class XagmanTradeCapacityViewGroup
@@ -748,9 +763,11 @@ public partial class SlaveWindow
             var policyUnknownOwnerCount = Math.Max(0, policyGroup.Owners.Count - policyKnownOwners.Count);
             var perOwnerQuantity = (long)Math.Max(0, policy.Quantity);
             var isGil = IsXagmanGilItem(definition.ItemId);
+            var isElementalCrystal = IsXagmanElementalCrystalItem(definition.ItemId);
             var stackSize = isGil ? 0 : Math.Max(1, definition.StackSize);
             var knownPartialFit = 0L;
             var knownNewSlots = 0L;
+            var knownCrystalCapacityShort = 0L;
             foreach (var owner in policyKnownOwners)
             {
                 requiredTakeSlotsByOwner.TryAdd(owner, 0L);
@@ -759,9 +776,13 @@ public partial class SlaveWindow
                 var snapshot = snapshots[owner];
                 var partialFit = Math.Min(perOwnerQuantity, snapshot.GetPartialStackHeadroom(itemKey, stackSize));
                 var remaining = Math.Max(0L, perOwnerQuantity - partialFit);
-                var newSlots = remaining <= 0 ? 0L : (remaining + stackSize - 1L) / stackSize;
+                var newSlots = isElementalCrystal || remaining <= 0
+                    ? 0L
+                    : (remaining + stackSize - 1L) / stackSize;
                 knownPartialFit += partialFit;
                 knownNewSlots += newSlots;
+                if (isElementalCrystal)
+                    knownCrystalCapacityShort += remaining;
                 requiredTakeSlotsByOwner[owner] += newSlots;
             }
             takeRows.Add(new XagmanOwnerTakeForecastViewItem
@@ -778,6 +799,8 @@ public partial class SlaveWindow
                 UnknownOwnerCount = policyUnknownOwnerCount,
                 KnownPartialFitQuantity = knownPartialFit,
                 KnownNewSlotsRequired = knownNewSlots,
+                UsesCrystalPouch = isElementalCrystal,
+                KnownCrystalCapacityShortQuantity = knownCrystalCapacityShort,
             });
         }
 
@@ -836,6 +859,8 @@ public partial class SlaveWindow
             KnownTakeRequiredSlots = knownTakeRequiredSlots,
             KnownTakeFreeSlots = knownTakeFreeSlots,
             KnownTakeShortSlots = knownTakeShortSlots,
+            KnownTakeCrystalCapacityShortQuantity = takeRows.Sum(item =>
+                Math.Max(0L, item.KnownCrystalCapacityShortQuantity)),
             HasFiniteTakeGil = takeRows.Any(item => item.IsGil),
             GiveItems = giveRows
                 .OrderBy(item => item.ItemName, StringComparer.OrdinalIgnoreCase)
@@ -1003,12 +1028,13 @@ public partial class SlaveWindow
             {
                 var key = new XagmanForecastItemKey(source.ItemId, source.IsHq);
                 var isGil = IsXagmanGilItem(source.ItemId);
+                var isElementalCrystal = IsXagmanElementalCrystalItem(source.ItemId);
                 var stackSize = isGil ? 0 : GetXagmanForecastStackSize(source.ItemId, source.StackSize);
                 var partialHeadroom = isGil
                     ? 0L
                     : knownTonySnapshots.Sum(snapshot => snapshot.GetPartialStackHeadroom(key, stackSize));
                 var incomingAfterPartials = Math.Max(0L, source.IncomingToTonyQuantity - partialHeadroom);
-                var requiredSlots = isGil || incomingAfterPartials <= 0
+                var requiredSlots = isGil || isElementalCrystal || incomingAfterPartials <= 0
                     ? 0L
                     : ((incomingAfterPartials - 1L) / stackSize) + 1L;
                 var tonyStock = isGil
@@ -1147,6 +1173,8 @@ public partial class SlaveWindow
             ? default
             : new XagmanForecastItemKey(collectionItem.ItemId, collectionItem.IsHq);
         var stackSize = collectionItem == null ? 0 : Math.Max(1, collectionItem.StackSize);
+        var isElementalCrystal = collectionItem != null
+            && IsXagmanElementalCrystalItem(collectionItem.ItemId);
         var rows = new List<XagmanRegionalCollectionCapacityView>();
 
         foreach (var regionGroup in tonyKeys
@@ -1161,11 +1189,13 @@ public partial class SlaveWindow
                 .Where(key => tonySnapshots.TryGetValue(key, out var snapshot) && snapshot.IsKnown)
                 .Select(key => tonySnapshots[key])
                 .ToList();
-            var knownEmptyStackSlots = knownSnapshots.Aggregate(
-                0L,
-                (total, snapshot) => SaturatingXagmanCapacityAdd(
-                    total,
-                    Math.Max(0, snapshot.FreeSlots)));
+            var knownEmptyStackSlots = isElementalCrystal
+                ? 0L
+                : knownSnapshots.Aggregate(
+                    0L,
+                    (total, snapshot) => SaturatingXagmanCapacityAdd(
+                        total,
+                        Math.Max(0, snapshot.FreeSlots)));
             var emptyStackCapacity = stackSize > 0
                 ? SaturatingXagmanCapacityMultiply(knownEmptyStackSlots, stackSize)
                 : 0L;
@@ -1201,7 +1231,9 @@ public partial class SlaveWindow
         long knownFreeSlots)
     {
         var stackSize = Math.Max(1, item.StackSize);
-        var emptyStackSlots = Math.Max(0L, knownFreeSlots);
+        var emptyStackSlots = IsXagmanElementalCrystalItem(item.ItemId)
+            ? 0L
+            : Math.Max(0L, knownFreeSlots);
         var emptyStackCapacity = SaturatingXagmanCapacityMultiply(emptyStackSlots, stackSize);
         var partialStackHeadroom = Math.Max(0L, item.PartialStackHeadroom);
         var totalItemCapacity = SaturatingXagmanCapacityAdd(emptyStackCapacity, partialStackHeadroom);
@@ -1302,8 +1334,8 @@ public partial class SlaveWindow
     private List<XagmanForecastItemDefinition> BuildXagmanForecastItemDefinitions(IEnumerable<XagmanItemEntry> items)
     {
         return items
-            .Where(item => item.ItemId > 0
-                && !string.IsNullOrWhiteSpace(item.ItemName)
+            .Where(item => item.SelectorKind == XagmanItemSelectorKind.ExactItem
+                && IsValidXagmanItemEntry(item)
                 && (IsXagmanGilItem(item.ItemId) || IsXagmanForecastItemTradable(item.ItemId)))
             .GroupBy(item => new XagmanForecastItemKey(item.ItemId, item.IsHq))
             .Select(group =>
@@ -1371,7 +1403,7 @@ public partial class SlaveWindow
                 if (!remoteKeys.Contains(match.CharacterNameWorld)
                     || match.ItemId != definition.ItemId
                     || match.IsHq != definition.IsHq
-                    || !IsXagmanMainInventoryContainer(match.ContainerName)
+                    || !IsXagmanSupportedItemContainer(match.ItemId, match.ContainerName)
                     || match.Quantity <= 0)
                 {
                     continue;
@@ -1514,7 +1546,7 @@ public partial class SlaveWindow
                     var containerName = entry.TryGetProperty("ContainerName", out var containerElement)
                         ? containerElement.GetString() ?? string.Empty
                         : string.Empty;
-                    if (!IsXagmanMainInventoryContainer(containerName))
+                    if (!IsXagmanSupportedItemContainer((uint)parsedItemId, containerName))
                         continue;
                     var isHq = entry.TryGetProperty("IsHq", out var hqElement)
                         && hqElement.ValueKind is JsonValueKind.True or JsonValueKind.False
@@ -1562,8 +1594,11 @@ public partial class SlaveWindow
             }
             var itemSheet = Plugin.DataManager.GetExcelSheet<Item>();
             var loadedContainerCount = 0;
+            var inventoryTypes = requestedKeys.Any(key => IsXagmanElementalCrystalItem(key.ItemId))
+                ? XagmanMainInventoryTypes.Concat(XagmanCrystalInventoryTypes).ToArray()
+                : XagmanMainInventoryTypes;
 
-            foreach (var inventoryType in XagmanMainInventoryTypes)
+            foreach (var inventoryType in inventoryTypes)
             {
                 var container = inventoryManager->GetInventoryContainer(inventoryType);
                 if (container == null || !container->IsLoaded)
@@ -1583,7 +1618,7 @@ public partial class SlaveWindow
                     snapshot.AddStack(key, (int)slot->Quantity);
                 }
             }
-            snapshot.IsKnown = loadedContainerCount == XagmanMainInventoryTypes.Length;
+            snapshot.IsKnown = loadedContainerCount == inventoryTypes.Length;
             if (!snapshot.IsKnown)
             {
                 snapshot.FreeSlots = 0;
@@ -1626,6 +1661,24 @@ public partial class SlaveWindow
             || containerName.Equals("Inventory 2", StringComparison.OrdinalIgnoreCase)
             || containerName.Equals("Inventory 3", StringComparison.OrdinalIgnoreCase)
             || containerName.Equals("Inventory 4", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsXagmanElementalCrystalItem(uint itemId)
+    {
+        return itemId >= XagmanFirstElementalCrystalItemId
+            && itemId <= XagmanLastElementalCrystalItemId;
+    }
+
+    private static bool IsXagmanCrystalInventoryContainer(string containerName)
+    {
+        return containerName.Equals("Crystals", StringComparison.OrdinalIgnoreCase);
+    }
+
+    private static bool IsXagmanSupportedItemContainer(uint itemId, string containerName)
+    {
+        return IsXagmanElementalCrystalItem(itemId)
+            ? IsXagmanCrystalInventoryContainer(containerName)
+            : IsXagmanMainInventoryContainer(containerName);
     }
 
     private static bool IsXagmanTradeCapacityInventorySnapshotFresh(ReloggerCharacterData info, DateTime now)
@@ -1915,12 +1968,19 @@ public partial class SlaveWindow
         else if (takeUncertainty)
             ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"{slotSummary} Incomplete inputs prevent a complete result.");
         else
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"{slotSummary} Every known owner has enough starting capacity.");
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"{slotSummary} Every known owner has enough main-bag capacity.");
+
+        if (view.KnownTakeCrystalCapacityShortQuantity > 0)
+        {
+            ImGui.TextColored(
+                new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
+                $"Crystal pouch capacity is {view.KnownTakeCrystalCapacityShortQuantity:N0} unit(s) short across the known finite Take rows.");
+        }
 
         if (view.HasFiniteTakeGil)
             DrawXagmanTradeCapacityWarning("Gil uses zero bag slots. Its quantity is advisory only; Tony's live gil minimum and the live trade cap remain authoritative.");
 
-        if (!ImGui.BeginTable("XagmanOwnerTakeForecastItems", 6,
+        if (!ImGui.BeginTable("XagmanOwnerTakeForecastItems", 7,
                 ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
             return;
         ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
@@ -1929,6 +1989,7 @@ public partial class SlaveWindow
         ImGui.TableSetupColumn("Stack", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
         ImGui.TableSetupColumn("Known Partial Fit", ImGuiTableColumnFlags.WidthFixed, Scale(115f));
         ImGui.TableSetupColumn("Known New Slots", ImGuiTableColumnFlags.WidthFixed, Scale(105f));
+        ImGui.TableSetupColumn("Crystal Short", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
         ImGui.TableHeadersRow();
         foreach (var item in view.TakeItems)
         {
@@ -1950,9 +2011,13 @@ public partial class SlaveWindow
             ImGui.TextDisabled(item.IsGil ? "-" : item.KnownPartialFitQuantity.ToString("N0", CultureInfo.InvariantCulture));
             ImGui.TableNextColumn();
             ImGui.TextDisabled(item.KnownNewSlotsRequired.ToString("N0", CultureInfo.InvariantCulture));
+            ImGui.TableNextColumn();
+            ImGui.TextDisabled(item.UsesCrystalPouch
+                ? item.KnownCrystalCapacityShortQuantity.ToString("N0", CultureInfo.InvariantCulture)
+                : "-");
         }
         ImGui.EndTable();
-        ImGui.TextDisabled("Starting capacity covers one configured Take batch per owner. Matching NQ/HQ partial stacks are credited first, and all finite Take items share that owner's free slots; later live supply passes remain authoritative. Take 0 is excluded.");
+        ImGui.TextDisabled("Starting capacity covers one configured Take batch per owner. Non-crystal partial stacks are credited before shared Inventory 1-4 slots; elemental crystal rows use only their dedicated 9,999-unit pouch headroom and never consume bag slots. Later live supply passes remain authoritative. Take 0 is excluded.");
     }
 
     private static string GetXagmanOwnerForecastItemLabel(

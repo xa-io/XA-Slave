@@ -306,7 +306,7 @@ public sealed class Plugin : IDalamudPlugin
         ArConfigReader = new AutoRetainerConfigReader(PluginInterface, Log);
         IpcProvider = new IpcProvider(PluginInterface, this, Log);
         ExternalTaskLoader = new ExternalTaskLoader(this, PluginInterface, Log);
-        WindowRenamer = new WindowRenamerService(Log);
+        WindowRenamer = new WindowRenamerService(PluginInterface, Framework, Log, () => Configuration);
         AutoSkipCutscenes = new AutoSkipCutsceneService(Condition, Framework, ClientState, DataManager, PartyList, SigScanner, GameInterop, AgentLifecycle, Log);
         BuddyFeedCutsceneSkip = new BuddyFeedCutsceneSkipService(SigScanner, GameInterop, ClientState, Log);
         PopupCleaner = new PopupCleanerService(AddonLifecycle, Log);
@@ -5012,5 +5012,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.42";
+    public const string Version = "0.0.0.43";
 }

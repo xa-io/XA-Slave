@@ -105,7 +105,10 @@ public partial class SlaveWindow
                 liveIpcValues["Splatoon.IsLoaded"] = plugin.IpcClient.SplatoonIsLoaded();
 
             // XA Slave (own channels - direct query, no IPC round-trip)
-            liveIpcValues["XASlave.IsBusy"] = plugin.TaskRunner.IsRunning || plugin.AutoCollector.IsRunning;
+            liveIpcValues["XASlave.IsBusy"] =
+                plugin.TaskRunner.IsRunning
+                || plugin.AutoCollector.IsRunning
+                || plugin.AutoOpenMoogleMail.IsProcessing;
         }
         catch { /* individual failures already handled in IpcClient try/catch */ }
     }
@@ -153,7 +156,7 @@ public partial class SlaveWindow
             if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableHeadersRow();
 
-            DrawIpcRow("XASlave.IsBusy", "bool", "True when any task is running", livePulls);
+            DrawIpcRow("XASlave.IsBusy", "bool", "True while a task, auto-collection, or Moogle Mail operation is running", livePulls);
             DrawIpcRow("XASlave.ExecuteCommand", "string", "Run the same subcommands accepted by `/xa` and return an `OK:`/`ERROR:` status string. Accepts either `logout`, `killgame`, or `/xa logout` style input.", livePulls);
             DrawIpcRow("XASlave.RunTask", "Action", "Start a named task (string taskName)", livePulls);
 

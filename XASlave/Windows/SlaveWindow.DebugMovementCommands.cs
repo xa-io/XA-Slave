@@ -1,5 +1,6 @@
 using System;
 using Dalamud.Game.ClientState.Conditions;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using XASlave.Services;
 using XASlave.Services.Tasks;
 
@@ -7,6 +8,11 @@ namespace XASlave.Windows;
 
 public partial class SlaveWindow
 {
+    private const int DebugLeaveDutyQuickMenuAttempts = 8;
+    private const int DebugLeaveDutyQuickPromptAttempts = 12;
+    private const int DebugLeaveDutyQuickRetryDelayMilliseconds = 250;
+    private int debugLeaveDutyQuickRunning;
+
     public bool TryExecuteXaMovementCommand(string subcommand, string arguments, out string message, out bool handled)
     {
         handled = true;
@@ -611,6 +617,193 @@ public partial class SlaveWindow
                 SetDebugResult("Leave Duty: ContentsFinderMenu not visible or Leave button not found.");
             }
         });
+    }
+
+    private void RunDebugLeaveDutyQuick()
+    {
+        if (!Plugin.Condition[ConditionFlag.BoundByDuty])
+        {
+            SetDebugResult("Leave Duty Quick: not in a duty, nothing to leave.");
+            return;
+        }
+
+        if (Plugin.Condition[ConditionFlag.InCombat])
+        {
+            SetDebugResult("Leave Duty Quick blocked: combat is active.");
+            return;
+        }
+
+        if (TryGetDebugLeaveDutyQuickBlocker(out var blocker))
+        {
+            SetDebugResult($"Leave Duty Quick blocked: {blocker}.");
+            return;
+        }
+
+        if (System.Threading.Interlocked.CompareExchange(ref debugLeaveDutyQuickRunning, 1, 0) != 0)
+        {
+            SetDebugResult("Leave Duty Quick is already running.");
+            return;
+        }
+
+        SetDebugResult("Leave Duty Quick: opening the game-owned duty menu without pressing U...");
+        System.Threading.Tasks.Task.Run(async () =>
+        {
+            try
+            {
+                var existingPromptState = await Plugin.Framework.Run(() =>
+                {
+                    if (!AddonHelper.IsAddonVisible("SelectYesno"))
+                        return 0;
+
+                    return AddonHelper.IsAddonReady("SelectYesno") &&
+                           AddonHelper.IsLeaveDutyConfirmationPrompt()
+                        ? 1
+                        : -1;
+                });
+                if (existingPromptState < 0)
+                {
+                    SetDebugResult("Leave Duty Quick stopped: an unrelated or unreadable SelectYesno is already open.");
+                    return;
+                }
+
+                if (existingPromptState > 0)
+                {
+                    var confirmed = await Plugin.Framework.Run(() => AddonHelper.ClickYesNo(true));
+                    SetDebugResult(confirmed
+                        ? "Leave Duty Quick: confirmed the existing validated leave-duty prompt; waiting for zone-out."
+                        : "Leave Duty Quick: validated the existing leave-duty prompt, but the Yes callback failed.");
+                    return;
+                }
+
+                var callbacksSent = false;
+                for (var attempt = 1; attempt <= DebugLeaveDutyQuickMenuAttempts; attempt++)
+                {
+                    if (!await Plugin.Framework.Run(() => Plugin.Condition[ConditionFlag.BoundByDuty]))
+                    {
+                        SetDebugResult("Leave Duty Quick: duty exit already started.");
+                        return;
+                    }
+
+                    var menuReady = await Plugin.Framework.Run(() =>
+                        AddonHelper.IsAddonReady("ContentsFinderMenu"));
+                    if (!menuReady)
+                    {
+                        var agentShown = await Plugin.Framework.Run(() =>
+                            AddonHelper.ShowAgent(AgentId.ContentsFinderMenu));
+                        if (!agentShown && attempt == DebugLeaveDutyQuickMenuAttempts)
+                        {
+                            SetDebugResult("Leave Duty Quick: ContentsFinderMenu agent was unavailable.");
+                            return;
+                        }
+
+                        await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds);
+                        continue;
+                    }
+
+                    callbacksSent = await Plugin.Framework.Run(
+                        AddonHelper.TryRequestLeaveDutyFromContentsFinderMenu);
+                    if (callbacksSent)
+                        break;
+
+                    await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds);
+                }
+
+                if (!callbacksSent)
+                {
+                    SetDebugResult("Leave Duty Quick: the duty menu opened, but its Leave Duty callbacks failed.");
+                    return;
+                }
+
+                SetDebugResult("Leave Duty Quick: leave callbacks sent; waiting for the validated confirmation...");
+                for (var attempt = 1; attempt <= DebugLeaveDutyQuickPromptAttempts; attempt++)
+                {
+                    if (!await Plugin.Framework.Run(() => Plugin.Condition[ConditionFlag.BoundByDuty]))
+                    {
+                        SetDebugResult("Leave Duty Quick: duty exit started.");
+                        return;
+                    }
+
+                    var selectYesnoVisible = await Plugin.Framework.Run(() =>
+                        AddonHelper.IsAddonVisible("SelectYesno"));
+                    if (selectYesnoVisible)
+                    {
+                        var selectYesnoReady = await Plugin.Framework.Run(() =>
+                            AddonHelper.IsAddonReady("SelectYesno"));
+                        if (!selectYesnoReady)
+                        {
+                            await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds);
+                            continue;
+                        }
+
+                        var isLeavePrompt = await Plugin.Framework.Run(
+                            AddonHelper.IsLeaveDutyConfirmationPrompt);
+                        if (!isLeavePrompt)
+                        {
+                            SetDebugResult("Leave Duty Quick stopped: SelectYesno is not a readable leave-duty prompt.");
+                            return;
+                        }
+
+                        var confirmed = await Plugin.Framework.Run(() => AddonHelper.ClickYesNo(true));
+                        SetDebugResult(confirmed
+                            ? "Leave Duty Quick: confirmed the validated leave-duty prompt; waiting for zone-out."
+                            : "Leave Duty Quick: validated the leave-duty prompt, but the Yes callback failed.");
+                        return;
+                    }
+
+                    if (attempt == DebugLeaveDutyQuickPromptAttempts / 2)
+                    {
+                        await Plugin.Framework.Run(() =>
+                        {
+                            if (!AddonHelper.IsAddonReady("ContentsFinderMenu"))
+                                return;
+
+                            AddonHelper.TryRequestLeaveDutyFromContentsFinderMenu();
+                        });
+                    }
+
+                    await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds);
+                }
+
+                SetDebugResult("Leave Duty Quick: no leave-duty confirmation appeared within 3 seconds.");
+            }
+            catch (Exception ex)
+            {
+                Plugin.Log.Warning(ex, "[XASlave] Leave Duty Quick failed.");
+                SetDebugResult($"Leave Duty Quick error: {ex.Message}");
+            }
+            finally
+            {
+                System.Threading.Interlocked.Exchange(ref debugLeaveDutyQuickRunning, 0);
+            }
+        });
+    }
+
+    private static bool TryGetDebugLeaveDutyQuickBlocker(out string blocker)
+    {
+        if (Plugin.Condition[ConditionFlag.BetweenAreas] ||
+            Plugin.Condition[ConditionFlag.BetweenAreas51])
+        {
+            blocker = "area transition is active";
+            return true;
+        }
+
+        if (Plugin.Condition[ConditionFlag.OccupiedInCutSceneEvent] ||
+            Plugin.Condition[ConditionFlag.WatchingCutscene])
+        {
+            blocker = "cutscene is active";
+            return true;
+        }
+
+        if (Plugin.Condition[ConditionFlag.OccupiedInQuestEvent] ||
+            Plugin.Condition[ConditionFlag.Occupied33] ||
+            Plugin.Condition[ConditionFlag.Occupied39])
+        {
+            blocker = "occupied transition is active";
+            return true;
+        }
+
+        blocker = string.Empty;
+        return false;
     }
 
     private void RunDebugRecommendedGear()

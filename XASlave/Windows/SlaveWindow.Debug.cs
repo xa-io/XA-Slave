@@ -1316,6 +1316,11 @@ public partial class SlaveWindow
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Attempts to leave the current duty.\nWaits up to 30s if in combat, then sends /leaveDuty + confirms Yes.");
+        ImGui.SameLine();
+        if (ImGui.Button("Leave Duty Quick"))
+            RunDebugLeaveDutyQuick();
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Controller-safe quick leave.\nUses the game-owned duty-menu agent and callbacks without pressing U, then confirms only a readable leave-duty prompt.");
 
         ImGui.Spacing();
 

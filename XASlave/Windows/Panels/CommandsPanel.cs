@@ -96,7 +96,7 @@ public partial class SlaveWindow
         new("/xa typingcombat on|off", "Toggle `Alert When Typing In Combat`.", "Plays the configured local sound and toast when ChatLog is focused while ConditionFlag.InCombat is active."),
         new("/xa inventorymover on|off", "Toggle `Better Inventory Mover`.", "Hold the configured modifier while right-clicking for the first available move, or use the added destination-aware context-menu moves."),
         new("/xa itemcommands on|off", "Toggle `Item Commands`.", "Adds XA's `/xa equip <itemId>` command."),
-        new("/xa leaveduty on|off", "Toggle `Auto Leave Duty`.", "Also accepts `/xa autoleaveduty on|off`. XA watches for duty completion, waits the configured delay, then opens the duty menu and confirms Leave Duty once combat and blocking duty UI states are clear."),
+        new("/xa leaveduty on|off", "Toggle `Auto Leave Duty`.", "Also accepts `/xa autoleaveduty on|off`. XA watches for duty completion, waits the configured delay, then uses the controller-safe game-owned duty-menu callbacks without pressing U and confirms only a validated Leave Duty prompt once combat and blocking states are clear."),
         new("/xa automerge on|off", "Toggle `Auto Merge`.", "Watches for the inventory window to open, then merges incomplete main-bag stacks together locally."),
         new("/xa mooglemail on|off", "Toggle `Auto Open Moogle Mail`.", "Exposes Letter List mail cleanup actions."),
         new("/xa sit", "Trigger Sit Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),

@@ -239,7 +239,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
             ImGui.BeginDisabled();
 
         if (DrawOverlayButton("Take all", "TakeAll"))
-            QueueClaimAttachments();
+            QueueClaimAttachments(Plugin.Instance?.Configuration.AutoOpenMoogleMailDeleteAllWhenFinished ?? false);
 
         ImGui.SameLine();
         if (DrawOverlayButton("Delete all", "DeleteAll"))

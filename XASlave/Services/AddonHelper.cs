@@ -591,6 +591,92 @@ public static class AddonHelper
     }
 
     /// <summary>
+    /// Fires an integer-only callback while explicitly controlling the native update-state flag.
+    /// This matches the Dad/ADS ContentsFinderMenu leave sequence without synthesizing a keyboard key.
+    /// </summary>
+    public static unsafe bool FireCallback(string addonName, bool updateState, params int[] values)
+    {
+        var addon = GetAddon(addonName);
+        if (addon == null || !addon->IsVisible) return false;
+
+        try
+        {
+            AtkValue* atkValues = stackalloc AtkValue[values.Length];
+            for (int i = 0; i < values.Length; i++)
+            {
+                atkValues[i] = default;
+                atkValues[i].Type = AtkValueType.Int;
+                atkValues[i].Int = values[i];
+            }
+
+            addon->FireCallback((uint)values.Length, atkValues, updateState);
+            Plugin.Log.Information(
+                $"[XASlave] AddonHelper.FireCallback: fired on '{addonName}' with [{string.Join(", ", values)}] (updateState={updateState})");
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error(
+                $"[XASlave] AddonHelper.FireCallback error on '{addonName}' (updateState={updateState}): {ex.Message}");
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Shows a game-owned addon through its registered agent.
+    /// </summary>
+    public static unsafe bool ShowAgent(AgentId agentId)
+    {
+        try
+        {
+            var agentModule = AgentModule.Instance();
+            if (agentModule == null)
+                return false;
+
+            var agent = agentModule->GetAgentByInternalId(agentId);
+            if (agent == null)
+                return false;
+
+            agent->Show();
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "[XASlave] AddonHelper.ShowAgent failed for {AgentId}.", agentId);
+            return false;
+        }
+    }
+
+    /// <summary>
+    /// Sends the controller-safe Leave Duty callback sequence used by Dad/ADS.
+    /// The Contents Finder menu must already be ready on the framework thread.
+    /// </summary>
+    public static bool TryRequestLeaveDutyFromContentsFinderMenu()
+    {
+        if (!IsAddonReady("ContentsFinderMenu"))
+            return false;
+
+        var menuStateSent = FireCallback("ContentsFinderMenu", updateState: true, 0);
+        var leaveSent = FireCallback("ContentsFinderMenu", updateState: false, -2);
+        return menuStateSent && leaveSent;
+    }
+
+    /// <summary>
+    /// Requires both an exit intent and duty/instance scope before a leave confirmation can be accepted.
+    /// </summary>
+    public static bool IsLeaveDutyConfirmationPrompt()
+    {
+        var asksToLeave =
+            AddonHasText("SelectYesno", "leave", contains: true) ||
+            AddonHasText("SelectYesno", "exit", contains: true) ||
+            AddonHasText("SelectYesno", "abandon", contains: true);
+        var dutyScoped =
+            AddonHasText("SelectYesno", "duty", contains: true) ||
+            AddonHasText("SelectYesno", "instance", contains: true);
+        return asksToLeave && dutyScoped;
+    }
+
+    /// <summary>
     /// Sends an agent event with integer arguments.
     /// Useful for UI flows routed through an Agent instead of an addon callback.
     /// </summary>

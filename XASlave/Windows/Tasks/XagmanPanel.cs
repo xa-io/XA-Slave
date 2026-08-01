@@ -151,6 +151,8 @@ public partial class SlaveWindow
     private List<XagmanItemSearchEntry> xagmanItemResults = new();
     private List<XagmanItemSearchEntry>? xagmanLuminaItemCatalogCache;
     private Dictionary<string, XagmanItemSearchEntry>? xagmanItemNameLookupCache;
+    private static readonly object xagmanItemHqCapabilityCacheLock = new();
+    private static readonly Dictionary<uint, bool> xagmanItemHqCapabilityCache = new();
     private int xagmanItemSearchDisplayCount = XagmanItemSearchPageSize;
     private const int XagmanItemSearchPageSize = 100;
     private static readonly (string Label, XagmanItemMode Mode, XagmanItemApplicability Applicability)[] xagmanItemPolicyOptions =
@@ -231,7 +233,7 @@ public partial class SlaveWindow
     {
         public uint ItemId { get; init; }
         public string ItemName { get; init; } = string.Empty;
-        public bool IsHq { get; init; }
+        public bool CanBeHq { get; init; }
     }
     private sealed class XagmanTonySellDestination
     {
@@ -750,12 +752,12 @@ public partial class SlaveWindow
         {
             ImGui.TextColored(sectionColor, "Tony Setup");
             ImGui.TextWrapped("1. Optional: create a Tony Search Item List.");
-            ImGui.TextWrapped("2. Filter region if needed or use the search bar. Select characters manually, or left-click Select Matching Items to select visible Tonys that hold items from the Tony Search Item List. Right-click it to limit those suppliers to Tonys with or without registered retainers or submarines.");
+            ImGui.TextWrapped("2. Filter region if needed or use the search bar. Select characters manually, left-click Select Matching Items to select visible Tonys that hold items from the Tony Search Item List, or use Select Current Character while logged in to add that configured home-world character regardless of filters. Right-click Select Matching Items to limit suppliers to Tonys with or without registered retainers or submarines.");
             ImGui.TextWrapped("3. Select a world to meet and a meet location as the set aetheryte.");
             ImGui.TextWrapped("4. Set Tony Gil Minimum. Default: 10000.");
             ImGui.TextWrapped("5. Connect peers. Tony is then ready for Start Tony, or you can use Start All Peers / Stop All Peers when the alt clients are connected and selected.");
             ImGui.TextWrapped("6. Tony moves into position, confirms the meetup location, and then sends the green light for everyone else to start processing.");
-            ImGui.TextWrapped("7. Prioritize Characters Giving Items First belongs to each Franchise Owner client. Tony ignores Tony's local saved setting and Shared Item list: all participating FOs off starts the legacy flow, all on and valid starts collection-first, and mixed or invalid clients are named and refused before a run is frozen.");
+            ImGui.TextWrapped("7. Prioritize Characters Giving Items First belongs to each Franchise Owner client. Tony ignores Tony's local saved setting and Shared Item list. An FO with no conditional policy is effectively Off even if its hidden saved value is On: all participating FOs effectively Off starts the legacy flow, all On and valid starts collection-first, and mixed or invalid clients are named and refused before a run is frozen.");
             ImGui.TextWrapped("8. Final collection-first cleanup is scoped to that frozen run. Tony waits for every FO to acknowledge the cleanup command; a missing acknowledgement keeps Tony connected in Error instead of logging out or closing the client.");
             return;
         }
@@ -769,16 +771,16 @@ public partial class SlaveWindow
         ImGui.TextWrapped("- TopUp: request only the deficit to the amount and leave owner surplus untouched. TopUp 0 does nothing.");
         ImGui.TextWrapped("- A plain Give, Take, Balance, or TopUp row is the fallback for every owner. The matching 'if Subs' or 'if Retainers' row overrides it for owners with registered AutoRetainer counts.");
         ImGui.TextWrapped("- If an owner has both, 'if Subs' wins over 'if Retainers'; either conditional row wins over the plain fallback. With no matching row, that item is ignored.");
-        ImGui.TextWrapped("- The same item and NQ/HQ quality may appear once for each applicability (plain, Subs, Retainers). An exact duplicate is rejected.");
-        ImGui.TextWrapped("- Conditional registration is metadata only. All quantities still come only from Inventory 1-4. If registration cannot be established, that conditional item group is skipped safely.");
+        ImGui.TextWrapped("- NQ/HQ are separate only when Lumina marks that exact item as HQ-capable. Sheet-declared NQ-only items show a fixed NQ value instead of an HQ checkbox. The same valid quality may appear once for each applicability (plain, Subs, Retainers); an exact duplicate is rejected.");
+        ImGui.TextWrapped("- Conditional registration is metadata only. Non-crystal quantities come only from Inventory 1-4; elemental shards, crystals, and clusters use the player's Crystals inventory. If registration cannot be established, that conditional item group is skipped safely.");
         ImGui.TextWrapped("- Example: Ceruleum Tank Give 0 plus Balance if Subs 22,650 makes owners without registered submarines give all, while submarine owners give surplus or request their deficit to 22,650.");
-        ImGui.TextWrapped("- Optional Prioritize Characters Giving Items First appears only while conditional policies exist and is owned by this FO client. Every participating FO must enable it for collection-first; all off uses legacy, while mixed, invalid, or mismatched-build cohorts are refused before startup.");
+        ImGui.TextWrapped("- Optional Prioritize Characters Giving Items First appears only while conditional policies exist and is owned by this FO client. Its saved value is ignored while no If Subs/Retainers policy exists. Every participating FO must effectively enable it for collection-first; all effectively Off uses legacy, while mixed, invalid, or mismatched-build cohorts are refused before startup.");
         ImGui.TextWrapped("- In collection-first mode, Give/Balance-surplus runs across every participating FO client first. Receiver-only clients pause at a visible global barrier; after every expected client acknowledges collection, Tony repeats the full world/DC sweep for Take/Balance-deficit/TopUp.");
         ImGui.TextWrapped("- The forecast shows Tony stock now, projected stock after all collection, shortage now, and projected shortage after collection. The projection is conditional when Tony collection slots, owner snapshots, or Take 0 requests are indeterminate.");
         ImGui.TextWrapped("- Collection-first is not used by Outside Network Helper. Stop/cancel never advances the barrier, and every participating client must use the same build/protocol.");
         ImGui.TextWrapped("- After the Restock barrier, each FO acknowledges Tony's run-scoped cleanup before terminal FC/logout work. If any acknowledgement is missed, Tony stays connected in visible Error for explicit recovery.");
         ImGui.Unindent();
-        ImGui.TextWrapped("2. Filter region if needed or use the search bar. Select characters manually, or left-click Select Matching Items to select every owner that needs the Shared Item List changes. Right-click it to include only owners with or without registered retainers or submarines.");
+        ImGui.TextWrapped("2. Filter region if needed or use the search bar. Select characters manually, left-click Select Matching Items to select every owner that needs the Shared Item List changes, or use Select Current Character while logged in to add that configured home-world character regardless of filters. Right-click Select Matching Items to include only owners with or without registered retainers or submarines.");
         ImGui.TextWrapped("3. Click Connect.");
         ImGui.TextWrapped("4. Franchise Owner is then ready for Tony to send the all-start trigger, or you can start one client manually with Start Owners.");
     }
@@ -816,7 +818,15 @@ public partial class SlaveWindow
             ImGui.EndPopup();
         }
         if (tonyMatchingButtonHovered)
-            ImGui.SetTooltip("Left-click to select visible Tonys holding a Tony Search Item List item in Inventory 1-4. Saddlebags and retainer stock do not count. Right-click to add a retainer/submarine registration filter. Region, Search, and Selected Only remain active.");
+            ImGui.SetTooltip("Left-click to select visible Tonys holding a Tony Search Item List item in Inventory 1-4, or an elemental shard/crystal/cluster in the player's Crystals inventory. Saddlebags and retainer stock do not count. Right-click to add a retainer/submarine registration filter. Region, Search, and Selected Only remain active.");
+        if (TryGetLoggedInXagmanCurrentCharacter(out var currentTonyCharacter))
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Select Current Character##xagmanTonyCurrent"))
+                SelectXagmanCurrentCharacter(XagmanMatchSelectionTarget.Tony, currentTonyCharacter);
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Add the logged-in character to the Tony selection. This uses the XA Debug home-world Name@World identity and does not change Region, Search, Selected Only, or other selected characters.");
+        }
         ImGui.SameLine();
         ImGui.Checkbox("Selected Only##xagmanTonySelOnly", ref xagmanTonyShowOnlySelected);
         ImGui.SetNextItemWidth(Scale(240f));
@@ -994,7 +1004,15 @@ public partial class SlaveWindow
             ImGui.EndPopup();
         }
         if (ownerMatchingButtonHovered)
-            ImGui.SetTooltip("Left-click to select every owner under the active Region and Search filters that needs the configured items based on Inventory 1-4 only. Saddlebags and retainer stock do not count. Right-click to add a retainer/submarine registration filter.");
+            ImGui.SetTooltip("Left-click to select every owner under the active Region and Search filters that needs the configured items based on Inventory 1-4, with elemental shards/crystals/clusters read from the player's Crystals inventory. Saddlebags and retainer stock do not count. Right-click to add a retainer/submarine registration filter.");
+        if (TryGetLoggedInXagmanCurrentCharacter(out var currentOwnerCharacter))
+        {
+            ImGui.SameLine();
+            if (ImGui.Button("Select Current Character##xagmanOwnerCurrent"))
+                SelectXagmanCurrentCharacter(XagmanMatchSelectionTarget.FranchiseOwner, currentOwnerCharacter);
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip("Add the logged-in character to the Franchise Owner selection. This uses the XA Debug home-world Name@World identity and does not change Region, Search, Selected Only, or other selected characters.");
+        }
         ImGui.SameLine();
         ImGui.Checkbox("Selected Only##xagmanOwnerSelOnly", ref xagmanFranchiseShowOnlySelected);
         ImGui.SetNextItemWidth(Scale(240f));
@@ -1207,6 +1225,30 @@ public partial class SlaveWindow
             _ => string.Empty,
         };
     }
+    private static bool CanXagmanItemBeHq(uint itemId)
+    {
+        if (itemId <= 1)
+            return false;
+        lock (xagmanItemHqCapabilityCacheLock)
+        {
+            if (xagmanItemHqCapabilityCache.TryGetValue(itemId, out var cachedCanBeHq))
+                return cachedCanBeHq;
+        }
+        try
+        {
+            var itemSheet = Plugin.DataManager.GetExcelSheet<Item>();
+            if (!itemSheet.TryGetRow(itemId, out var itemRow))
+                return false;
+            var canBeHq = itemRow.CanBeHq;
+            lock (xagmanItemHqCapabilityCacheLock)
+                xagmanItemHqCapabilityCache[itemId] = canBeHq;
+            return canBeHq;
+        }
+        catch
+        {
+            return false;
+        }
+    }
     private static bool IsValidXagmanItemEntry(XagmanItemEntry item, bool searchOnly = false)
     {
         if (!Enum.IsDefined(item.SelectorKind)
@@ -1216,7 +1258,11 @@ public partial class SlaveWindow
             return false;
         }
         if (item.SelectorKind == XagmanItemSelectorKind.ExactItem)
-            return item.ItemId > 0 && !string.IsNullOrWhiteSpace(item.ItemName);
+        {
+            return item.ItemId > 0
+                && !string.IsNullOrWhiteSpace(item.ItemName)
+                && (!item.IsHq || CanXagmanItemBeHq(item.ItemId));
+        }
         return !searchOnly
             && IsXagmanGreenValueSelector(item.SelectorKind)
             && item.ItemId == 0
@@ -1240,6 +1286,7 @@ public partial class SlaveWindow
                 || entry.TargetValueScaled2 != 0
                 || entry.CurrentValueScaled2 != 0
                 || entry.ValueDeficitScaled2 != 0
+                || (entry.IsHq && !CanXagmanItemBeHq(entry.ItemId))
                 || !entry.GreenScanComplete
                 || !string.IsNullOrEmpty(entry.GreenScanError))
             {
@@ -1323,6 +1370,8 @@ public partial class SlaveWindow
         bool isHq,
         bool searchOnly)
     {
+        if (isHq && !CanXagmanItemBeHq(itemId))
+            return false;
         if (searchOnly)
             return !items.Any(item => item.SelectorKind == XagmanItemSelectorKind.ExactItem
                 && item.ItemId == itemId
@@ -1464,9 +1513,12 @@ public partial class SlaveWindow
         return ResolveXagmanItemsForOwner(items, ownerCharacter, out _);
     }
 
-    private bool IsXagmanCollectionFirstRequestedForRole(XagmanRole role)
+    private bool IsXagmanCollectionFirstRequestedForRole(
+        XagmanRole role,
+        bool hasConditionalItemPolicies)
     {
         return role == XagmanRole.FranchiseOwner
+            && hasConditionalItemPolicies
             && plugin.Configuration.XagmanPrioritizeCharactersGivingItemsFirst
             && !plugin.Configuration.XagmanOutsideNetworkHelper;
     }
@@ -1559,16 +1611,19 @@ public partial class SlaveWindow
                 "Xagman: refused collection-first start because the Tony directive was incomplete or used an unsupported coordination protocol.");
             return false;
         }
-        if (!IsXagmanCollectionFirstRequestedForRole(XagmanRole.FranchiseOwner))
-        {
-            plugin.TaskRunner.AddLog(
-                "Xagman: refused collection-first start because this Franchise Owner client has not enabled Prioritize Characters Giving Items First.");
-            return false;
-        }
-        if (!HasXagmanConditionalItemPolicies(plugin.Configuration.XagmanItems))
+        var hasConditionalItemPolicies = HasXagmanConditionalItemPolicies(plugin.Configuration.XagmanItems);
+        if (!hasConditionalItemPolicies)
         {
             plugin.TaskRunner.AddLog(
                 "Xagman: refused collection-first start because this client has no conditional Shared Item policies.");
+            return false;
+        }
+        if (!IsXagmanCollectionFirstRequestedForRole(
+                XagmanRole.FranchiseOwner,
+                hasConditionalItemPolicies))
+        {
+            plugin.TaskRunner.AddLog(
+                "Xagman: refused collection-first start because this Franchise Owner client has not enabled Prioritize Characters Giving Items First.");
             return false;
         }
         if (startDirective.ExpectedFranchiseOwnerInstanceIds.Count == 0
@@ -2095,7 +2150,7 @@ public partial class SlaveWindow
                     ? "Collection-first coordination requires connected Xagman peers and is not used by Outside Network Helper."
                     : xagmanRunning
                         ? "This FO preference is locked while its run is active."
-                        : "This Franchise Owner advertises collection-first to Tony. Every participating FO must enable it; Tony ignores Tony-local settings and refuses mixed or invalid cohorts before startup.");
+                        : "This Franchise Owner advertises collection-first to Tony while at least one conditional Shared Item policy exists. The saved value is ignored when the list has no If Subs/Retainers policies. Every participating FO must enable it; Tony ignores Tony-local settings and refuses mixed or invalid cohorts before startup.");
             }
         }
 
@@ -2135,6 +2190,19 @@ public partial class SlaveWindow
                 if (isGreenSelector)
                 {
                     ImGui.TextDisabled("Mixed");
+                }
+                else if (!CanXagmanItemBeHq(item.ItemId))
+                {
+                    if (item.IsHq)
+                        ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid HQ");
+                    else
+                        ImGui.TextDisabled("NQ");
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.SetTooltip(item.IsHq
+                            ? "Lumina Item.CanBeHq is false. This impossible legacy/imported HQ row is excluded from Xagman; delete it and add the item again as NQ."
+                            : "Lumina Item.CanBeHq is false. This item is NQ-only, so HQ cannot be selected.");
+                    }
                 }
                 else
                 {
@@ -2291,7 +2359,9 @@ public partial class SlaveWindow
     private static List<XagmanItemEntry> CloneXagmanItemsForTeamcraftExport(IEnumerable<XagmanItemEntry> items, bool searchOnly = false)
     {
         return items
-            .Where(item => item.ItemId > 0 && !string.IsNullOrWhiteSpace(item.ItemName))
+            .Where(item => item.ItemId > 0
+                && !string.IsNullOrWhiteSpace(item.ItemName)
+                && IsValidXagmanItemEntry(item, searchOnly))
             .GroupBy(item => new { item.ItemId, item.IsHq })
             .Select(group =>
             {
@@ -2530,6 +2600,7 @@ public partial class SlaveWindow
         }
 
         var unresolvedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var unsupportedHqNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var resolvedItems = new List<XagmanItemEntry>();
         foreach (var hqGroup in parsedLines.GroupBy(line => line.IsHq))
         {
@@ -2538,6 +2609,11 @@ public partial class SlaveWindow
                 if (!TryResolveXagmanItemByName(group.Key, out var resolvedItem))
                 {
                     unresolvedNames.Add(group.Key);
+                    continue;
+                }
+                if (hqGroup.Key && !resolvedItem.CanBeHq)
+                {
+                    unsupportedHqNames.Add(resolvedItem.ItemName);
                     continue;
                 }
                 var quantity = group.Sum(line => line.Quantity);
@@ -2550,6 +2626,12 @@ public partial class SlaveWindow
                     Quantity = searchOnly ? 0 : Math.Max(0, quantity),
                 });
             }
+        }
+
+        if (unsupportedHqNames.Count > 0)
+        {
+            message = $"Xagman: Teamcraft HQ import rejected because Lumina marks these item(s) NQ-only: {string.Join(", ", unsupportedHqNames.OrderBy(name => name, StringComparer.OrdinalIgnoreCase))}.";
+            return false;
         }
 
         var importedItems = resolvedItems
@@ -2628,7 +2710,7 @@ public partial class SlaveWindow
                 {
                     ItemId = itemId,
                     ItemName = itemName,
-                    IsHq = false,
+                    CanBeHq = row.CanBeHq,
                 };
                 return true;
             }
@@ -2700,7 +2782,7 @@ public partial class SlaveWindow
             {
                 ItemId = row.RowId,
                 ItemName = itemName,
-                IsHq = false,
+                CanBeHq = row.CanBeHq,
             };
         }
         xagmanItemNameLookupCache = lookup;
@@ -3351,7 +3433,7 @@ public partial class SlaveWindow
                     {
                         xagmanCollectionFirstStartupModeNegotiated = true;
                         plugin.TaskRunner.AddLog(
-                            $"Xagman: all {franchisePeers.Count} participating Franchise Owner client(s) have collection-first disabled; starting the legacy flow. Tony's local Prioritize setting was ignored.");
+                            $"Xagman: all {franchisePeers.Count} participating Franchise Owner client(s) have collection-first effectively disabled; starting the legacy flow. Tony's local Prioritize setting was ignored.");
                     }).ConfigureAwait(false);
                 }
             }
@@ -4189,6 +4271,60 @@ public partial class SlaveWindow
         return MatchesXagmanFranchiseCharacterFilters(cfg, charName)
             && (!xagmanFranchiseShowOnlySelected || xagmanFranchiseSelectedIndices.Contains(index));
     }
+    private static bool TryGetLoggedInXagmanCurrentCharacter(out string currentCharacter)
+    {
+        currentCharacter = string.Empty;
+        if (!Plugin.ClientState.IsLoggedIn
+            || !Plugin.PlayerState.IsLoaded
+            || Plugin.PlayerState.ContentId == 0)
+        {
+            return false;
+        }
+
+        var characterNameWorld = MonthlyReloggerTask.GetCurrentCharacterNameWorld().Trim();
+        var separatorIndex = characterNameWorld.LastIndexOf('@');
+        if (separatorIndex <= 0
+            || separatorIndex >= characterNameWorld.Length - 1
+            || characterNameWorld.EndsWith("@Unknown", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        currentCharacter = characterNameWorld;
+        return true;
+    }
+    private void SelectXagmanCurrentCharacter(
+        XagmanMatchSelectionTarget target,
+        string currentCharacter)
+    {
+        ResetXagmanMatchingCharacterSelection();
+        var cfg = plugin.Configuration;
+        var index = target == XagmanMatchSelectionTarget.Tony
+            ? cfg.XagmanTonyCharacters.FindIndex(entry =>
+                entry.CharacterNameWorld.Equals(currentCharacter, StringComparison.OrdinalIgnoreCase))
+            : cfg.XagmanFranchiseCharacters.FindIndex(entry =>
+                entry.Equals(currentCharacter, StringComparison.OrdinalIgnoreCase));
+        var selectionLabel = target == XagmanMatchSelectionTarget.Tony
+            ? "Tony"
+            : "Franchise Owner";
+        if (index < 0)
+        {
+            arImportStatus = $"Xagman: the logged-in character cannot be selected because it is not configured in the {selectionLabel} list.";
+            arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+            return;
+        }
+
+        var selectedIndices = target == XagmanMatchSelectionTarget.Tony
+            ? xagmanTonySelectedIndices
+            : xagmanFranchiseSelectedIndices;
+        var added = selectedIndices.Add(index);
+        if (added)
+            InvalidateXagmanTradeCapacityForecast();
+        arImportStatus = added
+            ? $"Xagman: selected the logged-in character in the {selectionLabel} list."
+            : $"Xagman: the logged-in character is already selected in the {selectionLabel} list.";
+        arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
+    }
     private List<int> GetVisibleXagmanTonyCharacterIndices(Configuration cfg)
     {
         var indices = new List<int>();
@@ -4678,8 +4814,8 @@ public partial class SlaveWindow
             return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // XA.Database.GetMatchingCharactersForItems returns character keys only and deliberately
-        // searches all globally indexed item containers, including retainers. Xagman can trade from
-        // the four main bags only, so use detailed rows where the container can be proven first.
+        // searches all globally indexed item containers, including retainers. Xagman uses detailed
+        // rows so ordinary items remain main-bag-only while elemental crystals can use Crystals.
         var matches = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in items.Where(item => ShouldIncludeXagmanMatchingSelectionItem(item, ignoreGil)))
         {
@@ -4725,7 +4861,7 @@ public partial class SlaveWindow
             {
                 ItemId = row.RowId,
                 ItemName = itemName,
-                IsHq = false,
+                CanBeHq = row.CanBeHq,
             });
         }
 
@@ -4773,7 +4909,7 @@ public partial class SlaveWindow
         foreach (var line in lines)
         {
             if (TryParseXagmanSearchMatch(line, out var match)
-                && IsXagmanMainInventoryContainer(match.ContainerName))
+                && IsXagmanSupportedItemContainer(match.ItemId, match.ContainerName))
             {
                 results.Add(match);
             }
@@ -4814,7 +4950,8 @@ public partial class SlaveWindow
         bool isHq,
         bool searchOnly = false)
     {
-        if (!CanAddXagmanItem(items, itemId, isHq, searchOnly))
+        if ((isHq && !CanXagmanItemBeHq(itemId))
+            || !CanAddXagmanItem(items, itemId, isHq, searchOnly))
             return;
 
         var applicability = XagmanItemApplicability.All;
@@ -11278,6 +11415,8 @@ public partial class SlaveWindow
                 ? xagmanPreferredTonyCharacter
                 : GetXagmanPreferredTonyCharacter());
         var items = plugin.Configuration.XagmanItems;
+        var hasConditionalItemPolicies = role == XagmanRole.FranchiseOwner
+            && HasXagmanConditionalItemPolicies(items);
         var requestedItems = xagmanRunning
             && xagmanActiveRole == XagmanRole.FranchiseOwner
             && !IsXagmanCollectionFirstCollectionPhase()
@@ -11346,9 +11485,10 @@ public partial class SlaveWindow
                 GreenValueProtocolRevision = XagmanGreenValueProtocolRevision,
                 RunId = IsXagmanCollectionFirstRunActive() ? xagmanRunId : string.Empty,
                 CollectionFirstEnabled = IsXagmanCollectionFirstRunActive(),
-                CollectionFirstRequested = IsXagmanCollectionFirstRequestedForRole(role),
-                HasConditionalItemPolicies = role == XagmanRole.FranchiseOwner
-                    && HasXagmanConditionalItemPolicies(items),
+                CollectionFirstRequested = IsXagmanCollectionFirstRequestedForRole(
+                    role,
+                    hasConditionalItemPolicies),
+                HasConditionalItemPolicies = hasConditionalItemPolicies,
                 RunPhase = IsXagmanCollectionFirstRunActive() ? xagmanRunPhase : XagmanRunPhase.Legacy,
                 PhaseTotalCharacters = IsXagmanCollectionFirstRunActive() ? Math.Max(0, xagmanPhaseTotalCharacters) : 0,
                 PhaseResolvedCharacters = IsXagmanCollectionFirstRunActive()
@@ -13456,7 +13596,10 @@ public partial class SlaveWindow
 
             var quantity = 0;
             var loadedContainerCount = 0;
-            foreach (var inventoryType in XagmanMainInventoryTypes)
+            var inventoryTypes = IsXagmanElementalCrystalItem(itemId)
+                ? XagmanCrystalInventoryTypes
+                : XagmanMainInventoryTypes;
+            foreach (var inventoryType in inventoryTypes)
             {
                 var container = inventoryManager->GetInventoryContainer(inventoryType);
                 if (container == null || !container->IsLoaded)
@@ -13479,7 +13622,7 @@ public partial class SlaveWindow
                 }
             }
 
-            return loadedContainerCount == XagmanMainInventoryTypes.Length ? quantity : 0;
+            return loadedContainerCount == inventoryTypes.Length ? quantity : 0;
         }
         catch
         {
@@ -13561,8 +13704,9 @@ public partial class SlaveWindow
         if (IsXagmanCurrentLocalCharacter(characterNameWorld))
             return GetXagmanLiveLocalItemQuantity(itemId, isHq, tradableOnly: false);
 
-        // XA Database item snapshots describe held Inventory 1-4 quantities. The
-        // local path above is the only place the Dropbox eligibility filter differs.
+        // XA Database item snapshots describe held Inventory 1-4 quantities plus the dedicated
+        // Crystals container for elemental shards/crystals/clusters. The local path above is the
+        // only place the Dropbox eligibility filter differs.
         return GetXagmanCharacterItemQuantity(characterNameWorld, itemId, isHq, itemName);
     }
 

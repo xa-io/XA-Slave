@@ -2,6 +2,7 @@ using System;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.DutyState;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 
 namespace XASlave.Services;
 
@@ -12,8 +13,6 @@ public sealed class AutoLeaveDutyService : IDisposable
     public const int DelaySecondsDefault = 1;
 
     private const int RetryThrottleMilliseconds = 1500;
-    private const int ContentsFinderMenuLeaveNodeIndex = 43;
-    private const byte ContentsFinderMenuVirtualKey = 0x55;
 
     private readonly IDutyState dutyState;
     private readonly IClientState clientState;
@@ -171,7 +170,7 @@ public sealed class AutoLeaveDutyService : IDisposable
         if (AddonHelper.IsAddonVisible("ContentsFinderMenu"))
         {
             if (AddonHelper.IsAddonReady("ContentsFinderMenu"))
-                TryClickLeave(now);
+                TryRequestLeave(now);
 
             UpdateStatusText();
             return;
@@ -213,7 +212,11 @@ public sealed class AutoLeaveDutyService : IDisposable
     {
         try
         {
-            KeyInputHelper.PressKey(ContentsFinderMenuVirtualKey);
+            if (!AddonHelper.ShowAgent(AgentId.ContentsFinderMenu))
+            {
+                log.Debug("[XASlave] Auto Leave Duty is waiting for the ContentsFinderMenu agent.");
+            }
+
             lastInteractionTick = now;
         }
         catch (Exception ex)
@@ -222,18 +225,18 @@ public sealed class AutoLeaveDutyService : IDisposable
         }
     }
 
-    private void TryClickLeave(long now)
+    private void TryRequestLeave(long now)
     {
         try
         {
-            if (!AddonHelper.ClickAddonButton("ContentsFinderMenu", ContentsFinderMenuLeaveNodeIndex))
+            if (!AddonHelper.TryRequestLeaveDutyFromContentsFinderMenu())
                 return;
 
             lastInteractionTick = now;
         }
         catch (Exception ex)
         {
-            log.Warning(ex, "[XASlave] Auto Leave Duty failed while clicking Leave Duty.");
+            log.Warning(ex, "[XASlave] Auto Leave Duty failed while sending the Leave Duty callbacks.");
         }
     }
 
@@ -241,14 +244,8 @@ public sealed class AutoLeaveDutyService : IDisposable
     {
         try
         {
-            // Only confirm a SelectYesno that actually looks like the leave-duty prompt. Once
-            // pendingLeave is armed, blindly clicking Yes on any visible yes/no dialog could
-            // auto-accept an unrelated prompt (loot roll, gear-drop, etc.) that appears first.
-            if (!AddonHelper.AddonHasText("SelectYesno", "duty", contains: true)
-                && !AddonHelper.AddonHasText("SelectYesno", "leave", contains: true))
-            {
+            if (!AddonHelper.IsLeaveDutyConfirmationPrompt())
                 return;
-            }
 
             if (!AddonHelper.ClickYesNo(true))
                 return;
@@ -303,20 +300,30 @@ public sealed class AutoLeaveDutyService : IDisposable
 
         if (AddonHelper.IsAddonVisible("SelectYesno"))
         {
-            StatusText = AddonHelper.IsAddonReady("SelectYesno")
-                ? "Enabled - duty complete detected; confirming Leave Duty."
-                : "Enabled - duty complete detected; waiting for the leave confirmation dialog.";
+            if (!AddonHelper.IsAddonReady("SelectYesno"))
+            {
+                StatusText = "Enabled - duty complete detected; waiting for the leave confirmation dialog.";
+            }
+            else if (AddonHelper.IsLeaveDutyConfirmationPrompt())
+            {
+                StatusText = "Enabled - duty complete detected; confirming the validated Leave Duty prompt.";
+            }
+            else
+            {
+                StatusText = "Enabled - unrelated or unreadable confirmation is open; leaving it untouched.";
+            }
+
             return;
         }
 
         if (AddonHelper.IsAddonVisible("ContentsFinderMenu"))
         {
             StatusText = AddonHelper.IsAddonReady("ContentsFinderMenu")
-                ? "Enabled - duty complete detected; pressing Leave Duty in the duty menu."
+                ? "Enabled - duty complete detected; sending the controller-safe Leave Duty request."
                 : "Enabled - duty complete detected; waiting for the duty menu to finish opening.";
             return;
         }
 
-        StatusText = "Enabled - duty complete detected; opening the duty menu to leave.";
+        StatusText = "Enabled - duty complete detected; opening the game-owned duty menu without keyboard input.";
     }
 }

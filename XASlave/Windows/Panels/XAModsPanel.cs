@@ -3175,9 +3175,9 @@ public partial class SlaveWindow
             plugin.AutoLeaveDuty.SetEnabled,
             applied => configuration.AutoLeaveDutyEnabled = applied,
             "Leaves a completed duty automatically after combat and blocking duty UI states clear.",
-            "Watches for duty completion, waits the selected delay, then opens the duty menu and confirms Leave Duty once combat, cutscene, and occupied-state blockers are gone. This is meant for normal completed-duty cleanup and does not force an early exit.",
+            "Watches for duty completion, waits the selected delay, then opens the game-owned duty menu through its agent without pressing U, sends the controller-safe Leave Duty callbacks, and confirms only a validated leave-duty prompt once combat, cutscene, and occupied-state blockers are gone. This is meant for normal completed-duty cleanup and does not force an early exit.",
             plugin.AutoLeaveDuty.StatusText,
-            searchTerms: ["completed duty", "leave duty", "instance", "dungeon", "raid", "delay", "1-10 sec", "duty menu"],
+            searchTerms: ["completed duty", "leave duty", "instance", "dungeon", "raid", "delay", "1-10 sec", "duty menu", "controller", "no U"],
             drawOptions: DrawAutoLeaveDutyOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -3745,8 +3745,15 @@ public partial class SlaveWindow
             toonModsShowOnlyEnabled = !toonModsShowOnlyEnabled;
         }
         ImGui.SameLine();
+        var disableAllModsModifierHeld = ImGui.GetIO().KeyCtrl;
+        if (!disableAllModsModifierHeld)
+            ImGui.BeginDisabled();
         if (ImGui.Button("Disable All Mods##ToonModsDisableAll"))
             DisableAllMods();
+        if (!disableAllModsModifierHeld)
+            ImGui.EndDisabled();
+        if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+            ImGui.SetTooltip("Hold CTRL and click to clear all XA Mods.");
         ImGui.SameLine();
         if (ImGui.Button("Save List##ToonModsSaveList"))
             ImGui.OpenPopup("ToonModsSaveListPopup");

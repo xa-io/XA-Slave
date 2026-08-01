@@ -23,6 +23,33 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.43 - 2026-08-01",
+            Lines =
+            [
+                "XA Mods",
+                "- Disable All Mods is now locked and grayed out until Ctrl is held. Its tooltip explains that Ctrl+click is required before clearing every enabled XA Mod.",
+                "",
+                "Player Mods & Debug",
+                "- Added Leave Duty Quick beside the existing Debug Leave Duty control. It bypasses the physical/controller U key, opens the game-owned duty menu, sends the server-side leave callback, and confirms only a validated leave-duty prompt.",
+                "- Updated XA Mods > Player Mods > Auto Leave Duty to use the same controller-safe duty-menu agent/callback path instead of pressing U or clicking a hardcoded menu node, while preserving its saved toggle, selected delay, safety blockers, status, and cleanup behavior.",
+                "",
+                "Window & Plugin Compatibility",
+                "- Window Renamer now keeps the exact native FINAL FANTASY XIV title while XIVWindowResizer is loaded, visibly pauses only the live rename, and reapplies the user's unchanged custom/PID/character title after XIVWindowResizer unloads.",
+                "",
+                "Moogle Mail & IPC",
+                "- IPC Calls live pulls now show the same XASlave.IsBusy state exposed to other plugins, including the full pending Auto Open Moogle Mail operation.",
+                "- The Letter List overlay's Take all action now honors the saved Delete all when finished option, matching Claim Attachments in XA Mods.",
+                "",
+                "Xagman",
+                "- Added a logged-in-only Select Current Character button after Select Matching Items in both role tables. It uses XA Debug's home-world Name@World identity and adds the configured current row without clearing other selections or changing filters.",
+                "- Prioritize Characters Giving Items First is now effective only while that Franchise Owner has an if Subs/Retainers Shared Item policy. A saved hidden preference advertises Off, so all-ordinary lists retain the legacy combined trade flow instead of refusing startup.",
+                "- HQ selection now follows the exact Lumina Item.CanBeHq value. Sheet-declared NQ-only items show a fixed NQ value, while genuinely HQ-capable items retain the checkbox; impossible imported, saved, or peer-provided HQ rows fail closed.",
+                "- Elemental shards, crystals, and clusters now use the player's dedicated Crystals inventory for live counts, XA Database matching, forecasts, Dropbox supply, finite-Take baselines, and post-trade reconciliation. Every non-crystal exact item remains limited to Inventory 1-4.",
+                "- Crystal capacity uses each element's dedicated 9,999-unit pouch slot and does not consume or advertise main-bag slots.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.42 - 2026-07-28",
             Lines =
             [
