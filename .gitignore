@@ -6,13 +6,18 @@ obj/
 .vs/
 .windsurf/
 .claude-octopus
+.agents
+.vscode/
+.codex/
+.claude/
+.github/
 *.user
 *.suo
 *.cache
 
-
 # Backups (local development history)
 backups/
+**/backups/
 
 # Local changelog (not committed)
 changelog.txt
@@ -22,10 +27,19 @@ github_release/
 github_release_stable/
 github_release_testing/
 dual_builds/
+.github_release.staging/
+.github_release_stable.staging/
+.github_release_testing.staging/
+.github_release_stable.previous-*/
+.github_release_testing.previous-*/
 
 # Internal tooling scripts (not part of the plugin source)
 *.py
 docs/
+TestResults/
+test/
+tests/
+*.Tests/
 
 # Root-level images (not plugin assets)
 *.png
@@ -41,6 +55,7 @@ Previous Releases/
 # Python cache
 __pycache__/
 *.pyc
+crash_log_*.log
 
 # OS files
 Thumbs.db
