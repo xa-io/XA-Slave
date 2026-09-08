@@ -4,6 +4,7 @@ using System.Linq;
 using System.Numerics;
 using System.Text.Json;
 using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Utility.Raii;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using XASlave.Data;
 using XASlave.Services;
@@ -23,6 +24,13 @@ public partial class SlaveWindow
         IllegalMods,
     }
 
+    private sealed record XAModCatalogueEntry(
+        ToonModsSection Section,
+        string Label,
+        string SearchHaystack,
+        Func<bool> GetCurrent,
+        Action Draw);
+
     private static readonly string[] AutoExpertDeliveryPageLabels = { "Supply Missions", "Provisioning Missions", "Expert Delivery" };
     private static readonly EurekaInstanceIdService.EurekaZone[] EurekaZoneOptions =
     {
@@ -31,7 +39,19 @@ public partial class SlaveWindow
         EurekaInstanceIdService.EurekaZone.Pyros,
         EurekaInstanceIdService.EurekaZone.Hydatos,
     };
+    private static readonly (ToonModsSection Section, string Title)[] ToonModsSectionOrder =
+    {
+        (ToonModsSection.GameMods, "Game Mods"),
+        (ToonModsSection.UiMods, "UI Mods"),
+        (ToonModsSection.GraphicMods, "Graphic Mods"),
+        (ToonModsSection.PlayerMods, "Player Mods"),
+        (ToonModsSection.PluginMods, "Plugin Mods"),
+        (ToonModsSection.EurekaMods, "Eureka Mods"),
+        (ToonModsSection.IllegalMods, "Illegal Shit You Shouldn't Use"),
+    };
     private string toonModsSearchText = string.Empty;
+    private string toonModsCachedSearchText = string.Empty;
+    private string[] toonModsLowerQueryTerms = [];
     private bool toonModsShowOnlyEnabled;
     private string toonModsSavedListName = string.Empty;
     private string toonModsStatus = string.Empty;
@@ -44,6 +64,13 @@ public partial class SlaveWindow
     private string dalamudLogDisablerFilter = string.Empty;
     private string notifyWhenFriendIsNearPatternInput = string.Empty;
     private readonly Dictionary<ToonModsSection, (float StartY, float EndY, string Title)> toonModsSectionScrollRanges = new();
+    private readonly List<XAModCatalogueEntry> xaModCatalogue = [];
+    private readonly List<(string Key, Func<bool> GetCurrent, Func<bool, bool> Apply, Action<bool> Store)> xaModDefinitions = [];
+    private Dictionary<ToonModsSection, XAModCatalogueEntry[]> xaModCatalogueBySection = [];
+    private readonly Dictionary<XAModCatalogueEntry, bool> xaModCurrentStateFrame = [];
+    private readonly Dictionary<XAModCatalogueEntry, bool> xaModVisibilityFrame = [];
+    private IReadOnlyList<ToonModSavedList>? toonModsSortedSavedLists;
+    private bool xaModCatalogueBuilt;
     private float toonModsSectionsScrollY;
     private static readonly JsonSerializerOptions toonModsListJsonOptions = ToonModsPresetSerialization.JsonOptions;
 
@@ -112,28 +139,34 @@ public partial class SlaveWindow
                 return;
         }
 
-        plugin.Configuration.Save();
+        plugin.Configuration.SaveDeferred();
     }
 
     private void DrawXAModsTask()
     {
         var configuration = plugin.Configuration;
-        var featureEntries = new List<(ToonModsSection Section, string Label, Action Draw)>();
-        var toonModDefinitions = new List<(string Key, Func<bool> GetCurrent, Func<bool, bool> Apply, Action<bool> Store)>();
-        var toonModsSectionOrder = new (ToonModsSection Section, string Title)[]
+        var featureEntries = xaModCatalogue;
+        var toonModDefinitions = xaModDefinitions;
+        var buildCatalogue = !xaModCatalogueBuilt;
+        if (buildCatalogue)
         {
-            (ToonModsSection.GameMods, "Game Mods"),
-            (ToonModsSection.UiMods, "UI Mods"),
-            (ToonModsSection.GraphicMods, "Graphic Mods"),
-            (ToonModsSection.PlayerMods, "Player Mods"),
-            (ToonModsSection.PluginMods, "Plugin Mods"),
-            (ToonModsSection.EurekaMods, "Eureka Mods"),
-            (ToonModsSection.IllegalMods, "Illegal Shit You Shouldn't Use"),
-        };
+            featureEntries.Clear();
+            toonModDefinitions.Clear();
+            xaModCatalogueBySection.Clear();
+        }
+
+        if (!string.Equals(toonModsCachedSearchText, toonModsSearchText, StringComparison.Ordinal))
+        {
+            toonModsCachedSearchText = toonModsSearchText;
+            toonModsLowerQueryTerms = toonModsSearchText
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(term => term.ToLowerInvariant())
+                .ToArray();
+        }
 
         void SaveConfiguration()
         {
-            configuration.Save();
+            configuration.SaveDeferred();
         }
 
         void SetToonModsStatus(string message, bool isError = false)
@@ -157,11 +190,9 @@ public partial class SlaveWindow
             if (!ImGui.IsItemHovered())
                 return;
 
-            ImGui.BeginTooltip();
-            ImGui.PushTextWrapPos(Scale(460f));
-            ImGui.TextUnformatted(helpText);
-            ImGui.PopTextWrapPos();
-            ImGui.EndTooltip();
+            using (ImRaii.Tooltip())
+            using (ImRaii.TextWrapPos(Scale(460f)))
+                ImGui.TextUnformatted(helpText);
         }
 
         void DrawWarningText(string warningText)
@@ -169,9 +200,8 @@ public partial class SlaveWindow
             if (string.IsNullOrWhiteSpace(warningText))
                 return;
 
-            ImGui.PushTextWrapPos(Scale(460f));
-            ImGui.TextColored(new Vector4(1.0f, 0.7f, 0.25f, 1.0f), warningText);
-            ImGui.PopTextWrapPos();
+            using (ImRaii.TextWrapPos(Scale(460f)))
+                ImGui.TextColored(new Vector4(1.0f, 0.7f, 0.25f, 1.0f), warningText);
         }
 
         Vector4 GetSpecialRenderBackgroundColor()
@@ -335,6 +365,7 @@ public partial class SlaveWindow
 
         void ApplySightDistanceConfiguration()
         {
+            NormalizeSightDistanceConfiguration();
             plugin.SightDistance.ApplyConfiguration(
                 configuration.CustomSightDistanceMaxDistance,
                 configuration.CustomSightDistanceMinDistance,
@@ -344,6 +375,20 @@ public partial class SlaveWindow
                 configuration.CustomSightDistanceMinFoV,
                 configuration.CustomSightDistanceFoV,
                 configuration.CustomSightDistanceIgnoreCollision);
+        }
+
+        void NormalizeSightDistanceConfiguration()
+        {
+            static float ClampFinite(float value, float minimum, float maximum, float fallback)
+                => float.IsFinite(value) ? Math.Clamp(value, minimum, maximum) : Math.Clamp(fallback, minimum, maximum);
+
+            configuration.CustomSightDistanceMaxDistance = ClampFinite(configuration.CustomSightDistanceMaxDistance, 1f, 80f, 80f);
+            configuration.CustomSightDistanceMinDistance = ClampFinite(configuration.CustomSightDistanceMinDistance, 0f, configuration.CustomSightDistanceMaxDistance, 1.5f);
+            configuration.CustomSightDistanceMaxRotation = ClampFinite(configuration.CustomSightDistanceMaxRotation, -1.569f, 1.569f, 1.569f);
+            configuration.CustomSightDistanceMinRotation = ClampFinite(configuration.CustomSightDistanceMinRotation, -1.569f, configuration.CustomSightDistanceMaxRotation, -1.483530f);
+            configuration.CustomSightDistanceMaxFoV = ClampFinite(configuration.CustomSightDistanceMaxFoV, 0.01f, 3f, 0.78f);
+            configuration.CustomSightDistanceMinFoV = ClampFinite(configuration.CustomSightDistanceMinFoV, 0.01f, configuration.CustomSightDistanceMaxFoV, 0.69f);
+            configuration.CustomSightDistanceFoV = ClampFinite(configuration.CustomSightDistanceFoV, configuration.CustomSightDistanceMinFoV, configuration.CustomSightDistanceMaxFoV, configuration.CustomSightDistanceMaxFoV);
         }
 
         void ApplyInfiniteSprintConfiguration()
@@ -379,32 +424,30 @@ public partial class SlaveWindow
             var modifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
             var toggled = false;
 
-            if (requireCtrlShiftToEnable && !currentValue && !modifierHeld)
-            {
-                ImGui.BeginDisabled();
-                ImGui.Checkbox(label, ref value);
-                ImGui.EndDisabled();
+            var enableBlocked = requireCtrlShiftToEnable && !currentValue && !modifierHeld;
+            using (ImRaii.Disabled(enableBlocked))
+                toggled = ImGui.Checkbox(label, ref value);
 
+            if (enableBlocked)
+            {
                 if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                 {
-                    ImGui.BeginTooltip();
-                    ImGui.PushTextWrapPos(Scale(320f));
-                    ImGui.TextUnformatted("Hold CTRL + SHIFT to allow changing.");
-                    ImGui.PopTextWrapPos();
-                    ImGui.EndTooltip();
+                    using (ImRaii.Tooltip())
+                    using (ImRaii.TextWrapPos(Scale(320f)))
+                        ImGui.TextUnformatted("Hold CTRL + SHIFT to allow changing.");
                 }
-            }
-            else
-            {
-                toggled = ImGui.Checkbox(label, ref value);
             }
 
             if (toggled)
             {
-                var applied = apply(value);
-                store(applied);
-                SaveConfiguration();
-                value = applied;
+                var queued = plugin.QueueXAModToggle(
+                    label,
+                    value,
+                    apply,
+                    store,
+                    (success, resultMessage) => SetToonModsStatus($"XA Mods: {resultMessage}", !success),
+                    out var queueMessage);
+                SetToonModsStatus($"XA Mods: {queueMessage}", !queued);
             }
 
             ImGui.SameLine(0f, 6f);
@@ -424,22 +467,20 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
-        bool MatchesToonModsSearch(string label, string description, string helpText, string[]? extraTerms = null)
+        static string BuildToonModsSearchHaystack(string label, string description, string helpText, string[]? extraTerms)
         {
-            if (string.IsNullOrWhiteSpace(toonModsSearchText))
-                return true;
-
-            var queryTerms = toonModsSearchText.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-            if (queryTerms.Length == 0)
-                return true;
-
             var haystack = $"{label}\n{description}\n{helpText}";
             if (extraTerms is { Length: > 0 })
                 haystack = $"{haystack}\n{string.Join('\n', extraTerms)}";
 
-            foreach (var term in queryTerms)
+            return haystack.ToLowerInvariant();
+        }
+
+        bool MatchesToonModsSearch(string searchHaystack)
+        {
+            foreach (var term in toonModsLowerQueryTerms)
             {
-                if (!haystack.Contains(term, StringComparison.OrdinalIgnoreCase))
+                if (!searchHaystack.Contains(term, StringComparison.Ordinal))
                     return false;
             }
 
@@ -449,25 +490,36 @@ public partial class SlaveWindow
         void AddFeatureEntry(
             ToonModsSection section,
             string label,
-            bool currentValue,
+            Func<bool> getCurrent,
             Func<bool, bool> apply,
             Action<bool> store,
             string description,
             string helpText,
-            string status,
+            Func<string> getStatus,
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
             string[]? searchTerms = null,
             Action? drawOptions = null,
             bool showOptionsWhenDisabled = false)
         {
-            if (toonModsShowOnlyEnabled && !currentValue)
-                return;
-
-            if (!MatchesToonModsSearch(label, description, helpText, searchTerms))
-                return;
-
-            featureEntries.Add((section, label, () => DrawFeatureToggle(label, currentValue, apply, store, description, helpText, status, warningText, requireCtrlShiftToEnable, drawOptions, showOptionsWhenDisabled)));
+            var searchHaystack = BuildToonModsSearchHaystack(label, description, helpText, searchTerms);
+            featureEntries.Add(new XAModCatalogueEntry(
+                section,
+                label,
+                searchHaystack,
+                getCurrent,
+                () => DrawFeatureToggle(
+                    label,
+                    getCurrent(),
+                    apply,
+                    store,
+                    description,
+                    helpText,
+                    getStatus(),
+                    warningText,
+                    requireCtrlShiftToEnable,
+                    drawOptions,
+                    showOptionsWhenDisabled)));
         }
 
         void AddSavedFeatureEntry(
@@ -479,7 +531,7 @@ public partial class SlaveWindow
             Action<bool> store,
             string description,
             string helpText,
-            string status,
+            Func<string> getStatus,
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
             string[]? searchTerms = null,
@@ -487,7 +539,7 @@ public partial class SlaveWindow
             bool showOptionsWhenDisabled = false)
         {
             toonModDefinitions.Add((key, getCurrent, apply, store));
-            AddFeatureEntry(section, label, getCurrent(), apply, store, description, helpText, status, warningText, requireCtrlShiftToEnable, searchTerms, drawOptions, showOptionsWhenDisabled);
+            AddFeatureEntry(section, label, getCurrent, apply, store, description, helpText, getStatus, warningText, requireCtrlShiftToEnable, searchTerms, drawOptions, showOptionsWhenDisabled);
         }
 
         List<string> GetCurrentToonModKeys()
@@ -527,7 +579,8 @@ public partial class SlaveWindow
                 saved.ModSettings = modSettings;
             }
 
-            SaveConfiguration();
+            configuration.Save();
+            toonModsSortedSavedLists = null;
             toonModsSavedListName = name;
             SetToonModsStatus($"XA Mods: saved list '{name}' ({modKeys.Count} mods).");
         }
@@ -536,8 +589,13 @@ public partial class SlaveWindow
         {
             var safeTitle = string.IsNullOrWhiteSpace(title) ? "XA Mods Selection" : title.Trim();
             toonModsSavedListName = safeTitle;
-            var success = plugin.ApplySavedXAModsPreset(safeTitle, modKeys, modSettings, out var message);
-            SetToonModsStatus($"XA Mods: {message}", !success);
+            var queued = plugin.ApplySavedXAModsPreset(
+                safeTitle,
+                modKeys,
+                modSettings,
+                (success, resultMessage) => SetToonModsStatus($"XA Mods: {resultMessage}", !success),
+                out var queueMessage);
+            SetToonModsStatus($"XA Mods: {queueMessage}", !queued);
         }
 
         void ExportCurrentToonModsList()
@@ -569,11 +627,19 @@ public partial class SlaveWindow
 
         bool TryImportToonModsList(string clipboardText, out ToonModsListPackage package, out string message)
         {
+            const int maxPresetCharacters = 512 * 1024;
+            const int supportedSchemaVersion = 2;
             package = new ToonModsListPackage();
 
             if (string.IsNullOrWhiteSpace(clipboardText))
             {
                 message = "XA Mods: clipboard data not supported.";
+                return false;
+            }
+
+            if (clipboardText.Length > maxPresetCharacters)
+            {
+                message = $"XA Mods: preset is too large ({clipboardText.Length:N0} characters, max {maxPresetCharacters:N0}).";
                 return false;
             }
 
@@ -592,6 +658,12 @@ public partial class SlaveWindow
                     && schemaVersionElement.TryGetInt32(out var schemaVersion))
                 {
                     package.SchemaVersion = schemaVersion;
+                }
+
+                if (package.SchemaVersion <= 0 || package.SchemaVersion > supportedSchemaVersion)
+                {
+                    message = $"XA Mods: preset schema v{package.SchemaVersion} is not supported by this build (latest v{supportedSchemaVersion}).";
+                    return false;
                 }
 
                 if (TryGetToonModsJsonProperty(root, "listId", out var listIdElement) && listIdElement.ValueKind == JsonValueKind.String)
@@ -618,14 +690,22 @@ public partial class SlaveWindow
                     .Where(element => element.ValueKind == JsonValueKind.String)
                     .Select(element => element.GetString() ?? string.Empty)
                     .Where(key => !string.IsNullOrWhiteSpace(key))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
                     .ToList();
+
+                var unknownKeys = package.ModKeys.Where(key => !plugin.IsKnownXAModKey(key)).Take(6).ToList();
+                if (unknownKeys.Count > 0)
+                {
+                    message = $"XA Mods: preset contains unknown mod key(s): {string.Join(", ", unknownKeys)}.";
+                    return false;
+                }
 
                 if (TryGetToonModsJsonProperty(root, "modSettings", out var modSettingsElement)
                     && modSettingsElement.ValueKind == JsonValueKind.Object)
                 {
                     foreach (var property in modSettingsElement.EnumerateObject())
                     {
-                        if (string.IsNullOrWhiteSpace(property.Name))
+                        if (string.IsNullOrWhiteSpace(property.Name) || !plugin.IsKnownXAModKey(property.Name))
                             continue;
 
                         package.ModSettings[property.Name] = property.Value.Clone();
@@ -662,7 +742,8 @@ public partial class SlaveWindow
 
         void DrawToonModsSaveListPopup()
         {
-            if (!ImGui.BeginPopup("ToonModsSaveListPopup"))
+            using var popup = ImRaii.Popup("ToonModsSaveListPopup");
+            if (!popup)
                 return;
 
             ImGui.SetNextItemWidth(Scale(220f));
@@ -671,22 +752,24 @@ public partial class SlaveWindow
             if (ImGui.Button("Save Current##ToonModsSaveCurrent"))
                 SaveCurrentToonModsList();
 
-            ImGui.EndPopup();
         }
 
         void DrawToonModsLoadListPopup()
         {
-            if (!ImGui.BeginPopup("ToonModsLoadListPopup"))
+            using var popup = ImRaii.Popup("ToonModsLoadListPopup");
+            if (!popup)
                 return;
 
             if (configuration.ToonModsSavedLists.Count == 0)
             {
                 ImGui.TextDisabled("No saved lists.");
-                ImGui.EndPopup();
                 return;
             }
 
-            foreach (var saved in configuration.ToonModsSavedLists.OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase).ToList())
+            toonModsSortedSavedLists ??= configuration.ToonModsSavedLists
+                .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
+                .ToArray();
+            foreach (var saved in toonModsSortedSavedLists)
             {
                 ImGui.TextUnformatted(saved.Name);
                 ImGui.SameLine();
@@ -694,34 +777,57 @@ public partial class SlaveWindow
                     ApplyToonModsList(saved.Name, saved.ModKeys, saved.ModSettings);
 
                 ImGui.SameLine();
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
-                if (ImGui.SmallButton($"X##ToonModsDelete{saved.Name}"))
+                using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
-                    configuration.ToonModsSavedLists.RemoveAll(entry => entry.Name.Equals(saved.Name, StringComparison.OrdinalIgnoreCase));
-                    SaveConfiguration();
-                    SetToonModsStatus($"XA Mods: deleted list '{saved.Name}'.");
-                    ImGui.PopStyleColor();
-                    break;
+                    if (ImGui.SmallButton($"X##ToonModsDelete{saved.Name}"))
+                    {
+                        configuration.ToonModsSavedLists.RemoveAll(entry => entry.Name.Equals(saved.Name, StringComparison.OrdinalIgnoreCase));
+                        configuration.Save();
+                        toonModsSortedSavedLists = null;
+                        SetToonModsStatus($"XA Mods: deleted list '{saved.Name}'.");
+                        break;
+                    }
                 }
-
-                ImGui.PopStyleColor();
             }
-
-            ImGui.EndPopup();
         }
 
-        List<(ToonModsSection Section, string Label, Action Draw)> GetSortedSectionEntries(ToonModsSection section)
+        IReadOnlyList<XAModCatalogueEntry> GetSortedSectionEntries(ToonModsSection section)
         {
-            return featureEntries
-                .Where(entry => entry.Section == section)
-                .OrderBy(entry => entry.Label, StringComparer.OrdinalIgnoreCase)
-                .ToList();
+            return xaModCatalogueBySection.TryGetValue(section, out var entries)
+                ? entries
+                : Array.Empty<XAModCatalogueEntry>();
+        }
+
+        bool GetToonModEntryCurrent(XAModCatalogueEntry entry)
+        {
+            if (xaModCurrentStateFrame.TryGetValue(entry, out var current))
+                return current;
+
+            current = entry.GetCurrent();
+            xaModCurrentStateFrame[entry] = current;
+            return current;
+        }
+
+        bool IsToonModEntryVisible(XAModCatalogueEntry entry)
+        {
+            if (xaModVisibilityFrame.TryGetValue(entry, out var visible))
+                return visible;
+
+            visible = (!toonModsShowOnlyEnabled || GetToonModEntryCurrent(entry))
+                && MatchesToonModsSearch(entry.SearchHaystack);
+            xaModVisibilityFrame[entry] = visible;
+            return visible;
         }
 
         void DrawModSection(ToonModsSection section, string title)
         {
             var sectionEntries = GetSortedSectionEntries(section);
-            var visibleCount = sectionEntries.Count;
+            var visibleCount = 0;
+            foreach (var entry in sectionEntries)
+            {
+                if (IsToonModEntryVisible(entry))
+                    visibleCount++;
+            }
             if (visibleCount == 0)
                 return;
 
@@ -730,7 +836,10 @@ public partial class SlaveWindow
             {
                 DrawSectionHeader($"{title} ({visibleCount})");
                 foreach (var entry in sectionEntries)
-                    entry.Draw();
+                {
+                    if (IsToonModEntryVisible(entry))
+                        entry.Draw();
+                }
 
                 return;
             }
@@ -738,10 +847,12 @@ public partial class SlaveWindow
             var sectionStartY = ImGui.GetCursorPosY();
 
             ImGui.Spacing();
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.6f, 0.9f, 1.0f, 1.0f));
-            ImGui.SetNextItemOpen(GetToonModsSectionExpanded(section), ImGuiCond.Always);
-            var isOpen = ImGui.CollapsingHeader(title);
-            ImGui.PopStyleColor();
+            bool isOpen;
+            using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.6f, 0.9f, 1.0f, 1.0f)))
+            {
+                ImGui.SetNextItemOpen(GetToonModsSectionExpanded(section), ImGuiCond.Always);
+                isOpen = ImGui.CollapsingHeader(title);
+            }
 
             if (isOpen != GetToonModsSectionExpanded(section))
                 SetToonModsSectionExpanded(section, isOpen);
@@ -754,7 +865,10 @@ public partial class SlaveWindow
 
             ImGui.Indent();
             foreach (var entry in sectionEntries)
-                entry.Draw();
+            {
+                if (IsToonModEntryVisible(entry))
+                    entry.Draw();
+            }
 
             ImGui.Unindent();
             toonModsSectionScrollRanges[section] = (sectionStartY, ImGui.GetCursorPosY(), title);
@@ -766,7 +880,7 @@ public partial class SlaveWindow
                 return null;
 
             var headerHeight = ImGui.GetFrameHeightWithSpacing();
-            foreach (var (section, title) in toonModsSectionOrder)
+            foreach (var (section, title) in ToonModsSectionOrder)
             {
                 if (!GetToonModsSectionExpanded(section))
                     continue;
@@ -788,31 +902,24 @@ public partial class SlaveWindow
             if (stickySection is not { } sticky)
                 return;
 
-            ImGui.PushStyleColor(ImGuiCol.Button, new Vector4(0.12f, 0.24f, 0.30f, 1.0f));
-            ImGui.PushStyleColor(ImGuiCol.ButtonHovered, new Vector4(0.16f, 0.34f, 0.42f, 1.0f));
-            ImGui.PushStyleColor(ImGuiCol.ButtonActive, new Vector4(0.10f, 0.20f, 0.26f, 1.0f));
-            if (ImGui.Button($"{sticky.Title}  ^##ToonModsStickySection{sticky.Section}", new Vector2(ImGui.GetContentRegionAvail().X, 0f)))
-                SetToonModsSectionExpanded(sticky.Section, false);
+            using (var colors = ImRaii.PushColor(ImGuiCol.Button, new Vector4(0.12f, 0.24f, 0.30f, 1.0f)))
+            {
+                colors.Push(ImGuiCol.ButtonHovered, new Vector4(0.16f, 0.34f, 0.42f, 1.0f));
+                colors.Push(ImGuiCol.ButtonActive, new Vector4(0.10f, 0.20f, 0.26f, 1.0f));
+                if (ImGui.Button($"{sticky.Title}  ^##ToonModsStickySection{sticky.Section}", new Vector2(ImGui.GetContentRegionAvail().X, 0f)))
+                    SetToonModsSectionExpanded(sticky.Section, false);
+            }
 
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip($"Collapse {sticky.Title}");
-
-            ImGui.PopStyleColor();
-            ImGui.PopStyleColor();
-            ImGui.PopStyleColor();
-        }
-
-        void DisableFeature(Func<bool, bool> apply, Action<bool> store)
-        {
-            store(apply(false));
         }
 
         void DisableAllMods()
         {
-            foreach (var definition in toonModDefinitions)
-                DisableFeature(definition.Apply, definition.Store);
-
-            SaveConfiguration();
+            var queued = plugin.QueueDisableAllXAMods(
+                (success, resultMessage) => SetToonModsStatus($"XA Mods: {resultMessage}", !success),
+                out var queueMessage);
+            SetToonModsStatus($"XA Mods: {queueMessage}", !queued);
         }
 
         void DrawBackgroundRenderingOptions()
@@ -964,13 +1071,9 @@ public partial class SlaveWindow
         {
             var value = currentValue;
             var disableEnablePath = !currentValue && !string.IsNullOrWhiteSpace(blockedEnableMessage);
-            if (disableEnablePath)
-                ImGui.BeginDisabled();
-
-            var changed = ImGui.Checkbox($"{label}##{id}", ref value);
-
-            if (disableEnablePath)
-                ImGui.EndDisabled();
+            bool changed;
+            using (ImRaii.Disabled(disableEnablePath))
+                changed = ImGui.Checkbox($"{label}##{id}", ref value);
 
             if (disableEnablePath && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                 ImGui.SetTooltip(blockedEnableMessage);
@@ -990,15 +1093,14 @@ public partial class SlaveWindow
 
             void DrawWorldFadeButton(string label, bool hidden)
             {
-                if (!worldFadeAvailable)
-                    ImGui.BeginDisabled();
-
-                if (ImGui.Button(label))
-                    plugin.SystemWindowMods.SetSpecialRenderWorldHidden(hidden, backgroundColor);
+                using (ImRaii.Disabled(!worldFadeAvailable))
+                {
+                    if (ImGui.Button(label))
+                        plugin.SystemWindowMods.SetSpecialRenderWorldHidden(hidden, backgroundColor);
+                }
 
                 if (!worldFadeAvailable)
                 {
-                    ImGui.EndDisabled();
                     if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
                         ImGui.SetTooltip("World fade is unavailable because the native fade helper could not be resolved. UI visibility toggles still work.");
                 }
@@ -1107,7 +1209,7 @@ public partial class SlaveWindow
 
             ImGui.SameLine();
             ImGui.TextDisabled("Example");
-            ImGui.TextDisabled("Command: /xa res 500x345");
+            ImGui.TextDisabled("Commands: /xa res 500x345 or /xa res 1280 720; /xa res reset restores the captured size");
 
             var width = xaModsCustomResolutionWidth;
             if (ImGui.InputInt("Width##CustomResolutionPresetWidth", ref width))
@@ -1152,7 +1254,7 @@ public partial class SlaveWindow
         void DrawLowResolutionOptions()
         {
             var scale = configuration.LowResolutionScale;
-            if (ImGui.SliderFloat("3D resolution scale##LowResolution", ref scale, 0.01f, 1.00f, "%.2f"))
+            if (ImGui.SliderFloat("3D resolution scale##LowResolution", ref scale, 0.01f, 1.00f, "%.2f", ImGuiSliderFlags.AlwaysClamp))
             {
                 configuration.LowResolutionScale = scale;
                 plugin.SystemWindowMods.ApplyLowResolutionConfiguration(scale);
@@ -1197,7 +1299,7 @@ public partial class SlaveWindow
         void DrawSightDistanceSlider(string label, string id, float currentValue, float minimumValue, float maximumValue, string format, Action<float> store)
         {
             var value = currentValue;
-            if (!ImGui.SliderFloat($"{label}##{id}", ref value, minimumValue, maximumValue, format))
+            if (!ImGui.SliderFloat($"{label}##{id}", ref value, minimumValue, maximumValue, format, ImGuiSliderFlags.AlwaysClamp))
                 return;
 
             store(value);
@@ -1295,28 +1397,25 @@ public partial class SlaveWindow
         void DrawInstantLogoutTool()
         {
             var logoutActionsAllowed = plugin.CanTriggerLogoutActions(out var blockedMessage);
-            if (!logoutActionsAllowed)
-                ImGui.BeginDisabled();
-
-            if (ImGui.Button("Log out now##InstantLogout"))
+            using (ImRaii.Disabled(!logoutActionsAllowed))
             {
-                if (!plugin.TryRequestLogoutAction(out var message))
-                    SetToonModsStatus($"XA Mods: {message}", true);
-                else
-                    SetToonModsStatus("XA Mods: Triggered XA hard logout.");
-            }
+                if (ImGui.Button("Log out now##InstantLogout"))
+                {
+                    if (!plugin.TryRequestLogoutAction(out var message))
+                        SetToonModsStatus($"XA Mods: {message}", true);
+                    else
+                        SetToonModsStatus("XA Mods: Triggered XA hard logout.");
+                }
 
-            ImGui.SameLine();
-            if (ImGui.Button("Kill game now##InstantLogout"))
-            {
-                if (!plugin.TryRequestKillGameAction(out var message))
-                    SetToonModsStatus($"XA Mods: {message}", true);
-                else
-                    SetToonModsStatus("XA Mods: Triggered XA kill-game flow.");
+                ImGui.SameLine();
+                if (ImGui.Button("Kill game now##InstantLogout"))
+                {
+                    if (!plugin.TryRequestKillGameAction(out var message))
+                        SetToonModsStatus($"XA Mods: {message}", true);
+                    else
+                        SetToonModsStatus("XA Mods: Triggered XA kill-game flow.");
+                }
             }
-
-            if (!logoutActionsAllowed)
-                ImGui.EndDisabled();
 
             ImGui.TextDisabled("Commands: /xa logout | /xa killgame");
             ImGui.TextDisabled("Kill game waits for logout to complete, then sends /xlkill.");
@@ -1338,7 +1437,7 @@ public partial class SlaveWindow
             }
 
             ImGui.SetNextItemWidth(Scale(180f));
-            if (ImGui.SliderInt("Timeout##BailoutEscMenu", ref timeoutIndex, 0, timeoutOptions.Length - 1, $"{timeoutOptions[timeoutIndex]} sec"))
+            if (ImGui.SliderInt("Timeout##BailoutEscMenu", ref timeoutIndex, 0, timeoutOptions.Length - 1, $"{timeoutOptions[timeoutIndex]} sec", ImGuiSliderFlags.AlwaysClamp))
             {
                 configuration.BailoutEscMenuSeconds = timeoutOptions[timeoutIndex];
                 ApplyBailoutEscMenuConfiguration();
@@ -1370,7 +1469,8 @@ public partial class SlaveWindow
                     ref delaySeconds,
                     PlayerModsService.InfiniteSprintDelaySecondsMinimum,
                     PlayerModsService.InfiniteSprintDelaySecondsMaximum,
-                    "%.1f sec"))
+                    "%.1f sec",
+                    ImGuiSliderFlags.AlwaysClamp))
             {
                 configuration.InfiniteSprintDelaySeconds = delaySeconds;
                 ApplyInfiniteSprintConfiguration();
@@ -1388,7 +1488,8 @@ public partial class SlaveWindow
                     ref delaySeconds,
                     AutoLeaveDutyService.DelaySecondsMinimum,
                     AutoLeaveDutyService.DelaySecondsMaximum,
-                    "%d sec"))
+                    "%d sec",
+                    ImGuiSliderFlags.AlwaysClamp))
             {
                 configuration.AutoLeaveDutyDelaySeconds = delaySeconds;
                 ApplyAutoLeaveDutyConfiguration();
@@ -1535,24 +1636,25 @@ public partial class SlaveWindow
             ImGui.TextDisabled($"Use +/- for 30-second steps or type an exact value ({AlertWhenTypingInCombatService.MinimumCooldownSeconds}-{AlertWhenTypingInCombatService.MaximumCooldownSeconds}s).");
 
             var toneId = AlertWhenTypingInCombatService.NormalizeToneId(configuration.AlertWhenTypingInCombatToneId);
-            if (ImGui.BeginCombo("Tone / pitch##AlertWhenTypingInCombat", XAPeepSoundPlayer.GetToneLabel(toneId)))
+            using (var combo = ImRaii.Combo("Tone / pitch##AlertWhenTypingInCombat", XAPeepSoundPlayer.GetToneLabel(toneId)))
             {
-                for (var option = 1; option <= XAPeepData.MaxSoundEffectId; option++)
+                if (combo)
                 {
-                    var selected = toneId == option;
-                    if (ImGui.Selectable(XAPeepSoundPlayer.GetToneLabel(option), selected))
+                    for (var option = 1; option <= XAPeepData.MaxSoundEffectId; option++)
                     {
-                        configuration.AlertWhenTypingInCombatToneId = option;
-                        ApplyAlertWhenTypingInCombatConfiguration();
-                        plugin.AlertWhenTypingInCombat.PreviewSound();
-                        toneId = option;
+                        var selected = toneId == option;
+                        if (ImGui.Selectable(XAPeepSoundPlayer.GetToneLabel(option), selected))
+                        {
+                            configuration.AlertWhenTypingInCombatToneId = option;
+                            ApplyAlertWhenTypingInCombatConfiguration();
+                            plugin.AlertWhenTypingInCombat.PreviewSound();
+                            toneId = option;
+                        }
+
+                        if (selected)
+                            ImGui.SetItemDefaultFocus();
                     }
-
-                    if (selected)
-                        ImGui.SetItemDefaultFocus();
                 }
-
-                ImGui.EndCombo();
             }
 
             var beepCount = configuration.AlertWhenTypingInCombatBeepCount;
@@ -1567,7 +1669,7 @@ public partial class SlaveWindow
             }
 
             var volumePercent = Math.Clamp(configuration.AlertWhenTypingInCombatSoundVolume, 0f, 1f) * 100f;
-            if (ImGui.SliderFloat("Alert volume##AlertWhenTypingInCombat", ref volumePercent, 0f, 100f, "%.0f%%"))
+            if (ImGui.SliderFloat("Alert volume##AlertWhenTypingInCombat", ref volumePercent, 0f, 100f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
                 configuration.AlertWhenTypingInCombatSoundVolume = Math.Clamp(volumePercent / 100f, 0f, 1f);
 
             if (ImGui.IsItemDeactivatedAfterEdit())
@@ -1598,12 +1700,14 @@ public partial class SlaveWindow
         void DrawBetterCastBarOptions()
         {
             var slidecastMode = BetterCastBarService.NormalizeSlidecastMode(configuration.BetterCastBarSlidecastMode);
-            if (ImGui.BeginCombo("Slidecast mode##BetterCastBarMode", GetBetterCastBarModeLabel(slidecastMode)))
+            using (var combo = ImRaii.Combo("Slidecast mode##BetterCastBarMode", GetBetterCastBarModeLabel(slidecastMode)))
             {
-                DrawBetterCastBarModeOption("None", BetterCastBarService.SlidecastModeNone, ref slidecastMode);
-                DrawBetterCastBarModeOption("Zone", BetterCastBarService.SlidecastModeZone, ref slidecastMode);
-                DrawBetterCastBarModeOption("Line", BetterCastBarService.SlidecastModeLine, ref slidecastMode);
-                ImGui.EndCombo();
+                if (combo)
+                {
+                    DrawBetterCastBarModeOption("None", BetterCastBarService.SlidecastModeNone, ref slidecastMode);
+                    DrawBetterCastBarModeOption("Zone", BetterCastBarService.SlidecastModeZone, ref slidecastMode);
+                    DrawBetterCastBarModeOption("Line", BetterCastBarService.SlidecastModeLine, ref slidecastMode);
+                }
             }
 
             var thresholdMs = configuration.BetterCastBarSlidecastThresholdMs;
@@ -1687,15 +1791,17 @@ public partial class SlaveWindow
         void DrawBetterInventoryMoverOptions()
         {
             var quickMoveModifier = BetterInventoryMoverService.NormalizeModifier(configuration.BetterInventoryMoverQuickMoveModifier);
-            if (ImGui.BeginCombo("Quick move modifier##BetterInventoryMover", BetterInventoryMoverService.GetModifierLabel(quickMoveModifier)))
+            using (var combo = ImRaii.Combo("Quick move modifier##BetterInventoryMover", BetterInventoryMoverService.GetModifierLabel(quickMoveModifier)))
             {
-                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.LeftShift, ref quickMoveModifier);
-                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.LeftControl, ref quickMoveModifier);
-                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.LeftAlt, ref quickMoveModifier);
-                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.RightShift, ref quickMoveModifier);
-                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.RightControl, ref quickMoveModifier);
-                DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.RightAlt, ref quickMoveModifier);
-                ImGui.EndCombo();
+                if (combo)
+                {
+                    DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.LeftShift, ref quickMoveModifier);
+                    DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.LeftControl, ref quickMoveModifier);
+                    DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.LeftAlt, ref quickMoveModifier);
+                    DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.RightShift, ref quickMoveModifier);
+                    DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.RightControl, ref quickMoveModifier);
+                    DrawBetterInventoryMoverModifierOption(BetterInventoryMoverModifierKey.RightAlt, ref quickMoveModifier);
+                }
             }
 
             ImGui.TextDisabled($"Hold {plugin.BetterInventoryMover.QuickMoveModifierLabel} and right-click an item while both the source and destination inventory windows are open.");
@@ -1723,16 +1829,18 @@ public partial class SlaveWindow
         void DrawBetterCompanyChestOptions()
         {
             var defaultPage = Math.Clamp(configuration.BetterCompanyChestDefaultPage, 0, 6);
-            if (ImGui.BeginCombo("Default chest page##BetterCompanyChest", GetBetterCompanyChestPageLabel(defaultPage)))
+            using (var combo = ImRaii.Combo("Default chest page##BetterCompanyChest", GetBetterCompanyChestPageLabel(defaultPage)))
             {
-                DrawBetterCompanyChestPageOption("Disabled", 0, ref defaultPage);
-                DrawBetterCompanyChestPageOption("Page 1", 1, ref defaultPage);
-                DrawBetterCompanyChestPageOption("Page 2", 2, ref defaultPage);
-                DrawBetterCompanyChestPageOption("Page 3", 3, ref defaultPage);
-                DrawBetterCompanyChestPageOption("Page 4", 4, ref defaultPage);
-                DrawBetterCompanyChestPageOption("Page 5", 5, ref defaultPage);
-                DrawBetterCompanyChestPageOption("Crystals", 6, ref defaultPage);
-                ImGui.EndCombo();
+                if (combo)
+                {
+                    DrawBetterCompanyChestPageOption("Disabled", 0, ref defaultPage);
+                    DrawBetterCompanyChestPageOption("Page 1", 1, ref defaultPage);
+                    DrawBetterCompanyChestPageOption("Page 2", 2, ref defaultPage);
+                    DrawBetterCompanyChestPageOption("Page 3", 3, ref defaultPage);
+                    DrawBetterCompanyChestPageOption("Page 4", 4, ref defaultPage);
+                    DrawBetterCompanyChestPageOption("Page 5", 5, ref defaultPage);
+                    DrawBetterCompanyChestPageOption("Crystals", 6, ref defaultPage);
+                }
             }
 
             var quickMoveEnabled = configuration.BetterCompanyChestQuickMoveEnabled;
@@ -1792,38 +1900,35 @@ public partial class SlaveWindow
         void DrawAutoOpenMoogleMailOptions()
         {
             var enabledForActions = configuration.AutoOpenMoogleMailEnabled;
-            if (!enabledForActions)
-                ImGui.BeginDisabled();
-
-            if (ImGui.Button("Claim Attachments##AutoOpenMoogleMail"))
+            using (ImRaii.Disabled(!enabledForActions))
             {
-                var success = plugin.AutoOpenMoogleMail.QueueClaimAttachments(configuration.AutoOpenMoogleMailDeleteAllWhenFinished);
-                SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
-            }
+                if (ImGui.Button("Claim Attachments##AutoOpenMoogleMail"))
+                {
+                    var success = plugin.AutoOpenMoogleMail.QueueClaimAttachments(configuration.AutoOpenMoogleMailDeleteAllWhenFinished);
+                    SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
+                }
 
-            ImGui.SameLine();
-            if (ImGui.Button("Delete Non-Player##AutoOpenMoogleMail"))
-            {
-                var success = plugin.AutoOpenMoogleMail.QueueDeleteNonPlayerLetters();
-                SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
-            }
+                ImGui.SameLine();
+                if (ImGui.Button("Delete Non-Player##AutoOpenMoogleMail"))
+                {
+                    var success = plugin.AutoOpenMoogleMail.QueueDeleteNonPlayerLetters();
+                    SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
+                }
 
-            ImGui.SameLine();
-            if (ImGui.Button("Delete All##AutoOpenMoogleMail"))
-            {
-                var success = plugin.AutoOpenMoogleMail.QueueDeleteAllLetters();
-                SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
-            }
+                ImGui.SameLine();
+                if (ImGui.Button("Delete All##AutoOpenMoogleMail"))
+                {
+                    var success = plugin.AutoOpenMoogleMail.QueueDeleteAllLetters();
+                    SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
+                }
 
-            ImGui.SameLine();
-            if (ImGui.Button("Request Delivery##AutoOpenMoogleMail"))
-            {
-                var success = plugin.AutoOpenMoogleMail.QueueRequestDelivery();
-                SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
+                ImGui.SameLine();
+                if (ImGui.Button("Request Delivery##AutoOpenMoogleMail"))
+                {
+                    var success = plugin.AutoOpenMoogleMail.QueueRequestDelivery();
+                    SetToonModsStatus(plugin.AutoOpenMoogleMail.LastActionText, !success);
+                }
             }
-
-            if (!enabledForActions)
-                ImGui.EndDisabled();
 
             var deleteAllWhenFinished = configuration.AutoOpenMoogleMailDeleteAllWhenFinished;
             if (ImGui.Checkbox("Delete all when finished##AutoOpenMoogleMailDeleteAll", ref deleteAllWhenFinished))
@@ -1853,32 +1958,29 @@ public partial class SlaveWindow
         {
             ImGui.TextDisabled(plugin.FieldEntryCommand.BuildUsageText().Replace("[XASlave] ", string.Empty, StringComparison.Ordinal));
 
-            if (!configuration.FieldEntryCommandEnabled)
-                ImGui.BeginDisabled();
-
-            ImGui.SetNextItemWidth(Scale(260f));
-            ImGui.InputTextWithHint(
-                "Field entry##FieldEntryCommand",
-                "anemos, pagos, pyros, hydatos...",
-                ref xaModsFieldEntryQuery,
-                128);
-
-            ImGui.SameLine();
-            if (ImGui.Button("Queue##FieldEntryCommand"))
-                TryStartFieldEntryCommand(xaModsFieldEntryQuery);
-
-            foreach (var key in plugin.FieldEntryCommand.SupportedKeys)
+            using (ImRaii.Disabled(!configuration.FieldEntryCommandEnabled))
             {
-                if (ImGui.SmallButton($"{key}##FieldEntryCommand_{key}"))
-                    TryStartFieldEntryCommand(key);
+                ImGui.SetNextItemWidth(Scale(260f));
+                ImGui.InputTextWithHint(
+                    "Field entry##FieldEntryCommand",
+                    "anemos, pagos, pyros, hydatos...",
+                    ref xaModsFieldEntryQuery,
+                    128);
 
                 ImGui.SameLine();
+                if (ImGui.Button("Queue##FieldEntryCommand"))
+                    TryStartFieldEntryCommand(xaModsFieldEntryQuery);
+
+                foreach (var key in plugin.FieldEntryCommand.SupportedKeys)
+                {
+                    if (ImGui.SmallButton($"{key}##FieldEntryCommand_{key}"))
+                        TryStartFieldEntryCommand(key);
+
+                    ImGui.SameLine();
+                }
+
+                ImGui.NewLine();
             }
-
-            ImGui.NewLine();
-
-            if (!configuration.FieldEntryCommandEnabled)
-                ImGui.EndDisabled();
 
             ImGui.TextDisabled($"Pending entry: {plugin.FieldEntryCommand.PendingEntryText}");
             ImGui.TextDisabled($"Suggested zone: {plugin.FieldEntryCommand.LastSuggestedZone}");
@@ -1917,29 +2019,28 @@ public partial class SlaveWindow
                 SaveConfiguration();
             }
 
-            ImGui.BeginDisabled(!configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen);
-            var selectedPage = Math.Clamp(configuration.AutoUnlockExpertDeliveryDefaultPage, 0, AutoExpertDeliveryPageLabels.Length - 1);
-            if (ImGui.BeginCombo("Landing page##AutoUnlockExpertDelivery", AutoExpertDeliveryPageLabels[selectedPage]))
+            using (ImRaii.Disabled(!configuration.AutoUnlockExpertDeliveryAutoSwitchWhenOpen))
             {
-                for (var i = 0; i < AutoExpertDeliveryPageLabels.Length; i++)
+                var selectedPage = Math.Clamp(configuration.AutoUnlockExpertDeliveryDefaultPage, 0, AutoExpertDeliveryPageLabels.Length - 1);
+                using var combo = ImRaii.Combo("Landing page##AutoUnlockExpertDelivery", AutoExpertDeliveryPageLabels[selectedPage]);
+                if (combo)
                 {
-                    var isSelected = selectedPage == i;
-                    if (ImGui.Selectable(AutoExpertDeliveryPageLabels[i], isSelected))
+                    for (var i = 0; i < AutoExpertDeliveryPageLabels.Length; i++)
                     {
-                        configuration.AutoUnlockExpertDeliveryDefaultPage = i;
-                        ApplyExpertDeliveryConfiguration();
-                        SaveConfiguration();
-                        selectedPage = i;
+                        var isSelected = selectedPage == i;
+                        if (ImGui.Selectable(AutoExpertDeliveryPageLabels[i], isSelected))
+                        {
+                            configuration.AutoUnlockExpertDeliveryDefaultPage = i;
+                            ApplyExpertDeliveryConfiguration();
+                            SaveConfiguration();
+                            selectedPage = i;
+                        }
+
+                        if (isSelected)
+                            ImGui.SetItemDefaultFocus();
                     }
-
-                    if (isSelected)
-                        ImGui.SetItemDefaultFocus();
                 }
-
-                ImGui.EndCombo();
             }
-
-            ImGui.EndDisabled();
 
             var skipHq = configuration.AutoUnlockExpertDeliverySkipHq;
             if (ImGui.Checkbox("Skip HQ items##AutoUnlockExpertDelivery", ref skipHq))
@@ -1973,24 +2074,25 @@ public partial class SlaveWindow
         void DrawUnlockExpertDeliveryOptions()
         {
             var selectedRank = ExpertDeliveryUnlockService.NormalizeForcedRankFloor(configuration.UnlockExpertDeliveryForcedRankFloor);
-            if (ImGui.BeginCombo("GC rank floor##UnlockExpertDelivery", GetUnlockExpertDeliveryRankLabel(selectedRank)))
+            using (var combo = ImRaii.Combo("GC rank floor##UnlockExpertDelivery", GetUnlockExpertDeliveryRankLabel(selectedRank)))
             {
-                for (var rank = ExpertDeliveryUnlockService.MinForcedRankFloor; rank <= ExpertDeliveryUnlockService.MaxForcedRankFloor; rank++)
+                if (combo)
                 {
-                    var isSelected = selectedRank == rank;
-                    if (ImGui.Selectable(GetUnlockExpertDeliveryRankLabel(rank), isSelected))
+                    for (var rank = ExpertDeliveryUnlockService.MinForcedRankFloor; rank <= ExpertDeliveryUnlockService.MaxForcedRankFloor; rank++)
                     {
-                        configuration.UnlockExpertDeliveryForcedRankFloor = rank;
-                        ApplyUnlockExpertDeliveryConfiguration();
-                        SaveConfiguration();
-                        selectedRank = rank;
+                        var isSelected = selectedRank == rank;
+                        if (ImGui.Selectable(GetUnlockExpertDeliveryRankLabel(rank), isSelected))
+                        {
+                            configuration.UnlockExpertDeliveryForcedRankFloor = rank;
+                            ApplyUnlockExpertDeliveryConfiguration();
+                            SaveConfiguration();
+                            selectedRank = rank;
+                        }
+
+                        if (isSelected)
+                            ImGui.SetItemDefaultFocus();
                     }
-
-                    if (isSelected)
-                        ImGui.SetItemDefaultFocus();
                 }
-
-                ImGui.EndCombo();
             }
 
             ImGui.TextDisabled("Rank 0 leaves the real rank untouched. Higher values use the named GC-rank labels from your reference list and only spoof upward when needed.");
@@ -2036,11 +2138,13 @@ public partial class SlaveWindow
         void DrawTeleportHelperOptions()
         {
             var selectYes = configuration.TeleportHelperSelectYes;
-            if (ImGui.BeginCombo("SelectYesNo response##TeleportHelper", GetTeleportHelperResponseLabel(selectYes)))
+            using (var combo = ImRaii.Combo("SelectYesNo response##TeleportHelper", GetTeleportHelperResponseLabel(selectYes)))
             {
-                DrawTeleportHelperResponseOption("No - reject ticket usage", false, ref selectYes);
-                DrawTeleportHelperResponseOption("Yes - allow ticket usage", true, ref selectYes);
-                ImGui.EndCombo();
+                if (combo)
+                {
+                    DrawTeleportHelperResponseOption("No - reject ticket usage", false, ref selectYes);
+                    DrawTeleportHelperResponseOption("Yes - allow ticket usage", true, ref selectYes);
+                }
             }
 
             ImGui.TextDisabled(selectYes
@@ -2076,13 +2180,13 @@ public partial class SlaveWindow
 
             ImGui.SameLine();
             var clearXaPeepHistoryModifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
-            if (!clearXaPeepHistoryModifierHeld)
-                ImGui.BeginDisabled();
-            if (ImGui.Button("Clear XA Peep History"))
-                plugin.XAPeep.ClearHistory();
+            using (ImRaii.Disabled(!clearXaPeepHistoryModifierHeld))
+            {
+                if (ImGui.Button("Clear XA Peep History"))
+                    plugin.XAPeep.ClearHistory();
+            }
             if (!clearXaPeepHistoryModifierHeld)
             {
-                ImGui.EndDisabled();
                 if (ImGui.IsItemHovered())
                     ImGui.SetTooltip("Press and hold CTRL + SHIFT to allow clearing.");
             }
@@ -2158,7 +2262,7 @@ public partial class SlaveWindow
             }
 
             var targeterDotSize = Math.Clamp(configuration.XAPeepTargeterDotSize, 1f, 15f);
-            if (ImGui.SliderFloat("Targeter dot size##XAPeep", ref targeterDotSize, 1f, 15f, "%.1f"))
+            if (ImGui.SliderFloat("Targeter dot size##XAPeep", ref targeterDotSize, 1f, 15f, "%.1f", ImGuiSliderFlags.AlwaysClamp))
             {
                 configuration.XAPeepTargeterDotSize = Math.Clamp(targeterDotSize, 1f, 15f);
                 SaveConfiguration();
@@ -2186,31 +2290,32 @@ public partial class SlaveWindow
             }
 
             var soundEffectId = XAPeepData.ClampSoundEffectId(configuration.XAPeepSoundEffectId);
-            if (ImGui.BeginCombo("Sound##XAPeep", XAPeepData.GetSoundEffectLabel(soundEffectId)))
+            using (var combo = ImRaii.Combo("Sound##XAPeep", XAPeepData.GetSoundEffectLabel(soundEffectId)))
             {
-                for (var i = 0; i <= XAPeepData.MaxSoundEffectId; i++)
+                if (combo)
                 {
-                    var selected = soundEffectId == i;
-                    if (ImGui.Selectable(XAPeepData.GetSoundEffectLabel(i), selected))
+                    for (var i = 0; i <= XAPeepData.MaxSoundEffectId; i++)
                     {
-                        configuration.XAPeepSoundEffectId = i;
-                        configuration.XAPeepPlaySound = i > 0;
-                        SaveConfiguration();
-                        if (i > 0)
-                            plugin.XAPeep.PlayConfiguredSoundPreview();
+                        var selected = soundEffectId == i;
+                        if (ImGui.Selectable(XAPeepData.GetSoundEffectLabel(i), selected))
+                        {
+                            configuration.XAPeepSoundEffectId = i;
+                            configuration.XAPeepPlaySound = i > 0;
+                            SaveConfiguration();
+                            if (i > 0)
+                                plugin.XAPeep.PlayConfiguredSoundPreview();
 
-                        soundEffectId = i;
+                            soundEffectId = i;
+                        }
+
+                        if (selected)
+                            ImGui.SetItemDefaultFocus();
                     }
-
-                    if (selected)
-                        ImGui.SetItemDefaultFocus();
                 }
-
-                ImGui.EndCombo();
             }
 
             var soundVolumePercent = Math.Clamp(configuration.XAPeepSoundVolume, 0f, 1f) * 100f;
-            if (ImGui.SliderFloat("Alert volume##XAPeep", ref soundVolumePercent, 0f, 100f, "%.0f%%"))
+            if (ImGui.SliderFloat("Alert volume##XAPeep", ref soundVolumePercent, 0f, 100f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
             {
                 configuration.XAPeepSoundVolume = Math.Clamp(soundVolumePercent / 100f, 0f, 1f);
                 SaveConfiguration();
@@ -2231,47 +2336,44 @@ public partial class SlaveWindow
                 value => configuration.DalamudNotificationsSuckHideAll = value,
                 "Dismisses every notification found in Dalamud's active and pending notification queues.");
 
-            if (configuration.DalamudNotificationsSuckHideAll)
-                ImGui.BeginDisabled();
+            using (ImRaii.Disabled(configuration.DalamudNotificationsSuckHideAll))
+            {
+                DrawDalamudNotificationOption(
+                    "Hide Dalamud/plugin update alerts##DalamudNotificationsSuck",
+                    () => configuration.DalamudNotificationsSuckHideDalamudUpdates,
+                    value => configuration.DalamudNotificationsSuckHideDalamudUpdates = value,
+                    "Targets update available, updating, update installed, and update failed notification text.");
 
-            DrawDalamudNotificationOption(
-                "Hide Dalamud/plugin update alerts##DalamudNotificationsSuck",
-                () => configuration.DalamudNotificationsSuckHideDalamudUpdates,
-                value => configuration.DalamudNotificationsSuckHideDalamudUpdates = value,
-                "Targets update available, updating, update installed, and update failed notification text.");
+                DrawDalamudNotificationOption(
+                    "Hide plugin lifecycle chatter##DalamudNotificationsSuck",
+                    () => configuration.DalamudNotificationsSuckHidePluginLifecycle,
+                    value => configuration.DalamudNotificationsSuckHidePluginLifecycle = value,
+                    "Targets plugin installed, enabled, disabled, loaded, reloaded, and unloaded notifications that do not look like errors.");
 
-            DrawDalamudNotificationOption(
-                "Hide plugin lifecycle chatter##DalamudNotificationsSuck",
-                () => configuration.DalamudNotificationsSuckHidePluginLifecycle,
-                value => configuration.DalamudNotificationsSuckHidePluginLifecycle = value,
-                "Targets plugin installed, enabled, disabled, loaded, reloaded, and unloaded notifications that do not look like errors.");
+                DrawDalamudNotificationOption(
+                    "Hide plugin error/load alerts##DalamudNotificationsSuck",
+                    () => configuration.DalamudNotificationsSuckHidePluginErrors,
+                    value => configuration.DalamudNotificationsSuckHidePluginErrors = value,
+                    "Targets plugin error, load failure, reload failure, crash, and dev-plugin error notifications.");
 
-            DrawDalamudNotificationOption(
-                "Hide plugin error/load alerts##DalamudNotificationsSuck",
-                () => configuration.DalamudNotificationsSuckHidePluginErrors,
-                value => configuration.DalamudNotificationsSuckHidePluginErrors = value,
-                "Targets plugin error, load failure, reload failure, crash, and dev-plugin error notifications.");
+                DrawDalamudNotificationOption(
+                    "Hide Penumbra/Glamourer/mod alerts##DalamudNotificationsSuck",
+                    () => configuration.DalamudNotificationsSuckHideModManagerAlerts,
+                    value => configuration.DalamudNotificationsSuckHideModManagerAlerts = value,
+                    "Targets notifications mentioning Penumbra, Glamourer, Customize+, Mare, TexTools, or mod load failures without firing plugin-owned dismiss callbacks.");
 
-            DrawDalamudNotificationOption(
-                "Hide Penumbra/Glamourer/mod alerts##DalamudNotificationsSuck",
-                () => configuration.DalamudNotificationsSuckHideModManagerAlerts,
-                value => configuration.DalamudNotificationsSuckHideModManagerAlerts = value,
-                "Targets notifications mentioning Penumbra, Glamourer, Customize+, Mare, TexTools, or mod load failures without firing plugin-owned dismiss callbacks.");
+                DrawDalamudNotificationOption(
+                    "Hide success/info notifications##DalamudNotificationsSuck",
+                    () => configuration.DalamudNotificationsSuckHideSuccessInfo,
+                    value => configuration.DalamudNotificationsSuckHideSuccessInfo = value,
+                    "Targets notifications whose Dalamud notification type is Success or Info.");
 
-            DrawDalamudNotificationOption(
-                "Hide success/info notifications##DalamudNotificationsSuck",
-                () => configuration.DalamudNotificationsSuckHideSuccessInfo,
-                value => configuration.DalamudNotificationsSuckHideSuccessInfo = value,
-                "Targets notifications whose Dalamud notification type is Success or Info.");
-
-            DrawDalamudNotificationOption(
-                "Hide warning/error notifications##DalamudNotificationsSuck",
-                () => configuration.DalamudNotificationsSuckHideWarningsErrors,
-                value => configuration.DalamudNotificationsSuckHideWarningsErrors = value,
-                "Targets notifications whose Dalamud notification type is Warning or Error.");
-
-            if (configuration.DalamudNotificationsSuckHideAll)
-                ImGui.EndDisabled();
+                DrawDalamudNotificationOption(
+                    "Hide warning/error notifications##DalamudNotificationsSuck",
+                    () => configuration.DalamudNotificationsSuckHideWarningsErrors,
+                    value => configuration.DalamudNotificationsSuckHideWarningsErrors = value,
+                    "Targets notifications whose Dalamud notification type is Warning or Error.");
+            }
 
             DrawWarningText("Warning: this uses Dalamud internals and may stop working after a Dalamud update. Hiding warnings/errors can hide useful crash, plugin, or update alerts.");
         }
@@ -2296,24 +2398,25 @@ public partial class SlaveWindow
             ImGui.TextDisabled("Uses the game's native potential-target highlight backend.");
 
             var selectedColor = BetterHighlightPotentialTargetsService.NormalizeHighlightColor(configuration.BetterHighlightPotentialTargetsColor);
-            if (ImGui.BeginCombo("Highlight color##BetterHighlightPotentialTargets", BetterHighlightPotentialTargetsService.GetColorLabel(selectedColor)))
+            using (var combo = ImRaii.Combo("Highlight color##BetterHighlightPotentialTargets", BetterHighlightPotentialTargetsService.GetColorLabel(selectedColor)))
             {
-                foreach (var color in BetterHighlightPotentialTargetsService.SelectableHighlightColors)
+                if (combo)
                 {
-                    var isSelected = selectedColor == color;
-                    if (ImGui.Selectable($"{BetterHighlightPotentialTargetsService.GetColorLabel(color)}##BetterHighlightPotentialTargets_{color}", isSelected))
+                    foreach (var color in BetterHighlightPotentialTargetsService.SelectableHighlightColors)
                     {
-                        configuration.BetterHighlightPotentialTargetsColor = color;
-                        ApplyBetterHighlightPotentialTargetsConfiguration();
-                        SaveConfiguration();
-                        SetToonModsStatus($"XA Mods: Better Highlight Potential Targets color set to {BetterHighlightPotentialTargetsService.GetColorLabel(color)}.");
+                        var isSelected = selectedColor == color;
+                        if (ImGui.Selectable($"{BetterHighlightPotentialTargetsService.GetColorLabel(color)}##BetterHighlightPotentialTargets_{color}", isSelected))
+                        {
+                            configuration.BetterHighlightPotentialTargetsColor = color;
+                            ApplyBetterHighlightPotentialTargetsConfiguration();
+                            SaveConfiguration();
+                            SetToonModsStatus($"XA Mods: Better Highlight Potential Targets color set to {BetterHighlightPotentialTargetsService.GetColorLabel(color)}.");
+                        }
+
+                        if (isSelected)
+                            ImGui.SetItemDefaultFocus();
                     }
-
-                    if (isSelected)
-                        ImGui.SetItemDefaultFocus();
                 }
-
-                ImGui.EndCombo();
             }
 
             ImGui.SameLine(0f, 6f);
@@ -2443,9 +2546,9 @@ public partial class SlaveWindow
         void DrawAutoSkipCutsceneOptionGroup(string title, string id, Action drawContent)
         {
             ImGui.Spacing();
-            ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.6f, 0.9f, 1.0f, 1.0f));
-            var isOpen = ImGui.CollapsingHeader($"{title}##{id}");
-            ImGui.PopStyleColor();
+            bool isOpen;
+            using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.6f, 0.9f, 1.0f, 1.0f)))
+                isOpen = ImGui.CollapsingHeader($"{title}##{id}");
 
             if (!isOpen)
                 return;
@@ -2544,6 +2647,8 @@ public partial class SlaveWindow
             });
         }
 
+        if (buildCatalogue)
+        {
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-allow-multiple-game-instances",
@@ -2553,7 +2658,7 @@ public partial class SlaveWindow
             applied => configuration.AutoAllowMultipleGameInstancesEnabled = applied,
             "Clears the client-side single-instance launch lock for this process.",
             "Clears the game's named launch-lock handles inside the current process when the toggle is enabled or when the plugin starts with it already on.",
-            plugin.SystemWindowMods.AllowMultipleGameInstancesStatusText);
+            () => plugin.SystemWindowMods.AllowMultipleGameInstancesStatusText);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-cancel-login-cooldown",
@@ -2563,7 +2668,7 @@ public partial class SlaveWindow
             applied => configuration.AutoCancelLoginCooldownEnabled = applied,
             "Clears the temporary character-select login cooldown locally.",
             "Hooks the AgentLobby update path and clears the `TemporaryLocked` gate before and after the original update.",
-            plugin.SystemWindowMods.CancelLoginCooldownStatusText);
+            () => plugin.SystemWindowMods.CancelLoginCooldownStatusText);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "auto-display-msq-progress",
@@ -2573,7 +2678,7 @@ public partial class SlaveWindow
             applied => configuration.AutoDisplayMsqProgressEnabled = applied,
             "Expands Scenario Tree with remaining main-scenario count and completion percentage.",
             "Waits for the addon nodes to be ready, refreshes on `PostDraw`, resolves the first incomplete MSQ, and rewrites the visible summary with all-MSQ completion progress from Lumina quest data.",
-            plugin.MsqProgressDisplay.StatusText,
+            () => plugin.MsqProgressDisplay.StatusText,
             searchTerms: ["Scenario Tree", "main scenario", "remaining", "completion percentage"]);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
@@ -2584,7 +2689,7 @@ public partial class SlaveWindow
             applied => configuration.DisableTitleScreenMovieEnabled = applied,
             "Prevents the title screen idle movie from starting.",
             "Resets `AgentLobby.IdleTime` while enabled so the title screen stays on the normal menu instead of playing the idle intro movie.",
-            plugin.SystemWindowMods.DisableTitleScreenMovieStatusText,
+            () => plugin.SystemWindowMods.DisableTitleScreenMovieStatusText,
             searchTerms: ["title screen", "movie", "intro", "AgentLobby", "IdleTime"]);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
@@ -2604,7 +2709,7 @@ public partial class SlaveWindow
             applied => configuration.AutoDisplayIdsEnabled = applied,
             "Adds item, action, target, weather, zone, and map IDs to supported local UI surfaces.",
             "Shows item IDs on item tooltips, action IDs on action details, target data IDs on target info, weather IDs on weather tooltips when available, and optional live zone/map IDs in DTR.",
-            plugin.AutoDisplayIds.StatusText,
+            () => plugin.AutoDisplayIds.StatusText,
             searchTerms: ["tooltip", "skill id", "action id", "target data id", "weather id", "zone id", "map id"],
             drawOptions: DrawAutoDisplayIdsOptions,
             showOptionsWhenDisabled: true);
@@ -2621,7 +2726,7 @@ public partial class SlaveWindow
             applied => configuration.AutoDisplayNetworkLatencyEnabled = applied,
             "Shows the detected game-server ping in the DTR bar.",
             "Detects the live game TCP endpoint for this process, resolves local loopback proxy hops when possible, pings the effective endpoint once per second, and displays the result in the server-info bar.",
-            plugin.AutoDisplayNetworkLatency.StatusText,
+            () => plugin.AutoDisplayNetworkLatency.StatusText,
             searchTerms: ["ping", "latency", "DTR", "server", "network"],
             drawOptions: DrawAutoDisplayNetworkLatencyOptions,
             showOptionsWhenDisabled: true);
@@ -2634,7 +2739,7 @@ public partial class SlaveWindow
             applied => configuration.CustomTimestampFormatEnabled = applied,
             "Adds seconds to chat timestamps.",
             "Hooks the chat timestamp formatter for addon text IDs 7840 and 7841 and formats timestamps as `[HH:mm:ss]` by default.",
-            plugin.ChatTimestampFormat.StatusText,
+            () => plugin.ChatTimestampFormat.StatusText,
             warningText: "Disable other chat timestamp formatter tweaks before enabling this hook.",
             searchTerms: ["chat", "timestamp", "seconds", "time", "7840", "7841"],
             drawOptions: DrawCustomTimestampFormatOptions,
@@ -2648,7 +2753,7 @@ public partial class SlaveWindow
             applied => configuration.NoUiFadeEnabled = applied,
             "Suppresses common black, white, and event UI fade transitions.",
             "Hooks the native middle-back draw, white fade in/out, and event fade in/out paths and returns without drawing or starting those fade transitions while enabled.",
-            plugin.NoUiFade.StatusText,
+            () => plugin.NoUiFade.StatusText,
             warningText: "Native hook-backed: if the current client signatures move, this reports unavailable instead of enabling.",
             searchTerms: ["fade", "black fade", "white fade", "event fade", "screen fade", "transition", "UIOptimization"]);
         AddSavedFeatureEntry(
@@ -2660,7 +2765,7 @@ public partial class SlaveWindow
             applied => configuration.TargetCommandFixEnabled = applied,
             "Selects the closest targetable actor when the game's `/target` command cannot resolve a visible player or NPC name.",
             "Watches failed target-name errors and chooses the closest matching targetable actor from the object table. XA automation also uses the same direct lookup before falling back to the game command.",
-            plugin.TargetCommandFix.StatusText,
+            () => plugin.TargetCommandFix.StatusText,
             searchTerms: ["/target", "target fix", "Rodney", "NPC", "player"]);
         var autoSkipCutsceneHelpText = plugin.Configuration.DebugMenuVisible
             ? "Skips standard cutscene prompts, staff roll surfaces, seen-cutscene checks, MSQ/Gold Saucer category hooks, risky area opt-ins, and debug-only Fashion Report addon handling when the configured gates allow it."
@@ -2681,7 +2786,7 @@ public partial class SlaveWindow
             applied => configuration.AutoSkipCutscenesEnabled = applied,
             "Skips standard cutscenes and optional content categories, with per-zone allow/block controls.",
             autoSkipCutsceneHelpText,
-            plugin.AutoSkipCutscenes.StatusText,
+            () => plugin.AutoSkipCutscenes.StatusText,
             searchTerms: autoSkipCutsceneSearchTerms,
             drawOptions: DrawAutoSkipCutsceneOptions,
             showOptionsWhenDisabled: true);
@@ -2694,7 +2799,7 @@ public partial class SlaveWindow
             applied => configuration.AutoIgnoreMinimumWindowSizeEnabled = applied,
             "Lowers the client minimum window size and re-syncs rendering after restore or maximize.",
             "Lowers the client-side minimum width and height limits, but keeps a guarded 250x200 floor because smaller values have been observed to crash the client. While this toggle is enabled, XA watches the real client size after restore or maximize operations and clamps undersized results back up so rendering can recover cleanly without subclassing the game window.",
-            plugin.SystemWindowMods.IgnoreMinimumWindowSizeStatusText);
+            () => plugin.SystemWindowMods.IgnoreMinimumWindowSizeStatusText);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
             "auto-hide-unnecessary-popups",
@@ -2704,7 +2809,7 @@ public partial class SlaveWindow
             applied => configuration.AutoHideUnnecessaryPopupsEnabled = applied,
             "Closes tutorial and recommendation popups as they appear.",
             "Closes a fixed set of tutorial and recommendation surfaces as they are drawn, including Play Guide, How To, recommendation, launcher, and achievement-style popups. Use the subsetting below if you also want XA to hide `HowToNotice`.",
-            plugin.PopupCleaner.StatusText,
+            () => plugin.PopupCleaner.StatusText,
             searchTerms: ["HowToNotice", "HowTo", "PlayGuide", "RecommendList", "AchievementInfo"],
             drawOptions: DrawHideUnnecessaryPopupsOptions);
         AddSavedFeatureEntry(
@@ -2720,7 +2825,7 @@ public partial class SlaveWindow
             applied => configuration.DalamudNotificationsSuckEnabled = applied,
             "Hides selected Dalamud toast notification categories before they draw.",
             "Best-effort suppression for Dalamud's internal ImGui notifications, including update notices, plugin lifecycle chatter, plugin error/load alerts, and Penumbra/Glamourer/mod-manager notifications.",
-            plugin.DalamudNotificationsSuck.StatusText,
+            () => plugin.DalamudNotificationsSuck.StatusText,
             warningText: "Uses Dalamud internals; if Dalamud changes this will report unavailable instead of crashing.",
             searchTerms: ["Dalamud", "notification", "toast", "plugin error", "plugin load", "Penumbra", "Glamourer", "mod failed", "update alert"],
             drawOptions: DrawDalamudNotificationsSuckOptions,
@@ -2738,7 +2843,7 @@ public partial class SlaveWindow
             applied => configuration.BetterHighlightPotentialTargetsEnabled = applied,
             "Changes the yellow potential-target hover highlight to a selected native backend color.",
             "Reads Dalamud's mouse-over target and reapplies the game's built-in object highlight color after stable plugin/game load and stable hover checks. After enabling, it waits about 5 seconds plus 30 stable frames and a brief stable hover before repainting. Uses the native color enum instead of drawing a custom overlay. To remove the yellow flash before XA Slave replaces it, open FFXIV Character Configuration > Control Settings > Target and unselect Highlight Potential Targets.",
-            plugin.BetterHighlightPotentialTargets.StatusText,
+            () => plugin.BetterHighlightPotentialTargets.StatusText,
             warningText: "Safety-gated: this arms last after plugin load, waits about 5 seconds plus 30 stable frames and a brief stable hover after enable, and suspends during login, logout, territory changes, and unload. For no yellow pre-flash, unselect FFXIV Character Configuration > Control Settings > Target > Highlight Potential Targets.",
             searchTerms: ["highlight", "target highlight", "mouseover", "mouse over", "hover", "yellow outline", "potential target", "ObjectHighlightColor"],
             drawOptions: DrawBetterHighlightPotentialTargetsOptions,
@@ -2752,7 +2857,7 @@ public partial class SlaveWindow
             applied => configuration.AutoPreventGameExitingFromLobbyErrorsEnabled = applied,
             "Overrides the forced shutdown countdown used by lobby error dialogs.",
             "Overrides the forced shutdown timeout used by the relevant lobby error dialog surface so the client is not auto-closed locally.",
-            plugin.SystemWindowMods.PreventLobbyExitStatusText);
+            () => plugin.SystemWindowMods.PreventLobbyExitStatusText);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-close-lobby-errors",
@@ -2762,7 +2867,7 @@ public partial class SlaveWindow
             applied => configuration.AutoCloseLobbyErrorsEnabled = applied,
             "Confirms supported lobby Dialogue popups and closes NoKillPlugin's auth-error panel automatically.",
             "Waits for addon:Dialogue to show a supported lobby/networking marker. When `Dialogue` contains a marker such as `3088`, `5006`, `90002`, `3102`, `Connection with the server was lost.`, or `You are still logged into the game.`, XA opens a 10 second monitor window, clicks the live `OK` button automatically, and closes NoKillPlugin's `No Kill Plugin Panel` through reflection if it opens during that same window. The monitor is idle until a matching `Dialogue` appears. `Instant Logout` also enables this same Dialogue-triggered monitor briefly even when this toggle is off.",
-            plugin.LobbyErrorAutoClose.StatusText,
+            () => plugin.LobbyErrorAutoClose.StatusText,
             searchTerms: ["3088", "5006", "90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK", "NoKillPlugin", "nokill", "No Kill Plugin Panel", "auth error"]);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
@@ -2773,7 +2878,7 @@ public partial class SlaveWindow
             applied => configuration.BailoutEscMenuEnabled = applied,
             "Monitors addon:SystemMenu and force-closes it if it sits open too long.",
             "Watches `addon:SystemMenu` on the live client. If the ESC / System menu stays open longer than the selected timer, XA Slave closes it locally through the same direct addon close path used by the debug test button.",
-            plugin.EscMenuBailout.StatusText,
+            () => plugin.EscMenuBailout.StatusText,
             searchTerms: ["SystemMenu", "ESC menu", "escape menu", "close system menu", "timeout", "bailout"],
             drawOptions: DrawBailoutEscMenuOptions);
         AddSavedFeatureEntry(
@@ -2785,7 +2890,7 @@ public partial class SlaveWindow
             applied => configuration.AutoHideGameObjectsEnabled = applied,
             "Locally hides selected object categories from view with duty and territory guards.",
             "Hides players, pets, chocobos, or low-value NPCs on the local client while leaving party members, alliance members, friends, marked objects, and your own character visible. The extra options can disable the feature in duties or Island Sanctuary, and can apply the safer Occult Crescent filtering rules.",
-            plugin.AutoHideGameObjects.StatusText,
+            () => plugin.AutoHideGameObjects.StatusText,
             searchTerms: ["Hide players", "Hide unimportant NPCs", "Hide pets", "Hide chocobos", "Occult Crescent", "Island Sanctuary", "duty"],
             drawOptions: DrawAutoHideGameObjectsOptions);
         AddSavedFeatureEntry(
@@ -2795,10 +2900,10 @@ public partial class SlaveWindow
             () => configuration.CustomResolutionsEnabled,
             plugin.SystemWindowMods.SetCustomResolutionsEnabled,
             applied => configuration.CustomResolutionsEnabled = applied,
-            "Applies saved or typed client sizes from the panel or `/xa res <width>x<height>`.",
-            "Lets you apply custom window sizes, use the built-in 500x345 example, and save or remove your own preset buttons. A safety floor stays enforced so unstable sizes are not requested.",
-            plugin.SystemWindowMods.CustomResolutionsStatusText,
-            searchTerms: ["/xa res", "500x345", "Width", "Height", "Add button", "Delete"],
+            "Applies saved or typed client sizes from the panel or `/xa res <width>x<height>` / `/xa res <width> <height>`.",
+            "Lets you apply custom window sizes, reset to the size captured when this feature was enabled, use the built-in 500x345 example, and save or remove your own preset buttons. A safety floor stays enforced so unstable sizes are not requested.",
+            () => plugin.SystemWindowMods.CustomResolutionsStatusText,
+            searchTerms: ["/xa res", "/xa res reset", "500x345", "1280 720", "Width", "Height", "Add button", "Delete"],
             drawOptions: DrawCustomResolutionTools);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
@@ -2809,7 +2914,7 @@ public partial class SlaveWindow
             applied => configuration.AutoSkipDialogueEnabled = applied,
             "Auto-advances Talk dialogue and the broader native talk surfaces locally.",
             "Auto-clicks the standard `Talk` addon and also hooks the native Talk, SystemTalk, ShortTalk, leve, and guildleve dialogue surfaces when those signatures are available.",
-            plugin.DialogueSkip.StatusText,
+            () => plugin.DialogueSkip.StatusText,
             searchTerms: ["Talk", "SystemTalk", "ShortTalk", "npc", "dialogue", "conversation", "leve", "guildleve"]);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
@@ -2820,7 +2925,7 @@ public partial class SlaveWindow
             applied => configuration.LockGameWindowInCombatEnabled = applied,
             "Prevents the game window from being moved while the local character is in combat.",
             "Subclasses the current FFXIV window while combat is active and forces position changes to keep the existing top-left coordinate. The lock is removed when combat ends or the mod is disabled.",
-            plugin.AutoLockGameWindow.StatusText,
+            () => plugin.AutoLockGameWindow.StatusText,
             searchTerms: ["window", "combat", "lock", "move", "position"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -2835,7 +2940,7 @@ public partial class SlaveWindow
             applied => configuration.NotifyWhenFriendIsNearEnabled = applied,
             "Shows a local XA Slave alert when a configured player appears nearby.",
             "Scans visible player objects every two seconds for exact-name or `/regex/` patterns and prints only local XA Slave system/toast notifications. It never sends an in-game chat message.",
-            plugin.NotifyWhenFriendIsNear.StatusText,
+            () => plugin.NotifyWhenFriendIsNear.StatusText,
             searchTerms: ["friend", "near", "player", "notify", "regex", "system message"],
             drawOptions: DrawNotifyWhenFriendIsNearOptions,
             showOptionsWhenDisabled: true);
@@ -2852,7 +2957,7 @@ public partial class SlaveWindow
             applied => configuration.AlertWhenTypingInCombatEnabled = applied,
             "Plays a local sound and toast when ChatLog is focused during combat.",
             "Checks ConditionFlag.InCombat and the focused ChatLog addon on the framework thread. A configurable cooldown suppresses repeated warnings, while the tone, volume, and beep count can be previewed locally without sending chat.",
-            plugin.AlertWhenTypingInCombat.StatusText,
+            () => plugin.AlertWhenTypingInCombat.StatusText,
             searchTerms: ["combat", "typing", "ChatLog", "chat box", "toast", "sound", "tone", "pitch", "beeps", "cooldown", "/xa typingcombat"],
             drawOptions: DrawAlertWhenTypingInCombatOptions,
             showOptionsWhenDisabled: true);
@@ -2869,7 +2974,7 @@ public partial class SlaveWindow
             applied => configuration.BetterCastBarEnabled = applied,
             "Restyles the local cast bar and adds a slidecast readiness marker.",
             "Updates `_CastBar` node layout locally and draws a configurable slidecast zone or line over the cast-progress bar. Original node layout is restored when the cast bar finalizes or the mod is disabled.",
-            plugin.BetterCastBar.StatusText,
+            () => plugin.BetterCastBar.StatusText,
             searchTerms: ["_CastBar", "slidecast", "cast", "casting", "marker", "spell"],
             drawOptions: DrawBetterCastBarOptions,
             showOptionsWhenDisabled: true);
@@ -2882,7 +2987,7 @@ public partial class SlaveWindow
             applied => configuration.BetterDutyFinderEnabled = applied,
             "Adds inline duty-finder setting buttons to Contents Finder and Raid Finder.",
             "Shows compact language, loot-rule, join-in-progress, unrestricted, level-sync, minimum-IL, echo, explorer, and limited-leveling-roulette controls over the supported duty finder windows.",
-            plugin.BetterDutyFinder.StatusText,
+            () => plugin.BetterDutyFinder.StatusText,
             searchTerms: ["duty finder", "ContentsFinder", "RaidFinder", "unsync", "explorer", "loot", "language"]);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
@@ -2893,7 +2998,7 @@ public partial class SlaveWindow
             applied => configuration.DisplayActualQueuePositionEnabled = applied,
             "Expands queue displays with position and ETA information.",
             "Shows queue position, elapsed time, and an ETA on supported queue displays.",
-            plugin.QueuePositionDisplay.StatusText,
+            () => plugin.QueuePositionDisplay.StatusText,
             searchTerms: ["ETA", "elapsed", "queue position", "wait time"]);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
@@ -2904,7 +3009,7 @@ public partial class SlaveWindow
             applied => configuration.ReplaceUnownedMountHotbarsEnabled = applied,
             "Uses Mount Roulette in native Mount hotbar slots whose mount is not unlocked on the current character.",
             "Replaces the slot's displayed action and execution only while the assigned mount is unowned. Owned mounts and non-Mount slots stay unchanged, and XA never writes or saves the hotbar.",
-            plugin.ReplaceUnownedMountHotbars.StatusText,
+            () => plugin.ReplaceUnownedMountHotbars.StatusText,
             searchTerms: ["mount roulette", "unowned mount", "hotbar", "cross hotbar", "missing mount"]);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
@@ -2915,7 +3020,7 @@ public partial class SlaveWindow
             applied => configuration.DisableBackgroundGameRenderingEnabled = applied,
             "Pauses the background DX11 render tick and forces a keep-alive frame periodically.",
             "Pauses most background rendering, lets an occasional keep-alive frame through, and supports minimized-only or AutoRetainer multi-mode exceptions.",
-            plugin.SystemWindowMods.DisableBackgroundRenderingStatusText,
+            () => plugin.SystemWindowMods.DisableBackgroundRenderingStatusText,
             searchTerms: ["Only while minimized", "Disable when AR Multi is on", "AutoRetainer multi-mode", "DX11", "nameplate"],
             drawOptions: DrawBackgroundRenderingOptions);
         AddSavedFeatureEntry(
@@ -2927,7 +3032,7 @@ public partial class SlaveWindow
             applied => configuration.LowResolutionEnabled = applied,
             "Forces the live 3D resolution scale below the game's normal UI floor.",
             "Forces the live 3D resolution scale to the slider value between 0.01 and 1.00. If the current runtime scaler is DLSS, XA temporarily switches to AMD FSR while the feature is active and restores the previous mode on disable.",
-            plugin.SystemWindowMods.LowResolutionStatusText,
+            () => plugin.SystemWindowMods.LowResolutionStatusText,
             searchTerms: ["3D resolution scale", "resolution scale", "upscale type", "0.01", "1.00", "DLSS", "FSR"],
             drawOptions: DrawLowResolutionOptions);
         AddSavedFeatureEntry(
@@ -2939,7 +3044,7 @@ public partial class SlaveWindow
             applied => configuration.CopyItemNameForAllEnabled = applied,
             "Adds inventory context-menu actions to copy base or glamour item names.",
             "Adds copy-name actions to supported inventory context menus, including glamour-source resolution when available.",
-            plugin.CopyItemNameContextMenu.StatusText);
+            () => plugin.CopyItemNameContextMenu.StatusText);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
             "special-rendering-modes",
@@ -2949,7 +3054,7 @@ public partial class SlaveWindow
             applied => configuration.SpecialRenderModesEnabled = applied,
             "Reveals world fade and UI visibility tools. Turning this off restores all world/UI surfaces.",
             "Shows the world fade and UI visibility tools while enabled. Turning it off restores the world and any hidden UI groups. `Hide Chat` is blocked while AutoRetainer Multi Mode is active so chat does not disappear during AR multi sessions.",
-            configuration.SpecialRenderModesEnabled
+            () => configuration.SpecialRenderModesEnabled
                 ? plugin.SystemWindowMods.SpecialRenderModesStatusText
                 : "Disabled",
             searchTerms: [
@@ -2972,7 +3077,7 @@ public partial class SlaveWindow
             applied => configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied,
             "Adds FFLogs, Lodestone, and Lalachievements shortcuts to player context menus.",
             "Adds a search submenu to supported player context menus. The options below decide which providers appear and whether an Open All shortcut is shown.",
-            plugin.PlayerSearchContextMenu.StatusText,
+            () => plugin.PlayerSearchContextMenu.StatusText,
             searchTerms: ["FFLogs", "Lodestone", "Lalachievements", "Open All"],
             drawOptions: DrawPlayerSearchOptions);
         AddSavedFeatureEntry(
@@ -2984,7 +3089,7 @@ public partial class SlaveWindow
             applied => configuration.LiveAnonymousModeEnabled = applied,
             "Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases.",
             "Masks visible player nameplates locally with deterministic CLI/programming aliases such as `CLI Programming`, and removes titles or FC tags from the rewritten plates. The alias choice is keyed from the original character name and world so it stays stable across redraws. This only changes local presentation and does not change server data.",
-            plugin.NameplatePrivacy.AnonymousModeStatusText);
+            () => plugin.NameplatePrivacy.AnonymousModeStatusText);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "better-inventory-mover",
@@ -2994,7 +3099,7 @@ public partial class SlaveWindow
             applied => configuration.BetterInventoryMoverEnabled = applied,
             "Adds configurable-modifier right-click moves between open inventory, retainer, saddlebag, and premium saddlebag windows.",
             "While the source and destination inventory interfaces are both open, holding the configured modifier during item right-click moves to the first available matching destination. Without the modifier, XA adds destination-aware move actions to supported item context menus.",
-            plugin.BetterInventoryMover.StatusText,
+            () => plugin.BetterInventoryMover.StatusText,
             searchTerms: ["inventory", "retainer", "saddlebag", "premium saddlebag", "move item", "context menu"],
             drawOptions: DrawBetterInventoryMoverOptions);
         AddSavedFeatureEntry(
@@ -3006,7 +3111,7 @@ public partial class SlaveWindow
             applied => configuration.BetterCompanyChestEnabled = applied,
             "Adds FC chest defaults, right-click quick move, quantity prompt handling, and exchangeable gil-value display.",
             "Improves the Company Chest surface with a saved default page, right-click inventory quick move, optional auto-confirm for quantity prompts, and an optional exchangeable-value overlay on the chest window.",
-            plugin.BetterCompanyChest.StatusText,
+            () => plugin.BetterCompanyChest.StatusText,
             searchTerms: ["Company Chest", "FC chest", "free company chest", "quick move", "quantity", "exchangeable", "crystals"],
             drawOptions: DrawBetterCompanyChestOptions,
             showOptionsWhenDisabled: true);
@@ -3019,7 +3124,7 @@ public partial class SlaveWindow
             applied => configuration.AutoOpenMoogleMailEnabled = applied,
             "Exposes Moogle Mail cleanup actions on the Letter List.",
             "XA can queue manual actions for claiming attachments, deleting opened letters, deleting opened NPC letters, and requesting delivery from the Letter List.",
-            plugin.AutoOpenMoogleMail.StatusText,
+            () => plugin.AutoOpenMoogleMail.StatusText,
             searchTerms: ["Moogle Mail", "Delivery Moogle", "letters", "attachments", "request delivery", "delete letters"],
             drawOptions: DrawAutoOpenMoogleMailOptions,
             showOptionsWhenDisabled: true);
@@ -3032,7 +3137,7 @@ public partial class SlaveWindow
             applied => configuration.EnableItemIconInShopsEnabled = applied,
             "Replaces placeholder shop row icons with the actual item icons when the shop addon refreshes.",
             "Updates supported shop, exchange, collectables, and free-shop addon rows after setup so the visible icon matches the real item.",
-            plugin.EnableItemIconInShops.StatusText,
+            () => plugin.EnableItemIconInShops.StatusText,
             searchTerms: ["shop", "item icon", "GrandCompanyExchange", "CollectablesShop", "FreeShop", "exchange"],
             drawOptions: DrawEnableItemIconInShopsOptions);
         AddSavedFeatureEntry(
@@ -3044,7 +3149,7 @@ public partial class SlaveWindow
             applied => configuration.FieldEntryCommandEnabled = applied,
             "Adds `/xa fe <entry>` for Eureka entries.",
             "Queues the requested Eureka entry, requests Pier #1 staging travel when Rodney is not locally reachable, routes to Rodney, and advances supported entry dialogs.",
-            plugin.FieldEntryCommand.StatusText,
+            () => plugin.FieldEntryCommand.StatusText,
             searchTerms: ["/xa fe", "field entry", "field operations", "Eureka", "Anemos", "Pagos", "Pyros", "Hydatos", "Rodney"],
             drawOptions: DrawFieldEntryCommandOptions,
             showOptionsWhenDisabled: true);
@@ -3058,7 +3163,7 @@ public partial class SlaveWindow
             applied => configuration.AntiAfkEnabled = applied,
             "Resets the local AFK timer every 2 minutes so this client stays ahead of the game's 10-minute idle kick path.",
             "Keeps the local AFK timer fresh on a 2-minute cadence while enabled. XA only touches the local idle timer; it does not send chat or movement packets.",
-            plugin.AntiAfk.StatusText,
+            () => plugin.AntiAfk.StatusText,
             searchTerms: ["afk", "idle", "kick", "timer"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -3069,7 +3174,7 @@ public partial class SlaveWindow
             applied => configuration.AutoDutyCommenceEnabled = applied,
             "Automatically confirms duty commencement prompts.",
             "Watches the Contents Finder confirm addon and clicks Commence when the standard duty-ready prompt appears.",
-            plugin.AutoDutyCommence.StatusText,
+            () => plugin.AutoDutyCommence.StatusText,
             searchTerms: ["duty", "commence", "ContentsFinderConfirm", "queue pop", "ready check"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -3080,7 +3185,7 @@ public partial class SlaveWindow
             applied => configuration.AutoUnlockExpertDeliveryEnabled = applied,
             "Automates Expert Delivery hand-ins for characters that already have the feature unlocked, with local failure, prompt-classification, repeat-scan, and configurable seal-cap handling.",
             "Automates Expert Delivery hand-ins, handles confirmation prompts, stops when no eligible items remain, and can either respect or ignore the seal cap option below.",
-            plugin.AutoUnlockExpertDelivery.StatusText,
+            () => plugin.AutoUnlockExpertDelivery.StatusText,
             searchTerms: ["Auto switch on window open", "Landing page", "Skip HQ items", "Skip items with materia", "Ignore seal max and keep selling"],
             drawOptions: DrawExpertDeliveryOptions);
         AddSavedFeatureEntry(
@@ -3092,7 +3197,7 @@ public partial class SlaveWindow
             applied => configuration.UnlockExpertDeliveryEnabled = applied,
             "Lets you choose the local Grand Company rank floor XA spoofs so Expert Delivery can appear at the selected threshold.",
             "Locally spoofs the selected minimum Grand Company rank so the Expert Delivery entry can appear. Use the dropdown below to choose the floor XA returns.",
-            plugin.ExpertDeliveryUnlock.StatusText,
+            () => plugin.ExpertDeliveryUnlock.StatusText,
             warningText: "DO NOT USE IF YOUR LODESTONE IS NOT SET TO PRIVATE! You take the risk of revealing your character on the leaderboards by using this. If you're not the actual proper rank, it's easy to determine if you're using this.",
             requireCtrlShiftToEnable: true,
             searchTerms: ["GC rank floor", "Grand Company rank", "rank 0", "rank 19", "Storm Captain", "Storm Champion"],
@@ -3107,7 +3212,7 @@ public partial class SlaveWindow
             applied => configuration.AutoRefuseTradeRequestEnabled = applied,
             "Refuses incoming trade requests automatically.",
             "Refuses incoming trade requests unless this client recently initiated one. The options below control local notifications plus custom /e lines or slash commands that should run after each refusal.",
-            plugin.AutoRefuseTrade.StatusText,
+            () => plugin.AutoRefuseTrade.StatusText,
             searchTerms: ["Show notification", "Send /e message", "Echo lines", "Commands after refusal", "<trader>", "<target>"],
             drawOptions: DrawTradeRefusalOptions);
         AddSavedFeatureEntry(
@@ -3119,7 +3224,7 @@ public partial class SlaveWindow
             applied => configuration.ShowTitlesAsPlayernamesEnabled = applied,
             "Moves visible player titles into the player name line.",
             "Moves prefix titles before the player name and suffix titles after the player name, then hides the native title line. If Support Honorific is enabled, XA uses Honorific's resolved custom title when available before falling back to the native title. If Show Traveler World Names is also enabled, @HomeWorld is appended after the title-adjusted name.",
-            plugin.NameplatePrivacy.ShowTitlesAsPlayernamesStatusText,
+            () => plugin.NameplatePrivacy.ShowTitlesAsPlayernamesStatusText,
             searchTerms: ["title", "titles", "player title", "prefix title", "suffix title", "nameplate", "playernames", "Honorific", "custom title", "traveler"],
             drawOptions: DrawShowTitlesAsPlayernamesOptions,
             showOptionsWhenDisabled: true);
@@ -3132,7 +3237,7 @@ public partial class SlaveWindow
             applied => configuration.ShowBlacklistedPlayernameInPartyEnabled = applied,
             "Shows blocked party-list Unknown names as the blocked player name.",
             "Replaces local _PartyList Unknown ## text for blacklisted party members with the matching blacklist name from the client blacklist proxy and colors the row name red. This is local presentation only and does not change party data.",
-            plugin.BlacklistedPartyName.StatusText,
+            () => plugin.BlacklistedPartyName.StatusText,
             searchTerms: ["blacklist", "blacklisted", "block list", "blocked", "party list", "_PartyList", "Unknown 01", "Unknown", "account id", "red text"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -3143,7 +3248,7 @@ public partial class SlaveWindow
             applied => configuration.ShowTravelerWorldNamesEnabled = applied,
             "Shows visible wanderer, traveler, and voyager nameplates as Name@HomeWorld.",
             "Appends @HomeWorld to the local nameplate name for visible players whose home world differs from their current world, then hides Wanderer, Traveler, Voyager, or FC/travel tag framing. The Add spacer option changes the local format to Name @ HomeWorld. The option below can leave duties untouched. This is local presentation only and does not alter server data. Anonymous Mode takes precedence and removes this label while it is masking nameplates.",
-            plugin.NameplatePrivacy.ShowTravelerWorldNamesStatusText,
+            () => plugin.NameplatePrivacy.ShowTravelerWorldNamesStatusText,
             searchTerms: ["traveler", "traveller", "wanderer", "voyager", "world visit", "data center travel", "cross data center", "physical data center", "FC tag", "free company tag", "home world", "disable in duties", "duty", "spacer", "space", "Name @ HomeWorld"],
             drawOptions: DrawShowTravelerWorldNamesOptions);
         AddSavedFeatureEntry(
@@ -3155,7 +3260,7 @@ public partial class SlaveWindow
             applied => configuration.AutoRevealUndiscoveredAreasEnabled = applied,
             "Clears local map discovery flags when the map agent refreshes.",
             "Reveals map coverage locally by clearing undiscovered-area flags whenever the map refreshes.",
-            plugin.SystemWindowMods.RevealUndiscoveredAreasStatusText);
+            () => plugin.SystemWindowMods.RevealUndiscoveredAreasStatusText);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "auto-clear-teleportation-lock",
@@ -3165,7 +3270,7 @@ public partial class SlaveWindow
             applied => configuration.AutoClearTeleportationLockEnabled = applied,
             "Suppresses the teleport-lock log and retries Teleport locally.",
             "Suppresses the teleport-lock log message and retries Teleport immediately when that local lock is hit.",
-            plugin.TeleportLockClear.StatusText,
+            () => plugin.TeleportLockClear.StatusText,
             searchTerms: ["1665", "Teleport", "stuck", "log message"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -3176,7 +3281,7 @@ public partial class SlaveWindow
             applied => configuration.AutoLeaveDutyEnabled = applied,
             "Leaves a completed duty automatically after combat and blocking duty UI states clear.",
             "Watches for duty completion, waits the selected delay, then opens the game-owned duty menu through its agent without pressing U, sends the controller-safe Leave Duty callbacks, and confirms only a validated leave-duty prompt once combat, cutscene, and occupied-state blockers are gone. This is meant for normal completed-duty cleanup and does not force an early exit.",
-            plugin.AutoLeaveDuty.StatusText,
+            () => plugin.AutoLeaveDuty.StatusText,
             searchTerms: ["completed duty", "leave duty", "instance", "dungeon", "raid", "delay", "1-10 sec", "duty menu", "controller", "no U"],
             drawOptions: DrawAutoLeaveDutyOptions);
         AddSavedFeatureEntry(
@@ -3188,7 +3293,7 @@ public partial class SlaveWindow
             applied => configuration.AutoMergeEnabled = applied,
             "Merges incomplete main-bag stacks after opening the inventory.",
             "Watches for the main inventory window to open, then walks incomplete normal or HQ bag stacks together until the mergeable stacks settle.",
-            plugin.AutoMerge.StatusText,
+            () => plugin.AutoMerge.StatusText,
             searchTerms: ["inventory", "stacks", "merge", "bags"]);
         AddSavedFeatureEntry(
             ToonModsSection.IllegalMods,
@@ -3199,7 +3304,7 @@ public partial class SlaveWindow
             applied => configuration.QuickReturnEnabled = applied,
             "Skips Return cast/cooldown, leaves the in-game confirmation prompt manual, and stays off in PvP.",
             "Hooks the native Return action so XA can fire the fast return command directly and leave or disband party first when the current party state would otherwise block that path. The in-game confirmation prompt is left for the user.",
-            plugin.QuickReturn.StatusText,
+            () => plugin.QuickReturn.StatusText,
             searchTerms: ["Return", "instant return", "instance return", "cast", "cooldown", "instant", "PvP", "party", "disband", "leave party", "manual confirm"],
             requireCtrlShiftToEnable: true);
         AddSavedFeatureEntry(
@@ -3211,7 +3316,7 @@ public partial class SlaveWindow
             applied => configuration.CustomSightDistanceEnabled = applied,
             "Overrides camera distance, angle, FoV, and optional collision limits.",
             "Lets you adjust camera distance, rotation, field of view, and optional collision handling while the camera hooks are active.",
-            plugin.SightDistance.StatusText,
+            () => plugin.SightDistance.StatusText,
             searchTerms: ["Max distance", "Min distance", "Max rotation", "Min rotation", "Max FoV", "Min FoV", "Current FoV", "Ignore camera collision"],
             drawOptions: DrawSightDistanceOptions);
         AddSavedFeatureEntry(
@@ -3223,7 +3328,7 @@ public partial class SlaveWindow
             applied => configuration.DozeSitAnywhereEnabled = applied,
             "Lets you trigger Sit and Doze from the panel or `/xa sit` / `/xa doze` without nearby furniture.",
             "Allows Sit and Doze to fire without a nearby bed or chair. The panel buttons and `/xa sit` / `/xa doze` only work while this toggle is enabled, and the same actions can also be added as titlebar favourites in Plugin Operations.",
-            plugin.DozeSitAnywhere.StatusText,
+            () => plugin.DozeSitAnywhere.StatusText,
             searchTerms: ["/xa sit", "/xa doze", "sit now", "doze now", "titlebar favourite", "emote", "bed", "chair"],
             drawOptions: DrawDozeSitAnywhereTools);
         AddSavedFeatureEntry(
@@ -3235,7 +3340,7 @@ public partial class SlaveWindow
             applied => configuration.InfiniteSprintEnabled = applied,
             "Reapplies Sprint only while the local character is moving, with a configurable movement-start delay.",
             "Reapplies Sprint after it falls off, but only while real movement is detected and after the configured movement-start delay.",
-            plugin.PlayerMods.InfiniteSprintStatusText,
+            () => plugin.PlayerMods.InfiniteSprintStatusText,
             searchTerms: ["Sprint delay", "movement-start delay", "recast delay"],
             drawOptions: DrawInfiniteSprintOptions);
         AddSavedFeatureEntry(
@@ -3247,7 +3352,7 @@ public partial class SlaveWindow
             applied => configuration.InstantLogoutEnabled = applied,
             "Arms hard logout and enables `/xa logout` and `/xa killgame`.",
             "Uses the native contents-finder request path for hard logout. `/xa killgame` waits for the logout to complete, then sends `/xlkill`. When this toggle is off, the panel buttons are hidden and those commands do nothing. Logout and kill-game actions are also blocked while Special Rendering Modes is actively hiding chat.",
-            plugin.InstantLogout.StatusText,
+            () => plugin.InstantLogout.StatusText,
             searchTerms: ["logout", "/xa logout", "/xa killgame", "Log out now", "Kill game now"],
             requireCtrlShiftToEnable: true,
             drawOptions: DrawInstantLogoutTool);
@@ -3260,7 +3365,7 @@ public partial class SlaveWindow
             applied => configuration.ItemCommandsEnabled = applied,
             "Adds `/xa equip <itemId>`.",
             "Adds an XA-routed item-equip command: `/xa equip <itemId>` equips from the main inventory or armory chest.",
-            plugin.ItemCommands.StatusText,
+            () => plugin.ItemCommands.StatusText,
             searchTerms: ["/xa equip", "equip item id", "armory"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -3271,7 +3376,7 @@ public partial class SlaveWindow
             applied => configuration.XAPeepEnabled = applied,
             "XA target tracker with a small cached list and full history window.",
             "Tracks players targeting you in all areas, including PvP, keeps the small XA Peep list and the separate history window available through logout, records cumulative per-player counts in XA Slave's local database, and can show purple cards, lines, dots, center-screen notifications, prefixed chat notifications, and selectable XA alert sounds that still play even if the game's own sound channel is muted. XA Peep can be filtered to skip party, alliance, in-combat, or in-duty targeters, can auto-open its compact window on plugin load, and lets you lock or unlock window resizing from the title bar. Use `/xa peep` to open the small window or `/xa peep on|off` to toggle tracking from chat.",
-            plugin.XAPeep.StatusText,
+            () => plugin.XAPeep.StatusText,
             searchTerms: ["Show card when targeted", "Show Targeter's Line", "Show targeter's dot", "targeter line color", "targeter dot color", "targeter dot size", "Show targeters card", "Show center-screen notification", "Print chat notification", "is targeting you", "Log party members", "Log alliance members", "Log players in combat", "Log while in duty", "Auto open XA Peep on plugin load", "lock", "resize", "/xa peep", "history", "PvP", "sound", "window"],
             drawOptions: DrawXAPeepOptions,
             showOptionsWhenDisabled: true);
@@ -3284,7 +3389,7 @@ public partial class SlaveWindow
             applied => configuration.MoveableAfterDeathEnabled = applied,
             "Keeps local movement permission open after death.",
             "Keeps local movement enabled after death.",
-            plugin.PlayerMods.MoveableAfterDeathStatusText,
+            () => plugin.PlayerMods.MoveableAfterDeathStatusText,
             warningText: "USE AT YOUR OWN RISK! Others will see your dead feckin body moving around, while they die of laughter others might get angry.",
             requireCtrlShiftToEnable: true);
 
@@ -3301,7 +3406,7 @@ public partial class SlaveWindow
             applied => configuration.GlobalCharacterListAnonymizeEnabled = applied,
             "Forces screenshot-safe aliases in XA Slave character-list tables.",
             "Applies deterministic CLI/programming/world aliases to XA Slave character-list tables and duplicate summaries. Every task-list `Anonymize` checkbox writes to this same shared global setting, so turning it on in one list carries across the others. Because it is a normal XA Mod, it can also be added as a titlebar favourite.",
-            configuration.GlobalCharacterListAnonymizeEnabled
+            () => configuration.GlobalCharacterListAnonymizeEnabled
                 ? "Enabled - character-list tables and duplicate summaries use deterministic aliases for screenshot-safe local views."
                 : "Disabled",
             searchTerms: ["screenshot", "character list", "character lists", "anonymize", "privacy", "titlebar favourite"]);
@@ -3318,7 +3423,7 @@ public partial class SlaveWindow
             applied => configuration.TeleportHelperEnabled = applied,
             "Handles SelectYesNo prompts that ask about using an aetheryte ticket for teleporting.",
             "Monitors the active `SelectYesno` prompt text. When it asks whether to use an aetheryte ticket to teleport, XA selects the configured Yes/No response. The default response is No.",
-            plugin.TeleportHelper.StatusText,
+            () => plugin.TeleportHelper.StatusText,
             warningText: configuration.TeleportHelperSelectYes
                 ? "Yes mode allows aetheryte ticket prompts instead of rejecting them."
                 : "This will reject using any aetheryte ticket usage.",
@@ -3334,7 +3439,7 @@ public partial class SlaveWindow
             applied => configuration.ForcePeepingTomEnabled = applied,
             "Keeps Peeping Tom target tracking active in PvP matches.",
             "Keeps Peeping Tom target tracking active in PvP by bypassing its local PvP runtime gate. Peeping Tom still controls what markers or windows it shows.",
-            plugin.PeepingTomIntegration.StatusText,
+            () => plugin.PeepingTomIntegration.StatusText,
             searchTerms: ["PvP", "Peeping Tom"]);
         void ApplyARealmRecordedAllZonesConfiguration()
         {
@@ -3389,27 +3494,28 @@ public partial class SlaveWindow
                     currentOption = levelOptions[levelOptions.Count - 1];
 
                 ImGui.SetNextItemWidth(Scale(320f));
-                if (ImGui.BeginCombo("Levels to keep##DalamudLogDisablerLevel", currentOption.Label))
+                using (var combo = ImRaii.Combo("Levels to keep##DalamudLogDisablerLevel", currentOption.Label))
                 {
-                    foreach (var option in levelOptions)
+                    if (combo)
                     {
-                        var selected = option.Value == currentLevel;
-                        if (ImGui.Selectable($"{option.Label}##DalamudLogDisablerLevel{option.Value}", selected)
-                            && option.Value != currentLevel)
+                        foreach (var option in levelOptions)
                         {
-                            configuration.DalamudLogDisablerMinimumKeptLevel = option.Value;
-                            ApplyDalamudLogDisablerConfiguration();
-                            SaveConfiguration();
+                            var selected = option.Value == currentLevel;
+                            if (ImGui.Selectable($"{option.Label}##DalamudLogDisablerLevel{option.Value}", selected)
+                                && option.Value != currentLevel)
+                            {
+                                configuration.DalamudLogDisablerMinimumKeptLevel = option.Value;
+                                ApplyDalamudLogDisablerConfiguration();
+                                SaveConfiguration();
+                            }
+
+                            if (ImGui.IsItemHovered() && !string.IsNullOrEmpty(option.Blocked))
+                                ImGui.SetTooltip($"Blacklists: {option.Blocked}");
+
+                            if (selected)
+                                ImGui.SetItemDefaultFocus();
                         }
-
-                        if (ImGui.IsItemHovered() && !string.IsNullOrEmpty(option.Blocked))
-                            ImGui.SetTooltip($"Blacklists: {option.Blocked}");
-
-                        if (selected)
-                            ImGui.SetItemDefaultFocus();
                     }
-
-                    ImGui.EndCombo();
                 }
 
                 ImGui.SameLine(0f, 6f);
@@ -3451,17 +3557,17 @@ public partial class SlaveWindow
                 ImGui.TextDisabled("Muted but not currently loaded:");
                 foreach (var entry in blockedNotLoaded)
                 {
-                    ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.5f, 0.5f, 1.0f));
-                    if (ImGui.SmallButton($"X##DalamudLogDisablerRemove{entry}"))
+                    using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.5f, 0.5f, 1.0f)))
                     {
-                        configuration.DalamudLogDisablerBlockedPlugins.RemoveAll(e => e.Equals(entry, StringComparison.OrdinalIgnoreCase));
-                        ApplyDalamudLogDisablerConfiguration();
-                        SaveConfiguration();
-                        ImGui.PopStyleColor();
-                        break;
+                        if (ImGui.SmallButton($"X##DalamudLogDisablerRemove{entry}"))
+                        {
+                            configuration.DalamudLogDisablerBlockedPlugins.RemoveAll(e => e.Equals(entry, StringComparison.OrdinalIgnoreCase));
+                            ApplyDalamudLogDisablerConfiguration();
+                            SaveConfiguration();
+                            break;
+                        }
                     }
 
-                    ImGui.PopStyleColor();
                     ImGui.SameLine();
                     ImGui.TextUnformatted(entry);
                 }
@@ -3569,9 +3675,8 @@ public partial class SlaveWindow
                         if (entry.IsStock)
                         {
                             var alwaysOn = true;
-                            ImGui.BeginDisabled();
-                            ImGui.Checkbox($"{entry.Name} (stock)##ARealmRecordedContentType{entry.Id}", ref alwaysOn);
-                            ImGui.EndDisabled();
+                            using (ImRaii.Disabled())
+                                ImGui.Checkbox($"{entry.Name} (stock)##ARealmRecordedContentType{entry.Id}", ref alwaysOn);
                             continue;
                         }
 
@@ -3627,47 +3732,37 @@ public partial class SlaveWindow
             ImGui.TextDisabled("Recording = status & 0x74 == 0x74, the same check behind ARealmRecorded's DTR icon.");
 
             var canForceStart = state.StateAvailable && !state.IsRecording && !state.InPlayback;
-            if (!canForceStart)
-                ImGui.BeginDisabled();
-
-            if (ImGui.Button("Force Start Recording##ARealmRecordedForceStart"))
-                plugin.ARealmRecordedIntegration.RequestForceStartRecording();
-
-            if (!canForceStart)
-                ImGui.EndDisabled();
+            using (ImRaii.Disabled(!canForceStart))
+            {
+                if (ImGui.Button("Force Start Recording##ARealmRecordedForceStart"))
+                    plugin.ARealmRecordedIntegration.RequestForceStartRecording();
+            }
 
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             {
-                ImGui.BeginTooltip();
-                ImGui.PushTextWrapPos(Scale(360f));
-                ImGui.TextUnformatted(canForceStart
-                    ? "Runs ARealmRecorded's own recording initialization for the CURRENT zone - use this when the plugin never attempted to record (entered before enabling the mod, event content, stuck Armed state). If the zone has no ContentFinderCondition, XA spoofs one into the recorder (preferring a duty matched to this territory, otherwise any whitelisted duty). WARNING: force-started recordings can end up with a FALSE location in the replay list, and such recordings may be UNPLAYABLE. The replay starts from this moment; anything earlier is not captured."
-                    : "Force start is only available while the recorder is not already recording or playing back.");
-                ImGui.PopTextWrapPos();
-                ImGui.EndTooltip();
+                using (ImRaii.Tooltip())
+                using (ImRaii.TextWrapPos(Scale(360f)))
+                    ImGui.TextUnformatted(canForceStart
+                        ? "Runs ARealmRecorded's own recording initialization for the CURRENT zone - use this when the plugin never attempted to record (entered before enabling the mod, event content, stuck Armed state). If the zone has no ContentFinderCondition, XA spoofs one into the recorder (preferring a duty matched to this territory, otherwise any whitelisted duty). WARNING: force-started recordings can end up with a FALSE location in the replay list, and such recordings may be UNPLAYABLE. The replay starts from this moment; anything earlier is not captured."
+                        : "Force start is only available while the recorder is not already recording or playing back.");
             }
 
             ImGui.SameLine();
 
             var canForceStop = state.IsRecording || state.IsArmed;
-            if (!canForceStop)
-                ImGui.BeginDisabled();
-
-            if (ImGui.Button("Force Stop Recording##ARealmRecordedForceStop"))
-                plugin.ARealmRecordedIntegration.RequestForceStopRecording();
-
-            if (!canForceStop)
-                ImGui.EndDisabled();
+            using (ImRaii.Disabled(!canForceStop))
+            {
+                if (ImGui.Button("Force Stop Recording##ARealmRecordedForceStop"))
+                    plugin.ARealmRecordedIntegration.RequestForceStopRecording();
+            }
 
             if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             {
-                ImGui.BeginTooltip();
-                ImGui.PushTextWrapPos(Scale(360f));
-                ImGui.TextUnformatted(canForceStop
-                    ? "Invokes the game's native EndRecording on the Duty Recorder module (via ARealmRecorded's Hypostasis). Use this to clear a stuck Armed/Recording state before re-entering a zone. Stopping an active recording finalizes it immediately."
-                    : "The recorder is idle; there is nothing to stop.");
-                ImGui.PopTextWrapPos();
-                ImGui.EndTooltip();
+                using (ImRaii.Tooltip())
+                using (ImRaii.TextWrapPos(Scale(360f)))
+                    ImGui.TextUnformatted(canForceStop
+                        ? "Invokes the game's native EndRecording on the Duty Recorder module (via ARealmRecorded's Hypostasis). Use this to clear a stuck Armed/Recording state before re-entering a zone. Stopping an active recording finalizes it immediately."
+                        : "The recorder is idle; there is nothing to stop.");
             }
 
             var lastForceAction = plugin.ARealmRecordedIntegration.LastForceActionMessage;
@@ -3688,7 +3783,7 @@ public partial class SlaveWindow
             applied => configuration.DalamudLogDisablerEnabled = applied,
             "Filters selected plugins' output to Dalamud's log (/xllog window and the on-disk log file) by log level.",
             "Pick plugins whose log spam you want gone, and choose which levels to keep. XA sets the chosen plugin's Dalamud per-plugin log level, which is a single threshold - keeping the selected level and everything more severe while blacklisting everything below it. 'Allow Warning and above' keeps Warning/Error/Fatal and blacklists Information/Debug/Verbose; 'Block all logs' mutes completely. The plugin keeps running normally - only its logging is filtered - and the original level is restored when you untick it or turn this mod off. Reloaded plugins are re-applied automatically. Plugins that log through means other than Dalamud's IPluginLog cannot be filtered this way.",
-            plugin.DalamudLogDisabler.StatusText,
+            () => plugin.DalamudLogDisabler.StatusText,
             searchTerms: ["Dalamud", "log", "logging", "xllog", "logger", "serilog", "mute", "silence", "spam", "verbose", "debug", "warning", "error", "fatal", "level", "disable logs", "blacklist"],
             drawOptions: DrawDalamudLogDisablerOptions,
             showOptionsWhenDisabled: true);
@@ -3705,7 +3800,7 @@ public partial class SlaveWindow
             applied => configuration.ARealmRecordedAllZonesEnabled = applied,
             "Lets ARealmRecorded start Duty Recorder recordings in restricted content types (Event, Eureka, Masked Carnivale, ...) - all of them, or only the ones you tick.",
             "ARealmRecorded only starts recordings for content types on its internal whitelist (dungeons, trials, raids, and similar). While this mod is on, XA injects extra ContentType ids into that whitelist - either every content type (default) or, with `Record all content types` unticked, only the ones you select in the list below; deselected types are removed again on the fly. The stock whitelist is restored when the mod is turned off. Zones without a Duty Finder entry (open world, housing) still cannot be recorded - that is a game limitation, not a whitelist one. Field operations never run the normal duty-end path, so the recorder can stay stuck Armed after you leave; XA auto-invokes the game's native EndRecording once you are out of the duty (after a few seconds), and the Force Stop Recording button below does the same on demand.",
-            plugin.ARealmRecordedIntegration.StatusText,
+            () => plugin.ARealmRecordedIntegration.StatusText,
             warningText: "Forcing the Duty Recorder in field operations is unsupported by the game. If a zone-in bounces you back to town or force-logs you, make sure the plugin state below shows Idle (use Force Stop Recording if it is stuck Armed) before re-entering. Force-started recordings can carry a false location and may be unplayable.",
             searchTerms: ["ARealmRecorded", "A Realm Recorded", "duty recorder", "replay", "recording", "Eureka", "Carnivale", "Bozja", "whitelist", "bounce", "zone-in", "plugin state"],
             drawOptions: DrawARealmRecordedStateOptions,
@@ -3719,12 +3814,27 @@ public partial class SlaveWindow
             applied => configuration.EurekaInstanceIdEnabled = applied,
             "Shows the live Eureka instance ID while you are inside Anemos, Pagos, Pyros, or Hydatos.",
             "Turn this on to enable the live Eureka instance surface and the optional DTR entry. The actual Rodney farming loop now lives in `Field Operations` -> `Eureka Instance Hunter`, where XA can scan any mix of `Anemos`, `Pagos`, `Pyros`, and `Hydatos`, use per-zone baselines, leave duplicate runs through the duty menu with a configurable delay, run CharacterSafeWait in Kugane before Rodney interaction, and stop once a selected zone lands on a different instance.",
-            plugin.EurekaInstanceId.StatusText,
+            () => plugin.EurekaInstanceId.StatusText,
             searchTerms: ["Eureka", "instance", "DTR", "server bar", "Field Operations", "Eureka Instance Hunter", "Rodney", "Anemos", "Pagos", "Pyros", "Hydatos", "farming"],
             drawOptions: DrawEurekaInstanceIdOptions,
             showOptionsWhenDisabled: true);
 
-        var enabledXAModsCount = toonModDefinitions.Count(entry => entry.GetCurrent());
+        xaModCatalogueBySection = featureEntries
+            .GroupBy(entry => entry.Section)
+            .ToDictionary(
+                group => group.Key,
+                group => group.OrderBy(entry => entry.Label, StringComparer.OrdinalIgnoreCase).ToArray());
+        xaModCatalogueBuilt = true;
+        }
+
+        xaModCurrentStateFrame.Clear();
+        xaModVisibilityFrame.Clear();
+        var enabledXAModsCount = 0;
+        foreach (var entry in featureEntries)
+        {
+            if (GetToonModEntryCurrent(entry))
+                enabledXAModsCount++;
+        }
         ImGui.TextColored(
             new Vector4(0.4f, 0.8f, 1.0f, 1.0f),
             $"XA QoL Mods: {toonModDefinitions.Count} Total Available | {enabledXAModsCount} Enabled");
@@ -3746,12 +3856,11 @@ public partial class SlaveWindow
         }
         ImGui.SameLine();
         var disableAllModsModifierHeld = ImGui.GetIO().KeyCtrl;
-        if (!disableAllModsModifierHeld)
-            ImGui.BeginDisabled();
-        if (ImGui.Button("Disable All Mods##ToonModsDisableAll"))
-            DisableAllMods();
-        if (!disableAllModsModifierHeld)
-            ImGui.EndDisabled();
+        using (ImRaii.Disabled(!disableAllModsModifierHeld))
+        {
+            if (ImGui.Button("Disable All Mods##ToonModsDisableAll"))
+                DisableAllMods();
+        }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip("Hold CTRL and click to clear all XA Mods.");
         ImGui.SameLine();
@@ -3781,22 +3890,32 @@ public partial class SlaveWindow
         ImGui.Spacing();
         DrawStickyToonModsSectionHeader();
 
-        if (ImGui.BeginChild("##XAModsSectionsScrollRegion", new Vector2(0f, 0f), false))
+        using (var child = ImRaii.Child("##XAModsSectionsScrollRegion", new Vector2(0f, 0f), false))
         {
-            toonModsSectionsScrollY = ImGui.GetScrollY();
-            toonModsSectionScrollRanges.Clear();
-
-            foreach (var (section, title) in toonModsSectionOrder)
-                DrawModSection(section, title);
-
-            if (featureEntries.Count == 0)
+            if (child)
             {
-                ImGui.TextDisabled("No XA Mods matched the current filter.");
-                ImGui.TextDisabled("Filters apply the search text plus the optional enabled-only toggle.");
+                toonModsSectionsScrollY = ImGui.GetScrollY();
+                toonModsSectionScrollRanges.Clear();
+
+                foreach (var (section, title) in ToonModsSectionOrder)
+                    DrawModSection(section, title);
+
+                var hasVisibleEntries = false;
+                foreach (var entry in featureEntries)
+                {
+                    if (!IsToonModEntryVisible(entry))
+                        continue;
+                    hasVisibleEntries = true;
+                    break;
+                }
+
+                if (!hasVisibleEntries)
+                {
+                    ImGui.TextDisabled("No XA Mods matched the current filter.");
+                    ImGui.TextDisabled("Filters apply the search text plus the optional enabled-only toggle.");
+                }
             }
         }
-
-        ImGui.EndChild();
     }
 
 }

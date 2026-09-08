@@ -1,7 +1,9 @@
 using System;
+using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
+using XASlave.Services;
 
 namespace XASlave.Windows;
 
@@ -80,7 +82,14 @@ public sealed class EurekaLogogramCreatorFavoritesOverlayWindow : Window
                 var buttonId = $"##EurekaLogogramCreatorFavoritePlateButton{i}";
                 if (ImGui.InvisibleButton(buttonId, new Vector2(PlateButtonWidth, ButtonHeight)))
                 {
-                    plugin.EurekaLogogramCreator.QueueFavoritePlate(plate);
+                    var queuedPlate = new FavoritePlate
+                    {
+                        Name = plate.Name,
+                        AstralActionId = plate.AstralActionId,
+                        UmbralActionId = plate.UmbralActionId,
+                        ActionIds = new List<uint>(plate.ActionIds),
+                    };
+                    Plugin.ScheduleOnGameThread(() => plugin.EurekaLogogramCreator.QueueFavoritePlate(queuedPlate));
                 }
 
                 var min = ImGui.GetItemRectMin();
@@ -101,9 +110,10 @@ public sealed class EurekaLogogramCreatorFavoritesOverlayWindow : Window
                 var textPos = new Vector2(
                     min.X + Math.Max(6f, (PlateButtonWidth - textSize.X) * 0.5f),
                     min.Y + Math.Max(0f, (ButtonHeight - textSize.Y) * 0.5f));
-                ImGui.PushClipRect(min, max, true);
-                drawList.AddText(textPos, textColor, label);
-                ImGui.PopClipRect();
+                using (XASlaveImRaii.ClipRect(min, max, true))
+                {
+                    drawList.AddText(textPos, textColor, label);
+                }
 
                 if (ImGui.IsItemHovered())
                 {

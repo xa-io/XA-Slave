@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -28,8 +29,22 @@ namespace XASlave.Windows;
 /// </summary>
 public partial class SlaveWindow
 {
+    // Current game strings mirrored from AutoRetainer's language table. Selection remains exact
+    // and fail-closed so an unexpected menu shape can never fall back to a numeric row.
+    private static readonly (string Text, bool Contains)[] RefreshPreviousVoyageLogEntries =
+    {
+        ("View previous voyage log", false),
+        ("å‰å›žã®ãƒœã‚¤ã‚¸ãƒ£ãƒ¼å ±å‘Š", false),
+        ("ä¸Šæ¬¡çš„è¿œèˆªæŠ¥å‘Š", false),
+        ("ä¸Šæ¬¡çš„é èˆªå ±å‘Š", false),
+        ("Bericht der letzten Erkundung", false),
+        ("Consulter le journal de la prÃ©cÃ©dente expÃ©dition", false),
+        ("ì´ì „ íƒì‚¬ ë³´ê³ ì„œ", false),
+    };
+
     // -- Refresh AR Subs/Bell state --
     private readonly HashSet<int> refreshSubsSelectedIndices = new();
+    private readonly ConcurrentQueue<string> refreshSubsCompletedCharacterQueue = new();
     private string refreshSubsNewChar = "";
     private string refreshSubsSearchFilter = "";
     private bool refreshSubsShowLog;
@@ -61,11 +76,16 @@ public partial class SlaveWindow
             return;
 
         var config = plugin.Configuration;
-        refreshSubsDoOpenArmoury = config.AutoCollectArmouryChest;
-        refreshSubsDoOpenSaddlebags = config.AutoCollectSaddlebag;
-        refreshSubsDoOpenJournal = config.AutoCollectJournal;
-        refreshSubsDoCollectPersonalPlotInfo = config.AutoCollectPersonalPlotInfo;
-        refreshSubsDoReturnToHome = config.AutoCollectPersonalPlotInfo;
+        refreshSubsGoWorkshop = config.RefreshSubsGoWorkshop;
+        refreshSubsExtraWait = Math.Clamp(config.RefreshSubsExtraWaitSeconds, 0f, 30f);
+        refreshSubsDoLogoutOnComplete = config.RefreshSubsLogoutOnComplete;
+        refreshSubsDoKillGameOnComplete = config.RefreshSubsKillGameOnComplete;
+        refreshSubsDoEnableArMulti = config.RefreshSubsEnableArMultiOnComplete;
+        refreshSubsDoOpenArmoury = config.RefreshSubsOpenArmoury;
+        refreshSubsDoOpenSaddlebags = config.RefreshSubsOpenSaddlebags;
+        refreshSubsDoOpenJournal = config.RefreshSubsOpenJournal;
+        refreshSubsDoCollectPersonalPlotInfo = config.RefreshSubsCollectPersonalPlotInfo;
+        refreshSubsDoReturnToHome = config.RefreshSubsReturnToHome;
         refreshSubsActionOptionsInitialized = true;
     }
 
@@ -73,6 +93,11 @@ public partial class SlaveWindow
     {
         var cfg = plugin.Configuration;
         var chars = cfg.RefreshSubsCharacters;
+        while (refreshSubsCompletedCharacterQueue.TryDequeue(out var completedCharacter))
+        {
+            if (SelectionCompletion.RemoveCompletedCharacter(chars, refreshSubsSelectedIndices, completedCharacter))
+                plugin.TaskRunner.AddLog($"Refresh Sub/Bell/Chest: unchecked {completedCharacter} from the character list.");
+        }
         EnsureRefreshSubsActionOptionsInitialized();
 
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Refresh Sub/Bell/Chest");
@@ -81,25 +106,26 @@ public partial class SlaveWindow
 
         // -- Import / Refresh buttons --
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
-        if (!arConfigExists) ImGui.BeginDisabled();
-        if (ImGui.Button("Import from AutoRetainer##refreshSubsImportAR"))
+        using (ImRaii.Disabled(!arConfigExists))
         {
-            try
+            if (ImGui.Button("Import from AutoRetainer##refreshSubsImportAR"))
             {
-                var (added, total) = ImportCharactersFromArToList(chars);
-                cfg.Save();
-                arImportStatus = added > 0
-                    ? $"Imported {added} new ({total} total)"
-                    : $"All {total} already in list";
-                arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
-            }
-            catch (Exception ex)
-            {
-                arImportStatus = $"Import failed: {ex.Message}";
-                arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                try
+                {
+                    var (added, total) = ImportCharactersFromArToList(chars);
+                    cfg.Save();
+                    arImportStatus = added > 0
+                        ? $"Imported {added} new ({total} total)"
+                        : $"All {total} already in list";
+                    arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                }
+                catch (Exception ex)
+                {
+                    arImportStatus = $"Import failed: {ex.Message}";
+                    arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                }
             }
         }
-        if (!arConfigExists) ImGui.EndDisabled();
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(arConfigExists
                 ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
@@ -107,10 +133,11 @@ public partial class SlaveWindow
 
         ImGui.SameLine();
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
-        if (!xaDbAvailable) ImGui.BeginDisabled();
-        if (ImGui.Button("Pull XA Database Info##refreshSubsPullXA"))
-            PullXaDatabaseInfo();
-        if (!xaDbAvailable) ImGui.EndDisabled();
+        using (ImRaii.Disabled(!xaDbAvailable))
+        {
+            if (ImGui.Button("Pull XA Database Info##refreshSubsPullXA"))
+                PullXaDatabaseInfo();
+        }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(xaDbAvailable
                 ? "Read XA Database to update retainer/submarine counts for all characters."
@@ -130,17 +157,22 @@ public partial class SlaveWindow
         DrawTaskPluginStatus(refreshSubsDoCollectPersonalPlotInfo);
 
         // Config
-        ImGui.Checkbox("##refreshSubsWorkshop", ref refreshSubsGoWorkshop);
+        if (ImGui.Checkbox("##refreshSubsWorkshop", ref refreshSubsGoWorkshop))
+            SaveRefreshSubsOptions();
         ImGui.SameLine(0f, ImGui.GetStyle().ItemInnerSpacing.X);
-        ImGui.BeginGroup();
-        ImGui.AlignTextToFramePadding();
-        ImGui.TextUnformatted("Enter Workshop and tap the Voyage Console and Summoning bell to refresh AutoRetainer.");
-        ImGui.TextUnformatted("While inside the workshop, XA Slave also checks Company Chest gil for XA Database before resuming AR.");
-        ImGui.TextUnformatted("If not selected it will only collect the summoning bell inside the plot.");
-        ImGui.Spacing();
-        ImGui.EndGroup();
+        using (ImRaii.Group())
+        {
+            ImGui.AlignTextToFramePadding();
+            ImGui.TextUnformatted("Enter Workshop and tap the Voyage Console and Summoning bell to refresh AutoRetainer.");
+            ImGui.TextUnformatted("While inside the workshop, XA Slave also checks Company Chest gil for XA Database before resuming AR.");
+            ImGui.TextUnformatted("If not selected it will only collect the summoning bell inside the plot.");
+            ImGui.Spacing();
+        }
         if (ImGui.IsItemClicked())
+        {
             refreshSubsGoWorkshop = !refreshSubsGoWorkshop;
+            SaveRefreshSubsOptions();
+        }
 
         ImGui.SetNextItemWidth(Scale(80f));
         var wait = refreshSubsExtraWait;
@@ -149,6 +181,7 @@ public partial class SlaveWindow
             if (wait < 0f) wait = 0f;
             if (wait > 30f) wait = 30f;
             refreshSubsExtraWait = wait;
+            SaveRefreshSubsOptions();
         }
 
         ImGui.Spacing();
@@ -228,9 +261,10 @@ public partial class SlaveWindow
         // Character table - columns: checkbox, #, character, world, retainers, submarines, remove
         var charInfo = cfg.ReloggerCharacterInfo;
 
-        if (ImGui.BeginTable("RefreshSubsCharTable", 7,
+        using (var imguiScope262 = ImRaii.Table("RefreshSubsCharTable", 7,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
             ScaledVector(0f, 250f)))
+        if (imguiScope262)
         {
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
@@ -333,24 +367,24 @@ public partial class SlaveWindow
 
                 // Remove
                 ImGui.TableNextColumn();
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
-                if (ImGui.SmallButton($"X##rsRm{i}"))
+                using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
-                    chars.RemoveAt(i);
-                    refreshSubsSelectedIndices.Remove(i);
-                    var newSet = new HashSet<int>();
-                    foreach (var idx in refreshSubsSelectedIndices)
-                        newSet.Add(idx > i ? idx - 1 : idx);
-                    refreshSubsSelectedIndices.Clear();
-                    foreach (var idx in newSet) refreshSubsSelectedIndices.Add(idx);
-                    cfg.Save();
-                    ImGui.PopStyleColor();
-                    break;
+                    if (ImGui.SmallButton($"X##rsRm{i}"))
+                    {
+                        chars.RemoveAt(i);
+                        refreshSubsSelectedIndices.Remove(i);
+                        var newSet = new HashSet<int>();
+                        foreach (var idx in refreshSubsSelectedIndices)
+                            newSet.Add(idx > i ? idx - 1 : idx);
+                        refreshSubsSelectedIndices.Clear();
+                        foreach (var idx in newSet) refreshSubsSelectedIndices.Add(idx);
+                        cfg.Save();
+                        break;
+                    }
                 }
-                ImGui.PopStyleColor();
             }
 
-            ImGui.EndTable();
+
         }
 
         ImGui.Spacing();
@@ -378,15 +412,37 @@ public partial class SlaveWindow
 
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Actions Per Character");
         ImGui.Spacing();
-        ImGui.Checkbox("Open Armoury Chest##refreshSubsArmoury", ref refreshSubsDoOpenArmoury);
-        ImGui.Checkbox("Open Saddlebags##refreshSubsSaddlebags", ref refreshSubsDoOpenSaddlebags);
-        ImGui.Checkbox("Open Journal##refreshSubsJournal", ref refreshSubsDoOpenJournal);
-        ImGui.Checkbox("Teleport Home (Lifestream)##refreshSubsHome", ref refreshSubsDoReturnToHome);
-        ImGui.Checkbox("Collect Personal Plot Info##refreshSubsPlot", ref refreshSubsDoCollectPersonalPlotInfo);
+        var refreshOptionsChanged = false;
+        refreshOptionsChanged |= ImGui.Checkbox("Open Armoury Chest##refreshSubsArmoury", ref refreshSubsDoOpenArmoury);
+        refreshOptionsChanged |= ImGui.Checkbox("Open Saddlebags##refreshSubsSaddlebags", ref refreshSubsDoOpenSaddlebags);
+        refreshOptionsChanged |= ImGui.Checkbox("Open Journal##refreshSubsJournal", ref refreshSubsDoOpenJournal);
+        refreshOptionsChanged |= ImGui.Checkbox("Teleport Home (Lifestream)##refreshSubsHome", ref refreshSubsDoReturnToHome);
+        refreshOptionsChanged |= ImGui.Checkbox("Collect Personal Plot Info##refreshSubsPlot", ref refreshSubsDoCollectPersonalPlotInfo);
+        if (refreshOptionsChanged)
+            SaveRefreshSubsOptions();
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Opens /housing, checks Apartment, Private Estate, and Shared Estate signboards when available,\nand triggers XA Database saves after each housing pass.");
 
+        var completionBefore = (refreshSubsDoLogoutOnComplete, refreshSubsDoKillGameOnComplete, refreshSubsDoEnableArMulti);
         DrawSharedCompletionAndLogFooter("refreshSubs", "refreshSubs", ref refreshSubsDoLogoutOnComplete, ref refreshSubsDoKillGameOnComplete, ref refreshSubsDoEnableArMulti, ref refreshSubsShowLog, plugin.TaskRunner);
+        if (completionBefore != (refreshSubsDoLogoutOnComplete, refreshSubsDoKillGameOnComplete, refreshSubsDoEnableArMulti))
+            SaveRefreshSubsOptions();
+    }
+
+    private void SaveRefreshSubsOptions()
+    {
+        var config = plugin.Configuration;
+        config.RefreshSubsGoWorkshop = refreshSubsGoWorkshop;
+        config.RefreshSubsExtraWaitSeconds = refreshSubsExtraWait;
+        config.RefreshSubsLogoutOnComplete = refreshSubsDoLogoutOnComplete;
+        config.RefreshSubsKillGameOnComplete = refreshSubsDoKillGameOnComplete;
+        config.RefreshSubsEnableArMultiOnComplete = refreshSubsDoEnableArMulti;
+        config.RefreshSubsOpenArmoury = refreshSubsDoOpenArmoury;
+        config.RefreshSubsOpenSaddlebags = refreshSubsDoOpenSaddlebags;
+        config.RefreshSubsOpenJournal = refreshSubsDoOpenJournal;
+        config.RefreshSubsReturnToHome = refreshSubsDoReturnToHome;
+        config.RefreshSubsCollectPersonalPlotInfo = refreshSubsDoCollectPersonalPlotInfo;
+        config.SaveDeferred();
     }
 
     private List<string> GetSelectedRefreshSubsCharacters()
@@ -428,31 +484,25 @@ public partial class SlaveWindow
             .Select(i => chars[i])
             .ToList();
 
-        HaltAutoCollectionForPriorityTask("Refresh Sub/Bell/Chest");
-
-        refreshSubsArSuppressedByTask = false;
-
         var steps = BuildRefreshSubsBellSteps(selected, plugin.TaskRunner);
 
-        // Set reloggerRunList for DrawProcessingList
-        reloggerRunList = new List<string>(selected);
-
-        plugin.TaskRunner.Start("Refresh Sub/Bell/Chest", steps, onFinished: () =>
+        if (!plugin.TaskRunner.Start("Refresh Sub/Bell/Chest", steps, onFinished: () =>
         {
             ReleaseRefreshSubsArSuppression();
         }, onLog: (msg) =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
-        });
+        }, totalItems: selected.Count, suppressLogoutCancel: true))
+            return;
+
+        HaltAutoCollectionForPriorityTask("Refresh Sub/Bell/Chest");
+        refreshSubsArSuppressedByTask = false;
+        reloggerRunList = new List<string>(selected);
     }
 
     private List<TaskStep> BuildRefreshSubsBellSteps(List<string> characters, TaskRunner runner)
     {
         var steps = new List<TaskStep>();
-
-        runner.TotalItems = characters.Count;
-        runner.CompletedItems = 0;
-        runner.SuppressLogoutCancel = true;
 
         // Disable AR Multi Mode
         steps.Add(new TaskStep
@@ -533,7 +583,7 @@ public partial class SlaveWindow
                 OnTimeout = () =>
                 {
                     relogState.Failed = true;
-                    runner.FailedCharacters.Add(charName);
+                    runner.RecordFailedCharacter(charName);
                     runner.AddLog($"FAILED: Could not relog to {charName}. Leaving the character checked.");
                 },
             });
@@ -995,6 +1045,8 @@ public partial class SlaveWindow
 
     private static void AddRefreshSubsSubConsoleSteps(List<TaskStep> steps, TaskRunner runner, string charName)
     {
+        var voyageLogSelected = false;
+
         steps.Add(new TaskStep
         {
             Name = $"Target Sub Console: {charName}",
@@ -1039,11 +1091,19 @@ public partial class SlaveWindow
             Name = $"Sub Reports: {charName}",
             OnEnter = () =>
             {
-                if (AddonHelper.IsAddonReady("SelectString"))
-                    AddonHelper.FireCallbackAndClose("SelectString", 1);
+                voyageLogSelected = AddonHelper.SelectFirstAddonListText(
+                    "SelectString",
+                    out _,
+                    out var matchedText,
+                    RefreshPreviousVoyageLogEntries);
+                if (voyageLogSelected)
+                    runner.AddLog($"Selected voyage menu entry by text: {matchedText}");
             },
-            IsComplete = () => true,
+            IsComplete = () => voyageLogSelected &&
+                               (!AddonHelper.IsAddonReady("SelectString") || AddonHelper.IsAddonVisible("AirShipExplorationResult")),
             TimeoutSec = 3f,
+            MaxRetries = 1,
+            OnTimeout = () => runner.AddLog("Could not resolve 'View previous voyage log' in the Voyage Control Panel; no numeric fallback was used."),
         });
         steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Reports Wait: {charName}", 1.0f));
 
@@ -1316,17 +1376,7 @@ public partial class SlaveWindow
 
     private void UncheckRefreshSubsCharacter(string characterName, TaskRunner runner)
     {
-        var chars = plugin.Configuration.RefreshSubsCharacters;
-        for (var idx = 0; idx < chars.Count; idx++)
-        {
-            if (!chars[idx].Equals(characterName, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            if (refreshSubsSelectedIndices.Remove(idx))
-                runner.AddLog($"Refresh Sub/Bell/Chest: unchecked {characterName} from the character list.");
-
-            break;
-        }
+        refreshSubsCompletedCharacterQueue.Enqueue(characterName);
     }
 
     private class RefreshSubsRelogState

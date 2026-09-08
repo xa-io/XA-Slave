@@ -1843,8 +1843,10 @@ public partial class SlaveWindow
                 "Known selected-owner supply covers every Give batch target.");
         }
 
-        if (!ImGui.BeginTable("XagmanOwnerGiveForecastItems", 5,
-                ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        using (var table = ImRaii.Table("XagmanOwnerGiveForecastItems", 5,
+                   ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        {
+        if (!table)
             return;
         ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Target (Batch)", ImGuiTableColumnFlags.WidthFixed, Scale(105f));
@@ -1871,7 +1873,7 @@ public partial class SlaveWindow
             ImGui.TableNextColumn();
             DrawXagmanOwnerForecastRange(item.ConfirmedShortageQuantity, item.MaximumShortageQuantity);
         }
-        ImGui.EndTable();
+        }
         ImGui.TextDisabled("Known to Give sums min(owner inventory, Give N). Still Needed is max(0, batch target - known total); unknown owners can reduce, never increase, that shortage.");
     }
 
@@ -1902,8 +1904,10 @@ public partial class SlaveWindow
                 "Every known owner already meets each positive Balance target.");
         }
 
-        if (!ImGui.BeginTable("XagmanOwnerBalanceForecastItems", 7,
-                ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        using (var table = ImRaii.Table("XagmanOwnerBalanceForecastItems", 7,
+                   ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        {
+        if (!table)
             return;
         ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Target Each", ImGuiTableColumnFlags.WidthFixed, Scale(85f));
@@ -1939,7 +1943,7 @@ public partial class SlaveWindow
             ImGui.TableNextColumn();
             DrawXagmanOwnerForecastRange(item.ConfirmedNeededQuantity, item.MaximumNeededQuantity);
         }
-        ImGui.EndTable();
+        }
         ImGui.TextDisabled("Known Filled credits min(owner inventory, Balance N) per owner. Surplus on one owner never cancels another owner's deficit. Balance 0 has no deficit row.");
     }
 
@@ -1980,8 +1984,10 @@ public partial class SlaveWindow
         if (view.HasFiniteTakeGil)
             DrawXagmanTradeCapacityWarning("Gil uses zero bag slots. Its quantity is advisory only; Tony's live gil minimum and the live trade cap remain authoritative.");
 
-        if (!ImGui.BeginTable("XagmanOwnerTakeForecastItems", 7,
-                ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        using (var table = ImRaii.Table("XagmanOwnerTakeForecastItems", 7,
+                   ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        {
+        if (!table)
             return;
         ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Each", ImGuiTableColumnFlags.WidthFixed, Scale(75f));
@@ -2016,7 +2022,7 @@ public partial class SlaveWindow
                 ? item.KnownCrystalCapacityShortQuantity.ToString("N0", CultureInfo.InvariantCulture)
                 : "-");
         }
-        ImGui.EndTable();
+        }
         ImGui.TextDisabled("Starting capacity covers one configured Take batch per owner. Non-crystal partial stacks are credited before shared Inventory 1-4 slots; elemental crystal rows use only their dedicated 9,999-unit pouch headroom and never consume bag slots. Later live supply passes remain authoritative. Take 0 is excluded.");
     }
 
@@ -2243,7 +2249,9 @@ public partial class SlaveWindow
             return;
         var tableId = $"XagmanTradeCapacityItems##{group.GroupKey}";
         var tableColumnCount = view.ShowCollectionFirstProjection ? 9 : 7;
-        if (!ImGui.BeginTable(tableId, tableColumnCount, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        using (var itemsTable = ImRaii.Table(tableId, tableColumnCount, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        {
+        if (!itemsTable)
             return;
         ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Stack", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
@@ -2315,7 +2323,7 @@ public partial class SlaveWindow
                 }
             }
         }
-        ImGui.EndTable();
+        }
         ImGui.TextDisabled(
             "Collection slots credit matching partial stacks first. Stock After Collect assumes every projected Give/Balance surplus is received; " +
             "if collection slots are short, the after-collection supply result is conditional.");
@@ -2325,8 +2333,10 @@ public partial class SlaveWindow
         ImGui.Spacing();
         ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), "Per-Tony Supply Availability");
         var availabilityTableId = $"XagmanTonySupplyAvailability##{group.GroupKey}";
-        if (!ImGui.BeginTable(availabilityTableId, 4,
-                ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        using (var availabilityTable = ImRaii.Table(availabilityTableId, 4,
+                   ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
+        {
+        if (!availabilityTable)
             return;
         ImGui.TableSetupColumn("Tony", ImGuiTableColumnFlags.WidthStretch);
         ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
@@ -2359,7 +2369,7 @@ public partial class SlaveWindow
             else
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), "?");
         }
-        ImGui.EndTable();
+        }
         ImGui.TextDisabled("Availability only; no stock is reserved or split here. Runtime Tony order/rotation and live trade checks decide which Tony supplies each unit. Gil availability is the amount above Tony Gil Minimum.");
     }
 
@@ -2444,11 +2454,12 @@ public partial class SlaveWindow
         var collectColor = capacity.RemainingQuantity > 0
             ? new Vector4(1.0f, 0.8f, 0.3f, 1.0f)
             : new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
-        ImGui.PushStyleColor(ImGuiCol.Text, collectColor);
-        ImGui.TextWrapped(
-            $"{collectLabel}: {capacity.CollectableQuantity:N0} of {capacity.IncomingQuantity:N0} unit(s), " +
-            $"using up to {capacity.NewStackSlotsUsed:N0} new stack slot(s); {capacity.RemainingQuantity:N0} remain.");
-        ImGui.PopStyleColor();
+        using (ImRaii.PushColor(ImGuiCol.Text, collectColor))
+        {
+            ImGui.TextWrapped(
+                $"{collectLabel}: {capacity.CollectableQuantity:N0} of {capacity.IncomingQuantity:N0} unit(s), " +
+                $"using up to {capacity.NewStackSlotsUsed:N0} new stack slot(s); {capacity.RemainingQuantity:N0} remain.");
+        }
     }
 
     private static void DrawXagmanTradeCapacityWarning(string text)

@@ -27,6 +27,9 @@ namespace XASlave.Windows;
 public partial class SlaveWindow : Window, IDisposable
 {
     private readonly Plugin plugin;
+    private bool isDisposed;
+    private readonly System.Threading.CancellationTokenSource workerCts = new();
+    private int exclusiveWorkerRunning;
     private const string PluginVersion = BuildInfo.Version;
     private const string WebsiteUrl = "https://aethertek.io/";
     private const string DiscordUrl = "https://discord.gg/g2NmYxPQCa";
@@ -124,7 +127,9 @@ public partial class SlaveWindow : Window, IDisposable
 
     private static readonly (SlaveTask Task, string Label)[] ReferenceItems =
     {
+#if DEBUG
         (SlaveTask.DebugCommands, "Debug / Test"),
+#endif
         (SlaveTask.ExportData, "Export Data"),
         (SlaveTask.RepoList, "Repo List"),
         (SlaveTask.IpcCallsAvailable, "IPC Calls Available"),
@@ -134,6 +139,8 @@ public partial class SlaveWindow : Window, IDisposable
 
     private SlaveTask? selectedTask;
     private bool debugMenuVisible;
+    private string debugResult = string.Empty;
+    private DateTime debugResultExpiry = DateTime.MinValue;
 
     private ITaskPanel? selectedExternalTask;
 
@@ -141,14 +148,20 @@ public partial class SlaveWindow : Window, IDisposable
         : base("XA Slave###SlaveWindow", ImGuiWindowFlags.None)
     {
         this.plugin = plugin;
-        debugMenuVisible = plugin.Configuration.DebugMenuVisible;
+#if DEBUG
+        debugMenuVisible = true;
+#else
+        debugMenuVisible = false;
+#endif
         UpdateSizeConstraints(UiScaleSafe);
         RestoreLastSelectedTaskSelection();
         Plugin.Framework.Update += OnFrameworkUpdate;
         Plugin.ClientState.Login += OnExportDataLogin;
         Plugin.ClientState.Logout += OnExportDataLogoutHandler;
+#if DEBUG
         Plugin.NamePlateGui.OnDataUpdate += OnXaAbuseNamePlateUpdate;
         Plugin.PluginInterface.UiBuilder.Draw += DrawXaAbuseOverlay;
+#endif
 
         // Initialize Xagman peer event handlers for TCP task control
         InitializeXagmanPeerEventHandlers();
@@ -885,6 +898,17 @@ public partial class SlaveWindow : Window, IDisposable
 
     public bool ToggleDebugMenu(out string message)
     {
+#if !DEBUG
+        debugMenuVisible = false;
+        if (plugin.Configuration.DebugMenuVisible)
+        {
+            plugin.Configuration.DebugMenuVisible = false;
+            plugin.Configuration.SaveDeferred();
+        }
+
+        message = "Debug / Test commands are unavailable in Release builds.";
+        return false;
+#else
         debugMenuVisible = !debugMenuVisible;
         if (plugin.Configuration.DebugMenuVisible != debugMenuVisible)
         {
@@ -906,20 +930,118 @@ public partial class SlaveWindow : Window, IDisposable
 
         message = "Debug / Test menu hidden.";
         return true;
+#endif
+    }
+
+    private void SetDebugResult(string msg)
+    {
+        debugResult = $"[{DateTime.Now:HH:mm:ss}] {msg}";
+        debugResultExpiry = DateTime.UtcNow.AddSeconds(15);
+        Plugin.Log.Information($"[XASlave] Debug: {msg}");
     }
 
     public void Dispose()
     {
-        CancelScheduledAutoCollection(true);
-        ReleaseRefreshSubsArSuppression();
-        StopXagmanTask();
-        Plugin.Framework.Update -= OnFrameworkUpdate;
-        Plugin.ClientState.Login -= OnExportDataLogin;
-        Plugin.ClientState.Logout -= OnExportDataLogoutHandler;
+        if (isDisposed)
+            return;
+
+        isDisposed = true;
+
+        DetachDuringDispose("Worker cancellation", workerCts.Cancel);
+
+        DetachDuringDispose("Framework.Update", () => Plugin.Framework.Update -= OnFrameworkUpdate);
+        DetachDuringDispose("ClientState.Login", () => Plugin.ClientState.Login -= OnExportDataLogin);
+        DetachDuringDispose("ClientState.Logout", () => Plugin.ClientState.Logout -= OnExportDataLogoutHandler);
+#if DEBUG
+        DetachDuringDispose("NamePlateGui.OnDataUpdate", () => Plugin.NamePlateGui.OnDataUpdate -= OnXaAbuseNamePlateUpdate);
+        DetachDuringDispose("UiBuilder.Draw", () => Plugin.PluginInterface.UiBuilder.Draw -= DrawXaAbuseOverlay);
+        DetachDuringDispose("AR RetainerListTaskButtonsDraw", () => plugin.IpcClient.AutoRetainerUnsubscribeRetainerListTaskButtonsDraw(OnDebugAutoRetainerDepositGilListTaskButtonsDraw));
+        DetachDuringDispose("AR RetainerAdditionalTask", () => plugin.IpcClient.AutoRetainerUnsubscribeRetainerAdditionalTask(OnDebugAutoRetainerDepositGilAdditionalTask));
+        DetachDuringDispose("AR RetainerPostProcess", () => plugin.IpcClient.AutoRetainerUnsubscribeRetainerPostProcess(OnDebugAutoRetainerDepositGilReadyForPostprocess));
+        debugAutoRetainerDepositGilSubscribed = false;
+#endif
+
+        DetachDuringDispose("CancelScheduledAutoCollection", () => CancelScheduledAutoCollection(true));
+        DetachDuringDispose("ReleaseRefreshSubsArSuppression", ReleaseRefreshSubsArSuppression);
+        DetachDuringDispose("StopXagmanTask", StopXagmanTask);
+
+#if DEBUG
         xaAbuseEnabled = false;
-        Plugin.NamePlateGui.RequestRedraw();
-        Plugin.NamePlateGui.OnDataUpdate -= OnXaAbuseNamePlateUpdate;
-        Plugin.PluginInterface.UiBuilder.Draw -= DrawXaAbuseOverlay;
+        DetachDuringDispose("NamePlateGui.RequestRedraw", Plugin.NamePlateGui.RequestRedraw);
+#endif
+        DetachDuringDispose("Worker cancellation source", workerCts.Dispose);
+    }
+
+    /// <summary>
+    /// Owns every window-scoped background worker so unload cancels it, faults are observed, and
+    /// movement-capable workers can share one re-entrancy gate.
+    /// </summary>
+    private bool RunWorker(
+        string label,
+        Func<System.Threading.CancellationToken, System.Threading.Tasks.Task> body,
+        bool exclusive = false)
+    {
+        if (isDisposed || workerCts.IsCancellationRequested)
+        {
+            SetDebugResult($"'{label}' rejected - XA Slave is disposing.");
+            return false;
+        }
+
+        if (exclusive && System.Threading.Interlocked.CompareExchange(ref exclusiveWorkerRunning, 1, 0) != 0)
+        {
+            SetDebugResult($"'{label}' rejected - another movement command is already running.");
+            return false;
+        }
+
+        var token = workerCts.Token;
+        try
+        {
+            _ = System.Threading.Tasks.Task.Run(async () =>
+            {
+                try
+                {
+                    await body(token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (token.IsCancellationRequested)
+                {
+                    // Expected during window/plugin teardown.
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.Error(ex, $"[XASlave] Worker '{label}' failed.");
+                    SetDebugResult($"{label} failed: {ex.Message}");
+                }
+                finally
+                {
+                    if (exclusive)
+                        System.Threading.Interlocked.Exchange(ref exclusiveWorkerRunning, 0);
+                }
+            }, System.Threading.CancellationToken.None);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            if (exclusive)
+                System.Threading.Interlocked.Exchange(ref exclusiveWorkerRunning, 0);
+            Plugin.Log.Error(ex, $"[XASlave] Could not start worker '{label}'.");
+            SetDebugResult($"{label} could not start: {ex.Message}");
+            return false;
+        }
+    }
+
+    private bool RejectIfExclusiveWorkerBusy(string label)
+    {
+        if (System.Threading.Volatile.Read(ref exclusiveWorkerRunning) == 0)
+            return false;
+
+        SetDebugResult($"'{label}' rejected - another movement command is already running.");
+        return true;
+    }
+
+    private static void DetachDuringDispose(string label, System.Action action)
+    {
+        try { action(); }
+        catch (Exception ex) { Plugin.Log.Warning(ex, $"[XASlave] SlaveWindow.Dispose: {label} failed."); }
     }
 
     private void RestoreLastSelectedTaskSelection()
@@ -1189,6 +1311,7 @@ public partial class SlaveWindow : Window, IDisposable
 
     public override void Draw()
     {
+        Plugin.AssertGameThread();
         RefreshTitleBarFavIconColors();
 
         // -- Left panel: Task menu --
@@ -1201,32 +1324,32 @@ public partial class SlaveWindow : Window, IDisposable
         var leftWidth = Scale(storedLeftWidth);
 
         var panelHeight = Math.Max(Scale(120f), ImGui.GetContentRegionAvail().Y - Scale(30f));
-        ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, ScaledVector(TaskLayoutColumnGap, 0f));
-        ImGui.PushStyleColor(ImGuiCol.Separator, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
-        ImGui.PushStyleColor(ImGuiCol.SeparatorHovered, new Vector4(0.40f, 0.40f, 0.40f, 1.0f));
-        ImGui.PushStyleColor(ImGuiCol.SeparatorActive, new Vector4(0.55f, 0.55f, 0.55f, 1.0f));
-        if (ImGui.BeginTable("SlaveLayout", 2, ImGuiTableFlags.Resizable | ImGuiTableFlags.NoSavedSettings, new Vector2(0f, panelHeight)))
         {
-            ImGui.TableSetupColumn("TaskMenuColumn", ImGuiTableColumnFlags.WidthFixed, leftWidth);
-            ImGui.TableSetupColumn("TaskContentColumn", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableNextRow();
-
-            ImGui.TableNextColumn();
-            DrawTaskMenuPanel(panelHeight);
-            var currentWidth = ClampTaskMenuWidth(Unscale(ImGui.GetColumnWidth(0)));
-
-            if (Math.Abs(plugin.Configuration.TaskMenuWidth - currentWidth) > 0.5f)
+            using var padding = ImRaii.PushStyle(ImGuiStyleVar.CellPadding, ScaledVector(TaskLayoutColumnGap, 0f));
+            using var colors = ImRaii.PushColor(ImGuiCol.Separator, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
+            colors.Push(ImGuiCol.SeparatorHovered, new Vector4(0.40f, 0.40f, 0.40f, 1.0f));
+            colors.Push(ImGuiCol.SeparatorActive, new Vector4(0.55f, 0.55f, 0.55f, 1.0f));
+            using var table = ImRaii.Table("SlaveLayout", 2, ImGuiTableFlags.Resizable | ImGuiTableFlags.NoSavedSettings, new Vector2(0f, panelHeight));
+            if (table)
             {
-                plugin.Configuration.TaskMenuWidth = currentWidth;
-                plugin.Configuration.Save();
-            }
+                ImGui.TableSetupColumn("TaskMenuColumn", ImGuiTableColumnFlags.WidthFixed, leftWidth);
+                ImGui.TableSetupColumn("TaskContentColumn", ImGuiTableColumnFlags.WidthStretch);
+                ImGui.TableNextRow();
 
-            ImGui.TableNextColumn();
-            DrawTaskContentPanel(panelHeight);
-            ImGui.EndTable();
+                ImGui.TableNextColumn();
+                DrawTaskMenuPanel(panelHeight);
+                var currentWidth = ClampTaskMenuWidth(Unscale(ImGui.GetColumnWidth(0)));
+
+                if (Math.Abs(plugin.Configuration.TaskMenuWidth - currentWidth) > 0.5f)
+                {
+                    plugin.Configuration.TaskMenuWidth = currentWidth;
+                    plugin.Configuration.Save();
+                }
+
+                ImGui.TableNextColumn();
+                DrawTaskContentPanel(panelHeight);
+            }
         }
-        ImGui.PopStyleColor(3);
-        ImGui.PopStyleVar();
 
         // -- Status bar --
         ImGui.Separator();
@@ -1235,7 +1358,7 @@ public partial class SlaveWindow : Window, IDisposable
 
     private void DrawTaskMenuPanel(float panelHeight)
     {
-        ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
+        using var border = ImRaii.PushColor(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
         using (var child = ImRaii.Child("TaskMenu", new Vector2(0f, panelHeight), true))
         {
             if (child.Success)
@@ -1248,7 +1371,19 @@ public partial class SlaveWindow : Window, IDisposable
 
                 foreach (var ext in plugin.ExternalTaskLoader.Tasks)
                 {
-                    if (!TryGetVisibleTaskLabel(ext.Label, out var visibleLabel))
+                    string label;
+                    try
+                    {
+                        label = ext.Label;
+                    }
+                    catch (Exception ex)
+                    {
+                        ImGui.TextColored(
+                            new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
+                            $"[task DLL error] {ex.Message}");
+                        continue;
+                    }
+                    if (!TryGetVisibleTaskLabel(label, out var visibleLabel))
                         continue;
                     var isSelected = selectedExternalTask == ext;
                     if (ImGui.Selectable(visibleLabel, isSelected))
@@ -1263,19 +1398,23 @@ public partial class SlaveWindow : Window, IDisposable
                 DrawMenuSection(MenuSection.Reference, "Reference", ReferenceItems, new Vector4(0.6f, 0.6f, 0.6f, 1.0f));
             }
         }
-        ImGui.PopStyleColor();
     }
 
     private void DrawTaskContentPanel(float panelHeight)
     {
-        ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
+        using var border = ImRaii.PushColor(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
         using (var child = ImRaii.Child("TaskContent", new Vector2(0f, panelHeight), true))
         {
             if (child.Success)
             {
                 if (selectedExternalTask != null)
                 {
-                    try { selectedExternalTask.Draw(); }
+                    try
+                    {
+                        Plugin.RunOnGameThread(selectedExternalTask.Draw)
+                            .GetAwaiter()
+                            .GetResult();
+                    }
                     catch (Exception ex)
                     {
                         ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), $"Error: {ex.Message}");
@@ -1283,83 +1422,94 @@ public partial class SlaveWindow : Window, IDisposable
                 }
                 else
                 {
-                    switch (selectedTask)
+                    try
                     {
-                        case null:
-                            DrawDefaultLandingPage();
-                            break;
-                        case SlaveTask.SaveToXaDatabase:
-                            DrawSaveToXaDatabaseTask();
-                            break;
-                        case SlaveTask.MonthlyRelogger:
-                            DrawMonthlyReloggerTask();
-                            break;
-                        case SlaveTask.CheckDuplicatePlots:
-                            DrawCheckDuplicatePlotsTask();
-                            break;
-                        case SlaveTask.Xagman:
-                            DrawXagmanTask();
-                            break;
-                        case SlaveTask.ReturnAltsToHomeworlds:
-                            DrawReturnAltsToHomeworldsTask();
-                            break;
-                        case SlaveTask.CityChatFlooder:
-                            DrawCityChatFlooder();
-                            break;
-                        case SlaveTask.AutoGlamWeather:
-                            DrawAutoGlamWeatherTask();
-                            break;
-                        case SlaveTask.AutoRetainerTasks:
-                            DrawArPostProcessTask();
-                            break;
-                        case SlaveTask.PrepLogistics:
-                            DrawPrepLogisticsTask();
-                            break;
-                        case SlaveTask.RefreshArSubsBell:
-                            DrawRefreshArSubsBellTask();
-                            break;
-                        case SlaveTask.AutoAcceptFcInvite:
-                            DrawAutoAcceptFcInviteTask();
-                            break;
-                        case SlaveTask.MultiFcPermissions:
-                            DrawMultiFcPermissionsTask();
-                            break;
-                        case SlaveTask.EurekaInstanceHunter:
-                            DrawEurekaInstanceHunterTask();
-                            break;
-                        case SlaveTask.EurekaLogogramCreator:
-                            plugin.EurekaLogogramCreator.EnsureDataLoaded();
-                            DrawEurekaLogogramCreatorTask();
-                            break;
-                        case SlaveTask.WindowRenamer:
-                            DrawWindowRenamerTask();
-                            break;
-                        case SlaveTask.PluginOperations:
-                            DrawPluginOperationsTask();
-                            break;
-                        case SlaveTask.XAMods:
-                            DrawXAModsTask();
-                            break;
-                        case SlaveTask.DebugCommands:
-                            DrawDebugCommands();
-                            break;
-                        case SlaveTask.ExportData:
-                            DrawExportData();
-                            break;
-                        case SlaveTask.RepoList:
-                            DrawRepoList();
-                            break;
-                        case SlaveTask.IpcCallsAvailable:
-                            DrawIpcCallsAvailable();
-                            break;
-                        case SlaveTask.CommandsReference:
-                            DrawCommandsReference();
-                            break;
+                        switch (selectedTask)
+                        {
+                            case null:
+                                DrawDefaultLandingPage();
+                                break;
+                            case SlaveTask.SaveToXaDatabase:
+                                DrawSaveToXaDatabaseTask();
+                                break;
+                            case SlaveTask.MonthlyRelogger:
+                                DrawMonthlyReloggerTask();
+                                break;
+                            case SlaveTask.CheckDuplicatePlots:
+                                DrawCheckDuplicatePlotsTask();
+                                break;
+                            case SlaveTask.Xagman:
+                                DrawXagmanTask();
+                                break;
+                            case SlaveTask.ReturnAltsToHomeworlds:
+                                DrawReturnAltsToHomeworldsTask();
+                                break;
+                            case SlaveTask.CityChatFlooder:
+                                DrawCityChatFlooder();
+                                break;
+                            case SlaveTask.AutoGlamWeather:
+                                DrawAutoGlamWeatherTask();
+                                break;
+                            case SlaveTask.AutoRetainerTasks:
+                                DrawArPostProcessTask();
+                                break;
+                            case SlaveTask.PrepLogistics:
+                                DrawPrepLogisticsTask();
+                                break;
+                            case SlaveTask.RefreshArSubsBell:
+                                DrawRefreshArSubsBellTask();
+                                break;
+                            case SlaveTask.AutoAcceptFcInvite:
+                                DrawAutoAcceptFcInviteTask();
+                                break;
+                            case SlaveTask.MultiFcPermissions:
+                                DrawMultiFcPermissionsTask();
+                                break;
+                            case SlaveTask.EurekaInstanceHunter:
+                                DrawEurekaInstanceHunterTask();
+                                break;
+                            case SlaveTask.EurekaLogogramCreator:
+                                plugin.EurekaLogogramCreator.EnsureDataLoaded();
+                                DrawEurekaLogogramCreatorTask();
+                                break;
+                            case SlaveTask.WindowRenamer:
+                                DrawWindowRenamerTask();
+                                break;
+                            case SlaveTask.PluginOperations:
+                                DrawPluginOperationsTask();
+                                break;
+                            case SlaveTask.XAMods:
+                                DrawXAModsTask();
+                                break;
+                            case SlaveTask.DebugCommands:
+#if DEBUG
+                                DrawDebugCommands();
+#endif
+                                break;
+                            case SlaveTask.ExportData:
+                                DrawExportData();
+                                break;
+                            case SlaveTask.RepoList:
+                                DrawRepoList();
+                                break;
+                            case SlaveTask.IpcCallsAvailable:
+                                DrawIpcCallsAvailable();
+                                break;
+                            case SlaveTask.CommandsReference:
+                                DrawCommandsReference();
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        Plugin.Log.Error(ex, $"[XASlave] Panel '{selectedTask}' threw during Draw.");
+                        ImGui.TextColored(
+                            new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
+                            $"Panel error: {ex.Message}");
                     }
                 }
             }
         }
-        ImGui.PopStyleColor();
     }
 
     // -----------------------------------------------
@@ -1603,17 +1753,18 @@ public partial class SlaveWindow : Window, IDisposable
     {
         ImGui.Spacing();
         var expanded = GetMenuSectionExpanded(section);
-        ImGui.PushStyleColor(ImGuiCol.Text, headerColor);
-        ImGui.PushStyleColor(ImGuiCol.Header, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
-        ImGui.PushStyleColor(ImGuiCol.HeaderHovered, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
-        ImGui.PushStyleColor(ImGuiCol.HeaderActive, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
-        ImGui.PushStyleColor(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameBorderSize, Scale(1f));
-        ImGui.PushStyleVar(ImGuiStyleVar.FrameRounding, Scale(4f));
-        ImGui.SetNextItemOpen(expanded, ImGuiCond.Always);
-        var isOpen = ImGui.CollapsingHeader($"{header}##{section}");
-        ImGui.PopStyleVar(2);
-        ImGui.PopStyleColor(5);
+        bool isOpen;
+        using (var colors = ImRaii.PushColor(ImGuiCol.Text, headerColor))
+        using (var styles = ImRaii.PushStyle(ImGuiStyleVar.FrameBorderSize, Scale(1f)))
+        {
+            colors.Push(ImGuiCol.Header, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
+            colors.Push(ImGuiCol.HeaderHovered, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
+            colors.Push(ImGuiCol.HeaderActive, new Vector4(0.0f, 0.0f, 0.0f, 0.0f));
+            colors.Push(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
+            styles.Push(ImGuiStyleVar.FrameRounding, Scale(4f));
+            ImGui.SetNextItemOpen(expanded, ImGuiCond.Always);
+            isOpen = ImGui.CollapsingHeader($"{header}##{section}");
+        }
         if (isOpen != expanded)
             SetMenuSectionExpanded(section, isOpen);
         if (!isOpen)
@@ -1625,25 +1776,22 @@ public partial class SlaveWindow : Window, IDisposable
                 continue;
 
             var shouldPulse = ShouldPulseMenuTaskItem(task);
-            if (shouldPulse)
-                ImGui.PushStyleColor(ImGuiCol.Text, GetPriorityTaskPulseColor());
-
-            var isSplashScreen = task == SlaveTask.SplashScreen;
-            var isSelected = isSplashScreen
-                ? selectedExternalTask == null && selectedTask == null
-                : selectedExternalTask == null && selectedTask == task;
-            if (ImGui.Selectable(visibleLabel, isSelected))
+            using (ImRaii.PushColor(ImGuiCol.Text, GetPriorityTaskPulseColor(), shouldPulse))
             {
-                if (isSplashScreen)
-                    ClearTaskSelection();
-                else if (isSelected && ImGui.GetIO().KeyCtrl)
-                    ClearTaskSelection();
-                else
-                    SelectBuiltInTask(task);
+                var isSplashScreen = task == SlaveTask.SplashScreen;
+                var isSelected = isSplashScreen
+                    ? selectedExternalTask == null && selectedTask == null
+                    : selectedExternalTask == null && selectedTask == task;
+                if (ImGui.Selectable(visibleLabel, isSelected))
+                {
+                    if (isSplashScreen)
+                        ClearTaskSelection();
+                    else if (isSelected && ImGui.GetIO().KeyCtrl)
+                        ClearTaskSelection();
+                    else
+                        SelectBuiltInTask(task);
+                }
             }
-
-            if (shouldPulse)
-                ImGui.PopStyleColor();
         }
     }
 
@@ -1726,12 +1874,12 @@ public partial class SlaveWindow : Window, IDisposable
     {
         DrawDefaultLandingPageIcon();
 
-        ImGui.PushTextWrapPos(0f);
-        ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.95f, 0.85f, 0.50f, 1.0f));
-        ImGui.TextWrapped($"XA Slave v{PluginVersion}");
-        ImGui.PopStyleColor();
-        ImGui.Text("General information, support links, and setup guidance for XA Slave.");
-        ImGui.PopTextWrapPos();
+        using (ImRaii.TextWrapPos(0f))
+        {
+            using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.95f, 0.85f, 0.50f, 1.0f)))
+                ImGui.TextWrapped($"XA Slave v{PluginVersion}");
+            ImGui.Text("General information, support links, and setup guidance for XA Slave.");
+        }
 
         ImGui.Spacing();
         if (ImGui.Button("https://Aethertek.io"))
@@ -1751,45 +1899,43 @@ public partial class SlaveWindow : Window, IDisposable
             plugin.UpdatesWindow.Toggle();
 
         ImGui.Separator();
-        ImGui.PushTextWrapPos(0f);
-        ImGui.Text("XA Slave is still in a very early phase. Expect ongoing changes, new automation surfaces, and many months of additional features.");
+        using (ImRaii.TextWrapPos(0f))
+        {
+            ImGui.Text("XA Slave is still in a very early phase. Expect ongoing changes, new automation surfaces, and many months of additional features.");
 
-        ImGui.Spacing();
-        DrawWrappedDisabledText("General Terms");
-        DrawWrappedBulletText("Treat every automation workflow as supervised until you trust the exact task and configuration you are running.");
-        DrawWrappedBulletText("Enable Show Log when you need visibility, or enable Plugin Operations > Verbose Task Logging when reporting issues.");
-        DrawWrappedBulletText("Make sure supporting plugins and character data are configured before running tasks that depend on AutoRetainer, XA Database, Lifestream, or Dropbox.");
-        DrawWrappedBulletText("Use Logout on Complete or Enable AR Multi on Complete when you do not want characters left idle in game after a run.");
+            ImGui.Spacing();
+            DrawWrappedDisabledText("General Terms");
+            DrawWrappedBulletText("Treat every automation workflow as supervised until you trust the exact task and configuration you are running.");
+            DrawWrappedBulletText("Enable Show Log when you need visibility, or enable Plugin Operations > Verbose Task Logging when reporting issues.");
+            DrawWrappedBulletText("Make sure supporting plugins and character data are configured before running tasks that depend on AutoRetainer, XA Database, Lifestream, or Dropbox.");
+            DrawWrappedBulletText("Use Logout on Complete or Enable AR Multi on Complete when you do not want characters left idle in game after a run.");
 
-        ImGui.Spacing();
-        DrawWrappedDisabledText("First Time");
-        DrawWrappedBulletText("Import characters from AutoRetainer before expecting XA Slave task lists to populate cleanly.");
-        DrawWrappedBulletText("Pull XA Database info before relying on matching/selection features that use stored inventory or character data.");
-        DrawWrappedBulletText("Running Monthly Relogger across your roster first is the best way to sweep and normalize character data.");
+            ImGui.Spacing();
+            DrawWrappedDisabledText("First Time");
+            DrawWrappedBulletText("Import characters from AutoRetainer before expecting XA Slave task lists to populate cleanly.");
+            DrawWrappedBulletText("Pull XA Database info before relying on matching/selection features that use stored inventory or character data.");
+            DrawWrappedBulletText("Running Monthly Relogger across your roster first is the best way to sweep and normalize character data.");
 
-        ImGui.Spacing();
-        DrawWrappedDisabledText("Support");
-        DrawWrappedBulletText("The website includes general plugin information and project-facing links.");
-        DrawWrappedBulletText("The Discord server is the fastest route for reporting issues, feature requests, and feedback.");
-        ImGui.PopTextWrapPos();
+            ImGui.Spacing();
+            DrawWrappedDisabledText("Support");
+            DrawWrappedBulletText("The website includes general plugin information and project-facing links.");
+            DrawWrappedBulletText("The Discord server is the fastest route for reporting issues, feature requests, and feedback.");
+        }
     }
 
     private static void DrawWrappedDisabledText(string text)
     {
-        ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
-        ImGui.PushTextWrapPos(0f);
-        ImGui.TextUnformatted(text);
-        ImGui.PopTextWrapPos();
-        ImGui.PopStyleColor();
+        using (ImRaii.PushColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]))
+        using (ImRaii.TextWrapPos(0f))
+            ImGui.TextUnformatted(text);
     }
 
     private static void DrawWrappedBulletText(string text)
     {
         ImGui.Bullet();
         ImGui.SameLine();
-        ImGui.PushTextWrapPos(0f);
-        ImGui.TextUnformatted(text);
-        ImGui.PopTextWrapPos();
+        using (ImRaii.TextWrapPos(0f))
+            ImGui.TextUnformatted(text);
     }
 
     private void DrawDefaultLandingPageIcon()

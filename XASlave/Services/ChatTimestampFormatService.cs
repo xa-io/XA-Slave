@@ -24,6 +24,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
 
     private Hook<ApplyTextFormatDelegate>? applyTextFormatHook;
     private Task<Hook<ApplyTextFormatDelegate>?>? startupHookTask;
+    private System.Threading.CancellationTokenSource? startupHookCancellation;
     private Utf8String* formattedTimestamp;
     private bool enabled;
     private bool hookInitialized;
@@ -84,7 +85,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
 
         CancelStartupArming(disposeCompletedResult: true);
         EnsureStringAllocated();
-        EnsureHookInitialized();
+        EnsureHookInitialized(retryMissing: hookInitialized);
         if (applyTextFormatHook == null)
         {
             enabled = false;
@@ -114,7 +115,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
 
         EnsureStringAllocated();
         enabled = true;
-        StatusText = "Arming - chat timestamp hook is initializing outside the framework tick.";
+        StatusText = "Arming - chat timestamp hook is initializing on the framework thread.";
         StartStartupHookCreation();
         return true;
     }
@@ -156,13 +157,13 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
             formattedTimestamp = Utf8String.FromString(string.Empty);
     }
 
-    private void EnsureHookInitialized()
+    private void EnsureHookInitialized(bool retryMissing = false)
     {
-        if (hookInitialized)
+        if (hookInitialized && !retryMissing)
             return;
 
         hookInitialized = true;
-        applyTextFormatHook = TryCreateApplyTextFormatHook();
+        applyTextFormatHook ??= TryCreateApplyTextFormatHook();
     }
 
     private Hook<ApplyTextFormatDelegate>? TryCreateApplyTextFormatHook()
@@ -170,7 +171,10 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(Sigs.ApplyTextFormatSig, out var address) || address == nint.Zero)
+            {
+                log.Warning("[XASlave] Custom Timestamp Format could not resolve ApplyTextFormat; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             return interopProvider.HookFromAddress<ApplyTextFormatDelegate>(address, FormatTextDetour);
         }
@@ -186,7 +190,15 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
         lock (startupArmingLock)
         {
             startupArmingPending = true;
-            startupHookTask ??= Task.Run(TryCreateApplyTextFormatHook);
+            if (startupHookTask == null)
+            {
+                startupHookCancellation?.Dispose();
+                startupHookCancellation = new System.Threading.CancellationTokenSource();
+                startupHookTask = Plugin.RunOnGameThread(
+                    TryCreateApplyTextFormatHook,
+                    "Custom Timestamp Format startup hook creation",
+                    startupHookCancellation.Token);
+            }
         }
 
         SubscribeStartupArming();
@@ -213,12 +225,18 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
     private void CancelStartupArming(bool disposeCompletedResult)
     {
         Task<Hook<ApplyTextFormatDelegate>?>? task;
+        System.Threading.CancellationTokenSource? cancellation;
         lock (startupArmingLock)
         {
             startupArmingPending = false;
             task = startupHookTask;
             startupHookTask = null;
+            cancellation = startupHookCancellation;
+            startupHookCancellation = null;
         }
+
+        cancellation?.Cancel();
+        cancellation?.Dispose();
 
         UnsubscribeStartupArming();
 
@@ -233,7 +251,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
         if (task.IsCompleted)
         {
             if (task.Status == TaskStatus.RanToCompletion)
-                DisposeHook(task.Result);
+                _ = Plugin.RunOnGameThread(() => DisposeHook(task.Result), "Dispose cancelled Custom Timestamp Format startup hook");
             return;
         }
 
@@ -241,7 +259,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
             completedTask =>
             {
                 if (completedTask.Status == TaskStatus.RanToCompletion)
-                    DisposeHook(completedTask.Result);
+                    _ = Plugin.RunOnGameThread(() => DisposeHook(completedTask.Result), "Dispose cancelled Custom Timestamp Format startup hook");
             },
             TaskScheduler.Default);
     }
@@ -272,11 +290,15 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
             log.Warning(ex, "[XASlave] Custom Timestamp Format startup hook initialization failed.");
         }
 
+        System.Threading.CancellationTokenSource? completedCancellation;
         lock (startupArmingLock)
         {
             startupHookTask = null;
             startupArmingPending = false;
+            completedCancellation = startupHookCancellation;
+            startupHookCancellation = null;
         }
+        completedCancellation?.Dispose();
 
         UnsubscribeStartupArming();
         hookInitialized = true;
@@ -347,7 +369,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
             log.Warning(ex, "[XASlave] Custom Timestamp Format failed while formatting a chat timestamp.");
         }
 
-        return applyTextFormatHook!.Original(raptureTextModule, addonTextId, value);
+        return applyTextFormatHook!.OriginalDisposeSafe(raptureTextModule, addonTextId, value);
     }
 
     private string FormatTimestamp(DateTime time)

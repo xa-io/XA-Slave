@@ -1700,10 +1700,8 @@ public sealed class ArPostProcessService : IDisposable
     private unsafe void ClickAddonNode(string addonName, int nodeListIndex)
     {
         var addon = GetAddon(addonName);
-        if (addon == null || !addon->IsVisible || nodeListIndex >= addon->UldManager.NodeListCount) return;
-
-        var node = addon->UldManager.NodeList[nodeListIndex];
-        if (node == null) return;
+        if (addon == null || !addon->IsVisible ||
+            !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var node)) return;
 
         try
         {

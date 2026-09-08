@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
 
@@ -10,8 +11,15 @@ namespace XASlave.Windows;
 /// </summary>
 public partial class SlaveWindow
 {
-    private readonly record struct CommandReferenceEntry(string Command, string Purpose, string Notes);
+    private sealed record CommandReferenceEntry(string Command, string Purpose, string Notes)
+    {
+        public string SearchHaystack { get; } = $"{Command}\n{Purpose}\n{Notes}".ToLowerInvariant();
+    }
+
     private string commandsSearchText = string.Empty;
+    private string commandsCachedSearchText = string.Empty;
+    private string[] commandsLowerQueryTerms = [];
+    private readonly Dictionary<CommandReferenceEntry[], CommandReferenceEntry[]> commandsFilteredEntries = [];
 
     private static readonly CommandReferenceEntry[] GeneralCommandEntries =
     {
@@ -19,13 +27,14 @@ public partial class SlaveWindow
         new("/xa allrestore", "Disable every top-level XA Mod toggle.", "Chat equivalent of the `Disable All Mods` button."),
         new("/xa commands", "Open the window directly to `References > Commands`.", "Useful when you want the command inventory instead of just toggling the main window."),
         new("/xa updates", "Open the version history window.", "Shows the plugin changelog as collapsible version entries. Also accessible from Plugin Operations > Show Updates."),
-        new("/xa db <itemId:qty ...>", "Queue Dropbox trade items from local inventory and start trading.", "Accepts the same `itemId:qty` syntax as the older external queue flow, but XA now owns the command surface directly."),
+        new("/xa db <itemId:qty ...>", "Queue Dropbox trade items from local inventory and start trading.", "Positive quantities keep the existing queue-up-to-this-many behavior. A negative quantity is a keep-remaining request: XA combines the local NQ/HQ count, subtracts the absolute quantity, and queues the rest in the existing NQ-first order. Example: with 5,000 of item 10155, `10155:-1080` queues 3,920 and leaves 1,080. If the keep amount is at least the local count, that item queues nothing."),
         new("/xa db inv", "Queue all eligible items from `Inventory1` through `Inventory4` and start trading.", "Scans the four main inventory bags only, preserves NQ/HQ quantities, skips bound/collectable/untradable entries, and adds the results to the current Dropbox queue."),
         new("/xa db clear", "Clear the current Dropbox item queue.", "Used by Xagman cleanup and for manual queue resets without any extra wrapper command."),
         new("/xa db begin", "Start trading the queued Dropbox items.", "Dropbox only begins trading when it is idle and a player focus target is set, so this promotes your current player target to focus target if needed and then kicks the trade queue. Use it after queueing without a partner targeted, or after a previous trade finishes."),
         new("/xa db request <itemId:qty ...>", "Print the missing quantities still needed locally.", "Returns a ready-to-run `/xa db ...` command built from the requested amounts minus what this character already has."),
         new("/xa db <shortcut>", "Build missing crystal-fill commands.", "Shortcuts: `shards`, `crystals`, `clusters`, `shards+crystals`, `crystals+clusters`, and `shards+crystals+clusters`. Prints the equivalent `/xa db ...` request output."),
         new("/xa db subloot", "Queue the eight subaquatic loot items and start trading.", "Shortcut for `/xa db 22500:99999 22501:99999 22502:99999 22503:99999 22504:99999 22505:99999 22506:99999 22507:99999` (item IDs 22500-22507). Queues whatever this character holds from local inventory, same as the explicit `/xa db <itemId:qty ...>` flow. The chat confirmation reports the queued entry/item counts and the total vendor gil value of the queued salvage items. Trading starts automatically when a player is targeted or focus-targeted (the current target is promoted); otherwise the items stay queued for `/xa db begin`."),
+        new("/xa dbsub <gil-value>", "Queue a minimum-overflow subaquatic-loot value and start trading.", "Scans locally held salvage item IDs 22500-22507, chooses a bounded mixture whose vendor total is the smallest reachable value at or above the positive gil target, and reports the item count, selected value, and exact overflow. If the target exceeds all available salvage, XA queues everything and reports the shortfall. Existing Dropbox queue entries are preserved. Trading starts automatically when a player is targeted or focus-targeted; otherwise use `/xa db begin`."),
         new("/xa debug", "Toggle the hidden Debug / Test menu.", "Support diagnostics remain hidden in public builds until this command is typed; once shown, the menu stays visible across reloads until this command is typed again."),
         new("/xa preset list", "List the currently saved XA Mods presets.", "Prints each saved preset name to chat."),
         new("/xa preset load <name>", "Load a saved XA Mods preset by name.", "Applies the saved mod-key set after clearing the current top-level toggles."),
@@ -76,7 +85,8 @@ public partial class SlaveWindow
         new("/xa lowres off", "Disable `Low Resolution`.", "Forces one live 3D scale `1.00` render pass, then turns off the forced low-resolution scale and restores the previous runtime upscale mode."),
         new("/xa minwindow on|off", "Toggle `Ignore Minimum Window Size`.", "Lowers or restores XA's guarded local minimum-size floor and corrects undersized restore or maximize results after the window changes."),
         new("/xa nouifade on|off", "Toggle `No UI Fade`.", "Suppresses common black, white, and event UI fade transitions while enabled."),
-        new("/xa res <width>x<height>", "Apply a custom client resolution such as `/xa res 500x345`.", "Requires `Custom Resolutions` to be enabled in XA Mods."),
+        new("/xa res <width>x<height> | <width> <height>", "Apply a custom client resolution such as `/xa res 500x345` or `/xa res 1280 720`.", "Requires `Custom Resolutions` to be enabled in XA Mods."),
+        new("/xa res reset", "Restore the client size captured when XA first enabled `Custom Resolutions`.", "Keeps `Custom Resolutions` enabled and does not change saved preset buttons."),
         new("/xa res add <width>x<height>", "Add a saved custom-resolution button.", "Stores a panel preset without needing to use the UI add-button flow."),
         new("/xa res remove <width>x<height>", "Remove a saved custom-resolution button.", "Deletes the matching saved preset when present."),
         new("/xa resrestore", "Disable the current top-level Graphic Mods toggles.", "Also runs the normal Special Rendering Modes world/UI restore behavior."),
@@ -167,6 +177,16 @@ public partial class SlaveWindow
             ref commandsSearchText,
             256);
 
+        if (!string.Equals(commandsCachedSearchText, commandsSearchText, StringComparison.Ordinal))
+        {
+            commandsCachedSearchText = commandsSearchText;
+            commandsLowerQueryTerms = commandsSearchText
+                .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(term => term.ToLowerInvariant())
+                .ToArray();
+            commandsFilteredEntries.Clear();
+        }
+
         var visibleSectionCount = 0;
         DrawFilteredCommandSection("General", GeneralCommandEntries, ref visibleSectionCount);
         DrawFilteredCommandSection("Game Mods", GameModsCommandEntries, ref visibleSectionCount);
@@ -197,29 +217,29 @@ public partial class SlaveWindow
 
     private CommandReferenceEntry[] FilterCommandEntries(CommandReferenceEntry[] entries)
     {
-        if (string.IsNullOrWhiteSpace(commandsSearchText))
+        if (commandsLowerQueryTerms.Length == 0)
             return entries;
 
-        var queryTerms = commandsSearchText.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (queryTerms.Length == 0)
-            return entries;
+        if (commandsFilteredEntries.TryGetValue(entries, out var cached))
+            return cached;
 
         var matches = new List<CommandReferenceEntry>();
         foreach (var entry in entries)
         {
-            if (MatchesCommandSearch(entry, queryTerms))
+            if (MatchesCommandSearch(entry, commandsLowerQueryTerms))
                 matches.Add(entry);
         }
 
-        return matches.ToArray();
+        var result = matches.ToArray();
+        commandsFilteredEntries[entries] = result;
+        return result;
     }
 
     private static bool MatchesCommandSearch(CommandReferenceEntry entry, string[] queryTerms)
     {
-        var haystack = $"{entry.Command}\n{entry.Purpose}\n{entry.Notes}";
         foreach (var term in queryTerms)
         {
-            if (!haystack.Contains(term, StringComparison.OrdinalIgnoreCase))
+            if (!entry.SearchHaystack.Contains(term, StringComparison.Ordinal))
                 return false;
         }
 
@@ -230,10 +250,11 @@ public partial class SlaveWindow
     {
         DrawWrappedDisabledText(title);
 
-        if (ImGui.BeginTable(
+        using (var imguiScope251 = ImRaii.Table(
                 $"CommandsReferenceTable##{title}",
                 2,
                 ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.NoSavedSettings | ImGuiTableFlags.PadOuterX))
+        if (imguiScope251)
         {
             ImGui.TableSetupColumn("Command", ImGuiTableColumnFlags.WidthFixed, Scale(210f));
             ImGui.TableSetupColumn("Description", ImGuiTableColumnFlags.WidthStretch);
@@ -249,17 +270,19 @@ public partial class SlaveWindow
                         : new Vector4(0.03f, 0.03f, 0.03f, 0.24f)));
 
                 ImGui.TableNextColumn();
-                ImGui.PushTextWrapPos(0f);
-                ImGui.TextColored(new Vector4(0.88f, 0.92f, 0.98f, 1.0f), entry.Command);
-                ImGui.PopTextWrapPos();
+                using (ImRaii.TextWrapPos(0f))
+                {
+                    ImGui.TextColored(new Vector4(0.88f, 0.92f, 0.98f, 1.0f), entry.Command);
+                }
 
                 ImGui.TableNextColumn();
-                ImGui.PushTextWrapPos(0f);
-                ImGui.TextUnformatted($"{entry.Purpose} {entry.Notes}");
-                ImGui.PopTextWrapPos();
+                using (ImRaii.TextWrapPos(0f))
+                {
+                    ImGui.TextUnformatted($"{entry.Purpose} {entry.Notes}");
+                }
             }
 
-            ImGui.EndTable();
+
         }
 
         ImGui.Spacing();

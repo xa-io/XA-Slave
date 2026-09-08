@@ -233,7 +233,8 @@ public partial class SlaveWindow
             ImGui.TextColored(GetXagmanStatusColor(arImportStatus), arImportStatus);
         }
 
-        if (ImGui.BeginTable("xagmanOnhFriendTable", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, ScaledVector(0f, 150f)))
+        using (var imguiScope236 = ImRaii.Table("xagmanOnhFriendTable", 2, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, ScaledVector(0f, 150f)))
+        if (imguiScope236)
         {
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
             ImGui.TableSetupColumn(string.Empty, ImGuiTableColumnFlags.WidthFixed, Scale(30f));
@@ -245,17 +246,17 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(list[i]);
                 ImGui.TableNextColumn();
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
-                if (ImGui.SmallButton($"X##xagmanOnhFriendRm{i}"))
+                using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
-                    list.RemoveAt(i);
-                    cfg.Save();
-                    ImGui.PopStyleColor();
-                    break;
+                    if (ImGui.SmallButton($"X##xagmanOnhFriendRm{i}"))
+                    {
+                        list.RemoveAt(i);
+                        cfg.Save();
+                        break;
+                    }
                 }
-                ImGui.PopStyleColor();
             }
-            ImGui.EndTable();
+
         }
         ImGui.TextDisabled($"{list.Count} character(s) imported.");
     }
@@ -272,7 +273,8 @@ public partial class SlaveWindow
             ImGui.TextDisabled("No imported characters yet. Import a partner list in the section above.");
             return;
         }
-        if (ImGui.BeginTable("xagmanOnhQueueTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, ScaledVector(0f, 150f)))
+        using (var imguiScope275 = ImRaii.Table("xagmanOnhQueueTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, ScaledVector(0f, 150f)))
+        if (imguiScope275)
         {
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, Scale(30f));
             ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
@@ -289,7 +291,7 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 ImGui.TextDisabled("Pending");
             }
-            ImGui.EndTable();
+
         }
         ImGui.TextDisabled("Live handshake status shows in the task status line and log; per-row completion marks are not wired yet.");
     }

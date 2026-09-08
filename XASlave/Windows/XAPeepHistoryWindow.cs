@@ -15,7 +15,6 @@ public sealed class XAPeepHistoryWindow : Window
     private static float UiScaleSafe => ImGuiHelpers.GlobalScale;
     private XAPeepHistorySortColumn sortColumn = XAPeepHistorySortColumn.LastSeen;
     private bool sortDescending = true;
-    private int tableOpenSerial;
 
     public XAPeepHistoryWindow(Plugin plugin)
         : base("XA Peep History###XAPeepHistoryWindow", ImGuiWindowFlags.None)
@@ -35,8 +34,6 @@ public sealed class XAPeepHistoryWindow : Window
     {
         sortColumn = XAPeepHistorySortColumn.LastSeen;
         sortDescending = true;
-        tableOpenSerial++;
-
         if (plugin.Configuration.XAPeepHistoryWindowOpen)
             return;
 
@@ -56,13 +53,13 @@ public sealed class XAPeepHistoryWindow : Window
     public override void Draw()
     {
         var clearHistoryModifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
-        if (!clearHistoryModifierHeld)
-            ImGui.BeginDisabled();
-        if (ImGui.SmallButton("Clear"))
-            plugin.XAPeep.ClearHistory();
+        using (ImRaii.Disabled(!clearHistoryModifierHeld))
+        {
+            if (ImGui.SmallButton("Clear"))
+                plugin.XAPeep.ClearHistory();
+        }
         if (!clearHistoryModifierHeld)
         {
-            ImGui.EndDisabled();
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Press and hold CTRL + SHIFT to allow clearing.");
         }
@@ -76,11 +73,12 @@ public sealed class XAPeepHistoryWindow : Window
             return;
         }
 
-        if (!ImGui.BeginTable(
-                $"##XAPeepHistoryTable{tableOpenSerial}",
+        using var table = ImRaii.Table(
+                "##XAPeepHistoryTable",
                 4,
                 ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.Sortable,
-                new Vector2(-1f, -1f)))
+                new Vector2(-1f, -1f));
+        if (!table)
             return;
 
         ImGui.TableSetupScrollFreeze(0, 1);
@@ -96,26 +94,24 @@ public sealed class XAPeepHistoryWindow : Window
         foreach (var player in sortedPlayers)
         {
             ImGui.TableNextRow();
-            if (!player.IsLive)
-                ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
+            using (ImRaii.PushColor(
+                       ImGuiCol.Text,
+                       ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled],
+                       !player.IsLive))
+            {
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(player.TotalTargetCount.ToString());
 
-            ImGui.TableNextColumn();
-            ImGui.TextUnformatted(player.TotalTargetCount.ToString());
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(player.DisplayName);
 
-            ImGui.TableNextColumn();
-            ImGui.TextUnformatted(player.DisplayName);
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(FormatTimestamp(player.LastSeenUtc));
 
-            ImGui.TableNextColumn();
-            ImGui.TextUnformatted(FormatTimestamp(player.LastSeenUtc));
-
-            ImGui.TableNextColumn();
-            ImGui.TextUnformatted(FormatDurationSeconds(player.TotalTargetDurationSeconds));
-
-            if (!player.IsLive)
-                ImGui.PopStyleColor();
+                ImGui.TableNextColumn();
+                ImGui.TextUnformatted(FormatDurationSeconds(player.TotalTargetDurationSeconds));
+            }
         }
-
-        ImGui.EndTable();
     }
 
     private void ApplyTableSortSpecs()

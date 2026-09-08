@@ -100,7 +100,7 @@ public unsafe sealed class PlayerModsService : IDisposable
             return false;
         }
 
-        if (!TryEnsureMovePermissionHookReady(out var pendingStatusText))
+        if (!TryEnsureMovePermissionHookReady(retryMissing: true, statusText: out var pendingStatusText))
         {
             moveableAfterDeathEnabled = false;
             moveableAfterDeathEnablePending = true;
@@ -134,7 +134,7 @@ public unsafe sealed class PlayerModsService : IDisposable
         DisposeHook(ref movePermissionHook);
     }
 
-    private bool TryEnsureMovePermissionHookReady(out string statusText)
+    private bool TryEnsureMovePermissionHookReady(bool retryMissing, out string statusText)
     {
         statusText = string.Empty;
         if (movePermissionHook is { IsDisposed: false })
@@ -147,7 +147,7 @@ public unsafe sealed class PlayerModsService : IDisposable
             return false;
         }
 
-        if (initialized)
+        if (initialized && !retryMissing)
         {
             statusText = "Unavailable - movement permission hook missing.";
             return false;
@@ -168,7 +168,10 @@ public unsafe sealed class PlayerModsService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
+            {
+                log.Warning($"[XASlave] Player Mods could not resolve {label}; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             var hook = interopProvider.HookFromAddress<T>(address, detour);
             return hook;
@@ -240,7 +243,7 @@ public unsafe sealed class PlayerModsService : IDisposable
         if (!moveableAfterDeathEnablePending)
             return;
 
-        if (!TryEnsureMovePermissionHookReady(out var pendingStatusText))
+        if (!TryEnsureMovePermissionHookReady(retryMissing: false, statusText: out var pendingStatusText))
         {
             MoveableAfterDeathStatusText = pendingStatusText;
             return;
@@ -360,10 +363,17 @@ public unsafe sealed class PlayerModsService : IDisposable
 
     private nint MovePermissionDetour(nint a1, uint permissionId, int a3, int a4)
     {
-        if (moveableAfterDeathEnabled && MovePermissionIds.Contains(permissionId))
-            return 1;
+        try
+        {
+            if (moveableAfterDeathEnabled && MovePermissionIds.Contains(permissionId))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Player Mods movement-permission detour failed; calling the original.");
+        }
 
-        return movePermissionHook?.Original(a1, permissionId, a3, a4) ?? 0;
+        return movePermissionHook?.OriginalDisposeSafe(a1, permissionId, a3, a4) ?? 0;
     }
 
     private delegate nint MovePermissionDelegate(nint a1, uint permissionId, int a3, int a4);

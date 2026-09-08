@@ -226,13 +226,14 @@ public unsafe sealed class AutoMergeService : IDisposable
 
         foreach (var containerType in MainInventoryTypes)
         {
-            var container = inventoryManager->GetInventoryContainer(containerType);
-            if (container == null || !container->IsLoaded)
+            if (!NativeArrayAccess.TryGetInventoryContainer(inventoryManager, containerType, out var container))
                 continue;
 
             for (var slotIndex = 0; slotIndex < container->Size; slotIndex++)
             {
-                var item = inventoryManager->GetInventorySlot(containerType, slotIndex);
+                if (!NativeArrayAccess.TryGetInventorySlot(container, slotIndex, out var item))
+                    continue;
+
                 item = ResolveInventoryItem(item);
                 if (item == null || item->ItemId == 0 || item->IsCollectable())
                     continue;

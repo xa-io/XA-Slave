@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -20,6 +21,8 @@ public partial class SlaveWindow
 
     private DateTime repoListStatusExpiry = DateTime.MinValue;
     private string repoListStatus = string.Empty;
+    private PolledValue<RepoListEntry[]>? repoListEntries;
+    private HashSet<string> repoInstalledPluginNames = new(StringComparer.OrdinalIgnoreCase);
 
     private void DrawRepoList()
     {
@@ -35,17 +38,34 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
         if (ImGui.Button("Open Plugin Installer"))
-            ChatHelper.SendMessage("/xlplugins");
+            Plugin.ScheduleOnGameThread(() => ChatHelper.SendMessage("/xlplugins"));
 
         ImGui.SameLine();
         if (ImGui.Button("Open Plugin Settings"))
-            ChatHelper.SendMessage("/xlsettings");
+            Plugin.ScheduleOnGameThread(() => ChatHelper.SendMessage("/xlsettings"));
 
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
-        DrawRepositoryTable(
+        repoListEntries ??= new PolledValue<RepoListEntry[]>(
+            "Repo List plugin availability",
+            BuildRepoListEntries,
+            TimeSpan.FromSeconds(5),
+            Array.Empty<RepoListEntry>());
+        DrawRepositoryTable(repoListEntries.Value);
+    }
+
+    private RepoListEntry[] BuildRepoListEntries()
+    {
+        repoInstalledPluginNames = Plugin.PluginInterface.InstalledPlugins
+            .SelectMany(installedPlugin => new[] { installedPlugin.InternalName, installedPlugin.Name })
+            .Where(name => !string.IsNullOrWhiteSpace(name))
+            .Select(name => name!)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        return
+        [
             RepoPlugin("Aethertek", "XA", "XA Database", AethertekRepoUrl, plugin.IpcClient.IsXaDatabaseAvailable() || IsPluginInstalled("XADatabase", "XA Database")),
             RepoPlugin("Aethertek", "XA", "XA Slave", AethertekRepoUrl, true),
             RepoPlugin("Aethertek", "XA", "XA HUD Navigator", AethertekRepoUrl, "XAHudNavigator"),
@@ -112,18 +132,25 @@ public partial class SlaveWindow
             RepoPlugin("Vera", "vera.lyn", "Gearsetter", VeraRepoUrl, "Gearsetter"),
             RepoPlugin("Vera", "vera.lyn", "Fish Notify", VeraRepoUrl, "FishNotify"),
             RepoPlugin("Vera", "vera.lyn", "Vera's Integrated World Improvements", VeraRepoUrl, "VIWI"),
-            RepoPlugin("Vera", "vera.lyn", "KitchenSink", VeraRepoUrl, "KitchenSink"));
+            RepoPlugin("Vera", "vera.lyn", "KitchenSink", VeraRepoUrl, "KitchenSink"),
+        ];
     }
 
     private RepoListEntry RepoPlugin(string group, string author, string pluginName, string repoUrl, bool installed)
         => new(group, author, pluginName, repoUrl, installed);
 
     private RepoListEntry RepoPlugin(string group, string author, string pluginName, string repoUrl, params string[] candidates)
-        => new(group, author, pluginName, repoUrl, IsPluginInstalled(candidates.Concat(new[] { pluginName }).ToArray()));
+        => new(
+            group,
+            author,
+            pluginName,
+            repoUrl,
+            repoInstalledPluginNames.Contains(pluginName) || IsPluginInstalled(candidates));
 
     private void DrawRepositoryTable(params RepoListEntry[] entries)
     {
-        if (ImGui.BeginTable("RepoPlugins", 5, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.Sortable))
+        using (var imguiScope152 = ImRaii.Table("RepoPlugins", 5, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.Sortable))
+        if (imguiScope152)
         {
             ImGui.TableSetupColumn("Group", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.DefaultSort, 1.35f);
             ImGui.TableSetupColumn("Author", ImGuiTableColumnFlags.WidthStretch, 1.05f);
@@ -169,7 +196,7 @@ public partial class SlaveWindow
                     ImGui.SetTooltip(string.IsNullOrWhiteSpace(entry.RepoUrl) ? "Install from your configured plugin repositories." : entry.RepoUrl);
             }
 
-            ImGui.EndTable();
+
         }
     }
 
@@ -308,18 +335,14 @@ public partial class SlaveWindow
         Status,
     }
 
-    private static bool IsPluginInstalled(params string[] candidates)
+    private bool IsPluginInstalled(params string[] candidates)
     {
-        try
+        foreach (var candidate in candidates)
         {
-            return Plugin.PluginInterface.InstalledPlugins.Any(installedPlugin =>
-                candidates.Any(candidate =>
-                    installedPlugin.InternalName.Equals(candidate, StringComparison.OrdinalIgnoreCase) ||
-                    installedPlugin.Name.Equals(candidate, StringComparison.OrdinalIgnoreCase)));
+            if (repoInstalledPluginNames.Contains(candidate))
+                return true;
         }
-        catch
-        {
-            return false;
-        }
+
+        return false;
     }
 }

@@ -63,6 +63,7 @@ public partial class SlaveWindow
     private readonly List<string> xagmanOnhRunList = new();
     private int xagmanOnhIndex = -1;
     private bool xagmanOnhSubTaskFailed;
+    private bool xagmanOnhSubTaskCompleted;
 
     // The partner this character is currently engaged with (FO -> its Tony, or Tony -> its FO).
     private string xagmanOnhEngagedPartner = string.Empty;
@@ -176,7 +177,17 @@ public partial class SlaveWindow
 
         ClearXagmanRunSnapshot();
         HaltAutoCollectionForPriorityTask("Xagman");
-        plugin.TaskRunner.ClearLog();
+        plugin.TaskRunner.ClearRunHistory();
+        xagmanCharacterFailureReasons.Clear();
+        xagmanSkipFcReturnAfterFailureCharacter = string.Empty;
+        ResetXagmanTravelFailureMonitor();
+        plugin.TaskRunner.AddLog($"Xagman ONH: starting {cfg.XagmanRole} run with {runList.Count} selected character(s).");
+        foreach (var regionGroup in runList.GroupBy(GetXagmanRegionOfChar))
+        {
+            var regionLabel = string.IsNullOrWhiteSpace(regionGroup.Key) ? "unknown" : regionGroup.Key;
+            plugin.TaskRunner.AddLog(
+                $"Xagman ONH: roster region {regionLabel}: {regionGroup.Count()} character(s): {string.Join(", ", regionGroup)}.");
+        }
         AutoOpenTaskLogIfVerbose(ref xagmanShowLog);
 
         ResetXagmanOnhState();
@@ -237,6 +248,7 @@ public partial class SlaveWindow
         xagmanOnhRunList.Clear();
         xagmanOnhIndex = -1;
         xagmanOnhSubTaskFailed = false;
+        xagmanOnhSubTaskCompleted = false;
         xagmanOnhEngagedPartner = string.Empty;
         xagmanOnhGilBaseline = -1;
         ClearXagmanOnhCandidate();
@@ -337,6 +349,8 @@ public partial class SlaveWindow
                 DriveXagmanOnhStartCharacter();
                 break;
             case XagmanOnhPhase.AwaitStartup:
+                if (!TryConsumeXagmanOnhSubTaskCompletion())
+                    return;
                 DriveXagmanOnhAfterStartup();
                 break;
 
@@ -347,12 +361,16 @@ public partial class SlaveWindow
                 DriveXagmanOnhFoAwaitStartGil();
                 break;
             case XagmanOnhPhase.FoGiving:
+                if (!TryConsumeXagmanOnhSubTaskCompletion())
+                    return;
                 DriveXagmanOnhFoAfterGive();
                 break;
             case XagmanOnhPhase.FoSettle:
                 DriveXagmanOnhFoSettle();
                 break;
             case XagmanOnhPhase.FoSendDoneGil:
+                if (!TryConsumeXagmanOnhSubTaskCompletion())
+                    return;
                 DriveXagmanOnhFoAfterDoneGil();
                 break;
 
@@ -360,12 +378,40 @@ public partial class SlaveWindow
                 DriveXagmanOnhTonySearch();
                 break;
             case XagmanOnhPhase.TonySendStartGil:
+                if (!TryConsumeXagmanOnhSubTaskCompletion())
+                    return;
                 DriveXagmanOnhTonyAfterStartGil();
                 break;
             case XagmanOnhPhase.TonyReceiving:
                 DriveXagmanOnhTonyReceiving();
                 break;
         }
+    }
+
+    private bool TryStartXagmanOnhSubTask(List<TaskStep> steps)
+    {
+        xagmanOnhSubTaskCompleted = false;
+        return plugin.TaskRunner.Start(
+            "Xagman",
+            steps,
+            onFinished: () => xagmanOnhSubTaskCompleted = true,
+            onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"),
+            suppressLogoutCancel: true,
+            preserveRunHistory: true);
+    }
+
+    private bool TryConsumeXagmanOnhSubTaskCompletion()
+    {
+        if (xagmanOnhSubTaskCompleted)
+        {
+            xagmanOnhSubTaskCompleted = false;
+            return true;
+        }
+
+        if (plugin.TaskRunner.StatusText is "Cancelled" or "Halted")
+            FailXagmanOnhRun($"the {xagmanOnhPhase} sub-task ended as {plugin.TaskRunner.StatusText.ToLowerInvariant()} instead of completing");
+
+        return false;
     }
 
     // ---- Shared per-character startup ----
@@ -393,8 +439,13 @@ public partial class SlaveWindow
         var steps = BuildXagmanOnhStartupSteps(
             charKey,
             plugin.Configuration.XagmanRole == XagmanRole.Tony);
+        if (!TryStartXagmanOnhSubTask(steps))
+        {
+            plugin.TaskRunner.AddLog($"Xagman ONH: could not start the startup sub-task for {charKey}; retrying next tick.");
+            return;
+        }
+
         SetXagmanOnhPhase(XagmanOnhPhase.AwaitStartup);
-        plugin.TaskRunner.Start("Xagman", steps, onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"));
     }
 
     private List<TaskStep> BuildXagmanOnhStartupSteps(string charKey, bool isTony)
@@ -402,7 +453,6 @@ public partial class SlaveWindow
         var runner = plugin.TaskRunner;
         var helper = new MonthlyReloggerTask(plugin);
         var steps = new List<TaskStep>();
-        runner.SuppressLogoutCancel = true;
 
         bool ShouldSkipStartup() => xagmanOnhSubTaskFailed;
 
@@ -607,8 +657,13 @@ public partial class SlaveWindow
             xagmanStatus = XagmanStatus.Trading;
             xagmanStatusText = $"{xagmanActiveCharacter} is giving to {xagmanOnhEngagedPartner}.";
             var steps = BuildXagmanOnhGiveSteps(xagmanOnhEngagedPartner, remaining);
+            if (!TryStartXagmanOnhSubTask(steps))
+            {
+                plugin.TaskRunner.AddLog($"Xagman ONH: could not start the give sub-task for {xagmanOnhEngagedPartner}; retrying next tick.");
+                return;
+            }
+
             SetXagmanOnhPhase(XagmanOnhPhase.FoGiving);
-            plugin.TaskRunner.Start("Xagman", steps, onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"));
             return;
         }
 
@@ -673,8 +728,13 @@ public partial class SlaveWindow
         xagmanStatus = XagmanStatus.Trading;
         xagmanStatusText = $"{xagmanActiveCharacter} sending the completion gil to {xagmanOnhEngagedPartner}.";
         var steps = BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, $"done -> {xagmanOnhEngagedPartner}");
+        if (!TryStartXagmanOnhSubTask(steps))
+        {
+            plugin.TaskRunner.AddLog($"Xagman ONH: could not start the completion-gil sub-task for {xagmanOnhEngagedPartner}; retrying next tick.");
+            return;
+        }
+
         SetXagmanOnhPhase(XagmanOnhPhase.FoSendDoneGil);
-        plugin.TaskRunner.Start("Xagman", steps, onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"));
     }
 
     private void DriveXagmanOnhFoAfterDoneGil()
@@ -875,8 +935,13 @@ public partial class SlaveWindow
         xagmanStatus = XagmanStatus.Trading;
         xagmanStatusText = $"Tony {xagmanActiveCharacter} sending the start signal to {xagmanOnhCandidate}.";
         var steps = BuildXagmanOnhSendGilSteps(xagmanOnhCandidate, $"start -> {xagmanOnhCandidate}");
+        if (!TryStartXagmanOnhSubTask(steps))
+        {
+            plugin.TaskRunner.AddLog($"Xagman ONH: could not start the start-gil sub-task for {xagmanOnhCandidate}; retrying next tick.");
+            return;
+        }
+
         SetXagmanOnhPhase(XagmanOnhPhase.TonySendStartGil);
-        plugin.TaskRunner.Start("Xagman", steps, onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"));
     }
 
     private void DriveXagmanOnhTonyAfterStartGil()
@@ -1216,9 +1281,9 @@ public partial class SlaveWindow
         if (!string.IsNullOrWhiteSpace(charKey))
         {
             if (failed && !plugin.TaskRunner.FailedCharacters.Contains(charKey))
-                plugin.TaskRunner.FailedCharacters.Add(charKey);
+                plugin.TaskRunner.RecordFailedCharacter(charKey);
             else if (incomplete && !plugin.TaskRunner.IncompleteCharacters.Contains(charKey))
-                plugin.TaskRunner.IncompleteCharacters.Add(charKey);
+                plugin.TaskRunner.RecordIncompleteCharacter(charKey);
         }
 
         xagmanActiveTradePartner = string.Empty;

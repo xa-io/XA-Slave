@@ -277,27 +277,49 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
 
     private byte ShouldSnapDetour(Character* player, SnapPosition* snapPosition)
     {
-        return (byte)(suppressedSnap ? 0 : (shouldSnapHook?.Original(player, snapPosition) ?? 0));
+        try
+        {
+            if (suppressedSnap)
+                return 0;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Doze/Sit Anywhere snap detour failed; calling the original.");
+        }
+
+        return shouldSnapHook?.OriginalDisposeSafe(player, snapPosition) ?? 0;
     }
 
     private byte ShouldSnapUnsitDetour(Character* player, SnapPosition* snapPosition)
     {
-        var original = shouldSnapUnsitHook?.Original(player, snapPosition) ?? 0;
+        var original = shouldSnapUnsitHook?.OriginalDisposeSafe(player, snapPosition) ?? 0;
         if (original == 0)
             return 0;
 
-        var position = savedSitPosition;
-        var rotation = savedSitRotation;
-        if (position.HasValue && rotation.HasValue && Distance(player->GameObject.Position, position.Value) < UnsitRestoreDistance)
+        try
         {
-            snapPosition->PositionB.X = position.Value.X;
-            snapPosition->PositionB.Y = position.Value.Y;
-            snapPosition->PositionB.Z = position.Value.Z;
-            snapPosition->RotationB = rotation.Value;
+            var position = savedSitPosition;
+            var rotation = savedSitRotation;
+            if (player != null
+                && snapPosition != null
+                && position.HasValue
+                && rotation.HasValue
+                && Distance(player->GameObject.Position, position.Value) < UnsitRestoreDistance)
+            {
+                snapPosition->PositionB.X = position.Value.X;
+                snapPosition->PositionB.Y = position.Value.Y;
+                snapPosition->PositionB.Z = position.Value.Z;
+                snapPosition->RotationB = rotation.Value;
+            }
+
+            savedSitPosition = null;
+            savedSitRotation = null;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Doze/Sit Anywhere unsit detour failed after the original call.");
         }
 
-        savedSitPosition = null;
-        savedSitRotation = null;
         return original;
     }
 

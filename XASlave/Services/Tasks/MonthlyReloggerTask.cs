@@ -61,10 +61,6 @@ public sealed class MonthlyReloggerTask
     {
         var steps = new List<TaskStep>();
 
-        runner.TotalItems = characters.Count;
-        runner.CompletedItems = 0;
-        runner.SuppressLogoutCancel = true; // Relogger expects logouts during /ays relog
-
         // -- PRIORITY #1: Disable AR Multi Mode FIRST --
         // Must happen before pre-flight to prevent AR from relogging during checks
         steps.Add(new TaskStep
@@ -422,7 +418,7 @@ public sealed class MonthlyReloggerTask
     {
         runner.AddLog(message);
         if (!runner.FailedCharacters.Contains(charName))
-            runner.FailedCharacters.Add(charName);
+            runner.RecordFailedCharacter(charName);
         relogState.Failed = true;
     }
 
@@ -435,7 +431,7 @@ public sealed class MonthlyReloggerTask
     {
         runner.AddLog(message);
         if (!runner.IncompleteCharacters.Contains(charName))
-            runner.IncompleteCharacters.Add(charName);
+            runner.RecordIncompleteCharacter(charName);
         relogState.Incomplete = true;
     }
 
@@ -1281,7 +1277,6 @@ public sealed class MonthlyReloggerTask
         });
 
         // Step 4a-4e: Leave duty if in one (step-based, same as per-char duty guard)
-        var dummyRelogState = new RelogState(); // not used for gating here
         foreach (var dutyStep in BuildDutyLeaveSequence("Pre-Flight", runner, preFlightState))
         {
             steps.Add(dutyStep);
@@ -1334,6 +1329,8 @@ public sealed class MonthlyReloggerTask
         public bool IsLoggedIn;
         public string LoggedInAs = string.Empty;
         public bool InDuty;
+        public bool LeaveClickDispatched;
+        public bool LeaveFailed;
     }
 
     /// <summary>
@@ -1399,10 +1396,22 @@ public sealed class MonthlyReloggerTask
             {
                 if (!state.InDuty) return;
                 runner.AddLog($"{label}: clicking Leave button...");
-                AddonHelper.ClickAddonButton("ContentsFinderMenu", 43);
+                state.LeaveClickDispatched = AddonHelper.ClickAddonButtonResolved(
+                    "ContentsFinderMenu",
+                    "Leave",
+                    expectedNodeId: null,
+                    fallbackNodeListIndex: AddonNodes.ContentsFinderMenuLeave).Succeeded;
+                if (!state.LeaveClickDispatched)
+                    runner.AddLog($"{label}: Leave button click was not dispatched; the addon node may have changed.");
             },
-            IsComplete = () => !state.InDuty || true,
+            IsComplete = () => !state.InDuty
+                               || (state.LeaveClickDispatched && AddonHelper.IsAddonVisible("SelectYesno")),
             TimeoutSec = 3f,
+            OnTimeout = () => HaltPreFlightDutyLeave(
+                label,
+                runner,
+                state,
+                "the Leave duty action could not be dispatched; refusing to continue the relog sequence"),
         });
 
         steps.Add(MakeDelay($"{label}: Leave Confirm Wait", 0.5f));
@@ -1426,7 +1435,13 @@ public sealed class MonthlyReloggerTask
             OnTimeout = () =>
             {
                 if (state.InDuty && Plugin.Condition[ConditionFlag.BoundByDuty])
-                    runner.AddLog($"{label}: still in duty after leave attempt - proceeding anyway.");
+                {
+                    HaltPreFlightDutyLeave(
+                        label,
+                        runner,
+                        state,
+                        "the character is still bound by duty after the leave attempt; refusing to continue the relog sequence");
+                }
             },
         });
 
@@ -1440,6 +1455,18 @@ public sealed class MonthlyReloggerTask
     //  This ensures housing/FC data is collected correctly.
     // ═══════════════════════════════════════════════════════
 
+    private static void HaltPreFlightDutyLeave(string label, TaskRunner runner, PreFlightState state, string reason)
+    {
+        if (state.LeaveFailed)
+            return;
+
+        state.LeaveFailed = true;
+        if (!string.IsNullOrWhiteSpace(state.LoggedInAs))
+            runner.RecordIncompleteCharacter(state.LoggedInAs);
+
+        runner.RequestHalt($"{label}: {reason}.");
+    }
+
     /// <summary>
     /// Builds homeworld check steps. If the character is not on their homeworld,
     /// uses Lifestream to travel back. Always-on - cannot be disabled.
@@ -1450,6 +1477,7 @@ public sealed class MonthlyReloggerTask
     {
         var steps = new List<TaskStep>();
         var needsReturn = false;
+        var worldReturnDispatched = false;
 
         AddLoggedCharacterSafeWait3Pass(steps, $"Homeworld Pre-SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt);
 
@@ -1501,15 +1529,22 @@ public sealed class MonthlyReloggerTask
                     if (local == null) return;
                     var homeName = local.HomeWorld.Value.Name.ToString();
                     runner.AddLog($"Returning to homeworld {homeName} via Lifestream...");
-                    plugin.IpcClient.LifestreamChangeWorld(homeName);
+                    worldReturnDispatched = plugin.IpcClient.LifestreamChangeWorld(homeName);
+                    if (!worldReturnDispatched)
+                        runner.AddLog($"Homeworld Return: Lifestream declined the request for {charName}.");
                 }
                 catch (Exception ex)
                 {
                     runner.AddLog($"Homeworld return error: {ex.Message}");
                 }
             },
-            IsComplete = () => relogState.ShouldHalt || !needsReturn || true,
+            IsComplete = () => relogState.ShouldHalt || !needsReturn || worldReturnDispatched,
             TimeoutSec = 3f,
+            OnTimeout = () => RecordRelogIncomplete(
+                runner,
+                relogState,
+                charName,
+                $"INCOMPLETE: {charName} - Lifestream did not accept the homeworld return request."),
         });
 
         // Wait for Lifestream to start (if returning) - 2s init delay then poll
@@ -1613,6 +1648,7 @@ public sealed class MonthlyReloggerTask
     {
         var steps = new List<TaskStep>();
         var dutyDetected = false;
+        var leaveClickDispatched = false;
 
         AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Pre-SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt);
 
@@ -1676,10 +1712,23 @@ public sealed class MonthlyReloggerTask
             {
                 if (relogState.ShouldHalt || !dutyDetected) return;
                 runner.AddLog($"Duty Guard: clicking Leave button...");
-                AddonHelper.ClickAddonButton("ContentsFinderMenu", 43);
+                leaveClickDispatched = AddonHelper.ClickAddonButtonResolved(
+                    "ContentsFinderMenu",
+                    "Leave",
+                    expectedNodeId: null,
+                    fallbackNodeListIndex: AddonNodes.ContentsFinderMenuLeave).Succeeded;
+                if (!leaveClickDispatched)
+                    runner.AddLog("Duty Guard: Leave button click was not dispatched; the addon node may have changed.");
             },
-            IsComplete = () => relogState.ShouldHalt || !dutyDetected || true,
+            IsComplete = () => relogState.ShouldHalt
+                               || !dutyDetected
+                               || (leaveClickDispatched && AddonHelper.IsAddonVisible("SelectYesno")),
             TimeoutSec = 3f,
+            OnTimeout = () => RecordRelogIncomplete(
+                runner,
+                relogState,
+                charName,
+                $"INCOMPLETE: {charName} - the Leave duty action could not be dispatched."),
         });
 
         steps.Add(MakeDelay($"Duty Guard: Confirm Wait ({charName})", 0.5f));

@@ -114,7 +114,7 @@ public partial class SlaveWindow
         {
             configuration.EurekaInstanceIdShowInDtr = showInDtr;
             ApplyEurekaInstanceIdConfiguration();
-            configuration.Save();
+            configuration.SaveDeferred();
         }
     }
 
@@ -125,7 +125,10 @@ public partial class SlaveWindow
         eurekaHunterStatusExpiryUtc = DateTime.UtcNow.AddSeconds(8);
     }
 
-    private unsafe void PlayEurekaInstanceHunterSoundPreview()
+    private void PlayEurekaInstanceHunterSoundPreview()
+        => Plugin.ScheduleOnGameThread(PlayEurekaInstanceHunterSoundPreviewOnFramework);
+
+    private unsafe void PlayEurekaInstanceHunterSoundPreviewOnFramework()
     {
         var soundEffectValue = XAPeepData.GetSoundEffectValue(plugin.Configuration.EurekaInstanceIdSoundEffectId);
         if (soundEffectValue == 0)
@@ -181,7 +184,7 @@ public partial class SlaveWindow
         if (ImGui.Checkbox("Instance ID##EurekaInstanceHunterEnabled", ref enabled))
         {
             configuration.EurekaInstanceIdEnabled = plugin.EurekaInstanceId.SetEnabled(enabled);
-            configuration.Save();
+            configuration.SaveDeferred();
             SetEurekaInstanceHunterStatus(
                 configuration.EurekaInstanceIdEnabled
                     ? "Enabled live Eureka instance display."
@@ -201,18 +204,20 @@ public partial class SlaveWindow
                 : new Vector4(1.0f, 0.45f, 0.45f, 1.0f);
         ImGui.TextColored(stateColor, $"Status: {stateLabel}");
 
-        ImGui.PushTextWrapPos(0f);
-        ImGui.TextUnformatted(plugin.EurekaInstanceId.StatusText);
-        ImGui.PopTextWrapPos();
+        using (ImRaii.TextWrapPos(0f))
+        {
+            ImGui.TextUnformatted(plugin.EurekaInstanceId.StatusText);
+        }
 
         if (!string.IsNullOrEmpty(eurekaHunterStatus) && DateTime.UtcNow < eurekaHunterStatusExpiryUtc)
             ImGui.TextColored(eurekaHunterStatusIsError ? new Vector4(1.0f, 0.4f, 0.4f, 1.0f) : new Vector4(0.4f, 1.0f, 0.4f, 1.0f), eurekaHunterStatus);
 
         ImGui.Spacing();
-        if (ImGui.BeginTable(
+        using (var imguiScope215 = ImRaii.Table(
                 "EurekaInstanceHunterZones",
                 3,
                 ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
+        if (imguiScope215)
         {
             ImGui.TableSetupColumn("Zone", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
             ImGui.TableSetupColumn("Use", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
@@ -232,7 +237,7 @@ public partial class SlaveWindow
                 {
                     SetEurekaInstanceIdZoneEnabled(zone, enabledZone);
                     ApplyEurekaInstanceIdConfiguration();
-                    configuration.Save();
+                    configuration.SaveDeferred();
                 }
 
                 ImGui.TableSetColumnIndex(2);
@@ -242,83 +247,100 @@ public partial class SlaveWindow
                 {
                     SetEurekaInstanceIdZoneBaseline(zone, baselineInstanceId);
                     ApplyEurekaInstanceIdConfiguration();
-                    configuration.Save();
+                    configuration.SaveDeferred();
                 }
             }
 
-            ImGui.EndTable();
+
         }
 
         if (ImGui.Button("Use Current Zone##EurekaInstanceHunter"))
         {
-            if (plugin.EurekaInstanceId.TryUseCurrentInstance(out var currentZone, out var currentInstanceId, out var message))
+            if (plugin.EurekaInstanceId.RequestUseCurrentInstance((success, currentZone, currentInstanceId, resultMessage) =>
             {
+                if (!success)
+                {
+                    SetEurekaInstanceHunterStatus(resultMessage, true);
+                    return;
+                }
+
                 configuration.EurekaInstanceIdZone = (int)currentZone;
                 configuration.EurekaInstanceIdBaselineInstanceId = currentInstanceId;
                 SetEurekaInstanceIdZoneBaseline(currentZone, currentInstanceId);
                 ApplyEurekaInstanceIdConfiguration();
-                configuration.Save();
+                configuration.SaveDeferred();
                 Plugin.ChatGui.Print($"[XASlave] {EurekaInstanceIdService.GetZoneLabel(currentZone)} Instance: {currentInstanceId}");
-                SetEurekaInstanceHunterStatus(message);
+                SetEurekaInstanceHunterStatus(resultMessage);
+            }, out var requestMessage))
+            {
+                SetEurekaInstanceHunterStatus(requestMessage);
             }
             else
-            {
-                SetEurekaInstanceHunterStatus(message, true);
-            }
+                SetEurekaInstanceHunterStatus(requestMessage, true);
         }
 
         ImGui.SameLine();
         var startColor = GetEurekaHunterStartButtonColor(isScanning);
-        ImGui.PushStyleColor(ImGuiCol.Button, startColor);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenButtonColor(startColor, 0.08f));
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive, BrightenButtonColor(startColor, 0.16f));
-        if (ImGui.Button("Start##EurekaInstanceHunter"))
+        using (ImRaii.PushColor(ImGuiCol.Button, startColor))
         {
-            if (isScanning)
+            using (ImRaii.PushColor(ImGuiCol.ButtonHovered, BrightenButtonColor(startColor, 0.08f)))
             {
-                SetEurekaInstanceHunterStatus("Eureka instance scanning is already running.");
-            }
-            else
-            {
-                ApplyEurekaInstanceIdConfiguration();
-                if (!configuration.EurekaInstanceIdEnabled)
+                using (ImRaii.PushColor(ImGuiCol.ButtonActive, BrightenButtonColor(startColor, 0.16f)))
                 {
-                    configuration.EurekaInstanceIdEnabled = plugin.EurekaInstanceId.SetEnabled(true);
-                    configuration.Save();
-                }
+                    if (ImGui.Button("Start##EurekaInstanceHunter"))
+                    {
+                        if (isScanning)
+                        {
+                            SetEurekaInstanceHunterStatus("Eureka instance scanning is already running.");
+                        }
+                        else
+                        {
+                            ApplyEurekaInstanceIdConfiguration();
+                            if (!configuration.EurekaInstanceIdEnabled)
+                            {
+                                configuration.EurekaInstanceIdEnabled = plugin.EurekaInstanceId.SetEnabled(true);
+                                configuration.SaveDeferred();
+                            }
 
-                if (GetEnabledEurekaInstanceIdZoneCount() <= 0)
-                {
-                    SetEurekaInstanceHunterStatus("Enable at least one Eureka zone row before starting the scanner.", true);
-                }
-                else
-                {
-                    var applied = plugin.EurekaInstanceId.StartScanning();
-                    SetEurekaInstanceHunterStatus(
-                        applied
-                            ? $"Started Eureka instance scanning across {BuildEnabledEurekaInstanceIdZoneSummary()}."
-                            : plugin.EurekaInstanceId.StatusText,
-                        !applied);
+                            if (GetEnabledEurekaInstanceIdZoneCount() <= 0)
+                            {
+                                SetEurekaInstanceHunterStatus("Enable at least one Eureka zone row before starting the scanner.", true);
+                            }
+                            else
+                            {
+                                var applied = plugin.EurekaInstanceId.StartScanning();
+                                SetEurekaInstanceHunterStatus(
+                                    applied
+                                        ? $"Started Eureka instance scanning across {BuildEnabledEurekaInstanceIdZoneSummary()}."
+                                        : plugin.EurekaInstanceId.StatusText,
+                                    !applied);
+                            }
+                        }
+                    }
+
                 }
             }
         }
-
-        ImGui.PopStyleColor(3);
         ImGui.SameLine();
         var stopColor = GetEurekaHunterStopButtonColor();
-        ImGui.PushStyleColor(ImGuiCol.Button, stopColor);
-        ImGui.PushStyleColor(ImGuiCol.ButtonHovered, BrightenButtonColor(stopColor, 0.08f));
-        ImGui.PushStyleColor(ImGuiCol.ButtonActive, BrightenButtonColor(stopColor, 0.16f));
-        if (ImGui.Button("Stop##EurekaInstanceHunter"))
+        using (ImRaii.PushColor(ImGuiCol.Button, stopColor))
         {
-            plugin.EurekaInstanceId.StopScanning();
-            SetEurekaInstanceHunterStatus(
-                configuration.EurekaInstanceIdEnabled
-                    ? "Stopped Eureka instance scanning. Live instance display remains enabled."
-                    : "Stopped Eureka instance scanning.");
-        }
+            using (ImRaii.PushColor(ImGuiCol.ButtonHovered, BrightenButtonColor(stopColor, 0.08f)))
+            {
+                using (ImRaii.PushColor(ImGuiCol.ButtonActive, BrightenButtonColor(stopColor, 0.16f)))
+                {
+                    if (ImGui.Button("Stop##EurekaInstanceHunter"))
+                    {
+                        plugin.EurekaInstanceId.StopScanning();
+                        SetEurekaInstanceHunterStatus(
+                            configuration.EurekaInstanceIdEnabled
+                                ? "Stopped Eureka instance scanning. Live instance display remains enabled."
+                                : "Stopped Eureka instance scanning.");
+                    }
 
-        ImGui.PopStyleColor(3);
+                }
+            }
+        }
 
         ImGui.Spacing();
         DrawEurekaInstanceIdSharedDisplayOptions("EurekaInstanceHunter");
@@ -329,11 +351,12 @@ public partial class SlaveWindow
                 ref leaveDutyDelaySeconds,
                 EurekaInstanceIdService.LeaveDutyDelaySecondsMinimum,
                 EurekaInstanceIdService.LeaveDutyDelaySecondsMaximum,
-                "%d sec"))
+                "%d sec",
+                ImGuiSliderFlags.AlwaysClamp))
         {
             configuration.EurekaInstanceIdLeaveDutyDelaySeconds = leaveDutyDelaySeconds;
             ApplyEurekaInstanceIdConfiguration();
-            configuration.Save();
+            configuration.SaveDeferred();
         }
 
         var playSound = configuration.EurekaInstanceIdPlaySound;
@@ -341,46 +364,48 @@ public partial class SlaveWindow
         {
             configuration.EurekaInstanceIdPlaySound = playSound;
             ApplyEurekaInstanceIdConfiguration();
-            configuration.Save();
+            configuration.SaveDeferred();
         }
 
-        ImGui.BeginDisabled(!configuration.EurekaInstanceIdPlaySound);
-        var soundEffectId = configuration.EurekaInstanceIdSoundEffectId;
-        if (ImGui.BeginCombo("Sound##EurekaInstanceHunter", XAPeepData.GetSoundEffectLabel(soundEffectId)))
+        using (ImRaii.Disabled(!configuration.EurekaInstanceIdPlaySound))
         {
-            for (var id = 0; id <= XAPeepData.MaxSoundEffectId; id++)
+            var soundEffectId = configuration.EurekaInstanceIdSoundEffectId;
+            using (var imguiScope360 = ImRaii.Combo("Sound##EurekaInstanceHunter", XAPeepData.GetSoundEffectLabel(soundEffectId)))
+            if (imguiScope360)
             {
-                var isSelected = soundEffectId == id;
-                if (ImGui.Selectable(XAPeepData.GetSoundEffectLabel(id), isSelected))
+                for (var id = 0; id <= XAPeepData.MaxSoundEffectId; id++)
                 {
-                    configuration.EurekaInstanceIdSoundEffectId = id;
-                    ApplyEurekaInstanceIdConfiguration();
-                    configuration.Save();
-                    if (id > 0)
-                        PlayEurekaInstanceHunterSoundPreview();
+                    var isSelected = soundEffectId == id;
+                    if (ImGui.Selectable(XAPeepData.GetSoundEffectLabel(id), isSelected))
+                    {
+                        configuration.EurekaInstanceIdSoundEffectId = id;
+                        ApplyEurekaInstanceIdConfiguration();
+                        configuration.SaveDeferred();
+                        if (id > 0)
+                            PlayEurekaInstanceHunterSoundPreview();
 
-                    soundEffectId = id;
+                        soundEffectId = id;
+                    }
+
+                    if (isSelected)
+                        ImGui.SetItemDefaultFocus();
                 }
 
-                if (isSelected)
-                    ImGui.SetItemDefaultFocus();
+
             }
 
-            ImGui.EndCombo();
+            var soundVolumePercent = configuration.EurekaInstanceIdSoundVolume * 100f;
+            if (ImGui.SliderFloat("Alert volume##EurekaInstanceHunter", ref soundVolumePercent, 0f, 100f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
+            {
+                configuration.EurekaInstanceIdSoundVolume = soundVolumePercent / 100f;
+                ApplyEurekaInstanceIdConfiguration();
+                configuration.SaveDeferred();
+            }
+
+            if (ImGui.IsItemDeactivatedAfterEdit() && XAPeepData.ClampSoundEffectId(configuration.EurekaInstanceIdSoundEffectId) > 0)
+                PlayEurekaInstanceHunterSoundPreview();
+
         }
-
-        var soundVolumePercent = configuration.EurekaInstanceIdSoundVolume * 100f;
-        if (ImGui.SliderFloat("Alert volume##EurekaInstanceHunter", ref soundVolumePercent, 0f, 100f, "%.0f%%"))
-        {
-            configuration.EurekaInstanceIdSoundVolume = soundVolumePercent / 100f;
-            ApplyEurekaInstanceIdConfiguration();
-            configuration.Save();
-        }
-
-        if (ImGui.IsItemDeactivatedAfterEdit() && XAPeepData.ClampSoundEffectId(configuration.EurekaInstanceIdSoundEffectId) > 0)
-            PlayEurekaInstanceHunterSoundPreview();
-
-        ImGui.EndDisabled();
 
         ImGui.Spacing();
         if (ImGui.Button(eurekaHunterHowToUseExpanded ? "How to use [-]##EurekaInstanceHunterHowToUse" : "How to use [+]##EurekaInstanceHunterHowToUse"))

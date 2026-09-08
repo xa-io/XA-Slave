@@ -27,6 +27,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
     private bool startupArmingSubscribed;
     private bool disposed;
     private Task<StartupHookResult>? startupHookTask;
+    private System.Threading.CancellationTokenSource? startupHookCancellation;
     private int availableHookSurfaces;
     private long suppressedFadeCalls;
 
@@ -67,7 +68,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
         }
 
         CancelStartupArming(disposeCompletedResult: true);
-        EnsureInitialized();
+        EnsureInitialized(retryMissing: initialized);
         if (availableHookSurfaces == 0)
         {
             enabled = false;
@@ -97,7 +98,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
             return SetEnabled(true);
 
         enabled = true;
-        StatusText = "Arming - UI fade hooks are initializing outside the framework tick.";
+        StatusText = "Arming - UI fade hooks are initializing on the framework thread.";
         StartStartupHookCreation();
         return true;
     }
@@ -114,18 +115,18 @@ public unsafe sealed class NoUiFadeService : IDisposable
         DisposeHook(ref eventFadeOutHook);
     }
 
-    private void EnsureInitialized()
+    private void EnsureInitialized(bool retryMissing = false)
     {
-        if (initialized)
+        if (initialized && !retryMissing)
             return;
 
         initialized = true;
 
-        fadeMiddleBackDrawHook = TryCreateHook<FadeMiddleBackDrawDelegate>(Sigs.FadeMiddleBackDrawSig, FadeMiddleBackDrawDetour, "FadeMiddleBackDraw");
-        whiteFadeInHook = TryCreateHook<WhiteFadeInDelegate>(Sigs.WhiteFadeInSig, WhiteFadeInDetour, "WhiteFadeIn");
-        whiteFadeOutHook = TryCreateHook<WhiteFadeOutDelegate>(Sigs.WhiteFadeOutSig, WhiteFadeOutDetour, "WhiteFadeOut");
-        eventFadeInHook = TryCreateHook<EventFadeInDelegate>(Sigs.EventFadeInSig, EventFadeInDetour, "EventFadeIn");
-        eventFadeOutHook = TryCreateHook<EventFadeOutDelegate>(Sigs.EventFadeOutSig, EventFadeOutDetour, "EventFadeOut");
+        fadeMiddleBackDrawHook ??= TryCreateHook<FadeMiddleBackDrawDelegate>(Sigs.FadeMiddleBackDrawSig, FadeMiddleBackDrawDetour, "FadeMiddleBackDraw");
+        whiteFadeInHook ??= TryCreateHook<WhiteFadeInDelegate>(Sigs.WhiteFadeInSig, WhiteFadeInDetour, "WhiteFadeIn");
+        whiteFadeOutHook ??= TryCreateHook<WhiteFadeOutDelegate>(Sigs.WhiteFadeOutSig, WhiteFadeOutDetour, "WhiteFadeOut");
+        eventFadeInHook ??= TryCreateHook<EventFadeInDelegate>(Sigs.EventFadeInSig, EventFadeInDetour, "EventFadeIn");
+        eventFadeOutHook ??= TryCreateHook<EventFadeOutDelegate>(Sigs.EventFadeOutSig, EventFadeOutDetour, "EventFadeOut");
 
         availableHookSurfaces = CountAvailableHookSurfaces();
         log.Debug($"[XASlave] No UI Fade scan resolved {availableHookSurfaces}/{TotalHookSurfaces} hook surface(s).");
@@ -146,7 +147,15 @@ public unsafe sealed class NoUiFadeService : IDisposable
         lock (startupArmingLock)
         {
             startupArmingPending = true;
-            startupHookTask ??= Task.Run(CreateStartupHookResult);
+            if (startupHookTask == null)
+            {
+                startupHookCancellation?.Dispose();
+                startupHookCancellation = new System.Threading.CancellationTokenSource();
+                startupHookTask = Plugin.RunOnGameThread(
+                    CreateStartupHookResult,
+                    "No UI Fade startup hook creation",
+                    startupHookCancellation.Token);
+            }
         }
 
         SubscribeStartupArming();
@@ -173,12 +182,18 @@ public unsafe sealed class NoUiFadeService : IDisposable
     private void CancelStartupArming(bool disposeCompletedResult)
     {
         Task<StartupHookResult>? task;
+        System.Threading.CancellationTokenSource? cancellation;
         lock (startupArmingLock)
         {
             startupArmingPending = false;
             task = startupHookTask;
             startupHookTask = null;
+            cancellation = startupHookCancellation;
+            startupHookCancellation = null;
         }
+
+        cancellation?.Cancel();
+        cancellation?.Dispose();
 
         UnsubscribeStartupArming();
 
@@ -193,7 +208,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
         if (task.IsCompleted)
         {
             if (task.Status == TaskStatus.RanToCompletion)
-                task.Result.DisposeHooks();
+                _ = Plugin.RunOnGameThread(task.Result.DisposeHooks, "Dispose cancelled No UI Fade startup hooks");
             return;
         }
 
@@ -201,7 +216,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
             completedTask =>
             {
                 if (completedTask.Status == TaskStatus.RanToCompletion)
-                    completedTask.Result.DisposeHooks();
+                    _ = Plugin.RunOnGameThread(completedTask.Result.DisposeHooks, "Dispose cancelled No UI Fade startup hooks");
             },
             TaskScheduler.Default);
     }
@@ -232,11 +247,15 @@ public unsafe sealed class NoUiFadeService : IDisposable
             log.Warning(ex, "[XASlave] No UI Fade startup hook initialization failed.");
         }
 
+        System.Threading.CancellationTokenSource? completedCancellation;
         lock (startupArmingLock)
         {
             startupHookTask = null;
             startupArmingPending = false;
+            completedCancellation = startupHookCancellation;
+            startupHookCancellation = null;
         }
+        completedCancellation?.Dispose();
 
         UnsubscribeStartupArming();
         initialized = true;
@@ -288,7 +307,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
             {
-                log.Debug($"[XASlave] No UI Fade could not find {label}; this hook surface will stay disabled.");
+                log.Warning($"[XASlave] No UI Fade could not find {label}; retry by disabling and re-enabling the feature.");
                 return null;
             }
 
@@ -359,7 +378,9 @@ public unsafe sealed class NoUiFadeService : IDisposable
         }
 
         var surfaceCount = activeSurfaces ?? CountActiveHookSurfaces();
-        StatusText = $"Enabled - suppressing {surfaceCount} UI fade surfaces. Suppressed fades: {suppressedFadeCalls}.";
+        StatusText = surfaceCount < TotalHookSurfaces
+            ? $"Partially enabled - suppressing {surfaceCount}/{TotalHookSurfaces} UI fade surfaces. Suppressed fades: {suppressedFadeCalls}."
+            : $"Enabled - suppressing all {TotalHookSurfaces} UI fade surfaces. Suppressed fades: {suppressedFadeCalls}.";
     }
 
     private int CountActiveHookSurfaces()
@@ -390,8 +411,8 @@ public unsafe sealed class NoUiFadeService : IDisposable
     {
         if (hook is { IsDisposed: false })
             hook.Dispose();
-
-        hook = null;
+        // Keep the disposed wrapper reachable. OriginalDisposeSafe uses its stored
+        // target address when an in-flight detour reaches this field during teardown.
     }
 
     private void SuppressFade()
@@ -404,49 +425,99 @@ public unsafe sealed class NoUiFadeService : IDisposable
 
     private void FadeMiddleBackDrawDetour(AtkUnitBase* addon)
     {
+        var hook = fadeMiddleBackDrawHook
+            ?? throw new InvalidOperationException("NoUiFade FadeMiddleBackDraw detour ran without its hook wrapper.");
         if (!enabled)
         {
-            fadeMiddleBackDrawHook?.Original(addon);
+            hook.OriginalDisposeSafe(addon);
             return;
         }
 
-        SuppressFade();
+        try
+        {
+            SuppressFade();
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] NoUiFade FadeMiddleBackDraw detour failed; calling the original.");
+            hook.OriginalDisposeSafe(addon);
+        }
     }
 
     private nint WhiteFadeInDetour()
     {
+        var hook = whiteFadeInHook
+            ?? throw new InvalidOperationException("NoUiFade WhiteFadeIn detour ran without its hook wrapper.");
         if (!enabled)
-            return whiteFadeInHook?.Original() ?? nint.Zero;
+            return hook.OriginalDisposeSafe();
 
-        SuppressFade();
-        return nint.Zero;
+        try
+        {
+            SuppressFade();
+            return nint.Zero;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] NoUiFade WhiteFadeIn detour failed; calling the original.");
+            return hook.OriginalDisposeSafe();
+        }
     }
 
     private nint WhiteFadeOutDetour()
     {
+        var hook = whiteFadeOutHook
+            ?? throw new InvalidOperationException("NoUiFade WhiteFadeOut detour ran without its hook wrapper.");
         if (!enabled)
-            return whiteFadeOutHook?.Original() ?? nint.Zero;
+            return hook.OriginalDisposeSafe();
 
-        SuppressFade();
-        return nint.Zero;
+        try
+        {
+            SuppressFade();
+            return nint.Zero;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] NoUiFade WhiteFadeOut detour failed; calling the original.");
+            return hook.OriginalDisposeSafe();
+        }
     }
 
     private nint EventFadeInDetour(nint a1)
     {
+        var hook = eventFadeInHook
+            ?? throw new InvalidOperationException("NoUiFade EventFadeIn detour ran without its hook wrapper.");
         if (!enabled)
-            return eventFadeInHook?.Original(a1) ?? nint.Zero;
+            return hook.OriginalDisposeSafe(a1);
 
-        SuppressFade();
-        return nint.Zero;
+        try
+        {
+            SuppressFade();
+            return nint.Zero;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] NoUiFade EventFadeIn detour failed; calling the original.");
+            return hook.OriginalDisposeSafe(a1);
+        }
     }
 
     private nint EventFadeOutDetour(nint a1, int a2, int a3)
     {
+        var hook = eventFadeOutHook
+            ?? throw new InvalidOperationException("NoUiFade EventFadeOut detour ran without its hook wrapper.");
         if (!enabled)
-            return eventFadeOutHook?.Original(a1, a2, a3) ?? nint.Zero;
+            return hook.OriginalDisposeSafe(a1, a2, a3);
 
-        SuppressFade();
-        return nint.Zero;
+        try
+        {
+            SuppressFade();
+            return nint.Zero;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] NoUiFade EventFadeOut detour failed; calling the original.");
+            return hook.OriginalDisposeSafe(a1, a2, a3);
+        }
     }
 
     private delegate void FadeMiddleBackDrawDelegate(AtkUnitBase* addon);

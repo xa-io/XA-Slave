@@ -85,12 +85,11 @@ public unsafe sealed class AutoDutyCommenceService : IDisposable
             var addon = (AddonContentsFinderConfirm*)addonAddress;
             if (addon == null
                 || !addon->AtkUnitBase.IsVisible
-                || !addon->AtkUnitBase.IsReady
-                || addon->AtkUnitBase.AtkValues == null
-                || addon->AtkUnitBase.AtkValuesCount <= 7)
+                || !addon->AtkUnitBase.IsReady)
                 return;
 
-            if (addon->AtkUnitBase.AtkValues[7].UInt != 0)
+            if (!NativeArrayAccess.TryGetAtkUInt(&addon->AtkUnitBase, 7, out var commenceState) ||
+                commenceState != 0)
                 return;
 
             lastAddonAddress = addonAddress;

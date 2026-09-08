@@ -1,7 +1,9 @@
 using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Threading;
 using Dalamud.Plugin;
@@ -13,8 +15,8 @@ namespace XASlave.Services;
 /// Renames the FFXIV game window title using Win32 SetWindowText.
 /// Finds the game window via Process.GetCurrentProcess().MainWindowHandle
 /// with a current-process-scoped FindWindowEx("FFXIVGAME") fallback.
-/// Yields the exact native title while XIVWindowResizer is loaded because
-/// that plugin's initial handle lookup depends on the native window title.
+/// When XIVWindowResizer is loaded, primes its private current-process window-handle
+/// cache before applying the custom title so both plugins can remain active.
 /// Restores original title ("FINAL FANTASY XIV") on disable/dispose.
 /// </summary>
 public sealed class WindowRenamerService : IDisposable
@@ -36,12 +38,17 @@ public sealed class WindowRenamerService : IDisposable
     [return: MarshalAs(UnmanagedType.Bool)]
     private static extern bool IsWindowVisible(IntPtr hWnd);
 
+    [DllImport("user32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool IsWindow(IntPtr hWnd);
+
     public const string NativeGameWindowTitle = "FINAL FANTASY XIV";
 
     private const string GameWindowClass = "FFXIVGAME";
     private const string XivWindowResizerInternalName = "xivWindowResizer";
     private const string XivWindowResizerDisplayName = "XIVWindowResizer";
-    private const int MaxNativeTitleRestoreAttempts = 3;
+    private const int MaxCompatibilityPrimeAttempts = 3;
+    private const BindingFlags InstanceBindings = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
 
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly IFramework framework;
@@ -49,7 +56,7 @@ public sealed class WindowRenamerService : IDisposable
     private readonly Func<Configuration> getConfiguration;
     private bool isRenamed;
     private int compatibilityRefreshQueued;
-    private int nativeTitleRestoreAttempts;
+    private int compatibilityPrimeAttempts;
     private int windowRenamerEnabled;
     private int disposed;
 
@@ -68,8 +75,10 @@ public sealed class WindowRenamerService : IDisposable
     }
 
     public bool IsXIVWindowResizerCompatibilityActive { get; private set; }
-    public bool IsXIVWindowResizerNativeTitleConfirmed { get; private set; }
-    public bool HasXIVWindowResizerCompatibilityRefreshError { get; private set; }
+    public bool IsXIVWindowResizerHandleReady { get; private set; }
+    public bool HasXIVWindowResizerCompatibilityError { get; private set; }
+    public string XIVWindowResizerCompatibilityStatusText { get; private set; } = string.Empty;
+    public bool IsCustomTitleApplied => isRenamed;
 
     /// <summary>
     /// Attempts to find the FFXIV game window handle.
@@ -215,60 +224,82 @@ public sealed class WindowRenamerService : IDisposable
         if (Volatile.Read(ref disposed) != 0)
             return;
 
-        HasXIVWindowResizerCompatibilityRefreshError = false;
+        HasXIVWindowResizerCompatibilityError = false;
+        XIVWindowResizerCompatibilityStatusText = string.Empty;
         Interlocked.Exchange(ref windowRenamerEnabled, config.WindowRenamerEnabled ? 1 : 0);
         if (!config.WindowRenamerEnabled)
         {
             IsXIVWindowResizerCompatibilityActive = false;
-            IsXIVWindowResizerNativeTitleConfirmed = false;
-            Interlocked.Exchange(ref nativeTitleRestoreAttempts, 0);
+            IsXIVWindowResizerHandleReady = false;
+            Interlocked.Exchange(ref compatibilityPrimeAttempts, 0);
             Restore();
             return;
         }
 
-        if (IsXIVWindowResizerLoaded())
+        if (!TryIsXIVWindowResizerLoaded(out var xivWindowResizerLoaded))
         {
-            if (!isCompatibilityRetry)
-                Interlocked.Exchange(ref nativeTitleRestoreAttempts, 0);
-
+            IsXIVWindowResizerCompatibilityActive = false;
+            RegisterCompatibilityFailure(
+                "XA could not read Dalamud's loaded-plugin state. The custom title remains active, but XIVWindowResizer compatibility could not be confirmed.",
+                isCompatibilityRetry);
+        }
+        else if (xivWindowResizerLoaded)
+        {
             var compatibilityWasActive = IsXIVWindowResizerCompatibilityActive;
+            var handleWasReady = IsXIVWindowResizerHandleReady;
             IsXIVWindowResizerCompatibilityActive = true;
-            IsXIVWindowResizerNativeTitleConfirmed = RestoreNativeTitle(force: true);
 
-            if (IsXIVWindowResizerNativeTitleConfirmed)
+            if (TryPrepareXIVWindowResizerHandle(out var compatibilityStatus))
             {
-                Interlocked.Exchange(ref nativeTitleRestoreAttempts, 0);
-                if (!compatibilityWasActive)
-                {
-                    log.Information(
-                        "[XASlave] WindowRenamer: Paused custom title while XIVWindowResizer is loaded; confirmed the native game-window title.");
-                }
+                IsXIVWindowResizerHandleReady = true;
+                HasXIVWindowResizerCompatibilityError = false;
+                XIVWindowResizerCompatibilityStatusText = compatibilityStatus;
+                Interlocked.Exchange(ref compatibilityPrimeAttempts, 0);
+                if (!compatibilityWasActive || !handleWasReady)
+                    log.Information($"[XASlave] WindowRenamer: {compatibilityStatus}");
             }
             else
             {
-                var attempt = Interlocked.Increment(ref nativeTitleRestoreAttempts);
-                log.Warning(
-                    $"[XASlave] WindowRenamer: Couldn't confirm the native title for XIVWindowResizer (attempt {attempt}/{MaxNativeTitleRestoreAttempts}).");
-                if (attempt < MaxNativeTitleRestoreAttempts)
-                    QueueCompatibilityRefresh(isCompatibilityRetry: true);
+                RegisterCompatibilityFailure(compatibilityStatus, isCompatibilityRetry);
+            }
+        }
+        else
+        {
+            if (IsXIVWindowResizerCompatibilityActive)
+            {
+                log.Information(
+                    "[XASlave] WindowRenamer: XIVWindowResizer unloaded; the saved custom title remains active.");
             }
 
-            return;
+            IsXIVWindowResizerCompatibilityActive = false;
+            IsXIVWindowResizerHandleReady = false;
+            Interlocked.Exchange(ref compatibilityPrimeAttempts, 0);
         }
 
-        if (IsXIVWindowResizerCompatibilityActive)
-        {
-            log.Information(
-                "[XASlave] WindowRenamer: XIVWindowResizer unloaded; reapplying the saved custom title.");
-        }
+        ApplyConfiguredTitle(config, currentCharacterNameOverride);
+    }
 
-        IsXIVWindowResizerCompatibilityActive = false;
-        IsXIVWindowResizerNativeTitleConfirmed = false;
-        Interlocked.Exchange(ref nativeTitleRestoreAttempts, 0);
+    private void ApplyConfiguredTitle(Configuration config, string? currentCharacterNameOverride)
+    {
         var title = string.IsNullOrWhiteSpace(config.WindowRenamerTitle)
             ? NativeGameWindowTitle
             : config.WindowRenamerTitle;
         Rename(title, config.WindowRenamerUseProcessId, config.WindowRenamerShowCurrentCharacter, currentCharacterNameOverride);
+    }
+
+    private void RegisterCompatibilityFailure(string status, bool isCompatibilityRetry)
+    {
+        if (!isCompatibilityRetry)
+            Interlocked.Exchange(ref compatibilityPrimeAttempts, 0);
+
+        IsXIVWindowResizerHandleReady = false;
+        HasXIVWindowResizerCompatibilityError = true;
+        XIVWindowResizerCompatibilityStatusText = status;
+        var attempt = Interlocked.Increment(ref compatibilityPrimeAttempts);
+        log.Warning(
+            $"[XASlave] WindowRenamer: {status} Compatibility attempt {attempt}/{MaxCompatibilityPrimeAttempts}; Window Renamer remains active.");
+        if (attempt < MaxCompatibilityPrimeAttempts)
+            QueueCompatibilityRefresh(isCompatibilityRetry: true);
     }
 
     private static string BuildFinalTitle(string title, bool useProcessId, bool showCurrentCharacter, string? currentCharacterNameOverride)
@@ -304,21 +335,110 @@ public sealed class WindowRenamerService : IDisposable
             : currentCharacterName;
     }
 
-    private bool IsXIVWindowResizerLoaded()
+    private bool TryIsXIVWindowResizerLoaded(out bool loaded)
     {
         try
         {
-            return pluginInterface.InstalledPlugins.Any(plugin =>
+            loaded = pluginInterface.InstalledPlugins.Any(plugin =>
                 plugin.IsLoaded
                 && (IsXIVWindowResizerIdentifier(plugin.InternalName)
                     || IsXIVWindowResizerIdentifier(plugin.Name)));
+            return true;
         }
         catch (Exception ex)
         {
             log.Warning(
-                $"[XASlave] WindowRenamer: Couldn't read the active plugin list; retaining the native title for safety: {ex.Message}");
-            return true;
+                $"[XASlave] WindowRenamer: Couldn't read the active plugin list: {ex.Message}");
+            loaded = false;
+            return false;
         }
+    }
+
+    private bool TryPrepareXIVWindowResizerHandle(out string status)
+    {
+        if (!TryGetGameWindow(out var gameWindowHandle))
+        {
+            status = "XA could not resolve the current FFXIV window before preparing XIVWindowResizer.";
+            return false;
+        }
+
+        var pluginInstance = TryGetXIVWindowResizerPluginInstance();
+        var result = XivWindowResizerCompatibilityBridge.PrimeWindowHandle(
+            pluginInstance,
+            gameWindowHandle,
+            IsUsableCurrentProcessWindow);
+        status = result.Message;
+        return result.Success;
+    }
+
+    private object? TryGetXIVWindowResizerPluginInstance()
+    {
+        try
+        {
+            var pluginManagerServiceType = typeof(IDalamudPluginInterface).Assembly.GetType("Dalamud.Service`1");
+            var pluginManagerType = typeof(IDalamudPluginInterface).Assembly.GetType("Dalamud.Plugin.Internal.PluginManager");
+            if (pluginManagerServiceType == null || pluginManagerType == null)
+                return null;
+
+            var pluginManager = pluginManagerServiceType
+                .MakeGenericType(pluginManagerType)
+                .GetMethod("Get")?
+                .Invoke(null, null);
+            var installedPlugins = pluginManager?.GetType()
+                .GetProperty("InstalledPlugins", InstanceBindings)?
+                .GetValue(pluginManager) as IEnumerable;
+            if (installedPlugins == null)
+                return null;
+
+            foreach (var pluginState in installedPlugins)
+            {
+                if (pluginState == null
+                    || GetMemberValue(pluginState, "IsLoaded") is not true
+                    || (!IsXIVWindowResizerIdentifier(GetMemberValue(pluginState, "InternalName")?.ToString())
+                        && !IsXIVWindowResizerIdentifier(GetMemberValue(pluginState, "Name")?.ToString())))
+                {
+                    continue;
+                }
+
+                var instance = GetFieldValueInHierarchy(pluginState, "instance");
+                if (instance != null)
+                    return instance;
+            }
+        }
+        catch (Exception ex)
+        {
+            log.Warning($"[XASlave] WindowRenamer: Couldn't resolve the XIVWindowResizer instance: {ex.Message}");
+        }
+
+        return null;
+    }
+
+    private static bool IsUsableCurrentProcessWindow(IntPtr handle)
+    {
+        if (handle == IntPtr.Zero || !IsWindow(handle))
+            return false;
+
+        _ = GetWindowThreadProcessId(handle, out var processId);
+        return processId == (uint)Environment.ProcessId;
+    }
+
+    private static object? GetFieldValueInHierarchy(object source, string fieldName)
+    {
+        for (var type = source.GetType(); type != null; type = type.BaseType)
+        {
+            var field = type.GetField(fieldName, InstanceBindings | BindingFlags.DeclaredOnly);
+            if (field != null)
+                return field.GetValue(source);
+        }
+
+        return null;
+    }
+
+    private static object? GetMemberValue(object source, string memberName)
+    {
+        var type = source.GetType();
+        return type.GetProperty(memberName, InstanceBindings)?.GetValue(source)
+            ?? type.GetField(memberName, InstanceBindings)?.GetValue(source);
     }
 
     private static bool IsXIVWindowResizerIdentifier(string? value)
@@ -337,7 +457,7 @@ public sealed class WindowRenamerService : IDisposable
             if (!args.AffectedInternalNames.Any(IsXIVWindowResizerIdentifier))
                 return;
 
-            Interlocked.Exchange(ref nativeTitleRestoreAttempts, 0);
+            Interlocked.Exchange(ref compatibilityPrimeAttempts, 0);
         }
         catch (Exception ex)
         {
@@ -379,8 +499,9 @@ public sealed class WindowRenamerService : IDisposable
             if (Volatile.Read(ref disposed) == 0
                 && Volatile.Read(ref windowRenamerEnabled) != 0)
             {
-                HasXIVWindowResizerCompatibilityRefreshError = true;
-                IsXIVWindowResizerNativeTitleConfirmed = RestoreNativeTitle(force: true);
+                HasXIVWindowResizerCompatibilityError = true;
+                XIVWindowResizerCompatibilityStatusText =
+                    "XA could not schedule an XIVWindowResizer compatibility refresh. The custom title remains active; use Apply Now to retry.";
             }
         }
     }
@@ -392,11 +513,12 @@ public sealed class WindowRenamerService : IDisposable
 
         pluginInterface.ActivePluginsChanged -= OnActivePluginsChanged;
         Interlocked.Exchange(ref compatibilityRefreshQueued, 0);
-        Interlocked.Exchange(ref nativeTitleRestoreAttempts, 0);
+        Interlocked.Exchange(ref compatibilityPrimeAttempts, 0);
         Interlocked.Exchange(ref windowRenamerEnabled, 0);
         IsXIVWindowResizerCompatibilityActive = false;
-        IsXIVWindowResizerNativeTitleConfirmed = false;
-        HasXIVWindowResizerCompatibilityRefreshError = false;
+        IsXIVWindowResizerHandleReady = false;
+        HasXIVWindowResizerCompatibilityError = false;
+        XIVWindowResizerCompatibilityStatusText = string.Empty;
         Restore();
     }
 }

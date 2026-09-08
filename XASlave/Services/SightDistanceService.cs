@@ -32,6 +32,7 @@ public unsafe sealed class SightDistanceService : IDisposable
     private bool disposed;
     private int startupArmingStep;
     private System.Threading.Tasks.Task<StartupHookResult>? startupHookTask;
+    private System.Threading.CancellationTokenSource? startupHookCancellation;
 
     private float minDistance = 1.5f;
     private float maxDistance = 80f;
@@ -41,6 +42,8 @@ public unsafe sealed class SightDistanceService : IDisposable
     private float maxFoV = 0.78f;
     private float currentFoV = 0.78f;
     private bool ignoreCollision = true;
+    private nint capturedCameraAddress;
+    private CameraSnapshot? capturedCamera;
 
     public SightDistanceService(
         IFramework framework,
@@ -71,7 +74,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         startupArmingStep = 0;
         StartStartupHookCreation();
         SubscribeStartupArming();
-        StatusText = "Arming - camera hooks and patch surfaces are initializing outside the framework tick.";
+        StatusText = "Arming - camera hooks and patch surfaces are initializing on the framework thread.";
         return true;
     }
 
@@ -88,19 +91,19 @@ public unsafe sealed class SightDistanceService : IDisposable
         if (disposed)
             return;
 
-        this.maxDistance = maxDistance;
-        this.minDistance = minDistance;
-        this.maxRotation = maxRotation;
-        this.minRotation = minRotation;
-        this.maxFoV = maxFoV;
-        this.minFoV = minFoV;
-        this.currentFoV = currentFoV;
+        this.maxDistance = ClampFinite(maxDistance, 1f, 80f, 80f);
+        this.minDistance = ClampFinite(minDistance, 0f, this.maxDistance, 1.5f);
+        this.maxRotation = ClampFinite(maxRotation, -1.569f, 1.569f, 1.569f);
+        this.minRotation = ClampFinite(minRotation, -1.569f, this.maxRotation, -1.483530f);
+        this.maxFoV = ClampFinite(maxFoV, 0.01f, 3f, 0.78f);
+        this.minFoV = ClampFinite(minFoV, 0.01f, this.maxFoV, 0.69f);
+        this.currentFoV = ClampFinite(currentFoV, this.minFoV, this.maxFoV, this.maxFoV);
         this.ignoreCollision = ignoreCollision;
 
         if (enabled && !startupArmingPending)
         {
             if (!TryUpdateActiveCamera())
-                StatusText = "Enabled - waiting for an active camera after a transition.";
+                StatusText = GetEnabledStatusText(activeCameraReady: false);
 
             UpdateCollisionPatch();
         }
@@ -127,12 +130,12 @@ public unsafe sealed class SightDistanceService : IDisposable
             ToggleHook(setActiveCameraHook, false, "SetActiveCamera");
             ToggleHook(cameraCurrentSightDistanceHook, false, "CameraCurrentSightDistance");
             RestoreCollisionPatch();
-            ResetCameraDefaults();
+            RestoreCapturedCamera();
             StatusText = "Disabled";
             return false;
         }
 
-        EnsureInitialized();
+        EnsureInitialized(retryMissing: initialized);
         CancelStartupArming(disposeCompletedResult: true);
         if (setActiveCameraHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
         {
@@ -144,9 +147,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         ToggleHook(setActiveCameraHook, true, "SetActiveCamera");
         ToggleHook(cameraCurrentSightDistanceHook, true, "CameraCurrentSightDistance");
         UpdateCollisionPatch();
-        StatusText = TryUpdateActiveCamera()
-            ? "Enabled - camera sight distance, angle, and FoV limits are overridden locally."
-            : "Enabled - waiting for an active camera after a transition.";
+        StatusText = GetEnabledStatusText(TryUpdateActiveCamera());
         return true;
     }
 
@@ -159,19 +160,20 @@ public unsafe sealed class SightDistanceService : IDisposable
         CancelStartupArming(disposeCompletedResult: true);
         enabled = false;
         RestoreCollisionPatch();
-        ResetCameraDefaults();
+        RestoreCapturedCamera();
         DisposeHook(ref setActiveCameraHook);
         DisposeHook(ref cameraCurrentSightDistanceHook);
     }
 
-    private void EnsureInitialized()
+    private void EnsureInitialized(bool retryMissing = false)
     {
-        if (initialized)
+        if (initialized && !retryMissing)
             return;
 
         setActiveCameraHook ??= TryCreateHook<SetActiveCameraDelegate>(Sigs.SetActiveCameraSig, SetActiveCameraDetour, "SetActiveCamera");
         cameraCurrentSightDistanceHook ??= TryCreateHook<CameraCurrentSightDistanceDelegate>(Sigs.CameraCurrentSightDistanceSig, CameraCurrentSightDistanceDetour, "CameraCurrentSightDistance");
-        cameraCollisionPatchAddress = TryScanPatchAddress(Sigs.CameraCollisionPatchSig, "CameraCollisionPatch");
+        if (cameraCollisionPatchAddress == nint.Zero)
+            cameraCollisionPatchAddress = TryScanPatchAddress(Sigs.CameraCollisionPatchSig, "CameraCollisionPatch");
         initialized = true;
     }
 
@@ -189,7 +191,10 @@ public unsafe sealed class SightDistanceService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
+            {
+                log.Warning($"[XASlave] Custom Sight Distance could not resolve {label}; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             var hook = interopProvider.HookFromAddress<T>(address, detour);
             return hook;
@@ -213,9 +218,11 @@ public unsafe sealed class SightDistanceService : IDisposable
     {
         try
         {
-            return sigScanner.TryScanText(signature, out var address)
-                ? address
-                : nint.Zero;
+            if (sigScanner.TryScanText(signature, out var address) && address != nint.Zero)
+                return address;
+
+            log.Warning($"[XASlave] Custom Sight Distance could not resolve {label}; retry by disabling and re-enabling the feature.");
+            return nint.Zero;
         }
         catch (Exception ex)
         {
@@ -230,7 +237,36 @@ public unsafe sealed class SightDistanceService : IDisposable
             return;
 
         if (ignoreCollision)
-            ApplyPatch(ref cameraCollisionPatchApplied, cameraCollisionPatchAddress, [0x90, 0x90, 0xE9, 0xA7, 0x01, 0x00, 0x00, 0x90], ref cameraCollisionOriginalBytes, "CameraCollisionPatch");
+        {
+            if (cameraCollisionOriginalBytes == null
+                && !SafeMemory.ReadBytes((IntPtr)cameraCollisionPatchAddress, 8, out cameraCollisionOriginalBytes))
+            {
+                log.Warning("[XASlave] Failed to read the original CameraCollisionPatch branch bytes.");
+                return;
+            }
+
+            if (cameraCollisionOriginalBytes is not { Length: 8 }
+                || cameraCollisionOriginalBytes[0] != 0x84
+                || cameraCollisionOriginalBytes[1] != 0xC0
+                || cameraCollisionOriginalBytes[2] != 0x0F
+                || cameraCollisionOriginalBytes[3] != 0x84)
+            {
+                log.Warning("[XASlave] CameraCollisionPatch matched an unexpected instruction; refusing to patch it.");
+                return;
+            }
+
+            var originalDisplacement = BitConverter.ToInt32(cameraCollisionOriginalBytes, 4);
+            var replacementDisplacement = (long)originalDisplacement + 1;
+            if (replacementDisplacement is < int.MinValue or > int.MaxValue)
+            {
+                log.Warning("[XASlave] CameraCollisionPatch branch displacement is out of range; refusing to patch it.");
+                return;
+            }
+
+            var replacement = new byte[] { 0x90, 0x90, 0xE9, 0, 0, 0, 0, 0x90 };
+            BitConverter.TryWriteBytes(replacement.AsSpan(3, sizeof(int)), (int)replacementDisplacement);
+            ApplyPatch(ref cameraCollisionPatchApplied, cameraCollisionPatchAddress, replacement, ref cameraCollisionOriginalBytes, "CameraCollisionPatch");
+        }
         else
             RestoreCollisionPatch();
     }
@@ -335,18 +371,32 @@ public unsafe sealed class SightDistanceService : IDisposable
     {
         lock (startupArmingLock)
         {
-            startupHookTask ??= System.Threading.Tasks.Task.Run(CreateStartupHookResult);
+            if (startupHookTask != null)
+                return;
+
+            startupHookCancellation?.Dispose();
+            startupHookCancellation = new System.Threading.CancellationTokenSource();
+            startupHookTask = Plugin.RunOnGameThread(
+                CreateStartupHookResult,
+                "Sight Distance startup hook creation",
+                startupHookCancellation.Token);
         }
     }
 
     private void CancelStartupArming(bool disposeCompletedResult = false)
     {
         System.Threading.Tasks.Task<StartupHookResult>? task;
+        System.Threading.CancellationTokenSource? cancellation;
         lock (startupArmingLock)
         {
             task = startupHookTask;
             startupHookTask = null;
+            cancellation = startupHookCancellation;
+            startupHookCancellation = null;
         }
+
+        cancellation?.Cancel();
+        cancellation?.Dispose();
 
         startupArmingPending = false;
         startupArmingStep = 0;
@@ -369,7 +419,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         if (task.IsCompleted)
         {
             if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
-                task.Result.DisposeHooks();
+                _ = Plugin.RunOnGameThread(task.Result.DisposeHooks, "Dispose cancelled Sight Distance startup hooks");
             return;
         }
 
@@ -377,7 +427,7 @@ public unsafe sealed class SightDistanceService : IDisposable
             completedTask =>
             {
                 if (completedTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
-                    completedTask.Result.DisposeHooks();
+                    _ = Plugin.RunOnGameThread(completedTask.Result.DisposeHooks, "Dispose cancelled Sight Distance startup hooks");
             },
             System.Threading.Tasks.TaskScheduler.Default);
     }
@@ -426,9 +476,7 @@ public unsafe sealed class SightDistanceService : IDisposable
                     UpdateCollisionPatch();
                     break;
                 default:
-                    StatusText = TryUpdateActiveCamera()
-                        ? "Enabled - camera sight distance, angle, and FoV limits are overridden locally."
-                        : "Enabled - waiting for an active camera after a transition.";
+                    StatusText = GetEnabledStatusText(TryUpdateActiveCamera());
                     CancelStartupArming();
                     return;
             }
@@ -475,8 +523,14 @@ public unsafe sealed class SightDistanceService : IDisposable
             log.Warning(ex, "[XASlave] Custom Sight Distance startup hook initialization failed.");
         }
 
+        System.Threading.CancellationTokenSource? completedCancellation;
         lock (startupArmingLock)
+        {
             startupHookTask = null;
+            completedCancellation = startupHookCancellation;
+            startupHookCancellation = null;
+        }
+        completedCancellation?.Dispose();
 
         if (disposed || !enabled)
         {
@@ -516,11 +570,29 @@ public unsafe sealed class SightDistanceService : IDisposable
         log.Debug($"[XASlave] Custom Sight Distance startup arming step '{label}' took {elapsedMilliseconds:F1}ms.");
     }
 
+    private string GetEnabledStatusText(bool activeCameraReady)
+    {
+        var resolvedSurfaces = (setActiveCameraHook != null ? 1 : 0)
+            + (cameraCurrentSightDistanceHook != null ? 1 : 0)
+            + (cameraCollisionPatchAddress != nint.Zero ? 1 : 0);
+        var availabilityLabel = resolvedSurfaces < 3 ? "Partially enabled" : "Enabled";
+        return activeCameraReady
+            ? $"{availabilityLabel} - camera overrides are active on {resolvedSurfaces}/3 native surfaces."
+            : $"{availabilityLabel} - {resolvedSurfaces}/3 native surfaces are ready; waiting for an active camera after a transition.";
+    }
+
     private void SetActiveCameraDetour(CameraManager* manager, int cameraIndex, void* a3)
     {
-        setActiveCameraHook?.Original(manager, cameraIndex, a3);
-        if (enabled && manager != null)
-            UpdateCamera(manager->Camera);
+        setActiveCameraHook?.OriginalDisposeSafe(manager, cameraIndex, a3);
+        try
+        {
+            if (enabled && manager != null)
+                UpdateCamera(manager->Camera);
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Custom Sight Distance camera detour failed after the original call.");
+        }
     }
 
     private float CameraCurrentSightDistanceDetour(
@@ -535,33 +607,41 @@ public unsafe sealed class SightDistanceService : IDisposable
     {
         const float Epsilon = 0.001f;
         if (!enabled)
-            return cameraCurrentSightDistanceHook?.Original(a1, minimumValue, maximumValue, upperBound, lowerBound, mode, currentValue, targetValue) ?? currentValue;
+            return cameraCurrentSightDistanceHook?.OriginalDisposeSafe(a1, minimumValue, maximumValue, upperBound, lowerBound, mode, currentValue, targetValue) ?? currentValue;
 
-        var frameworkInstance = Framework.Instance();
-        var adjustedUpperBound = Math.Min(upperBound - Epsilon, maximumValue);
-        var adjustedLowerBound = Math.Min(lowerBound - Epsilon, maximumValue);
-
-        var newValue = mode switch
+        try
         {
-            1 => Math.Min(adjustedUpperBound, Interpolate(adjustedLowerBound, 0.3f)),
-            2 => Interpolate(adjustedUpperBound, 0.3f),
-            3 => adjustedUpperBound,
-            0 or 4 or 5 => Interpolate(adjustedUpperBound, 0.07f),
-            _ => currentValue
-        };
+            var frameworkInstance = Framework.Instance();
+            var adjustedUpperBound = Math.Min(upperBound - Epsilon, maximumValue);
+            var adjustedLowerBound = Math.Min(lowerBound - Epsilon, maximumValue);
 
-        return Math.Max(Math.Min(targetValue, newValue), minDistance);
+            var newValue = mode switch
+            {
+                1 => Math.Min(adjustedUpperBound, Interpolate(adjustedLowerBound, 0.3f)),
+                2 => Interpolate(adjustedUpperBound, 0.3f),
+                3 => adjustedUpperBound,
+                0 or 4 or 5 => Interpolate(adjustedUpperBound, 0.07f),
+                _ => currentValue
+            };
 
-        float Interpolate(float target, float multiplier)
+            return Math.Max(Math.Min(targetValue, newValue), minDistance);
+
+            float Interpolate(float target, float multiplier)
+            {
+                if (frameworkInstance == null || Math.Abs(target - currentValue) < Epsilon)
+                    return target;
+
+                var delta = Math.Min(frameworkInstance->FrameDeltaTime * 60.0f * multiplier, 1.0f);
+                if (currentValue < target && target > targetValue)
+                    return Math.Min(currentValue + delta * (target - currentValue), targetValue);
+
+                return currentValue + delta * (target - currentValue);
+            }
+        }
+        catch (Exception ex)
         {
-            if (frameworkInstance == null || Math.Abs(target - currentValue) < Epsilon)
-                return target;
-
-            var delta = Math.Min(frameworkInstance->FrameDeltaTime * 60.0f * multiplier, 1.0f);
-            if (currentValue < target && target > targetValue)
-                return Math.Min(currentValue + delta * (target - currentValue), targetValue);
-
-            return currentValue + delta * (target - currentValue);
+            log.Warning(ex, "[XASlave] Custom Sight Distance interpolation detour failed; calling the original.");
+            return cameraCurrentSightDistanceHook?.OriginalDisposeSafe(a1, minimumValue, maximumValue, upperBound, lowerBound, mode, currentValue, targetValue) ?? currentValue;
         }
     }
 
@@ -569,6 +649,20 @@ public unsafe sealed class SightDistanceService : IDisposable
     {
         if (!enabled || camera == null)
             return;
+
+        var cameraAddress = (nint)camera;
+        if (capturedCameraAddress != cameraAddress || capturedCamera == null)
+        {
+            capturedCameraAddress = cameraAddress;
+            capturedCamera = new CameraSnapshot(
+                camera->MinDistance,
+                camera->MaxDistance,
+                *(float*)((byte*)camera + 344),
+                *(float*)((byte*)camera + 348),
+                camera->MinFoV,
+                camera->MaxFoV,
+                camera->FoV);
+        }
 
         camera->MinDistance = minDistance;
         camera->MaxDistance = maxDistance;
@@ -588,19 +682,31 @@ public unsafe sealed class SightDistanceService : IDisposable
         return true;
     }
 
-    private void ResetCameraDefaults()
+    private void RestoreCapturedCamera()
     {
-        if (!TryGetActiveCamera(out var camera))
+        if (capturedCamera == null
+            || !TryGetActiveCamera(out var camera)
+            || (nint)camera != capturedCameraAddress)
+        {
+            capturedCameraAddress = nint.Zero;
+            capturedCamera = null;
             return;
+        }
 
-        camera->MinDistance = 1.5f;
-        camera->MaxDistance = 20f;
-        *(float*)((byte*)camera + 344) = -1.483530f;
-        *(float*)((byte*)camera + 348) = 0.785398f;
-        camera->MinFoV = 0.69f;
-        camera->MaxFoV = 0.78f;
-        camera->FoV = 0.78f;
+        var original = capturedCamera.Value;
+        camera->MinDistance = original.MinDistance;
+        camera->MaxDistance = original.MaxDistance;
+        *(float*)((byte*)camera + 344) = original.MinRotation;
+        *(float*)((byte*)camera + 348) = original.MaxRotation;
+        camera->MinFoV = original.MinFoV;
+        camera->MaxFoV = original.MaxFoV;
+        camera->FoV = original.FoV;
+        capturedCameraAddress = nint.Zero;
+        capturedCamera = null;
     }
+
+    private static float ClampFinite(float value, float minimum, float maximum, float fallback)
+        => float.IsFinite(value) ? Math.Clamp(value, minimum, maximum) : Math.Clamp(fallback, minimum, maximum);
 
     private static bool TryGetActiveCamera(out Camera* camera)
     {
@@ -613,6 +719,15 @@ public unsafe sealed class SightDistanceService : IDisposable
         camera = manager->Camera;
         return true;
     }
+
+    private readonly record struct CameraSnapshot(
+        float MinDistance,
+        float MaxDistance,
+        float MinRotation,
+        float MaxRotation,
+        float MinFoV,
+        float MaxFoV,
+        float FoV);
 
     private delegate void SetActiveCameraDelegate(CameraManager* manager, int cameraIndex, void* a3);
 

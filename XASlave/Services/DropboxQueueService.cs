@@ -11,6 +11,26 @@ using Lumina.Excel.Sheets;
 
 namespace XASlave.Services;
 
+internal interface IDropboxQueueClient
+{
+    bool IsDropboxAvailable();
+    bool DropboxTryGetItemQuantity(uint itemId, bool isHq, out int quantity);
+    bool DropboxSetItemQuantity(uint itemId, bool isHq, int quantity);
+    bool DropboxIsBusy();
+    bool DropboxBeginTrading();
+}
+
+internal sealed class DropboxQueueClientAdapter(IpcClient client) : IDropboxQueueClient
+{
+    public bool IsDropboxAvailable() => client.IsDropboxAvailable();
+    public bool DropboxTryGetItemQuantity(uint itemId, bool isHq, out int quantity)
+        => client.DropboxTryGetItemQuantity(itemId, isHq, out quantity);
+    public bool DropboxSetItemQuantity(uint itemId, bool isHq, int quantity)
+        => client.DropboxSetItemQuantity(itemId, isHq, quantity);
+    public bool DropboxIsBusy() => client.DropboxIsBusy();
+    public bool DropboxBeginTrading() => client.DropboxBeginTrading();
+}
+
 public sealed class DropboxQueueService
 {
     private static readonly InventoryType[] MainInventoryTypes =
@@ -43,7 +63,7 @@ public sealed class DropboxQueueService
         InventoryType.Currency,
     };
 
-    private const string UsageText = "Usage: /xa db <itemId:qty ...> | inv | clear | begin | request <itemId:qty ...> | shards | crystals | clusters | shards+crystals | crystals+clusters | shards+crystals+clusters | subloot";
+    private const string UsageText = "Usage: /xa db <itemId:qty ...> (negative qty keeps that many) | inv | clear | begin | request <itemId:qty ...> | shards | crystals | clusters | shards+crystals | crystals+clusters | shards+crystals+clusters | subloot";
 
     // /xa db subloot expands to the eight subaquatic loot items (22500-22507), each at 99999.
     private static readonly string SublootArguments =
@@ -70,10 +90,18 @@ public sealed class DropboxQueueService
     private readonly record struct ItemCount(int NormalQualityQuantity, int HighQualityQuantity);
 
     private readonly IDalamudPluginInterface pluginInterface;
-    private readonly IpcClient ipcClient;
+    private readonly IDropboxQueueClient ipcClient;
     private readonly IPluginLog log;
 
     public DropboxQueueService(IDalamudPluginInterface pluginInterface, IpcClient ipcClient, IPluginLog log)
+        : this(pluginInterface, new DropboxQueueClientAdapter(ipcClient), log)
+    {
+    }
+
+    internal DropboxQueueService(
+        IDalamudPluginInterface pluginInterface,
+        IDropboxQueueClient ipcClient,
+        IPluginLog log)
     {
         this.pluginInterface = pluginInterface;
         this.ipcClient = ipcClient;
@@ -147,6 +175,103 @@ public sealed class DropboxQueueService
         return true;
     }
 
+    public bool TryQueueSublootValue(string arguments, out string message)
+    {
+        if (!SublootValueSelector.TryParseTarget(arguments, out var targetValue))
+        {
+            message = "Usage: /xa dbsub <positive gil value> (example: /xa dbsub 5000000).";
+            return false;
+        }
+
+        if (!ipcClient.IsDropboxAvailable())
+        {
+            message = "Dropbox is not available.";
+            return false;
+        }
+
+        var itemCounts = GetItemCounts();
+        var stock = SublootValues
+            .OrderBy(entry => entry.Key)
+            .Select(entry =>
+            {
+                itemCounts.TryGetValue(entry.Key, out var count);
+                var quantity = (int)Math.Min(
+                    int.MaxValue,
+                    (long)count.NormalQualityQuantity + count.HighQualityQuantity);
+                return new SublootStockItem(entry.Key, entry.Value, quantity);
+            })
+            .ToArray();
+
+        SublootValueSelectionResult selection;
+        try
+        {
+            selection = SublootValueSelector.Select(stock, targetValue);
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Failed to calculate a minimum-overflow subloot selection.");
+            message = $"Could not calculate a subloot selection: {ex.Message}";
+            return false;
+        }
+
+        if (selection.SelectedItemCount == 0)
+        {
+            message = $"Found no local subaquatic loot for the {targetValue:N0} gil target; Dropbox trading was not started.";
+            return false;
+        }
+
+        var queuedEntries = 0;
+        var queuedTotal = 0;
+        foreach (var selected in selection.Quantities.OrderBy(entry => entry.Key))
+        {
+            var count = itemCounts[selected.Key];
+            var nqQuantity = Math.Min(selected.Value, count.NormalQualityQuantity);
+            var hqQuantity = Math.Min(selected.Value - nqQuantity, count.HighQualityQuantity);
+
+            if (nqQuantity > 0)
+            {
+                if (!TryEnqueueItem(selected.Key, false, nqQuantity, out message))
+                    return false;
+
+                queuedEntries++;
+                queuedTotal += nqQuantity;
+            }
+
+            if (hqQuantity > 0)
+            {
+                if (!TryEnqueueItem(selected.Key, true, hqQuantity, out message))
+                    return false;
+
+                queuedEntries++;
+                queuedTotal += hqQuantity;
+            }
+        }
+
+        var targetResult = selection.TargetReached
+            ? selection.Overflow == 0
+                ? "exact target"
+                : $"{selection.Overflow:N0} gil over target; minimum reachable overflow"
+            : $"{selection.Shortfall:N0} gil short; queued all available subloot";
+        if (!DropboxQueuePolicy.ShouldStartTrading(queuedEntries))
+        {
+            message = $"Selected subloot for the {targetValue:N0} gil target ({targetResult}), but queued no Dropbox entries; trading was not started.";
+            return false;
+        }
+
+        var startResult = TryStartTrading(out var partnerName);
+        var queuedText = $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling "
+                         + $"{queuedTotal} subloot item(s), valued at {selection.SelectedValue:N0} gil for the "
+                         + $"{targetValue:N0} gil target ({targetResult})";
+        message = startResult switch
+        {
+            TradeStartResult.Started => $"{queuedText}; trading with {partnerName}.",
+            TradeStartResult.AlreadyTrading => $"{queuedText}, but Dropbox was already trading; this queue may not be the one in flight.",
+            TradeStartResult.NoPartner => $"{queuedText}, but no player is targeted or focused; trading was not started.",
+            _ => $"{queuedText}, but Dropbox declined to start trading.",
+        };
+        return startResult == TradeStartResult.Started;
+    }
+
     private bool TryBuildRequest(string arguments, out string message)
     {
         if (string.IsNullOrWhiteSpace(arguments))
@@ -158,6 +283,12 @@ public sealed class DropboxQueueService
         var parsed = ParseArguments(arguments, out message);
         if (parsed == null)
             return false;
+
+        if (parsed.Any(item => item.Needed < 0))
+        {
+            message = "db: Negative keep-remaining quantities are supported only when queueing with /xa db <itemId:-keep ...>.";
+            return false;
+        }
 
         unsafe
         {
@@ -205,14 +336,19 @@ public sealed class DropboxQueueService
         var queuedEntries = 0;
         var queuedTotal = 0;
         var queuedValue = 0L;
+        var keepRequestCount = parsed.Count(item => item.Needed < 0);
 
         foreach (var item in parsed)
         {
             if (!itemCounts.TryGetValue(item.ItemId, out var count))
                 continue;
 
-            var nqQuantity = Math.Min(item.Needed, count.NormalQualityQuantity);
-            var hqQuantity = Math.Min(item.Needed - nqQuantity, count.HighQualityQuantity);
+            var quantityPlan = DropboxQueueQuantityPlanner.Create(
+                count.NormalQualityQuantity,
+                count.HighQualityQuantity,
+                item.Needed);
+            var nqQuantity = quantityPlan.NormalQualityQuantity;
+            var hqQuantity = quantityPlan.HighQualityQuantity;
 
             if (nqQuantity > 0)
             {
@@ -240,12 +376,27 @@ public sealed class DropboxQueueService
             }
         }
 
-        var startResult = TryStartTrading(out _);
-        log.Debug($"[XASlave] Dropbox trade start after queueing: {startResult}.");
-        message = queuedEntries > 0
-            ? $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s){FormatQueuedValue(queuedValue)}."
-            : "Queued no matching local items.";
-        return true;
+        var keepSummary = keepRequestCount > 0
+            ? $" after reserving the requested remainder for {keepRequestCount} item ID{(keepRequestCount == 1 ? string.Empty : "s")}"
+            : string.Empty;
+        if (!DropboxQueuePolicy.ShouldStartTrading(queuedEntries))
+        {
+            message = keepRequestCount > 0
+                ? "Queued no items; local quantities do not exceed the requested keep-remaining amounts, so trading was not started."
+                : "Queued no matching local items; trading was not started.";
+            return false;
+        }
+
+        var startResult = TryStartTrading(out var partnerName);
+        var queuedText = $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s){FormatQueuedValue(queuedValue)}{keepSummary}";
+        message = startResult switch
+        {
+            TradeStartResult.Started => $"{queuedText}; trading with {partnerName}.",
+            TradeStartResult.AlreadyTrading => $"{queuedText}, but Dropbox was already trading; this queue may not be the one in flight.",
+            TradeStartResult.NoPartner => $"{queuedText}, but no player is targeted or focused; trading was not started.",
+            _ => $"{queuedText}, but Dropbox declined to start trading.",
+        };
+        return startResult == TradeStartResult.Started;
     }
 
     private bool TryQueueMainInventory(out string message)
@@ -260,7 +411,7 @@ public sealed class DropboxQueueService
         if (itemCounts.Count == 0)
         {
             message = "Found no eligible tradable items in Inventory1-4; Dropbox trading was not started.";
-            return true;
+            return false;
         }
 
         var queuedEntries = 0;
@@ -291,10 +442,22 @@ public sealed class DropboxQueueService
                 queuedValue += unitValue * (entry.Value.NormalQualityQuantity + entry.Value.HighQualityQuantity);
         }
 
-        var startResult = TryStartTrading(out _);
-        log.Debug($"[XASlave] Dropbox trade start after queueing Inventory1-4: {startResult}.");
-        message = $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s) from Inventory1-4{FormatQueuedValue(queuedValue)}.";
-        return true;
+        if (!DropboxQueuePolicy.ShouldStartTrading(queuedEntries))
+        {
+            message = "Queued no eligible Inventory1-4 entries; Dropbox trading was not started.";
+            return false;
+        }
+
+        var startResult = TryStartTrading(out var partnerName);
+        var queuedText = $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s) from Inventory1-4{FormatQueuedValue(queuedValue)}";
+        message = startResult switch
+        {
+            TradeStartResult.Started => $"{queuedText}; trading with {partnerName}.",
+            TradeStartResult.AlreadyTrading => $"{queuedText}, but Dropbox was already trading; this queue may not be the one in flight.",
+            TradeStartResult.NoPartner => $"{queuedText}, but no player is targeted or focused; trading was not started.",
+            _ => $"{queuedText}, but Dropbox declined to start trading.",
+        };
+        return startResult == TradeStartResult.Started;
     }
 
     public bool TryEnqueueXagmanItem(uint itemId, bool isHq, int quantity, out string message)
@@ -304,15 +467,18 @@ public sealed class DropboxQueueService
 
     private bool TryEnqueueItem(uint itemId, bool isHq, int quantity, out string message)
     {
-        if (!ipcClient.DropboxTryGetItemQuantity(itemId, isHq, out var existingQuantity))
+        if (quantity <= 0)
+        {
+            message = $"Refusing to queue item {itemId} with a non-positive quantity ({quantity}).";
+            return false;
+        }
+
+        if (!ipcClient.DropboxTryGetItemQuantity(itemId, isHq, out var existingQuantity)
+            || !DropboxQueuePolicy.TryCalculateTargetQuantity(existingQuantity, quantity, out var targetQuantity))
         {
             message = $"Failed to read the current Dropbox quantity for item {itemId}{(isHq ? " HQ" : string.Empty)}.";
             return false;
         }
-
-        var targetQuantity = existingQuantity >= int.MaxValue - quantity
-            ? int.MaxValue
-            : existingQuantity + quantity;
 
         if (!ipcClient.DropboxSetItemQuantity(itemId, isHq, targetQuantity))
         {
@@ -352,7 +518,8 @@ public sealed class DropboxQueueService
             return TradeStartResult.NoPartner;
 
         partnerName = focus.Name.ToString();
-        ipcClient.DropboxBeginTrading();
+        if (!ipcClient.DropboxBeginTrading())
+            return TradeStartResult.NotStarted;
         return ipcClient.DropboxIsBusy() ? TradeStartResult.Started : TradeStartResult.NotStarted;
     }
 
@@ -372,7 +539,7 @@ public sealed class DropboxQueueService
             TradeStartResult.NoPartner => "Target or focus target your trade partner first.",
             _ => "Dropbox did not start trading (is the item queue empty?).",
         };
-        return result == TradeStartResult.Started || result == TradeStartResult.AlreadyTrading;
+        return result == TradeStartResult.Started;
     }
 
     private static string FormatQueuedValue(long queuedValue)
@@ -451,14 +618,13 @@ public sealed class DropboxQueueService
 
         foreach (var inventoryType in DefaultInventoryTypes)
         {
-            var container = inventoryManager->GetInventoryContainer(inventoryType);
-            if (container == null)
+            if (!NativeArrayAccess.TryGetInventoryContainer(inventoryManager, inventoryType, out var container))
                 continue;
 
             for (var slotIndex = 0; slotIndex < container->Size; slotIndex++)
             {
-                var slot = container->GetInventorySlot(slotIndex);
-                if (slot == null || slot->ItemId == 0 || slot->SpiritbondOrCollectability > 0)
+                if (!NativeArrayAccess.TryGetInventorySlot(container, slotIndex, out var slot)
+                    || slot->ItemId == 0 || slot->SpiritbondOrCollectability > 0)
                     continue;
 
                 itemCounts.TryGetValue(slot->ItemId, out var count);
@@ -487,14 +653,13 @@ public sealed class DropboxQueueService
         var itemSheet = Plugin.DataManager.GetExcelSheet<Item>();
         foreach (var inventoryType in MainInventoryTypes)
         {
-            var container = inventoryManager->GetInventoryContainer(inventoryType);
-            if (container == null)
+            if (!NativeArrayAccess.TryGetInventoryContainer(inventoryManager, inventoryType, out var container))
                 continue;
 
             for (var slotIndex = 0; slotIndex < container->Size; slotIndex++)
             {
-                var slot = container->GetInventorySlot(slotIndex);
-                if (slot == null || slot->ItemId == 0 || slot->SpiritbondOrCollectability > 0)
+                if (!NativeArrayAccess.TryGetInventorySlot(container, slotIndex, out var slot)
+                    || slot->ItemId == 0 || slot->SpiritbondOrCollectability > 0)
                     continue;
 
                 if (!itemSheet.TryGetRow(slot->ItemId, out var itemRow) || itemRow.IsUntradable)
@@ -520,13 +685,38 @@ public sealed class DropboxQueueService
         {
             var pluginInstance = TryGetDropboxPluginInstance();
             if (pluginInstance == null)
+            {
+                log.Warning("[XASlave] Dropbox queue reflection failed: no loaded Dropbox plugin instance was available.");
                 return false;
+            }
 
             var queueUiType = pluginInstance.GetType().Assembly.GetType("Dropbox.ItemQueueUI");
-            itemQuantities = queueUiType?
-                .GetField("ItemQuantities", BindingFlags.Public | BindingFlags.Static)?
-                .GetValue(null) as IDictionary ?? null!;
-            return itemQuantities != null;
+            if (queueUiType == null)
+            {
+                log.Warning(
+                    "[XASlave] Dropbox queue reflection failed: type 'Dropbox.ItemQueueUI' was not found in {Assembly}.",
+                    pluginInstance.GetType().Assembly.FullName ?? "unknown assembly");
+                return false;
+            }
+
+            var itemQuantitiesField = queueUiType.GetField("ItemQuantities", BindingFlags.Public | BindingFlags.Static);
+            if (itemQuantitiesField == null)
+            {
+                log.Warning("[XASlave] Dropbox queue reflection failed: public static field 'Dropbox.ItemQueueUI.ItemQuantities' was not found.");
+                return false;
+            }
+
+            var reflectedValue = itemQuantitiesField.GetValue(null);
+            if (reflectedValue is not IDictionary quantities)
+            {
+                log.Warning(
+                    "[XASlave] Dropbox queue reflection failed: 'Dropbox.ItemQueueUI.ItemQuantities' returned {ActualType}, expected IDictionary.",
+                    reflectedValue?.GetType().FullName ?? "null");
+                return false;
+            }
+
+            itemQuantities = quantities;
+            return true;
         }
         catch (Exception ex)
         {

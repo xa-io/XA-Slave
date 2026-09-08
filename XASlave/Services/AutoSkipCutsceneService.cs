@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Runtime.InteropServices;
+using System.Text;
 using Dalamud;
 using Dalamud.Game.Agent;
 using Dalamud.Game.Agent.AgentArgTypes;
@@ -15,7 +16,7 @@ using FFXIVClientStructs.FFXIV.Client.Game.UI;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 using FFXIVClientStructs.FFXIV.Common.Lua;
 using Lumina.Excel.Sheets;
-using ClientAgentInterface = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentInterface;
+using ClientAgentPointMenu = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentPointMenu;
 using DalamudAgentId = Dalamud.Game.Agent.AgentId;
 using TerritoryIntendedUse = FFXIVClientStructs.FFXIV.Client.Enums.TerritoryIntendedUse;
 
@@ -26,6 +27,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private const ushort GoldSaucerTerritoryId = 144;
     private const ushort MahjongTerritoryId = 831;
     private const int PointMenuResultEvent = 12;
+    private const bool PointMenuApiAvailable = true;
     private const string MsqContentDirectorLabel = "MSQ/Gold Saucer/Ocean/PvP content director";
     private const string MassivePcContentDirectorLabel = "Massive PC content director";
     private const string CustomTalkContentDirectorLabel = "Custom Talk content director";
@@ -36,12 +38,12 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private static readonly ushort[] CastrumTerritoryIds = [1043];
     private static readonly ushort[] PortaDecumanaTerritoryIds = [1046];
 
-    private const string MsqContentDirectorSig = "48 89 5C 24 ?? 57 48 83 EC 50 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? BA ?? ?? ?? ?? B3 01 E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? 48 8B F8 E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 84 99 ?? ?? ?? ??";
-    private const string MassivePcContentDirectorSig = "48 89 5C 24 ?? 57 48 83 EC 50 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? BA ?? ?? ?? ?? B3 01 E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? 48 8B F8 E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 48 8B 11";
-    private const string GoldSaucerContentDirectorSig = "48 89 5C 24 ?? 57 48 83 EC 50 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? BA ?? ?? ?? ?? B3 01 E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? 48 8B F8 E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 84 99 ?? ?? ?? ??";
-    private const string CustomTalkContentDirectorSig = "48 83 EC 58 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 48 85 C9 74 06";
-    private const string NormalCutscenesSig = "40 53 55 57 41 56 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 8B 59 08";
-    private const string InnContentDirectorSig = "48 83 EC 58 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ??";
+    // const strings leak through metadata; runtime initializers allow Obfuscar string hiding.
+    private static readonly string MsqContentDirectorSig = "48 89 5C 24 ?? 57 48 83 EC 50 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? BA ?? ?? ?? ?? B3 01 E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? 48 8B F8 E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 84 99 ?? ?? ?? ??";
+    private static readonly string MassivePcContentDirectorSig = "48 89 5C 24 ?? 57 48 83 EC 50 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? BA ?? ?? ?? ?? B3 01 E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? 48 8B F8 E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 48 8B 11";
+    private static readonly string CustomTalkContentDirectorSig = "48 83 EC 58 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 48 85 C9 74 06";
+    private static readonly string NormalCutscenesSig = "40 53 55 57 41 56 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 8B 59 08";
+    private static readonly string InnContentDirectorSig = "48 83 EC 58 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ??";
 
     private readonly ICondition condition;
     private readonly IFramework framework;
@@ -60,8 +62,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private Hook<IsCutsceneSeenDelegate>? isCutsceneSeenHook;
     private Hook<LuaFunctionDelegate>? playStaffRollHook;
     private Hook<LuaFunctionDelegate>? playToBeContinuedHook;
-    private PushAgentResultToLuaDelegate? pushAgentResultToLua;
-
     private Hook<ContentDirectorDelegate>? msqContentDirectorHook;
     private Hook<ContentDirectorDelegate>? massivePcContentDirectorHook;
     private Hook<ContentDirectorDelegate>? goldSaucerContentDirectorHook;
@@ -83,9 +83,11 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private int availableSurfaceCount;
     private int availableOptionalSurfaceCount;
     private DateTime lastPromptAttemptUtc = DateTime.MinValue;
+    private DateTime lastPromptResolverWarningUtc = DateTime.MinValue;
     private DateTime lastFashionReportAttemptUtc = DateTime.MinValue;
     private readonly HashSet<string> unavailableOptionalHooks = new(StringComparer.OrdinalIgnoreCase);
     private System.Threading.Tasks.Task<StartupHookResult>? startupHookTask;
+    private System.Threading.CancellationTokenSource? startupHookCancellation;
 
     private bool useZoneWhitelist;
     private HashSet<uint> whitelistTerritories = new();
@@ -204,7 +206,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         startupArmingPending = true;
         availableSurfaceCount = 0;
         availableOptionalSurfaceCount = 0;
-        StatusText = "Arming - cutscene hook surfaces are initializing outside the framework tick.";
+        StatusText = "Arming - cutscene hook surfaces are initializing on the framework thread.";
         StartStartupHookCreation();
         return true;
     }
@@ -233,9 +235,9 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         UpdateClientStateSubscriptions(true);
         enabled = true;
         startupArmingPending = false;
-        EnsureInitializedForEnabledState();
+        EnsureInitializedForEnabledState(retryMissing: initialized);
         RefreshStatusText();
-        return true;
+        return enabled;
     }
 
     public void Dispose()
@@ -300,10 +302,13 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         RestoreCutsceneUnskippablePatch();
     }
 
-    private void EnsureInitialized()
+    private void EnsureInitialized(bool retryMissing = false)
     {
-        if (initialized)
+        if (initialized && !retryMissing)
             return;
+
+        if (retryMissing)
+            unavailableOptionalHooks.Clear();
 
         cutsceneHandleInputHook ??= TryCreateHook<CutsceneHandleInputDelegate>(Sigs.CutsceneHandleInputSig, CutsceneHandleInputDetour, "CutsceneHandleInput");
         playCutsceneHook ??= TryCreateHook<PlayCutsceneDelegate>(Sigs.PlayCutsceneSig, PlayCutsceneDetour, "PlayCutscene");
@@ -311,10 +316,12 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         isCutsceneSeenHook ??= TryCreateHook<IsCutsceneSeenDelegate>(Sigs.IsCutsceneSeenSig, IsCutsceneSeenDetour, "IsCutsceneSeen");
         playStaffRollHook ??= TryCreateLuaFunctionHook<LuaFunctionDelegate>(Sigs.LuaBaseSig02, "PlayStaffRoll", PlayStaffRollDetour, "PlayStaffRoll");
         playToBeContinuedHook ??= TryCreateLuaFunctionHook<LuaFunctionDelegate>(Sigs.LuaBaseSig02, "PlayToBeContinued", PlayToBeContinuedDetour, "PlayToBeContinued");
-        pushAgentResultToLua ??= TryCreateDelegate<PushAgentResultToLuaDelegate>(Sigs.PushAgentResultToLuaSig, "PushAgentResultToLua");
-
-        if (cutsceneUnskippablePatchAddress == nint.Zero && !sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress))
-            log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature.");
+        if (cutsceneUnskippablePatchAddress == nint.Zero
+            && (!sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out cutsceneUnskippablePatchAddress)
+                || cutsceneUnskippablePatchAddress == nint.Zero))
+        {
+            log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature; retry by disabling and re-enabling the feature.");
+        }
 
         initialized = true;
     }
@@ -322,8 +329,8 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private StartupHookResult CreateStartupHookResult()
     {
         var patchAddress = nint.Zero;
-        if (!sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out patchAddress))
-            log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature.");
+        if (!sigScanner.TryScanText(Sigs.CutsceneUnskippablePatchSig, out patchAddress) || patchAddress == nint.Zero)
+            log.Warning("[XASlave] Auto Skip Cutscenes could not find the unskippable cutscene patch signature; retry by disabling and re-enabling the feature.");
 
         var armMsqContentDirector = ShouldArmMsqHook() || ShouldArmGoldSaucerHook();
         var armMassivePcContentDirector = skipMassivePc;
@@ -338,7 +345,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             TryCreateHook<IsCutsceneSeenDelegate>(Sigs.IsCutsceneSeenSig, IsCutsceneSeenDetour, "IsCutsceneSeen"),
             TryCreateLuaFunctionHook<LuaFunctionDelegate>(Sigs.LuaBaseSig02, "PlayStaffRoll", PlayStaffRollDetour, "PlayStaffRoll"),
             TryCreateLuaFunctionHook<LuaFunctionDelegate>(Sigs.LuaBaseSig02, "PlayToBeContinued", PlayToBeContinuedDetour, "PlayToBeContinued"),
-            TryCreateDelegate<PushAgentResultToLuaDelegate>(Sigs.PushAgentResultToLuaSig, "PushAgentResultToLua"),
             patchAddress,
             armMsqContentDirector,
             armMsqContentDirector ? TryCreateContentDirectorHook(MsqContentDirectorSig, MsqContentDirectorDetour, MsqContentDirectorLabel) : null,
@@ -352,11 +358,14 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             armInnContentDirector ? TryCreateContentDirectorHook(InnContentDirectorSig, InnContentDirectorDetour, InnContentDirectorLabel) : null);
     }
 
-    private void EnsureInitializedForEnabledState()
+    private void EnsureInitializedForEnabledState(bool retryMissing = false)
     {
-        EnsureInitialized();
+        EnsureInitialized(retryMissing);
         if (!HasAnyCutsceneSurface())
         {
+            enabled = false;
+            UnsubscribeFramework();
+            UpdateClientStateSubscriptions(false);
             StatusText = "Unavailable - cutscene signatures were not found.";
             log.Warning("[XASlave] Auto Skip Cutscenes unavailable: no cutscene hook or patch signatures were found.");
             return;
@@ -377,6 +386,9 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
         if (availableSurfaceCount + availableOptionalSurfaceCount == 0)
         {
+            enabled = false;
+            UnsubscribeFramework();
+            UpdateClientStateSubscriptions(false);
             StatusText = "Unavailable - cutscene hooks failed to enable.";
             log.Warning("[XASlave] Auto Skip Cutscenes could not enable any hook or patch surfaces.");
             return;
@@ -395,7 +407,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
         if (startupArmingPending)
         {
-            StatusText = "Arming - cutscene hook surfaces are initializing outside the framework tick.";
+            StatusText = "Arming - cutscene hook surfaces are initializing on the framework thread.";
             return;
         }
 
@@ -412,15 +424,26 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             return;
         }
 
+        var availabilityLabel = HasMissingConfiguredSurface() ? "Partially enabled" : "Enabled";
         var inactiveReason = GetInactiveReason();
         if (!string.IsNullOrWhiteSpace(inactiveReason))
         {
-            StatusText = $"Enabled but inactive here ({CurrentTerritoryId} {CurrentTerritoryName}, {CurrentCategoryLabel}) - {inactiveReason}. {surfaceCount} cutscene surfaces available.";
+            StatusText = $"{availabilityLabel} but inactive here ({CurrentTerritoryId} {CurrentTerritoryName}, {CurrentCategoryLabel}) - {inactiveReason}. {surfaceCount} cutscene surfaces available.";
             return;
         }
 
-        StatusText = $"Enabled ({surfaceCount} cutscene surfaces available; current: {CurrentTerritoryId} {CurrentTerritoryName}, {CurrentCategoryLabel}).";
+        StatusText = $"{availabilityLabel} ({surfaceCount} cutscene surfaces available; current: {CurrentTerritoryId} {CurrentTerritoryName}, {CurrentCategoryLabel}).";
     }
+
+    private bool HasMissingConfiguredSurface()
+        => cutsceneHandleInputHook == null
+            || playCutsceneHook == null
+            || playCutsceneLuaHook == null
+            || isCutsceneSeenHook == null
+            || playStaffRollHook == null
+            || playToBeContinuedHook == null
+            || cutsceneUnskippablePatchAddress == nint.Zero
+            || unavailableOptionalHooks.Count > 0;
 
     private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
         where T : Delegate
@@ -428,7 +451,10 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
+            {
+                log.Warning($"[XASlave] Auto Skip Cutscenes could not resolve {label}; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             return interopProvider.HookFromAddress(address, detour);
         }
@@ -445,11 +471,17 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(luaBaseSignature, out var baseAddress) || baseAddress == nint.Zero)
+            {
+                log.Warning($"[XASlave] Auto Skip Cutscenes could not resolve the {label} Lua base; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             var functionAddress = GetLuaFunctionByName(baseAddress, functionName);
             if (functionAddress == nint.Zero)
+            {
+                log.Warning($"[XASlave] Auto Skip Cutscenes could not validate {label}'s computed Lua function address; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             return interopProvider.HookFromAddress(functionAddress, detour);
         }
@@ -460,16 +492,21 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         }
     }
 
-    private static nint GetLuaFunctionByName(nint luaSetupFunctionStartAddress, string functionName, int scanSize = 8192)
+    private nint GetLuaFunctionByName(nint luaSetupFunctionStartAddress, string functionName, int scanSize = 8192)
     {
-        if (luaSetupFunctionStartAddress == nint.Zero || string.IsNullOrEmpty(functionName))
+        if (luaSetupFunctionStartAddress == nint.Zero || string.IsNullOrEmpty(functionName) || scanSize <= 0)
             return nint.Zero;
 
-        var functionBytes = new byte[scanSize];
+        var textBase = sigScanner.Module.BaseAddress + (sigScanner.TextSectionBase - sigScanner.SearchBase);
+        if (!NativeAddressPolicy.TryGetBoundedLength(luaSetupFunctionStartAddress, textBase, sigScanner.TextSectionSize, scanSize, out var boundedScanSize)
+            || boundedScanSize < 7)
+            return nint.Zero;
+
+        var functionBytes = new byte[boundedScanSize];
 
         try
         {
-            Marshal.Copy(luaSetupFunctionStartAddress, functionBytes, 0, scanSize);
+            Marshal.Copy(luaSetupFunctionStartAddress, functionBytes, 0, boundedScanSize);
         }
         catch
         {
@@ -490,8 +527,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             var displacement = BitConverter.ToInt32(functionBytes, i + 3);
             var nextInstructionAddress = (long)luaSetupFunctionStartAddress + i + 7;
             var stringAddress = nextInstructionAddress + displacement;
-            var referencedString = Marshal.PtrToStringAnsi((nint)stringAddress);
-            if (!string.Equals(referencedString, functionName, StringComparison.Ordinal))
+            if (!IsExactAsciiStringAt((nint)stringAddress, functionName))
                 continue;
 
             stringLeaIndex = i;
@@ -512,27 +548,32 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
             var displacement = BitConverter.ToInt32(functionBytes, i + 3);
             var nextInstructionAddress = (long)luaSetupFunctionStartAddress + i + 7;
-            return (nint)(nextInstructionAddress + displacement);
+            var functionAddress = (nint)(nextInstructionAddress + displacement);
+            return NativeAddressPolicy.IsRangeValid(functionAddress, textBase, sigScanner.TextSectionSize, 1)
+                ? functionAddress
+                : nint.Zero;
         }
 
         return nint.Zero;
     }
 
-    private T? TryCreateDelegate<T>(ProtectedSig signature, string label)
-        where T : Delegate
+    private bool IsExactAsciiStringAt(nint address, string expected)
     {
+        var expectedBytes = Encoding.ASCII.GetBytes(expected);
+        if (!NativeAddressPolicy.IsRangeValid(address, sigScanner.Module.BaseAddress, sigScanner.Module.ModuleMemorySize, expectedBytes.Length + 1))
+            return false;
+
+        var actual = new byte[expectedBytes.Length + 1];
         try
         {
-            if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
-                return null;
-
-            return Marshal.GetDelegateForFunctionPointer<T>(address);
+            Marshal.Copy(address, actual, 0, actual.Length);
         }
-        catch (Exception ex)
+        catch
         {
-            log.Warning(ex, $"[XASlave] Auto Skip Cutscenes failed to create {label} delegate.");
-            return null;
+            return false;
         }
+
+        return actual[^1] == 0 && actual.AsSpan(0, expectedBytes.Length).SequenceEqual(expectedBytes);
     }
 
     private Hook<ContentDirectorDelegate>? TryCreateContentDirectorHook(string signature, ContentDirectorDelegate detour, string label)
@@ -569,15 +610,12 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             || isCutsceneSeenHook != null
             || playStaffRollHook != null
             || playToBeContinuedHook != null
-            || pushAgentResultToLua != null
+            || PointMenuApiAvailable
             || cutsceneUnskippablePatchAddress != nint.Zero;
     }
 
     private int UpdatePointMenuAgentSubscription(bool targetEnabled)
     {
-        if (targetEnabled && pushAgentResultToLua == null)
-            return 0;
-
         if (pointMenuAgentSubscribed == targetEnabled)
             return targetEnabled ? 1 : 0;
 
@@ -789,7 +827,10 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             return;
 
         if (!SafeMemory.WriteBytes((IntPtr)cutsceneUnskippablePatchAddress, cutsceneUnskippableOriginalBytes))
+        {
             log.Warning("[XASlave] Auto Skip Cutscenes failed to restore the unskippable cutscene branch byte.");
+            return;
+        }
 
         cutsceneUnskippablePatchApplied = false;
     }
@@ -797,18 +838,34 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private void StartStartupHookCreation()
     {
         lock (startupArmingLock)
-            startupHookTask ??= System.Threading.Tasks.Task.Run(CreateStartupHookResult);
+        {
+            if (startupHookTask != null)
+                return;
+
+            startupHookCancellation?.Dispose();
+            startupHookCancellation = new System.Threading.CancellationTokenSource();
+            startupHookTask = Plugin.RunOnGameThread(
+                CreateStartupHookResult,
+                "Auto Skip Cutscenes startup hook creation",
+                startupHookCancellation.Token);
+        }
     }
 
     private void CancelStartupArming(bool disposeCompletedResult)
     {
         System.Threading.Tasks.Task<StartupHookResult>? task;
+        System.Threading.CancellationTokenSource? cancellation;
         lock (startupArmingLock)
         {
             startupArmingPending = false;
             task = startupHookTask;
             startupHookTask = null;
+            cancellation = startupHookCancellation;
+            startupHookCancellation = null;
         }
+
+        cancellation?.Cancel();
+        cancellation?.Dispose();
 
         if (!disposeCompletedResult || task == null)
             return;
@@ -821,7 +878,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         if (task.IsCompleted)
         {
             if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
-                task.Result.DisposeHooks();
+                _ = Plugin.RunOnGameThread(task.Result.DisposeHooks, "Dispose cancelled Auto Skip Cutscenes startup hooks");
             return;
         }
 
@@ -829,7 +886,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             completedTask =>
             {
                 if (completedTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
-                    completedTask.Result.DisposeHooks();
+                    _ = Plugin.RunOnGameThread(completedTask.Result.DisposeHooks, "Dispose cancelled Auto Skip Cutscenes startup hooks");
             },
             System.Threading.Tasks.TaskScheduler.Default);
     }
@@ -860,11 +917,15 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             log.Warning(ex, "[XASlave] Auto Skip Cutscenes startup hook initialization failed.");
         }
 
+        System.Threading.CancellationTokenSource? completedCancellation;
         lock (startupArmingLock)
         {
             startupHookTask = null;
             startupArmingPending = false;
+            completedCancellation = startupHookCancellation;
+            startupHookCancellation = null;
         }
+        completedCancellation?.Dispose();
 
         initialized = true;
 
@@ -910,7 +971,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         isCutsceneSeenHook = result.IsCutsceneSeenHook;
         playStaffRollHook = result.PlayStaffRollHook;
         playToBeContinuedHook = result.PlayToBeContinuedHook;
-        pushAgentResultToLua = result.PushAgentResultToLua;
         cutsceneUnskippablePatchAddress = result.CutsceneUnskippablePatchAddress;
 
         if (result.MsqContentDirectorAttempted)
@@ -998,7 +1058,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
         lastPromptAttemptUtc = now;
         if (AddonHelper.IsAddonReady("SelectString"))
-            AddonHelper.FireCallbackAndClose("SelectString", 0);
+            TrySelectValidatedCutsceneSkipPrompt(now);
     }
 
     private void OnLogin()
@@ -1045,7 +1105,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     {
         try
         {
-            if (!IsEffectivelyEnabled(CutsceneSkipCategory.Generic) || pushAgentResultToLua == null)
+            if (!IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
                 return;
 
             if (args is not AgentReceiveEventArgs receiveEventArgs
@@ -1058,22 +1118,35 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             if (atkValues[0].Int != PointMenuResultEvent)
                 return;
 
-            var agent = (PointMenuAgent*)receiveEventArgs.Agent.Address;
-            if (agent->Context == null)
+            var agent = (ClientAgentPointMenu*)receiveEventArgs.Agent.Address;
+            if (agent != ClientAgentPointMenu.Instance()
+                || agent->Context == null
+                || !agent->Context->IsLoaded)
                 return;
 
-            var index = agent->FindFirstUncompletedEntry();
-            if (index < 0)
+            var entryCount = agent->Context->Entries.Count;
+            var completionKey = agent->Context->PointMenuId;
+            var completedBitfield = 0;
+            if (agent->CompletionData != null)
+                agent->CompletionData->TryGetValue(in completionKey, out completedBitfield, false);
+
+            var index = PointMenuSelectionPolicy.FindFirstUncompleted(entryCount, completedBitfield);
+            if (index < 0 || index >= entryCount)
             {
-                HidePointMenu(agent);
+                agent->Hide();
+                return;
+            }
+
+            ref var entry = ref agent->Context->Entries[index];
+            if (entry.PointMenuStringId == 0 && entry.Text.Length == 0)
+            {
+                log.Warning("[XASlave] Auto Skip Cutscenes refused a PointMenu entry with neither a string id nor text.");
                 return;
             }
 
             agent->SelectedIndex = index;
-            agent->PendingResultFlags |= PointMenuPendingResultFlags.HasPendingResult;
-            pushAgentResultToLua(agent);
-            HidePointMenu(agent);
-            agent->PendingResultFlags &= ~PointMenuPendingResultFlags.HasPendingResult;
+            agent->SendEntryToAddon((uint)index);
+            agent->Hide();
         }
         catch (Exception ex)
         {
@@ -1400,10 +1473,10 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             return;
         }
 
-        if (AddonHelper.IsAddonReady("SelectString") && SelectStringLooksLikeFashionReport())
+        if (AddonHelper.IsAddonReady("SelectString") && TryResolveFashionReportSelectString(out var callbackIndex))
         {
             lastFashionReportAttemptUtc = now;
-            AddonHelper.FireCallbackAndClose("SelectString", 1);
+            AddonHelper.SelectAddonListText("SelectString", callbackIndex);
         }
     }
 
@@ -1415,11 +1488,37 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             || text.Contains("present yourself", StringComparison.OrdinalIgnoreCase));
     }
 
-    private static bool SelectStringLooksLikeFashionReport()
+    private void TrySelectValidatedCutsceneSkipPrompt(DateTime now)
     {
-        return AddonHelper.GetAddonTextEntries("SelectString").Any(text =>
+        var optionText = AddonHelper.GetAddonTextEntries("SelectString")
+            .FirstOrDefault(text =>
+                text.Contains("skip", StringComparison.OrdinalIgnoreCase)
+                && text.Contains("cutscene", StringComparison.OrdinalIgnoreCase));
+        var callbackIndex = string.IsNullOrWhiteSpace(optionText)
+            ? -1
+            : AddonHelper.GetAddonListTextCallbackIndex("SelectString", optionText);
+        if (callbackIndex >= 0)
+        {
+            AddonHelper.SelectAddonListText("SelectString", callbackIndex);
+            return;
+        }
+
+        if ((now - lastPromptResolverWarningUtc).TotalSeconds < 10)
+            return;
+
+        lastPromptResolverWarningUtc = now;
+        log.Warning("[XASlave] Auto Skip Cutscenes left SelectString untouched because no validated cutscene-skip option was resolved.");
+    }
+
+    private static bool TryResolveFashionReportSelectString(out int callbackIndex)
+    {
+        var optionText = AddonHelper.GetAddonTextEntries("SelectString").FirstOrDefault(text =>
             text.Contains("Present yourself", StringComparison.OrdinalIgnoreCase)
             || text.Contains("judg", StringComparison.OrdinalIgnoreCase));
+        callbackIndex = string.IsNullOrWhiteSpace(optionText)
+            ? -1
+            : AddonHelper.GetAddonListTextCallbackIndex("SelectString", optionText);
+        return callbackIndex >= 0;
     }
 
     private static bool IsMsqTerritory(ushort territoryId)
@@ -1500,103 +1599,187 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             log.Warning(ex, "[XASlave] Auto Skip Cutscenes input detour failed before original call.");
         }
 
-        return cutsceneHandleInputHook?.Original(a1, a2) ?? 0;
+        return cutsceneHandleInputHook?.OriginalDisposeSafe(a1, a2) ?? 0;
     }
 
     private nint PlayCutsceneDetour(EventFramework* eventFramework, lua_State* state)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
-            return 1;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes PlayCutscene detour failed; calling the original.");
+        }
 
-        return playCutsceneHook?.Original(eventFramework, state) ?? 0;
+        return playCutsceneHook?.OriginalDisposeSafe(eventFramework, state) ?? 0;
     }
 
     private ulong PlayCutsceneLuaDetour(lua_State* state)
     {
-        if (!IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
-            return playCutsceneLuaHook?.Original(state) ?? 0;
-
-        if (state != null)
+        try
         {
+            if (!IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
+                return playCutsceneLuaHook?.OriginalDisposeSafe(state) ?? 0;
+
+            if (state == null
+                || state->top == null
+                || state->stack_last == null
+                || state->top >= state->stack_last)
+            {
+                return playCutsceneLuaHook?.OriginalDisposeSafe(state) ?? 0;
+            }
+
             state->top->tt = 2;
             state->top->value.n = 1;
             state->top += 1;
+
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes PlayCutsceneLua detour failed; calling the original.");
         }
 
-        return 1;
+        return playCutsceneLuaHook?.OriginalDisposeSafe(state) ?? 0;
     }
 
     private ulong PlayStaffRollDetour(lua_State* state)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
-            return 1;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes staff-roll detour failed; calling the original.");
+        }
 
-        return playStaffRollHook?.Original(state) ?? 0;
+        return playStaffRollHook?.OriginalDisposeSafe(state) ?? 0;
     }
 
     private ulong PlayToBeContinuedDetour(lua_State* state)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
-            return 1;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes ToBeContinued detour failed; calling the original.");
+        }
 
-        return playToBeContinuedHook?.Original(state) ?? 0;
+        return playToBeContinuedHook?.OriginalDisposeSafe(state) ?? 0;
     }
 
     private bool IsCutsceneSeenDetour(UIState* state, uint cutsceneId)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
-            return true;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
+                return true;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes seen-state detour failed; calling the original.");
+        }
 
-        return isCutsceneSeenHook?.Original(state, cutsceneId) ?? true;
+        return isCutsceneSeenHook?.OriginalDisposeSafe(state, cutsceneId) ?? true;
     }
 
     private long MsqContentDirectorDetour(nint luaState)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.Msq)
-            || IsEffectivelyEnabled(CutsceneSkipCategory.GoldSaucer))
-            return 1;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.Msq)
+                || IsEffectivelyEnabled(CutsceneSkipCategory.GoldSaucer))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes MSQ content-director detour failed; calling the original.");
+        }
 
-        return msqContentDirectorHook?.Original(luaState) ?? 0;
+        return msqContentDirectorHook?.OriginalDisposeSafe(luaState) ?? 0;
     }
 
     private long MassivePcContentDirectorDetour(nint luaState)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.MassivePc))
-            return 1;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.MassivePc))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes massive-PC content-director detour failed; calling the original.");
+        }
 
-        return massivePcContentDirectorHook?.Original(luaState) ?? 0;
+        return massivePcContentDirectorHook?.OriginalDisposeSafe(luaState) ?? 0;
     }
 
     private long GoldSaucerContentDirectorDetour(nint luaState)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.GoldSaucer))
-            return 1;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.GoldSaucer))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes Gold Saucer content-director detour failed; calling the original.");
+        }
 
-        return goldSaucerContentDirectorHook?.Original(luaState) ?? 0;
+        return goldSaucerContentDirectorHook?.OriginalDisposeSafe(luaState) ?? 0;
     }
 
     private long CustomTalkContentDirectorDetour(nint luaState)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.CustomTalk))
-            return 1;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.CustomTalk))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes custom-talk content-director detour failed; calling the original.");
+        }
 
-        return customTalkContentDirectorHook?.Original(luaState) ?? 0;
+        return customTalkContentDirectorHook?.OriginalDisposeSafe(luaState) ?? 0;
     }
 
     private long NormalCutscenesDetour(nint luaState1, nint luaState2)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.NormalCutscenes))
-            return 1;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.NormalCutscenes))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes normal-cutscene detour failed; calling the original.");
+        }
 
-        return normalCutscenesHook?.Original(luaState1, luaState2) ?? 0;
+        return normalCutscenesHook?.OriginalDisposeSafe(luaState1, luaState2) ?? 0;
     }
 
     private long InnContentDirectorDetour(nint luaState)
     {
-        if (IsEffectivelyEnabled(CutsceneSkipCategory.Inn))
-            return 1;
+        try
+        {
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.Inn))
+                return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Cutscenes inn content-director detour failed; calling the original.");
+        }
 
-        return innContentDirectorHook?.Original(luaState) ?? 0;
+        return innContentDirectorHook?.OriginalDisposeSafe(luaState) ?? 0;
     }
 
     private delegate byte CutsceneHandleInputDelegate(nint a1, float a2);
@@ -1607,17 +1790,9 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
     private delegate bool IsCutsceneSeenDelegate(UIState* state, uint cutsceneId);
 
-    private delegate void PushAgentResultToLuaDelegate(void* agent);
-
     private delegate long ContentDirectorDelegate(nint luaState);
 
     private delegate long NormalCutscenesDelegate(nint luaState1, nint luaState2);
-
-    private static void HidePointMenu(PointMenuAgent* agent)
-    {
-        if (agent != null)
-            ((ClientAgentInterface*)agent)->Hide();
-    }
 
     private sealed record StartupHookResult(
         Hook<CutsceneHandleInputDelegate>? CutsceneHandleInputHook,
@@ -1626,7 +1801,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         Hook<IsCutsceneSeenDelegate>? IsCutsceneSeenHook,
         Hook<LuaFunctionDelegate>? PlayStaffRollHook,
         Hook<LuaFunctionDelegate>? PlayToBeContinuedHook,
-        PushAgentResultToLuaDelegate? PushAgentResultToLua,
         nint CutsceneUnskippablePatchAddress,
         bool MsqContentDirectorAttempted,
         Hook<ContentDirectorDelegate>? MsqContentDirectorHook,
@@ -1646,7 +1820,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             || IsCutsceneSeenHook != null
             || PlayStaffRollHook != null
             || PlayToBeContinuedHook != null
-            || PushAgentResultToLua != null
+            || PointMenuApiAvailable
             || CutsceneUnskippablePatchAddress != nint.Zero;
 
         public void DisposeHooks()
@@ -1665,118 +1839,4 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         }
     }
 
-    [Flags]
-    private enum PointMenuPendingResultFlags : byte
-    {
-        None = 0,
-        HasPendingResult = 2,
-    }
-
-    [StructLayout(LayoutKind.Explicit, Size = 64)]
-    private unsafe struct PointMenuAgent
-    {
-        [FieldOffset(36)]
-        public PointMenuPendingResultFlags PendingResultFlags;
-
-        [FieldOffset(40)]
-        public PointMenuContext* Context;
-
-        [FieldOffset(48)]
-        public nint CompletionTreeRoot;
-
-        [FieldOffset(60)]
-        public int SelectedIndex;
-
-        public readonly int EntryCount
-        {
-            get
-            {
-                if (Context == null)
-                    return 0;
-
-                var byteCount = (long)(nint)Context->EntriesEnd - (long)(nint)Context->Entries;
-                return byteCount <= 0 ? 0 : (int)(byteCount / sizeof(PointMenuEntry));
-            }
-        }
-
-        public readonly int FindFirstUncompletedEntry()
-        {
-            if (CompletionTreeRoot == nint.Zero)
-                return 0;
-
-            if (Context == null)
-                return -1;
-
-            var root = *(PointMenuCompletionNode**)CompletionTreeRoot;
-            if (root == null)
-                return -1;
-
-            var key = Context->CompletionKey;
-            var current = root->Right;
-            var candidate = root;
-
-            while (current != null && current->IsSentinel == 0)
-            {
-                if (current->Key >= key)
-                {
-                    candidate = current;
-                    current = current->Left;
-                }
-                else
-                {
-                    current = current->Right;
-                }
-            }
-
-            if (candidate->IsSentinel != 0 || key < candidate->Key || candidate == root)
-                return -1;
-
-            var completedBitfield = candidate->CompletedBitfield;
-            var entryCount = EntryCount;
-            for (var index = 0; index < entryCount; index++)
-            {
-                if ((completedBitfield & (1 << (index & 31))) == 0)
-                    return index;
-            }
-
-            return -1;
-        }
-    }
-
-    [StructLayout(LayoutKind.Explicit, Size = 320)]
-    private unsafe struct PointMenuContext
-    {
-        [FieldOffset(288)]
-        public PointMenuEntry* Entries;
-
-        [FieldOffset(296)]
-        public PointMenuEntry* EntriesEnd;
-
-        [FieldOffset(312)]
-        public int CompletionKey;
-    }
-
-    [StructLayout(LayoutKind.Explicit, Size = 136)]
-    private struct PointMenuEntry
-    {
-    }
-
-    [StructLayout(LayoutKind.Explicit, Size = 40)]
-    private unsafe struct PointMenuCompletionNode
-    {
-        [FieldOffset(0)]
-        public PointMenuCompletionNode* Left;
-
-        [FieldOffset(8)]
-        public PointMenuCompletionNode* Right;
-
-        [FieldOffset(25)]
-        public byte IsSentinel;
-
-        [FieldOffset(28)]
-        public int Key;
-
-        [FieldOffset(32)]
-        public int CompletedBitfield;
-    }
 }

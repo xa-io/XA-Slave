@@ -11,6 +11,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Auto-Glam Weather** - Pick valid glamour plates from per-weather lists and apply them automatically when the active weather changes.
 - **City Chat Flooder** - Send announcements across selected worlds and cities with loop and delay controls.
 - **Xagman** - Coordinate automated item transfers between Tony collectors/suppliers and Franchise Owner characters. Supports fixed-world, Server Matching, and Outside Network Helper runs, item policies, forecasts, peer coordination, recovery, and Dropbox trade reconciliation.
+- **Message Log** - Enable **Log Chat, Messages and Emotes to /xllog** in **Plugin Operations** to write delivered chat, system/error messages, and emotes to the Dalamud log as `[XA Slave] [Message Log]`. This defaults off, applies immediately, and saves across reloads. Enabled logging includes sender names and message text, including private chat. The observer never handles or suppresses chat and retains only the latest 512 records in memory. Xagman's detection of insufficient teleport gil and unattuned destinations remains active when log output is off.
 
    <details>
    <summary>How to use Xagman</summary>
@@ -62,7 +63,10 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
    | **Outside Network Helper** | Two different players on separate machines cannot share the peer network. Exchange selected rosters by clipboard and coordinate the owner-to-Tony transfer through the in-game one-gil start/done handshake. This mode supports `Give` and `Balance` surplus only; it does not supply owners or use collection-first scheduling. |
 
    Multiple Tonys can rotate as they fill or deplete. Connected Server Matching keeps replacement
-   Tonys within the active region, while fixed-world runs use the combined selected pool. Optional
+   Tonys within the active region, while fixed-world runs use the combined selected pool. Standby
+   cancellation is scoped to the interrupted Tony character and client instance, so a replacement
+   Tony ignores the predecessor's signal and resumes the waiting owner; missing identity or mixed
+   coordination protocols fail closed. Optional
    Tony selling-when-full is limited to supported ARR city or hamlet routes; normal rotation remains
    the fallback.
 
@@ -95,6 +99,22 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
    ownership, stock, AutoRetainer registration, matching, and forecast data.
    - Ctrl+click a character name to send `/ays relog FirstLast@World` for that saved row while Xagman
    and the shared task runner are idle.
+   - Automated Xagman relogs use up to three 600-second attempts. Before attempts 2 and 3, XA runs
+   the shared pre-flight: a logged-in character is normalized through the normal safety path,
+   character select backs out to the title screen, and the main-menu movie is escaped before XA
+   sends a fresh relog command. Every attempt, confirmed login, and terminal failure is logged with
+   the character name. A character confirmed missing from AutoRetainer fails immediately with a
+   specific reason; an unreadable roster is reported as unknown and keeps the bounded retry path.
+   Otherwise, only the final failed attempt marks the character red and advances.
+   - Xagman's task log keeps earlier characters and failure results through Tony rotation, owner
+   standby/resume, and internal sequences. Starting a new run or clearing the log leaves an explicit
+   marker; if the 8,000-entry limit removes older lines, the log reports the omitted count. Initial
+   and resumed rosters include their regions to make a missing batch easier to investigate.
+   - During Xagman travel, `Unable to teleport. Insufficient gil.` records `not enough gil`, and
+   `No attuned Aetheryte found for ...` records `unable to teleport to location`. The affected owner
+   is marked failed and proceeds through cleanup to the next character without waiting for the
+   normal travel timeout. `/li fc` remains a home-world return: `Could not find free company house`
+   is normal when the character has no FC house and is not treated as a failure.
    - `Refuse Trades When Idle` optionally reuses XA's Refuse Trade Request protection while preserving
    the saved manual preference around Dropbox auto-accept windows.
    - The normal Xagman `Stop` control stops one client. `Stop All Peers` stops connected clients and
@@ -115,7 +135,7 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 - **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared task action flow.
 - **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with prep actions, region filters, bell-only mode, safer menu recovery, optional Company Chest gil sync, and shared completion actions.
 - **Field Operations** - Eureka tools for instance tracking and Logos Manipulator automation. `Instance Hunter` handles per-zone InstanceID, Rodney controls, duty-ready commence, alerts, and rollover until new instances are found. `Logogram Creator` adds favorites, recipe selection, stock scanning, queue and extraction automation, overlays, a floating cancel control, separate `Static Catalog` and `Live Stock Cache` status, and a `Retry Catalog Load` action when packaged catalog data cannot load.
-- **Window Renamer** - Rename the FFXIV game window with a custom title, process-ID prefix, or current-character suffix.
+- **Window Renamer** - Rename the FFXIV game window with a custom title, process-ID prefix, or current-character suffix. When XIVWindowResizer is loaded, XA primes its cached current-process handle without resizing so the custom title and later resize commands can coexist; private-layout drift leaves the title active and shows a visible warning.
 - **Auto Open Moogle Mail** - Queue Letter List actions for taking attachments, deleting opened letters, deleting opened NPC letters, and requesting delivery, with cleanup between letters and an in-window Stop control.
 - **XA Mods** - Searchable mod manager with categorized sections, persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation.
 
@@ -148,18 +168,21 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 
   </details>
 
-- **Plugin Operations** - Manage startup behavior (including Open Plugin on Load and Custom Resolution on Plugin Load, which force-resizes the game window to a saved width/height with an optional Ignore Minimum Window Size sub-option), verbose logging, titlebar favourites, version display, update history, and quick actions such as presets, rendering presets, Sit/Doze, All XA Mods Off, task stop, Xagman disconnect, and Kill Game.
+- **Plugin Operations** - Manage startup behavior (including Open Plugin on Load and Custom Resolution on Plugin Load, which force-resizes the game window to a saved width/height with an optional Ignore Minimum Window Size sub-option), verbose task logging, optional chat/message/emote logging to `/xllog`, titlebar favourites, version display, update history, and quick actions such as presets, rendering presets, Sit/Doze, All XA Mods Off, task stop, Xagman disconnect, and Kill Game.
 - **Export Data** - Export AutoRetainer, Lifestream, and XA Database tables to timestamped TSV/CSV files or overwrite a fixed path for automation.
 - **Repo List** - Review all plugins from the referenced repositories in one sortable table with group, author, plugin status, installer/settings shortcuts, and copy-to-clipboard repo actions.
-- **IPC Calls Available** - Check supported IPC integrations, live/cached plugin availability, XA Slave provider channels, and direct examples such as `XASlave.ExecuteCommand("xamods")`.
+- **IPC Calls Available** - Check supported IPC integrations, live/cached plugin availability, XA Slave provider channels, and direct examples such as `XASlave.ExecuteCommand("xamods")`. The final Dalamud Client State table shows the public login flag, the last logout event observed this session, and native `AgentLobby` login/zone/logout values while warning that stored logout parameters can be default or stale.
+- **IPC and Dropbox Safety** - XA Slave registers its four provider channels atomically, rolls back a partial registration, disposes them in reverse order, and marshals provider work to the framework thread. Manual Dropbox queue commands add to existing quantities with saturating arithmetic, skip empty work, and report whether trading started, was already busy, lacked a partner, or was declined.
 - **Commands** - Browse the current `/xa` command surface in searchable grouped tables for general commands, XA Mods categories, Dropbox queueing, movement helpers, and item commands.
-- **Support Diagnostics** - `/xa debug` reveals the hidden Debug / Test panel for support-guided checks and keeps it visible across reloads until toggled off.
-- **Priority Tasks** - Long-running automation tasks share one active-task lock, cross-panel stop controls, pulsing menu status, and clearer DTR visibility.
-- **XA Mods Native Hooks** - 50+ local QoL hooks cover multi-instance handling, login/queue cleanup, menu and duty recovery, inventory actions, return/logout shortcuts, rendering, camera controls, teleport-lock recovery, and other client utilities. Startup prioritizes safety hooks, defers heavier work, and restores live rendering, UI visibility, and nameplate privacy on unload.
+- **Support Diagnostics** - Debug builds show the Debug / Test menu automatically; `/xa debug` toggles it during the current session. Debug / Test actions are unavailable in Release builds. `XA Abuse > Dalamud DLL Bypass Checker` performs inert local path, SHA-256, loaded-version metadata, and process-timestamp checks; it classifies only exact reviewed launcher DLL hashes and leaves unknown files unresolved without loading the assembly or using the network.
+- **Lifecycle Safety** - XA Slave applies saved-configuration migrations in order, normalizes legacy/null state before services start, refuses to load a configuration schema newer than it supports before the older plugin can save over unknown settings, coalesces high-frequency configuration writes on the framework thread, rolls back partial construction, and flushes pending state during unload.
+- **UI and Draw Safety** - Shared RAII owners balance ImGui window, table, child, popup, tree, style, and clip scopes; one panel failure is contained instead of taking down the full window. Debug jobs are cancellation-owned and marshal game state back to the framework thread, while Monthly Relogger performs XA Database reads through one background single-flight pull and applies a deferred save after returning to the game thread.
+- **Priority Tasks** - Long-running automation tasks share one explicit active-task owner, bounded logs, detached result snapshots, cross-panel stop controls, pulsing menu status, and clearer DTR visibility. Busy or empty starts are rejected without running completion continuations, and cancellation or a safety halt is kept distinct from successful completion.
+- **XA Mods Native Hooks** - 50+ local QoL hooks cover multi-instance handling, login/queue cleanup, menu and duty recovery, inventory actions, return/logout shortcuts, rendering, camera controls, teleport-lock recovery, and other client utilities. Hook creation and cancelled teardown stay on the game thread, detours preserve disposal-safe Original calls, native arrays/scans/layouts fail closed behind shared bounds, and addon buttons resolve by text or stable node id before an observable numeric fallback. Startup prioritizes safety hooks, defers heavier work, and restores live rendering, UI visibility, and nameplate privacy on unload.
 
 ## Commands
 
-The in-plugin `Reference > Commands` page is the full index for command descriptions and notes. The same XA command surface can also be used over IPC through `XASlave.ExecuteCommand`.
+The in-plugin `Reference > Commands` page is the full index for command descriptions and notes. The same XA command surface can also be used over IPC through `XASlave.ExecuteCommand`: empty `/xa` toggles the main window, every named direct route is mirrored, and IPC returns an `OK:` or `ERROR:` result string after the command runs on the framework thread. For queue-and-start Dropbox commands, `OK:` means trading actually started; `ERROR:` can still report that entries were added but Dropbox was already busy, no partner was targeted/focused, or Dropbox declined the start.
 
 <details>
 <summary>General</summary>
@@ -169,14 +192,15 @@ The in-plugin `Reference > Commands` page is the full index for command descript
 | `/xa` | Toggle the XA Slave window. |
 | `/xa allrestore` | Disable every top-level XA Mod toggle. |
 | `/xa commands` | Open `Reference > Commands`. |
-| `/xa db <itemId:qty ...>` | Queue Dropbox trade items from local inventory and start trading. |
-| `/xa db inv` | Queue all eligible items from `Inventory1` through `Inventory4` and start trading. |
+| `/xa db <itemId:qty ...>` | Add Dropbox trade items from local inventory, then attempt to start trading. Positive quantities keep the existing "queue up to this many" behavior. A negative quantity means "keep this many and queue the rest" across the item's combined local NQ/HQ count; for example, if item `10155` has 5,000 available, `10155:-1080` queues 3,920 and leaves 1,080. XA retains the existing NQ-first queue order, saturates additive queue totals instead of wrapping, skips a zero-item start, and reports the exact start outcome. |
+| `/xa db inv` | Add every eligible item from `Inventory1` through `Inventory4`, then attempt to start trading and report the exact start outcome. |
 | `/xa db clear` | Clear the current Dropbox item queue. |
 | `/xa db begin` | Start trading the queued Dropbox items: promotes your current player target to focus target if needed, then kicks Dropbox's trade queue. |
 | `/xa db request <itemId:qty ...>` | Print the missing quantities still needed locally as a ready-to-run `/xa db ...` command. |
 | `/xa db <shortcut>` | Build missing crystal-fill commands with `shards`, `crystals`, `clusters`, `shards+crystals`, `crystals+clusters`, or `shards+crystals+clusters`. |
-| `/xa db subloot` | Shortcut for `/xa db 22500:99999 ... 22507:99999` (item IDs 22500-22507); queues those items from local inventory and reports their total vendor gil value in chat. Trading starts automatically when a player is targeted/focus-targeted; otherwise use `/xa db begin`. |
-| `/xa debug` | Toggle the hidden Debug / Test menu for support diagnostics; the shown state persists until toggled off. |
+| `/xa db subloot` | Shortcut for `/xa db 22500:99999 ... 22507:99999` (item IDs 22500-22507); adds those items from local inventory and reports their total vendor gil value in chat. Trading starts when a player is targeted/focus-targeted; without a partner the queue is retained and the result says trading did not start, so `/xa db begin` can be used later. |
+| `/xa dbsub <gil-value>` | Add a minimum-overflow mixture of locally held subaquatic salvage (item IDs 22500-22507) whose vendor value is the smallest reachable total at or above the positive gil target. The result reports selected item count, value, overflow/shortfall, and the exact start outcome. Existing Dropbox queue entries are preserved; without a partner the selected entries remain queued for a later `/xa db begin`. |
+| `/xa debug` | Toggle the Debug / Test menu during the current session in Debug builds, where it starts visible. Unavailable in Release builds. |
 | `/xa preset list` | List saved XA Mods presets. |
 | `/xa preset load <name>` | Load a saved XA Mods preset, including the supported subsettings captured for the enabled mods. |
 | `/xa preset save <name>` | Save the current XA Mods selection and the supported subsettings for the enabled mods as a preset. |
@@ -240,7 +264,8 @@ The in-plugin `Reference > Commands` page is the full index for command descript
 | `/xa lowres off` | Disable `Low Resolution` after forcing the live 3D resolution scale to render once at `1.00` without changing the saved slider value. |
 | `/xa minwindow on/off` | Toggle `Ignore Minimum Window Size`; when enabled XA lowers the live minimum to `250x200`, corrects undersized restore or maximize results after the window changes, and when disabled XA restores the normal game minimum floor even if `Custom Resolutions` remains enabled. |
 | `/xa nouifade on/off` | Toggle `No UI Fade` for common black, white, and event UI fade transitions. |
-| `/xa res <width>x<height>` | Apply a custom client resolution at or above the guarded `250x200` floor. |
+| `/xa res <width>x<height>` or `/xa res <width> <height>` | Apply a custom client resolution at or above the guarded `250x200` floor, such as `/xa res 1280 720`. |
+| `/xa res reset` | Restore the client size captured when XA first enabled `Custom Resolutions`; the feature remains enabled and saved presets are unchanged. |
 | `/xa res add <width>x<height>` | Add a saved custom-resolution button. |
 | `/xa res remove <width>x<height>` | Remove a saved custom-resolution button. |
 | `/xa resrestore` | Disable the current Graphic Mods toggles. |

@@ -21,7 +21,7 @@ namespace XASlave.Windows;
 
 /// <summary>
 /// Debug / Test Commands panel, partial class split from SlaveWindow.cs.
-/// Contains DrawDebugCommands(), SetDebugResult(), IsMounted(), HasFlightUnlocked(), CanMount(), InSanctuary().
+/// Contains DrawDebugCommands(), SetDebugResult(), CanMount(), and InSanctuary().
 /// </summary>
 public partial class SlaveWindow
 {
@@ -30,13 +30,11 @@ public partial class SlaveWindow
     //  Test buttons for all xafunc-referenced commands
     //  These functions will be used as templates for future tasks
     // -----------------------------------------------
-    private string debugResult = string.Empty;
     private string debugTargetPlayerName = string.Empty;
     private string debugCallbackAddonName = "SelectString";
     private string debugCallbackValues = "0";
     private int debugAutoRetainerItemId;
     private int debugAutoRetainerDepositGilKeepAmount = 1_000_000;
-    private DateTime debugResultExpiry = DateTime.MinValue;
     private bool debugXaFcChestCheckRunning;
     private bool debugAutoRetainerDepositGilActive;
     private bool debugAutoRetainerDepositGilListTaskRequested;
@@ -84,21 +82,6 @@ public partial class SlaveWindow
     private readonly record struct DebugAutoRetainerBellOpenResult(
         bool Opened,
         string Message);
-    private enum DebugCallbackValueKind
-    {
-        Null,
-        Int,
-        UInt,
-        Bool,
-    }
-
-    private readonly record struct DebugCallbackValue(
-        DebugCallbackValueKind Kind,
-        int IntValue,
-        uint UIntValue,
-        bool BoolValue,
-        string Display);
-
     private static readonly DalamudTestNotificationDefinition[] DalamudTestNotificationDefinitions =
     [
         new("All / None", "general", "XA Test: General Notification", "General Dalamud notification for Hide All testing.", NotificationType.None),
@@ -137,9 +120,10 @@ public partial class SlaveWindow
         if (!scrollChild.Success) return;
 
         // ----------------------------------------------
-        // [Movement Functions]                        
+        // [Movement Functions]
         // ----------------------------------------------
-        if (ImGui.TreeNode("Movement Functions"))
+        using (var imguiScope167 = ImRaii.TreeNode("Movement Functions"))
+        if (imguiScope167)
         {
 
         // ----------------------------------------------
@@ -150,19 +134,16 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         if (ImGui.Button("Interact"))
-        {
-            var ok = AddonHelper.InteractWithTarget();
-            SetDebugResult(ok ? "InteractWithTarget: OK" : "No target or interaction failed");
-        }
+            RunDebugInteract();
         ImGui.SameLine();
         if (ImGui.Button("vnav: Stop"))
-        {
-            plugin.IpcClient.VnavStop();
-            SetDebugResult("Sent: vnavmesh.Path.Stop()");
-        }
+            RunDebugVnavStop();
         ImGui.SameLine();
         if (ImGui.Button("PathToTarget"))
         {
+            if (RejectIfExclusiveWorkerBusy("PathToTarget"))
+                return;
+
             var local = Plugin.ObjectTable.LocalPlayer;
             var target = local?.TargetObject;
             if (local != null && target != null && plugin.IpcClient.VnavIsReady())
@@ -174,7 +155,7 @@ public partial class SlaveWindow
                 if (ok)
                 {
                     SetDebugResult($"Pathing to {targetName} (stop={stopDist:F1}y, no auto-interact)");
-                    System.Threading.Tasks.Task.Run(async () =>
+                    RunWorker("PathToTarget", async token =>
                     {
                         var distSamples = new System.Collections.Generic.List<float>();
                         const int maxSamples = 7;
@@ -185,15 +166,15 @@ public partial class SlaveWindow
                         int elapsed = 0;
                         int jumpAttempts = 0;
 
-                        await System.Threading.Tasks.Task.Delay(600);
+                        await System.Threading.Tasks.Task.Delay(600, token);
                         elapsed += 600;
 
                         while (elapsed < maxTimeoutMs)
                         {
-                            await System.Threading.Tasks.Task.Delay(pollMs);
+                            await System.Threading.Tasks.Task.Delay(pollMs, token);
                             elapsed += pollMs;
 
-                            var (ringDist, pathActive) = await Plugin.Framework.Run(() =>
+                            var (ringDist, pathActive) = await Plugin.RunOnGameThread(() =>
                             {
                                 var lp = Plugin.ObjectTable.LocalPlayer;
                                 var tgt = lp?.TargetObject;
@@ -211,7 +192,7 @@ public partial class SlaveWindow
                             // Negative ring = overlapping hitboxes = very close, treat as arrived
                             if (ringDist <= 0)
                             {
-                                plugin.IpcClient.VnavStop();
+                                await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                                 SetDebugResult($"Arrived at {targetName} (ring={ringDist:F1}y, overlapping)");
                                 break;
                             }
@@ -234,7 +215,7 @@ public partial class SlaveWindow
                             }
                             else if (stalled && ringDist <= closeEnough)
                             {
-                                plugin.IpcClient.VnavStop();
+                                await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                                 SetDebugResult($"Arrived near {targetName} (ring={ringDist:F1}y, stalled, stopped)");
                                 Plugin.Log.Information($"[XASlave] PathToTarget: stalled within {ringDist:F1}y of {targetName}, stopping");
                                 break;
@@ -242,10 +223,10 @@ public partial class SlaveWindow
                             else if (stalled && jumpAttempts < 5)
                             {
                                 Plugin.Log.Information($"[XASlave] PathToTarget: stalled at ring={ringDist:F1}y, jump attempt {jumpAttempts + 1}");
-                                KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE);
+                                await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE));
                                 jumpAttempts++;
                                 distSamples.Clear();
-                                await System.Threading.Tasks.Task.Delay(800);
+                                await System.Threading.Tasks.Task.Delay(800, token);
                                 elapsed += 800;
                             }
                             else
@@ -257,10 +238,10 @@ public partial class SlaveWindow
 
                         if (elapsed >= maxTimeoutMs)
                         {
-                            plugin.IpcClient.VnavStop();
+                            await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                             SetDebugResult($"PathToTarget timeout (60s) for {targetName}");
                         }
-                    });
+                    }, exclusive: true);
                 }
                 else SetDebugResult("Pathfind failed");
             }
@@ -274,6 +255,9 @@ public partial class SlaveWindow
 
         if (ImGui.Button("PathToTargetThenInteract"))
         {
+            if (RejectIfExclusiveWorkerBusy("PathToTargetThenInteract"))
+                return;
+
             var local = Plugin.ObjectTable.LocalPlayer;
             var target = local?.TargetObject;
             if (local != null && target != null && plugin.IpcClient.VnavIsReady())
@@ -290,7 +274,7 @@ public partial class SlaveWindow
                 {
                     SetDebugResult($"Pathing to {targetName} (stop={stopDist:F1}y, interact<={interactRange:F1}y ring)");
                     Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: {targetName} hitbox={targetHitbox:F1} stopDist={stopDist:F1} interactRange={interactRange:F1}");
-                    System.Threading.Tasks.Task.Run(async () =>
+                    RunWorker("PathToTargetThenInteract", async token =>
                     {
                         var distSamples = new System.Collections.Generic.List<float>();
                         const int maxSamples = 7;
@@ -301,15 +285,15 @@ public partial class SlaveWindow
                         bool interacted = false;
                         int jumpAttempts = 0;
 
-                        await System.Threading.Tasks.Task.Delay(600);
+                        await System.Threading.Tasks.Task.Delay(600, token);
                         elapsed += 600;
 
                         while (elapsed < maxTimeoutMs)
                         {
-                            await System.Threading.Tasks.Task.Delay(pollMs);
+                            await System.Threading.Tasks.Task.Delay(pollMs, token);
                             elapsed += pollMs;
 
-                            var (ringDist, centerDist, pathRunning, pathfinding) = await Plugin.Framework.Run(() =>
+                            var (ringDist, centerDist, pathRunning, pathfinding) = await Plugin.RunOnGameThread(() =>
                             {
                                 var lp = Plugin.ObjectTable.LocalPlayer;
                                 var tgt = lp?.TargetObject;
@@ -328,8 +312,8 @@ public partial class SlaveWindow
                             if (ringDist <= 0)
                             {
                                 SetDebugResult($"Overlapping {targetName}: ring={ringDist:F1}y, interacting");
-                                await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
-                                plugin.IpcClient.VnavStop();
+                                await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
+                                await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                                 Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: overlapping interact with {targetName} (ring={ringDist:F1}y)");
                                 interacted = true;
                                 break;
@@ -351,8 +335,8 @@ public partial class SlaveWindow
                             if (ringDist <= interactRange)
                             {
                                 SetDebugResult($"In range of {targetName}: ring={ringDist:F1}y, interacting");
-                                await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
-                                plugin.IpcClient.VnavStop();
+                                await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
+                                await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                                 Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: interacted with {targetName} (ring={ringDist:F1}y center={centerDist:F1}y)");
                                 interacted = true;
                                 break;
@@ -363,10 +347,10 @@ public partial class SlaveWindow
                                 Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: stalled at ring={ringDist:F1}y, jump attempt {jumpAttempts + 1}");
                                 if (jumpAttempts < 5)
                                 {
-                                    KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE);
+                                    await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE));
                                     jumpAttempts++;
                                     distSamples.Clear();
-                                    await System.Threading.Tasks.Task.Delay(800);
+                                    await System.Threading.Tasks.Task.Delay(800, token);
                                     elapsed += 800;
                                 }
                             }
@@ -376,7 +360,7 @@ public partial class SlaveWindow
                                 Plugin.Log.Warning($"[XASlave] PathToTargetThenInteract: path ended for {targetName} (ring={ringDist:F1}y center={centerDist:F1}y)");
                                 if (ringDist <= interactRange * 3)
                                 {
-                                    await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
+                                    await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                                     SetDebugResult($"Path ended, attempted interact at ring={ringDist:F1}y");
                                     interacted = true;
                                 }
@@ -391,10 +375,10 @@ public partial class SlaveWindow
 
                         if (!interacted && elapsed >= maxTimeoutMs)
                         {
-                            plugin.IpcClient.VnavStop();
+                            await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                             SetDebugResult($"PathToTargetThenInteract timeout (60s) for {targetName}");
                         }
-                    });
+                    }, exclusive: true);
                 }
                 else SetDebugResult("Pathfind failed, vnav could not start route");
             }
@@ -413,6 +397,9 @@ public partial class SlaveWindow
         ImGui.SameLine();
         if (ImGui.Button("PathSmartThenInteract"))
         {
+            if (RejectIfExclusiveWorkerBusy("PathSmartThenInteract"))
+                return;
+
             var local = Plugin.ObjectTable.LocalPlayer;
             var target = local?.TargetObject;
             if (local != null && target != null && plugin.IpcClient.VnavIsReady())
@@ -433,14 +420,14 @@ public partial class SlaveWindow
                 SetDebugResult($"PathSmart to {targetName}: ring={ringDist0:F0}y, fly={canFly}, mount={shouldMount}");
                 Plugin.Log.Information($"[XASlave] PathSmartThenInteract: {targetName} ring={ringDist0:F1}y fly={canFly} mount={shouldMount} stop={stopDist:F1}");
 
-                System.Threading.Tasks.Task.Run(async () =>
+                RunWorker("PathSmartThenInteract", async token =>
                 {
                     // Mount + path simultaneously, mount cast works while running, no need to wait
                     if (shouldMount)
-                        await Plugin.Framework.Run(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
+                        await Plugin.RunOnGameThread(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
 
                     var fly = canFly && shouldMount; // Only fly-path if flight is unlocked AND mounted
-                    var pathOk = await Plugin.Framework.Run(() =>
+                    var pathOk = await Plugin.RunOnGameThread(() =>
                         plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, fly, stopDist));
                     if (!pathOk) { SetDebugResult("Pathfind failed"); return; }
 
@@ -453,15 +440,15 @@ public partial class SlaveWindow
                     bool interacted = false;
                     int jumpAttempts = 0;
 
-                    await System.Threading.Tasks.Task.Delay(200);
+                    await System.Threading.Tasks.Task.Delay(200, token);
                     elapsed += 200;
 
                     while (elapsed < maxTimeoutMs)
                     {
-                        await System.Threading.Tasks.Task.Delay(pollMs);
+                        await System.Threading.Tasks.Task.Delay(pollMs, token);
                         elapsed += pollMs;
 
-                        var (rd, cd, pathRunning, pathfinding) = await Plugin.Framework.Run(() =>
+                        var (rd, cd, pathRunning, pathfinding) = await Plugin.RunOnGameThread(() =>
                         {
                             var lp2 = Plugin.ObjectTable.LocalPlayer;
                             var tgt = lp2?.TargetObject;
@@ -478,9 +465,9 @@ public partial class SlaveWindow
                         // Negative ring = overlapping hitboxes = very close, interact immediately
                         if (rd <= 0)
                         {
-                            plugin.IpcClient.VnavStop();
+                            await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                             SetDebugResult($"Overlapping {targetName}: ring={rd:F1}y, interacting");
-                            await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
+                            await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                             Plugin.Log.Information($"[XASlave] PathSmartThenInteract: overlapping interact with {targetName} (ring={rd:F1}y)");
                             interacted = true;
                             break;
@@ -501,30 +488,30 @@ public partial class SlaveWindow
 
                         if (rd <= interactRange)
                         {
-                            plugin.IpcClient.VnavStop();
-                            var isMounted = await Plugin.Framework.Run(() =>
+                            await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
+                            var isMounted = await Plugin.RunOnGameThread(() =>
                                 Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                             if (isMounted)
                             {
                                 SetDebugResult($"In range of {targetName}: ring={rd:F1}y, dismounting...");
-                                await Plugin.Framework.Run(() => ChatHelper.SendMessage("/mount"));
+                                await Plugin.RunOnGameThread(() => ChatHelper.SendMessage("/mount"));
                                 for (int w = 0; w < 30; w++)
                                 {
-                                    await System.Threading.Tasks.Task.Delay(100);
-                                    isMounted = await Plugin.Framework.Run(() =>
+                                    await System.Threading.Tasks.Task.Delay(100, token);
+                                    isMounted = await Plugin.RunOnGameThread(() =>
                                         Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                                     if (!isMounted) break;
                                 }
                             }
 
                             // Hard 2s delay after dismount, prevents "Unable to execute command while jumping" error
-                            await System.Threading.Tasks.Task.Delay(2000);
+                            await System.Threading.Tasks.Task.Delay(2000, token);
 
                             // Brief ready check, wait up to 1.5s for character to be actionable after dismount
                             for (int sw = 0; sw < 15; sw++)
                             {
-                                await System.Threading.Tasks.Task.Delay(100);
-                                var charReady = await Plugin.Framework.Run(() =>
+                                await System.Threading.Tasks.Task.Delay(100, token);
+                                var charReady = await Plugin.RunOnGameThread(() =>
                                     MonthlyReloggerTask.IsPlayerAvailable() &&
                                     !Plugin.Condition[ConditionFlag.Casting]);
                                 if (charReady) break;
@@ -532,7 +519,7 @@ public partial class SlaveWindow
 
                             // Re-check distance after dismount, large mounts expand player hitbox
                             // and dismounting may leave us further away than expected
-                            var postDismountRd = await Plugin.Framework.Run(() =>
+                            var postDismountRd = await Plugin.RunOnGameThread(() =>
                             {
                                 var lp3 = Plugin.ObjectTable.LocalPlayer;
                                 var tgt3 = lp3?.TargetObject;
@@ -547,13 +534,13 @@ public partial class SlaveWindow
                                 // Too far after dismount, re-path on foot to close the gap
                                 SetDebugResult($"Post-dismount too far: ring={postDismountRd:F1}y, re-pathing on foot");
                                 Plugin.Log.Information($"[XASlave] PathSmartThenInteract: post-dismount ring={postDismountRd:F1}y > {interactRange:F1}y, re-pathing");
-                                await Plugin.Framework.Run(() =>
+                                await Plugin.RunOnGameThread(() =>
                                     plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, false, stopDist));
                                 // Wait for re-path to complete
                                 for (int rp = 0; rp < 100; rp++)
                                 {
-                                    await System.Threading.Tasks.Task.Delay(200);
-                                    var (rpRd, rpIdle) = await Plugin.Framework.Run(() =>
+                                    await System.Threading.Tasks.Task.Delay(200, token);
+                                    var (rpRd, rpIdle) = await Plugin.RunOnGameThread(() =>
                                     {
                                         var lp4 = Plugin.ObjectTable.LocalPlayer;
                                         var tgt4 = lp4?.TargetObject;
@@ -569,31 +556,31 @@ public partial class SlaveWindow
                             }
 
                             SetDebugResult($"In range of {targetName}: ring={postDismountRd:F1}y, interacting");
-                            await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
-                            plugin.IpcClient.VnavStop();
+                            await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
+                            await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                             Plugin.Log.Information($"[XASlave] PathSmartThenInteract: interacted with {targetName} (ring={postDismountRd:F1}y)");
                             interacted = true;
                             break;
                         }
                         else if (stalled && rd < 20.0f)
                         {
-                            var isMounted = await Plugin.Framework.Run(() =>
+                            var isMounted = await Plugin.RunOnGameThread(() =>
                                 Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                             if (isMounted)
                             {
-                                plugin.IpcClient.VnavStop();
-                                await Plugin.Framework.Run(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
+                                await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
+                                await Plugin.RunOnGameThread(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
                                 for (int w = 0; w < 50; w++)
                                 {
-                                    await System.Threading.Tasks.Task.Delay(100);
-                                    isMounted = await Plugin.Framework.Run(() =>
+                                    await System.Threading.Tasks.Task.Delay(100, token);
+                                    isMounted = await Plugin.RunOnGameThread(() =>
                                         Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                                     if (!isMounted) break;
                                 }
-                                await Plugin.Framework.Run(() =>
+                                await Plugin.RunOnGameThread(() =>
                                     plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, false, stopDist));
                                 distSamples.Clear();
-                                await System.Threading.Tasks.Task.Delay(600);
+                                await System.Threading.Tasks.Task.Delay(600, token);
                                 elapsed += 600;
                             }
                             else
@@ -601,10 +588,10 @@ public partial class SlaveWindow
                                 SetDebugResult($"Stalled near {targetName}: ring={rd:F1}y, jumping");
                                 if (jumpAttempts < 5)
                                 {
-                                    KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE);
+                                    await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE));
                                     jumpAttempts++;
                                     distSamples.Clear();
-                                    await System.Threading.Tasks.Task.Delay(800);
+                                    await System.Threading.Tasks.Task.Delay(800, token);
                                     elapsed += 800;
                                 }
                             }
@@ -615,20 +602,20 @@ public partial class SlaveWindow
                             Plugin.Log.Warning($"[XASlave] PathSmartThenInteract: path ended for {targetName} (ring={rd:F1}y)");
                             if (rd <= interactRange * 3)
                             {
-                                var isMounted = await Plugin.Framework.Run(() =>
+                                var isMounted = await Plugin.RunOnGameThread(() =>
                                     Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                                 if (isMounted)
                                 {
-                                    await Plugin.Framework.Run(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
+                                    await Plugin.RunOnGameThread(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
                                     for (int w = 0; w < 50; w++)
                                     {
-                                        await System.Threading.Tasks.Task.Delay(100);
-                                        isMounted = await Plugin.Framework.Run(() =>
+                                        await System.Threading.Tasks.Task.Delay(100, token);
+                                        isMounted = await Plugin.RunOnGameThread(() =>
                                             Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                                         if (!isMounted) break;
                                     }
                                 }
-                                await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
+                                await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                                 SetDebugResult($"Path ended, attempted interact at ring={rd:F1}y");
                                 interacted = true;
                             }
@@ -643,10 +630,10 @@ public partial class SlaveWindow
 
                     if (!interacted && elapsed >= maxTimeoutMs)
                     {
-                        plugin.IpcClient.VnavStop();
+                        await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                         SetDebugResult($"PathSmartThenInteract timeout (60s) for {targetName}");
                     }
-                });
+                }, exclusive: true);
             }
             else if (target == null) SetDebugResult("No target selected");
             else SetDebugResult("vnavmesh not ready");
@@ -714,15 +701,16 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end XA Lazy Movements
 
-        ImGui.TreePop();
+
         } // end Movement Functions
 
         ImGui.Spacing();
 
         // ----------------------------------------------
-        // [Aetheryte Functions]                        
+        // [Aetheryte Functions]
         // ----------------------------------------------
-        if (ImGui.TreeNode("Aetheryte Functions"))
+        using (var imguiScope753 = ImRaii.TreeNode("Aetheryte Functions"))
+        if (imguiScope753)
         {
             if (ImGui.Button("GetAetherytesCount"))
             {
@@ -869,24 +857,25 @@ public partial class SlaveWindow
                     .OrderBy(x => x.ZoneId)
                     .ThenBy(x => x.Name)
                     .Select(x => $"{x.ZoneId}\t{x.Name}\t{x.ZoneName}");
-                
+
                 var header = "ZoneId\tAetheryteName\tZoneName";
                 var exportContent = string.Join("\n", new[] { header }.Concat(exportLines));
-                
+
                 SetDebugResult($"Exported {aetherytes.Count} aetherytes:\n\n{exportContent}");
             }
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Exports all aetherytes with ZoneID, name, and zone name for analysis");
 
-            ImGui.TreePop();
+
         }
 
         ImGui.Spacing();
 
         // ----------------------------------------------
-        // [Player Checkers]                           
+        // [Player Checkers]
         // ----------------------------------------------
-        if (ImGui.TreeNode("Player Checkers"))
+        using (var imguiScope917 = ImRaii.TreeNode("Player Checkers"))
+        if (imguiScope917)
         {
 
         // ----------------------------------------------
@@ -899,15 +888,16 @@ public partial class SlaveWindow
         if (ImGui.Button("CharacterSafeWait"))
         {
             SetDebugResult("CharacterSafeWait: checking...");
-            System.Threading.Tasks.Task.Run(async () =>
+            RunWorker("CharacterSafeWait", async token =>
             {
                 int consecutivePasses = 0;
                 int totalAttempts = 0;
-                while (consecutivePasses < 3)
+                const int maxAttempts = 120;
+                while (consecutivePasses < 3 && totalAttempts < maxAttempts)
                 {
-                    await System.Threading.Tasks.Task.Delay(1000);
+                    await System.Threading.Tasks.Task.Delay(1000, token);
                     totalAttempts++;
-                    var (np, pa, casting, combat, charName) = await Plugin.Framework.Run(() =>
+                    var (np, pa, casting, combat, charName) = await Plugin.RunOnGameThread(() =>
                     {
                         return (MonthlyReloggerTask.IsNamePlateReady(),
                                 MonthlyReloggerTask.IsPlayerAvailable(),
@@ -929,7 +919,14 @@ public partial class SlaveWindow
                         SetDebugResult($"[0/3] waiting... NP={np} PA={pa} Cast={casting} Combat={combat} (attempt #{totalAttempts})");
                     }
                 }
-                var finalName = await Plugin.Framework.Run(() => MonthlyReloggerTask.GetCurrentCharacterNameWorld());
+
+                if (consecutivePasses < 3)
+                {
+                    SetDebugResult("CharacterSafeWait timed out after 120 seconds.");
+                    return;
+                }
+
+                var finalName = await Plugin.RunOnGameThread(() => MonthlyReloggerTask.GetCurrentCharacterNameWorld());
                 SetDebugResult($"[3/3] CONFIRMED READY, {finalName}");
             });
         }
@@ -1266,17 +1263,17 @@ public partial class SlaveWindow
             else
             {
                 SetDebugResult("In duty, attempting to leave...");
-                System.Threading.Tasks.Task.Run(async () =>
+                RunWorker("Leave Duty", async token =>
                 {
                     // Wait up to 30s if in combat (might be finishing monsters)
-                    var inCombat = await Plugin.Framework.Run(() => Plugin.Condition[ConditionFlag.InCombat]);
+                    var inCombat = await Plugin.RunOnGameThread(() => Plugin.Condition[ConditionFlag.InCombat]);
                     if (inCombat)
                     {
                         SetDebugResult("In combat, waiting up to 30s for combat to end...");
                         for (int w = 0; w < 60; w++)
                         {
-                            await System.Threading.Tasks.Task.Delay(500);
-                            inCombat = await Plugin.Framework.Run(() => Plugin.Condition[ConditionFlag.InCombat]);
+                            await System.Threading.Tasks.Task.Delay(500, token);
+                            inCombat = await Plugin.RunOnGameThread(() => Plugin.Condition[ConditionFlag.InCombat]);
                             if (!inCombat) break;
                         }
                         if (inCombat)
@@ -1288,20 +1285,20 @@ public partial class SlaveWindow
                     }
 
                     // Press U to open the Duty Finder menu (ContentsFinderMenu)
-                    await Plugin.Framework.Run(() => KeyInputHelper.PressKey(0x55)); // VK_U = 0x55
-                    await System.Threading.Tasks.Task.Delay(1000);
+                    await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(0x55)); // VK_U = 0x55
+                    await System.Threading.Tasks.Task.Delay(1000, token);
 
-                    // Click the Leave button, ContentsFinderMenu NodeList[43]
-                    var leaveClicked = await Plugin.Framework.Run(() =>
-                        AddonHelper.ClickAddonButton("ContentsFinderMenu", 43));
+                    // Click the named, patch-sensitive ContentsFinderMenu Leave node.
+                    var leaveClicked = await Plugin.RunOnGameThread(() =>
+                        AddonHelper.ClickAddonButton("ContentsFinderMenu", AddonNodes.ContentsFinderMenuLeave));
 
                     if (leaveClicked)
                     {
                         SetDebugResult("Leave Duty: clicked Leave button, waiting for confirmation...");
-                        await System.Threading.Tasks.Task.Delay(500);
+                        await System.Threading.Tasks.Task.Delay(500, token);
 
                         // Click Yes on the confirmation dialog
-                        var yesClicked = await Plugin.Framework.Run(() => AddonHelper.ClickYesNo(true));
+                        var yesClicked = await Plugin.RunOnGameThread(() => AddonHelper.ClickYesNo(true));
                         if (yesClicked)
                             SetDebugResult("Leave Duty: confirmed Yes, leaving instance.");
                         else
@@ -1311,7 +1308,7 @@ public partial class SlaveWindow
                     {
                         SetDebugResult("Leave Duty: ContentsFinderMenu not visible or Leave button not found.");
                     }
-                });
+                }, exclusive: true);
             }
         }
         if (ImGui.IsItemHovered())
@@ -1587,8 +1584,13 @@ public partial class SlaveWindow
         ImGui.SameLine();
         if (ImGui.Button("EquipGear Step2: Recommend"))
         {
-            var ok = AddonHelper.ClickAddonButton("Character", 74);
-            SetDebugResult(ok ? "Clicked Character NodeList[74] (Button #12) †’ RecommendEquip should open" : "Character addon not visible, open it first with Step1");
+            var addonReady = AddonHelper.IsAddonReady("Character");
+            var ok = addonReady && AddonHelper.ClickAddonButton("Character", AddonNodes.CharacterRecommendEquip);
+            SetDebugResult(ok
+                ? $"Clicked Character NodeList[{AddonNodes.CharacterRecommendEquip}] -> RecommendEquip should open"
+                : addonReady
+                    ? $"Character is ready, but recommend node {AddonNodes.CharacterRecommendEquip} is unavailable; verify the current addon layout."
+                    : "Character addon is not ready; open it first with Step1.");
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Clicks Button Component Node #12 at NodeList[74] in Character addon.\nOpens Recommended Gear window (RecommendEquip).\nConfirmed via /xldata Addon Inspector.");
@@ -1597,8 +1599,13 @@ public partial class SlaveWindow
 
         if (ImGui.Button("EquipGear Step3: Equip"))
         {
-            var ok = AddonHelper.ClickAddonButton("RecommendEquip", 3);
-            SetDebugResult(ok ? "Clicked RecommendEquip NodeList[3] (Button #11) †’ gear equipped" : "RecommendEquip addon not visible, run Step2 first");
+            var addonReady = AddonHelper.IsAddonReady("RecommendEquip");
+            var ok = addonReady && AddonHelper.ClickAddonButton("RecommendEquip", AddonNodes.RecommendEquipConfirm);
+            SetDebugResult(ok
+                ? $"Clicked RecommendEquip NodeList[{AddonNodes.RecommendEquipConfirm}] -> gear equipped"
+                : addonReady
+                    ? $"RecommendEquip is ready, but confirm node {AddonNodes.RecommendEquipConfirm} is unavailable; verify the current addon layout."
+                    : "RecommendEquip addon is not ready; run Step2 first.");
         }
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Clicks Button Component Node #11 at NodeList[3] in RecommendEquip addon.\nEquips recommended gear.\nConfirmed via /xldata Addon Inspector.");
@@ -1775,10 +1782,11 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end XA Database
 
-        ImGui.TreePop();
+
         } // end Player Checkers
 
-        if (ImGui.TreeNode("XA Abuse"))
+        using (var imguiScope1827 = ImRaii.TreeNode("XA Abuse"))
+        if (imguiScope1827)
         {
 
         if (ImGui.CollapsingHeader("PlayerNames##xaAbuse"))
@@ -1852,9 +1860,105 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
+        if (ImGui.CollapsingHeader("AutoRetainer##xaAbuse"))
+        {
+            ImGui.TextDisabled("Reflects AutoRetainer's live character IDs and ImGui header state; no AR configuration is changed.");
+            ImGui.TextDisabled("If a tab has never been opened this session, open it once before using its buttons.");
+            ImGui.Spacing();
+
+            if (ImGui.Button("Expand All Retainers##xaAbuseAutoRetainer"))
+            {
+                var result = AutoRetainerUiReflectionService.SetAllCharacterHeaders(
+                    AutoRetainerUiSection.Retainers,
+                    true);
+                SetDebugResult(result.Message);
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Collapse All Retainers##xaAbuseAutoRetainer"))
+            {
+                var result = AutoRetainerUiReflectionService.SetAllCharacterHeaders(
+                    AutoRetainerUiSection.Retainers,
+                    false);
+                SetDebugResult(result.Message);
+            }
+
+            if (ImGui.Button("Expand All Deployables##xaAbuseAutoRetainer"))
+            {
+                var result = AutoRetainerUiReflectionService.SetAllCharacterHeaders(
+                    AutoRetainerUiSection.Deployables,
+                    true);
+                SetDebugResult(result.Message);
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Collapse All Deployables##xaAbuseAutoRetainer"))
+            {
+                var result = AutoRetainerUiReflectionService.SetAllCharacterHeaders(
+                    AutoRetainerUiSection.Deployables,
+                    false);
+                SetDebugResult(result.Message);
+            }
+
+            ImGui.Spacing();
+            var attentionFilterEnabled = AutoRetainerUiReflectionService.DeployablesAttentionFilterEnabled;
+            var attentionFilterButtonText = attentionFilterEnabled
+                ? "Refresh Alert Deployables Only"
+                : "Show Alert Deployables Only";
+            if (ImGui.Button($"{attentionFilterButtonText}##xaAbuseAutoRetainer"))
+            {
+                var result = AutoRetainerUiReflectionService.SetDeployablesAttentionFilter(true);
+                SetDebugResult(result.Message);
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Show All Characters##xaAbuseAutoRetainer"))
+            {
+                var result = AutoRetainerUiReflectionService.SetCharacterFilter(
+                    AutoRetainerCharacterFilterMode.None);
+                SetDebugResult(result.Message);
+            }
+
+            if (ImGui.Button("Show Only Enabled##xaAbuseAutoRetainer"))
+            {
+                var result = AutoRetainerUiReflectionService.SetCharacterFilter(
+                    AutoRetainerCharacterFilterMode.MultiEnabled);
+                SetDebugResult(result.Message);
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Show Only Disabled##xaAbuseAutoRetainer"))
+            {
+                var result = AutoRetainerUiReflectionService.SetCharacterFilter(
+                    AutoRetainerCharacterFilterMode.MultiDisabled);
+                SetDebugResult(result.Message);
+            }
+
+            var missingFcAddressFilterEnabled = AutoRetainerUiReflectionService.CharacterFilterMode
+                == AutoRetainerCharacterFilterMode.MissingLifestreamFcAddress;
+            var missingFcAddressButtonText = missingFcAddressFilterEnabled
+                ? "Refresh Missing FC Address"
+                : "Show Missing FC Address";
+            if (ImGui.Button($"{missingFcAddressButtonText}##xaAbuseAutoRetainer"))
+            {
+                var result = AutoRetainerUiReflectionService.SetCharacterFilter(
+                    AutoRetainerCharacterFilterMode.MissingLifestreamFcAddress);
+                SetDebugResult(result.Message);
+            }
+
+            ImGui.TextDisabled("Alert-only matches available sub slots, multi-enabled characters with disabled/idle submarines, and suboptimal builds.");
+            ImGui.TextDisabled("Enabled uses each tab's multi-mode switch. Disabled also includes enabled characters with an unchecked retainer/submarine; it never toggles either.");
+            ImGui.TextDisabled("Missing FC Address means Lifestream has no non-private house registration for that character CID.");
+            ImGui.TextDisabled("The filter is a temporary UI projection; AutoRetainer configuration and automation stay unchanged.");
+
+            ImGui.Spacing();
+        }
+
         if (ImGui.CollapsingHeader("Lobby Test##xaAbuse"))
         {
             DrawXaAbuseLobbyTest();
+            ImGui.Spacing();
+        }
+
+        if (ImGui.CollapsingHeader("Dalamud DLL Bypass Checker##xaAbuse"))
+        {
+            DrawXaAbuseDalamudDllBypassChecker();
             ImGui.Spacing();
         }
 
@@ -1877,15 +1981,16 @@ public partial class SlaveWindow
         }
 
         ImGui.Spacing();
-        ImGui.TreePop();
+
         }
 
         ImGui.Spacing();
 
         // ----------------------------------------------
-        //   [Punish]                                    
+        //   [Punish]
         // ----------------------------------------------
-        if (ImGui.TreeNode("Punish"))
+        using (var imguiScope1940 = ImRaii.TreeNode("Punish"))
+        if (imguiScope1940)
         {
 
         // ----------------------------------------------
@@ -2634,11 +2739,11 @@ public partial class SlaveWindow
         ImGui.Spacing();
         } // end vnavmesh
 
-        ImGui.TreePop();
+
         } // end Punish
 
         // ----------------------------------------------
-        //   [Key Inputs]                                
+        //   [Key Inputs]
         // ----------------------------------------------
         if (ImGui.CollapsingHeader("Key Inputs"))
         {
@@ -2910,9 +3015,10 @@ public partial class SlaveWindow
             }
 
             ImGui.Spacing();
-            ImGui.BeginChild("##xaAbuseDbIpcReport", new Vector2(0f, Scale(220f)), true);
-            ImGui.TextUnformatted(xaDbIpcTestReport);
-            ImGui.EndChild();
+            using (ImRaii.Child("##xaAbuseDbIpcReport", new Vector2(0f, Scale(220f)), true))
+            {
+                ImGui.TextUnformatted(xaDbIpcTestReport);
+            }
         }
     }
 
@@ -3212,11 +3318,12 @@ public partial class SlaveWindow
         debugAutoRetainerNonAutoInteractStartedUtc = DateTime.UtcNow;
         var runStartedUtc = debugAutoRetainerNonAutoInteractStartedUtc;
 
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("AR non-auto interact", async token =>
         {
             var result = await OpenDebugRetainerListWithoutAutoRetainerEnableAsync(
                 "AR non-auto interact",
-                () => debugAutoRetainerNonAutoInteractActive && debugAutoRetainerNonAutoInteractStartedUtc == runStartedUtc);
+                () => debugAutoRetainerNonAutoInteractActive && debugAutoRetainerNonAutoInteractStartedUtc == runStartedUtc,
+                token);
 
             if (debugAutoRetainerNonAutoInteractStartedUtc != runStartedUtc)
                 return;
@@ -3281,16 +3388,16 @@ public partial class SlaveWindow
 
     private void StartDebugRetainerListCancelRecovery(string completionMessage)
     {
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("AR RetainerList recovery", async token =>
         {
             try
             {
-                await System.Threading.Tasks.Task.Delay(1000);
+                await System.Threading.Tasks.Task.Delay(1000, token);
 
                 const int maxAttempts = 8;
                 for (var attempt = 1; attempt <= maxAttempts; attempt++)
                 {
-                    var state = await Plugin.Framework.Run(GetDebugRetainerListCancelState);
+                    var state = await Plugin.RunOnGameThread(GetDebugRetainerListCancelState);
                     if (state.CharacterSafeWaitReady)
                     {
                         await SetDebugResultOnFrameworkAsync($"{completionMessage} RetainerList cleared; CharacterSafeWait is ready.");
@@ -3299,10 +3406,10 @@ public partial class SlaveWindow
 
                     if (state.RetainerListVisible)
                     {
-                        var cancelled = await Plugin.Framework.Run(CancelDebugRetainerList);
-                        await System.Threading.Tasks.Task.Delay(1000);
+                        var cancelled = await Plugin.RunOnGameThread(CancelDebugRetainerList);
+                        await System.Threading.Tasks.Task.Delay(1000, token);
 
-                        state = await Plugin.Framework.Run(GetDebugRetainerListCancelState);
+                        state = await Plugin.RunOnGameThread(GetDebugRetainerListCancelState);
                         if (state.CharacterSafeWaitReady)
                         {
                             await SetDebugResultOnFrameworkAsync($"{completionMessage} RetainerList cancelled; CharacterSafeWait is ready.");
@@ -3315,7 +3422,7 @@ public partial class SlaveWindow
 
                     if (attempt >= 3)
                     {
-                        await Plugin.Framework.Run(() =>
+                        await Plugin.RunOnGameThread(() =>
                         {
                             KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE);
                             return true;
@@ -3323,20 +3430,24 @@ public partial class SlaveWindow
                         Plugin.Log.Information($"[XASlave] AR deposit gil: CharacterSafeWait still false and RetainerList not visible; pressed ESC on recovery attempt {attempt}/{maxAttempts}.");
                     }
 
-                    await System.Threading.Tasks.Task.Delay(1000);
+                    await System.Threading.Tasks.Task.Delay(1000, token);
                 }
 
-                var finalState = await Plugin.Framework.Run(GetDebugRetainerListCancelState);
+                var finalState = await Plugin.RunOnGameThread(GetDebugRetainerListCancelState);
                 if (!finalState.CharacterSafeWaitReady && finalState.RetainerListVisible)
                 {
-                    await Plugin.Framework.Run(CancelDebugRetainerList);
-                    await System.Threading.Tasks.Task.Delay(1000);
-                    finalState = await Plugin.Framework.Run(GetDebugRetainerListCancelState);
+                    await Plugin.RunOnGameThread(CancelDebugRetainerList);
+                    await System.Threading.Tasks.Task.Delay(1000, token);
+                    finalState = await Plugin.RunOnGameThread(GetDebugRetainerListCancelState);
                 }
 
                 await SetDebugResultOnFrameworkAsync(finalState.CharacterSafeWaitReady
                     ? $"{completionMessage} RetainerList recovery completed; CharacterSafeWait is ready."
                     : $"{completionMessage} RetainerList recovery timed out; visible={finalState.RetainerListVisible}, ready={finalState.RetainerListReady}, CharacterSafeWait={finalState.CharacterSafeWaitReady}.");
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -3356,7 +3467,7 @@ public partial class SlaveWindow
 
     private async System.Threading.Tasks.Task SetDebugResultOnFrameworkAsync(string message)
     {
-        await Plugin.Framework.Run(() =>
+        await Plugin.RunOnGameThread(() =>
         {
             SetDebugResult(message);
             return true;
@@ -3446,19 +3557,23 @@ public partial class SlaveWindow
         debugAutoRetainerDepositGilLastActivityUtc = DateTime.UtcNow;
         var keepAmount = Math.Max(0, debugAutoRetainerDepositGilKeepAmount);
 
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker($"AR deposit gil for {retainerName}", async token =>
         {
             var stopAfterCurrentRetainer = false;
             var stopMessage = string.Empty;
             try
             {
-                var result = await RunDebugAutoRetainerDepositGilForRetainerAsync(retainerName, keepAmount);
+                var result = await RunDebugAutoRetainerDepositGilForRetainerAsync(retainerName, keepAmount, token);
                 debugAutoRetainerDepositGilProcessedRetainers++;
                 debugAutoRetainerDepositGilRequestedTotal += result.RequestedDeposit;
                 debugAutoRetainerDepositGilActualTotal += result.ActualDeposit;
                 SetDebugResult(result.Message);
                 stopAfterCurrentRetainer = result.ShouldStop;
                 stopMessage = result.Message;
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
@@ -3469,14 +3584,14 @@ public partial class SlaveWindow
             }
             finally
             {
-                plugin.IpcClient.AutoRetainerFinishRetainerPostProcess();
+                await Plugin.RunOnGameThread(() => plugin.IpcClient.AutoRetainerFinishRetainerPostProcess());
                 debugAutoRetainerDepositGilProcessingRetainer = false;
                 debugAutoRetainerDepositGilLastActivityUtc = DateTime.UtcNow;
 
                 if (stopAfterCurrentRetainer)
                 {
-                    await System.Threading.Tasks.Task.Delay(100);
-                    await Plugin.Framework.Run(() =>
+                    await System.Threading.Tasks.Task.Delay(100, token);
+                    await Plugin.RunOnGameThread(() =>
                     {
                         CompleteDebugAutoRetainerDepositGil(
                             $"{stopMessage} Closing RetainerList.",
@@ -3496,11 +3611,12 @@ public partial class SlaveWindow
 
         debugAutoRetainerDepositGilOpeningRetainerList = true;
 
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("AR deposit gil RetainerList open", async token =>
         {
             var result = await OpenDebugRetainerListWithoutAutoRetainerEnableAsync(
                 "AR deposit gil",
-                () => debugAutoRetainerDepositGilActive && debugAutoRetainerDepositGilStartedUtc == runStartedUtc);
+                () => debugAutoRetainerDepositGilActive && debugAutoRetainerDepositGilStartedUtc == runStartedUtc,
+                token);
 
             if (!debugAutoRetainerDepositGilActive || debugAutoRetainerDepositGilStartedUtc != runStartedUtc)
                 return;
@@ -3517,18 +3633,21 @@ public partial class SlaveWindow
         });
     }
 
-    private async System.Threading.Tasks.Task<DebugAutoRetainerBellOpenResult> OpenDebugRetainerListWithoutAutoRetainerEnableAsync(string operationName, Func<bool> shouldContinue)
+    private async System.Threading.Tasks.Task<DebugAutoRetainerBellOpenResult> OpenDebugRetainerListWithoutAutoRetainerEnableAsync(
+        string operationName,
+        Func<bool> shouldContinue,
+        System.Threading.CancellationToken token)
     {
-        if (await Plugin.Framework.Run(() => IsDebugAddonReady("RetainerList")))
+        if (await Plugin.RunOnGameThread(() => IsDebugAddonReady("RetainerList")))
         {
-            var alreadySuppressed = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerGetSuppressed());
+            var alreadySuppressed = await Plugin.RunOnGameThread(() => plugin.IpcClient.AutoRetainerGetSuppressed());
             if (alreadySuppressed)
             {
-                var released = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerSetSuppressed(false));
+                var released = await Plugin.RunOnGameThread(() => plugin.IpcClient.AutoRetainerSetSuppressed(false));
                 if (!released)
                     return new(false, $"{operationName}: RetainerList is already active but failed to release AutoRetainer suppression.");
 
-                await System.Threading.Tasks.Task.Delay(250);
+                await System.Threading.Tasks.Task.Delay(250, token);
                 return new(true, $"{operationName}: RetainerList is already active and ready; AutoRetainer suppression released for custom-task processing.");
             }
 
@@ -3540,23 +3659,23 @@ public partial class SlaveWindow
         var releasedSuppression = false;
         try
         {
-            var alreadySuppressed = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerGetSuppressed());
+            var alreadySuppressed = await Plugin.RunOnGameThread(() => plugin.IpcClient.AutoRetainerGetSuppressed());
             wasSuppressedBeforeOpen = alreadySuppressed;
             if (!alreadySuppressed)
             {
-                var suppressed = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerSetSuppressed(true));
+                var suppressed = await Plugin.RunOnGameThread(() => plugin.IpcClient.AutoRetainerSetSuppressed(true));
                 if (!suppressed)
                     return new(false, $"{operationName}: failed to suppress AutoRetainer before Summoning Bell interaction.");
 
                 suppressedByTask = true;
-                await System.Threading.Tasks.Task.Delay(250);
+                await System.Threading.Tasks.Task.Delay(250, token);
             }
 
             var started = Environment.TickCount64;
             var interacted = false;
             while (shouldContinue() && Environment.TickCount64 - started < 20000)
             {
-                var opened = await Plugin.Framework.Run(() =>
+                var opened = await Plugin.RunOnGameThread(() =>
                 {
                     if (IsDebugAddonReady("RetainerList"))
                         return true;
@@ -3582,15 +3701,15 @@ public partial class SlaveWindow
 
                 if (opened)
                 {
-                    await System.Threading.Tasks.Task.Delay(250);
+                    await System.Threading.Tasks.Task.Delay(250, token);
                     if (suppressedByTask || wasSuppressedBeforeOpen)
                     {
-                        var released = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerSetSuppressed(false));
+                        var released = await Plugin.RunOnGameThread(() => plugin.IpcClient.AutoRetainerSetSuppressed(false));
                         if (!released)
                             return new(false, $"{operationName}: RetainerList active but failed to release AutoRetainer suppression.");
 
                         releasedSuppression = true;
-                        await System.Threading.Tasks.Task.Delay(250);
+                        await System.Threading.Tasks.Task.Delay(250, token);
                     }
 
                     var suffix = (suppressedByTask || wasSuppressedBeforeOpen)
@@ -3599,10 +3718,14 @@ public partial class SlaveWindow
                     return new(true, $"{operationName}: RetainerList active; {suffix}.");
                 }
 
-                await System.Threading.Tasks.Task.Delay(interacted ? 750 : 500);
+                await System.Threading.Tasks.Task.Delay(interacted ? 750 : 500, token);
             }
 
             return new(false, $"{operationName}: could not open RetainerList from Summoning Bell.");
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {
@@ -3612,18 +3735,18 @@ public partial class SlaveWindow
         {
             if (suppressedByTask && !releasedSuppression)
             {
-                try { await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerSetSuppressed(false)); } catch { }
+                try { await Plugin.RunOnGameThread(() => plugin.IpcClient.AutoRetainerSetSuppressed(false)); } catch { }
             }
         }
     }
 
     private void StartDebugAutoRetainerDepositGilMonitor(DateTime runStartedUtc)
     {
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("AR deposit gil monitor", async token =>
         {
             while (debugAutoRetainerDepositGilActive && debugAutoRetainerDepositGilStartedUtc == runStartedUtc)
             {
-                await System.Threading.Tasks.Task.Delay(1000);
+                await System.Threading.Tasks.Task.Delay(1000, token);
 
                 if (!debugAutoRetainerDepositGilActive || debugAutoRetainerDepositGilStartedUtc != runStartedUtc)
                     return;
@@ -3634,7 +3757,7 @@ public partial class SlaveWindow
 
                 if (!debugAutoRetainerDepositGilListTaskRequested && elapsed > TimeSpan.FromMinutes(2))
                 {
-                    await Plugin.Framework.Run(() =>
+                    await Plugin.RunOnGameThread(() =>
                     {
                         CompleteDebugAutoRetainerDepositGil("AR deposit gil: timed out waiting for RetainerList.", abortArTasks: true, closeRetainerList: true);
                         return true;
@@ -3644,7 +3767,7 @@ public partial class SlaveWindow
 
                 if (elapsed > TimeSpan.FromMinutes(15))
                 {
-                    await Plugin.Framework.Run(() =>
+                    await Plugin.RunOnGameThread(() =>
                     {
                         CompleteDebugAutoRetainerDepositGil("AR deposit gil: timed out after 15 minutes.", abortArTasks: true, closeRetainerList: true);
                         return true;
@@ -3658,11 +3781,11 @@ public partial class SlaveWindow
                 if (debugAutoRetainerDepositGilProcessedRetainers == 0 && idleFor < TimeSpan.FromSeconds(10))
                     continue;
 
-                var arBusy = await Plugin.Framework.Run(() => plugin.IpcClient.AutoRetainerPluginStateIsBusy());
+                var arBusy = await Plugin.RunOnGameThread(() => plugin.IpcClient.AutoRetainerPluginStateIsBusy());
                 if (!arBusy && idleFor > TimeSpan.FromSeconds(3))
                 {
-                    var remainingGil = await Plugin.Framework.Run(GetDebugCurrentCharacterGil);
-                    await Plugin.Framework.Run(() =>
+                    var remainingGil = await Plugin.RunOnGameThread(GetDebugCurrentCharacterGil);
+                    await Plugin.RunOnGameThread(() =>
                     {
                         CompleteDebugAutoRetainerDepositGil(
                             $"AR deposit gil stopped: retainers {debugAutoRetainerDepositGilProcessedRetainers}, requested {debugAutoRetainerDepositGilRequestedTotal:N0}, actual {debugAutoRetainerDepositGilActualTotal:N0}, remaining {remainingGil:N0}.",
@@ -3676,51 +3799,54 @@ public partial class SlaveWindow
         });
     }
 
-    private async System.Threading.Tasks.Task<DebugAutoRetainerDepositGilResult> RunDebugAutoRetainerDepositGilForRetainerAsync(string retainerName, int keepAmount)
+    private async System.Threading.Tasks.Task<DebugAutoRetainerDepositGilResult> RunDebugAutoRetainerDepositGilForRetainerAsync(
+        string retainerName,
+        int keepAmount,
+        System.Threading.CancellationToken token)
     {
-        var beforeGil = await Plugin.Framework.Run(GetDebugCurrentCharacterGil);
+        var beforeGil = await Plugin.RunOnGameThread(GetDebugCurrentCharacterGil);
         var requestedDeposit = Math.Max(0, beforeGil - keepAmount);
         if (requestedDeposit <= 0)
         {
             return new(0, 0, beforeGil, true, false, $"AR deposit gil: {retainerName} skipped; current gil {beforeGil:N0} is at or below keep {keepAmount:N0}.");
         }
 
-        if (!await WaitForDebugFrameworkConditionAsync(() => IsDebugAddonReady("SelectString"), 5000))
+        if (!await WaitForDebugFrameworkConditionAsync(() => IsDebugAddonReady("SelectString"), 5000, token))
             return new(0, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; SelectString did not become ready.");
 
-        if (!await Plugin.Framework.Run(SelectDebugAutoRetainerGilMenu))
+        if (!await Plugin.RunOnGameThread(SelectDebugAutoRetainerGilMenu))
             return new(0, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; could not select gil menu.");
 
-        if (!await WaitForDebugFrameworkConditionAsync(() => IsDebugAddonReady("Bank"), 5000))
+        if (!await WaitForDebugFrameworkConditionAsync(() => IsDebugAddonReady("Bank"), 5000, token))
             return new(0, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; Bank did not become ready.");
 
-        await System.Threading.Tasks.Task.Delay(500);
+        await System.Threading.Tasks.Task.Delay(500, token);
 
-        if (!await Plugin.Framework.Run(() => FireDebugBankSwapDepositMode()))
+        if (!await Plugin.RunOnGameThread(() => FireDebugBankSwapDepositMode()))
             return new(0, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; could not switch Bank to deposit mode.");
 
-        await System.Threading.Tasks.Task.Delay(500);
+        await System.Threading.Tasks.Task.Delay(500, token);
 
-        beforeGil = await Plugin.Framework.Run(GetDebugCurrentCharacterGil);
+        beforeGil = await Plugin.RunOnGameThread(GetDebugCurrentCharacterGil);
         requestedDeposit = Math.Max(0, beforeGil - keepAmount);
         if (requestedDeposit <= 0)
         {
-            await Plugin.Framework.Run(() => FireDebugBankProcessOrCancel(forceCancel: true));
+            await Plugin.RunOnGameThread(() => FireDebugBankProcessOrCancel(forceCancel: true));
             return new(0, 0, beforeGil, true, false, $"AR deposit gil: {retainerName} skipped after bank opened; gil {beforeGil:N0}, keep {keepAmount:N0}.");
         }
 
         var depositAmount = (uint)Math.Min(requestedDeposit, uint.MaxValue);
-        if (!await Plugin.Framework.Run(() => FireDebugBankSetDepositAmount(depositAmount)))
+        if (!await Plugin.RunOnGameThread(() => FireDebugBankSetDepositAmount(depositAmount)))
             return new(requestedDeposit, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; could not set deposit amount {requestedDeposit:N0}.");
 
-        await System.Threading.Tasks.Task.Delay(250);
+        await System.Threading.Tasks.Task.Delay(250, token);
 
-        if (!await Plugin.Framework.Run(() => FireDebugBankProcessOrCancel(forceCancel: false)))
+        if (!await Plugin.RunOnGameThread(() => FireDebugBankProcessOrCancel(forceCancel: false)))
             return new(requestedDeposit, 0, beforeGil, true, true, $"AR deposit gil: {retainerName} failed; could not process Bank deposit.");
 
-        await System.Threading.Tasks.Task.Delay(1000);
+        await System.Threading.Tasks.Task.Delay(1000, token);
 
-        var afterGil = await Plugin.Framework.Run(GetDebugCurrentCharacterGil);
+        var afterGil = await Plugin.RunOnGameThread(GetDebugCurrentCharacterGil);
         var actualDeposit = Math.Max(0, beforeGil - afterGil);
         var shouldStop = afterGil <= keepAmount;
         var capDetail = !shouldStop && actualDeposit < requestedDeposit
@@ -3735,15 +3861,19 @@ public partial class SlaveWindow
             $"AR deposit gil: {retainerName} requested {requestedDeposit:N0}, actual {actualDeposit:N0}, remaining {afterGil:N0}.{capDetail}");
     }
 
-    private static async System.Threading.Tasks.Task<bool> WaitForDebugFrameworkConditionAsync(Func<bool> condition, int timeoutMs, int pollMs = 100)
+    private static async System.Threading.Tasks.Task<bool> WaitForDebugFrameworkConditionAsync(
+        Func<bool> condition,
+        int timeoutMs,
+        System.Threading.CancellationToken token,
+        int pollMs = 100)
     {
         var started = Environment.TickCount64;
         while (Environment.TickCount64 - started < timeoutMs)
         {
-            if (await Plugin.Framework.Run(condition))
+            if (await Plugin.RunOnGameThread(condition))
                 return true;
 
-            await System.Threading.Tasks.Task.Delay(pollMs);
+            await System.Threading.Tasks.Task.Delay(pollMs, token);
         }
 
         return false;
@@ -3839,11 +3969,7 @@ public partial class SlaveWindow
             return false;
 
         var nodeIndex = forceCancel ? 2 : 3;
-        if (addon->UldManager.NodeListCount <= nodeIndex)
-            return false;
-
-        var node = addon->UldManager.NodeList[nodeIndex];
-        if (node == null || !node->IsVisible())
+        if (!NativeArrayAccess.TryGetNode(&addon->UldManager, nodeIndex, out var node) || !node->IsVisible())
             return false;
 
         var button = (AtkComponentButton*)node->GetComponent();
@@ -3861,13 +3987,6 @@ public partial class SlaveWindow
             ? "[XASlave] AR deposit gil: Bank cancelled."
             : "[XASlave] AR deposit gil: Bank deposit processed.");
         return true;
-    }
-
-    private void SetDebugResult(string msg)
-    {
-        debugResult = $"[{DateTime.Now:HH:mm:ss}] {msg}";
-        debugResultExpiry = DateTime.UtcNow.AddSeconds(15);
-        Plugin.Log.Information($"[XASlave] Debug: {msg}");
     }
 
     private static string FormatNullableBool(bool? value)
@@ -3894,59 +4013,14 @@ public partial class SlaveWindow
             : $"Callback test: failed to fire {addonName}; addon may be hidden or not ready.");
     }
 
-    private static bool TryParseDebugCallbackValues(string rawValues, out List<DebugCallbackValue> values, out string error)
+    private static unsafe bool FireDebugRawAddonCallback(string addonName, IReadOnlyList<DebugCallbackValue> values)
     {
-        values = new List<DebugCallbackValue>();
-        error = string.Empty;
-
-        if (string.IsNullOrWhiteSpace(rawValues))
-            return true;
-
-        var tokens = rawValues.Split(new[] { ' ', '\t', '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        foreach (var token in tokens)
+        if (values.Count > MaxDebugCallbackValues)
         {
-            if (token.Equals("null", StringComparison.OrdinalIgnoreCase))
-            {
-                values.Add(new DebugCallbackValue(DebugCallbackValueKind.Null, 0, 0, false, "null"));
-                continue;
-            }
-
-            if (bool.TryParse(token, out var boolValue))
-            {
-                values.Add(new DebugCallbackValue(DebugCallbackValueKind.Bool, boolValue ? 1 : 0, 0, boolValue, boolValue ? "true" : "false"));
-                continue;
-            }
-
-            if (token.StartsWith("uint:", StringComparison.OrdinalIgnoreCase)
-                || token.StartsWith("u:", StringComparison.OrdinalIgnoreCase))
-            {
-                var separatorIndex = token.IndexOf(':');
-                var uintText = separatorIndex >= 0 ? token[(separatorIndex + 1)..] : string.Empty;
-                if (uint.TryParse(uintText, out var uintValue))
-                {
-                    values.Add(new DebugCallbackValue(DebugCallbackValueKind.UInt, 0, uintValue, false, $"uint:{uintValue}"));
-                    continue;
-                }
-
-                error = $"'{token}' is not a valid uint token.";
-                return false;
-            }
-
-            if (int.TryParse(token, out var intValue))
-            {
-                values.Add(new DebugCallbackValue(DebugCallbackValueKind.Int, intValue, 0, false, intValue.ToString()));
-                continue;
-            }
-
-            error = $"Unsupported token '{token}'. Use signed integers, true/false, null, or uint:<value>.";
+            Plugin.Log.Warning($"[XASlave] Callback test refused {values.Count} values; maximum is {MaxDebugCallbackValues}.");
             return false;
         }
 
-        return true;
-    }
-
-    private static unsafe bool FireDebugRawAddonCallback(string addonName, IReadOnlyList<DebugCallbackValue> values)
-    {
         var addon = AddonHelper.GetAddon(addonName);
         if (addon == null || !addon->IsVisible || !addon->IsReady)
             return false;
@@ -4173,11 +4247,11 @@ public partial class SlaveWindow
         debugXaFcChestCheckRunning = true;
         SetDebugResult("XA FC Chest: starting debug run...");
 
-        _ = System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("XA FC Chest check", async token =>
         {
             try
             {
-                var (zoneName, zoneMatch, xaDbReady, vnavReady) = await Plugin.Framework.Run(() =>
+                var (zoneName, zoneMatch, xaDbReady, vnavReady) = await Plugin.RunOnGameThread(() =>
                 {
                     var currentZoneName = AddonHelper.GetCurrentZoneName();
                     return (
@@ -4206,39 +4280,39 @@ public partial class SlaveWindow
                 }
 
                 SetDebugResult($"XA FC Chest: zone '{zoneName}' OK - targeting Company Chest...");
-                await Plugin.Framework.Run(() => AddonHelper.TargetByName("Company Chest"));
+                await Plugin.RunOnGameThread(() => AddonHelper.TargetByName("Company Chest"));
 
-                if (!await WaitForDebugTargetMatchAsync("Company Chest", 3000))
+                if (!await WaitForDebugTargetMatchAsync("Company Chest", 3000, token))
                 {
                     SetDebugResult("XA FC Chest: failed to target Company Chest.");
                     return;
                 }
 
                 SetDebugResult("XA FC Chest: pathing to Company Chest (1.5y stop)...");
-                var pathStarted = await Plugin.Framework.Run(() => AddonHelper.TryPathToCurrentTarget(1.5f));
+                var pathStarted = await Plugin.RunOnGameThread(() => AddonHelper.TryPathToCurrentTarget(1.5f));
                 if (!pathStarted)
                 {
                     SetDebugResult("XA FC Chest: could not start path to Company Chest.");
                     return;
                 }
 
-                if (!await WaitForDebugTargetInRangeAsync("Company Chest", 1.5f, 20000))
+                if (!await WaitForDebugTargetInRangeAsync("Company Chest", 1.5f, 20000, token))
                 {
-                    plugin.IpcClient.VnavStop();
+                    await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                     SetDebugResult("XA FC Chest: path to Company Chest timed out.");
                     return;
                 }
 
-                if (!await TryOpenFcChestWithRecoveryAsync())
+                if (!await TryOpenFcChestWithRecoveryAsync(token))
                 {
                     return;
                 }
 
-                await System.Threading.Tasks.Task.Delay(500);
+                await System.Threading.Tasks.Task.Delay(500, token);
                 SetDebugResult("XA FC Chest: saving to XA Database...");
-                var saveOk = await Plugin.Framework.Run(() => plugin.SaveToXaDatabaseAndRecordSync());
+                var saveOk = await Plugin.RunOnGameThread(() => plugin.SaveToXaDatabaseAndRecordSync());
 
-                if (await CloseDebugAddonWithEscAsync("FreeCompanyChest", 12000))
+                if (await CloseDebugAddonWithEscAsync("FreeCompanyChest", 12000, token))
                 {
                     SetDebugResult(saveOk
                         ? "XA FC Chest: complete - saved to XA Database and closed FreeCompanyChest."
@@ -4251,27 +4325,35 @@ public partial class SlaveWindow
                         : "XA FC Chest: XA Database save failed and FreeCompanyChest stayed open after ESC retries.");
                 }
             }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
             catch (Exception ex)
             {
-                plugin.IpcClient.VnavStop();
+                await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                 SetDebugResult($"XA FC Chest: error - {ex.Message}");
             }
             finally
             {
                 debugXaFcChestCheckRunning = false;
             }
-        });
+        }, exclusive: true);
     }
 
-    private async System.Threading.Tasks.Task<bool> WaitForDebugTargetMatchAsync(string targetName, int timeoutMs, int pollMs = 100)
+    private async System.Threading.Tasks.Task<bool> WaitForDebugTargetMatchAsync(
+        string targetName,
+        int timeoutMs,
+        System.Threading.CancellationToken token,
+        int pollMs = 100)
     {
         int elapsed = 0;
         while (elapsed < timeoutMs)
         {
-            await System.Threading.Tasks.Task.Delay(pollMs);
+            await System.Threading.Tasks.Task.Delay(pollMs, token);
             elapsed += pollMs;
 
-            var matched = await Plugin.Framework.Run(() => AddonHelper.CurrentTargetMatches(targetName));
+            var matched = await Plugin.RunOnGameThread(() => AddonHelper.CurrentTargetMatches(targetName));
             if (matched)
                 return true;
         }
@@ -4279,15 +4361,20 @@ public partial class SlaveWindow
         return false;
     }
 
-    private async System.Threading.Tasks.Task<bool> WaitForDebugTargetInRangeAsync(string targetName, float stopDistance, int timeoutMs, int pollMs = 200)
+    private async System.Threading.Tasks.Task<bool> WaitForDebugTargetInRangeAsync(
+        string targetName,
+        float stopDistance,
+        int timeoutMs,
+        System.Threading.CancellationToken token,
+        int pollMs = 200)
     {
         int elapsed = 0;
         while (elapsed < timeoutMs)
         {
-            await System.Threading.Tasks.Task.Delay(pollMs);
+            await System.Threading.Tasks.Task.Delay(pollMs, token);
             elapsed += pollMs;
 
-            var inRange = await Plugin.Framework.Run(() =>
+            var inRange = await Plugin.RunOnGameThread(() =>
                 AddonHelper.IsCurrentTargetWithinStopDistanceAndStopped(targetName, stopDistance));
             if (inRange)
                 return true;
@@ -4296,7 +4383,7 @@ public partial class SlaveWindow
         return false;
     }
 
-    private async System.Threading.Tasks.Task<bool> TryOpenFcChestWithRecoveryAsync()
+    private async System.Threading.Tasks.Task<bool> TryOpenFcChestWithRecoveryAsync(System.Threading.CancellationToken token)
     {
         const string targetName = "Company Chest";
         const string addonName = "FreeCompanyChest";
@@ -4305,7 +4392,7 @@ public partial class SlaveWindow
         for (var recoveryAttempt = 0; recoveryAttempt <= maxRecoveryAttempts; recoveryAttempt++)
         {
             SetDebugResult($"XA FC Chest: interacting with {targetName}...");
-            var interactOk = await Plugin.Framework.Run(() =>
+            var interactOk = await Plugin.RunOnGameThread(() =>
             {
                 AddonHelper.DismissTextError();
                 return AddonHelper.InteractWithTarget();
@@ -4322,10 +4409,10 @@ public partial class SlaveWindow
 
             while (elapsed < interactTimeoutMs)
             {
-                await System.Threading.Tasks.Task.Delay(pollMs);
+                await System.Threading.Tasks.Task.Delay(pollMs, token);
                 elapsed += pollMs;
 
-                var (addonVisible, matchedText) = await Plugin.Framework.Run(() =>
+                var (addonVisible, matchedText) = await Plugin.RunOnGameThread(() =>
                 {
                     var opened = AddonHelper.IsAddonVisible(addonName);
                     var text = AddonHelper.TryGetCannotSeeTargetTextError(out var matched)
@@ -4341,27 +4428,27 @@ public partial class SlaveWindow
                 {
                     if (recoveryAttempt >= maxRecoveryAttempts)
                     {
-                        await Plugin.Framework.Run(() => AddonHelper.DismissTextError());
+                        await Plugin.RunOnGameThread(() => AddonHelper.DismissTextError());
                         SetDebugResult($"XA FC Chest: _TextError '{matchedText}' persisted after {maxRecoveryAttempts} recovery attempts.");
                         return false;
                     }
 
                     SetDebugResult($"XA FC Chest: _TextError '{matchedText}' - re-pathing for 0.5s, stopping vnav, and resetting camera ({recoveryAttempt + 1}/{maxRecoveryAttempts})...");
-                    await Plugin.Framework.Run(() =>
+                    await Plugin.RunOnGameThread(() =>
                     {
                         AddonHelper.DismissTextError();
                         AddonHelper.TryPathToCurrentTarget(1.5f);
                     });
 
-                    await System.Threading.Tasks.Task.Delay(500);
-                    plugin.IpcClient.VnavStop();
-                    await Plugin.Framework.Run(() =>
+                    await System.Threading.Tasks.Task.Delay(500, token);
+                    await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
+                    await Plugin.RunOnGameThread(() =>
                     {
                         AddonHelper.ResetCamera();
                         AddonHelper.DismissTextError();
                         AddonHelper.TargetByName(targetName);
                     });
-                    await System.Threading.Tasks.Task.Delay(250);
+                    await System.Threading.Tasks.Task.Delay(250, token);
                     break;
                 }
             }
@@ -4377,23 +4464,12 @@ public partial class SlaveWindow
         return false;
     }
 
-    private async System.Threading.Tasks.Task<bool> WaitForDebugAddonVisibleAsync(string addonName, int timeoutMs, int pollMs = 100)
-    {
-        int elapsed = 0;
-        while (elapsed < timeoutMs)
-        {
-            await System.Threading.Tasks.Task.Delay(pollMs);
-            elapsed += pollMs;
-
-            var visible = await Plugin.Framework.Run(() => AddonHelper.IsAddonVisible(addonName));
-            if (visible)
-                return true;
-        }
-
-        return false;
-    }
-
-    private async System.Threading.Tasks.Task<bool> CloseDebugAddonWithEscAsync(string addonName, int timeoutMs, int pollMs = 100, int escIntervalMs = 1000)
+    private async System.Threading.Tasks.Task<bool> CloseDebugAddonWithEscAsync(
+        string addonName,
+        int timeoutMs,
+        System.Threading.CancellationToken token,
+        int pollMs = 100,
+        int escIntervalMs = 1000)
     {
         int elapsed = 0;
         int closedChecks = 0;
@@ -4403,7 +4479,7 @@ public partial class SlaveWindow
 
         while (elapsed < timeoutMs)
         {
-            var visible = await Plugin.Framework.Run(() => AddonHelper.IsAddonVisible(addonName));
+            var visible = await Plugin.RunOnGameThread(() => AddonHelper.IsAddonVisible(addonName));
             if (!visible)
             {
                 closedChecks++;
@@ -4416,50 +4492,15 @@ public partial class SlaveWindow
                 if (elapsed - lastEscAtMs >= escIntervalMs)
                 {
                     lastEscAtMs = elapsed;
-                    await Plugin.Framework.Run(() => KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE));
+                    await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE));
                 }
             }
 
-            await System.Threading.Tasks.Task.Delay(pollMs);
+            await System.Threading.Tasks.Task.Delay(pollMs, token);
             elapsed += pollMs;
         }
 
         return false;
-    }
-
-    /// <summary>
-    /// Checks if the player is mounted or riding pillion.
-    /// </summary>
-    private static bool IsMounted()
-    {
-        return Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion];
-    }
-
-    /// <summary>
-    /// Checks if flying is unlocked in the current zone.
-    /// Uses PlayerState.CanFly field (offset 0x601), set during zone loading.
-    /// This is the direct equivalent of SND's Player.CanFly / dfunc HasFlightUnlocked().
-    /// </summary>
-    private static unsafe bool HasFlightUnlocked()
-    {
-        try
-        {
-            var ps = FFXIVClientStructs.FFXIV.Client.Game.UI.PlayerState.Instance();
-            if (ps == null)
-            {
-                Plugin.Log.Warning("[XASlave] HasFlightUnlocked: PlayerState.Instance() returned null");
-                return false;
-            }
-            var territory = Plugin.ClientState.TerritoryType;
-            var canFly = ps->CanFly;
-            Plugin.Log.Debug($"[XASlave] HasFlightUnlocked: territory={territory}, CanFly={canFly}");
-            return canFly;
-        }
-        catch (Exception ex)
-        {
-            Plugin.Log.Error($"[XASlave] HasFlightUnlocked error: {ex.Message}");
-            return false;
-        }
     }
 
     /// <summary>
@@ -4530,15 +4571,18 @@ public partial class SlaveWindow
     /// Returns true if movement completed, false if timed out.
     /// Equivalent to xafunc "MoveTo Completed" wait pattern.
     /// </summary>
-    private async System.Threading.Tasks.Task<bool> WaitForMovementComplete(int timeoutMs = 60000, int pollMs = 200)
+    private async System.Threading.Tasks.Task<bool> WaitForMovementComplete(
+        System.Threading.CancellationToken token,
+        int timeoutMs = 60000,
+        int pollMs = 200)
     {
         int elapsed = 0;
         while (elapsed < timeoutMs)
         {
-            await System.Threading.Tasks.Task.Delay(pollMs);
+            await System.Threading.Tasks.Task.Delay(pollMs, token);
             elapsed += pollMs;
 
-            var idle = await Plugin.Framework.Run(() => IsMovementIdle());
+            var idle = await Plugin.RunOnGameThread(() => IsMovementIdle());
             if (idle) return true;
         }
         return false;
@@ -4781,7 +4825,7 @@ public partial class SlaveWindow
             if (pluginInstance == null) return;
 
             await System.Threading.Tasks.Task.Delay(delayMs);
-            await Plugin.Framework.Run(() =>
+            await Plugin.RunOnGameThread(() =>
                 TrySetObjectMemberValue(pluginInstance, "OpenTabName", string.Empty));
         }
         catch (Exception ex)

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
+using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 
 namespace XASlave.Windows;
 
@@ -14,10 +15,13 @@ public partial class SlaveWindow
     private DateTime ipcCacheExpiry = DateTime.MinValue;
     private bool cachedArAvail, cachedLsAvail, cachedYaAvail, cachedDelAvail, cachedPbAvail, cachedDbxAvail;
     private bool cachedTaAvail, cachedArtAvail, cachedSplatAvail, cachedHonorificAvail;
+    private bool cachedXaDbReady, cachedVnavReady;
+    private string cachedXaDbVersion = string.Empty;
 
     // Live IPC bool polling
     private DateTime liveIpcExpiry = DateTime.MinValue;
     private readonly Dictionary<string, bool?> liveIpcValues = new();
+    private readonly Dictionary<string, string> liveClientStateValues = new();
 
     private void RefreshIpcCache()
     {
@@ -33,13 +37,17 @@ public partial class SlaveWindow
         cachedArtAvail = plugin.IpcClient.IsArtisanAvailable();
         cachedSplatAvail = plugin.IpcClient.IsSplatoonAvailable();
         cachedHonorificAvail = plugin.IpcClient.IsHonorificAvailable();
+        cachedXaDbReady = plugin.IpcClient.IsReady();
+        cachedXaDbVersion = cachedXaDbReady ? plugin.IpcClient.GetVersion() : string.Empty;
+        cachedVnavReady = plugin.IpcClient.VnavIsReady();
     }
 
     private void RefreshLiveIpcValues()
     {
         if (!plugin.Configuration.IpcLivePullsEnabled) return;
         if (DateTime.UtcNow < liveIpcExpiry) return;
-        liveIpcExpiry = DateTime.UtcNow.AddSeconds(plugin.Configuration.IpcLivePullIntervalSeconds);
+        var intervalSeconds = Math.Clamp(plugin.Configuration.IpcLivePullIntervalSeconds, 1, 30);
+        liveIpcExpiry = DateTime.UtcNow.AddSeconds(intervalSeconds);
 
         try
         {
@@ -109,8 +117,37 @@ public partial class SlaveWindow
                 plugin.TaskRunner.IsRunning
                 || plugin.AutoCollector.IsRunning
                 || plugin.AutoOpenMoogleMail.IsProcessing;
+
+            // Dalamud/client state (local reads, not IPC round-trips)
+            liveClientStateValues["IClientState.IsLoggedIn"] = Plugin.ClientState.IsLoggedIn ? "true" : "false";
+            liveClientStateValues["IClientState.Logout"] =
+                plugin.LastClientStateLogoutType.HasValue && plugin.LastClientStateLogoutCode.HasValue
+                    ? $"Type {plugin.LastClientStateLogoutType.Value}, Code {plugin.LastClientStateLogoutCode.Value} at {plugin.LastClientStateLogoutAtUtc:HH:mm:ss} UTC"
+                    : "Not observed this session";
+
+            unsafe
+            {
+                var lobby = AgentLobby.Instance();
+                if (lobby == null)
+                {
+                    liveClientStateValues["AgentLobby.IsLoggedIn"] = "unavailable";
+                    liveClientStateValues["AgentLobby.IsLoggedIntoZone"] = "unavailable";
+                    liveClientStateValues["AgentLobby.LogoutParams.Type"] = "unavailable";
+                    liveClientStateValues["AgentLobby.LogoutParams.Code"] = "unavailable";
+                }
+                else
+                {
+                    liveClientStateValues["AgentLobby.IsLoggedIn"] = lobby->IsLoggedIn ? "true" : "false";
+                    liveClientStateValues["AgentLobby.IsLoggedIntoZone"] = lobby->IsLoggedIntoZone ? "true" : "false";
+                    liveClientStateValues["AgentLobby.LogoutParams.Type"] = lobby->LogoutParams.Type.ToString();
+                    liveClientStateValues["AgentLobby.LogoutParams.Code"] = lobby->LogoutParams.Code.ToString();
+                }
+            }
         }
-        catch { /* individual failures already handled in IpcClient try/catch */ }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "[XASlave] Refreshing live IPC values failed.");
+        }
     }
 
     private void DrawIpcCallsAvailable()
@@ -124,18 +161,27 @@ public partial class SlaveWindow
         {
             plugin.Configuration.IpcLivePullsEnabled = livePulls;
             plugin.Configuration.Save();
-            if (!livePulls) liveIpcValues.Clear();
+            if (!livePulls)
+            {
+                liveIpcValues.Clear();
+                liveClientStateValues.Clear();
+            }
             else liveIpcExpiry = DateTime.MinValue;
         }
         if (livePulls)
         {
             ImGui.SameLine();
             ImGui.SetNextItemWidth(Scale(120f));
-            var interval = plugin.Configuration.IpcLivePullIntervalSeconds;
-            if (ImGui.SliderInt("##IpcInterval", ref interval, 0, 30, interval == 0 ? "Live" : $"{interval}s"))
+            var interval = Math.Clamp(plugin.Configuration.IpcLivePullIntervalSeconds, 1, 30);
+            if (interval != plugin.Configuration.IpcLivePullIntervalSeconds)
             {
                 plugin.Configuration.IpcLivePullIntervalSeconds = interval;
-                plugin.Configuration.Save();
+                plugin.Configuration.SaveDeferred();
+            }
+            if (ImGui.SliderInt("##IpcInterval", ref interval, 1, 30, $"{interval}s", ImGuiSliderFlags.AlwaysClamp))
+            {
+                plugin.Configuration.IpcLivePullIntervalSeconds = interval;
+                plugin.Configuration.SaveDeferred();
             }
             RefreshLiveIpcValues();
         }
@@ -148,7 +194,8 @@ public partial class SlaveWindow
         DrawIpcPluginStatus("XA Slave (Provider)", true, $"v{PluginVersion}");
 
         var cols0 = livePulls ? 4 : 3;
-        if (ImGui.BeginTable("IpcXaSlave", cols0, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcXaSlave", cols0, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(260f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -157,10 +204,9 @@ public partial class SlaveWindow
             ImGui.TableHeadersRow();
 
             DrawIpcRow("XASlave.IsBusy", "bool", "True while a task, auto-collection, or Moogle Mail operation is running", livePulls);
-            DrawIpcRow("XASlave.ExecuteCommand", "string", "Run the same subcommands accepted by `/xa` and return an `OK:`/`ERROR:` status string. Accepts either `logout`, `killgame`, or `/xa logout` style input.", livePulls);
+            DrawIpcRow("XASlave.ExecuteCommand", "string", "Mirror the direct `/xa` surface and return an `OK:`/`ERROR:` status string. Empty `/xa`, `updates`, `dbsub`, toggles, movement, and restore commands are supported; `/xa ...` input is accepted.", livePulls);
             DrawIpcRow("XASlave.RunTask", "Action", "Start a named task (string taskName)", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -169,19 +215,19 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Example IPC usage:");
         ImGui.BulletText("XASlave.IsBusy()");
         ImGui.BulletText("XASlave.ExecuteCommand(\"xamods\")");
+        ImGui.BulletText("XASlave.ExecuteCommand(\"dbsub 5000000\")");
         ImGui.BulletText("XASlave.ExecuteCommand(\"sprint on\")");
         ImGui.BulletText("XASlave.ExecuteCommand(\"killgame\")");
         ImGui.BulletText("XASlave.ExecuteCommand(\"/xa logout\")");
         ImGui.BulletText("XASlave.RunTask(\"save\")");
         ImGui.Spacing();
 
-        var dbReady = plugin.IpcClient.IsReady();
-        var dbVersion = plugin.IpcClient.GetVersion();
-        DrawIpcPluginStatus("XA Database", dbReady, dbReady ? $"v{dbVersion}" : null);
+        DrawIpcPluginStatus("XA Database", cachedXaDbReady, cachedXaDbReady ? $"v{cachedXaDbVersion}" : null);
 
         var cols = livePulls ? 4 : 3;
 
-        if (ImGui.BeginTable("IpcXaDb", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcXaDb", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(260f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -209,16 +255,15 @@ public partial class SlaveWindow
             DrawIpcRow("XA.Database.SearchItems", "string", "Item search (takes query)", livePulls);
             DrawIpcRow("XA.Database.GetMatchingCharactersForItems", "string", "Exact item-key match (takes itemId:isHq payload)", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
 
         // -- vnavmesh --
-        var vnavReady = plugin.IpcClient.VnavIsReady();
-        DrawIpcPluginStatus("vnavmesh", vnavReady, null);
+        DrawIpcPluginStatus("vnavmesh", cachedVnavReady, null);
 
-        if (ImGui.BeginTable("IpcVnav", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcVnav", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(340f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -234,7 +279,6 @@ public partial class SlaveWindow
             DrawIpcRow("vnavmesh.SimpleMove.PathfindInProgress", "bool", "SimpleMove pathfinding active", livePulls);
             DrawIpcRow("vnavmesh.Path.Stop", "Action", "Stop current path", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -242,7 +286,8 @@ public partial class SlaveWindow
         // -- AutoRetainer --
         DrawIpcPluginStatus("AutoRetainer", cachedArAvail, null);
 
-        if (ImGui.BeginTable("IpcAR", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcAR", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(380f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -263,7 +308,6 @@ public partial class SlaveWindow
             DrawIpcRow("AutoRetainer.SetSuppressed", "Action", "Set suppressed state (bool)", livePulls);
             DrawIpcRow("AutoRetainer.SetMultiModeEnabled", "Action", "Toggle multi-mode (bool)", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -271,7 +315,8 @@ public partial class SlaveWindow
         // -- Lifestream --
         DrawIpcPluginStatus("Lifestream", cachedLsAvail, null);
 
-        if (ImGui.BeginTable("IpcLS", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcLS", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -288,7 +333,6 @@ public partial class SlaveWindow
             DrawIpcRow("Lifestream.TeleportToApartment", "bool", "Teleport to apartment", livePulls);
             DrawIpcRow("Lifestream.AethernetTeleport", "bool", "Aethernet teleport by name", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -296,7 +340,8 @@ public partial class SlaveWindow
         // -- YesAlready --
         DrawIpcPluginStatus("YesAlready", cachedYaAvail, null);
 
-        if (ImGui.BeginTable("IpcYA", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcYA", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -308,7 +353,6 @@ public partial class SlaveWindow
             DrawIpcRow("YesAlready.SetPluginEnabled", "Action", "Enable/disable YesAlready (bool)", livePulls);
             DrawIpcRow("YesAlready.PausePlugin", "Action", "Pause for N milliseconds (int)", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -316,7 +360,8 @@ public partial class SlaveWindow
         // -- Deliveroo --
         DrawIpcPluginStatus("Deliveroo", cachedDelAvail, null);
 
-        if (ImGui.BeginTable("IpcDel", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcDel", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(260f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -326,7 +371,6 @@ public partial class SlaveWindow
 
             DrawIpcRow("Deliveroo.IsTurnInRunning", "bool", "True during GC turn-in", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -334,7 +378,8 @@ public partial class SlaveWindow
         // -- PandorasBox --
         DrawIpcPluginStatus("PandorasBox", cachedPbAvail, null);
 
-        if (ImGui.BeginTable("IpcPB", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcPB", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -346,7 +391,6 @@ public partial class SlaveWindow
             DrawIpcRow("PandorasBox.SetFeatureEnabled", "Action", "Enable/disable a feature (name, bool)", livePulls);
             DrawIpcRow("PandorasBox.PauseFeature", "Action", "Pause feature for N ms (name, int)", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -354,7 +398,8 @@ public partial class SlaveWindow
         // -- Dropbox --
         DrawIpcPluginStatus("Dropbox", cachedDbxAvail, null);
 
-        if (ImGui.BeginTable("IpcDB", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcDB", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(260f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -367,7 +412,6 @@ public partial class SlaveWindow
             DrawIpcRow("Dropbox.IsBusy", "bool", "True when trading", livePulls);
             DrawIpcRow("Dropbox.BeginTradingQueue", "Action", "Start trading queued items", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -375,7 +419,8 @@ public partial class SlaveWindow
         // -- TextAdvance --
         DrawIpcPluginStatus("TextAdvance", cachedTaAvail, null);
 
-        if (ImGui.BeginTable("IpcTA", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcTA", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -388,7 +433,6 @@ public partial class SlaveWindow
             DrawIpcRow("TextAdvance.IsPaused", "bool", "True when paused/blocked", livePulls);
             DrawIpcRow("TextAdvance.Stop", "Action", "Stop current task + movement", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -396,7 +440,8 @@ public partial class SlaveWindow
         // -- Artisan --
         DrawIpcPluginStatus("Artisan", cachedArtAvail, null);
 
-        if (ImGui.BeginTable("IpcArt", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcArt", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -414,7 +459,6 @@ public partial class SlaveWindow
             DrawIpcRow("Artisan.SetStopRequest", "Action", "Request stop/restart (bool)", livePulls);
             DrawIpcRow("Artisan.CraftItem", "Action", "Craft recipe x times (id, amount)", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -422,7 +466,8 @@ public partial class SlaveWindow
         // -- Splatoon --
         DrawIpcPluginStatus("Splatoon", cachedSplatAvail, null);
 
-        if (ImGui.BeginTable("IpcSplat", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcSplat", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
@@ -432,7 +477,6 @@ public partial class SlaveWindow
 
             DrawIpcRow("Splatoon.IsLoaded", "bool", "True when Splatoon is loaded", livePulls);
 
-            ImGui.EndTable();
         }
 
         ImGui.Spacing();
@@ -440,7 +484,8 @@ public partial class SlaveWindow
         // -- Honorific --
         DrawIpcPluginStatus("Honorific", cachedHonorificAvail, cachedHonorificAvail ? "API 3.2+" : null);
 
-        if (ImGui.BeginTable("IpcHonorific", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        using (var tableScope = ImRaii.Table("IpcHonorific", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
         {
             ImGui.TableSetupColumn("Channel", ImGuiTableColumnFlags.WidthFixed, Scale(300f));
             ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
@@ -452,7 +497,30 @@ public partial class SlaveWindow
             DrawIpcRow("Honorific.GetCharacterTitle", "string", "Resolved active title JSON for a visible object index.", livePulls);
             DrawIpcRow("Honorific.GetCharacterTitleList", "TitleData[]", "Configured default/custom title list for a character name and world id.", livePulls);
 
-            ImGui.EndTable();
+        }
+
+        ImGui.Spacing();
+
+        // -- Dalamud Client State --
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Dalamud Client State");
+        ImGui.TextDisabled("Local public-API and native AgentLobby reads; these are not IPC channels.");
+        ImGui.Spacing();
+
+        using (var tableScope = ImRaii.Table("DalamudClientState", cols, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg))
+        if (tableScope)
+        {
+            ImGui.TableSetupColumn("Member", ImGuiTableColumnFlags.WidthFixed, Scale(260f));
+            ImGui.TableSetupColumn("Type", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
+            ImGui.TableSetupColumn("Description");
+            if (livePulls) ImGui.TableSetupColumn("Value", ImGuiTableColumnFlags.WidthFixed, Scale(230f));
+            ImGui.TableHeadersRow();
+
+            DrawIpcRow("IClientState.IsLoggedIn", "bool", "Supported Dalamud property backed by the live AgentLobby login flag.", livePulls, liveClientStateValues.GetValueOrDefault("IClientState.IsLoggedIn"));
+            DrawIpcRow("IClientState.Logout", "event(int,int)", "Last logout callback observed by XA Slave this plugin session, including type, code, and UTC time.", livePulls, liveClientStateValues.GetValueOrDefault("IClientState.Logout"));
+            DrawIpcRow("AgentLobby.IsLoggedIn", "bool", "Native login flag read directly from the live lobby agent.", livePulls, liveClientStateValues.GetValueOrDefault("AgentLobby.IsLoggedIn"));
+            DrawIpcRow("AgentLobby.IsLoggedIntoZone", "bool", "Native flag indicating that the lobby completed a zone login.", livePulls, liveClientStateValues.GetValueOrDefault("AgentLobby.IsLoggedIntoZone"));
+            DrawIpcRow("AgentLobby.LogoutParams.Type", "int", "Stored native logout type. Type 2 opens the disconnect dialogue; this value may be default or stale.", livePulls, liveClientStateValues.GetValueOrDefault("AgentLobby.LogoutParams.Type"));
+            DrawIpcRow("AgentLobby.LogoutParams.Code", "int", "Stored native logout code. 10000 is normal logout and 90002 is lost connection; this value may be default or stale.", livePulls, liveClientStateValues.GetValueOrDefault("AgentLobby.LogoutParams.Code"));
         }
 
         ImGui.Spacing();
@@ -461,6 +529,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled("All calls are try/catch wrapped - missing plugins will not crash XA Slave.");
         ImGui.TextDisabled("Channel names verified from each plugin's IPC source code.");
         ImGui.TextDisabled("Connectivity refreshed every 5 seconds.");
+        ImGui.TextDisabled("Native LogoutParams is stored callback data, not an authoritative current network-health status.");
     }
 
     private static void DrawIpcPluginStatus(string name, bool? connected, string? extra)
@@ -474,7 +543,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
     }
 
-    private void DrawIpcRow(string channel, string type, string description, bool showValue = false)
+    private void DrawIpcRow(string channel, string type, string description, bool showValue = false, string? displayValue = null)
     {
         ImGui.TableNextRow();
         ImGui.TableNextColumn();
@@ -486,7 +555,22 @@ public partial class SlaveWindow
         if (showValue)
         {
             ImGui.TableNextColumn();
-            if ((type == "bool" || type == "bool?") && liveIpcValues.TryGetValue(channel, out var val))
+            if (displayValue != null)
+            {
+                if (type == "bool" && bool.TryParse(displayValue, out var boolValue))
+                {
+                    ImGui.TextColored(
+                        boolValue
+                            ? new Vector4(0.4f, 1.0f, 0.4f, 1.0f)
+                            : new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
+                        displayValue);
+                }
+                else
+                {
+                    ImGui.TextUnformatted(displayValue);
+                }
+            }
+            else if ((type == "bool" || type == "bool?") && liveIpcValues.TryGetValue(channel, out var val))
             {
                 if (!val.HasValue)
                     ImGui.TextDisabled("null");

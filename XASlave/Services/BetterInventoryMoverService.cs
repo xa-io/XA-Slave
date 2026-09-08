@@ -289,14 +289,12 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
 
         foreach (var inventoryType in destinationInventories)
         {
-            var container = manager->GetInventoryContainer(inventoryType);
-            if (container == null || !container->IsLoaded)
+            if (!NativeArrayAccess.TryGetInventoryContainer(manager, inventoryType, out var container))
                 continue;
 
             for (var index = 0; index < container->Size; index++)
             {
-                var slot = container->GetInventorySlot(index);
-                if (slot == null || !IsSameItem(slot, item))
+                if (!NativeArrayAccess.TryGetInventorySlot(container, index, out var slot) || !IsSameItem(slot, item))
                     continue;
 
                 if (slot->Quantity < itemData.StackSize)
@@ -309,14 +307,12 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
 
         foreach (var inventoryType in destinationInventories)
         {
-            var container = manager->GetInventoryContainer(inventoryType);
-            if (container == null || !container->IsLoaded)
+            if (!NativeArrayAccess.TryGetInventoryContainer(manager, inventoryType, out var container))
                 continue;
 
             for (var index = 0; index < container->Size; index++)
             {
-                var slot = container->GetInventorySlot(index);
-                if (slot == null || slot->GetItemId() != 0)
+                if (!NativeArrayAccess.TryGetInventorySlot(container, index, out var slot) || slot->GetItemId() != 0)
                     continue;
 
                 targetSlot = new TargetSlot(inventoryType, (ushort)slot->Slot);

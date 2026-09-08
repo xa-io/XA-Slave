@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -13,6 +14,7 @@ namespace XASlave.Windows;
 public partial class SlaveWindow
 {
     private readonly HashSet<int> prepLogisticsSelectedIndices = new();
+    private readonly ConcurrentQueue<string> prepLogisticsCompletedCharacterQueue = new();
     private string prepLogisticsNewChar = string.Empty;
     private string prepLogisticsSearchFilter = string.Empty;
     private string prepLogisticsWorldFilter = string.Empty;
@@ -25,6 +27,11 @@ public partial class SlaveWindow
         var cfg = plugin.Configuration;
         var runner = plugin.TaskRunner;
         var chars = cfg.PrepLogisticsCharacters;
+        while (prepLogisticsCompletedCharacterQueue.TryDequeue(out var completedCharacter))
+        {
+            if (SelectionCompletion.RemoveCompletedCharacter(chars, prepLogisticsSelectedIndices, completedCharacter))
+                runner.AddLog($"Prep Logistics: unchecked {completedCharacter} from the character list.");
+        }
         var arOk = plugin.IpcClient.IsAutoRetainerAvailable();
         var lsOk = plugin.IpcClient.IsLifestreamAvailable();
         var allRequired = arOk && lsOk;
@@ -35,25 +42,26 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
-        if (!arConfigExists) ImGui.BeginDisabled();
-        if (ImGui.Button("Import from AutoRetainer##prepLogisticsImportAR"))
+        using (ImRaii.Disabled(!arConfigExists))
         {
-            try
+            if (ImGui.Button("Import from AutoRetainer##prepLogisticsImportAR"))
             {
-                var (added, total) = ImportCharactersFromArToList(chars);
-                cfg.Save();
-                arImportStatus = added > 0
-                    ? $"Imported {added} new ({total} total)"
-                    : $"All {total} already in list";
-                arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
-            }
-            catch (Exception ex)
-            {
-                arImportStatus = $"Import failed: {ex.Message}";
-                arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                try
+                {
+                    var (added, total) = ImportCharactersFromArToList(chars);
+                    cfg.Save();
+                    arImportStatus = added > 0
+                        ? $"Imported {added} new ({total} total)"
+                        : $"All {total} already in list";
+                    arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                }
+                catch (Exception ex)
+                {
+                    arImportStatus = $"Import failed: {ex.Message}";
+                    arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                }
             }
         }
-        if (!arConfigExists) ImGui.EndDisabled();
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(arConfigExists
                 ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
@@ -61,10 +69,11 @@ public partial class SlaveWindow
 
         ImGui.SameLine();
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
-        if (!xaDbAvailable) ImGui.BeginDisabled();
-        if (ImGui.Button("Pull XA Database Info##prepLogisticsPullXA"))
-            PullXaDatabaseInfo();
-        if (!xaDbAvailable) ImGui.EndDisabled();
+        using (ImRaii.Disabled(!xaDbAvailable))
+        {
+            if (ImGui.Button("Pull XA Database Info##prepLogisticsPullXA"))
+                PullXaDatabaseInfo();
+        }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(xaDbAvailable
                 ? "Read XA Database to update character info shown in the table."
@@ -160,9 +169,10 @@ public partial class SlaveWindow
         ImGui.InputTextWithHint("##prepLogisticsSearch", "Search name or world...", ref prepLogisticsSearchFilter, 128);
         ImGui.Spacing();
 
-        if (ImGui.BeginTable("PrepLogisticsCharTable", 7,
+        using (var imguiScope171 = ImRaii.Table("PrepLogisticsCharTable", 7,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
             ScaledVector(0f, 250f)))
+        if (imguiScope171)
         {
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
@@ -253,25 +263,25 @@ public partial class SlaveWindow
                     ImGui.TextDisabled("-");
 
                 ImGui.TableNextColumn();
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
-                if (ImGui.SmallButton($"X##prepLogisticsRm{i}"))
+                using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
-                    chars.RemoveAt(i);
-                    prepLogisticsSelectedIndices.Remove(i);
-                    var newSet = new HashSet<int>();
-                    foreach (var idx in prepLogisticsSelectedIndices)
-                        newSet.Add(idx > i ? idx - 1 : idx);
-                    prepLogisticsSelectedIndices.Clear();
-                    foreach (var idx in newSet)
-                        prepLogisticsSelectedIndices.Add(idx);
-                    cfg.Save();
-                    ImGui.PopStyleColor();
-                    break;
+                    if (ImGui.SmallButton($"X##prepLogisticsRm{i}"))
+                    {
+                        chars.RemoveAt(i);
+                        prepLogisticsSelectedIndices.Remove(i);
+                        var newSet = new HashSet<int>();
+                        foreach (var idx in prepLogisticsSelectedIndices)
+                            newSet.Add(idx > i ? idx - 1 : idx);
+                        prepLogisticsSelectedIndices.Clear();
+                        foreach (var idx in newSet)
+                            prepLogisticsSelectedIndices.Add(idx);
+                        cfg.Save();
+                        break;
+                    }
                 }
-                ImGui.PopStyleColor();
             }
 
-            ImGui.EndTable();
+
         }
 
         ImGui.Spacing();
@@ -323,7 +333,8 @@ public partial class SlaveWindow
         if (ImGui.Button(label))
             ImGui.OpenPopup("PrepLogisticsWorldPopup");
 
-        if (!ImGui.BeginPopup("PrepLogisticsWorldPopup"))
+        using var popup = ImRaii.Popup("PrepLogisticsWorldPopup");
+        if (!popup)
             return;
 
         ImGui.SetNextItemWidth(Scale(240f));
@@ -336,14 +347,12 @@ public partial class SlaveWindow
             if (!regionWorlds.Any(w => string.IsNullOrWhiteSpace(prepLogisticsWorldFilter) || w.Name.Contains(prepLogisticsWorldFilter, StringComparison.OrdinalIgnoreCase)))
                 continue;
 
-            if (!ImGui.TreeNode(region))
+            using var regionNode = ImRaii.TreeNode(region);
+            if (!regionNode)
                 continue;
 
             if (!WorldData.DataCenterOrder.TryGetValue(region, out var dcs))
-            {
-                ImGui.TreePop();
                 continue;
-            }
 
             foreach (var dc in dcs)
             {
@@ -355,7 +364,8 @@ public partial class SlaveWindow
                 if (dcWorlds.Count == 0)
                     continue;
 
-                if (!ImGui.TreeNode(dc))
+                using var dataCenterNode = ImRaii.TreeNode(dc);
+                if (!dataCenterNode)
                     continue;
 
                 foreach (var world in dcWorlds)
@@ -369,23 +379,18 @@ public partial class SlaveWindow
                     ImGui.CloseCurrentPopup();
                     break;
                 }
-
-                ImGui.TreePop();
             }
-
-            ImGui.TreePop();
         }
-
-        ImGui.EndPopup();
     }
 
     private void DrawPrepLogisticsAetheryteSelector(XASlave.Configuration cfg)
     {
         if (string.IsNullOrWhiteSpace(cfg.PrepLogisticsTargetWorld))
         {
-            ImGui.BeginDisabled();
-            ImGui.Button("Select Location##prepLogisticsAetheryteButton");
-            ImGui.EndDisabled();
+            using (ImRaii.Disabled())
+            {
+                ImGui.Button("Select Location##prepLogisticsAetheryteButton");
+            }
             return;
         }
 
@@ -396,7 +401,8 @@ public partial class SlaveWindow
         if (ImGui.Button(label))
             ImGui.OpenPopup("PrepLogisticsAetherytePopup");
 
-        if (!ImGui.BeginPopup("PrepLogisticsAetherytePopup"))
+        using var popup = ImRaii.Popup("PrepLogisticsAetherytePopup");
+        if (!popup)
             return;
 
         ImGui.SetNextItemWidth(Scale(240f));
@@ -426,8 +432,6 @@ public partial class SlaveWindow
             ImGui.CloseCurrentPopup();
             break;
         }
-
-        ImGui.EndPopup();
     }
 
     private List<string> GetPrepLogisticsAetheryteNames()
@@ -527,8 +531,6 @@ public partial class SlaveWindow
         if (selected.Count == 0 || string.IsNullOrWhiteSpace(targetWorld))
             return;
 
-        HaltAutoCollectionForPriorityTask("Prep Logistics");
-
         var steps = BuildPrepLogisticsSteps(
             selected,
             targetWorld,
@@ -537,13 +539,15 @@ public partial class SlaveWindow
             cfg.PrepLogisticsLogoutOnComplete,
             cfg.PrepLogisticsKillGameOnComplete,
             plugin.TaskRunner);
-        reloggerRunList = new List<string>(selected);
-        AutoOpenTaskLogIfVerbose(ref prepLogisticsShowLog);
-
-        plugin.TaskRunner.Start("Prep Logistics", steps, onLog: msg =>
+        if (!plugin.TaskRunner.Start("Prep Logistics", steps, onLog: msg =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
-        });
+        }, totalItems: selected.Count, suppressLogoutCancel: true))
+            return;
+
+        HaltAutoCollectionForPriorityTask("Prep Logistics");
+        reloggerRunList = new List<string>(selected);
+        AutoOpenTaskLogIfVerbose(ref prepLogisticsShowLog);
     }
 
     private List<TaskStep> BuildPrepLogisticsSteps(List<string> characters, string targetWorld, string targetAetheryte, bool enableArMultiOnComplete, bool logoutOnComplete, bool killGameOnComplete, TaskRunner runner)
@@ -551,10 +555,6 @@ public partial class SlaveWindow
         var steps = new List<TaskStep>();
         var targetDestination = GetPrepLogisticsDestinationLabel(targetWorld, targetAetheryte);
         var lifestreamDestination = BuildPrepLogisticsDestinationCommand(targetWorld, targetAetheryte);
-        runner.TotalItems = characters.Count;
-        runner.CompletedItems = 0;
-        runner.SuppressLogoutCancel = true;
-
         steps.Add(new TaskStep
         {
             Name = "Disable AR Multi Mode",
@@ -610,7 +610,7 @@ public partial class SlaveWindow
                 OnTimeout = () =>
                 {
                     relogFailed = true;
-                    runner.FailedCharacters.Add(charName);
+                    runner.RecordFailedCharacter(charName);
                     runner.AddLog($"FAILED: Could not relog to {charName} after 3 attempt(s). Skipping travel.");
                 },
             });
@@ -845,16 +845,6 @@ public partial class SlaveWindow
 
     private void UncheckPrepLogisticsCharacter(string characterName, TaskRunner runner)
     {
-        var chars = plugin.Configuration.PrepLogisticsCharacters;
-        for (var idx = 0; idx < chars.Count; idx++)
-        {
-            if (!chars[idx].Equals(characterName, StringComparison.OrdinalIgnoreCase))
-                continue;
-
-            if (prepLogisticsSelectedIndices.Remove(idx))
-                runner.AddLog($"Prep Logistics: unchecked {characterName} from the character list.");
-
-            break;
-        }
+        prepLogisticsCompletedCharacterQueue.Enqueue(characterName);
     }
 }

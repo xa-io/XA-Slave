@@ -155,7 +155,10 @@ public unsafe sealed class MsqProgressDisplayService : IDisposable
                 return;
 
             var text = $"{quest.Name.ToString()} ({result.Remaining} / {result.PercentComplete:F1}%)";
-            scenarioTree->AtkValues[7].SetManagedString(text);
+            if (!NativeArrayAccess.TryGetAtkValue(scenarioTree, 7, out var scenarioValue))
+                return;
+
+            scenarioValue->SetManagedString(text);
             scenarioTree->OnRefresh(scenarioTree->AtkValuesCount, scenarioTree->AtkValues);
 
             var button = scenarioTree->GetComponentButtonById(13);

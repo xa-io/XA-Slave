@@ -37,6 +37,9 @@ public partial class SlaveWindow
 
     private string arImportStatus = string.Empty;
     private DateTime arImportStatusExpiry = DateTime.MinValue;
+    private readonly object xaDbPullSync = new();
+    private readonly List<Action> xaDbPullCallbacks = new();
+    private int xaDbPullRunning;
 
     // -----------------------------------------------
     //  Task: Monthly Relogger
@@ -70,10 +73,11 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
-        if (!arConfigExists) ImGui.BeginDisabled();
-        if (ImGui.Button("Import from AutoRetainer"))
-            ImportFromAutoRetainer();
-        if (!arConfigExists) ImGui.EndDisabled();
+        using (ImRaii.Disabled(!arConfigExists))
+        {
+            if (ImGui.Button("Import from AutoRetainer"))
+                ImportFromAutoRetainer();
+        }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(arConfigExists
                 ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
@@ -87,10 +91,11 @@ public partial class SlaveWindow
 
         ImGui.SameLine();
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
-        if (!xaDbAvailable) ImGui.BeginDisabled();
-        if (ImGui.Button("Pull XA Database Info"))
-            PullXaDatabaseInfo();
-        if (!xaDbAvailable) ImGui.EndDisabled();
+        using (ImRaii.Disabled(!xaDbAvailable))
+        {
+            if (ImGui.Button("Pull XA Database Info"))
+                PullXaDatabaseInfo();
+        }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(xaDbAvailable
                 ? "Read XA Database to update Lv, Gil, FC, Last Logged In for all characters.\nPulls directly from the SQLite database."
@@ -175,7 +180,7 @@ public partial class SlaveWindow
 
             ImGui.SameLine();
             ImGui.SetNextItemWidth(Scale(170f));
-            if (ImGui.SliderInt("##ReloggerStaleDays", ref staleSelectDays, 1, ReloggerStaleSliderMaxValue, "%d"))
+            if (ImGui.SliderInt("##ReloggerStaleDays", ref staleSelectDays, 1, ReloggerStaleSliderMaxValue, "%d", ImGuiSliderFlags.AlwaysClamp))
                 reloggerStaleSelectDaysInput = staleSelectDays;
             if (ImGui.IsItemDeactivatedAfterEdit() && cfg.ReloggerStaleSelectDays != reloggerStaleSelectDaysInput)
             {
@@ -214,9 +219,10 @@ public partial class SlaveWindow
         // Columns: checkbox, #, character, region, lv, gil, current rank, fc, in fc, personal, last logged in, remove
         var charInfo = cfg.ReloggerCharacterInfo;
 
-        if (ImGui.BeginTable("ReloggerCharTable", 12,
+        using (var imguiScope220 = ImRaii.Table("ReloggerCharTable", 12,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
             ScaledVector(0f, 250f)))
+        if (imguiScope220)
         {
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f)); // checkbox
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
@@ -331,21 +337,22 @@ public partial class SlaveWindow
                 ImGui.Text(displayCharName);
                 if (info != null && ImGui.IsItemHovered())
                 {
-                    ImGui.BeginTooltip();
-                    ImGui.Text(displayCharName);
-                    ImGui.Separator();
-                    ImGui.Text($"Level: {info.HighestLevel}");
-                    ImGui.Text($"Gil: {info.Gil:N0}");
-                    var rankLabel = GetFcMemberRankLabel(info);
-                    if (!string.IsNullOrEmpty(rankLabel))
-                        ImGui.Text($"Current Rank: {rankLabel}");
-                    if (!string.IsNullOrEmpty(info.FcName))
-                        ImGui.Text($"FC: {info.FcName}");
-                    if (!string.IsNullOrWhiteSpace(info.PersonalEstate))
-                        ImGui.Text($"Personal Estate: {info.PersonalEstate}");
-                    if (info.LastLoggedIn != DateTime.MinValue)
-                        ImGui.Text($"Last Logged In: {info.LastLoggedIn.ToLocalTime():yyyy-MM-dd HH:mm:ss}");
-                    ImGui.EndTooltip();
+                    using (ImRaii.Tooltip())
+                    {
+                        ImGui.Text(displayCharName);
+                        ImGui.Separator();
+                        ImGui.Text($"Level: {info.HighestLevel}");
+                        ImGui.Text($"Gil: {info.Gil:N0}");
+                        var rankLabel = GetFcMemberRankLabel(info);
+                        if (!string.IsNullOrEmpty(rankLabel))
+                            ImGui.Text($"Current Rank: {rankLabel}");
+                        if (!string.IsNullOrEmpty(info.FcName))
+                            ImGui.Text($"FC: {info.FcName}");
+                        if (!string.IsNullOrWhiteSpace(info.PersonalEstate))
+                            ImGui.Text($"Personal Estate: {info.PersonalEstate}");
+                        if (info.LastLoggedIn != DateTime.MinValue)
+                            ImGui.Text($"Last Logged In: {info.LastLoggedIn.ToLocalTime():yyyy-MM-dd HH:mm:ss}");
+                    }
                 }
 
                 // Mark characters AutoRetainer has no data for - they cannot be relogged.
@@ -430,24 +437,24 @@ public partial class SlaveWindow
 
                 // Remove button
                 ImGui.TableNextColumn();
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
-                if (ImGui.SmallButton($"X##rm{i}"))
+                using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
-                    chars.RemoveAt(i);
-                    reloggerSelectedIndices.Remove(i);
-                    var newSet = new HashSet<int>();
-                    foreach (var idx in reloggerSelectedIndices)
-                        newSet.Add(idx > i ? idx - 1 : idx);
-                    reloggerSelectedIndices.Clear();
-                    foreach (var idx in newSet) reloggerSelectedIndices.Add(idx);
-                    cfg.Save();
-                    ImGui.PopStyleColor();
-                    break;
+                    if (ImGui.SmallButton($"X##rm{i}"))
+                    {
+                        chars.RemoveAt(i);
+                        reloggerSelectedIndices.Remove(i);
+                        var newSet = new HashSet<int>();
+                        foreach (var idx in reloggerSelectedIndices)
+                            newSet.Add(idx > i ? idx - 1 : idx);
+                        reloggerSelectedIndices.Clear();
+                        foreach (var idx in newSet) reloggerSelectedIndices.Add(idx);
+                        cfg.Save();
+                        break;
+                    }
                 }
-                ImGui.PopStyleColor();
             }
 
-            ImGui.EndTable();
+
         }
 
         ImGui.Spacing();
@@ -669,8 +676,6 @@ public partial class SlaveWindow
     /// <summary>Start the Monthly Relogger task with the given character list.</summary>
     private void StartMonthlyRelogger(List<string> characters)
     {
-        HaltAutoCollectionForPriorityTask("Monthly Relogger");
-
         reloggerTask = new MonthlyReloggerTask(plugin)
         {
             DoEnableTextAdvance = plugin.Configuration.ReloggerDoTextAdvance,
@@ -699,8 +704,11 @@ public partial class SlaveWindow
             if (idx >= 0)
                 reloggerSelectedIndices.Remove(idx);
         });
-        plugin.TaskRunner.Start("Monthly Relogger", steps);
-        AutoOpenTaskLogIfVerbose(ref reloggerShowLog);
+        if (plugin.TaskRunner.Start("Monthly Relogger", steps, totalItems: characters.Count, suppressLogoutCancel: true))
+        {
+            HaltAutoCollectionForPriorityTask("Monthly Relogger");
+            AutoOpenTaskLogIfVerbose(ref reloggerShowLog);
+        }
     }
 
     /// <summary>
@@ -899,124 +907,170 @@ public partial class SlaveWindow
     /// and repair kit / ceruleum tank counts for all known characters.
     /// Uses the DB path from XA.Database.GetDbPath IPC, then reads SQLite directly.
     /// </summary>
-    private void PullXaDatabaseInfo()
+    private void PullXaDatabaseInfo(Action? afterApply = null)
     {
-        try
+        if (afterApply != null)
         {
-            var dbPath = plugin.IpcClient.GetDbPath();
-            if (string.IsNullOrEmpty(dbPath) || !System.IO.File.Exists(dbPath))
-            {
-                arImportStatus = "XA Database file not found.";
-                arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
-                return;
-            }
-
-            var cfg = plugin.Configuration;
-            var updated = 0;
-
-            using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
-            conn.Open();
-
-            // Query all characters with gil, highest job level, housing, and FC estate
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = @"
-                SELECT content_id, character_name, world, updated_utc,
-                       personal_estate, apartment,
-                       gil,
-                       highest_job_level AS highest_level,
-                       fc_name, fc_id, fc_estate,
-                       retainer_count,
-                       free_company_json,
-                       fc_members_json,
-                       inventory_summaries_json,
-                       items_json,
-                       listings_json,
-                       retainer_items_json
-                FROM xa_characters
-                ORDER BY character_name";
-
-            using var reader = cmd.ExecuteReader();
-            while (reader.Read())
-            {
-                var name = reader["character_name"].ToString() ?? "";
-                var world = reader["world"].ToString() ?? "";
-                var key = $"{name}@{world}";
-
-                // Update all characters from DB (needed for duplicate detection tasks)
-                if (!cfg.ReloggerCharacterInfo.TryGetValue(key, out var data))
-                    data = new ReloggerCharacterData();
-
-                var contentId = Convert.ToInt64(reader["content_id"]);
-                data.CID = contentId;
-
-                var dbLevel = Convert.ToInt32(reader["highest_level"]);
-                if (dbLevel > 0)
-                    data.HighestLevel = dbLevel;
-
-                var dbGil = Convert.ToInt32(reader["gil"]);
-                data.Gil = Math.Max(0, dbGil);
-
-                var fcName = reader["fc_name"].ToString() ?? "";
-                if (!string.IsNullOrEmpty(fcName))
-                    data.FcName = fcName;
-
-                var fcIdObj = reader["fc_id"];
-                if (fcIdObj != null && fcIdObj != DBNull.Value)
-                    data.FCID = Convert.ToInt64(fcIdObj);
-
-                // Housing data - always assign to clear stale values
-                data.PersonalEstate = reader["personal_estate"]?.ToString() ?? "";
-                data.Apartment = reader["apartment"]?.ToString() ?? "";
-                data.FcEstate = reader["fc_estate"]?.ToString() ?? "";
-                data.FcMemberRankName = string.Empty;
-                data.FcMemberRankSort = int.MaxValue;
-                data.FreeCompanyRank = 0;
-                data.MainInventoryUsedSlots = 0;
-                data.MainInventoryTotalSlots = 0;
-                data.MainInventoryFreeSlots = 0;
-                data.XaDatabaseSnapshotUpdatedUtc = DateTime.MinValue;
-                data.TreasureValue = 0;
-                data.MagitekRepairKits = 0;
-                data.CeruleumTanks = 0;
-
-                var dbRetainerCount = Convert.ToInt32(reader["retainer_count"]);
-                if (dbRetainerCount > 0)
-                    data.RetainerCount = dbRetainerCount;
-
-                UpdateCharacterFcMemberRank(data, name, world, reader["fc_members_json"]?.ToString() ?? "");
-                UpdateCharacterFreeCompanyRank(data, reader["free_company_json"]?.ToString() ?? "");
-                UpdateCharacterInventorySummary(data, reader["inventory_summaries_json"]?.ToString() ?? "");
-                UpdateCharacterItemHoldings(data,
-                    reader["items_json"]?.ToString() ?? "",
-                    reader["listings_json"]?.ToString() ?? "",
-                    reader["retainer_items_json"]?.ToString() ?? "");
-
-                var lastSeenStr = reader["updated_utc"].ToString() ?? "";
-                if (DateTime.TryParse(lastSeenStr, null, System.Globalization.DateTimeStyles.AssumeUniversal, out var lastSeen))
-                {
-                    lastSeen = lastSeen.ToUniversalTime();
-                    data.XaDatabaseSnapshotUpdatedUtc = lastSeen;
-                    if (lastSeen > data.LastLoggedIn)
-                        data.LastLoggedIn = lastSeen;
-                }
-
-                cfg.ReloggerCharacterInfo[key] = data;
-                updated++;
-            }
-
-            cfg.Save();
-
-            arImportStatus = $"XA DB: Updated {updated} characters";
-            arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
-            Plugin.Log.Information($"[XASlave] Pulled XA Database info for {updated} characters from {dbPath}");
+            lock (xaDbPullSync)
+                xaDbPullCallbacks.Add(afterApply);
         }
-        catch (Exception ex)
+
+        if (System.Threading.Interlocked.CompareExchange(ref xaDbPullRunning, 1, 0) != 0)
         {
-            arImportStatus = $"XA DB pull failed: {ex.Message}";
-            arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
-            Plugin.Log.Error($"[XASlave] PullXaDatabaseInfo error: {ex.Message}");
+            arImportStatus = "XA DB pull already in progress...";
+            arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
+            return;
+        }
+
+        arImportStatus = "XA DB: reading...";
+        arImportStatusExpiry = DateTime.UtcNow.AddSeconds(30);
+        if (!RunWorker("XA Database pull", async token =>
+        {
+            try
+            {
+                var dbPath = await Plugin.RunOnGameThread(() => plugin.IpcClient.GetDbPath());
+                if (string.IsNullOrWhiteSpace(dbPath) || !System.IO.File.Exists(dbPath))
+                    throw new System.IO.FileNotFoundException("XA Database file not found.", dbPath);
+
+                var rows = ReadXaDatabaseRows(dbPath, token);
+                await Plugin.RunOnGameThread(() => ApplyXaDatabaseRows(rows, dbPath));
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                await Plugin.RunOnGameThread(() =>
+                {
+                    arImportStatus = $"XA DB pull failed: {ex.Message}";
+                    arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                    Plugin.Log.Error(ex, "[XASlave] PullXaDatabaseInfo failed.");
+                });
+            }
+            finally
+            {
+                System.Threading.Interlocked.Exchange(ref xaDbPullRunning, 0);
+            }
+        }))
+        {
+            System.Threading.Interlocked.Exchange(ref xaDbPullRunning, 0);
         }
     }
+
+    private static List<XaDatabaseCharacterRow> ReadXaDatabaseRows(
+        string dbPath,
+        System.Threading.CancellationToken token)
+    {
+        var rows = new List<XaDatabaseCharacterRow>();
+        using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
+        conn.Open();
+        using var cmd = conn.CreateCommand();
+        cmd.CommandText = @"
+            SELECT content_id, character_name, world, updated_utc,
+                   personal_estate, apartment, gil,
+                   highest_job_level AS highest_level,
+                   fc_name, fc_id, fc_estate, retainer_count,
+                   free_company_json, fc_members_json, inventory_summaries_json,
+                   snapshot_version, inventory_json, saddlebag_json, crystals_json,
+                   armoury_json, equipped_json, items_json, listings_json, retainer_items_json
+            FROM xa_characters
+            ORDER BY character_name";
+
+        using var reader = cmd.ExecuteReader();
+        while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
+            var name = ReadDatabaseString(reader["character_name"]);
+            var world = ReadDatabaseString(reader["world"]);
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(world))
+                continue;
+
+            var data = new ReloggerCharacterData
+            {
+                CID = ReadDatabaseInt64(reader["content_id"]),
+                HighestLevel = Math.Max(0, ReadDatabaseInt32(reader["highest_level"])),
+                Gil = Math.Max(0, ReadDatabaseInt32(reader["gil"])),
+                FcName = ReadDatabaseString(reader["fc_name"]),
+                FCID = ReadDatabaseInt64(reader["fc_id"]),
+                PersonalEstate = ReadDatabaseString(reader["personal_estate"]),
+                Apartment = ReadDatabaseString(reader["apartment"]),
+                FcEstate = ReadDatabaseString(reader["fc_estate"]),
+                RetainerCount = Math.Max(0, ReadDatabaseInt32(reader["retainer_count"])),
+            };
+
+            UpdateCharacterFcMemberRank(data, name, world, ReadDatabaseString(reader["fc_members_json"]));
+            UpdateCharacterFreeCompanyRank(data, ReadDatabaseString(reader["free_company_json"]));
+            UpdateCharacterInventorySummary(data, ReadDatabaseString(reader["inventory_summaries_json"]));
+            UpdateCharacterItemHoldings(
+                data,
+                Math.Max(0, ReadDatabaseInt32(reader["snapshot_version"])),
+                ReadDatabaseString(reader["inventory_json"]),
+                ReadDatabaseString(reader["saddlebag_json"]),
+                ReadDatabaseString(reader["crystals_json"]),
+                ReadDatabaseString(reader["armoury_json"]),
+                ReadDatabaseString(reader["equipped_json"]),
+                ReadDatabaseString(reader["items_json"]),
+                ReadDatabaseString(reader["listings_json"]),
+                ReadDatabaseString(reader["retainer_items_json"]));
+
+            var lastSeenText = ReadDatabaseString(reader["updated_utc"]);
+            if (DateTime.TryParse(lastSeenText, null, System.Globalization.DateTimeStyles.AssumeUniversal, out var lastSeen))
+            {
+                data.XaDatabaseSnapshotUpdatedUtc = lastSeen.ToUniversalTime();
+                data.LastLoggedIn = data.XaDatabaseSnapshotUpdatedUtc;
+            }
+
+            rows.Add(new($"{name}@{world}", data));
+        }
+
+        return rows;
+    }
+
+    private void ApplyXaDatabaseRows(IReadOnlyList<XaDatabaseCharacterRow> rows, string dbPath)
+    {
+        var cfg = plugin.Configuration;
+        foreach (var row in rows)
+        {
+            if (cfg.ReloggerCharacterInfo.TryGetValue(row.Key, out var existing))
+            {
+                row.Data.CurrentWorld = existing.CurrentWorld;
+                row.Data.SubmarineCount = existing.SubmarineCount;
+                row.Data.FoundInAutoRetainer = existing.FoundInAutoRetainer;
+                if (existing.LastLoggedIn > row.Data.LastLoggedIn)
+                    row.Data.LastLoggedIn = existing.LastLoggedIn;
+            }
+            cfg.ReloggerCharacterInfo[row.Key] = row.Data;
+        }
+
+        cfg.SaveDeferred();
+        arImportStatus = $"XA DB: Updated {rows.Count} characters";
+        arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
+        Plugin.Log.Information($"[XASlave] Pulled XA Database info for {rows.Count} characters from {dbPath}");
+
+        Action[] callbacks;
+        lock (xaDbPullSync)
+        {
+            callbacks = xaDbPullCallbacks.ToArray();
+            xaDbPullCallbacks.Clear();
+        }
+        foreach (var callback in callbacks)
+        {
+            try { callback(); }
+            catch (Exception ex) { Plugin.Log.Warning(ex, "[XASlave] XA Database pull callback failed."); }
+        }
+    }
+
+    private static string ReadDatabaseString(object? value)
+        => DatabaseValueReader.ReadString(value);
+
+    private static long ReadDatabaseInt64(object? value)
+        => DatabaseValueReader.ReadInt64(value);
+
+    private static int ReadDatabaseInt32(object? value)
+        => DatabaseValueReader.ReadInt32(value);
+
+    private sealed record XaDatabaseCharacterRow(string Key, ReloggerCharacterData Data);
 
     private static void UpdateCharacterFcMemberRank(ReloggerCharacterData data, string name, string world, string fcMembersJson)
     {
@@ -1151,14 +1205,26 @@ public partial class SlaveWindow
     /// Update treasure value and submarine consumable counts from XA Database item snapshots.
     /// Treasure value follows the Export Data TRS rules (character items + market listings + retainer items);
     /// Magitek Repair Kits and Ceruleum Tanks count only items the character itself is holding.
+    /// Snapshot v3 stores character items in typed JSON sections and leaves items_json for unclassified rows;
+    /// older snapshots keep the complete character-item list in items_json.
     /// </summary>
-    private static void UpdateCharacterItemHoldings(ReloggerCharacterData data, string itemsJson, string listingsJson, string retainerItemsJson)
+    private static void UpdateCharacterItemHoldings(
+        ReloggerCharacterData data,
+        int snapshotVersion,
+        string inventoryJson,
+        string saddlebagJson,
+        string crystalsJson,
+        string armouryJson,
+        string equippedJson,
+        string itemsJson,
+        string listingsJson,
+        string retainerItemsJson)
     {
         long treasureValue = 0;
         long repairKits = 0;
         long ceruleumTanks = 0;
 
-        ForEachItemSnapshotEntry(itemsJson, (itemId, quantity) =>
+        void AccumulateCharacterItem(uint itemId, int quantity)
         {
             if (ExportTreasureValues.TryGetValue(itemId, out var itemValue))
                 treasureValue += (long)quantity * itemValue;
@@ -1166,7 +1232,27 @@ public partial class SlaveWindow
                 repairKits += quantity;
             else if (itemId == CeruleumTankItemId)
                 ceruleumTanks += quantity;
-        });
+        }
+
+        if (snapshotVersion >= 3)
+        {
+            ForEachItemSnapshotEntry(inventoryJson, AccumulateCharacterItem);
+            ForEachItemSnapshotEntry(saddlebagJson, AccumulateCharacterItem);
+            ForEachItemSnapshotEntry(crystalsJson, AccumulateCharacterItem);
+            ForEachItemSnapshotEntry(armouryJson, AccumulateCharacterItem);
+            ForEachItemSnapshotEntry(equippedJson, AccumulateCharacterItem);
+            ForEachItemSnapshotEntry(itemsJson, AccumulateCharacterItem);
+        }
+        else if (ForEachItemSnapshotEntry(itemsJson, AccumulateCharacterItem) == 0)
+        {
+            // Compatibility fallback for migrated rows whose legacy all-items payload is empty.
+            ForEachItemSnapshotEntry(inventoryJson, AccumulateCharacterItem);
+            ForEachItemSnapshotEntry(saddlebagJson, AccumulateCharacterItem);
+            ForEachItemSnapshotEntry(crystalsJson, AccumulateCharacterItem);
+            ForEachItemSnapshotEntry(armouryJson, AccumulateCharacterItem);
+            ForEachItemSnapshotEntry(equippedJson, AccumulateCharacterItem);
+        }
+
         ForEachItemSnapshotEntry(listingsJson, (itemId, quantity) =>
         {
             if (ExportTreasureValues.TryGetValue(itemId, out var itemValue))
@@ -1183,17 +1269,18 @@ public partial class SlaveWindow
         data.CeruleumTanks = ceruleumTanks > int.MaxValue ? int.MaxValue : (int)ceruleumTanks;
     }
 
-    private static void ForEachItemSnapshotEntry(string itemSnapshotJson, Action<uint, int> onEntry)
+    private static int ForEachItemSnapshotEntry(string itemSnapshotJson, Action<uint, int> onEntry)
     {
         if (string.IsNullOrWhiteSpace(itemSnapshotJson))
-            return;
+            return 0;
 
         try
         {
             using var doc = JsonDocument.Parse(itemSnapshotJson);
             if (doc.RootElement.ValueKind != JsonValueKind.Array)
-                return;
+                return 0;
 
+            var processedEntries = 0;
             foreach (var entry in doc.RootElement.EnumerateArray())
             {
                 if (entry.ValueKind != JsonValueKind.Object)
@@ -1210,10 +1297,14 @@ public partial class SlaveWindow
                     continue;
 
                 onEntry((uint)itemId, quantity);
+                processedEntries++;
             }
+
+            return processedEntries;
         }
         catch
         {
+            return 0;
         }
     }
 

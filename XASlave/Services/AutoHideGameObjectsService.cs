@@ -234,7 +234,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
     {
         void* original = null;
         if (updateObjectArraysHook != null)
-            original = updateObjectArraysHook.Original(objectManager);
+            original = updateObjectArraysHook.OriginalDisposeSafe(objectManager);
 
         if (enabled)
         {

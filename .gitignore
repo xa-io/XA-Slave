@@ -14,6 +14,7 @@ obj/
 *.user
 *.suo
 *.cache
+AGENTS.md
 
 # Backups (local development history)
 backups/
@@ -28,6 +29,8 @@ github_release_stable/
 github_release_testing/
 dual_builds/
 .github_release.staging/
+.github_release.staging-*/
+github_release.previous-*/
 .github_release_stable.staging/
 .github_release_testing.staging/
 .github_release_stable.previous-*/
@@ -40,6 +43,7 @@ TestResults/
 test/
 tests/
 *.Tests/
+*.Core/
 
 # Root-level images (not plugin assets)
 *.png
@@ -51,6 +55,9 @@ Plugin References/
 Previous Releases/
 *Sigs.cs
 *Sig.cs
+*[Ss]igs.cs
+*[Ss]ig.cs
+*[Ss]ignature*.cs
 
 # Python cache
 __pycache__/
@@ -61,3 +68,7 @@ crash_log_*.log
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Local XAPR protection tooling and isolated build artifacts.
+/artifacts/
+/xapr/

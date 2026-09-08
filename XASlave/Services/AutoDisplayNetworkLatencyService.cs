@@ -105,7 +105,13 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
 
         enabled = true;
         Subscribe();
-        StartMonitoring();
+        if (!StartMonitoring())
+        {
+            enabled = false;
+            Unsubscribe();
+            StatusText = "Unavailable - previous network monitor did not stop safely.";
+            return false;
+        }
         PublishPlaceholderDtr("Resolving game endpoint.");
         StatusText = BuildStatusText();
         return true;
@@ -114,11 +120,17 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
     public unsafe void Dispose()
     {
         enabled = false;
-        StopMonitoring();
+        var stopped = StopMonitoring();
         Unsubscribe();
         RemoveDtrEntry();
-        pingSender.Dispose();
 
+        if (!stopped)
+        {
+            log.Error("[XASlave] Network latency monitor is still running during disposal; retaining its Ping and native-buffer resources to prevent a use-after-free.");
+            return;
+        }
+
+        pingSender.Dispose();
         if (tcpBuffer != IntPtr.Zero)
         {
             NativeMemory.Free((void*)tcpBuffer);
@@ -154,30 +166,44 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
         needsAddressRefresh = true;
     }
 
-    private void StartMonitoring()
+    private bool StartMonitoring()
     {
-        StopMonitoring();
+        if (!StopMonitoring())
+            return false;
+
         cancellationTokenSource = new CancellationTokenSource();
         monitorTask = Task.Run(() => MonitorLoop(cancellationTokenSource.Token), cancellationTokenSource.Token);
+        return true;
     }
 
-    private void StopMonitoring()
+    private bool StopMonitoring()
     {
-        cancellationTokenSource?.Cancel();
+        var source = cancellationTokenSource;
+        var task = monitorTask;
+        source?.Cancel();
 
+        var stopped = true;
         try
         {
-            monitorTask?.Wait(2000);
+            stopped = task?.Wait(5000) ?? true;
         }
-        catch
+        catch (AggregateException)
         {
-            // Best-effort shutdown during plugin unload.
+            // The task has completed with its own cancellation/error path.
+            stopped = true;
+        }
+
+        if (!stopped)
+        {
+            log.Error("[XASlave] Network latency monitor did not stop within 5 seconds; retaining resources it may still be using.");
+            return false;
         }
 
         monitorTask = null;
-        cancellationTokenSource?.Dispose();
         cancellationTokenSource = null;
+        source?.Dispose();
         ResetMetrics();
+        return true;
     }
 
     private async Task MonitorLoop(CancellationToken cancellationToken)
@@ -235,7 +261,7 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
         LossRate = 0;
         StatusText = BuildStatusText();
 
-        framework.RunOnTick(() =>
+        Plugin.ScheduleOnGameThread(() =>
         {
             if (!enabled)
                 return;
@@ -274,7 +300,7 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
                 : serverEndpointSnapshot;
         }
 
-        framework.RunOnTick(() =>
+        Plugin.ScheduleOnGameThread(() =>
         {
             if (!enabled)
                 return;

@@ -11,7 +11,6 @@ public partial class SlaveWindow
     private const int DebugLeaveDutyQuickMenuAttempts = 8;
     private const int DebugLeaveDutyQuickPromptAttempts = 12;
     private const int DebugLeaveDutyQuickRetryDelayMilliseconds = 250;
-    private int debugLeaveDutyQuickRunning;
 
     public bool TryExecuteXaMovementCommand(string subcommand, string arguments, out string message, out bool handled)
     {
@@ -42,7 +41,24 @@ public partial class SlaveWindow
             }
         }
 
-        switch (normalized.ToLowerInvariant())
+        var normalizedCommand = normalized.ToLowerInvariant();
+        var isExclusiveCommand = normalizedCommand is
+            "movingcheatersmart" or
+            "movingcheaterfly" or
+            "movingcheaterwalk" or
+            "interact" or
+            "leaveduty" or
+            "recommendedgear" or
+            "pathtotargetinteract" or
+            "pathsmartinteract";
+        if (isExclusiveCommand && System.Threading.Volatile.Read(ref exclusiveWorkerRunning) != 0)
+        {
+            message = $"'{normalizedCommand}' rejected - another movement command is already running.";
+            SetDebugResult(message);
+            return false;
+        }
+
+        switch (normalizedCommand)
         {
             case "movingcheatersmart":
                 RunDebugMovingCheaterSmart();
@@ -89,90 +105,132 @@ public partial class SlaveWindow
 
     private void RunDebugInteract()
     {
-        var ok = AddonHelper.InteractWithTarget();
-        SetDebugResult(ok ? "InteractWithTarget: OK" : "No target or interaction failed");
+        RunWorker("Interact", async token =>
+        {
+            token.ThrowIfCancellationRequested();
+            var ok = await Plugin.RunOnGameThread(AddonHelper.InteractWithTarget);
+            SetDebugResult(ok ? "InteractWithTarget: OK" : "No target or interaction failed");
+        }, exclusive: true);
+    }
+
+    private async System.Threading.Tasks.Task<bool> WaitForDebugAddonVisibleAsync(
+        string addonName,
+        int timeoutMs,
+        System.Threading.CancellationToken token,
+        int pollMs = 100)
+    {
+        var elapsed = 0;
+        while (elapsed < timeoutMs)
+        {
+            await System.Threading.Tasks.Task.Delay(pollMs, token);
+            elapsed += pollMs;
+
+            var visible = await Plugin.RunOnGameThread(() => AddonHelper.IsAddonVisible(addonName));
+            if (visible)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsMounted()
+        => Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion];
+
+    private static unsafe bool HasFlightUnlocked()
+    {
+        try
+        {
+            var playerState = FFXIVClientStructs.FFXIV.Client.Game.UI.PlayerState.Instance();
+            if (playerState == null)
+            {
+                Plugin.Log.Warning("[XASlave] HasFlightUnlocked: PlayerState.Instance() returned null");
+                return false;
+            }
+
+            var territory = Plugin.ClientState.TerritoryType;
+            var canFly = playerState->CanFly;
+            Plugin.Log.Debug($"[XASlave] HasFlightUnlocked: territory={territory}, CanFly={canFly}");
+            return canFly;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Error($"[XASlave] HasFlightUnlocked error: {ex.Message}");
+            return false;
+        }
     }
 
     private void RunDebugVnavStop()
     {
-        plugin.IpcClient.VnavStop();
-        SetDebugResult("Sent: vnavmesh.Path.Stop()");
+        RunWorker("Stop Movement", async token =>
+        {
+            token.ThrowIfCancellationRequested();
+            await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
+            SetDebugResult("Sent: vnavmesh.Path.Stop()");
+        });
     }
 
     private void RunDebugMovingCheaterSmart()
     {
-        try
+        RunWorker("MovingCheater Smart", async token =>
         {
-            if (!TryStartMovingCheaterMountStep(out var alreadyMounted))
-                return;
+            token.ThrowIfCancellationRequested();
+            await Plugin.RunOnGameThread(() =>
+            {
+                if (!TryStartMovingCheaterMountStep(out var alreadyMounted))
+                    return;
 
-            var canFly = HasFlightUnlocked();
-            if (canFly)
-            {
-                ChatHelper.SendMessage("/vnav flyflag");
-                SetDebugResult(alreadyMounted
-                    ? "Smart: Already mounted + /vnav flyflag (flying unlocked in zone)"
-                    : "Smart: Mount + /vnav flyflag (flying unlocked in zone)");
-            }
-            else
-            {
-                ChatHelper.SendMessage("/vnav moveflag");
-                SetDebugResult(alreadyMounted
-                    ? "Smart: Already mounted + /vnav moveflag (flying NOT unlocked, ground pathfind)"
-                    : "Smart: Mount + /vnav moveflag (flying NOT unlocked, ground pathfind)");
-            }
-        }
-        catch (Exception ex)
-        {
-            SetDebugResult($"MovingCheater error: {ex.Message}");
-        }
+                var canFly = HasFlightUnlocked();
+                ChatHelper.SendMessage(canFly ? "/vnav flyflag" : "/vnav moveflag");
+                SetDebugResult(canFly
+                    ? alreadyMounted
+                        ? "Smart: Already mounted + /vnav flyflag (flying unlocked in zone)"
+                        : "Smart: Mount + /vnav flyflag (flying unlocked in zone)"
+                    : alreadyMounted
+                        ? "Smart: Already mounted + /vnav moveflag (flying NOT unlocked, ground pathfind)"
+                        : "Smart: Mount + /vnav moveflag (flying NOT unlocked, ground pathfind)");
+            });
+        }, exclusive: true);
     }
 
     private void RunDebugMovingCheaterFly()
     {
-        try
+        RunWorker("MovingCheater Fly", async token =>
         {
-            if (!TryStartMovingCheaterMountStep(out var alreadyMounted))
-                return;
+            token.ThrowIfCancellationRequested();
+            await Plugin.RunOnGameThread(() =>
+            {
+                if (!TryStartMovingCheaterMountStep(out var alreadyMounted))
+                    return;
 
-            var canFly = HasFlightUnlocked();
-            if (canFly)
-            {
-                ChatHelper.SendMessage("/vnav flyflag");
-                SetDebugResult(alreadyMounted
-                    ? "Sent: already mounted + /vnav flyflag (flying unlocked)"
-                    : "Sent: Mount + /vnav flyflag (flying unlocked)");
-            }
-            else
-            {
-                ChatHelper.SendMessage("/vnav moveflag");
-                SetDebugResult(alreadyMounted
-                    ? "Sent: already mounted + /vnav moveflag (flight NOT unlocked, fallback to ground)"
-                    : "Sent: Mount + /vnav moveflag (flight NOT unlocked, fallback to ground)");
-            }
-        }
-        catch (Exception ex)
-        {
-            SetDebugResult($"MovingCheater error: {ex.Message}");
-        }
+                var canFly = HasFlightUnlocked();
+                ChatHelper.SendMessage(canFly ? "/vnav flyflag" : "/vnav moveflag");
+                SetDebugResult(canFly
+                    ? alreadyMounted
+                        ? "Sent: already mounted + /vnav flyflag (flying unlocked)"
+                        : "Sent: Mount + /vnav flyflag (flying unlocked)"
+                    : alreadyMounted
+                        ? "Sent: already mounted + /vnav moveflag (flight NOT unlocked, fallback to ground)"
+                        : "Sent: Mount + /vnav moveflag (flight NOT unlocked, fallback to ground)");
+            });
+        }, exclusive: true);
     }
 
     private void RunDebugMovingCheaterWalk()
     {
-        try
+        RunWorker("MovingCheater Walk", async token =>
         {
-            if (!TryStartMovingCheaterMountStep(out var alreadyMounted))
-                return;
+            token.ThrowIfCancellationRequested();
+            await Plugin.RunOnGameThread(() =>
+            {
+                if (!TryStartMovingCheaterMountStep(out var alreadyMounted))
+                    return;
 
-            ChatHelper.SendMessage("/vnav moveflag");
-            SetDebugResult(alreadyMounted
-                ? "Sent: already mounted + /vnav moveflag (force ground)"
-                : "Sent: Mount + /vnav moveflag (force ground)");
-        }
-        catch (Exception ex)
-        {
-            SetDebugResult($"MovingCheater error: {ex.Message}");
-        }
+                ChatHelper.SendMessage("/vnav moveflag");
+                SetDebugResult(alreadyMounted
+                    ? "Sent: already mounted + /vnav moveflag (force ground)"
+                    : "Sent: Mount + /vnav moveflag (force ground)");
+            });
+        }, exclusive: true);
     }
 
     private bool TryStartMovingCheaterMountStep(out bool alreadyMounted)
@@ -193,6 +251,9 @@ public partial class SlaveWindow
 
     private void RunDebugPathToTargetThenInteract()
     {
+        if (RejectIfExclusiveWorkerBusy("PathToTargetThenInteract"))
+            return;
+
         var local = Plugin.ObjectTable.LocalPlayer;
         var target = local?.TargetObject;
         if (target == null)
@@ -222,7 +283,7 @@ public partial class SlaveWindow
 
         SetDebugResult($"Pathing to {targetName} (stop={stopDist:F1}y, interact<={interactRange:F1}y ring)");
         Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: {targetName} hitbox={targetHitbox:F1} stopDist={stopDist:F1} interactRange={interactRange:F1}");
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("PathToTargetThenInteract", async token =>
         {
             var distSamples = new System.Collections.Generic.List<float>();
             const int maxSamples = 7;
@@ -233,15 +294,15 @@ public partial class SlaveWindow
             bool interacted = false;
             int jumpAttempts = 0;
 
-            await System.Threading.Tasks.Task.Delay(600);
+            await System.Threading.Tasks.Task.Delay(600, token);
             elapsed += 600;
 
             while (elapsed < maxTimeoutMs)
             {
-                await System.Threading.Tasks.Task.Delay(pollMs);
+                await System.Threading.Tasks.Task.Delay(pollMs, token);
                 elapsed += pollMs;
 
-                var (ringDist, centerDist, pathRunning, pathfinding) = await Plugin.Framework.Run(() =>
+                var (ringDist, centerDist, pathRunning, pathfinding) = await Plugin.RunOnGameThread(() =>
                 {
                     var lp = Plugin.ObjectTable.LocalPlayer;
                     var tgt = lp?.TargetObject;
@@ -259,8 +320,8 @@ public partial class SlaveWindow
                 if (ringDist <= 0)
                 {
                     SetDebugResult($"Overlapping {targetName}: ring={ringDist:F1}y, interacting");
-                    await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
-                    plugin.IpcClient.VnavStop();
+                    await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
+                    await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                     Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: overlapping interact with {targetName} (ring={ringDist:F1}y)");
                     interacted = true;
                     break;
@@ -282,8 +343,8 @@ public partial class SlaveWindow
                 if (ringDist <= interactRange)
                 {
                     SetDebugResult($"In range of {targetName}: ring={ringDist:F1}y, interacting");
-                    await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
-                    plugin.IpcClient.VnavStop();
+                    await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
+                    await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                     Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: interacted with {targetName} (ring={ringDist:F1}y center={centerDist:F1}y)");
                     interacted = true;
                     break;
@@ -294,10 +355,10 @@ public partial class SlaveWindow
                     Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: stalled at ring={ringDist:F1}y, jump attempt {jumpAttempts + 1}");
                     if (jumpAttempts < 5)
                     {
-                        KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE);
+                        await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE));
                         jumpAttempts++;
                         distSamples.Clear();
-                        await System.Threading.Tasks.Task.Delay(800);
+                        await System.Threading.Tasks.Task.Delay(800, token);
                         elapsed += 800;
                     }
                 }
@@ -307,7 +368,7 @@ public partial class SlaveWindow
                     Plugin.Log.Warning($"[XASlave] PathToTargetThenInteract: path ended for {targetName} (ring={ringDist:F1}y center={centerDist:F1}y)");
                     if (ringDist <= interactRange * 3)
                     {
-                        await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
+                        await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                         SetDebugResult($"Path ended, attempted interact at ring={ringDist:F1}y");
                         interacted = true;
                     }
@@ -321,14 +382,17 @@ public partial class SlaveWindow
 
             if (!interacted && elapsed >= maxTimeoutMs)
             {
-                plugin.IpcClient.VnavStop();
+                await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                 SetDebugResult($"PathToTargetThenInteract timeout (60s) for {targetName}");
             }
-        });
+        }, exclusive: true);
     }
 
     private void RunDebugPathSmartThenInteract()
     {
+        if (RejectIfExclusiveWorkerBusy("PathSmartThenInteract"))
+            return;
+
         var local = Plugin.ObjectTable.LocalPlayer;
         var target = local?.TargetObject;
         if (target == null)
@@ -359,13 +423,13 @@ public partial class SlaveWindow
         SetDebugResult($"PathSmart to {targetName}: ring={ringDist0:F0}y, fly={canFly}, mount={shouldMount}");
         Plugin.Log.Information($"[XASlave] PathSmartThenInteract: {targetName} ring={ringDist0:F1}y fly={canFly} mount={shouldMount} stop={stopDist:F1}");
 
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("PathSmartThenInteract", async token =>
         {
             if (shouldMount)
-                await Plugin.Framework.Run(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
+                await Plugin.RunOnGameThread(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
 
             var fly = canFly && shouldMount;
-            var pathOk = await Plugin.Framework.Run(() =>
+            var pathOk = await Plugin.RunOnGameThread(() =>
                 plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, fly, stopDist));
             if (!pathOk) { SetDebugResult("Pathfind failed"); return; }
 
@@ -378,15 +442,15 @@ public partial class SlaveWindow
             bool interacted = false;
             int jumpAttempts = 0;
 
-            await System.Threading.Tasks.Task.Delay(200);
+            await System.Threading.Tasks.Task.Delay(200, token);
             elapsed += 200;
 
             while (elapsed < maxTimeoutMs)
             {
-                await System.Threading.Tasks.Task.Delay(pollMs);
+                await System.Threading.Tasks.Task.Delay(pollMs, token);
                 elapsed += pollMs;
 
-                var (rd, pathRunning, pathfinding) = await Plugin.Framework.Run(() =>
+                var (rd, pathRunning, pathfinding) = await Plugin.RunOnGameThread(() =>
                 {
                     var lp2 = Plugin.ObjectTable.LocalPlayer;
                     var tgt = lp2?.TargetObject;
@@ -402,9 +466,9 @@ public partial class SlaveWindow
 
                 if (rd <= 0)
                 {
-                    plugin.IpcClient.VnavStop();
+                    await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                     SetDebugResult($"Overlapping {targetName}: ring={rd:F1}y, interacting");
-                    await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
+                    await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                     Plugin.Log.Information($"[XASlave] PathSmartThenInteract: overlapping interact with {targetName} (ring={rd:F1}y)");
                     interacted = true;
                     break;
@@ -425,34 +489,34 @@ public partial class SlaveWindow
 
                 if (rd <= interactRange)
                 {
-                    plugin.IpcClient.VnavStop();
-                    var isMounted = await Plugin.Framework.Run(() =>
+                    await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
+                    var isMounted = await Plugin.RunOnGameThread(() =>
                         Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                     if (isMounted)
                     {
                         SetDebugResult($"In range of {targetName}: ring={rd:F1}y, dismounting...");
-                        await Plugin.Framework.Run(() => ChatHelper.SendMessage("/mount"));
+                        await Plugin.RunOnGameThread(() => ChatHelper.SendMessage("/mount"));
                         for (int w = 0; w < 30; w++)
                         {
-                            await System.Threading.Tasks.Task.Delay(100);
-                            isMounted = await Plugin.Framework.Run(() =>
+                            await System.Threading.Tasks.Task.Delay(100, token);
+                            isMounted = await Plugin.RunOnGameThread(() =>
                                 Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                             if (!isMounted) break;
                         }
                     }
 
-                    await System.Threading.Tasks.Task.Delay(2000);
+                    await System.Threading.Tasks.Task.Delay(2000, token);
 
                     for (int sw = 0; sw < 15; sw++)
                     {
-                        await System.Threading.Tasks.Task.Delay(100);
-                        var charReady = await Plugin.Framework.Run(() =>
+                        await System.Threading.Tasks.Task.Delay(100, token);
+                        var charReady = await Plugin.RunOnGameThread(() =>
                             MonthlyReloggerTask.IsPlayerAvailable() &&
                             !Plugin.Condition[ConditionFlag.Casting]);
                         if (charReady) break;
                     }
 
-                    var postDismountRd = await Plugin.Framework.Run(() =>
+                    var postDismountRd = await Plugin.RunOnGameThread(() =>
                     {
                         var lp3 = Plugin.ObjectTable.LocalPlayer;
                         var tgt3 = lp3?.TargetObject;
@@ -466,12 +530,12 @@ public partial class SlaveWindow
                     {
                         SetDebugResult($"Post-dismount too far: ring={postDismountRd:F1}y, re-pathing on foot");
                         Plugin.Log.Information($"[XASlave] PathSmartThenInteract: post-dismount ring={postDismountRd:F1}y > {interactRange:F1}y, re-pathing");
-                        await Plugin.Framework.Run(() =>
+                        await Plugin.RunOnGameThread(() =>
                             plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, false, stopDist));
                         for (int rp = 0; rp < 100; rp++)
                         {
-                            await System.Threading.Tasks.Task.Delay(200);
-                            var (rpRd, rpIdle) = await Plugin.Framework.Run(() =>
+                            await System.Threading.Tasks.Task.Delay(200, token);
+                            var (rpRd, rpIdle) = await Plugin.RunOnGameThread(() =>
                             {
                                 var lp4 = Plugin.ObjectTable.LocalPlayer;
                                 var tgt4 = lp4?.TargetObject;
@@ -487,31 +551,31 @@ public partial class SlaveWindow
                     }
 
                     SetDebugResult($"In range of {targetName}: ring={postDismountRd:F1}y, interacting");
-                    await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
-                    plugin.IpcClient.VnavStop();
+                    await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
+                    await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                     Plugin.Log.Information($"[XASlave] PathSmartThenInteract: interacted with {targetName} (ring={postDismountRd:F1}y)");
                     interacted = true;
                     break;
                 }
                 else if (stalled && rd < 20.0f)
                 {
-                    var isMounted = await Plugin.Framework.Run(() =>
+                    var isMounted = await Plugin.RunOnGameThread(() =>
                         Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                     if (isMounted)
                     {
-                        plugin.IpcClient.VnavStop();
-                        await Plugin.Framework.Run(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
+                        await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
+                        await Plugin.RunOnGameThread(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
                         for (int w = 0; w < 50; w++)
                         {
-                            await System.Threading.Tasks.Task.Delay(100);
-                            isMounted = await Plugin.Framework.Run(() =>
+                            await System.Threading.Tasks.Task.Delay(100, token);
+                            isMounted = await Plugin.RunOnGameThread(() =>
                                 Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                             if (!isMounted) break;
                         }
-                        await Plugin.Framework.Run(() =>
+                        await Plugin.RunOnGameThread(() =>
                             plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, false, stopDist));
                         distSamples.Clear();
-                        await System.Threading.Tasks.Task.Delay(600);
+                        await System.Threading.Tasks.Task.Delay(600, token);
                         elapsed += 600;
                     }
                     else
@@ -519,10 +583,10 @@ public partial class SlaveWindow
                         SetDebugResult($"Stalled near {targetName}: ring={rd:F1}y, jumping");
                         if (jumpAttempts < 5)
                         {
-                            KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE);
+                            await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE));
                             jumpAttempts++;
                             distSamples.Clear();
-                            await System.Threading.Tasks.Task.Delay(800);
+                            await System.Threading.Tasks.Task.Delay(800, token);
                             elapsed += 800;
                         }
                     }
@@ -533,20 +597,20 @@ public partial class SlaveWindow
                     Plugin.Log.Warning($"[XASlave] PathSmartThenInteract: path ended for {targetName} (ring={rd:F1}y)");
                     if (rd <= interactRange * 3)
                     {
-                        var isMounted = await Plugin.Framework.Run(() =>
+                        var isMounted = await Plugin.RunOnGameThread(() =>
                             Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                         if (isMounted)
                         {
-                            await Plugin.Framework.Run(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
+                            await Plugin.RunOnGameThread(() => ChatHelper.SendMessage("/gaction \"Mount Roulette\""));
                             for (int w = 0; w < 50; w++)
                             {
-                                await System.Threading.Tasks.Task.Delay(100);
-                                isMounted = await Plugin.Framework.Run(() =>
+                                await System.Threading.Tasks.Task.Delay(100, token);
+                                isMounted = await Plugin.RunOnGameThread(() =>
                                     Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                                 if (!isMounted) break;
                             }
                         }
-                        await Plugin.Framework.Run(() => AddonHelper.InteractWithTarget());
+                        await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                         SetDebugResult($"Path ended, attempted interact at ring={rd:F1}y");
                         interacted = true;
                     }
@@ -560,10 +624,10 @@ public partial class SlaveWindow
 
             if (!interacted && elapsed >= maxTimeoutMs)
             {
-                plugin.IpcClient.VnavStop();
+                await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                 SetDebugResult($"PathSmartThenInteract timeout (60s) for {targetName}");
             }
-        });
+        }, exclusive: true);
     }
 
     private void RunDebugLeaveDuty()
@@ -576,16 +640,16 @@ public partial class SlaveWindow
         }
 
         SetDebugResult("In duty, attempting to leave...");
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("Leave Duty", async token =>
         {
-            var inCombat = await Plugin.Framework.Run(() => Plugin.Condition[ConditionFlag.InCombat]);
+            var inCombat = await Plugin.RunOnGameThread(() => Plugin.Condition[ConditionFlag.InCombat]);
             if (inCombat)
             {
                 SetDebugResult("In combat, waiting up to 30s for combat to end...");
                 for (int w = 0; w < 60; w++)
                 {
-                    await System.Threading.Tasks.Task.Delay(500);
-                    inCombat = await Plugin.Framework.Run(() => Plugin.Condition[ConditionFlag.InCombat]);
+                    await System.Threading.Tasks.Task.Delay(500, token);
+                    inCombat = await Plugin.RunOnGameThread(() => Plugin.Condition[ConditionFlag.InCombat]);
                     if (!inCombat) break;
                 }
                 if (inCombat)
@@ -596,18 +660,18 @@ public partial class SlaveWindow
                 SetDebugResult("Combat ended, leaving duty...");
             }
 
-            await Plugin.Framework.Run(() => KeyInputHelper.PressKey(0x55));
-            await System.Threading.Tasks.Task.Delay(1000);
+            await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(0x55));
+            await System.Threading.Tasks.Task.Delay(1000, token);
 
-            var leaveClicked = await Plugin.Framework.Run(() =>
-                AddonHelper.ClickAddonButton("ContentsFinderMenu", 43));
+            var leaveClicked = await Plugin.RunOnGameThread(() =>
+                AddonHelper.ClickAddonButton("ContentsFinderMenu", AddonNodes.ContentsFinderMenuLeave));
 
             if (leaveClicked)
             {
                 SetDebugResult("Leave Duty: clicked Leave button, waiting for confirmation...");
-                await System.Threading.Tasks.Task.Delay(500);
+                await System.Threading.Tasks.Task.Delay(500, token);
 
-                var yesClicked = await Plugin.Framework.Run(() => AddonHelper.ClickYesNo(true));
+                var yesClicked = await Plugin.RunOnGameThread(() => AddonHelper.ClickYesNo(true));
                 SetDebugResult(yesClicked
                     ? "Leave Duty: confirmed Yes, leaving instance."
                     : "Leave Duty: Leave clicked but SelectYesno not visible, may need manual confirm.");
@@ -616,7 +680,7 @@ public partial class SlaveWindow
             {
                 SetDebugResult("Leave Duty: ContentsFinderMenu not visible or Leave button not found.");
             }
-        });
+        }, exclusive: true);
     }
 
     private void RunDebugLeaveDutyQuick()
@@ -639,18 +703,12 @@ public partial class SlaveWindow
             return;
         }
 
-        if (System.Threading.Interlocked.CompareExchange(ref debugLeaveDutyQuickRunning, 1, 0) != 0)
-        {
-            SetDebugResult("Leave Duty Quick is already running.");
-            return;
-        }
-
         SetDebugResult("Leave Duty Quick: opening the game-owned duty menu without pressing U...");
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("Leave Duty Quick", async token =>
         {
             try
             {
-                var existingPromptState = await Plugin.Framework.Run(() =>
+                var existingPromptState = await Plugin.RunOnGameThread(() =>
                 {
                     if (!AddonHelper.IsAddonVisible("SelectYesno"))
                         return 0;
@@ -668,7 +726,7 @@ public partial class SlaveWindow
 
                 if (existingPromptState > 0)
                 {
-                    var confirmed = await Plugin.Framework.Run(() => AddonHelper.ClickYesNo(true));
+                    var confirmed = await Plugin.RunOnGameThread(() => AddonHelper.ClickYesNo(true));
                     SetDebugResult(confirmed
                         ? "Leave Duty Quick: confirmed the existing validated leave-duty prompt; waiting for zone-out."
                         : "Leave Duty Quick: validated the existing leave-duty prompt, but the Yes callback failed.");
@@ -678,17 +736,17 @@ public partial class SlaveWindow
                 var callbacksSent = false;
                 for (var attempt = 1; attempt <= DebugLeaveDutyQuickMenuAttempts; attempt++)
                 {
-                    if (!await Plugin.Framework.Run(() => Plugin.Condition[ConditionFlag.BoundByDuty]))
+                    if (!await Plugin.RunOnGameThread(() => Plugin.Condition[ConditionFlag.BoundByDuty]))
                     {
                         SetDebugResult("Leave Duty Quick: duty exit already started.");
                         return;
                     }
 
-                    var menuReady = await Plugin.Framework.Run(() =>
+                    var menuReady = await Plugin.RunOnGameThread(() =>
                         AddonHelper.IsAddonReady("ContentsFinderMenu"));
                     if (!menuReady)
                     {
-                        var agentShown = await Plugin.Framework.Run(() =>
+                        var agentShown = await Plugin.RunOnGameThread(() =>
                             AddonHelper.ShowAgent(AgentId.ContentsFinderMenu));
                         if (!agentShown && attempt == DebugLeaveDutyQuickMenuAttempts)
                         {
@@ -696,16 +754,16 @@ public partial class SlaveWindow
                             return;
                         }
 
-                        await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds);
+                        await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds, token);
                         continue;
                     }
 
-                    callbacksSent = await Plugin.Framework.Run(
+                    callbacksSent = await Plugin.RunOnGameThread(
                         AddonHelper.TryRequestLeaveDutyFromContentsFinderMenu);
                     if (callbacksSent)
                         break;
 
-                    await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds);
+                    await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds, token);
                 }
 
                 if (!callbacksSent)
@@ -717,25 +775,25 @@ public partial class SlaveWindow
                 SetDebugResult("Leave Duty Quick: leave callbacks sent; waiting for the validated confirmation...");
                 for (var attempt = 1; attempt <= DebugLeaveDutyQuickPromptAttempts; attempt++)
                 {
-                    if (!await Plugin.Framework.Run(() => Plugin.Condition[ConditionFlag.BoundByDuty]))
+                    if (!await Plugin.RunOnGameThread(() => Plugin.Condition[ConditionFlag.BoundByDuty]))
                     {
                         SetDebugResult("Leave Duty Quick: duty exit started.");
                         return;
                     }
 
-                    var selectYesnoVisible = await Plugin.Framework.Run(() =>
+                    var selectYesnoVisible = await Plugin.RunOnGameThread(() =>
                         AddonHelper.IsAddonVisible("SelectYesno"));
                     if (selectYesnoVisible)
                     {
-                        var selectYesnoReady = await Plugin.Framework.Run(() =>
+                        var selectYesnoReady = await Plugin.RunOnGameThread(() =>
                             AddonHelper.IsAddonReady("SelectYesno"));
                         if (!selectYesnoReady)
                         {
-                            await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds);
+                            await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds, token);
                             continue;
                         }
 
-                        var isLeavePrompt = await Plugin.Framework.Run(
+                        var isLeavePrompt = await Plugin.RunOnGameThread(
                             AddonHelper.IsLeaveDutyConfirmationPrompt);
                         if (!isLeavePrompt)
                         {
@@ -743,7 +801,7 @@ public partial class SlaveWindow
                             return;
                         }
 
-                        var confirmed = await Plugin.Framework.Run(() => AddonHelper.ClickYesNo(true));
+                        var confirmed = await Plugin.RunOnGameThread(() => AddonHelper.ClickYesNo(true));
                         SetDebugResult(confirmed
                             ? "Leave Duty Quick: confirmed the validated leave-duty prompt; waiting for zone-out."
                             : "Leave Duty Quick: validated the leave-duty prompt, but the Yes callback failed.");
@@ -752,7 +810,7 @@ public partial class SlaveWindow
 
                     if (attempt == DebugLeaveDutyQuickPromptAttempts / 2)
                     {
-                        await Plugin.Framework.Run(() =>
+                        await Plugin.RunOnGameThread(() =>
                         {
                             if (!AddonHelper.IsAddonReady("ContentsFinderMenu"))
                                 return;
@@ -761,21 +819,21 @@ public partial class SlaveWindow
                         });
                     }
 
-                    await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds);
+                    await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds, token);
                 }
 
                 SetDebugResult("Leave Duty Quick: no leave-duty confirmation appeared within 3 seconds.");
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 Plugin.Log.Warning(ex, "[XASlave] Leave Duty Quick failed.");
                 SetDebugResult($"Leave Duty Quick error: {ex.Message}");
             }
-            finally
-            {
-                System.Threading.Interlocked.Exchange(ref debugLeaveDutyQuickRunning, 0);
-            }
-        });
+        }, exclusive: true);
     }
 
     private static bool TryGetDebugLeaveDutyQuickBlocker(out string blocker)
@@ -809,31 +867,31 @@ public partial class SlaveWindow
     private void RunDebugRecommendedGear()
     {
         SetDebugResult("Recommended Gear: starting Step1/2/3/close sequence.");
-        System.Threading.Tasks.Task.Run(async () =>
+        RunWorker("Recommended Gear", async token =>
         {
-            await Plugin.Framework.Run(() => RunDebugRecommendedGearStep1());
-            if (!await WaitForDebugAddonVisibleAsync("Character", 3000))
+            await Plugin.RunOnGameThread(() => RunDebugRecommendedGearStep1());
+            if (!await WaitForDebugAddonVisibleAsync("Character", 3000, token))
             {
                 SetDebugResult("Recommended Gear: Character addon did not open.");
                 return;
             }
 
-            var recommendClicked = await Plugin.Framework.Run(() => RunDebugRecommendedGearStep2());
+            var recommendClicked = await Plugin.RunOnGameThread(() => RunDebugRecommendedGearStep2());
             if (!recommendClicked)
                 return;
 
-            if (!await WaitForDebugAddonVisibleAsync("RecommendEquip", 3000))
+            if (!await WaitForDebugAddonVisibleAsync("RecommendEquip", 3000, token))
             {
                 SetDebugResult("Recommended Gear: RecommendEquip addon did not open.");
                 return;
             }
 
-            var equipClicked = await Plugin.Framework.Run(() => RunDebugRecommendedGearStep3());
-            await System.Threading.Tasks.Task.Delay(500);
-            await Plugin.Framework.Run(() => RunDebugRecommendedGearClose());
+            var equipClicked = await Plugin.RunOnGameThread(() => RunDebugRecommendedGearStep3());
+            await System.Threading.Tasks.Task.Delay(500, token);
+            await Plugin.RunOnGameThread(() => RunDebugRecommendedGearClose());
             if (equipClicked)
                 SetDebugResult("Recommended Gear: Step1/2/3/close complete.");
-        });
+        }, exclusive: true);
     }
 
     private void RunDebugRecommendedGearStep1()
@@ -844,19 +902,25 @@ public partial class SlaveWindow
 
     private bool RunDebugRecommendedGearStep2()
     {
-        var ok = AddonHelper.ClickAddonButton("Character", 74);
+        var addonReady = AddonHelper.IsAddonReady("Character");
+        var ok = addonReady && AddonHelper.ClickAddonButton("Character", AddonNodes.CharacterRecommendEquip);
         SetDebugResult(ok
-            ? "Clicked Character NodeList[74] (Button #12) -> RecommendEquip should open"
-            : "Character addon not visible, open it first with Step1");
+            ? $"Clicked Character NodeList[{AddonNodes.CharacterRecommendEquip}] -> RecommendEquip should open"
+            : addonReady
+                ? $"Character is ready, but recommend node {AddonNodes.CharacterRecommendEquip} is unavailable; verify the current addon layout."
+                : "Character addon is not ready; open it first with Step1.");
         return ok;
     }
 
     private bool RunDebugRecommendedGearStep3()
     {
-        var ok = AddonHelper.ClickAddonButton("RecommendEquip", 3);
+        var addonReady = AddonHelper.IsAddonReady("RecommendEquip");
+        var ok = addonReady && AddonHelper.ClickAddonButton("RecommendEquip", AddonNodes.RecommendEquipConfirm);
         SetDebugResult(ok
-            ? "Clicked RecommendEquip NodeList[3] (Button #11) -> gear equipped"
-            : "RecommendEquip addon not visible, run Step2 first");
+            ? $"Clicked RecommendEquip NodeList[{AddonNodes.RecommendEquipConfirm}] -> gear equipped"
+            : addonReady
+                ? $"RecommendEquip is ready, but confirm node {AddonNodes.RecommendEquipConfirm} is unavailable; verify the current addon layout."
+                : "RecommendEquip addon is not ready; run Step2 first.");
         return ok;
     }
 

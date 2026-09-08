@@ -52,10 +52,11 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
-        if (!arConfigExists) ImGui.BeginDisabled();
-        if (ImGui.Button("Import from AutoRetainer##ra"))
-        { ImportFromAutoRetainer(); RefreshReturnAltsList(); }
-        if (!arConfigExists) ImGui.EndDisabled();
+        using (ImRaii.Disabled(!arConfigExists))
+        {
+            if (ImGui.Button("Import from AutoRetainer##ra"))
+            { ImportFromAutoRetainer(); RefreshReturnAltsList(); }
+        }
 
         ImGui.SameLine();
         if (ImGui.Button("Refresh AR Data##ra"))
@@ -63,10 +64,11 @@ public partial class SlaveWindow
 
         ImGui.SameLine();
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
-        if (!xaDbAvailable) ImGui.BeginDisabled();
-        if (ImGui.Button("Pull XA Database Info##ra"))
-        { PullXaDatabaseInfo(); RefreshReturnAltsList(); }
-        if (!xaDbAvailable) ImGui.EndDisabled();
+        using (ImRaii.Disabled(!xaDbAvailable))
+        {
+            if (ImGui.Button("Pull XA Database Info##ra"))
+            { PullXaDatabaseInfo(RefreshReturnAltsList); }
+        }
 
         ImGui.SameLine();
         if (ImGui.Button("Refresh List##ra"))
@@ -106,8 +108,8 @@ public partial class SlaveWindow
         }
         else
         {
-            var selectedChars = returnAltsSelectedIndices
-                .Where(i => i >= 0 && i < returnAltsCharList.Count)
+            var selectedChars = Enumerable.Range(0, returnAltsCharList.Count)
+                .Where(returnAltsSelectedIndices.Contains)
                 .Select(i => returnAltsCharList[i].CharName)
                 .ToList();
 
@@ -120,7 +122,7 @@ public partial class SlaveWindow
                 SlaveTask.ReturnAltsToHomeworlds,
                 $"Start ({selectedChars.Count} chars)##ra",
                 canStart,
-                () => StartTaskWithConfig("Return Alts To Homeworlds", selectedChars, returnAltsSelectedIndices,
+                () => StartTaskWithConfig("Return Alts To Homeworlds", selectedChars, returnAltsCharList, returnAltsSelectedIndices,
                     raDoTextAdvance, raDoRemoveSprout, raDoOpenInventory, raDoOpenArmoury,
                     raDoOpenSaddlebags, raDoOpenJournal, raDoReturnToHome, raDoCollectPersonalPlotInfo,
                     raDoReturnToFc, raDoParseForXaDatabase, raDoLogoutOnComplete, raDoKillGameOnComplete, raDoEnableArMulti),
@@ -145,9 +147,10 @@ public partial class SlaveWindow
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
-        if (ImGui.BeginTable("ReturnAltsTable", 5,
+        using (var imguiScope148 = ImRaii.Table("ReturnAltsTable", 5,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
             ScaledVector(0f, 250f)))
+        if (imguiScope148)
         {
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(25f));
@@ -212,7 +215,7 @@ public partial class SlaveWindow
                 else
                     ImGui.TextDisabled(displayCurrentWorld);
             }
-            ImGui.EndTable();
+
         }
 
         ImGui.Spacing();

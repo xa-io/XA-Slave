@@ -1,5 +1,6 @@
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Hooking;
@@ -12,6 +13,7 @@ namespace XASlave.Services;
 
 public unsafe sealed class DialogueSkipService : IDisposable
 {
+    private const int TotalNativeHookSurfaces = 8;
     private readonly IAddonLifecycle addonLifecycle;
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
@@ -68,7 +70,10 @@ public unsafe sealed class DialogueSkipService : IDisposable
         // `initialized` is already true, so without this the hooks would stay disabled and only
         // the synthetic Talk-click fallback would work.
         if (initialized)
+        {
+            EnsureInitialized(retryMissing: true);
             UpdateHookState(true);
+        }
         RefreshStatusText();
         return true;
     }
@@ -88,30 +93,30 @@ public unsafe sealed class DialogueSkipService : IDisposable
         DisposeHook(ref guildleveAssignmentTalkHook);
     }
 
-    private void EnsureInitialized()
+    private void EnsureInitialized(bool retryMissing = false)
     {
-        if (initialized)
+        if (initialized && !retryMissing)
             return;
 
         initialized = true;
 
         var talkBase0 = TryScanBaseAddress(Sigs.TalkBaseSig0, "TalkBase0");
-        talkHook = TryCreateLuaHook<TalkDelegate>(talkBase0, "Talk", TalkDetour, "Talk");
-        talkAsyncHook = TryCreateLuaHook<TalkDelegate>(talkBase0, "TalkAsync", TalkDetour, "TalkAsync");
+        talkHook ??= TryCreateLuaHook<TalkDelegate>(talkBase0, "Talk", TalkDetour, "Talk");
+        talkAsyncHook ??= TryCreateLuaHook<TalkDelegate>(talkBase0, "TalkAsync", TalkDetour, "TalkAsync");
 
         var talkBase1 = TryScanBaseAddress(Sigs.TalkBaseSig1, "TalkBase1");
-        systemTalkHook = TryCreateLuaHook<TalkDelegate>(talkBase1, "SystemTalk", TalkDetour, "SystemTalk");
-        logMessageNoSkipHook = TryCreateLuaHook<LuaFunctionDelegate>(talkBase1, "LogMessageNoSkip", LuaStateTalkDetour, "LogMessageNoSkip");
+        systemTalkHook ??= TryCreateLuaHook<TalkDelegate>(talkBase1, "SystemTalk", TalkDetour, "SystemTalk");
+        logMessageNoSkipHook ??= TryCreateLuaHook<LuaFunctionDelegate>(talkBase1, "LogMessageNoSkip", LuaStateTalkDetour, "LogMessageNoSkip");
 
         var talkBase2 = TryScanBaseAddress(Sigs.TalkBaseSig2, "TalkBase2");
-        shortTalkHook = TryCreateLuaHook<TalkDelegate>(talkBase2, "ShortTalk", TalkDetour, "ShortTalk");
-        shortTalkWithLineVoiceHook = TryCreateLuaHook<TalkDelegate>(talkBase2, "ShortTalkWithLineVoice", TalkDetour, "ShortTalkWithLineVoice");
+        shortTalkHook ??= TryCreateLuaHook<TalkDelegate>(talkBase2, "ShortTalk", TalkDetour, "ShortTalk");
+        shortTalkWithLineVoiceHook ??= TryCreateLuaHook<TalkDelegate>(talkBase2, "ShortTalkWithLineVoice", TalkDetour, "ShortTalkWithLineVoice");
 
         var talkBase3 = TryScanBaseAddress(Sigs.TalkBaseSig3, "TalkBase3");
-        craftLeveTalkHook = TryCreateLuaHook<LuaFunctionDelegate>(talkBase3, "CraftLeveTalk", LuaStateTalkDetour, "CraftLeveTalk");
+        craftLeveTalkHook ??= TryCreateLuaHook<LuaFunctionDelegate>(talkBase3, "CraftLeveTalk", LuaStateTalkDetour, "CraftLeveTalk");
 
         var talkBase4 = TryScanBaseAddress(Sigs.TalkBaseSig4, "TalkBase4");
-        guildleveAssignmentTalkHook = TryCreateLuaHook<LuaFunctionDelegate>(talkBase4, "GuildleveAssignmentTalk", LuaStateTalkDetour, "GuildleveAssignmentTalk");
+        guildleveAssignmentTalkHook ??= TryCreateLuaHook<LuaFunctionDelegate>(talkBase4, "GuildleveAssignmentTalk", LuaStateTalkDetour, "GuildleveAssignmentTalk");
 
         availableHookSurfaces = CountHookSurfaces();
     }
@@ -131,7 +136,9 @@ public unsafe sealed class DialogueSkipService : IDisposable
         }
 
         StatusText = availableHookSurfaces > 0
-            ? $"Enabled - Talk addon auto-advance plus {availableHookSurfaces} native dialogue surfaces are active locally."
+            ? availableHookSurfaces < TotalNativeHookSurfaces
+                ? $"Partially enabled - Talk addon auto-advance plus {availableHookSurfaces}/{TotalNativeHookSurfaces} native dialogue surfaces are active locally."
+                : $"Enabled - Talk addon auto-advance plus all {TotalNativeHookSurfaces} native dialogue surfaces are active locally."
             : "Enabled - Talk addon auto-advance is active locally.";
     }
 
@@ -203,7 +210,10 @@ public unsafe sealed class DialogueSkipService : IDisposable
         {
             var functionAddress = GetLuaFunctionByName(baseAddress, functionName);
             if (functionAddress == nint.Zero)
+            {
+                log.Warning($"[XASlave] Skip Dialogue could not validate {label}'s computed Lua function address; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             var hook = interopProvider.HookFromAddress<T>(functionAddress, detour);
             return hook;
@@ -215,16 +225,28 @@ public unsafe sealed class DialogueSkipService : IDisposable
         }
     }
 
-    private static nint GetLuaFunctionByName(nint luaSetupFunctionStartAddress, string functionName, int scanSize = 8192)
+    private nint GetLuaFunctionByName(nint luaSetupFunctionStartAddress, string functionName, int scanSize = 8192)
     {
-        if (luaSetupFunctionStartAddress == nint.Zero || string.IsNullOrEmpty(functionName))
+        if (luaSetupFunctionStartAddress == nint.Zero || string.IsNullOrEmpty(functionName) || scanSize <= 0)
             return nint.Zero;
 
-        var functionBytes = new byte[scanSize];
+        var textBase = sigScanner.Module.BaseAddress + (sigScanner.TextSectionBase - sigScanner.SearchBase);
+        if (!NativeAddressPolicy.TryGetBoundedLength(
+                luaSetupFunctionStartAddress,
+                textBase,
+                sigScanner.TextSectionSize,
+                scanSize,
+                out var boundedScanSize)
+            || boundedScanSize < 7)
+        {
+            return nint.Zero;
+        }
+
+        var functionBytes = new byte[boundedScanSize];
 
         try
         {
-            Marshal.Copy(luaSetupFunctionStartAddress, functionBytes, 0, scanSize);
+            Marshal.Copy(luaSetupFunctionStartAddress, functionBytes, 0, boundedScanSize);
         }
         catch
         {
@@ -243,11 +265,9 @@ public unsafe sealed class DialogueSkipService : IDisposable
                 continue;
 
             var displacement = BitConverter.ToInt32(functionBytes, i + 3);
-            var currentInstructionAddress = (long)luaSetupFunctionStartAddress + i;
-            var nextInstructionAddress = currentInstructionAddress + 7;
+            var nextInstructionAddress = (long)luaSetupFunctionStartAddress + i + 7;
             var stringAddress = nextInstructionAddress + displacement;
-            var referencedString = Marshal.PtrToStringAnsi((nint)stringAddress);
-            if (!string.Equals(referencedString, functionName, StringComparison.Ordinal))
+            if (!IsExactAsciiStringAt((nint)stringAddress, functionName))
                 continue;
 
             stringLeaIndex = i;
@@ -267,12 +287,39 @@ public unsafe sealed class DialogueSkipService : IDisposable
                 continue;
 
             var displacement = BitConverter.ToInt32(functionBytes, i + 3);
-            var currentInstructionAddress = (long)luaSetupFunctionStartAddress + i;
-            var nextInstructionAddress = currentInstructionAddress + 7;
-            return (nint)(nextInstructionAddress + displacement);
+            var nextInstructionAddress = (long)luaSetupFunctionStartAddress + i + 7;
+            var functionAddress = (nint)(nextInstructionAddress + displacement);
+            return NativeAddressPolicy.IsRangeValid(functionAddress, textBase, sigScanner.TextSectionSize, 1)
+                ? functionAddress
+                : nint.Zero;
         }
 
         return nint.Zero;
+    }
+
+    private bool IsExactAsciiStringAt(nint address, string expected)
+    {
+        var expectedBytes = Encoding.ASCII.GetBytes(expected);
+        if (!NativeAddressPolicy.IsRangeValid(
+                address,
+                sigScanner.Module.BaseAddress,
+                sigScanner.Module.ModuleMemorySize,
+                expectedBytes.Length + 1))
+        {
+            return false;
+        }
+
+        var actual = new byte[expectedBytes.Length + 1];
+        try
+        {
+            Marshal.Copy(address, actual, 0, actual.Length);
+        }
+        catch
+        {
+            return false;
+        }
+
+        return actual[^1] == 0 && actual.AsSpan(0, expectedBytes.Length).SequenceEqual(expectedBytes);
     }
 
     private void ToggleHook<T>(Hook<T>? hook, bool targetEnabled, string label)
@@ -358,16 +405,43 @@ public unsafe sealed class DialogueSkipService : IDisposable
         }
     }
 
-    private static ulong LuaStateTalkDetour(lua_State* state)
+    private ulong LuaStateTalkDetour(lua_State* state)
     {
-        var value = state->top;
-        value->tt = 2;
-        value->value.n = 1;
-        state->top += 1;
+        try
+        {
+            if (state == null
+                || state->top == null
+                || state->stack_last == null
+                || state->top >= state->stack_last)
+            {
+                return 0;
+            }
+
+            var value = state->top;
+            value->tt = 2;
+            value->value.n = 1;
+            state->top += 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Dialogue Lua detour failed; suppressing the dialogue safely.");
+        }
+
         return 1;
     }
 
-    private static nint TalkDetour(EventSceneModuleImplBase* _) => 1;
+    private nint TalkDetour(EventSceneModuleImplBase* _)
+    {
+        try
+        {
+            return 1;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Skip Dialogue Talk detour failed; suppressing the dialogue safely.");
+            return 1;
+        }
+    }
 
     private delegate nint TalkDelegate(EventSceneModuleImplBase* scene);
 

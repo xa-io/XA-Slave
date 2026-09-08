@@ -131,7 +131,9 @@ public unsafe sealed class BlacklistedPartyNameService : IDisposable
         var replacedCount = 0;
         for (var index = 0; index < addon->UldManager.NodeListCount; index++)
         {
-            var node = addon->UldManager.NodeList[index];
+            if (!NativeArrayAccess.TryGetNode(&addon->UldManager, index, out var node))
+                continue;
+
             replacedCount += ApplyToNode(node, aliases, activeNodes, addonAddress);
         }
 
@@ -246,7 +248,9 @@ public unsafe sealed class BlacklistedPartyNameService : IDisposable
         var updatedCount = 0;
         for (var index = 0; index < componentNode->Component->UldManager.NodeListCount; index++)
         {
-            var child = componentNode->Component->UldManager.NodeList[index];
+            if (!NativeArrayAccess.TryGetNode(&componentNode->Component->UldManager, index, out var child))
+                continue;
+
             updatedCount += ApplyToNode(child, aliases, activeNodes, addonAddress, depth + 1);
         }
 

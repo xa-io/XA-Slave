@@ -1,0 +1,7 @@
+<Project>
+  <!-- Override automatic unprotected ZIP creation for every build entrypoint.
+       Publication candidates must go through xapr/release_gate.py. -->
+  <Target Name="XASlaveManifestOnly" AfterTargets="Build">
+    <Copy SourceFiles="$(ProjectDir)XASlave.json" DestinationFolder="$(OutputPath)" />
+  </Target>
+</Project>

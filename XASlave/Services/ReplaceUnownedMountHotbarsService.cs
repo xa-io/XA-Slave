@@ -168,7 +168,7 @@ public unsafe sealed class ReplaceUnownedMountHotbarsService : IDisposable
         RaptureHotbarModule* module,
         RaptureHotbarModule.HotbarSlot* slot)
     {
-        var originalResult = appearanceHook!.Original(actionType, actionId, unkC4, module, slot);
+        var originalResult = appearanceHook!.OriginalDisposeSafe(actionType, actionId, unkC4, module, slot);
         if (!enabled || actionType == null || actionId == null)
             return originalResult;
 
@@ -198,7 +198,7 @@ public unsafe sealed class ReplaceUnownedMountHotbarsService : IDisposable
         RaptureHotbarModule.HotbarSlot* slot)
     {
         if (!enabled)
-            return executeHook!.Original(module, slot);
+            return executeHook!.OriginalDisposeSafe(module, slot);
 
         bool shouldReplace;
         try
@@ -213,11 +213,11 @@ public unsafe sealed class ReplaceUnownedMountHotbarsService : IDisposable
                 log.Warning(ex, "[XASlave] Replace Unowned Mount Hotbars failed while executing a slot.");
             }
 
-            return executeHook!.Original(module, slot);
+            return executeHook!.OriginalDisposeSafe(module, slot);
         }
 
         if (!shouldReplace)
-            return executeHook!.Original(module, slot);
+            return executeHook!.OriginalDisposeSafe(module, slot);
 
         try
         {

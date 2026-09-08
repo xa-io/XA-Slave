@@ -45,7 +45,7 @@ public partial class SlaveWindow
         var cadenceIndex = GetCheckEveryIndex(plugin.Configuration.ArPrePostCheckEveryHours);
         ImGui.SetNextItemWidth(Scale(180f));
         if (ImGui.SliderInt("Check Every##arPrePostEvery", ref cadenceIndex, 0, CheckEveryHourOptions.Length - 1,
-                FormatCheckEveryHours(CheckEveryHourOptions[cadenceIndex])))
+                FormatCheckEveryHours(CheckEveryHourOptions[cadenceIndex]), ImGuiSliderFlags.AlwaysClamp))
         {
             plugin.Configuration.ArPrePostCheckEveryHours = CheckEveryHourOptions[cadenceIndex];
             plugin.Configuration.Save();
@@ -77,7 +77,7 @@ public partial class SlaveWindow
             if (bailoutIndex < 0) bailoutIndex = 0;
             ImGui.SetNextItemWidth(Scale(180f));
             if (ImGui.SliderInt("Bailout Timer##shipBailout", ref bailoutIndex, 0, bailoutOptions.Length - 1,
-                    $"{bailoutOptions[bailoutIndex]} sec"))
+                    $"{bailoutOptions[bailoutIndex]} sec", ImGuiSliderFlags.AlwaysClamp))
             {
                 plugin.Configuration.ArShipExplorationBailoutSeconds = bailoutOptions[bailoutIndex];
                 plugin.Configuration.Save();

@@ -181,11 +181,13 @@ public partial class SlaveWindow
             return false;
         }
 
-        if (!canStart) ImGui.BeginDisabled();
-        var clicked = ImGui.Button(buttonLabel);
-        if (clicked)
-            startAction();
-        if (!canStart) ImGui.EndDisabled();
+        bool clicked;
+        using (ImRaii.Disabled(!canStart))
+        {
+            clicked = ImGui.Button(buttonLabel);
+            if (clicked)
+                startAction();
+        }
         if (!canStart && !string.IsNullOrWhiteSpace(disabledTooltip) && ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(disabledTooltip);
         return clicked;
@@ -312,13 +314,15 @@ public partial class SlaveWindow
     /// Start a task using MonthlyReloggerTask with specific Do* flags.
     /// Reused by CheckDuplicatePlots, ReturnAltsToHomeworlds, and any future task.
     /// </summary>
-    private void StartTaskWithConfig(string taskName, List<string> characters, HashSet<int> selectedIndices,
+    private void StartTaskWithConfig(
+        string taskName,
+        List<string> characters,
+        IReadOnlyList<(string CharName, ReloggerCharacterData Info)> backingList,
+        HashSet<int> selectedIndices,
         bool doTextAdvance, bool doRemoveSprout, bool doOpenInventory, bool doOpenArmoury,
         bool doOpenSaddlebags, bool doOpenJournal, bool doReturnToHome, bool doCollectPersonalPlotInfo,
         bool doReturnToFc, bool doParseForXaDatabase, bool doLogoutOnComplete, bool doKillGameOnComplete, bool doEnableArMulti)
     {
-        HaltAutoCollectionForPriorityTask(taskName);
-
         reloggerTask = new MonthlyReloggerTask(plugin)
         {
             DoEnableTextAdvance = doTextAdvance,
@@ -340,9 +344,9 @@ public partial class SlaveWindow
 
         var steps = reloggerTask.BuildSteps(characters, plugin.TaskRunner, onCharacterCompleted: (charName) =>
         {
-            for (int i = 0; i < characters.Count; i++)
+            for (var i = 0; i < backingList.Count; i++)
             {
-                if (characters[i] == charName)
+                if (backingList[i].CharName.Equals(charName, StringComparison.OrdinalIgnoreCase))
                 {
                     selectedIndices.Remove(i);
                     break;
@@ -351,10 +355,16 @@ public partial class SlaveWindow
         });
 
         // Start with onLog callback that prints to Dalamud console as [TaskLogs]
-        plugin.TaskRunner.Start(taskName, steps, onLog: (msg) =>
+        if (!plugin.TaskRunner.Start(taskName, steps, onLog: (msg) =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
-        });
+        }, totalItems: characters.Count, suppressLogoutCancel: true))
+        {
+            plugin.TaskRunner.AddLog($"{taskName} was not started because another task owns the runner.");
+            return;
+        }
+
+        HaltAutoCollectionForPriorityTask(taskName);
     }
 
     /// <summary>Helper: extract world from "Name@World" key.</summary>

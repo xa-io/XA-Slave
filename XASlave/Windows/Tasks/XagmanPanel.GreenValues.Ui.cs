@@ -38,10 +38,11 @@ public partial class SlaveWindow
             .OrderBy(selector => selector)
             .ToList();
 
-        if (ImGui.BeginTable(
+        using (var imguiScope41 = ImRaii.Table(
                 "xagmanGreenValueForecastTable",
                 5,
                 ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
+        if (imguiScope41)
         {
             ImGui.TableSetupColumn("Metric");
             ImGui.TableSetupColumn("Current");
@@ -136,7 +137,7 @@ public partial class SlaveWindow
                     ImGui.TextDisabled("Unknown");
             }
 
-            ImGui.EndTable();
+
         }
 
         if (localSnapshot == null)

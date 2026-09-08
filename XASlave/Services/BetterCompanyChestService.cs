@@ -55,6 +55,7 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
     private readonly IDataManager dataManager;
     private readonly IPluginLog log;
     private readonly uint[] exchangeableItemIds;
+    private readonly bool nativeContextLayoutCompatible;
     private bool enabled;
     private bool subscribed;
     private bool quickMoveEnabled = true;
@@ -76,6 +77,18 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
         this.contextMenu = contextMenu;
         this.dataManager = dataManager;
         this.log = log;
+        nativeContextLayoutCompatible =
+            NativeOffsets.FitsIn<AgentFreeCompanyChest>(
+                NativeOffsets.FreeCompanyChestContextInventoryType,
+                sizeof(InventoryType))
+            && NativeOffsets.FitsIn<AgentFreeCompanyChest>(
+                NativeOffsets.FreeCompanyChestContextInventorySlot,
+                sizeof(short));
+        NativeOffsets.ReportOnce(
+            log,
+            "AgentFreeCompanyChest.ContextInventory",
+            nativeContextLayoutCompatible,
+            $"struct=0x{sizeof(AgentFreeCompanyChest):X}, inventory=0x{NativeOffsets.FreeCompanyChestContextInventoryType:X}, slot=0x{NativeOffsets.FreeCompanyChestContextInventorySlot:X}");
         exchangeableItemIds = dataManager
             .GetExcelSheet<Item>()
             .Where(item => item.RowId > 0 && item.ItemSortCategory.Value.Param == 150)
@@ -308,12 +321,13 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
                 return;
 
             var addon = (AtkUnitBase*)args.Addon.Address;
-            if (addon == null || !addon->IsVisible || addon->AtkValues == null || addon->AtkValuesCount <= 3)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 3, out var callbackValue))
                 return;
 
             awaitingNumericConfirm = false;
             awaitingNumericConfirmUntilUtc = DateTime.MinValue;
-            addon->FireCallbackInt((int)addon->AtkValues[3].UInt);
+            addon->FireCallbackInt((int)callbackValue);
             LastActionText = $"Last action: auto-confirmed the Free Company Chest quantity prompt at {DateTime.Now:HH:mm:ss}.";
         }
         catch (Exception ex)
@@ -397,7 +411,7 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
             return false;
         }
 
-        ClearFreeCompanyChestContext();
+        ClearFreeCompanyChestContext(sourceInventory, sourceSlot);
         return true;
     }
 
@@ -441,7 +455,7 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
         return sourceInventory != InventoryType.Invalid;
     }
 
-    private static bool TryGetFreeCompanyChestContext(out InventoryType sourceInventory, out ushort sourceSlot, out InventoryItem* sourceItem)
+    private bool TryGetFreeCompanyChestContext(out InventoryType sourceInventory, out ushort sourceSlot, out InventoryItem* sourceItem)
     {
         sourceInventory = InventoryType.Invalid;
         sourceSlot = 0;
@@ -451,29 +465,40 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
         if (agentModule == null)
             return false;
 
-        var agent = (FreeCompanyChestAgentContext*)agentModule->GetAgentByInternalId(AgentId.FreeCompanyChest);
-        if (agent == null ||
-            !IsFreeCompanyPage(agent->ContextInventoryType) ||
-            agent->ContextInventorySlot < 0)
+        var agent = (byte*)agentModule->GetAgentByInternalId(AgentId.FreeCompanyChest);
+        if (!nativeContextLayoutCompatible || agent == null)
+            return false;
+
+        var contextInventory = *(InventoryType*)(agent + NativeOffsets.FreeCompanyChestContextInventoryType);
+        var contextSlot = *(short*)(agent + NativeOffsets.FreeCompanyChestContextInventorySlot);
+        if (!IsFreeCompanyPage(contextInventory) || contextSlot < 0)
         {
             return false;
         }
 
-        sourceInventory = agent->ContextInventoryType;
-        sourceSlot = (ushort)agent->ContextInventorySlot;
+        sourceInventory = contextInventory;
+        sourceSlot = (ushort)contextSlot;
         sourceItem = TryGetInventoryItem(sourceInventory, sourceSlot);
         return sourceItem != null && sourceItem->ItemId != 0;
     }
 
-    private static void ClearFreeCompanyChestContext()
+    private void ClearFreeCompanyChestContext(InventoryType expectedInventory, ushort expectedSlot)
     {
+        if (!nativeContextLayoutCompatible)
+            return;
+
         var agentModule = AgentModule.Instance();
         if (agentModule == null)
             return;
 
-        var agent = (FreeCompanyChestAgentContext*)agentModule->GetAgentByInternalId(AgentId.FreeCompanyChest);
-        if (agent != null)
-            agent->ContextInventoryType = InventoryType.Invalid;
+        var agent = (byte*)agentModule->GetAgentByInternalId(AgentId.FreeCompanyChest);
+        if (agent == null)
+            return;
+
+        var inventory = (InventoryType*)(agent + NativeOffsets.FreeCompanyChestContextInventoryType);
+        var slot = (short*)(agent + NativeOffsets.FreeCompanyChestContextInventorySlot);
+        if (*inventory == expectedInventory && *slot == expectedSlot)
+            *inventory = InventoryType.Invalid;
     }
 
     private static InventoryItem* TryGetInventoryItem(InventoryType inventoryType, ushort slotIndex)
@@ -482,11 +507,9 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
         if (manager == null)
             return null;
 
-        var container = manager->GetInventoryContainer(inventoryType);
-        if (container == null || !container->IsLoaded || slotIndex >= container->Size)
-            return null;
-
-        return container->GetInventorySlot(slotIndex);
+        return NativeArrayAccess.TryGetInventorySlot(manager, inventoryType, slotIndex, out var item)
+            ? item
+            : null;
     }
 
     private static bool IsFreeCompanyPage(InventoryType inventoryType)
@@ -517,14 +540,13 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
 
         foreach (var inventoryType in destinationInventories)
         {
-            var container = manager->GetInventoryContainer(inventoryType);
-            if (container == null || !container->IsLoaded)
+            if (!NativeArrayAccess.TryGetInventoryContainer(manager, inventoryType, out var container))
                 continue;
 
             for (var index = 0; index < container->Size; index++)
             {
-                var slot = container->GetInventorySlot(index);
-                if (slot == null || !IsSameItem(slot, sourceItem))
+                if (!NativeArrayAccess.TryGetInventorySlot(container, index, out var slot) ||
+                    !IsSameItem(slot, sourceItem))
                     continue;
 
                 if (slot->Quantity + sourceItem->Quantity > itemData.StackSize)
@@ -538,14 +560,12 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
 
         foreach (var inventoryType in destinationInventories)
         {
-            var container = manager->GetInventoryContainer(inventoryType);
-            if (container == null || !container->IsLoaded)
+            if (!NativeArrayAccess.TryGetInventoryContainer(manager, inventoryType, out var container))
                 continue;
 
             for (var index = 0; index < container->Size; index++)
             {
-                var slot = container->GetInventorySlot(index);
-                if (slot == null || slot->GetItemId() != 0)
+                if (!NativeArrayAccess.TryGetInventorySlot(container, index, out var slot) || slot->GetItemId() != 0)
                     continue;
 
                 destinationInventory = inventoryType;
@@ -625,20 +645,21 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
     private static bool TryGetCurrentPage(AtkUnitBase* addon, out InventoryType page)
     {
         page = InventoryType.Invalid;
-        if (addon == null || addon->AtkValues == null || addon->AtkValuesCount <= 2)
+        if (!NativeArrayAccess.TryGetAtkUInt(addon, 1, out var crystalsTab) ||
+            !NativeArrayAccess.TryGetAtkUInt(addon, 2, out var pageIndex))
             return false;
 
         var hiddenNode = addon->GetNodeById(106);
         if (hiddenNode != null && hiddenNode->IsVisible())
             return false;
 
-        if (addon->AtkValues[1].UInt != 0)
+        if (crystalsTab != 0)
         {
             page = InventoryType.FreeCompanyCrystals;
             return true;
         }
 
-        page = (InventoryType)(20000 + addon->AtkValues[2].UInt);
+        page = (InventoryType)(20000 + pageIndex);
         return true;
     }
 

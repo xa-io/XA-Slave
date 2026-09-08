@@ -11,6 +11,33 @@ using CSGameObject = FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject;
 
 namespace XASlave.Services;
 
+public enum AddonClickStatus
+{
+    ClickedByText,
+    ClickedByNodeId,
+    ClickedByFallbackIndex,
+    AddonUnavailable,
+    TextNotFound,
+    NodeIdNotFound,
+    NodeOutOfRange,
+    EventUnavailable,
+    ClickFailed,
+}
+
+public readonly record struct AddonClickResult(
+    AddonClickStatus Status,
+    string AddonName,
+    string Detail,
+    int? FallbackIndex = null,
+    uint? NodeId = null)
+{
+    public bool Succeeded => Status is AddonClickStatus.ClickedByText
+        or AddonClickStatus.ClickedByNodeId
+        or AddonClickStatus.ClickedByFallbackIndex;
+
+    public bool UsedFallback => Status == AddonClickStatus.ClickedByFallbackIndex;
+}
+
 /// <summary>
 /// Static helpers for game addon interaction, target interaction, and UI callbacks.
 /// Replaces SND-dependent commands like /interact with native Dalamud/FFXIVClientStructs calls.
@@ -22,6 +49,10 @@ namespace XASlave.Services;
 /// </summary>
 public static class AddonHelper
 {
+    private static readonly object RetryDispatchLock = new();
+    private static readonly Dictionary<string, long> LastRetryDispatchMs = new(StringComparer.Ordinal);
+    private const long RetryDispatchIntervalMs = 750;
+
     public const string TextErrorAddonName = "_TextError";
     public const string CannotSeeTargetText = "Cannot see target";
     public const string ContentsFinderConfirmAddonName = "ContentsFinderConfirm";
@@ -40,6 +71,7 @@ public static class AddonHelper
     /// </summary>
     public static unsafe bool InteractWithTarget()
     {
+        Plugin.AssertGameThread();
         try
         {
             var targetSystem = TargetSystem.Instance();
@@ -75,11 +107,14 @@ public static class AddonHelper
     /// Targets the named object through the native game command path.
     /// </summary>
     public static void TargetByName(string targetName)
+        => TargetByName(targetName, exact: false);
+
+    public static void TargetByName(string targetName, bool exact)
     {
         if (string.IsNullOrWhiteSpace(targetName))
             return;
 
-        if (TryTargetByName(targetName, out _))
+        if (TryTargetByName(targetName, exact, out _))
             return;
 
         ChatHelper.SendMessage($"/target \"{targetName}\"");
@@ -90,7 +125,11 @@ public static class AddonHelper
     /// Mirrors SimpleTweaks' target-fix behavior without waiting for the game command to fail.
     /// </summary>
     public static unsafe bool TryTargetByName(string targetName, out string matchedName)
+        => TryTargetByName(targetName, exact: false, out matchedName);
+
+    public static unsafe bool TryTargetByName(string targetName, bool exact, out string matchedName)
     {
+        Plugin.AssertGameThread();
         matchedName = string.Empty;
         var searchName = targetName.Trim();
         if (string.IsNullOrWhiteSpace(searchName))
@@ -107,9 +146,10 @@ public static class AddonHelper
             foreach (var actor in Plugin.ObjectTable)
             {
                 var actorName = actor.Name.TextValue;
-                if (string.IsNullOrWhiteSpace(actorName)
-                    || !actorName.Contains(searchName, StringComparison.OrdinalIgnoreCase)
-                    || !IsTargetable(actor))
+                var nameMatches = exact
+                    ? actorName.Equals(searchName, StringComparison.Ordinal)
+                    : actorName.Contains(searchName, StringComparison.OrdinalIgnoreCase);
+                if (string.IsNullOrWhiteSpace(actorName) || !nameMatches || !IsTargetable(actor))
                 {
                     continue;
                 }
@@ -185,6 +225,7 @@ public static class AddonHelper
     /// </summary>
     public static unsafe bool IsInWorkshopByHousingManager()
     {
+        Plugin.AssertGameThread();
         try
         {
             var housingManager = HousingManager.Instance();
@@ -243,7 +284,8 @@ public static class AddonHelper
     {
         if (!CurrentTargetMatches(targetName))
         {
-            TargetByName(targetName);
+            if (ShouldDispatchRetry($"target:{targetName}"))
+                TargetByName(targetName, exact: true);
             return false;
         }
 
@@ -271,10 +313,31 @@ public static class AddonHelper
             return true;
         }
 
-        if (!movementActive)
+        if (!movementActive && ShouldDispatchRetry($"path:{targetName}"))
             TryPathToCurrentTarget(stopDistance);
 
         return false;
+    }
+
+    public static void ResetRetryDispatchThrottles()
+    {
+        lock (RetryDispatchLock)
+            LastRetryDispatchMs.Clear();
+    }
+
+    private static bool ShouldDispatchRetry(string key)
+    {
+        var nowMs = Environment.TickCount64;
+        lock (RetryDispatchLock)
+        {
+            if (LastRetryDispatchMs.TryGetValue(key, out var lastMs)
+                && nowMs - lastMs < RetryDispatchIntervalMs)
+            {
+                return false;
+            }
+            LastRetryDispatchMs[key] = nowMs;
+            return true;
+        }
     }
 
     /// <summary>
@@ -282,6 +345,7 @@ public static class AddonHelper
     /// </summary>
     public static unsafe AtkUnitBase* GetAddon(string name)
     {
+        Plugin.AssertGameThread();
         try { return AtkStage.Instance()->RaptureAtkUnitManager->GetAddonByName(name); }
         catch { return null; }
     }
@@ -336,12 +400,22 @@ public static class AddonHelper
 
         for (var i = 0; i < addon->UldManager.NodeListCount; i++)
         {
-            var node = addon->UldManager.NodeList[i];
-            if (node != null)
+            if (NativeArrayAccess.TryGetNode(&addon->UldManager, i, out var node))
                 CollectText(node, results, 0);
         }
 
         return results;
+    }
+
+    /// <summary>
+    /// Returns the visible text from the current SelectYesno prompt. Callers must still match
+    /// the returned text against the operation they intend to confirm before clicking either
+    /// answer; addon visibility alone is not authorization.
+    /// </summary>
+    public static bool TryGetSelectYesnoText(out string promptText)
+    {
+        promptText = string.Join(" | ", GetAddonTextEntries("SelectYesno"));
+        return !string.IsNullOrWhiteSpace(promptText);
     }
 
     public static unsafe int GetAddonTextEntryCount(string addonName)
@@ -627,6 +701,7 @@ public static class AddonHelper
     /// </summary>
     public static unsafe bool ShowAgent(AgentId agentId)
     {
+        Plugin.AssertGameThread();
         try
         {
             var agentModule = AgentModule.Instance();
@@ -682,6 +757,7 @@ public static class AddonHelper
     /// </summary>
     public static unsafe bool SendAgentEvent(AgentId agentId, params int[] values)
     {
+        Plugin.AssertGameThread();
         try
         {
             var agentModule = AgentModule.Instance();
@@ -786,53 +862,106 @@ public static class AddonHelper
     }
 
     /// <summary>
-    /// Clicks a button node in the named addon by its NodeList index.
-    /// Uses ReceiveEvent with AtkEventType.ButtonClick (25).
-    /// AtkEventManager lives on AtkResNode (which component nodes inherit).
-    /// Node indices confirmed via Dalamud /xldata Addon Inspector.
+    /// Resolves a button by visible text, then stable node id, and only then uses the supplied
+    /// patch-sensitive NodeList index as an observable fallback.
     /// </summary>
-    public static unsafe bool ClickAddonButton(string addonName, int nodeListIndex)
+    public static unsafe AddonClickResult ClickAddonButtonResolved(
+        string addonName,
+        string? expectedText,
+        uint? expectedNodeId,
+        int fallbackNodeListIndex,
+        bool containsText = true)
     {
         var addon = GetAddon(addonName);
         if (addon == null || !addon->IsVisible)
         {
-            Plugin.Log.Warning($"[XASlave] AddonHelper.ClickAddonButton: '{addonName}' not visible or null.");
-            return false;
-        }
-        if (nodeListIndex >= addon->UldManager.NodeListCount)
-        {
-            Plugin.Log.Warning($"[XASlave] AddonHelper.ClickAddonButton: node {nodeListIndex} out of bounds in '{addonName}' (count: {addon->UldManager.NodeListCount}).");
-            return false;
+            return new AddonClickResult(AddonClickStatus.AddonUnavailable, addonName, "Addon is not visible.", fallbackNodeListIndex, expectedNodeId);
         }
 
-        var node = addon->UldManager.NodeList[nodeListIndex];
-        if (node == null)
+        var priorFailure = string.Empty;
+        if (!string.IsNullOrWhiteSpace(expectedText))
         {
-            Plugin.Log.Warning($"[XASlave] AddonHelper.ClickAddonButton: node {nodeListIndex} in '{addonName}' is null.");
-            return false;
+            var textNode = FindMatchingTextNode(addon, expectedText, containsText);
+            var clickableNode = FindClickableNode(textNode);
+            if (clickableNode != null && TryClickNode(addon, clickableNode, out var detail))
+            {
+                return new AddonClickResult(AddonClickStatus.ClickedByText, addonName, detail, fallbackNodeListIndex, clickableNode->NodeId);
+            }
+
+            priorFailure = textNode == null
+                ? $"text '{expectedText}' was not found"
+                : $"text '{expectedText}' had no clickable event";
         }
+
+        if (expectedNodeId is > 0)
+        {
+            var idNode = FindNodeById(addon, expectedNodeId.Value);
+            if (idNode != null && TryClickNode(addon, idNode, out var detail))
+            {
+                return new AddonClickResult(AddonClickStatus.ClickedByNodeId, addonName, detail, fallbackNodeListIndex, expectedNodeId);
+            }
+
+            priorFailure = string.IsNullOrEmpty(priorFailure)
+                ? $"node id {expectedNodeId.Value} was not found or had no event"
+                : $"{priorFailure}; node id {expectedNodeId.Value} was not found or had no event";
+        }
+
+        if (!NativeArrayAccess.TryGetNode(&addon->UldManager, fallbackNodeListIndex, out var fallbackNode))
+        {
+            var detail = $"Fallback NodeList[{fallbackNodeListIndex}] is out of bounds (count {addon->UldManager.NodeListCount}); {priorFailure}.";
+            Plugin.Log.Warning("[XASlave] Addon click failed for {Addon}: {Detail}", addonName, detail);
+            return new AddonClickResult(AddonClickStatus.NodeOutOfRange, addonName, detail, fallbackNodeListIndex, expectedNodeId);
+        }
+
+        if (!TryClickNode(addon, fallbackNode, out var fallbackDetail))
+        {
+            var detail = $"Fallback NodeList[{fallbackNodeListIndex}] had no usable event; {priorFailure}.";
+            Plugin.Log.Warning("[XASlave] Addon click failed for {Addon}: {Detail}", addonName, detail);
+            return new AddonClickResult(AddonClickStatus.EventUnavailable, addonName, detail, fallbackNodeListIndex, expectedNodeId);
+        }
+
+        Plugin.Log.Warning(
+            "[XASlave] Addon click for {Addon} used patch-sensitive fallback NodeList[{Index}] because {PriorFailure}.",
+            addonName,
+            fallbackNodeListIndex,
+            string.IsNullOrEmpty(priorFailure) ? "no text or node-id contract was supplied" : priorFailure);
+        return new AddonClickResult(AddonClickStatus.ClickedByFallbackIndex, addonName, fallbackDetail, fallbackNodeListIndex, expectedNodeId);
+    }
+
+    /// <summary>
+    /// Compatibility wrapper for callers that have not yet supplied a text or node-id contract.
+    /// The structured resolver records that the numeric path was used.
+    /// </summary>
+    public static bool ClickAddonButton(string addonName, int nodeListIndex)
+        => ClickAddonButtonResolved(addonName, null, null, nodeListIndex).Succeeded;
+
+    private static unsafe bool TryClickNode(AtkUnitBase* addon, AtkResNode* node, out string detail)
+    {
+        detail = string.Empty;
+        if (addon == null || node == null)
+            return false;
 
         try
         {
             var evt = node->AtkEventManager.Event;
-            if (evt != null)
-            {
-                addon->ReceiveEvent((AtkEventType)25, (int)evt->Param, evt);
-                Plugin.Log.Information($"[XASlave] AddonHelper.ClickAddonButton: clicked node {nodeListIndex} in '{addonName}' (nodeType: {(ushort)node->Type}, param: {evt->Param})");
-                return true;
-            }
-            Plugin.Log.Warning($"[XASlave] AddonHelper.ClickAddonButton: node {nodeListIndex} in '{addonName}' has no event (nodeType: {(ushort)node->Type}, NodeListCount: {addon->UldManager.NodeListCount}).");
-            return false;
+            if (evt == null)
+                return false;
+
+            addon->ReceiveEvent((AtkEventType)25, (int)evt->Param, evt);
+            detail = $"Clicked node id {node->NodeId} (type {(ushort)node->Type}, event {evt->Param}).";
+            return true;
         }
         catch (Exception ex)
         {
-            Plugin.Log.Error($"[XASlave] AddonHelper.ClickAddonButton error on '{addonName}' node {nodeListIndex}: {ex.Message}");
+            detail = ex.Message;
+            Plugin.Log.Warning(ex, "[XASlave] AddonHelper failed to dispatch a resolved addon click.");
             return false;
         }
     }
 
     public static unsafe bool ClickResNode(AtkUnitBase* addon, AtkResNode* node)
     {
+        Plugin.AssertGameThread();
         if (addon == null || node == null)
             return false;
 
@@ -854,6 +983,7 @@ public static class AddonHelper
 
     public static unsafe bool ClickComponent(AtkUnitBase* addon, AtkComponentBase* component)
     {
+        Plugin.AssertGameThread();
         if (component == null)
             return false;
 
@@ -918,8 +1048,7 @@ public static class AddonHelper
         var childCount = compNode->Component->UldManager.NodeListCount;
         for (var i = 0; i < childCount; i++)
         {
-            var child = compNode->Component->UldManager.NodeList[i];
-            if (child != null)
+            if (NativeArrayAccess.TryGetNode(&compNode->Component->UldManager, i, out var child))
                 CollectText(child, results, depth + 1);
         }
     }
@@ -952,8 +1081,7 @@ public static class AddonHelper
         var childCount = compNode->Component->UldManager.NodeListCount;
         for (var i = 0; i < childCount; i++)
         {
-            var child = compNode->Component->UldManager.NodeList[i];
-            if (child != null)
+            if (NativeArrayAccess.TryGetNode(&compNode->Component->UldManager, i, out var child))
                 CollectTextEntries(child, $"{path}->[{i}]", results, depth + 1);
         }
     }
@@ -967,8 +1095,7 @@ public static class AddonHelper
         var entries = new List<(string Path, string Text)>();
         for (var i = 0; i < addon->UldManager.NodeListCount; i++)
         {
-            var node = addon->UldManager.NodeList[i];
-            if (node != null)
+            if (NativeArrayAccess.TryGetNode(&addon->UldManager, i, out var node))
                 CollectTextEntries(node, $"[{i}]", entries, 0);
         }
 
@@ -1031,11 +1158,51 @@ public static class AddonHelper
     {
         for (var i = 0; i < addon->UldManager.NodeListCount; i++)
         {
-            var node = addon->UldManager.NodeList[i];
-            if (node == null)
+            if (!NativeArrayAccess.TryGetNode(&addon->UldManager, i, out var node))
                 continue;
 
             var match = FindMatchingTextNode(node, text, contains, 0);
+            if (match != null)
+                return match;
+        }
+
+        return null;
+    }
+
+    private static unsafe AtkResNode* FindNodeById(AtkUnitBase* addon, uint nodeId)
+    {
+        for (var i = 0; i < addon->UldManager.NodeListCount; i++)
+        {
+            if (!NativeArrayAccess.TryGetNode(&addon->UldManager, i, out var node))
+                continue;
+
+            var match = FindNodeById(node, nodeId, 0);
+            if (match != null)
+                return match;
+        }
+
+        return null;
+    }
+
+    private static unsafe AtkResNode* FindNodeById(AtkResNode* node, uint nodeId, int depth)
+    {
+        if (node == null || depth > 6)
+            return null;
+        if (node->NodeId == nodeId)
+            return node;
+        if ((int)node->Type < 1000)
+            return null;
+
+        var componentNode = (AtkComponentNode*)node;
+        if (componentNode->Component == null)
+            return null;
+
+        for (var i = 0; i < componentNode->Component->UldManager.NodeListCount; i++)
+        {
+            if (!NativeArrayAccess.TryGetNode(&componentNode->Component->UldManager, i, out var child))
+                continue;
+
+            var match = FindNodeById(child, nodeId, depth + 1);
             if (match != null)
                 return match;
         }
@@ -1091,8 +1258,7 @@ public static class AddonHelper
         var childCount = compNode->Component->UldManager.NodeListCount;
         for (var i = 0; i < childCount; i++)
         {
-            var child = compNode->Component->UldManager.NodeList[i];
-            if (child == null)
+            if (!NativeArrayAccess.TryGetNode(&compNode->Component->UldManager, i, out var child))
                 continue;
 
             var match = FindMatchingTextNode(child, text, contains, depth + 1);

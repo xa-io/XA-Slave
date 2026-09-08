@@ -1,7 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Text.Json;
 using Dalamud.Plugin;
-using Dalamud.Plugin.Ipc;
 using Dalamud.Plugin.Services;
 
 namespace XASlave.Services;
@@ -15,47 +15,56 @@ namespace XASlave.Services;
 ///   XASlave.RunTask (Action, string) - start a named task from external plugins
 ///
 /// ExecuteCommand examples:
+///   "" or "/xa"
 ///   "xamods"
+///   "updates"
+///   "dbsub 5000000"
 ///   "sprint on"
 ///   "killgame"
 ///   "res 500x345"
+///   "res 1280 720"
+///   "res reset"
 ///   "preset load Favorites"
 ///   "/xa logout"
 /// </summary>
 public sealed class IpcProvider : IDisposable
 {
+    private readonly record struct CommandExecutionResult(bool Success, string Message);
+
     private readonly Plugin plugin;
     private readonly IPluginLog log;
 
-    private readonly ICallGateProvider<bool> isBusyProvider;
-    private readonly ICallGateProvider<string> getActivityProvider;
-    private readonly ICallGateProvider<string, string> executeCommandProvider;
-    private readonly ICallGateProvider<string, object> runTaskProvider;
+    private readonly List<(string Channel, IDisposable Registration)> registrations = new();
+    private bool isDisposed;
 
     public IpcProvider(IDalamudPluginInterface pluginInterface, Plugin plugin, IPluginLog log)
+        : this(new DalamudIpcProviderRegistrationHost(pluginInterface), plugin, log)
+    {
+    }
+
+    internal IpcProvider(IIpcProviderRegistrationHost registrationHost, Plugin plugin, IPluginLog log)
     {
         this.plugin = plugin;
         this.log = log;
 
-        // XASlave.IsBusy - returns true when TaskRunner, AutoCollector, or Auto Open Moogle Mail is running
-        isBusyProvider = pluginInterface.GetIpcProvider<bool>("XASlave.IsBusy");
-        isBusyProvider.RegisterFunc(IsBusy);
-
-        // Detailed activity for XA Sub Terminal and other observers.
-        getActivityProvider = pluginInterface.GetIpcProvider<string>("XASlave.GetActivityJson");
-        getActivityProvider.RegisterFunc(GetActivityJson);
-
-        // XASlave.ExecuteCommand - mirrors the /xa command surface over IPC
-        executeCommandProvider = pluginInterface.GetIpcProvider<string, string>("XASlave.ExecuteCommand");
-        executeCommandProvider.RegisterFunc(ExecuteCommand);
-
-        // XASlave.RunTask - start a named task (currently supports: "SaveToXaDatabase")
-        runTaskProvider = pluginInterface.GetIpcProvider<string, object>("XASlave.RunTask");
-        runTaskProvider.RegisterAction(RunTask);
-
+        try
+        {
+            Register("XASlave.IsBusy", registrationHost.RegisterIsBusy(IsBusy));
+            Register("XASlave.GetActivityJson", registrationHost.RegisterGetActivityJson(GetActivityJson));
+            Register("XASlave.ExecuteCommand", registrationHost.RegisterExecuteCommand(ExecuteCommand));
+            Register("XASlave.RunTask", registrationHost.RegisterRunTask(RunTask));
+        }
+        catch
+        {
+            UnregisterAll();
+            throw;
+        }
     }
 
     private bool IsBusy()
+        => Plugin.RunOnGameThread(IsBusyOnFrameworkThread).GetAwaiter().GetResult();
+
+    private bool IsBusyOnFrameworkThread()
     {
         return plugin.TaskRunner.IsRunning
             || plugin.ArPostProcessor.IsRunning
@@ -64,6 +73,9 @@ public sealed class IpcProvider : IDisposable
     }
 
     private string GetActivityJson()
+        => Plugin.RunOnGameThread(GetActivityJsonOnFrameworkThread).GetAwaiter().GetResult();
+
+    private string GetActivityJsonOnFrameworkThread()
     {
         var source = string.Empty;
         var detail = string.Empty;
@@ -93,7 +105,7 @@ public sealed class IpcProvider : IDisposable
         return JsonSerializer.Serialize(new
         {
             available = true,
-            busy = IsBusy(),
+            busy = IsBusyOnFrameworkThread(),
             source,
             detail,
             task = new
@@ -131,8 +143,22 @@ public sealed class IpcProvider : IDisposable
 
     private void RunTask(string taskName)
     {
-        log.Information($"[XASlave] IPC: RunTask('{taskName}') called.");
+        var normalized = IpcCommandPolicy.NormalizeTaskName(taskName);
+        if (normalized.Length == 0)
+        {
+            log.Warning("[XASlave] IPC: RunTask called with a null/empty task name.");
+            return;
+        }
 
+        log.Information($"[XASlave] IPC: RunTask('{normalized}') called.");
+
+        Plugin.RunOnGameThread(() => RunTaskOnFrameworkThread(normalized))
+            .GetAwaiter()
+            .GetResult();
+    }
+
+    private void RunTaskOnFrameworkThread(string taskName)
+    {
         if (plugin.TaskRunner.IsRunning || plugin.AutoCollector.IsRunning)
         {
             log.Warning($"[XASlave] IPC: RunTask('{taskName}') rejected - already busy.");
@@ -157,7 +183,27 @@ public sealed class IpcProvider : IDisposable
     {
         log.Information($"[XASlave] IPC: ExecuteCommand('{commandText}') called.");
 
-        var normalized = NormalizeCommand(commandText);
+        var normalized = IpcCommandPolicy.NormalizeCommand(commandText);
+        var execution = Plugin
+            .RunOnGameThread(() => ExecuteCommandOnFrameworkThread(normalized))
+            .GetAwaiter()
+            .GetResult();
+        var success = execution.Success;
+        var message = execution.Message;
+        var response = string.IsNullOrWhiteSpace(message)
+            ? (success ? "OK" : "ERROR")
+            : $"{(success ? "OK" : "ERROR")}: {message}";
+
+        if (success)
+            log.Information($"[XASlave] IPC: ExecuteCommand('{commandText}') succeeded. {message}");
+        else
+            log.Warning($"[XASlave] IPC: ExecuteCommand('{commandText}') failed. {message}");
+
+        return response;
+    }
+
+    private CommandExecutionResult ExecuteCommandOnFrameworkThread(string normalized)
+    {
         bool success;
         string message;
         if (normalized.Equals("logout", StringComparison.OrdinalIgnoreCase))
@@ -170,18 +216,10 @@ public sealed class IpcProvider : IDisposable
         }
         else
         {
-            success = plugin.TryExecuteXaCommandFromIpc(commandText, out message);
+            success = plugin.TryExecuteXaCommandFromIpc(normalized, out message);
         }
-        var response = string.IsNullOrWhiteSpace(message)
-            ? (success ? "OK" : "ERROR")
-            : $"{(success ? "OK" : "ERROR")}: {message}";
 
-        if (success)
-            log.Information($"[XASlave] IPC: ExecuteCommand('{commandText}') succeeded. {message}");
-        else
-            log.Warning($"[XASlave] IPC: ExecuteCommand('{commandText}') failed. {message}");
-
-        return response;
+        return new CommandExecutionResult(success, message);
     }
 
     private bool TryRequestForcedLogout(bool killGame, out string message)
@@ -198,23 +236,34 @@ public sealed class IpcProvider : IDisposable
         return success;
     }
 
-    private static string NormalizeCommand(string commandText)
+    public void Dispose()
     {
-        var normalized = (commandText ?? string.Empty).Trim();
-        if (normalized.StartsWith("/xa", StringComparison.OrdinalIgnoreCase))
-            normalized = normalized[3..].TrimStart();
-        return normalized;
+        if (isDisposed)
+            return;
+        isDisposed = true;
+
+        UnregisterAll();
     }
 
-    public void Dispose()
+    private void Register(string channel, IDisposable registration)
+        => registrations.Add((channel, registration));
+
+    private void UnregisterAll()
+    {
+        for (var index = registrations.Count - 1; index >= 0; index--)
+            TryUnregister(registrations[index].Channel, registrations[index].Registration);
+        registrations.Clear();
+    }
+
+    private void TryUnregister(string channel, IDisposable registration)
     {
         try
         {
-            isBusyProvider.UnregisterFunc();
-            getActivityProvider.UnregisterFunc();
-            executeCommandProvider.UnregisterFunc();
-            runTaskProvider.UnregisterAction();
+            registration.Dispose();
         }
-        catch { }
+        catch (Exception ex)
+        {
+            log.Warning($"[XASlave] IPC: failed to unregister {channel}: {ex.Message}");
+        }
     }
 }

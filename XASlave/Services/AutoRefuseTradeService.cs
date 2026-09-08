@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -71,7 +72,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     {
         if (value && xagmanOverride != XagmanTradeRefusalOverride.DropboxAutoAcceptSuppression)
         {
-            EnsureInitialized();
+            EnsureInitialized(retryMissing: initialized);
             if (!HasRequiredHooks)
             {
                 manualEnabled = false;
@@ -143,7 +144,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
             return true;
         }
 
-        EnsureInitialized();
+        EnsureInitialized(retryMissing: initialized);
         if (!HasRequiredHooks)
         {
             enabled = false;
@@ -210,16 +211,16 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         return success;
     }
 
-    private void EnsureInitialized()
+    private void EnsureInitialized(bool retryMissing = false)
     {
-        if (initialized)
+        if (initialized && !retryMissing)
             return;
 
         initialized = true;
 
-        tradeAgentShowHook = TryCreateTradeAgentShowHook();
-        sendTradeRequestHook = TryCreateSendTradeRequestHook();
-        tradeStatusUpdateHook = TryCreateHook<TradeStatusUpdateDelegate>(Sigs.TradeStatusUpdateSig, TradeStatusUpdateDetour, "TradeStatusUpdate");
+        tradeAgentShowHook ??= TryCreateTradeAgentShowHook();
+        sendTradeRequestHook ??= TryCreateSendTradeRequestHook();
+        tradeStatusUpdateHook ??= TryCreateHook<TradeStatusUpdateDelegate>(Sigs.TradeStatusUpdateSig, TradeStatusUpdateDetour, "TradeStatusUpdate");
     }
 
     private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
@@ -228,7 +229,10 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
+            {
+                log.Warning($"[XASlave] Auto Refuse Trade could not resolve {label}; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             var hook = interopProvider.HookFromAddress<T>(address, detour);
             return hook;
@@ -246,7 +250,10 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         {
             var address = (nint)InventoryManager.MemberFunctionPointers.SendTradeRequest;
             if (address == nint.Zero)
+            {
+                log.Warning("[XASlave] Auto Refuse Trade could not resolve SendTradeRequest; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             var hook = interopProvider.HookFromAddress<InventoryManager.Delegates.SendTradeRequest>(address, SendTradeRequestDetour);
             return hook;
@@ -262,13 +269,26 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     {
         try
         {
-            var agent = AgentModule.Instance()->GetAgentByInternalId(AgentId.Trade);
-            if (agent == null)
+            var agentModule = AgentModule.Instance();
+            if (agentModule == null)
+            {
+                log.Warning("[XASlave] Auto Refuse Trade could not access AgentModule while resolving AgentTradeShow; retry after login or a UI transition.");
                 return null;
+            }
+
+            var agent = agentModule->GetAgentByInternalId(AgentId.Trade);
+            if (agent == null)
+            {
+                log.Warning("[XASlave] Auto Refuse Trade could not resolve the Trade agent while resolving AgentTradeShow; retry after login or a UI transition.");
+                return null;
+            }
 
             var address = GetVirtualFunctionAddress(agent->VirtualTable, "Show");
             if (address == nint.Zero)
+            {
+                log.Warning("[XASlave] Auto Refuse Trade could not resolve AgentTradeShow; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             var hook = interopProvider.HookFromAddress<AgentShowDelegate>(address, TradeAgentShowDetour);
             return hook;
@@ -318,7 +338,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
             _ => "silent"
         };
 
-        var surfaceCount = 0;
+        var surfaceCount = 1;
         surfaceCount += tradeAgentShowHook != null ? 1 : 0;
         surfaceCount += tradeStatusUpdateHook != null ? 1 : 0;
         var extraCommandLabel = CountExtraCommands() switch
@@ -334,20 +354,29 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
             _ => "manual",
         };
 
-        StatusText = $"Enabled - incoming trades are refused automatically ({ownerLabel}; {feedbackMode}, {surfaceCount} surfaces, {extraCommandLabel}).";
+        var availabilityLabel = surfaceCount < 3 ? "Partially enabled" : "Enabled";
+        StatusText = $"{availabilityLabel} - incoming trades are refused automatically ({ownerLabel}; {feedbackMode}, {surfaceCount}/3 surfaces, {extraCommandLabel}).";
     }
 
     private void SendTradeRequestDetour(InventoryManager* manager, uint entityId)
     {
-        lastOutgoingTradeMs = Environment.TickCount64;
-        sendTradeRequestHook?.Original(manager, entityId);
+        try
+        {
+            lastOutgoingTradeMs = Environment.TickCount64;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Auto Refuse Trade failed to record an outgoing trade timestamp.");
+        }
+
+        sendTradeRequestHook?.OriginalDisposeSafe(manager, entityId);
     }
 
     private void TradeAgentShowDetour(AgentInterface* agent)
     {
         if (!enabled)
         {
-            tradeAgentShowHook?.Original(agent);
+            tradeAgentShowHook?.OriginalDisposeSafe(agent);
             return;
         }
 
@@ -361,12 +390,12 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
             log.Warning(ex, "[XASlave] Auto Refuse Trade failed while intercepting the trade window.");
         }
 
-        tradeAgentShowHook?.Original(agent);
+        tradeAgentShowHook?.OriginalDisposeSafe(agent);
     }
 
     private nint TradeStatusUpdateDetour(InventoryManager* manager, nint entityId, nint packet)
     {
-        var result = tradeStatusUpdateHook?.Original(manager, entityId, packet) ?? 0;
+        var result = tradeStatusUpdateHook?.OriginalDisposeSafe(manager, entityId, packet) ?? 0;
 
         if (!enabled || packet == nint.Zero)
             return result;
@@ -406,9 +435,28 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         lastAutoRefuseMs = nowMs;
         traderEntityId = GetCurrentTraderEntityId(traderEntityId, nowMs);
         var traderName = ResolveTraderNameSafely(traderEntityId);
-        InventoryManager.Instance()->RefuseTrade();
+        var inventoryManager = InventoryManager.Instance();
+        if (inventoryManager == null)
+        {
+            log.Warning("[XASlave] Auto Refuse Trade could not refuse the trade because InventoryManager is unavailable.");
+            return false;
+        }
+
+        inventoryManager->RefuseTrade();
         ReportTradeRefused(traderName);
         return true;
+    }
+
+    internal static string SanitizeImportedExtraCommands(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+            return string.Empty;
+
+        return string.Join(
+            Environment.NewLine,
+            value[..Math.Min(value.Length, 1024)]
+                .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Where(line => !line.StartsWith("/", StringComparison.Ordinal)));
     }
 
     private static uint ReadTradePacketEntityId(nint packet)
@@ -446,7 +494,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
         try
         {
-            Plugin.Framework.Run(() =>
+            Plugin.RunOnGameThread(() =>
             {
                 try
                 {

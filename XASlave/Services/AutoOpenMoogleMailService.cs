@@ -829,7 +829,16 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
             return false;
 
         var letterData = stage->GetNumberArrayData(NumberArrayType.Letter);
-        return letterData != null && letterData->IntArray[136] != 0;
+        var compatible = NativeArrayAccess.TryGetInt(
+            letterData,
+            NativeOffsets.LetterTransferBusyNumberIndex,
+            out var busyValue);
+        NativeOffsets.ReportOnce(
+            Plugin.Log,
+            "NumberArray.Letter.TransferBusy",
+            compatible,
+            $"length={(letterData == null ? 0 : letterData->Size)}, index={NativeOffsets.LetterTransferBusyNumberIndex}");
+        return compatible && busyValue != 0;
     }
 
     private void CloseLetterViewer()

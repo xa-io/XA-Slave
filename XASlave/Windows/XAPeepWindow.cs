@@ -20,6 +20,10 @@ public sealed class XAPeepWindow : Window
     private readonly TitleBarButton lockButton;
     private static float UiScale => ImGuiHelpers.GlobalScale;
     private static float UiScaleSafe => ImGuiHelpers.GlobalScale;
+    private readonly object pendingActionSync = new();
+    private readonly Queue<XAPeepPendingAction> pendingRowActions = new();
+    private XAPeepPendingAction? pendingFocusAction;
+    private bool pendingActionDrainScheduled;
     private bool focusPreviewCaptured;
     private ulong cachedFocusTargetId = ulong.MaxValue;
 
@@ -86,13 +90,13 @@ public sealed class XAPeepWindow : Window
             plugin.OpenXAPeepHistoryUi();
         ImGui.SameLine();
         var clearHistoryModifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
-        if (!clearHistoryModifierHeld)
-            ImGui.BeginDisabled();
-        if (ImGui.SmallButton("Clear"))
-            service.ClearHistory();
+        using (ImRaii.Disabled(!clearHistoryModifierHeld))
+        {
+            if (ImGui.SmallButton("Clear"))
+                service.ClearHistory();
+        }
         if (!clearHistoryModifierHeld)
         {
-            ImGui.EndDisabled();
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip("Press and hold CTRL + SHIFT to allow clearing.");
         }
@@ -100,7 +104,6 @@ public sealed class XAPeepWindow : Window
         ImGui.Spacing();
 
         var trackedPlayers = service.GetTrackedPlayers(200);
-        var liveActorIndex = BuildLiveActorIndex(trackedPlayers);
         if (!plugin.Configuration.XAPeepEnabled && trackedPlayers.Count == 0)
         {
             ReleaseFocusPreviewIfNeeded(false);
@@ -109,7 +112,8 @@ public sealed class XAPeepWindow : Window
         }
 
         var previewActiveThisFrame = false;
-        if (!ImGui.BeginListBox("##XAPeepList", new Vector2(-1f, -1f)))
+        using var listBox = ImRaii.ListBox("##XAPeepList", new Vector2(-1f, -1f));
+        if (!listBox)
         {
             ReleaseFocusPreviewIfNeeded(false);
             return;
@@ -122,81 +126,40 @@ public sealed class XAPeepWindow : Window
         else
         {
             foreach (var player in trackedPlayers)
-                DrawEntry(player, liveActorIndex, ref previewActiveThisFrame);
+                DrawEntry(player, ref previewActiveThisFrame);
         }
 
-        ImGui.EndListBox();
         ReleaseFocusPreviewIfNeeded(previewActiveThisFrame);
     }
 
-    private void DrawEntry(XAPeepTrackedPlayerView player, IReadOnlyDictionary<ulong, IGameObject> liveActorIndex, ref bool previewActiveThisFrame)
+    private void DrawEntry(XAPeepTrackedPlayerView player, ref bool previewActiveThisFrame)
     {
         var line = $"{player.TotalTargetCount:00} - {player.CompactName} - {FormatCompactTime(player.LastSeenUtc)}";
-        if (!player.IsLive)
-            ImGui.PushStyleColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]);
-
-        ImGui.Selectable(line, false, player.IsLive ? ImGuiSelectableFlags.None : ImGuiSelectableFlags.Disabled);
-        var actor = TryGetVisibleActor(player, liveActorIndex);
-        var hovered = ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled);
+        using (ImRaii.PushColor(
+                   ImGuiCol.Text,
+                   ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled],
+                   !player.IsLive))
+        {
+            ImGui.Selectable(line, false, player.IsLive ? ImGuiSelectableFlags.None : ImGuiSelectableFlags.Disabled);
+        }
+        var hovered = player.IsLive && ImGui.IsItemHovered();
         var controlHeld = ImGui.GetIO().KeyCtrl;
-
-        if (!player.IsLive)
-            ImGui.PopStyleColor();
 
         if (!hovered)
             return;
 
-        if (actor != null)
+        if (player.GameObjectId != 0)
         {
             previewActiveThisFrame = true;
-            UpdateFocusPreview(actor);
+            UpdateFocusPreview(player.GameObjectId);
         }
 
-        ExecuteRowAction(player, actor, GetRequestedAction(hovered, controlHeld));
+        QueueRowAction(player, GetRequestedAction(hovered, controlHeld));
     }
 
-    private static Dictionary<ulong, IGameObject> BuildLiveActorIndex(IEnumerable<XAPeepTrackedPlayerView> trackedPlayers)
+    private void UpdateFocusPreview(ulong gameObjectId)
     {
-        var liveIds = trackedPlayers
-            .Where(player => player.IsLive && player.GameObjectId != 0)
-            .Select(player => player.GameObjectId)
-            .ToHashSet();
-
-        if (liveIds.Count == 0)
-            return new();
-
-        var liveActorIndex = new Dictionary<ulong, IGameObject>(liveIds.Count);
-        foreach (var obj in Plugin.ObjectTable)
-        {
-            if (!liveIds.Contains(obj.GameObjectId) || liveActorIndex.ContainsKey(obj.GameObjectId))
-                continue;
-
-            liveActorIndex[obj.GameObjectId] = obj;
-        }
-
-        return liveActorIndex;
-    }
-
-    private static IGameObject? TryGetVisibleActor(XAPeepTrackedPlayerView player, IReadOnlyDictionary<ulong, IGameObject> liveActorIndex)
-    {
-        if (player.GameObjectId == 0)
-            return null;
-
-        return liveActorIndex.TryGetValue(player.GameObjectId, out var actor)
-            ? actor
-            : null;
-    }
-
-    private void UpdateFocusPreview(IGameObject actor)
-    {
-        if (!focusPreviewCaptured)
-        {
-            cachedFocusTargetId = Plugin.TargetManager.FocusTarget?.GameObjectId ?? ulong.MaxValue;
-            focusPreviewCaptured = true;
-        }
-
-        if (Plugin.TargetManager.FocusTarget?.GameObjectId != actor.GameObjectId)
-            Plugin.TargetManager.FocusTarget = actor;
+        QueuePendingAction(new(XAPeepRowAction.FocusPreview, gameObjectId, string.Empty, string.Empty), focusAction: true);
     }
 
     private void ReleaseFocusPreviewIfNeeded(bool previewActiveThisFrame)
@@ -209,23 +172,10 @@ public sealed class XAPeepWindow : Window
 
     private void ReleaseFocusPreview()
     {
-        if (!focusPreviewCaptured)
-            return;
-
-        if (cachedFocusTargetId == ulong.MaxValue)
-        {
-            Plugin.TargetManager.FocusTarget = null;
-        }
-        else
-        {
-            Plugin.TargetManager.FocusTarget = Plugin.ObjectTable.FirstOrDefault(obj => obj.GameObjectId == cachedFocusTargetId);
-        }
-
-        focusPreviewCaptured = false;
-        cachedFocusTargetId = ulong.MaxValue;
+        QueuePendingAction(new(XAPeepRowAction.ReleaseFocusPreview, 0, string.Empty, string.Empty), focusAction: true);
     }
 
-    private static void TargetPlayer(XAPeepTrackedPlayerView player, IGameObject? actor)
+    private static void TargetPlayer(XAPeepPendingAction action, IGameObject? actor)
     {
         if (actor != null)
         {
@@ -233,42 +183,42 @@ public sealed class XAPeepWindow : Window
             return;
         }
 
-        var targetName = string.IsNullOrWhiteSpace(player.CompactName)
-            ? player.DisplayName
-            : player.CompactName;
+        var targetName = string.IsNullOrWhiteSpace(action.CompactName)
+            ? action.DisplayName
+            : action.CompactName;
         AddonHelper.TargetByName(targetName);
     }
 
-    private static unsafe void ExaminePlayer(XAPeepTrackedPlayerView player, IGameObject? actor)
+    private static unsafe void ExaminePlayer(XAPeepPendingAction action, IGameObject? actor)
     {
         if (actor == null)
         {
-            Plugin.ToastGui.ShowError($"[XASlave] Could not examine {player.CompactName}: player is no longer nearby.");
+            Plugin.ToastGui.ShowError($"[XASlave] Could not examine {action.CompactName}: player is no longer nearby.");
             return;
         }
 
         var inspectAgent = AgentInspect.Instance();
         if (inspectAgent == null)
         {
-            Plugin.ToastGui.ShowError($"[XASlave] Could not open examine for {player.CompactName}.");
+            Plugin.ToastGui.ShowError($"[XASlave] Could not open examine for {action.CompactName}.");
             return;
         }
 
         inspectAgent->ExamineCharacter(actor.EntityId);
     }
 
-    private static unsafe void ShowAdventurePlate(XAPeepTrackedPlayerView player, IGameObject? actor)
+    private static unsafe void ShowAdventurePlate(XAPeepPendingAction action, IGameObject? actor)
     {
         if (actor == null)
         {
-            Plugin.ToastGui.ShowError($"[XASlave] Could not open adventurer plate for {player.CompactName}: player is no longer nearby.");
+            Plugin.ToastGui.ShowError($"[XASlave] Could not open adventurer plate for {action.CompactName}: player is no longer nearby.");
             return;
         }
 
         var charaCardAgent = AgentCharaCard.Instance();
         if (charaCardAgent == null)
         {
-            Plugin.ToastGui.ShowError($"[XASlave] Could not open adventurer plate for {player.CompactName}.");
+            Plugin.ToastGui.ShowError($"[XASlave] Could not open adventurer plate for {action.CompactName}.");
             return;
         }
 
@@ -289,21 +239,109 @@ public sealed class XAPeepWindow : Window
         return XAPeepRowAction.None;
     }
 
-    private static void ExecuteRowAction(XAPeepTrackedPlayerView player, IGameObject? actor, XAPeepRowAction action)
+    private void QueueRowAction(XAPeepTrackedPlayerView player, XAPeepRowAction action)
     {
-        switch (action)
+        if (action == XAPeepRowAction.None)
+            return;
+
+        QueuePendingAction(new(action, player.GameObjectId, player.CompactName, player.DisplayName), focusAction: false);
+    }
+
+    private void QueuePendingAction(XAPeepPendingAction action, bool focusAction)
+    {
+        lock (pendingActionSync)
+        {
+            if (focusAction)
+            {
+                pendingFocusAction = action;
+            }
+            else
+            {
+                if (pendingRowActions.Count >= 16)
+                    pendingRowActions.Dequeue();
+                pendingRowActions.Enqueue(action);
+            }
+
+            if (pendingActionDrainScheduled)
+                return;
+
+            pendingActionDrainScheduled = true;
+        }
+
+        Plugin.ScheduleOnGameThread(DrainPendingActions);
+    }
+
+    private void DrainPendingActions()
+    {
+        XAPeepPendingAction? focusAction;
+        XAPeepPendingAction[] rowActions;
+        lock (pendingActionSync)
+        {
+            focusAction = pendingFocusAction;
+            pendingFocusAction = null;
+            rowActions = pendingRowActions.ToArray();
+            pendingRowActions.Clear();
+            pendingActionDrainScheduled = false;
+        }
+
+        try
+        {
+            if (focusAction.HasValue)
+                ExecutePendingAction(focusAction.Value);
+            foreach (var action in rowActions)
+                ExecutePendingAction(action);
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "[XASlave] XA Peep pending action failed.");
+        }
+
+        lock (pendingActionSync)
+        {
+            if (pendingActionDrainScheduled || (pendingFocusAction == null && pendingRowActions.Count == 0))
+                return;
+            pendingActionDrainScheduled = true;
+        }
+        Plugin.ScheduleOnGameThread(DrainPendingActions);
+    }
+
+    private void ExecutePendingAction(XAPeepPendingAction action)
+    {
+        var actor = action.GameObjectId == 0
+            ? null
+            : Plugin.ObjectTable.FirstOrDefault(obj => obj.GameObjectId == action.GameObjectId);
+
+        switch (action.Action)
         {
             case XAPeepRowAction.EchoName:
-                Plugin.ChatGui.Print(player.DisplayName);
+                Plugin.ChatGui.Print(action.DisplayName);
                 break;
             case XAPeepRowAction.Target:
-                TargetPlayer(player, actor);
+                TargetPlayer(action, actor);
                 break;
             case XAPeepRowAction.Examine:
-                ExaminePlayer(player, actor);
+                ExaminePlayer(action, actor);
                 break;
             case XAPeepRowAction.ShowAdventurePlate:
-                ShowAdventurePlate(player, actor);
+                ShowAdventurePlate(action, actor);
+                break;
+            case XAPeepRowAction.FocusPreview:
+                if (!focusPreviewCaptured)
+                {
+                    cachedFocusTargetId = Plugin.TargetManager.FocusTarget?.GameObjectId ?? ulong.MaxValue;
+                    focusPreviewCaptured = true;
+                }
+                if (actor != null && Plugin.TargetManager.FocusTarget?.GameObjectId != actor.GameObjectId)
+                    Plugin.TargetManager.FocusTarget = actor;
+                break;
+            case XAPeepRowAction.ReleaseFocusPreview:
+                if (!focusPreviewCaptured)
+                    break;
+                Plugin.TargetManager.FocusTarget = cachedFocusTargetId == ulong.MaxValue
+                    ? null
+                    : Plugin.ObjectTable.FirstOrDefault(obj => obj.GameObjectId == cachedFocusTargetId);
+                focusPreviewCaptured = false;
+                cachedFocusTargetId = ulong.MaxValue;
                 break;
         }
     }
@@ -321,11 +359,13 @@ public sealed class XAPeepWindow : Window
         if (!ImGui.IsItemHovered())
             return;
 
-        ImGui.BeginTooltip();
-        ImGui.PushTextWrapPos(Scale(420f));
-        ImGui.TextUnformatted(helpText);
-        ImGui.PopTextWrapPos();
-        ImGui.EndTooltip();
+        using (ImRaii.Tooltip())
+        {
+            using (ImRaii.TextWrapPos(Scale(420f)))
+            {
+                ImGui.TextUnformatted(helpText);
+            }
+        }
     }
 
     private void UpdateSizeConstraints(float scale)
@@ -356,5 +396,13 @@ public sealed class XAPeepWindow : Window
         Target,
         Examine,
         ShowAdventurePlate,
+        FocusPreview,
+        ReleaseFocusPreview,
     }
+
+    private readonly record struct XAPeepPendingAction(
+        XAPeepRowAction Action,
+        ulong GameObjectId,
+        string CompactName,
+        string DisplayName);
 }

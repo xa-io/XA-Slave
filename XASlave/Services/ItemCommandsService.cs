@@ -151,13 +151,14 @@ public unsafe sealed class ItemCommandsService : IDisposable
     {
         foreach (var containerType in EquipSourceContainers)
         {
-            var container = inventoryManager->GetInventoryContainer(containerType);
-            if (container == null || !container->IsLoaded)
+            if (!NativeArrayAccess.TryGetInventoryContainer(inventoryManager, containerType, out var container))
                 continue;
 
             for (var slotIndex = 0; slotIndex < container->Size; slotIndex++)
             {
-                var item = inventoryManager->GetInventorySlot(containerType, slotIndex);
+                if (!NativeArrayAccess.TryGetInventorySlot(container, slotIndex, out var item))
+                    continue;
+
                 item = ResolveInventoryItem(item);
                 if (item == null || item->ItemId == 0 || item->IsCollectable())
                     continue;
@@ -240,10 +241,10 @@ public unsafe sealed class ItemCommandsService : IDisposable
 
         if (slotCategory.Value.FingerR == 1 || slotCategory.Value.FingerL == 1)
         {
-            var rightRing = inventoryManager->GetInventorySlot(InventoryType.EquippedItems, 11);
-            var leftRing = inventoryManager->GetInventorySlot(InventoryType.EquippedItems, 12);
-            var rightEmpty = rightRing == null || rightRing->ItemId == 0;
-            var leftEmpty = leftRing == null || leftRing->ItemId == 0;
+            var hasRightRing = NativeArrayAccess.TryGetInventorySlot(inventoryManager, InventoryType.EquippedItems, 11, out var rightRing);
+            var hasLeftRing = NativeArrayAccess.TryGetInventorySlot(inventoryManager, InventoryType.EquippedItems, 12, out var leftRing);
+            var rightEmpty = !hasRightRing || rightRing->ItemId == 0;
+            var leftEmpty = !hasLeftRing || leftRing->ItemId == 0;
 
             if (rightEmpty)
                 return SetDestination(11, "Right Ring", out destinationSlot, out destinationLabel);

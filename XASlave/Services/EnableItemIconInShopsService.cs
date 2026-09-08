@@ -114,32 +114,36 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
             const int FreeShopIconStartIndex = 199;
 
             var addon = (AtkUnitBase*)args.Addon.Address;
-            if (addon == null || addon->AtkValues == null)
+            if (addon == null)
                 return;
 
             var atkValuesCount = (int)addon->AtkValuesCount;
-            if (atkValuesCount <= FreeShopIconStartIndex)
+            if (atkValuesCount <= FreeShopIconStartIndex ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, FreeShopItemCountIndex, out var itemCount))
                 return;
 
-            var itemCount = addon->AtkValues[FreeShopItemCountIndex].UInt;
             if (itemCount == 0)
             {
                 RecordReplacement("FreeShop", 0);
                 return;
             }
 
-            var maxReadableItems = atkValuesCount - FreeShopItemIdStartIndex;
-            var maxWritableItems = atkValuesCount - FreeShopIconStartIndex;
-            var safeItemCount = (int)Math.Min(itemCount, (uint)Math.Min(maxReadableItems, maxWritableItems));
+            var safeItemCount = Math.Min(
+                ClampItemCount(itemCount, atkValuesCount, FreeShopItemIdStartIndex),
+                ClampItemCount(itemCount, atkValuesCount, FreeShopIconStartIndex));
 
             var replacementCount = 0;
             for (var index = 0; index < safeItemCount; index++)
             {
-                var itemId = addon->AtkValues[FreeShopItemIdStartIndex + index].UInt;
+                if (!NativeArrayAccess.TryGetAtkUInt(addon, FreeShopItemIdStartIndex + index, out var itemId))
+                    break;
+
                 if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
                     continue;
 
-                addon->AtkValues[FreeShopIconStartIndex + index].SetUInt(itemRow.Icon);
+                if (!NativeArrayAccess.TrySetAtkUInt(addon, FreeShopIconStartIndex + index, itemRow.Icon))
+                    break;
+
                 replacementCount++;
             }
 
@@ -169,14 +173,16 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
                 // (34+11*index) to AtkValuesCount so a large reported count cannot read past the array.
                 var atkValuesCount = (int)addon->AtkValuesCount;
                 var safeItemCount = 0;
-                if (atkValuesCount > 34)
+                if (atkValuesCount > 34 && NativeArrayAccess.TryGetAtkUInt(addon, 20, out var itemCount))
                 {
-                    var itemCount = addon->AtkValues[20].UInt;
-                    safeItemCount = (int)Math.Min(itemCount, (uint)((atkValuesCount - 34) / 11));
+                    safeItemCount = ClampItemCount(itemCount, atkValuesCount, 34, 11);
                 }
                 for (var index = 0; index < safeItemCount; index++)
                 {
-                    var itemId = addon->AtkValues[34 + 11 * index].UInt % 500000;
+                    if (!NativeArrayAccess.TryGetAtkUInt(addon, 34 + 11 * index, out var rawItemId))
+                        break;
+
+                    var itemId = rawItemId % 500000;
                     if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
                         continue;
 
@@ -208,7 +214,10 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
             {
                 if (16 + index >= nodeListCount)
                     break;
-                var listItemComponent = (AtkComponentNode*)listComponent->Component->UldManager.NodeList[16 + index];
+                if (!NativeArrayAccess.TryGetNode(&listComponent->Component->UldManager, 16 + index, out var listItemNode))
+                    break;
+
+                var listItemComponent = (AtkComponentNode*)listItemNode;
                 if (listItemComponent == null || listItemComponent->Component == null)
                     continue;
 
@@ -247,22 +256,26 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
         try
         {
             var addon = (AtkUnitBase*)args.Addon.Address;
-            if (addon == null || addon->AtkValues == null || addon->AtkValuesCount <= 1064)
+            if (addon == null || addon->AtkValuesCount <= 1064 ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 4, out var itemCount))
                 return;
 
-            var itemCount = addon->AtkValues[4].UInt;
             // The addon-reported item count is not trusted for bounds: the highest slot read is
             // 1064+index, so clamp the loop to the available AtkValue range (matches OnFreeShop).
             var atkValuesCount = (int)addon->AtkValuesCount;
-            var safeItemCount = (int)Math.Min(itemCount, (uint)Math.Max(0, atkValuesCount - 1064));
+            var safeItemCount = ClampItemCount(itemCount, atkValuesCount, 1064);
             var replacementCount = 0;
             for (var index = 0; index < safeItemCount; index++)
             {
-                var itemId = addon->AtkValues[1064 + index].UInt;
+                if (!NativeArrayAccess.TryGetAtkUInt(addon, 1064 + index, out var itemId))
+                    break;
+
                 if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
                     continue;
 
-                addon->AtkValues[210 + index].SetUInt(itemRow.Icon);
+                if (!NativeArrayAccess.TrySetAtkUInt(addon, 210 + index, itemRow.Icon))
+                    break;
+
                 replacementCount++;
             }
 
@@ -282,21 +295,25 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
         try
         {
             var addon = (AtkUnitBase*)args.Addon.Address;
-            if (addon == null || addon->AtkValues == null || addon->AtkValuesCount <= 317)
+            if (addon == null || addon->AtkValuesCount <= 317 ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 1, out var itemCount))
                 return;
 
-            var itemCount = addon->AtkValues[1].UInt;
             // Clamp to the available AtkValue range; highest slot read is 317+index.
             var atkValuesCount = (int)addon->AtkValuesCount;
-            var safeItemCount = (int)Math.Min(itemCount, (uint)Math.Max(0, atkValuesCount - 317));
+            var safeItemCount = ClampItemCount(itemCount, atkValuesCount, 317);
             var replacementCount = 0;
             for (var index = 0; index < safeItemCount; index++)
             {
-                var itemId = addon->AtkValues[317 + index].UInt;
+                if (!NativeArrayAccess.TryGetAtkUInt(addon, 317 + index, out var itemId))
+                    break;
+
                 if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
                     continue;
 
-                addon->AtkValues[167 + index].SetUInt(itemRow.Icon);
+                if (!NativeArrayAccess.TrySetAtkUInt(addon, 167 + index, itemRow.Icon))
+                    break;
+
                 replacementCount++;
             }
 
@@ -316,23 +333,26 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
         try
         {
             var addon = (AtkUnitBase*)args.Addon.Address;
-            if (addon == null || addon->AtkValues == null || addon->AtkValuesCount <= 301)
+            if (addon == null || addon->AtkValuesCount <= 301 ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 298, out var itemCount))
                 return;
 
-            var itemCount = addon->AtkValues[298].UInt;
             // Clamp to the available AtkValue range; highest slot touched is the icon write at
             // 301+index*18, so the largest safe item count keeps that index within AtkValuesCount.
             var atkValuesCount = (int)addon->AtkValuesCount;
-            var maxItems = (atkValuesCount - 302) / 18 + 1;
-            var safeItemCount = (int)Math.Min(itemCount, (uint)Math.Max(0, maxItems));
+            var safeItemCount = ClampItemCount(itemCount, atkValuesCount, 301, 18);
             var replacementCount = 0;
             for (var index = 0; index < safeItemCount; index++)
             {
-                var itemId = addon->AtkValues[300 + index * 18].UInt;
+                if (!NativeArrayAccess.TryGetAtkUInt(addon, 300 + index * 18, out var itemId))
+                    break;
+
                 if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
                     continue;
 
-                addon->AtkValues[301 + index * 18].SetUInt(itemRow.Icon);
+                if (!NativeArrayAccess.TrySetAtkUInt(addon, 301 + index * 18, itemRow.Icon))
+                    break;
+
                 replacementCount++;
             }
 
@@ -352,25 +372,37 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
         try
         {
             var addon = (AtkUnitBase*)args.Addon.Address;
-            if (addon == null || addon->AtkValues == null || addon->AtkValuesCount <= 441)
+            if (addon == null || addon->AtkValuesCount <= 441 ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 0, out var currentTab) ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 2, out var itemCount))
                 return;
 
-            var currentTab = addon->AtkValues[0].UInt;
-            var itemCount = addon->AtkValues[2].UInt;
+            var atkValuesCount = (int)addon->AtkValuesCount;
+            // The read at 441+index is the binding AtkValues range. The write at
+            // 197+index has more room but is constrained by the same safe count.
+            var safeItemCount = ClampItemCount(itemCount, atkValuesCount, 441);
             var replacementCount = 0;
 
-            for (var index = 0; index < itemCount; index++)
+            for (var index = 0; index < safeItemCount; index++)
             {
                 var itemId = 0u;
                 var isItemHq = false;
                 switch (currentTab)
                 {
                     case 0:
-                        itemId = addon->AtkValues[441 + index].UInt;
+                        if (!NativeArrayAccess.TryGetAtkUInt(addon, 441 + index, out itemId))
+                            continue;
                         break;
                     case 1:
                     {
-                        var buybackItem = ShopEventHandler.AgentProxy.Instance()->Handler->Buyback[index];
+                        var proxy = ShopEventHandler.AgentProxy.Instance();
+                        if (proxy == null || proxy->Handler == null)
+                            continue;
+
+                        var handler = proxy->Handler;
+                        if (!NativeArrayAccess.TryGetBuyback(handler, index, out var buybackItem))
+                            continue;
+
                         itemId = buybackItem.ItemId;
                         isItemHq = buybackItem.Flags.HasFlag(InventoryItem.ItemFlags.HighQuality);
                         break;
@@ -380,9 +412,14 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
                 if (itemId == 0 || !TryGetItem(itemId, out var itemRow))
                     continue;
 
-                addon->AtkValues[197 + index].SetUInt(itemRow.Icon + (isItemHq ? 1000000u : 0u));
+                if (!NativeArrayAccess.TrySetAtkUInt(addon, 197 + index, itemRow.Icon + (isItemHq ? 1000000u : 0u)))
+                    break;
+
                 replacementCount++;
             }
+
+            if (itemCount > (uint)safeItemCount)
+                log.Warning($"[XASlave] Enable Item Icon In Shops clamped Shop item count from {itemCount} to {safeItemCount} for {atkValuesCount} AtkValues.");
 
             RecordReplacement("Shop", replacementCount);
         }
@@ -391,6 +428,9 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
             log.Warning(ex, "[XASlave] Enable Item Icon In Shops failed while processing Shop.");
         }
     }
+
+    internal static int ClampItemCount(uint requestedCount, int atkValuesCount, int highestBaseIndex, int stride = 1)
+        => NativeArrayBounds.ClampElementCount(requestedCount, atkValuesCount, highestBaseIndex, stride);
 
     private bool TryGetItem(uint itemId, out Item itemRow)
     {

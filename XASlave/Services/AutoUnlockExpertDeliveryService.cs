@@ -167,20 +167,22 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
             return;
         }
 
-        if (!IsAddonVisible(addon) || !addon->IsReady || addon->AtkValues == null)
+        if (!IsAddonVisible(addon) || !addon->IsReady ||
+            !NativeArrayAccess.TryGetAtkUInt(addon, 0, out var loadedState) ||
+            !NativeArrayAccess.TryGetAtkUInt(addon, 5, out var rawCurrentPage))
         {
             ResetWindowState();
             RefreshWaitingStatusText();
             return;
         }
 
-        if (addon->AtkValues[0].UInt != SupplyListLoadedState)
+        if (loadedState != SupplyListLoadedState)
         {
             StatusText = "Enabled - waiting for Grand Company delivery data.";
             return;
         }
 
-        var currentPage = NormalizePage((int)addon->AtkValues[5].UInt);
+        var currentPage = NormalizePage((int)rawCurrentPage);
         if (autoSwitchWhenOpen && currentPage != defaultPage)
         {
             if (CanAct())
@@ -427,8 +429,11 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
             if (item.ItemId == 0 || item.IsBonusReward || item.ExpReward > 0 || item.SealReward <= 0)
                 continue;
 
-            var inventorySlot = InventoryManager.Instance()->GetInventorySlot(item.Inventory, item.Slot);
-            if (inventorySlot == null)
+            if (!NativeArrayAccess.TryGetInventorySlot(
+                    InventoryManager.Instance(),
+                    item.Inventory,
+                    item.Slot,
+                    out var inventorySlot))
                 continue;
 
             var visibleIndex = ResolveVisibleIndex(addon, item.ItemId, item.Inventory, item.Slot, (uint)item.SealReward);
@@ -491,19 +496,27 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
 
     private int ResolveVisibleIndex(AtkUnitBase* addon, uint itemId, InventoryType container, ushort slot, uint sealReward)
     {
-        if (addon == null || addon->AtkValues == null || addon->AtkValues[5].UInt != ExpertDeliveryTab)
+        if (!NativeArrayAccess.TryGetAtkUInt(addon, 5, out var currentTab) ||
+            !NativeArrayAccess.TryGetAtkUInt(addon, 6, out var itemCount) ||
+            currentTab != ExpertDeliveryTab)
             return -1;
 
-        var itemCount = addon->AtkValues[6].UInt;
-        if (itemCount == 0)
+        if (itemCount == 0 || addon->AtkValuesCount <= 425)
             return -1;
 
-        for (var i = 0; i < Math.Min(40, itemCount); i++)
+        var maxVisible = (int)Math.Min(
+            40u,
+            Math.Min(itemCount, (uint)(addon->AtkValuesCount - 425)));
+        for (var i = 0; i < maxVisible; i++)
         {
-            var visibleSealReward = addon->AtkValues[265 + i].UInt;
-            var visibleContainer = (InventoryType)addon->AtkValues[345 + i].UInt;
-            var visibleSlot = (ushort)addon->AtkValues[385 + i].UInt;
-            var visibleItemId = addon->AtkValues[425 + i].UInt;
+            if (!NativeArrayAccess.TryGetAtkUInt(addon, 265 + i, out var visibleSealReward) ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 345 + i, out var visibleContainerValue) ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 385 + i, out var visibleSlotValue) ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 425 + i, out var visibleItemId))
+                return -1;
+
+            var visibleContainer = (InventoryType)visibleContainerValue;
+            var visibleSlot = (ushort)visibleSlotValue;
             if (visibleItemId == itemId && visibleContainer == container && visibleSlot == slot && visibleSealReward == sealReward)
                 return i;
         }

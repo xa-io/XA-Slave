@@ -12,10 +12,12 @@ namespace XASlave.Services;
 
 public unsafe sealed class QueuePositionDisplayService : IDisposable
 {
+    private const int TotalHookSurfaces = 3;
     private readonly IFramework framework;
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
     private readonly IPluginLog log;
+    private readonly bool worldTravelLayoutCompatible;
     private readonly object startupArmingLock = new();
 
     private Hook<UpdateWorldTravelDataDelegate>? updateWorldTravelDataHook;
@@ -28,6 +30,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
     private bool startupArmingSubscribed;
     private bool disposed;
     private Task<StartupHookResult>? startupHookTask;
+    private System.Threading.CancellationTokenSource? startupHookCancellation;
     private DateTime queueEtaUtc = DateTime.UtcNow;
 
     public QueuePositionDisplayService(
@@ -40,6 +43,15 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         this.sigScanner = sigScanner;
         this.interopProvider = interopProvider;
         this.log = log;
+        worldTravelLayoutCompatible =
+            NativeOffsets.FitsIn<AgentWorldTravel>(NativeOffsets.WorldTravelQueueActive, sizeof(byte))
+            && NativeOffsets.FitsIn<AgentWorldTravel>(NativeOffsets.WorldTravelQueueElapsedSeconds, sizeof(int))
+            && NativeOffsets.FitsIn<AgentWorldTravel>(NativeOffsets.WorldTravelQueuePosition, sizeof(uint));
+        NativeOffsets.ReportOnce(
+            log,
+            "AgentWorldTravel.Queue",
+            worldTravelLayoutCompatible,
+            $"struct=0x{sizeof(AgentWorldTravel):X}, active=0x{NativeOffsets.WorldTravelQueueActive:X}, elapsed=0x{NativeOffsets.WorldTravelQueueElapsedSeconds:X}, position=0x{NativeOffsets.WorldTravelQueuePosition:X}");
     }
 
     public string StatusText { get; private set; } = "Disabled";
@@ -66,7 +78,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             return true;
 
         CancelStartupArming(disposeCompletedResult: true);
-        EnsureInitialized();
+        EnsureInitialized(retryMissing: initialized);
 
         var activeSurfaces = 0;
         activeSurfaces += ToggleHook(updateWorldTravelDataHook, true, "UpdateWorldTravelData");
@@ -79,7 +91,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         }
 
         enabled = true;
-        StatusText = $"Enabled - expanded queue details active on {activeSurfaces} surfaces.";
+        StatusText = GetEnabledStatusText(activeSurfaces);
         return true;
     }
 
@@ -92,7 +104,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             return SetEnabled(true);
 
         enabled = true;
-        StatusText = "Arming - queue display hooks are initializing outside the framework tick.";
+        StatusText = "Arming - queue display hooks are initializing on the framework thread.";
         StartStartupHookCreation();
         return true;
     }
@@ -107,15 +119,15 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         DisposeHook(ref contentFinderQueuePositionDataHook);
     }
 
-    private void EnsureInitialized()
+    private void EnsureInitialized(bool retryMissing = false)
     {
-        if (initialized)
+        if (initialized && !retryMissing)
             return;
 
         initialized = true;
-        updateWorldTravelDataHook = TryCreateHook<UpdateWorldTravelDataDelegate>(Sigs.UpdateWorldTravelDataSig, UpdateWorldTravelDataDetour, "UpdateWorldTravelData");
-        agentWorldTravelUpdateHook = TryCreateHook<AgentWorldTravelUpdateDelegate>(Sigs.AgentWorldTravelUpdateSig, AgentWorldTravelUpdateDetour, "AgentWorldTravelUpdate");
-        contentFinderQueuePositionDataHook = TryCreateHook<ContentFinderQueuePositionDataDelegate>(Sigs.ContentFinderQueuePositionDataSig, ContentFinderQueuePositionDataDetour, "ContentFinderQueuePositionData");
+        updateWorldTravelDataHook ??= TryCreateHook<UpdateWorldTravelDataDelegate>(Sigs.UpdateWorldTravelDataSig, UpdateWorldTravelDataDetour, "UpdateWorldTravelData");
+        agentWorldTravelUpdateHook ??= TryCreateHook<AgentWorldTravelUpdateDelegate>(Sigs.AgentWorldTravelUpdateSig, AgentWorldTravelUpdateDetour, "AgentWorldTravelUpdate");
+        contentFinderQueuePositionDataHook ??= TryCreateHook<ContentFinderQueuePositionDataDelegate>(Sigs.ContentFinderQueuePositionDataSig, ContentFinderQueuePositionDataDetour, "ContentFinderQueuePositionData");
     }
 
     private StartupHookResult CreateStartupHookResult()
@@ -131,7 +143,15 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         lock (startupArmingLock)
         {
             startupArmingPending = true;
-            startupHookTask ??= Task.Run(CreateStartupHookResult);
+            if (startupHookTask == null)
+            {
+                startupHookCancellation?.Dispose();
+                startupHookCancellation = new System.Threading.CancellationTokenSource();
+                startupHookTask = Plugin.RunOnGameThread(
+                    CreateStartupHookResult,
+                    "Queue Position Display startup hook creation",
+                    startupHookCancellation.Token);
+            }
         }
 
         SubscribeStartupArming();
@@ -158,12 +178,18 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
     private void CancelStartupArming(bool disposeCompletedResult)
     {
         Task<StartupHookResult>? task;
+        System.Threading.CancellationTokenSource? cancellation;
         lock (startupArmingLock)
         {
             startupArmingPending = false;
             task = startupHookTask;
             startupHookTask = null;
+            cancellation = startupHookCancellation;
+            startupHookCancellation = null;
         }
+
+        cancellation?.Cancel();
+        cancellation?.Dispose();
 
         UnsubscribeStartupArming();
 
@@ -178,7 +204,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         if (task.IsCompleted)
         {
             if (task.Status == TaskStatus.RanToCompletion)
-                task.Result.DisposeHooks();
+                _ = Plugin.RunOnGameThread(task.Result.DisposeHooks, "Dispose cancelled Queue Position Display startup hooks");
             return;
         }
 
@@ -186,7 +212,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             completedTask =>
             {
                 if (completedTask.Status == TaskStatus.RanToCompletion)
-                    completedTask.Result.DisposeHooks();
+                    _ = Plugin.RunOnGameThread(completedTask.Result.DisposeHooks, "Dispose cancelled Queue Position Display startup hooks");
             },
             TaskScheduler.Default);
     }
@@ -217,11 +243,15 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             log.Warning(ex, "[XASlave] Display Actual Queue Position startup hook initialization failed.");
         }
 
+        System.Threading.CancellationTokenSource? completedCancellation;
         lock (startupArmingLock)
         {
             startupHookTask = null;
             startupArmingPending = false;
+            completedCancellation = startupHookCancellation;
+            startupHookCancellation = null;
         }
+        completedCancellation?.Dispose();
 
         UnsubscribeStartupArming();
         initialized = true;
@@ -255,7 +285,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         }
 
         enabled = true;
-        StatusText = $"Enabled - expanded queue details active on {activeSurfaces} surfaces.";
+        StatusText = GetEnabledStatusText(activeSurfaces);
     }
 
     private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
@@ -264,7 +294,10 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
+            {
+                log.Warning($"[XASlave] Queue Position Display could not resolve {label}; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             var hook = interopProvider.HookFromAddress<T>(address, detour);
             return hook;
@@ -331,24 +364,51 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             log.Warning(ex, "[XASlave] Queue display failed while sampling world travel data.");
         }
 
-        updateWorldTravelDataHook?.Original(a1, a2);
+        updateWorldTravelDataHook?.OriginalDisposeSafe(a1, a2);
     }
 
     private bool AgentWorldTravelUpdateDetour(nint a1, NumberArrayData* numberArrayData, StringArrayData* stringArrayData, bool a4)
     {
-        var result = agentWorldTravelUpdateHook?.Original(a1, numberArrayData, stringArrayData, a4) ?? false;
-        if (!enabled || !result || numberArrayData == null || stringArrayData == null)
+        var result = agentWorldTravelUpdateHook?.OriginalDisposeSafe(a1, numberArrayData, stringArrayData, a4) ?? false;
+        if (!enabled || !result || !worldTravelLayoutCompatible || numberArrayData == null || stringArrayData == null)
             return result;
 
         try
         {
             var agentAddress = (nint)AgentWorldTravel.Instance();
-            if (agentAddress == nint.Zero || !(*(bool*)(agentAddress + 0x120)))
+            if (agentAddress == nint.Zero || stringArrayData->StringArray == null)
                 return result;
 
-            var positionIndex = numberArrayData->IntArray[5] > 0 ? 6 : 5;
-            var queuePosition = *(uint*)(agentAddress + 0x12C);
-            var elapsed = TimeSpan.FromSeconds(*(int*)(agentAddress + 0x128));
+            var activeMarker = *(byte*)(agentAddress + NativeOffsets.WorldTravelQueueActive);
+            if (activeMarker == 0)
+                return result;
+            if (activeMarker != 1)
+            {
+                NativeOffsets.ReportOnce(
+                    log,
+                    "AgentWorldTravel.Queue.ActiveMarker",
+                    false,
+                    $"expected 0 or 1 at 0x{NativeOffsets.WorldTravelQueueActive:X}, observed {activeMarker}");
+                return result;
+            }
+
+            if (!NativeArrayAccess.TryGetInt(
+                    numberArrayData,
+                    NativeOffsets.WorldTravelQueueVariantNumberIndex,
+                    out var queueVariant))
+                return result;
+
+            var positionIndex = queueVariant > 0 ? 6 : 5;
+            var stringSpan = stringArrayData->Span;
+            if (positionIndex < 0 || positionIndex + 1 >= stringSpan.Length)
+                return result;
+
+            var queuePosition = *(uint*)(agentAddress + NativeOffsets.WorldTravelQueuePosition);
+            var elapsedSeconds = *(int*)(agentAddress + NativeOffsets.WorldTravelQueueElapsedSeconds);
+            if (queuePosition > 1_000_000 || elapsedSeconds < 0 || elapsedSeconds > 7 * 24 * 60 * 60)
+                return result;
+
+            var elapsed = TimeSpan.FromSeconds(elapsedSeconds);
             var eta = queueEtaUtc - DateTime.UtcNow;
             if (eta < TimeSpan.Zero)
                 eta = TimeSpan.Zero;
@@ -386,8 +446,13 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             log.Warning(ex, "[XASlave] Queue display failed while applying content finder queue data.");
         }
 
-        contentFinderQueuePositionDataHook?.Original(info, state, infoState);
+        contentFinderQueuePositionDataHook?.OriginalDisposeSafe(info, state, infoState);
     }
+
+    private static string GetEnabledStatusText(int activeSurfaces)
+        => activeSurfaces < TotalHookSurfaces
+            ? $"Partially enabled - expanded queue details active on {activeSurfaces}/{TotalHookSurfaces} surfaces."
+            : $"Enabled - expanded queue details active on all {TotalHookSurfaces} surfaces.";
 
     private static double CalculateQueueWaitSeconds(int position)
     {

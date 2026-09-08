@@ -29,6 +29,7 @@ public partial class SlaveWindow
     private bool glamWeatherInputsInitialized;
 
     private const float AutoGlamClassJobInputWidth = 180f;
+    private const int MaxAutoGlamClassJob = 100;
     private const float AutoGlamWeatherPlateInputWidth = 90f;
     private const int AutoGlamWeatherColumnCount = 3;
     private const float AutoGlamWeatherColumnWidth = 95f;
@@ -76,7 +77,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // Start/Stop button moved to top
-        var classJobOptions = ParseAutoGlamInput(glamClassJobInput, 1, null);
+        var classJobOptions = ParseAutoGlamInput(glamClassJobInput, 1, MaxAutoGlamClassJob);
         var firstMissingWeatherLabel = GetFirstMissingAutoGlamWeatherLabel(cfg);
 
         var canStart = Plugin.PlayerState.IsLoaded
@@ -117,17 +118,17 @@ public partial class SlaveWindow
         ImGui.SetNextItemWidth(Scale(AutoGlamClassJobInputWidth));
         if (ImGui.InputText("Class/Job(s) to Assign##glamClass", ref glamClassJobInput, 128))
         {
-            glamClassJobInput = SanitizeAutoGlamInput(glamClassJobInput, 1, null, true);
-            var committedClassJobs = CommitAutoGlamInput(glamClassJobInput, 1, null);
+            glamClassJobInput = SanitizeAutoGlamInput(glamClassJobInput, 1, MaxAutoGlamClassJob, true);
+            var committedClassJobs = CommitAutoGlamInput(glamClassJobInput, 1, MaxAutoGlamClassJob);
             if (!string.Equals(cfg.AutoGlamWeatherClassJobOptions, committedClassJobs, StringComparison.Ordinal))
             {
                 cfg.AutoGlamWeatherClassJobOptions = committedClassJobs;
-                cfg.Save();
+                cfg.SaveDeferred();
                 glamConfigChanged = true;
             }
         }
         if (ImGui.IsItemDeactivatedAfterEdit())
-            glamClassJobInput = CommitAutoGlamInput(glamClassJobInput, 1, null);
+            glamClassJobInput = CommitAutoGlamInput(glamClassJobInput, 1, MaxAutoGlamClassJob);
         ImGui.SameLine();
         ImGui.TextDisabled("(Comma-separated numbers, no spaces)");
 
@@ -143,7 +144,7 @@ public partial class SlaveWindow
             if (interval < 1.0f) interval = 1.0f;
             if (interval > 60.0f) interval = 60.0f;
             cfg.AutoGlamWeatherCheckIntervalSeconds = interval;
-            cfg.Save();
+            cfg.SaveDeferred();
         }
 
         if (glamConfigChanged && glamWeatherRunning)
@@ -164,7 +165,7 @@ public partial class SlaveWindow
         if (glamWeatherInputsInitialized)
             return;
 
-        glamClassJobInput = CommitAutoGlamInput(cfg.AutoGlamWeatherClassJobOptions, 1, null);
+        glamClassJobInput = CommitAutoGlamInput(cfg.AutoGlamWeatherClassJobOptions, 1, MaxAutoGlamClassJob);
 
         var changed = false;
         if (!string.Equals(cfg.AutoGlamWeatherClassJobOptions, glamClassJobInput, StringComparison.Ordinal))
@@ -202,10 +203,11 @@ public partial class SlaveWindow
         for (var columnIndex = 0; columnIndex < AutoGlamWeatherColumnCount; columnIndex++)
         {
             ImGui.SetCursorPos(new Vector2(startX + (columnIndex * columnStride), startY));
-            ImGui.BeginGroup();
-            if (DrawAutoGlamWeatherPlateColumn(cfg, columnIndex))
-                changed = true;
-            ImGui.EndGroup();
+            using (ImRaii.Group())
+            {
+                if (DrawAutoGlamWeatherPlateColumn(cfg, columnIndex))
+                    changed = true;
+            }
 
             var columnHeight = MathF.Ceiling(ImGui.GetCursorPosY() - startY);
             if (columnHeight > maxHeight)
@@ -260,7 +262,7 @@ public partial class SlaveWindow
             if (!string.Equals(GetAutoGlamWeatherPlateOptions(cfg, weatherId), committed, StringComparison.Ordinal))
             {
                 cfg.AutoGlamWeatherPlateOptionsByWeatherId[weatherId] = committed;
-                cfg.Save();
+                cfg.SaveDeferred();
                 changed = true;
             }
         }
@@ -272,7 +274,7 @@ public partial class SlaveWindow
             if (!string.Equals(GetAutoGlamWeatherPlateOptions(cfg, weatherId), input, StringComparison.Ordinal))
             {
                 cfg.AutoGlamWeatherPlateOptionsByWeatherId[weatherId] = input;
-                cfg.Save();
+                cfg.SaveDeferred();
                 changed = true;
             }
         }
@@ -392,7 +394,7 @@ public partial class SlaveWindow
         try
         {
             var cfg = plugin.Configuration;
-            var classJobOptions = ParseAutoGlamInput(cfg.AutoGlamWeatherClassJobOptions, 1, null);
+            var classJobOptions = ParseAutoGlamInput(cfg.AutoGlamWeatherClassJobOptions, 1, MaxAutoGlamClassJob);
 
             // Get current weather ID via FFXIVClientStructs
             var weatherManager = FFXIVClientStructs.FFXIV.Client.Game.WeatherManager.Instance();
@@ -400,8 +402,15 @@ public partial class SlaveWindow
 
             var weatherId = (int)weatherManager->GetCurrentWeather();
 
-            var weatherOptionsId = cfg.AutoGlamWeatherPlateOptionsByWeatherId.ContainsKey(weatherId) ? weatherId : 1;
-            var plateOptions = ParseAutoGlamInput(GetAutoGlamWeatherPlateOptions(cfg, weatherOptionsId), 1, 20);
+            if (!cfg.AutoGlamWeatherPlateOptionsByWeatherId.ContainsKey(weatherId))
+            {
+                if (weatherId != glamLastWeatherId)
+                    plugin.TaskRunner.AddLog($"[Auto-Glam] Weather changed to Unknown({weatherId}); no plate mapping exists, so no gearset command was sent.");
+                glamLastWeatherId = weatherId;
+                return;
+            }
+
+            var plateOptions = ParseAutoGlamInput(GetAutoGlamWeatherPlateOptions(cfg, weatherId), 1, 20);
 
             if (weatherId != glamLastWeatherId)
             {

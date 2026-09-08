@@ -178,11 +178,13 @@ public partial class SlaveWindow
         {
             foreach (var w in WorldData.Worlds) cfg.FloorderSelectedWorlds.Add(w.Name);
             cfg.FloorderSelectedWorlds = cfg.FloorderSelectedWorlds.Distinct().ToList();
+            cfg.SaveDeferred();
         }
         ImGui.SameLine();
         if (ImGui.SmallButton("Clear All##flworlds"))
         {
             cfg.FloorderSelectedWorlds.Clear();
+            cfg.SaveDeferred();
         }
         ImGui.Spacing();
 
@@ -209,15 +211,18 @@ public partial class SlaveWindow
                     foreach (var w in regionWorlds)
                         if (!cfg.FloorderSelectedWorlds.Contains(w.Name))
                             cfg.FloorderSelectedWorlds.Add(w.Name);
+                    cfg.SaveDeferred();
                 }
                 ImGui.SameLine();
                 if (ImGui.SmallButton($"None##fl{region}"))
                 {
                     foreach (var w in regionWorlds)
                         cfg.FloorderSelectedWorlds.Remove(w.Name);
+                    cfg.SaveDeferred();
                 }
 
-                if (ImGui.BeginTable($"FlDCTable_{region}", dcs.Length, ImGuiTableFlags.None))
+                using (var imguiScope224 = ImRaii.Table($"FlDCTable_{region}", dcs.Length, ImGuiTableFlags.None))
+                if (imguiScope224)
                 {
                     foreach (var dc in dcs)
                         ImGui.TableSetupColumn(dc, ImGuiTableColumnFlags.WidthStretch);
@@ -237,10 +242,11 @@ public partial class SlaveWindow
                                     cfg.FloorderSelectedWorlds.Add(w.Name);
                                 else if (!sel)
                                     cfg.FloorderSelectedWorlds.Remove(w.Name);
+                                cfg.SaveDeferred();
                             }
                         }
                     }
-                    ImGui.EndTable();
+
                 }
             }
         }
@@ -257,11 +263,13 @@ public partial class SlaveWindow
             foreach (var c in FloorderDefaultCities)
                 if (!cfg.FloorderSelectedCities.Contains(c))
                     cfg.FloorderSelectedCities.Add(c);
+            cfg.SaveDeferred();
         }
         ImGui.SameLine();
         if (ImGui.SmallButton("Clear All##flcities"))
         {
             cfg.FloorderSelectedCities.Clear();
+            cfg.SaveDeferred();
         }
         ImGui.Spacing();
 
@@ -277,7 +285,8 @@ public partial class SlaveWindow
         if (citiesOpen)
         {
             var cols = 3;
-            if (ImGui.BeginTable("FlCityTable", cols, ImGuiTableFlags.None))
+            using (var imguiScope287 = ImRaii.Table("FlCityTable", cols, ImGuiTableFlags.None))
+            if (imguiScope287)
             {
                 for (int c = 0; c < cols; c++)
                     ImGui.TableSetupColumn($"col{c}", ImGuiTableColumnFlags.WidthStretch);
@@ -299,10 +308,11 @@ public partial class SlaveWindow
                                 cfg.FloorderSelectedCities.Add(city);
                             else if (!sel)
                                 cfg.FloorderSelectedCities.Remove(city);
+                            cfg.SaveDeferred();
                         }
                     }
                 }
-                ImGui.EndTable();
+
             }
         }
 
@@ -329,18 +339,19 @@ public partial class SlaveWindow
                             cfg.FloorderSelectedCities.Add(city);
                         else if (!sel)
                             cfg.FloorderSelectedCities.Remove(city);
+                        cfg.SaveDeferred();
                     }
                     ImGui.SameLine();
-                    ImGui.PushStyleColor(ImGuiCol.Text, red);
-                    if (ImGui.SmallButton($"X##flrmcust_{i}"))
+                    using (ImRaii.PushColor(ImGuiCol.Text, red))
                     {
-                        cfg.FloorderSelectedCities.Remove(city);
-                        cfg.FloorderCustomCities.RemoveAt(i);
-                        cfg.Save();
-                        ImGui.PopStyleColor();
-                        break;
+                        if (ImGui.SmallButton($"X##flrmcust_{i}"))
+                        {
+                            cfg.FloorderSelectedCities.Remove(city);
+                            cfg.FloorderCustomCities.RemoveAt(i);
+                            cfg.Save();
+                            break;
+                        }
                     }
-                    ImGui.PopStyleColor();
                 }
             }
         }
@@ -377,15 +388,15 @@ public partial class SlaveWindow
             if (ImGui.IsItemHovered())
                 ImGui.SetTooltip($"{msg}\n\n({msg.Length}/{FloorderMaxMessageLength} chars)");
             ImGui.SameLine();
-            ImGui.PushStyleColor(ImGuiCol.Text, red);
-            if (ImGui.SmallButton($"X##flrma{i}"))
+            using (ImRaii.PushColor(ImGuiCol.Text, red))
             {
-                cfg.FloorderAnnouncements.RemoveAt(i);
-                cfg.Save();
-                ImGui.PopStyleColor();
-                break;
+                if (ImGui.SmallButton($"X##flrma{i}"))
+                {
+                    cfg.FloorderAnnouncements.RemoveAt(i);
+                    cfg.Save();
+                    break;
+                }
             }
-            ImGui.PopStyleColor();
         }
 
         ImGui.SetNextItemWidth(-100);
@@ -408,13 +419,14 @@ public partial class SlaveWindow
         ImGui.Spacing();
         if (cfg.FloorderAnnouncements.Count > 0)
         {
-            ImGui.PushStyleColor(ImGuiCol.Text, red);
-            if (ImGui.SmallButton("Clear All Messages##flclearann"))
+            using (ImRaii.PushColor(ImGuiCol.Text, red))
             {
-                cfg.FloorderAnnouncements.Clear();
-                cfg.Save();
+                if (ImGui.SmallButton("Clear All Messages##flclearann"))
+                {
+                    cfg.FloorderAnnouncements.Clear();
+                    cfg.Save();
+                }
             }
-            ImGui.PopStyleColor();
         }
 
         // -- Log --
@@ -471,9 +483,6 @@ public partial class SlaveWindow
         catch { /* proceed if check fails */ }
 
         var steps = new List<TaskStep>();
-        runner.TotalItems = totalCityVisits;
-        runner.CompletedItems = 0;
-
         // -- Pre-flight: CharacterSafeWait --
         foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass("Pre-flight SafeWait", 30f))
             steps.Add(sw);
@@ -631,7 +640,7 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     runner.AddLog("==== Restarting flooding cycle... ====");
-                    Plugin.Framework.RunOnTick(() => StartCityChatFlooder(), TimeSpan.FromMilliseconds(500));
+                    Plugin.ScheduleOnGameThread(() => StartCityChatFlooder(), delay: TimeSpan.FromMilliseconds(500));
                 },
                 IsComplete = () => true,
                 TimeoutSec = 1f,
@@ -648,10 +657,11 @@ public partial class SlaveWindow
             });
         }
 
-        plugin.TaskRunner.Start("City Chat Flooder", steps, onLog: (msg) =>
+        if (!plugin.TaskRunner.Start("City Chat Flooder", steps, onLog: (msg) =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
-        });
+        }, totalItems: totalCityVisits))
+            return;
 
         AutoOpenTaskLogIfVerbose(ref floorderShowLog);
     }

@@ -21,16 +21,17 @@ public sealed class TaskRunner : IDisposable
     private IDtrBarEntry? dtrEntry;
     private string externalStatusText = string.Empty;
 
-    private readonly List<TaskStep> steps = new();
-    private int stepIndex = -1;
-    private DateTime stepStart;
-    private bool stepActionDone;
-    private bool running;
+    private readonly StepMachine stepMachine;
+    private bool hasActiveRun;
     private Action? onFinished;
     private Action<string>? onLog;
     private bool suppressCompletionReport;
+    private bool haltRequested;
+    private string haltReason = string.Empty;
+    private readonly TaskRunResults taskRunResults = new();
+    private int historySequenceNumber;
 
-    public bool IsRunning => running;
+    public bool IsRunning => hasActiveRun;
 
     /// <summary>
     /// When true, the logout handler should NOT cancel this task.
@@ -39,8 +40,8 @@ public sealed class TaskRunner : IDisposable
     public bool SuppressLogoutCancel { get; set; }
     public string CurrentTaskName { get; private set; } = string.Empty;
     public string StatusText { get; private set; } = string.Empty;
-    public int CurrentStep => stepIndex;
-    public int TotalSteps => steps.Count;
+    public int CurrentStep => stepMachine.CurrentStep;
+    public int TotalSteps => stepMachine.TotalSteps;
 
     // Progress tracking
     public int CompletedItems { get; set; }
@@ -48,37 +49,35 @@ public sealed class TaskRunner : IDisposable
     public string CurrentItemLabel { get; set; } = string.Empty;
 
     // Log messages for UI display
-    private readonly List<string> logMessages = new();
-    public IReadOnlyList<string> LogMessages => logMessages;
     private const int MaxLogMessages = 8000;
+    private readonly BoundedLogBuffer logMessages = new(MaxLogMessages);
+    public IReadOnlyList<string> LogMessages => logMessages.Snapshot(includeEvictionNotice: true);
 
-    // Characters that failed to relog (could not log in) - marked RED in the processing list.
-    public List<string> FailedCharacters { get; } = new();
+    // Detached snapshots for UI/report consumers. Mutations remain owned by TaskRunner.
+    public IReadOnlyList<string> FailedCharacters => taskRunResults.FailedCharactersSnapshot();
 
     // Characters that logged in successfully but could not complete the per-character process
     // (e.g. stuck in a duty that could not be left) - marked PURPLE in the processing list.
-    public List<string> IncompleteCharacters { get; } = new();
+    public IReadOnlyList<string> IncompleteCharacters => taskRunResults.IncompleteCharactersSnapshot();
 
     // Per-item active-processing timers (seconds). Started when an item begins processing and
     // recorded when it finishes (completed/failed/incomplete) - used for per-character timers + ETA.
-    private readonly Dictionary<string, DateTime> itemStartTimes = new(StringComparer.OrdinalIgnoreCase);
-    private readonly Dictionary<string, double> itemDurations = new(StringComparer.OrdinalIgnoreCase);
-    public IReadOnlyDictionary<string, double> ItemDurations => itemDurations;
+    public IReadOnlyDictionary<string, double> ItemDurations => taskRunResults.ItemDurationsSnapshot();
+
+    public bool RecordFailedCharacter(string characterName) => taskRunResults.RecordFailedCharacter(characterName);
+
+    public bool RecordIncompleteCharacter(string characterName) => taskRunResults.RecordIncompleteCharacter(characterName);
 
     /// <summary>Begin the active-processing timer for an item (idempotent per item).</summary>
     public void RecordItemStart(string item)
     {
-        if (!string.IsNullOrWhiteSpace(item))
-            itemStartTimes[item] = DateTime.UtcNow;
+        taskRunResults.RecordItemStart(item, DateTime.UtcNow);
     }
 
     /// <summary>Record the elapsed processing time for a finished item (first finish wins).</summary>
     public void RecordItemEnd(string item)
     {
-        if (string.IsNullOrWhiteSpace(item))
-            return;
-        if (itemStartTimes.TryGetValue(item, out var start) && !itemDurations.ContainsKey(item))
-            itemDurations[item] = Math.Max(0, (DateTime.UtcNow - start).TotalSeconds);
+        taskRunResults.RecordItemEnd(item, DateTime.UtcNow);
     }
 
     public TaskRunner(ICondition condition, IFramework framework, IPluginLog log, IDtrBar dtrBar, IToastGui toastGui)
@@ -88,67 +87,93 @@ public sealed class TaskRunner : IDisposable
         this.log = log;
         this.dtrBar = dtrBar;
         this.toastGui = toastGui;
+        stepMachine = new StepMachine(log, "TaskRunner", AddLog);
 
         // DTR bar always available - shows "Idle" when no task running
         InitDtrBar();
     }
 
-    /// <summary>Start executing a list of steps as a named task.</summary>
-    public void Start(string taskName, List<TaskStep> taskSteps, Action? onFinished = null, Action<string>? onLog = null, bool suppressCompletionReport = false)
+    /// <summary>
+    /// Start executing a list of steps as a named task. Set preserveRunHistory for another sequence
+    /// within the same coordinated run to retain logs, character outcomes, and timers.
+    /// </summary>
+    /// <returns><see langword="true"/> only when this call takes ownership of the runner.</returns>
+    public bool Start(
+        string taskName,
+        List<TaskStep> taskSteps,
+        Action? onFinished = null,
+        Action<string>? onLog = null,
+        bool suppressCompletionReport = false,
+        int? totalItems = null,
+        bool? suppressLogoutCancel = null,
+        bool preserveRunHistory = false)
     {
-        if (running) return;
+        var normalizedSteps = taskSteps ?? [];
+        var startDecision = TaskRunnerStartPolicy.Evaluate(hasActiveRun, normalizedSteps.Count);
+        if (startDecision == TaskRunnerStartDecision.Busy)
+        {
+            log.Warning($"[XASlave] TaskRunner: '{taskName}' rejected - '{CurrentTaskName}' is already running.");
+            return false;
+        }
+
+        if (startDecision == TaskRunnerStartDecision.Empty)
+        {
+            log.Warning($"[XASlave] TaskRunner: '{taskName}' rejected - no steps.");
+            return false;
+        }
 
         this.onFinished = onFinished;
         this.onLog = onLog;
         this.suppressCompletionReport = suppressCompletionReport;
+        haltRequested = false;
+        haltReason = string.Empty;
         CurrentTaskName = taskName;
         CompletedItems = 0;
-        // NOTE: TotalItems is set by the step builder (which knows the character/item count)
-        // *before* Start runs, so resetting it here would make every list task's progress read
-        // 0 (DTR "x/y" and the completion toast). It is cleared on idle transitions
-        // (Cancel/Finish) instead, so a later task that never sets it starts clean.
+        if (totalItems.HasValue)
+            TotalItems = Math.Max(0, totalItems.Value);
+        if (suppressLogoutCancel.HasValue)
+            SuppressLogoutCancel = suppressLogoutCancel.Value;
+        // Some dynamic owners (notably Xagman) establish progress before Start. Preserve that
+        // value when totalItems is omitted; Cancel/Finish clear it before the next idle run.
         CurrentItemLabel = string.Empty;
-        logMessages.Clear();
-        FailedCharacters.Clear();
-        IncompleteCharacters.Clear();
-        itemStartTimes.Clear();
-        itemDurations.Clear();
-
-        steps.Clear();
-        steps.AddRange(taskSteps);
-
-        if (steps.Count == 0)
+        if (!preserveRunHistory)
         {
-            onFinished?.Invoke();
-            return;
+            logMessages.Clear();
+            taskRunResults.Clear();
+            historySequenceNumber = 0;
         }
+        historySequenceNumber++;
 
-        stepIndex = 0;
-        stepStart = DateTime.UtcNow;
-        stepActionDone = false;
-        running = true;
-        StatusText = steps[0].Name;
+        stepMachine.Start(normalizedSteps);
+        hasActiveRun = true;
+        StatusText = stepMachine.CurrentStepName;
         framework.Update += OnTick;
 
-        AddLog($"[{taskName}] Started with {steps.Count} steps.");
-        log.Information($"[XASlave] TaskRunner: '{taskName}' started with {steps.Count} steps.");
+        AddLog(preserveRunHistory
+            ? $"[{taskName}] Starting sequence {historySequenceNumber}; earlier log entries and character results retained."
+            : $"[{taskName}] Starting sequence {historySequenceNumber} of a new run; earlier log entries and character results cleared.");
+        AddLog($"[{taskName}] Started with {stepMachine.TotalSteps} steps.");
+        log.Information($"[XASlave] TaskRunner: '{taskName}' started with {stepMachine.TotalSteps} steps.");
 
         // Show DTR bar progress
         UpdateDtrBar();
+        return true;
     }
 
     /// <summary>Append additional steps to a running task (for dynamic character rotation).</summary>
     public void AppendSteps(List<TaskStep> additionalSteps)
     {
-        steps.AddRange(additionalSteps);
+        stepMachine.Append(additionalSteps);
     }
 
     public void Cancel()
     {
-        if (!running) return;
-        running = false;
+        if (!hasActiveRun) return;
+        stepMachine.Stop();
+        hasActiveRun = false;
         framework.Update -= OnTick;
-        stepIndex = -1;
+        haltRequested = false;
+        haltReason = string.Empty;
         StatusText = "Cancelled";
         SuppressLogoutCancel = false;
         suppressCompletionReport = false;
@@ -163,10 +188,25 @@ public sealed class TaskRunner : IDisposable
         SetDtrIdle();
     }
 
+    /// <summary>
+    /// Stops the current sequence as an unsuccessful terminal outcome. Unlike normal completion,
+    /// this never invokes completion continuations or reports the task as complete.
+    /// </summary>
+    public void RequestHalt(string reason)
+    {
+        if (!hasActiveRun || haltRequested)
+            return;
+
+        haltRequested = true;
+        haltReason = string.IsNullOrWhiteSpace(reason) ? "A safety requirement failed." : reason.Trim();
+        stepMachine.Stop();
+        StatusText = "Halted";
+        AddLog($"[{CurrentTaskName}] Halted: {haltReason}");
+        log.Warning($"[XASlave] TaskRunner: '{CurrentTaskName}' halted: {haltReason}");
+    }
+
     public void AddLog(string message)
     {
-        if (logMessages.Count >= MaxLogMessages)
-            logMessages.RemoveAt(0);
         logMessages.Add($"[{DateTime.Now:HH:mm:ss}] {message}");
         onLog?.Invoke(message);
     }
@@ -182,6 +222,16 @@ public sealed class TaskRunner : IDisposable
     public void ClearLog()
     {
         logMessages.Clear();
+        AddLog("[Task history] Log cleared by request; character results retained.");
+    }
+
+    /// <summary>Explicitly start fresh history for a coordinated run before its first sequence.</summary>
+    public void ClearRunHistory()
+    {
+        logMessages.Clear();
+        taskRunResults.Clear();
+        historySequenceNumber = 0;
+        AddLog("[Task history] Log and character results cleared for a new run.");
     }
 
     public void SetExternalStatus(string statusText)
@@ -191,7 +241,7 @@ public sealed class TaskRunner : IDisposable
             return;
 
         externalStatusText = normalizedStatusText;
-        if (!running)
+        if (!hasActiveRun)
             UpdateDtrBar();
     }
 
@@ -201,7 +251,7 @@ public sealed class TaskRunner : IDisposable
             return;
 
         externalStatusText = string.Empty;
-        if (!running)
+        if (!hasActiveRun)
             UpdateDtrBar();
     }
 
@@ -212,7 +262,7 @@ public sealed class TaskRunner : IDisposable
 
     private string FormatStepLabel(int index, TaskStep step)
     {
-        return $"[{index + 1}/{steps.Count}] {step.Name}";
+        return $"[{index + 1}/{stepMachine.TotalSteps}] {step.Name}";
     }
 
     private static bool IsVerboseTaskLoggingEnabled()
@@ -233,114 +283,64 @@ public sealed class TaskRunner : IDisposable
     }
 
     private void OnTick(IFramework fw)
+        => ProcessTick();
+
+    /// <summary>
+    /// Runs one production lifecycle tick. Kept independent from the Dalamud event argument so the
+    /// owner itself can be regression-tested without a live framework loop.
+    /// </summary>
+    internal void ProcessTick()
     {
-        if (!running || stepIndex < 0 || stepIndex >= steps.Count)
+        if (!hasActiveRun)
+            return;
+
+        if (haltRequested)
         {
-            Finish();
+            FinalizeHalt();
             return;
         }
 
-        while (running && stepIndex >= 0 && stepIndex < steps.Count)
-        {
-            var pendingStep = steps[stepIndex];
-            if (pendingStep.ShouldSkip == null || !pendingStep.ShouldSkip())
-                break;
-
-            stepIndex++;
-            if (stepIndex >= steps.Count)
+        var previousStep = stepMachine.CurrentStep;
+        var result = stepMachine.Tick(
+            onStepStarted: LogStepStart,
+            onStepCompleted: LogStepComplete,
+            onRetry: (index, step, elapsed) =>
             {
-                Finish();
-                return;
-            }
-
-            stepStart = DateTime.UtcNow;
-            stepActionDone = false;
-            StatusText = steps[stepIndex].Name;
-            UpdateDtrBar();
-        }
-
-        if (!running || stepIndex < 0 || stepIndex >= steps.Count)
-        {
-            Finish();
-            return;
-        }
-
-        var step = steps[stepIndex];
-        var elapsed = (float)(DateTime.UtcNow - stepStart).TotalSeconds;
-
-        // Execute OnEnter once
-        if (!stepActionDone)
-        {
-            LogStepStart(stepIndex, step);
-            if (step.OnEnter != null)
-            {
-                try { step.OnEnter(); }
-                catch (Exception ex)
-                {
-                    log.Error($"[XASlave] TaskRunner step '{step.Name}' action error: {ex.Message}");
-                    AddLog($"Error in '{step.Name}': {ex.Message}");
-                }
-            }
-            stepActionDone = true;
-        }
-
-        // Check completion
-        try
-        {
-            if (step.IsComplete())
-            {
-                LogStepComplete(stepIndex, step, elapsed);
-                AdvanceStep();
-                return;
-            }
-        }
-        catch (Exception ex)
-        {
-            log.Error($"[XASlave] TaskRunner step '{step.Name}' check error: {ex.Message}");
-            AddLog($"Check error in '{step.Name}': {ex.Message}");
-        }
-
-        // Timeout handling
-        if (elapsed > step.TimeoutSec)
-        {
-            if (step.MaxRetries > 0 && step.RetryCount < step.MaxRetries)
-            {
-                step.RetryCount++;
-                stepActionDone = false;
-                stepStart = DateTime.UtcNow;
                 if (IsVerboseTaskLoggingEnabled())
-                    AddLog($"STEP RETRY {FormatStepLabel(stepIndex, step)} ({step.RetryCount}/{step.MaxRetries}) after {elapsed:0.00}s");
-                return;
-            }
+                    AddLog($"STEP RETRY {FormatStepLabel(index, step)} ({step.RetryCount}/{step.MaxRetries}) after {elapsed:0.00}s");
+            },
+            onTimeout: (index, step, elapsed) =>
+            {
+                AddLog($"STEP TIMEOUT {FormatStepLabel(index, step)} after {elapsed:0.00}s (limit {step.TimeoutSec:0.##}s) - skipping.");
+                log.Warning($"[XASlave] TaskRunner step '{step.Name}' timed out after {step.TimeoutSec}s.");
+            });
 
-            AddLog($"STEP TIMEOUT {FormatStepLabel(stepIndex, step)} after {elapsed:0.00}s (limit {step.TimeoutSec:0.##}s) - skipping.");
-            log.Warning($"[XASlave] TaskRunner step '{step.Name}' timed out after {step.TimeoutSec}s.");
-            try { step.OnTimeout?.Invoke(); }
-            catch (Exception ex) { log.Error($"[XASlave] TaskRunner step '{step.Name}' OnTimeout error: {ex.Message}"); }
-            AdvanceStep();
+        if (haltRequested)
+        {
+            FinalizeHalt();
+            return;
         }
-    }
 
-    private void AdvanceStep()
-    {
-        stepIndex++;
-        if (stepIndex >= steps.Count)
+        if (result == StepMachineTickResult.Completed)
         {
             Finish();
             return;
         }
-        stepStart = DateTime.UtcNow;
-        stepActionDone = false;
-        StatusText = steps[stepIndex].Name;
-        UpdateDtrBar();
+
+        StatusText = stepMachine.CurrentStepName;
+        if (stepMachine.CurrentStep != previousStep)
+            UpdateDtrBar();
     }
 
     private void Finish()
     {
-        if (!running) return;
-        running = false;
+        if (!hasActiveRun)
+            return;
+
+        hasActiveRun = false;
         framework.Update -= OnTick;
-        stepIndex = -1;
+        haltRequested = false;
+        haltReason = string.Empty;
         StatusText = "Complete";
         SuppressLogoutCancel = false;
         if (!suppressCompletionReport)
@@ -360,7 +360,7 @@ public sealed class TaskRunner : IDisposable
                 var total = TotalItems;
                 var failCount = FailedCharacters.Count;
                 var incompleteCount = IncompleteCharacters.Count;
-                framework.Run(() =>
+                _ = Plugin.RunOnGameThread(() =>
                 {
                     string msg;
                     if (failCount > 0 && incompleteCount > 0)
@@ -382,6 +382,24 @@ public sealed class TaskRunner : IDisposable
         finally { suppressCompletionReport = false; TotalItems = 0; }
     }
 
+    private void FinalizeHalt()
+    {
+        if (!hasActiveRun)
+            return;
+
+        hasActiveRun = false;
+        framework.Update -= OnTick;
+        stepMachine.Stop();
+        StatusText = "Halted";
+        SuppressLogoutCancel = false;
+        suppressCompletionReport = false;
+        CurrentItemLabel = string.Empty;
+        TotalItems = 0;
+        haltRequested = false;
+        haltReason = string.Empty;
+        SetDtrIdle();
+    }
+
     /// <summary>Initialize DTR bar entry - always visible, shows "Idle" by default.</summary>
     private void InitDtrBar()
     {
@@ -398,9 +416,9 @@ public sealed class TaskRunner : IDisposable
         try
         {
             dtrEntry ??= dtrBar.Get("XA Slave");
-            if (running && TotalItems > 0)
+            if (hasActiveRun && TotalItems > 0)
                 dtrEntry.Text = $"XA: {CurrentTaskName} {CompletedItems}/{TotalItems}";
-            else if (running)
+            else if (hasActiveRun)
                 dtrEntry.Text = $"XA: {CurrentTaskName}";
             else if (!string.IsNullOrWhiteSpace(externalStatusText))
                 dtrEntry.Text = $"XA: {externalStatusText}";
@@ -438,11 +456,14 @@ public sealed class TaskRunner : IDisposable
 
     public void Dispose()
     {
-        if (running)
+        if (hasActiveRun)
         {
-            running = false;
+            stepMachine.Stop();
+            hasActiveRun = false;
             framework.Update -= OnTick;
         }
+        haltRequested = false;
+        haltReason = string.Empty;
         RemoveDtrBar();
     }
 }

@@ -820,19 +820,24 @@ namespace XASlave.Services
                 return;
             }
 
-            var count = numberArray->IntArray[0];
+            if (!NativeArrayAccess.TryGetInt(numberArray, 0, out var count))
+                return;
+
             if (count < 0 || count > 200)
             {
                 Log.Warning($"Ignored invalid logogram shard-list count: {count}");
                 return;
             }
 
-            Log.Debug($"Reading {count} logograms from shard list");
+            var safeCount = NativeArrayBounds.ClampElementCount((uint)count, numberArray->Size, 5, 4);
+            Log.Debug($"Reading {safeCount} logograms from shard list (reported: {count})");
 
-            for (var i = 1; i <= count; i++)
+            for (var i = 1; i <= safeCount; i++)
             {
-                var id = numberArray->IntArray[(4 * i) + 1];
-                var stock = numberArray->IntArray[4 * i];
+                if (!NativeArrayAccess.TryGetInt(numberArray, (4 * i) + 1, out var id) ||
+                    !NativeArrayAccess.TryGetInt(numberArray, 4 * i, out var stock))
+                    break;
+
                 LogogramStock[id] = stock;
             }
         }
@@ -846,8 +851,12 @@ namespace XASlave.Services
 
             UpdateLogosActionSlotCapacity();
 
-            var rawSlotEntryCount = Math.Clamp(numberArray->IntArray[0], 0, 32);
-            var scanSlotCount = Math.Clamp(Math.Max(rawSlotEntryCount, LogosActionSlotCapacity), 0, 32);
+            if (!NativeArrayAccess.TryGetInt(numberArray, 0, out var rawEntryCount))
+                return false;
+
+            var rawSlotEntryCount = Math.Clamp(rawEntryCount, 0, 32);
+            var requestedSlotCount = Math.Clamp(Math.Max(rawSlotEntryCount, LogosActionSlotCapacity), 0, 32);
+            var scanSlotCount = NativeArrayBounds.ClampElementCount((uint)requestedSlotCount, numberArray->Size, 5, 4);
             Log.Debug($"Reading {scanSlotCount} logos action slot entries from ather list (raw header: {rawSlotEntryCount}, capacity: {LogosActionSlotCapacity})");
 
             LogosActionStock.Clear();
@@ -856,7 +865,10 @@ namespace XASlave.Services
             // NumberArray[138] exposes one entry per slot; empty slots carry an id of 0.
             for (var i = 1; i <= scanSlotCount; i++)
             {
-                var id = (uint)numberArray->IntArray[(4 * i) + 1];
+                if (!NativeArrayAccess.TryGetInt(numberArray, (4 * i) + 1, out var rawId))
+                    break;
+
+                var id = (uint)rawId;
                 if (id == 0)
                 {
                     continue;
@@ -882,14 +894,13 @@ namespace XASlave.Services
         private unsafe void UpdateLogosActionSlotCapacity()
         {
             var addon = GetAddon("EurekaMagiciteItemAtherList");
-            if (addon == null || addon->AtkValues == null || addon->AtkValuesCount <= 3)
+            if (!NativeArrayAccess.TryGetAtkValue(addon, 3, out var value))
             {
                 return;
             }
 
             try
             {
-                var value = &addon->AtkValues[3];
                 var capacity = value->Type switch
                 {
                     AtkValueType.UInt => (int)value->UInt,
@@ -2571,20 +2582,23 @@ namespace XASlave.Services
                 }
 
                 var numberArray = raptureAtkModule->AtkModule.AtkArrayDataHolder.NumberArrays[137];
-                if (numberArray == null || numberArray->IntArray == null)
+                if (numberArray == null || numberArray->Size <= 0 || numberArray->IntArray == null)
                 {
                     return -1;
                 }
 
-                var count = numberArray->IntArray[0];
+                if (!NativeArrayAccess.TryGetInt(numberArray, 0, out var count))
+                    return -1;
+
                 if (count <= 0 || count > 200)
                 {
                     return -1;
                 }
 
-                for (var i = 1; i <= count; i++)
+                var safeCount = NativeArrayBounds.ClampElementCount((uint)count, numberArray->Size, 5, 4);
+                for (var i = 1; i <= safeCount; i++)
                 {
-                    if (numberArray->IntArray[(4 * i) + 1] == logogramId)
+                    if (NativeArrayAccess.TryGetInt(numberArray, (4 * i) + 1, out var id) && id == logogramId)
                     {
                         return i - 1;
                     }
@@ -2674,14 +2688,13 @@ namespace XASlave.Services
                 return false;
             }
 
-            if (addon->AtkValues == null || addon->AtkValuesCount <= 32)
+            if (!NativeArrayAccess.TryGetAtkValue(addon, 32, out var value))
             {
                 return false;
             }
 
             try
             {
-                var value = &addon->AtkValues[32];
                 var warningText = value->Type switch
                 {
                     AtkValueType.String or AtkValueType.ConstString or AtkValueType.ManagedString => CleanAddonText(value->String.ToString()),
@@ -2754,10 +2767,9 @@ namespace XASlave.Services
                 return false;
             }
 
-            if (addon->UldManager.NodeListCount > 3)
+            if (NativeArrayAccess.TryGetNode(&addon->UldManager, 3, out var destroyNode))
             {
-                var destroyNode = addon->UldManager.NodeList[3];
-                if (destroyNode != null && destroyNode->IsVisible())
+                if (destroyNode->IsVisible())
                 {
                     return true;
                 }
@@ -2785,14 +2797,13 @@ namespace XASlave.Services
                 return visibleText;
             }
 
-            if (addon->AtkValues == null || addon->AtkValuesCount <= 36)
+            if (!NativeArrayAccess.TryGetAtkValue(addon, 36, out var value))
             {
                 return string.Empty;
             }
 
             try
             {
-                var value = &addon->AtkValues[36];
                 return value->Type switch
                 {
                     AtkValueType.String or AtkValueType.ConstString or AtkValueType.ManagedString => CleanAddonText(value->String.ToString()),
@@ -2828,12 +2839,13 @@ namespace XASlave.Services
         private unsafe string GetManipulatorArrayPromptText(int nodeListIndex)
         {
             var addon = GetAddon("EurekaMagiciteItemSynthesis");
-            if (addon == null || !addon->IsVisible || nodeListIndex < 0 || nodeListIndex >= addon->UldManager.NodeListCount)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var rawNode))
             {
                 return string.Empty;
             }
 
-            var node = (AtkComponentNode*)addon->UldManager.NodeList[nodeListIndex];
+            var node = (AtkComponentNode*)rawNode;
             if (node == null || node->Component == null)
             {
                 return string.Empty;
@@ -2857,14 +2869,14 @@ namespace XASlave.Services
 
         private unsafe int GetAddonAtkValueAsInt(AtkUnitBase* addon, int valueIndex)
         {
-            if (addon == null || !addon->IsVisible || addon->AtkValues == null || valueIndex < 0 || addon->AtkValuesCount <= valueIndex)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetAtkValue(addon, valueIndex, out var value))
             {
                 return 0;
             }
 
             try
             {
-                var value = &addon->AtkValues[valueIndex];
                 return value->Type switch
                 {
                     AtkValueType.UInt => (int)value->UInt,
@@ -2896,12 +2908,13 @@ namespace XASlave.Services
         {
             var nodeListIndex = GetManipulatorArrayNodeListIndex(side);
             var addon = GetAddon("EurekaMagiciteItemSynthesis");
-            if (addon == null || !addon->IsVisible || nodeListIndex < 0 || nodeListIndex >= addon->UldManager.NodeListCount)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var rawNode))
             {
                 return false;
             }
 
-            var componentNode = (AtkComponentNode*)addon->UldManager.NodeList[nodeListIndex];
+            var componentNode = (AtkComponentNode*)rawNode;
             if (componentNode == null || componentNode->Component == null)
             {
                 return false;
@@ -2957,12 +2970,13 @@ namespace XASlave.Services
             arrayNode = null;
 
             var nodeListIndex = GetManipulatorArrayNodeListIndex(side);
-            if (addon == null || !addon->IsVisible || nodeListIndex < 0 || nodeListIndex >= addon->UldManager.NodeListCount)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var rawNode))
             {
                 return false;
             }
 
-            arrayNode = (AtkComponentNode*)addon->UldManager.NodeList[nodeListIndex];
+            arrayNode = (AtkComponentNode*)rawNode;
             return arrayNode != null && arrayNode->Component != null;
         }
 
@@ -2970,12 +2984,13 @@ namespace XASlave.Services
         {
             var nodeListIndex = GetManipulatorArrayNodeListIndex(side);
             var addon = GetAddon("EurekaMagiciteItemSynthesis");
-            if (addon == null || !addon->IsVisible || nodeListIndex >= addon->UldManager.NodeListCount)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var rawNode))
             {
                 return false;
             }
 
-            var node = (AtkComponentNode*)addon->UldManager.NodeList[nodeListIndex];
+            var node = (AtkComponentNode*)rawNode;
             if (node == null || node->Component == null)
             {
                 return false;
@@ -3144,12 +3159,13 @@ namespace XASlave.Services
         {
             var addon = GetAddon("EurekaMagiciteItemSynthesis");
             var nodeListIndex = GetManipulatorArrayNodeListIndex(side);
-            if (addon == null || !addon->IsVisible || nodeListIndex >= addon->UldManager.NodeListCount)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var rawNode))
             {
                 return 0;
             }
 
-            var node = (AtkComponentNode*)addon->UldManager.NodeList[nodeListIndex];
+            var node = (AtkComponentNode*)rawNode;
             if (node == null || node->Component == null)
             {
                 return 0;
@@ -3238,7 +3254,8 @@ namespace XASlave.Services
             position = System.Numerics.Vector2.Zero;
 
             var addon = GetAddon("EurekaMagiciteItemSynthesis");
-            if (addon == null || !addon->IsVisible || addon->RootNode == null || nodeListIndex < 0 || nodeListIndex >= addon->UldManager.NodeListCount)
+            if (addon == null || !addon->IsVisible || addon->RootNode == null ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var buttonNode))
             {
                 return false;
             }
@@ -3249,8 +3266,7 @@ namespace XASlave.Services
                 return false;
             }
 
-            var buttonNode = addon->UldManager.NodeList[nodeListIndex];
-            if (buttonNode == null || !buttonNode->IsVisible())
+            if (!buttonNode->IsVisible())
             {
                 return false;
             }
@@ -3267,12 +3283,13 @@ namespace XASlave.Services
         private unsafe string GetAddonComponentButtonText(string addonName, int nodeListIndex)
         {
             var addon = GetAddon(addonName);
-            if (addon == null || !addon->IsVisible || nodeListIndex < 0 || nodeListIndex >= addon->UldManager.NodeListCount)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var rawNode))
             {
                 return string.Empty;
             }
 
-            var componentNode = (AtkComponentNode*)addon->UldManager.NodeList[nodeListIndex];
+            var componentNode = (AtkComponentNode*)rawNode;
             if (componentNode == null || componentNode->Component == null)
             {
                 return string.Empty;
@@ -3296,13 +3313,13 @@ namespace XASlave.Services
 
         private unsafe string GetAddonTextNodeText(AtkUnitBase* addon, int nodeListIndex)
         {
-            if (addon == null || !addon->IsVisible || nodeListIndex < 0 || nodeListIndex >= addon->UldManager.NodeListCount)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var node))
             {
                 return string.Empty;
             }
 
-            var node = addon->UldManager.NodeList[nodeListIndex];
-            if (node == null || node->Type != NodeType.Text)
+            if (node->Type != NodeType.Text)
             {
                 return string.Empty;
             }
@@ -3319,13 +3336,13 @@ namespace XASlave.Services
 
         private unsafe string GetVisibleAddonTextNodeText(AtkUnitBase* addon, int nodeListIndex)
         {
-            if (addon == null || !addon->IsVisible || nodeListIndex < 0 || nodeListIndex >= addon->UldManager.NodeListCount)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var node))
             {
                 return string.Empty;
             }
 
-            var node = addon->UldManager.NodeList[nodeListIndex];
-            if (node == null || !node->IsVisible() || node->Type != NodeType.Text)
+            if (!node->IsVisible() || node->Type != NodeType.Text)
             {
                 return string.Empty;
             }
@@ -3373,13 +3390,8 @@ namespace XASlave.Services
                 return false;
             }
 
-            if (nodeListIndex < 0 || nodeListIndex >= addon->UldManager.NodeListCount)
-            {
-                return false;
-            }
-
-            var node = addon->UldManager.NodeList[nodeListIndex];
-            if (node == null || !node->IsVisible())
+            if (!NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var node) ||
+                !node->IsVisible())
             {
                 return false;
             }
@@ -3435,12 +3447,12 @@ namespace XASlave.Services
                 return false;
             }
 
-            if (shardAddon->UldManager.NodeListCount <= 5)
+            if (!NativeArrayAccess.TryGetNode(&shardAddon->UldManager, 5, out var rawListNode))
             {
                 return false;
             }
 
-            var listComponentNode = (AtkComponentNode*)shardAddon->UldManager.NodeList[5];
+            var listComponentNode = (AtkComponentNode*)rawListNode;
             if (listComponentNode == null || listComponentNode->Component == null)
             {
                 Log.Warning("Shard tree list component was null");
@@ -3501,18 +3513,21 @@ namespace XASlave.Services
             visibleSlotCount = 0;
 
             var addon = GetAddon("EurekaMagiciteItemAtherList");
-            if (addon == null || !addon->IsVisible || addon->UldManager.NodeListCount <= 4)
+            if (addon == null || !addon->IsVisible ||
+                !NativeArrayAccess.TryGetNode(&addon->UldManager, 4, out var rawListNode))
             {
                 return false;
             }
 
-            var listComponentNode = (AtkComponentNode*)addon->UldManager.NodeList[4];
+            var listComponentNode = (AtkComponentNode*)rawListNode;
             if (listComponentNode == null || listComponentNode->Component == null)
             {
                 return false;
             }
 
-            var rowNodeCount = listComponentNode->Component->UldManager.NodeListCount;
+            var rowNodeCount = NativeArrayBounds.ClampCount(
+                listComponentNode->Component->UldManager.NodeListCount,
+                listComponentNode->Component->UldManager.NodeListSize);
             if (rowNodeCount <= 1)
             {
                 return false;
@@ -3529,19 +3544,21 @@ namespace XASlave.Services
 
             for (var slotIndex = 1; slotIndex <= visibleSlotCount; slotIndex++)
             {
-                var slotComponentNode = (AtkComponentNode*)listComponentNode->Component->UldManager.NodeList[slotIndex];
+                if (!NativeArrayAccess.TryGetNode(&listComponentNode->Component->UldManager, slotIndex, out var rawSlotNode))
+                    continue;
+
+                var slotComponentNode = (AtkComponentNode*)rawSlotNode;
                 if (slotComponentNode == null || slotComponentNode->Component == null)
                 {
                     continue;
                 }
 
-                if (slotComponentNode->Component->UldManager.NodeListCount <= 3)
+                if (!NativeArrayAccess.TryGetNode(&slotComponentNode->Component->UldManager, 3, out var filledSlotWindow))
                 {
                     continue;
                 }
 
-                var filledSlotWindow = slotComponentNode->Component->UldManager.NodeList[3];
-                if (filledSlotWindow != null && filledSlotWindow->IsVisible())
+                if (filledSlotWindow->IsVisible())
                 {
                     occupiedSlotCount++;
                 }
@@ -3594,13 +3611,7 @@ namespace XASlave.Services
                 return false;
             }
 
-            if (nodeListIndex < 0 || nodeListIndex >= addon->UldManager.NodeListCount)
-            {
-                return false;
-            }
-
-            var node = addon->UldManager.NodeList[nodeListIndex];
-            if (node == null)
+            if (!NativeArrayAccess.TryGetNode(&addon->UldManager, nodeListIndex, out var node))
             {
                 return false;
             }

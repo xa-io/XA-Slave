@@ -131,7 +131,7 @@ public unsafe sealed class QuickReturnService : IDisposable
     {
         if (!enabled || agent == null || !clientState.IsLoggedIn)
         {
-            returnHook?.Original(agent);
+            returnHook?.OriginalDisposeSafe(agent);
             return;
         }
 
@@ -139,14 +139,14 @@ public unsafe sealed class QuickReturnService : IDisposable
         {
             if (clientState.IsPvPExcludingDen)
             {
-                returnHook?.Original(agent);
+                returnHook?.OriginalDisposeSafe(agent);
                 return;
             }
 
             var actionManager = ActionManager.Instance();
             if (actionManager == null || actionManager->GetActionStatus(ActionType.GeneralAction, ReturnGeneralActionId) != 0)
             {
-                returnHook?.Original(agent);
+                returnHook?.OriginalDisposeSafe(agent);
                 return;
             }
 
@@ -154,7 +154,7 @@ public unsafe sealed class QuickReturnService : IDisposable
 
             if (!GameMain.ExecuteCommand(InstantReturnCommandId))
             {
-                returnHook?.Original(agent);
+                returnHook?.OriginalDisposeSafe(agent);
                 return;
             }
 
@@ -166,7 +166,7 @@ public unsafe sealed class QuickReturnService : IDisposable
             log.Warning(ex, "[XASlave] Instant Return failed while intercepting Return.");
         }
 
-        returnHook?.Original(agent);
+        returnHook?.OriginalDisposeSafe(agent);
     }
 
     private void ExitPartyIfNeeded()

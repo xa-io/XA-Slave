@@ -18,12 +18,19 @@ public partial class SlaveWindow
     private string lastIpcResult = string.Empty;
     private DateTime lastIpcResultExpiry = DateTime.MinValue;
     private bool saveToXaDatabaseShowLog;
+    private DateTime saveToXaDatabaseStatusExpiry = DateTime.MinValue;
+    private bool cachedSaveToXaDatabaseReady;
+    private string cachedSaveToXaDatabaseVersion = string.Empty;
+    private DateTime? cachedCurrentCharacterLastSyncUtc;
+    private int saveToXaDatabaseStatusRefreshRunning;
 
     // -----------------------------------------------
     //  Task: Save to XA Database
     // -----------------------------------------------
     private void DrawSaveToXaDatabaseTask()
     {
+        RefreshSaveToXaDatabaseStatusCache();
+
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Save to XA Database");
         ImGui.TextDisabled("Collects data from game windows and saves to XA Database via IPC.");
         ImGui.Spacing();
@@ -31,11 +38,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Connection status --
-        var dbReady = plugin.IpcClient.IsReady();
-        var dbVersion = plugin.IpcClient.GetVersion();
-        if (dbReady)
+        if (cachedSaveToXaDatabaseReady)
         {
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"XA Database: Connected (v{dbVersion})");
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"XA Database: Connected (v{cachedSaveToXaDatabaseVersion})");
         }
         else
         {
@@ -138,9 +143,8 @@ public partial class SlaveWindow
 
         if (Plugin.PlayerState.IsLoaded)
         {
-            var lastSyncedUtc = plugin.GetCurrentCharacterLastSyncedToXaDbUtc();
-            ImGui.TextDisabled(lastSyncedUtc.HasValue
-                ? $"Last synced to XA DB: {lastSyncedUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss}"
+            ImGui.TextDisabled(cachedCurrentCharacterLastSyncUtc.HasValue
+                ? $"Last synced to XA DB: {cachedCurrentCharacterLastSyncUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss}"
                 : "Last synced to XA DB: Never");
             ImGui.Spacing();
         }
@@ -170,10 +174,10 @@ public partial class SlaveWindow
             var cadenceIndex = GetCheckEveryIndex(plugin.Configuration.AutoCollectCheckEveryHours);
             ImGui.SetNextItemWidth(Scale(180f));
             if (ImGui.SliderInt("Check Every##autoCollectEvery", ref cadenceIndex, 0, CheckEveryHourOptions.Length - 1,
-                    FormatCheckEveryHours(CheckEveryHourOptions[cadenceIndex])))
+                    FormatCheckEveryHours(CheckEveryHourOptions[cadenceIndex]), ImGuiSliderFlags.AlwaysClamp))
             {
                 plugin.Configuration.AutoCollectCheckEveryHours = CheckEveryHourOptions[cadenceIndex];
-                plugin.Configuration.Save();
+                plugin.Configuration.SaveDeferred();
             }
 
             ImGui.Spacing();
@@ -184,7 +188,7 @@ public partial class SlaveWindow
                 if (delay < 3f) delay = 3f;
                 if (delay > 30f) delay = 30f;
                 plugin.Configuration.AutoCollectDelaySeconds = delay;
-                plugin.Configuration.Save();
+                plugin.Configuration.SaveDeferred();
             }
             ImGui.TextDisabled("Wait time after login before starting collection.");
         }
@@ -201,6 +205,45 @@ public partial class SlaveWindow
         }
 
         DrawTaskLog("saveToXaDatabase", ref saveToXaDatabaseShowLog, plugin.AutoCollector);
+    }
+
+    private void RefreshSaveToXaDatabaseStatusCache()
+    {
+        if (DateTime.UtcNow < saveToXaDatabaseStatusExpiry)
+            return;
+        if (System.Threading.Interlocked.CompareExchange(ref saveToXaDatabaseStatusRefreshRunning, 1, 0) != 0)
+            return;
+
+        saveToXaDatabaseStatusExpiry = DateTime.UtcNow.AddSeconds(5);
+        var contentId = Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ContentId : 0;
+        if (!RunWorker("XA Database status refresh", async token =>
+        {
+            try
+            {
+                token.ThrowIfCancellationRequested();
+                var (ready, version) = await Plugin.RunOnGameThread(() =>
+                {
+                    var isReady = plugin.IpcClient.IsReady();
+                    return (isReady, isReady ? plugin.IpcClient.GetVersion() : string.Empty);
+                });
+                var lastSyncUtc = contentId == 0
+                    ? null
+                    : plugin.SlaveDatabase.GetLastSyncedToXaDbUtc(contentId);
+                await Plugin.RunOnGameThread(() =>
+                {
+                    cachedSaveToXaDatabaseReady = ready;
+                    cachedSaveToXaDatabaseVersion = version;
+                    cachedCurrentCharacterLastSyncUtc = lastSyncUtc;
+                });
+            }
+            finally
+            {
+                System.Threading.Interlocked.Exchange(ref saveToXaDatabaseStatusRefreshRunning, 0);
+            }
+        }))
+        {
+            System.Threading.Interlocked.Exchange(ref saveToXaDatabaseStatusRefreshRunning, 0);
+        }
     }
 
     // -----------------------------------------------

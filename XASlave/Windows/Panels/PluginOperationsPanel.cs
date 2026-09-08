@@ -47,13 +47,19 @@ public partial class SlaveWindow
     private string[] pluginOpsFavResHeightInputs = new string[MaxResolutionFavItems];
 
     private bool pluginOpsFavInputsInitialized;
+    private int pluginOpsFavConfigFingerprint;
 
     private void EnsurePluginOpsFavInputsInitialized()
     {
-        if (pluginOpsFavInputsInitialized) return;
-        pluginOpsFavInputsInitialized = true;
-
         var cfg = plugin.Configuration;
+        var fingerprint = GetPluginOpsFavConfigFingerprint(cfg);
+        if (pluginOpsFavInputsInitialized && fingerprint == pluginOpsFavConfigFingerprint)
+            return;
+        if (pluginOpsFavInputsInitialized && ImGui.IsAnyItemActive())
+            return;
+
+        pluginOpsFavInputsInitialized = true;
+        pluginOpsFavConfigFingerprint = fingerprint;
 
         pluginOpsFavCustomEnabled.Clear();
         pluginOpsFavCustomMenuInputs.Clear();
@@ -72,6 +78,24 @@ public partial class SlaveWindow
             pluginOpsFavResWidthInputs[i] = item != null ? item.Width.ToString() : "500";
             pluginOpsFavResHeightInputs[i] = item != null ? item.Height.ToString() : "345";
         }
+    }
+
+    private static int GetPluginOpsFavConfigFingerprint(Configuration cfg)
+    {
+        var hash = new HashCode();
+        foreach (var item in cfg.TitleBarFavCustomItems)
+        {
+            hash.Add(item.Enabled);
+            hash.Add(item.SelectionKey, StringComparer.Ordinal);
+            hash.Add(item.MenuTarget, StringComparer.Ordinal);
+        }
+        foreach (var item in cfg.TitleBarFavResolutionItems)
+        {
+            hash.Add(item.Enabled);
+            hash.Add(item.Width);
+            hash.Add(item.Height);
+        }
+        return hash.ToHashCode();
     }
 
     private static void FavRowLabel(string text)
@@ -130,7 +154,7 @@ public partial class SlaveWindow
         var cfg = plugin.Configuration;
 
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Plugin Operations");
-        ImGui.TextDisabled("Configure XA Slave startup window behavior.");
+        ImGui.TextDisabled("Configure XA Slave startup, logging, and window behavior.");
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -155,36 +179,37 @@ public partial class SlaveWindow
 
         ImGui.TextDisabled("Force-resizes the game window to a custom resolution when the plugin loads (same engine as XA Mods → Custom Resolutions).");
 
-        ImGui.BeginDisabled(!cfg.CustomResolutionOnLoadEnabled);
-        ImGui.Indent();
-
-        var customResWidth = cfg.CustomResolutionOnLoadWidth;
-        ImGui.SetNextItemWidth(Scale(160f));
-        if (ImGui.InputInt("Width##CustomResolutionOnLoadWidth", ref customResWidth))
+        using (ImRaii.Disabled(!cfg.CustomResolutionOnLoadEnabled))
         {
-            cfg.CustomResolutionOnLoadWidth = Math.Clamp(customResWidth, 250, 16384);
-            cfg.Save();
+            ImGui.Indent();
+
+            var customResWidth = cfg.CustomResolutionOnLoadWidth;
+            ImGui.SetNextItemWidth(Scale(160f));
+            if (ImGui.InputInt("Width##CustomResolutionOnLoadWidth", ref customResWidth))
+            {
+                cfg.CustomResolutionOnLoadWidth = Math.Clamp(customResWidth, 250, 16384);
+                cfg.Save();
+            }
+
+            var customResHeight = cfg.CustomResolutionOnLoadHeight;
+            ImGui.SetNextItemWidth(Scale(160f));
+            if (ImGui.InputInt("Height##CustomResolutionOnLoadHeight", ref customResHeight))
+            {
+                cfg.CustomResolutionOnLoadHeight = Math.Clamp(customResHeight, 200, 16384);
+                cfg.Save();
+            }
+
+            var customResIgnoreMin = cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize;
+            if (ImGui.Checkbox("Ignore Minimum Window Size##CustomResolutionOnLoad", ref customResIgnoreMin))
+            {
+                cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize = customResIgnoreMin;
+                cfg.Save();
+            }
+
+            ImGui.TextDisabled("Lowers the client minimum window size so resolutions below 1024x720 stick instead of snapping back. Recommended on for small resolutions.");
+
+            ImGui.Unindent();
         }
-
-        var customResHeight = cfg.CustomResolutionOnLoadHeight;
-        ImGui.SetNextItemWidth(Scale(160f));
-        if (ImGui.InputInt("Height##CustomResolutionOnLoadHeight", ref customResHeight))
-        {
-            cfg.CustomResolutionOnLoadHeight = Math.Clamp(customResHeight, 200, 16384);
-            cfg.Save();
-        }
-
-        var customResIgnoreMin = cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize;
-        if (ImGui.Checkbox("Ignore Minimum Window Size##CustomResolutionOnLoad", ref customResIgnoreMin))
-        {
-            cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize = customResIgnoreMin;
-            cfg.Save();
-        }
-
-        ImGui.TextDisabled("Lowers the client minimum window size so resolutions below 1024x720 stick instead of snapping back. Recommended on for small resolutions.");
-
-        ImGui.Unindent();
-        ImGui.EndDisabled();
 
         var showVersionInTitle = cfg.ShowVersionInUpdatesTitle;
         if (ImGui.Checkbox("Show Version in Window Title", ref showVersionInTitle))
@@ -206,6 +231,18 @@ public partial class SlaveWindow
         }
 
         ImGui.TextDisabled("Off: normal user-facing task logs. On: detailed step timing, relog wait state, and CharacterSafeWait diagnostics.");
+
+        ImGui.Spacing();
+
+        var messageLogEnabled = cfg.MessageLogEnabled;
+        if (ImGui.Checkbox("Log Chat, Messages and Emotes to /xllog", ref messageLogEnabled))
+        {
+            cfg.MessageLogEnabled = messageLogEnabled;
+            cfg.Save();
+        }
+
+        ImGui.TextWrapped("Writes delivered chat, system/error messages, and emotes to the Dalamud log, including sender names and private chat text.");
+        ImGui.TextDisabled("Off by default. Applies immediately and saves across reloads. Xagman error detection stays active.");
 
         ImGui.Spacing();
 
@@ -290,7 +327,8 @@ public partial class SlaveWindow
             var savedNames = plugin.GetSavedModListNames();
             var currentName = cfg.TitleBarFavModListName;
             ImGui.SetNextItemWidth(Scale(200f));
-            if (ImGui.BeginCombo("##favModListName", string.IsNullOrEmpty(currentName) ? "(pick list)" : currentName))
+            using (var imguiScope317 = ImRaii.Combo("##favModListName", string.IsNullOrEmpty(currentName) ? "(pick list)" : currentName))
+            if (imguiScope317)
             {
                 foreach (var name in savedNames)
                 {
@@ -303,7 +341,7 @@ public partial class SlaveWindow
                     }
                     if (sel) ImGui.SetItemDefaultFocus();
                 }
-                ImGui.EndCombo();
+
             }
         }
 
@@ -375,85 +413,87 @@ public partial class SlaveWindow
 
         for (var i = 0; i < pluginOpsFavCustomEnabled.Count; i++)
         {
-            ImGui.PushID($"favCustom{i}");
-
-            var en = pluginOpsFavCustomEnabled[i];
-            if (ImGui.Checkbox($"##en{i}", ref en))
+            using (ImRaii.PushId($"favCustom{i}"))
             {
-                pluginOpsFavCustomEnabled[i] = en;
-                changed = true;
-            }
-            ImGui.SameLine();
 
-            ImGui.SetNextItemWidth(Scale(220f));
-            var comboLabel = pluginOpsFavCustomMenuInputs[i].Length > 0
-                ? GetTitleBarFavSelectionLabel(pluginOpsFavCustomMenuInputs[i])
-                : "(none - click to pick)";
-            if (ImGui.BeginCombo($"##menu{i}", comboLabel))
-            {
-                var searchInput = pluginOpsFavCustomSearchInputs[i];
-                if (ImGui.IsWindowAppearing())
+                var en = pluginOpsFavCustomEnabled[i];
+                if (ImGui.Checkbox($"##en{i}", ref en))
                 {
-                    searchInput = string.Empty;
-                    ImGui.SetKeyboardFocusHere();
-                }
-
-                ImGui.SetNextItemWidth(-1f);
-                ImGui.InputTextWithHint($"##menuSearch{i}", "Search panels, mods, actions", ref searchInput, 128);
-                pluginOpsFavCustomSearchInputs[i] = searchInput;
-
-                ImGui.Separator();
-
-                if (ImGui.Selectable("(none)", string.IsNullOrEmpty(pluginOpsFavCustomMenuInputs[i])))
-                {
-                    pluginOpsFavCustomMenuInputs[i] = string.Empty;
-                    pluginOpsFavCustomSearchInputs[i] = string.Empty;
+                    pluginOpsFavCustomEnabled[i] = en;
                     changed = true;
                 }
+                ImGui.SameLine();
 
-                var lastCategory = string.Empty;
-                var matchesFound = false;
-                foreach (var option in selectionOptions)
+                ImGui.SetNextItemWidth(Scale(220f));
+                var comboLabel = pluginOpsFavCustomMenuInputs[i].Length > 0
+                    ? GetTitleBarFavSelectionLabel(pluginOpsFavCustomMenuInputs[i])
+                    : "(none - click to pick)";
+                using (var imguiScope416 = ImRaii.Combo($"##menu{i}", comboLabel))
+                if (imguiScope416)
                 {
-                    if (!MatchesTitleBarFavSelectionSearch(option, searchInput))
-                        continue;
-
-                    matchesFound = true;
-                    if (!option.Category.Equals(lastCategory, StringComparison.Ordinal))
+                    var searchInput = pluginOpsFavCustomSearchInputs[i];
+                    if (ImGui.IsWindowAppearing())
                     {
-                        if (lastCategory.Length > 0)
-                            ImGui.Spacing();
-
-                        ImGui.TextDisabled(option.Category);
-                        lastCategory = option.Category;
+                        searchInput = string.Empty;
+                        ImGui.SetKeyboardFocusHere();
                     }
 
-                    var selected = pluginOpsFavCustomMenuInputs[i].Equals(option.Key, StringComparison.OrdinalIgnoreCase);
-                    if (ImGui.Selectable(option.Label, selected))
+                    ImGui.SetNextItemWidth(-1f);
+                    ImGui.InputTextWithHint($"##menuSearch{i}", "Search panels, mods, actions", ref searchInput, 128);
+                    pluginOpsFavCustomSearchInputs[i] = searchInput;
+
+                    ImGui.Separator();
+
+                    if (ImGui.Selectable("(none)", string.IsNullOrEmpty(pluginOpsFavCustomMenuInputs[i])))
                     {
-                        pluginOpsFavCustomMenuInputs[i] = option.Key;
+                        pluginOpsFavCustomMenuInputs[i] = string.Empty;
                         pluginOpsFavCustomSearchInputs[i] = string.Empty;
                         changed = true;
                     }
-                    if (selected) ImGui.SetItemDefaultFocus();
+
+                    var lastCategory = string.Empty;
+                    var matchesFound = false;
+                    foreach (var option in selectionOptions)
+                    {
+                        if (!MatchesTitleBarFavSelectionSearch(option, searchInput))
+                            continue;
+
+                        matchesFound = true;
+                        if (!option.Category.Equals(lastCategory, StringComparison.Ordinal))
+                        {
+                            if (lastCategory.Length > 0)
+                                ImGui.Spacing();
+
+                            ImGui.TextDisabled(option.Category);
+                            lastCategory = option.Category;
+                        }
+
+                        var selected = pluginOpsFavCustomMenuInputs[i].Equals(option.Key, StringComparison.OrdinalIgnoreCase);
+                        if (ImGui.Selectable(option.Label, selected))
+                        {
+                            pluginOpsFavCustomMenuInputs[i] = option.Key;
+                            pluginOpsFavCustomSearchInputs[i] = string.Empty;
+                            changed = true;
+                        }
+                        if (selected) ImGui.SetItemDefaultFocus();
+                    }
+
+                    if (!matchesFound)
+                        ImGui.TextDisabled("No matches.");
+
+
                 }
 
-                if (!matchesFound)
-                    ImGui.TextDisabled("No matches.");
+                ImGui.SameLine();
+                if (ImGui.SmallButton($"x##remove{i}"))
+                {
+                    removedIndex = i;
+                }
 
-                ImGui.EndCombo();
+                ImGui.SameLine();
+                FavRowLabel($"[{GetCustomFavSlotLabel(i)}]");
+
             }
-
-            ImGui.SameLine();
-            if (ImGui.SmallButton($"x##remove{i}"))
-            {
-                removedIndex = i;
-            }
-
-            ImGui.SameLine();
-            FavRowLabel($"[{GetCustomFavSlotLabel(i)}]");
-
-            ImGui.PopID();
         }
 
         if (removedIndex >= 0)
@@ -477,40 +517,49 @@ public partial class SlaveWindow
 
         for (var i = 0; i < MaxResolutionFavItems; i++)
         {
-            ImGui.PushID($"favRes{i}");
-
-            var en = pluginOpsFavResEnabled[i];
-            if (ImGui.Checkbox($"##en{i}", ref en))
+            using (ImRaii.PushId($"favRes{i}"))
             {
-                pluginOpsFavResEnabled[i] = en;
-                changed = true;
+
+                var en = pluginOpsFavResEnabled[i];
+                if (ImGui.Checkbox($"##en{i}", ref en))
+                {
+                    pluginOpsFavResEnabled[i] = en;
+                    changed = true;
+                }
+                ImGui.SameLine();
+
+                ImGui.SetNextItemWidth(Scale(60f));
+                ImGui.InputText($"##resW{i}", ref pluginOpsFavResWidthInputs[i], 6);
+                if (ImGui.IsItemDeactivatedAfterEdit())
+                {
+                    pluginOpsFavResWidthInputs[i] = NormalizeResolutionInput(pluginOpsFavResWidthInputs[i], 250, 500);
+                    changed = true;
+                }
+
+                ImGui.SameLine();
+                ImGui.TextDisabled("x");
+                ImGui.SameLine();
+                ImGui.SetNextItemWidth(Scale(60f));
+                ImGui.InputText($"##resH{i}", ref pluginOpsFavResHeightInputs[i], 6);
+                if (ImGui.IsItemDeactivatedAfterEdit())
+                {
+                    pluginOpsFavResHeightInputs[i] = NormalizeResolutionInput(pluginOpsFavResHeightInputs[i], 200, 345);
+                    changed = true;
+                }
+
+                ImGui.SameLine();
+                if (ImGui.SmallButton($"x##clr{i}"))
+                {
+                    pluginOpsFavResEnabled[i] = false;
+                    pluginOpsFavResWidthInputs[i] = "500";
+                    pluginOpsFavResHeightInputs[i] = "345";
+                    changed = true;
+                }
+
+                ImGui.SameLine();
+                FavRowLabel($"[desktop]  {pluginOpsFavResWidthInputs[i]}x{pluginOpsFavResHeightInputs[i]}");
+
             }
-            ImGui.SameLine();
-
-            ImGui.SetNextItemWidth(Scale(60f));
-            if (ImGui.InputText($"##resW{i}", ref pluginOpsFavResWidthInputs[i], 6))
-                changed = true;
-
-            ImGui.SameLine();
-            ImGui.TextDisabled("x");
-            ImGui.SameLine();
-            ImGui.SetNextItemWidth(Scale(60f));
-            if (ImGui.InputText($"##resH{i}", ref pluginOpsFavResHeightInputs[i], 6))
-                changed = true;
-
-            ImGui.SameLine();
-            if (ImGui.SmallButton($"x##clr{i}"))
-            {
-                pluginOpsFavResEnabled[i] = false;
-                pluginOpsFavResWidthInputs[i] = "500";
-                pluginOpsFavResHeightInputs[i] = "345";
-                changed = true;
-            }
-
-            ImGui.SameLine();
-            FavRowLabel($"[desktop]  {pluginOpsFavResWidthInputs[i]}x{pluginOpsFavResHeightInputs[i]}");
-
-            ImGui.PopID();
         }
 
         if (changed)
@@ -532,7 +581,8 @@ public partial class SlaveWindow
             });
         }
 
-        cfg.Save();
+        pluginOpsFavConfigFingerprint = GetPluginOpsFavConfigFingerprint(cfg);
+        cfg.SaveDeferred();
         RebuildTitleBarFavButtons();
     }
 
@@ -541,10 +591,10 @@ public partial class SlaveWindow
         cfg.TitleBarFavResolutionItems.Clear();
         for (var i = 0; i < MaxResolutionFavItems; i++)
         {
-            if (!int.TryParse(pluginOpsFavResWidthInputs[i], out var w) || w <= 0)
-                w = 500;
-            if (!int.TryParse(pluginOpsFavResHeightInputs[i], out var h) || h <= 0)
-                h = 345;
+            pluginOpsFavResWidthInputs[i] = NormalizeResolutionInput(pluginOpsFavResWidthInputs[i], 250, 500);
+            pluginOpsFavResHeightInputs[i] = NormalizeResolutionInput(pluginOpsFavResHeightInputs[i], 200, 345);
+            var w = int.Parse(pluginOpsFavResWidthInputs[i]);
+            var h = int.Parse(pluginOpsFavResHeightInputs[i]);
 
             cfg.TitleBarFavResolutionItems.Add(new TitleBarFavResolutionItem
             {
@@ -554,7 +604,15 @@ public partial class SlaveWindow
             });
         }
 
-        cfg.Save();
+        pluginOpsFavConfigFingerprint = GetPluginOpsFavConfigFingerprint(cfg);
+        cfg.SaveDeferred();
         RebuildTitleBarFavButtons();
+    }
+
+    private static string NormalizeResolutionInput(string value, int minimum, int fallback)
+    {
+        if (!int.TryParse(value, out var parsed))
+            parsed = fallback;
+        return Math.Clamp(parsed, minimum, 16384).ToString();
     }
 }

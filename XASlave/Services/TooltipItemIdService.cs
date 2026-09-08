@@ -182,7 +182,7 @@ public unsafe sealed class TooltipItemIdService : IDisposable
             log.Warning(ex, "[XASlave] Show Item ID failed while generating an item tooltip.");
         }
 
-        return generateItemTooltipHook!.Original(addonItemDetail, numberArrayData, stringArrayData);
+        return generateItemTooltipHook!.OriginalDisposeSafe(addonItemDetail, numberArrayData, stringArrayData);
     }
 
     private void TryEnableMultilineOnVisibleItemDetail()

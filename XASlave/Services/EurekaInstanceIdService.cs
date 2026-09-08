@@ -54,8 +54,12 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     private const string RodneyName = "Rodney";
     private const int RodneyStopDistance = 4;
     private const int RetryThrottleMilliseconds = 1500;
+    private const int LeaveDutyMenuDelayMilliseconds = 1000;
+    private const int LeaveDutyConfirmDelayMilliseconds = 500;
+    private const int LeaveDutyRetryMilliseconds = 5000;
+    private const int CurrentInstanceResolveAttempts = 20;
+    private const int CurrentInstanceResolveIntervalMilliseconds = 200;
     private const int StableReadyMilliseconds = 1000;
-    private const int ContentsFinderMenuLeaveNodeIndex = 43;
     private const byte ContentsFinderMenuVirtualKey = 0x55;
 
     private static readonly EurekaZone[] OrderedZones =
@@ -77,6 +81,11 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
 
     private Hook<UIModule.Delegates.HandlePacket>? uiModuleHandlePacketHook;
     private IDtrBarEntry? dtrEntry;
+    private bool currentInstanceResolvePending;
+    private int currentInstanceResolveAttempt;
+    private long currentInstanceResolveNextTick;
+    private EurekaZone currentInstanceResolveZone;
+    private Action<bool, EurekaZone, int, string>? currentInstanceResolveCallback;
 
     private bool enabled;
     private bool subscribed;
@@ -88,6 +97,8 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     private long lastInteractionTick;
     private long readySinceTick;
     private long leaveDutyReadyAtTick;
+    private long leaveDutyRequestedAtTick;
+    private bool leaveDutyConfirmationSent;
     private string pendingLeaveReason = string.Empty;
     private string lastDtrText = string.Empty;
     private bool lastDtrShown;
@@ -284,6 +295,12 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         enabled = false;
         scannerRunning = false;
         displayRefreshPending = false;
+        if (currentInstanceResolvePending)
+        {
+            framework.Update -= OnCurrentInstanceResolvePoll;
+            currentInstanceResolvePending = false;
+            currentInstanceResolveCallback = null;
+        }
         ResetProgress(false);
         UpdateSubscription(false);
         uiModuleHandlePacketHook?.Dispose();
@@ -502,6 +519,8 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     {
         if (!condition[ConditionFlag.BoundByDuty])
         {
+            leaveDutyRequestedAtTick = 0;
+            leaveDutyConfirmationSent = false;
             ResetReadyHold();
             state = IsInKugane()
                 ? EurekaHopState.WaitingForCharacterSafe
@@ -522,26 +541,56 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
             state = EurekaHopState.LeavingDuty;
         }
 
-        if (!CanLeaveDutyNow())
+        var dutyMenuVisible = AddonHelper.IsAddonVisible("ContentsFinderMenu");
+        if (!CanLeaveDutyNow(completingLeave: dutyMenuVisible || leaveDutyRequestedAtTick != 0))
         {
             UpdateStatusText();
             return;
+        }
+
+        // Let our menu/confirmation progress even when that UI sets Occupied flags.
+        // Keep waiting across frames when the prompt takes longer than Debug's initial 500 ms.
+        if (leaveDutyRequestedAtTick != 0)
+        {
+            if (!leaveDutyConfirmationSent && AddonHelper.IsAddonVisible("SelectYesno"))
+            {
+                if (AddonHelper.IsAddonReady("SelectYesno")
+                    && now - lastInteractionTick >= LeaveDutyConfirmDelayMilliseconds)
+                    TryConfirmLeave(now);
+
+                UpdateStatusText();
+                return;
+            }
+
+            // A successful callback is not proof of departure. Wait for BoundByDuty to clear.
+            if (now - lastInteractionTick < LeaveDutyRetryMilliseconds)
+            {
+                UpdateStatusText();
+                return;
+            }
+
+            leaveDutyRequestedAtTick = 0;
+            leaveDutyConfirmationSent = false;
         }
 
         if (AddonHelper.IsAddonVisible("SelectYesno"))
         {
-            if (AddonHelper.IsAddonReady("SelectYesno") && now - lastInteractionTick >= RetryThrottleMilliseconds)
-                TryConfirmLeave(now);
+            // A dialog that preceded our Leave click belongs to another action.
+            UpdateStatusText();
+            return;
+        }
+
+        if (dutyMenuVisible)
+        {
+            if (AddonHelper.IsAddonReady("ContentsFinderMenu") && now - lastInteractionTick >= LeaveDutyMenuDelayMilliseconds)
+                TryClickLeave(now);
 
             UpdateStatusText();
             return;
         }
 
-        if (AddonHelper.IsAddonVisible("ContentsFinderMenu"))
+        if (!CanLeaveDutyNow())
         {
-            if (AddonHelper.IsAddonReady("ContentsFinderMenu") && now - lastInteractionTick >= RetryThrottleMilliseconds)
-                TryClickLeave(now);
-
             UpdateStatusText();
             return;
         }
@@ -865,26 +914,29 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     {
         zoneEvaluationPending = false;
         pendingLeaveReason = reason;
+        leaveDutyRequestedAtTick = 0;
+        leaveDutyConfirmationSent = false;
+        lastInteractionTick = 0;
         leaveDutyReadyAtTick = Environment.TickCount64 + (configuration.EurekaInstanceIdLeaveDutyDelaySeconds * 1000L);
         SetNextTargetZoneAfter(currentZone);
         state = EurekaHopState.WaitingForLeaveDutyDelay;
         ResetReadyHold();
     }
 
-    private bool CanLeaveDutyNow()
+    private bool CanLeaveDutyNow(bool completingLeave = false)
     {
         return !condition[ConditionFlag.InCombat]
             && !condition[ConditionFlag.BetweenAreas]
             && !condition[ConditionFlag.BetweenAreas51]
             && !condition[ConditionFlag.WatchingCutscene]
-            && !condition[ConditionFlag.Occupied]
-            && !condition[ConditionFlag.Occupied30]
-            && !condition[ConditionFlag.Occupied33]
-            && !condition[ConditionFlag.Occupied38]
-            && !condition[ConditionFlag.Occupied39]
-            && !condition[ConditionFlag.OccupiedInEvent]
-            && !condition[ConditionFlag.OccupiedInQuestEvent]
-            && !condition[ConditionFlag.OccupiedInCutSceneEvent];
+            && !condition[ConditionFlag.OccupiedInCutSceneEvent]
+            && (completingLeave || (!condition[ConditionFlag.Occupied]
+                && !condition[ConditionFlag.Occupied30]
+                && !condition[ConditionFlag.Occupied33]
+                && !condition[ConditionFlag.Occupied38]
+                && !condition[ConditionFlag.Occupied39]
+                && !condition[ConditionFlag.OccupiedInEvent]
+                && !condition[ConditionFlag.OccupiedInQuestEvent]));
     }
 
     private void TryOpenDutyMenu(long now)
@@ -904,10 +956,14 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     {
         try
         {
-            if (!AddonHelper.ClickAddonButton("ContentsFinderMenu", ContentsFinderMenuLeaveNodeIndex))
+            lastInteractionTick = now;
+            // Same Leave button helper and node as Debug > Player State Checker (D).
+            if (!AddonHelper.ClickAddonButton("ContentsFinderMenu", AddonNodes.ContentsFinderMenuLeave))
                 return;
 
-            lastInteractionTick = now;
+            leaveDutyRequestedAtTick = now;
+            leaveDutyConfirmationSent = false;
+            log.Information("[XASlave] Eureka Instance Hunter: clicked Leave, waiting for confirmation.");
         }
         catch (Exception ex)
         {
@@ -919,10 +975,16 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     {
         try
         {
-            if (!AddonHelper.ClickYesNo(true))
+            if (leaveDutyRequestedAtTick == 0 || leaveDutyConfirmationSent
+                || !AddonHelper.IsLeaveDutyConfirmationPrompt())
                 return;
 
             lastInteractionTick = now;
+            if (!AddonHelper.ClickYesNo(true))
+                return;
+
+            leaveDutyConfirmationSent = true;
+            log.Information("[XASlave] Eureka Instance Hunter: confirmed Leave Duty; waiting for duty exit.");
         }
         catch (Exception ex)
         {
@@ -954,6 +1016,8 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         lastInteractionTick = 0;
         readySinceTick = 0;
         leaveDutyReadyAtTick = 0;
+        leaveDutyRequestedAtTick = 0;
+        leaveDutyConfirmationSent = false;
         pendingLeaveReason = string.Empty;
         lastObservedInstanceId = 0;
         lastNewInstanceId = 0;
@@ -1262,7 +1326,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
                     return;
                 }
 
-                if (!CanLeaveDutyNow())
+                if (!CanLeaveDutyNow(completingLeave: AddonHelper.IsAddonVisible("ContentsFinderMenu") || leaveDutyRequestedAtTick != 0))
                 {
                     StatusText = string.IsNullOrWhiteSpace(pendingLeaveReason)
                         ? "Enabled - waiting for blockers to clear before leaving the current Eureka duty."
@@ -1270,11 +1334,23 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
                     return;
                 }
 
+                if (leaveDutyConfirmationSent)
+                {
+                    StatusText = "Enabled - waiting for the game to finish leaving Eureka.";
+                    return;
+                }
+
                 if (AddonHelper.IsAddonVisible("SelectYesno"))
                 {
-                    StatusText = AddonHelper.IsAddonReady("SelectYesno")
-                        ? "Enabled - confirming Leave Duty."
-                        : "Enabled - waiting for the Leave Duty confirmation.";
+                    StatusText = leaveDutyRequestedAtTick == 0 || !AddonHelper.IsLeaveDutyConfirmationPrompt()
+                        ? "Enabled - waiting for the current confirmation to close before leaving Eureka."
+                        : "Enabled - waiting to confirm Leave Duty.";
+                    return;
+                }
+
+                if (leaveDutyRequestedAtTick != 0)
+                {
+                    StatusText = "Enabled - waiting for the Leave Duty confirmation.";
                     return;
                 }
 
@@ -1340,26 +1416,8 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
             return false;
         }
 
-        const int maxRetries = 20;
-        const int retryDelayMs = 200;
-        var resolution = new EurekaInstanceResolution(0, "None", 0, 0, string.Empty);
-
-        for (var i = 0; i < maxRetries; i++)
-        {
-            if (condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
-            {
-                message = "Cannot read instance ID while loading. Wait for zone load to complete.";
-                return false;
-            }
-
-            resolution = ResolveCurrentInstanceResolution();
-            ApplyResolution(zone, resolution);
-            if (resolution.InstanceId != 0)
-                break;
-
-            if (i < maxRetries - 1)
-                System.Threading.Thread.Sleep(retryDelayMs);
-        }
+        var resolution = ResolveCurrentInstanceResolution();
+        ApplyResolution(zone, resolution);
 
         if (resolution.InstanceId == 0)
         {
@@ -1370,6 +1428,86 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         instanceId = NormalizeInstanceId((int)resolution.InstanceId);
         message = $"Captured {GetZoneLabel(zone)} instance {instanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}.";
         return true;
+    }
+
+    public bool RequestUseCurrentInstance(Action<bool, EurekaZone, int, string> onResolved, out string message)
+    {
+        if (currentInstanceResolvePending)
+        {
+            message = "An instance ID read is already pending.";
+            return false;
+        }
+
+        if (!TryResolveCurrentEurekaZone(out currentInstanceResolveZone))
+        {
+            message = "Current zone is not Anemos, Pagos, Pyros, or Hydatos.";
+            return false;
+        }
+
+        if (condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
+        {
+            message = "Cannot read instance ID while loading. Wait a moment and try again.";
+            return false;
+        }
+
+        currentInstanceResolvePending = true;
+        currentInstanceResolveAttempt = 0;
+        currentInstanceResolveNextTick = 0;
+        currentInstanceResolveCallback = onResolved;
+        framework.Update += OnCurrentInstanceResolvePoll;
+        message = $"Reading the current {GetZoneLabel(currentInstanceResolveZone)} instance ID across framework ticks...";
+        return true;
+    }
+
+    private void OnCurrentInstanceResolvePoll(IFramework _)
+    {
+        if (!currentInstanceResolvePending)
+        {
+            framework.Update -= OnCurrentInstanceResolvePoll;
+            return;
+        }
+
+        var now = Environment.TickCount64;
+        if (now < currentInstanceResolveNextTick)
+            return;
+
+        currentInstanceResolveNextTick = now + CurrentInstanceResolveIntervalMilliseconds;
+        if (condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
+        {
+            CompleteCurrentInstanceResolve(false, 0, "Cannot read instance ID while loading. Wait for zone load to complete.");
+            return;
+        }
+
+        var resolution = ResolveCurrentInstanceResolution();
+        ApplyResolution(currentInstanceResolveZone, resolution);
+        currentInstanceResolveAttempt++;
+        if (resolution.InstanceId != 0)
+        {
+            var instanceId = NormalizeInstanceId((int)resolution.InstanceId);
+            CompleteCurrentInstanceResolve(
+                true,
+                instanceId,
+                $"Captured {GetZoneLabel(currentInstanceResolveZone)} instance {instanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}.");
+            return;
+        }
+
+        if (currentInstanceResolveAttempt >= CurrentInstanceResolveAttempts)
+        {
+            CompleteCurrentInstanceResolve(
+                false,
+                0,
+                $"Could not read the current {GetZoneLabel(currentInstanceResolveZone)} instance ID. Last candidate snapshot: {resolution.Diagnostics}");
+        }
+    }
+
+    private void CompleteCurrentInstanceResolve(bool success, int instanceId, string message)
+    {
+        framework.Update -= OnCurrentInstanceResolvePoll;
+        currentInstanceResolvePending = false;
+        var callback = currentInstanceResolveCallback;
+        currentInstanceResolveCallback = null;
+        try { callback?.Invoke(success, currentInstanceResolveZone, instanceId, message); }
+        catch (Exception ex) { log.Warning(ex, "[XASlave] Eureka instance ID completion callback failed."); }
     }
 
     private ZoneInitSnapshot GetZoneInitSnapshot()
@@ -1385,28 +1523,35 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
 
     private void UIModuleHandlePacketDetour(UIModule* thisPtr, UIModulePacketType type, uint uintParam, void* packet)
     {
-        uiModuleHandlePacketHook!.Original(thisPtr, type, uintParam, packet);
+        uiModuleHandlePacketHook!.OriginalDisposeSafe(thisPtr, type, uintParam, packet);
 
         if (type != UIModulePacketType.ZoneInit || packet == null)
             return;
 
-        var zoneInitPacket = (ZoneInitPacket*)packet;
-        lock (gate)
+        try
         {
-            lastZoneInitSnapshot = new ZoneInitSnapshot(
-                HookActive: true,
-                HasCapturedPacket: true,
-                CapturedAtUtc: DateTime.UtcNow,
-                ServerId: zoneInitPacket->ServerId,
-                TerritoryTypeId: zoneInitPacket->TerritoryTypeId,
-                PacketInstance: zoneInitPacket->Instance,
-                ContentFinderConditionId: zoneInitPacket->ContentFinderConditionId,
-                PopRangeId: zoneInitPacket->PopRangeId,
-                Flags: zoneInitPacket->Flags);
-        }
+            var zoneInitPacket = (ZoneInitPacket*)packet;
+            lock (gate)
+            {
+                lastZoneInitSnapshot = new ZoneInitSnapshot(
+                    HookActive: true,
+                    HasCapturedPacket: true,
+                    CapturedAtUtc: DateTime.UtcNow,
+                    ServerId: zoneInitPacket->ServerId,
+                    TerritoryTypeId: zoneInitPacket->TerritoryTypeId,
+                    PacketInstance: zoneInitPacket->Instance,
+                    ContentFinderConditionId: zoneInitPacket->ContentFinderConditionId,
+                    PopRangeId: zoneInitPacket->PopRangeId,
+                    Flags: zoneInitPacket->Flags);
+            }
 
-        if (enabled && TryResolveEurekaZoneByTerritoryType(zoneInitPacket->TerritoryTypeId, out _))
-            displayRefreshPending = true;
+            if (enabled && TryResolveEurekaZoneByTerritoryType(zoneInitPacket->TerritoryTypeId, out _))
+                displayRefreshPending = true;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Eureka Instance ID packet detour failed after the original call.");
+        }
     }
 
     private EurekaInstanceResolution ResolveCurrentInstanceResolution()

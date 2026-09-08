@@ -308,7 +308,9 @@ public unsafe sealed class AutoDisplayIdsService : IDisposable
 
             for (var index = 0; index < addon->UldManager.NodeListCount; index++)
             {
-                var node = addon->UldManager.NodeList[index];
+                if (!NativeArrayAccess.TryGetNode(&addon->UldManager, index, out var node))
+                    continue;
+
                 if (TryAppendWeatherMarker(node, weatherName, CurrentWeatherId))
                 {
                     LastActionText = $"Last action: updated weather tooltip with weather ID {CurrentWeatherId} at {DateTime.Now:HH:mm:ss}.";
@@ -364,7 +366,9 @@ public unsafe sealed class AutoDisplayIdsService : IDisposable
 
         for (var index = 0; index < componentNode->Component->UldManager.NodeListCount; index++)
         {
-            var child = componentNode->Component->UldManager.NodeList[index];
+            if (!NativeArrayAccess.TryGetNode(&componentNode->Component->UldManager, index, out var child))
+                continue;
+
             if (TryAppendWeatherMarker(child, weatherName, weatherId, depth + 1))
                 return true;
         }

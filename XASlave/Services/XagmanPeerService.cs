@@ -1211,6 +1211,8 @@ public sealed class XagmanPeerService : IDisposable
             ActiveTradePartner = record.ActiveTradePartner,
             ActiveTradePartnerInstanceId = record.ActiveTradePartnerInstanceId,
             TonyRotationReady = record.TonyRotationReady,
+            StandbyRotationTonyCharacter = record.StandbyRotationTonyCharacter,
+            StandbyRotationTonyInstanceId = record.StandbyRotationTonyInstanceId,
             MainInventoryFreeSlots = record.MainInventoryFreeSlots,
             Gil = record.Gil,
             TonyGilMinimum = record.TonyGilMinimum,

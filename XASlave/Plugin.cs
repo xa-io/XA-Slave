@@ -6,6 +6,8 @@ using System.Linq;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
 using Dalamud.Game.Addon.Lifecycle;
 using Dalamud.Game.Agent;
 using Dalamud.Game.Command;
@@ -48,6 +50,97 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] public static IContextMenu ContextMenu { get; private set; } = null!;
     [PluginService] public static IChatGui ChatGui { get; private set; } = null!;
     [PluginService] public static INotificationManager NotificationManager { get; private set; } = null!;
+
+    /// <summary>
+    /// The single ingress gateway for synchronous game-state work. It executes
+    /// immediately when already on Framework.Update and otherwise schedules the
+    /// action for the next framework update.
+    /// </summary>
+    public static Task RunOnGameThread(
+        Action action,
+        [CallerMemberName] string operation = "")
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        return Framework.RunOnFrameworkThread(() =>
+        {
+            AssertGameThread(operation);
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"[XASlave] Game-thread action failed: {operation}");
+                throw;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Result-returning form of <see cref="RunOnGameThread(Action, string)"/>.
+    /// Async continuations must remain outside this gateway and explicitly
+    /// re-enter for each native/game-state operation.
+    /// </summary>
+    public static Task<T> RunOnGameThread<T>(
+        Func<T> function,
+        [CallerMemberName] string operation = "",
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(function);
+        return Framework.RunOnFrameworkThread(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            AssertGameThread(operation);
+            try
+            {
+                return function();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"[XASlave] Game-thread function failed: {operation}");
+                throw;
+            }
+        });
+    }
+
+    /// <summary>
+    /// Delayed form of the game-thread gateway. This is the only approved
+    /// scheduler for code that will touch game state after the current frame.
+    /// </summary>
+    public static void ScheduleOnGameThread(
+        Action action,
+        TimeSpan? delay = null,
+        int delayTicks = 0,
+        [CallerMemberName] string operation = "")
+    {
+        ArgumentNullException.ThrowIfNull(action);
+        void GuardedAction()
+        {
+            AssertGameThread(operation);
+            try
+            {
+                action();
+            }
+            catch (Exception ex)
+            {
+                Log.Error(ex, $"[XASlave] Scheduled game-thread action failed: {operation}");
+                throw;
+            }
+        }
+
+        if (delay.HasValue)
+            Framework.RunOnTick(GuardedAction, delay: delay.Value);
+        else
+            Framework.RunOnTick(GuardedAction, delayTicks: Math.Max(0, delayTicks));
+    }
+
+    [Conditional("DEBUG")]
+    public static void AssertGameThread([CallerMemberName] string operation = "")
+    {
+        Debug.Assert(
+            Framework.IsInFrameworkUpdateThread,
+            $"{operation} must run on Dalamud's framework update thread.");
+    }
 
     private const string CommandName = "/xa";
     private enum XAModsRestoreScope
@@ -101,6 +194,9 @@ public sealed class Plugin : IDalamudPlugin
     public static Plugin Instance { get; private set; } = null!;
     public string InstanceId { get; }
     public int ProcessId { get; }
+    internal int? LastClientStateLogoutType { get; private set; }
+    internal int? LastClientStateLogoutCode { get; private set; }
+    internal DateTime? LastClientStateLogoutAtUtc { get; private set; }
 
     public Configuration Configuration { get; init; }
 
@@ -114,6 +210,7 @@ public sealed class Plugin : IDalamudPlugin
 
     // Services
     public IpcClient IpcClient { get; init; }
+    internal MessageLogService MessageLog { get; init; }
     public DropboxQueueService DropboxQueue { get; init; }
     public IpcProvider IpcProvider { get; init; }
     public AutoCollectionService AutoCollector { get; init; }
@@ -182,6 +279,7 @@ public sealed class Plugin : IDalamudPlugin
     private UiFlags appliedSpecialRenderUiFlags;
     private bool hasAppliedSpecialRenderUiFlags;
     private bool isDisposed;
+    private bool xaModMutationPending;
     private readonly Queue<DeferredStartupAction> deferredStartupActions = new();
     private readonly Queue<PostLoadXAModActivation> postLoadXAModActivations = new();
     private readonly HashSet<string> pendingPostLoadXAModActivations = new(StringComparer.Ordinal);
@@ -203,43 +301,20 @@ public sealed class Plugin : IDalamudPlugin
 
     public Plugin()
     {
-        Instance = this;
         ProcessId = Process.GetCurrentProcess().Id;
         InstanceId = Guid.NewGuid().ToString("N");
 
+        try
+        {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         var livePullsWereEnabled = Configuration.IpcLivePullsEnabled;
         Configuration.IpcLivePullsEnabled = false;
         var protectedRiskyToonModsReset = Configuration.UnlockExpertDeliveryEnabled || Configuration.MoveableAfterDeathEnabled;
         Configuration.UnlockExpertDeliveryEnabled = false;
         Configuration.MoveableAfterDeathEnabled = false;
-        Configuration.InitializeFloorderDefaults();
-        var autoGlamDefaultsInitialized = Configuration.InitializeAutoGlamWeatherDefaults();
-        var showVersionInWindowTitleDefaultChanged = false;
-        if (!Configuration.ShowVersionInWindowTitleDefaultApplied)
-        {
-            Configuration.ShowVersionInUpdatesTitle = true;
-            Configuration.ShowVersionInWindowTitleDefaultApplied = true;
-            showVersionInWindowTitleDefaultChanged = true;
-        }
+        ConfigurationMigrations.Apply(Configuration, Log, ApplyLegacyConfigurationSchemaV1);
         var xagmanPreflightChanged = !Configuration.XagmanUsePreflightOnFirstCharacter;
         Configuration.XagmanUsePreflightOnFirstCharacter = true;
-        var xagmanItemsChanged = false;
-        var xagmanItemsMigrationChanged = false;
-        var characterListAnonymizeMigrationChanged = MigrateLegacyCharacterListAnonymizeState(Configuration);
-        var xaPeepSoundMigrationChanged = false;
-        var normalizedXAPeepSoundEffectId = XAPeepData.ClampSoundEffectId(Configuration.XAPeepSoundEffectId);
-        if (Configuration.XAPeepPlaySound && normalizedXAPeepSoundEffectId == 0)
-        {
-            normalizedXAPeepSoundEffectId = 2;
-            xaPeepSoundMigrationChanged = true;
-        }
-
-        if (Configuration.XAPeepSoundEffectId != normalizedXAPeepSoundEffectId)
-        {
-            Configuration.XAPeepSoundEffectId = normalizedXAPeepSoundEffectId;
-            xaPeepSoundMigrationChanged = true;
-        }
 
         var unlockExpertDeliveryRankFloorChanged = false;
         var normalizedUnlockExpertDeliveryRankFloor = ExpertDeliveryUnlockService.NormalizeForcedRankFloor(Configuration.UnlockExpertDeliveryForcedRankFloor);
@@ -249,30 +324,6 @@ public sealed class Plugin : IDalamudPlugin
             unlockExpertDeliveryRankFloorChanged = true;
         }
 
-        var titleBarFavCustomItemsMigrationChanged = false;
-        foreach (var item in Configuration.TitleBarFavCustomItems)
-        {
-            var normalizedSelectionKey = TitleBarFavSelectionKeys.Normalize(item.SelectionKey, item.MenuTarget);
-            if (string.Equals(item.SelectionKey, normalizedSelectionKey, StringComparison.Ordinal))
-                continue;
-
-            item.SelectionKey = normalizedSelectionKey;
-            titleBarFavCustomItemsMigrationChanged = true;
-        }
-        var eurekaInstanceIdMigrationChanged = MigrateLegacyEurekaInstanceIdState(Configuration);
-        var eurekaLogogramCreatorDefaultsChanged = ApplyEurekaLogogramCreatorDefaultSettings(Configuration);
-        if (!Configuration.XagmanSharedItemsMigrationComplete)
-        {
-            if (Configuration.XagmanItems.Count == 0 && (Configuration.XagmanTonyItems.Count > 0 || Configuration.XagmanFranchiseItems.Count > 0))
-            {
-                Configuration.XagmanItems = MergeXagmanItems(Configuration.XagmanTonyItems, Configuration.XagmanFranchiseItems);
-                xagmanItemsChanged = true;
-            }
-            Configuration.XagmanTonyItems.Clear();
-            Configuration.XagmanFranchiseItems.Clear();
-            Configuration.XagmanSharedItemsMigrationComplete = true;
-            xagmanItemsMigrationChanged = true;
-        }
         var normalizedXagmanHubAddress = XagmanPeerService.NormalizeHubAddress(Configuration.XagmanHubAddress);
         var xagmanHubAddressChanged = !string.Equals(Configuration.XagmanHubAddress, normalizedXagmanHubAddress, StringComparison.Ordinal);
         Configuration.XagmanHubAddress = normalizedXagmanHubAddress;
@@ -283,28 +334,19 @@ public sealed class Plugin : IDalamudPlugin
         Configuration.XagmanHubPort = normalizedXagmanHubPort;
         if (livePullsWereEnabled
             || protectedRiskyToonModsReset
-            || autoGlamDefaultsInitialized
-            || showVersionInWindowTitleDefaultChanged
             || xagmanPreflightChanged
-            || xagmanItemsChanged
-            || xagmanItemsMigrationChanged
-            || characterListAnonymizeMigrationChanged
-            || xaPeepSoundMigrationChanged
             || unlockExpertDeliveryRankFloorChanged
-            || titleBarFavCustomItemsMigrationChanged
-            || eurekaInstanceIdMigrationChanged
-            || eurekaLogogramCreatorDefaultsChanged
             || xagmanHubAddressChanged
             || xagmanHubPortChanged)
             Configuration.Save();
 
         IpcClient = new IpcClient(PluginInterface, Log);
+        MessageLog = new MessageLogService(ChatGui, Log, () => Configuration.MessageLogEnabled);
         DropboxQueue = new DropboxQueueService(PluginInterface, IpcClient, Log);
         SlaveDatabase = new SlaveDatabaseService(PluginInterface, Log);
         AutoCollector = new AutoCollectionService(this, Condition, Framework, ObjectTable, Log);
         TaskRunner = new TaskRunner(Condition, Framework, Log, DtrBar, ToastGui);
         ArConfigReader = new AutoRetainerConfigReader(PluginInterface, Log);
-        IpcProvider = new IpcProvider(PluginInterface, this, Log);
         ExternalTaskLoader = new ExternalTaskLoader(this, PluginInterface, Log);
         WindowRenamer = new WindowRenamerService(PluginInterface, Framework, Log, () => Configuration);
         AutoSkipCutscenes = new AutoSkipCutsceneService(Condition, Framework, ClientState, DataManager, PartyList, SigScanner, GameInterop, AgentLifecycle, Log);
@@ -1159,14 +1201,17 @@ public sealed class Plugin : IDalamudPlugin
             });
         }
 
+        // Register public IPC last: every gate can now safely dereference the complete service graph.
+        IpcProvider = new IpcProvider(PluginInterface, this, Log);
+
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, updates, db, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands.",
+            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, updates, db, dbsub, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands.",
             AllowedInMacros = true,
         });
 
         PluginInterface.UiBuilder.Draw += UpdateEurekaLogogramCreatorOverlayWindows;
-        PluginInterface.UiBuilder.Draw += WindowSystem.Draw;
+        PluginInterface.UiBuilder.Draw += DrawWindowSystemOnGameThread;
         PluginInterface.UiBuilder.Draw += BetterCompanyChest.DrawOverlay;
         PluginInterface.UiBuilder.Draw += AutoOpenMoogleMail.DrawOverlay;
         PluginInterface.UiBuilder.Draw += BetterCastBar.DrawOverlay;
@@ -1180,11 +1225,33 @@ public sealed class Plugin : IDalamudPlugin
 
         ScheduleDeferredStartupQueue();
         ScheduleExternalTaskLoad();
+        Instance = this;
+        }
+        catch (Exception ex)
+        {
+            Log.Error(ex, "[XASlave] Construction failed - rolling back partial initialisation.");
+            try
+            {
+                Dispose();
+            }
+            catch (Exception rollbackEx)
+            {
+                Log.Warning(rollbackEx, "[XASlave] Construction rollback encountered an unexpected failure.");
+            }
+            if (ReferenceEquals(Instance, this))
+                Instance = null!;
+            throw;
+        }
     }
 
     private void QueueDeferredStartupAction(Action action, [CallerLineNumber] int lineNumber = 0)
     {
         deferredStartupActions.Enqueue(new DeferredStartupAction(action, null, lineNumber));
+    }
+
+    private void DrawWindowSystemOnGameThread()
+    {
+        RunOnGameThread(WindowSystem.Draw).GetAwaiter().GetResult();
     }
 
     private void QueueDeferredStartupAction(string name, Action action, [CallerLineNumber] int lineNumber = 0)
@@ -1204,16 +1271,17 @@ public sealed class Plugin : IDalamudPlugin
             return;
 
         deferredStartupQueueScheduled = true;
-        Framework.RunOnTick(ProcessDeferredStartupQueue, delayTicks: 1);
+        ScheduleOnGameThread(ProcessDeferredStartupQueue, delayTicks: 1);
     }
 
     private void ScheduleExternalTaskLoad()
     {
-        Framework.RunOnTick(LoadExternalTasksAfterStartupDelay, delay: ExternalTaskLoadDelay);
+        ScheduleOnGameThread(LoadExternalTasksAfterStartupDelay, delay: ExternalTaskLoadDelay);
     }
 
     private void LoadExternalTasksAfterStartupDelay()
     {
+        AssertGameThread();
         if (isDisposed)
             return;
 
@@ -1331,7 +1399,7 @@ public sealed class Plugin : IDalamudPlugin
         while (postLoadXAModActivations.Count > 0)
         {
             var activation = postLoadXAModActivations.Dequeue();
-            Framework.RunOnTick(() => ProcessPostLoadXAModActivation(activation), delay: activation.Delay);
+            ScheduleOnGameThread(() => ProcessPostLoadXAModActivation(activation), delay: activation.Delay);
         }
 
         Log.Information($"[XASlave] Scheduled post-load XA Mod activation phase for {scheduledActivations.Length} enabled mod(s): {string.Join(", ", scheduledActivations.Select(activation => activation.DisplayName))}.");
@@ -1377,7 +1445,7 @@ public sealed class Plugin : IDalamudPlugin
             return;
 
         postLoadXAModActivationCompletionCheckScheduled = true;
-        Framework.RunOnTick(CheckPostLoadXAModActivationCompletion, delayTicks: 1);
+        ScheduleOnGameThread(CheckPostLoadXAModActivationCompletion, delayTicks: 1);
     }
 
     private void CheckPostLoadXAModActivationCompletion()
@@ -1608,10 +1676,12 @@ public sealed class Plugin : IDalamudPlugin
             return;
 
         isDisposed = true;
+        TryCleanup("Configuration.FlushPendingSave", () => Configuration?.FlushPendingSave());
 
         // Detach public-facing callbacks first so a reload cannot re-enter partially disposed UI or services.
+        TryCleanup("AutoRetainerUiReflectionService.Dispose", AutoRetainerUiReflectionService.Dispose);
         TryCleanup("UiBuilder.Draw -= UpdateEurekaLogogramCreatorOverlayWindows", () => PluginInterface.UiBuilder.Draw -= UpdateEurekaLogogramCreatorOverlayWindows);
-        TryCleanup("UiBuilder.Draw -= WindowSystem.Draw", () => PluginInterface.UiBuilder.Draw -= WindowSystem.Draw);
+        TryCleanup("UiBuilder.Draw -= DrawWindowSystemOnGameThread", () => PluginInterface.UiBuilder.Draw -= DrawWindowSystemOnGameThread);
         TryCleanup("UiBuilder.Draw -= BetterCompanyChest.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterCompanyChest.DrawOverlay);
         TryCleanup("UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay);
         TryCleanup("UiBuilder.Draw -= BetterCastBar.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterCastBar.DrawOverlay);
@@ -1622,7 +1692,9 @@ public sealed class Plugin : IDalamudPlugin
         TryCleanup("ClientState.Login -= OnLogin", () => ClientState.Login -= OnLogin);
         TryCleanup("ClientState.Logout -= OnLogout", () => ClientState.Logout -= OnLogout);
         TryCleanup($"CommandManager.RemoveHandler({CommandName})", () => CommandManager.RemoveHandler(CommandName));
-        TryCleanup("WindowSystem.RemoveAllWindows", WindowSystem.RemoveAllWindows);
+        TryDispose("IpcProvider", IpcProvider);
+        TryDispose("MessageLog", MessageLog);
+        TryCleanup("WindowSystem.RemoveAllWindows", () => WindowSystem?.RemoveAllWindows());
         TryCleanup("RestoreSpecialRenderModes", () =>
         {
             if (hasAppliedSpecialRenderUiFlags)
@@ -1630,7 +1702,7 @@ public sealed class Plugin : IDalamudPlugin
         });
 
         TryDispose("SlaveWindow", SlaveWindow);
-        TryCleanup("XagmanPeers.Stop", XagmanPeers.Stop);
+        TryCleanup("XagmanPeers.Stop", () => XagmanPeers?.Stop());
         TryDispose("TaskRunner", TaskRunner);
         TryDispose("AutoCollector", AutoCollector);
 
@@ -1690,10 +1762,11 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("TeleportHelper", TeleportHelper);
         TryDispose("ArPostProcessor", ArPostProcessor);
         TryDispose("WindowRenamer", WindowRenamer);
-        TryDispose("IpcProvider", IpcProvider);
         TryDispose("ExternalTaskLoader", ExternalTaskLoader);
         TryDispose("XagmanPeers", XagmanPeers);
         TryDispose("SlaveDatabase", SlaveDatabase);
+        if (ReferenceEquals(Instance, this))
+            Instance = null!;
     }
 
     private void TryDispose(string label, IDisposable? disposable)
@@ -1712,7 +1785,8 @@ public sealed class Plugin : IDalamudPlugin
         }
         catch (Exception ex)
         {
-            Log.Warning($"[XASlave] Dispose cleanup failed for {label}: {ex}");
+            if (Log != null)
+                Log.Warning($"[XASlave] Dispose cleanup failed for {label}: {ex}");
         }
     }
 
@@ -1775,6 +1849,10 @@ public sealed class Plugin : IDalamudPlugin
 
     private void OnLogout(int type, int code)
     {
+        LastClientStateLogoutType = type;
+        LastClientStateLogoutCode = code;
+        LastClientStateLogoutAtUtc = DateTime.UtcNow;
+
         SlaveWindow.CancelScheduledAutoCollection(true);
         var contentId = PlayerState.ContentId;
         var characterName = PlayerState.CharacterName.ToString();
@@ -1883,6 +1961,12 @@ public sealed class Plugin : IDalamudPlugin
         if (subcommand.Equals("db", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(DropboxQueue.TryExecute(subcommandArgs, out var message), message);
+            return;
+        }
+
+        if (subcommand.Equals("dbsub", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(DropboxQueue.TryQueueSublootValue(subcommandArgs, out var message), message);
             return;
         }
 
@@ -2043,8 +2127,9 @@ public sealed class Plugin : IDalamudPlugin
         var trimmed = NormalizeXaCommandInput(rawCommand);
         if (string.IsNullOrEmpty(trimmed))
         {
-            message = "Usage: pass the same text you would enter after /xa, for example `commands`, `mods`, `db clear`, `logout`, `killgame`, `sprint on`, or `res 500x345`.";
-            return false;
+            SlaveWindow.Toggle();
+            message = "Toggled XA Slave.";
+            return true;
         }
 
         var firstSpaceIndex = trimmed.IndexOf(' ');
@@ -2071,6 +2156,13 @@ public sealed class Plugin : IDalamudPlugin
         if (subcommand.Equals("debug", StringComparison.OrdinalIgnoreCase))
             return SlaveWindow.ToggleDebugMenu(out message);
 
+        if (subcommand.Equals("updates", StringComparison.OrdinalIgnoreCase))
+        {
+            UpdatesWindow.Toggle();
+            message = "Toggled XA Slave version history.";
+            return true;
+        }
+
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
             return TryHandleXAPeepCommand(subcommandArgs, out message);
 
@@ -2079,6 +2171,9 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("db", StringComparison.OrdinalIgnoreCase))
             return DropboxQueue.TryExecute(subcommandArgs, out message);
+
+        if (subcommand.Equals("dbsub", StringComparison.OrdinalIgnoreCase))
+            return DropboxQueue.TryQueueSublootValue(subcommandArgs, out message);
 
         if (subcommand.Equals("sit", StringComparison.OrdinalIgnoreCase))
         {
@@ -2194,17 +2289,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private static bool TryParseResolutionCommand(string value, out int width, out int height)
     {
-        width = 0;
-        height = 0;
-        if (string.IsNullOrWhiteSpace(value))
-            return false;
-
-        var parts = value.Split(['x', 'X'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-        if (parts.Length != 2)
-            return false;
-
-        return int.TryParse(parts[0], out width)
-            && int.TryParse(parts[1], out height);
+        return ResolutionCommandParser.TryParseDimensions(value, out width, out height);
     }
 
     private bool TryApplyLowResolutionCommand(string value, out string message)
@@ -2449,13 +2534,54 @@ public sealed class Plugin : IDalamudPlugin
         return snapshots;
     }
 
+    internal bool IsKnownXAModKey(string key)
+        => !string.IsNullOrWhiteSpace(key)
+            && GetAllXAModDefinitions().Any(definition => definition.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+
+    internal bool ApplySavedXAModsPreset(
+        string title,
+        IEnumerable<string> modKeys,
+        IReadOnlyDictionary<string, JsonElement>? modSettings,
+        Action<bool, string>? onCompleted,
+        out string message)
+        => QueueXAModsPreset(title, modKeys, modSettings, onCompleted, out message);
+
     internal bool ApplySavedXAModsPreset(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
-        => ApplyXAModsPreset(title, modKeys, modSettings, out message);
+        => QueueXAModsPreset(title, modKeys, modSettings, null, out message);
 
     private bool ApplyXAModsPreset(string title, IEnumerable<string> modKeys, out string message)
-        => ApplyXAModsPreset(title, modKeys, null, out message);
+        => QueueXAModsPreset(title, modKeys, null, null, out message);
 
     private bool ApplyXAModsPreset(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
+        => QueueXAModsPreset(title, modKeys, modSettings, null, out message);
+
+    private bool QueueXAModsPreset(
+        string title,
+        IEnumerable<string> modKeys,
+        IReadOnlyDictionary<string, JsonElement>? modSettings,
+        Action<bool, string>? onCompleted,
+        out string message)
+    {
+        var capturedKeys = modKeys
+            .Where(key => !string.IsNullOrWhiteSpace(key))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
+        var capturedSettings = modSettings == null
+            ? null
+            : new Dictionary<string, JsonElement>(modSettings, StringComparer.OrdinalIgnoreCase);
+
+        return QueueXAModMutation(
+            $"load preset '{title}'",
+            () =>
+            {
+                var success = ApplyXAModsPresetNow(title, capturedKeys, capturedSettings, out var resultMessage);
+                return (success, resultMessage);
+            },
+            onCompleted,
+            out message);
+    }
+
+    private bool ApplyXAModsPresetNow(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
     {
         var requestedKeys = modKeys
             .Where(key => !string.IsNullOrWhiteSpace(key))
@@ -2463,13 +2589,14 @@ public sealed class Plugin : IDalamudPlugin
             .ToList();
         var definitionsByKey = GetAllXAModDefinitions().ToDictionary(entry => entry.Key, StringComparer.OrdinalIgnoreCase);
 
-        DisableXAModDefinitions(definitionsByKey.Values);
+        var disableResult = DisableXAModDefinitions(definitionsByKey.Values);
 
         if (requestedKeys.Count == 0)
         {
-            Configuration.Save();
-            message = $"Loaded XA Mods preset '{title}' with all mods disabled.";
-            return true;
+            message = disableResult.Failures == 0
+                ? $"Loaded XA Mods preset '{title}' with all mods disabled."
+                : $"Loaded XA Mods preset '{title}', but {disableResult.Failures} mod teardown(s) failed; see the log.";
+            return disableResult.Failures == 0;
         }
 
         var appliedCount = 0;
@@ -2484,20 +2611,33 @@ public sealed class Plugin : IDalamudPlugin
                 continue;
             }
 
-            var applied = definition.Apply(true);
-            definition.Store(applied);
-            if (applied)
-                appliedCount++;
-            else
+            if (definition.Scope == XAModsRestoreScope.Illegal)
+            {
                 unavailableCount++;
+                continue;
+            }
+
+            try
+            {
+                var applied = definition.Apply(true);
+                definition.Store(applied);
+                if (applied)
+                    appliedCount++;
+                else
+                    unavailableCount++;
+            }
+            catch (Exception ex)
+            {
+                unavailableCount++;
+                Log.Error(ex, $"[XASlave] Enabling XA Mod '{definition.Key}' from preset '{title}' failed.");
+            }
         }
 
         ApplyImportedXAModSettings(modSettings);
-        Configuration.Save();
-        message = unknownCount > 0 || unavailableCount > 0
-            ? $"Loaded XA Mods preset '{title}' ({appliedCount} applied, {unavailableCount} unavailable, {unknownCount} unknown)."
+        message = unknownCount > 0 || unavailableCount > 0 || disableResult.Failures > 0
+            ? $"Loaded XA Mods preset '{title}' ({appliedCount} applied, {unavailableCount} unavailable, {unknownCount} unknown, {disableResult.Failures} teardown failures)."
             : $"Loaded XA Mods preset '{title}' ({appliedCount} mod(s)).";
-        return unknownCount == 0 && unavailableCount == 0;
+        return unknownCount == 0 && unavailableCount == 0 && disableResult.Failures == 0;
     }
 
     private bool TryCreateXAModSettingsSnapshot(string key, out JsonElement snapshot)
@@ -3436,9 +3576,12 @@ public sealed class Plugin : IDalamudPlugin
     {
         if (string.IsNullOrWhiteSpace(value))
         {
-            message = "Usage: /xa res <width>x<height>, /xa res add <width>x<height>, or /xa res remove <width>x<height>.";
+            message = "Usage: /xa res <width>x<height>, /xa res <width> <height>, /xa res reset, /xa res add <width>x<height>, or /xa res remove <width>x<height>.";
             return false;
         }
+
+        if (value.Trim().Equals("reset", StringComparison.OrdinalIgnoreCase))
+            return SystemWindowMods.TryResetCustomResolution(out message);
 
         if (value.StartsWith("add ", StringComparison.OrdinalIgnoreCase))
             return TryAddCustomResolutionPreset(value[4..].Trim(), out message);
@@ -3448,7 +3591,7 @@ public sealed class Plugin : IDalamudPlugin
 
         if (!TryParseResolutionCommand(value, out var width, out var height))
         {
-            message = "Usage: /xa res <width>x<height>, /xa res add <width>x<height>, or /xa res remove <width>x<height>.";
+            message = "Usage: /xa res <width>x<height>, /xa res <width> <height>, /xa res reset, /xa res add <width>x<height>, or /xa res remove <width>x<height>.";
             return false;
         }
 
@@ -3545,6 +3688,59 @@ public sealed class Plugin : IDalamudPlugin
             ChatGui.Print($"[XASlave] {message}");
         else
             ChatGui.PrintError($"[XASlave] {message}");
+    }
+
+    /// <summary>
+    /// Ordered schema-v1 migration for the one-time flags and ad-hoc constructor migrations that
+    /// predated <see cref="Configuration.Version"/>. This method must not persist independently;
+    /// <see cref="ConfigurationMigrations"/> records the step only after all mutations succeed.
+    /// </summary>
+    private static void ApplyLegacyConfigurationSchemaV1(Configuration configuration)
+    {
+        configuration.InitializeFloorderDefaults();
+        configuration.InitializeAutoGlamWeatherDefaults();
+
+        if (!configuration.ShowVersionInWindowTitleDefaultApplied)
+        {
+            configuration.ShowVersionInUpdatesTitle = true;
+            configuration.ShowVersionInWindowTitleDefaultApplied = true;
+        }
+
+        MigrateLegacyCharacterListAnonymizeState(configuration);
+
+        var normalizedXAPeepSoundEffectId = XAPeepData.ClampSoundEffectId(configuration.XAPeepSoundEffectId);
+        if (configuration.XAPeepPlaySound && normalizedXAPeepSoundEffectId == 0)
+            normalizedXAPeepSoundEffectId = 2;
+        configuration.XAPeepSoundEffectId = normalizedXAPeepSoundEffectId;
+
+        configuration.TitleBarFavCustomItems ??= new List<TitleBarFavCustomItem>();
+        foreach (var item in configuration.TitleBarFavCustomItems)
+        {
+            if (item == null)
+                continue;
+            item.SelectionKey = TitleBarFavSelectionKeys.Normalize(item.SelectionKey, item.MenuTarget);
+        }
+
+        MigrateLegacyEurekaInstanceIdState(configuration);
+        ApplyEurekaLogogramCreatorDefaultSettings(configuration);
+
+        configuration.XagmanItems ??= new List<XagmanItemEntry>();
+        configuration.XagmanTonyItems ??= new List<XagmanItemEntry>();
+        configuration.XagmanFranchiseItems ??= new List<XagmanItemEntry>();
+        if (!configuration.XagmanSharedItemsMigrationComplete)
+        {
+            if (configuration.XagmanItems.Count == 0
+                && (configuration.XagmanTonyItems.Count > 0 || configuration.XagmanFranchiseItems.Count > 0))
+            {
+                configuration.XagmanItems = MergeXagmanItems(
+                    configuration.XagmanTonyItems,
+                    configuration.XagmanFranchiseItems);
+            }
+
+            configuration.XagmanTonyItems.Clear();
+            configuration.XagmanFranchiseItems.Clear();
+            configuration.XagmanSharedItemsMigrationComplete = true;
+        }
     }
 
     private static bool MigrateLegacyCharacterListAnonymizeState(Configuration configuration)
@@ -4016,8 +4212,45 @@ public sealed class Plugin : IDalamudPlugin
 
     public void DisableAllXAMods()
     {
-        DisableXAModDefinitions(GetAllXAModDefinitions());
-        Configuration.Save();
+        if (!QueueDisableAllXAMods(null, out var message))
+            Log.Warning($"[XASlave] {message}");
+    }
+
+    internal bool QueueDisableAllXAMods(Action<bool, string>? onCompleted, out string message)
+    {
+        return QueueXAModMutation(
+            "disable all XA Mods",
+            () =>
+            {
+                var definitions = GetAllXAModDefinitions().ToArray();
+                var result = DisableXAModDefinitions(definitions);
+                var resultMessage = result.Failures == 0
+                    ? $"Disabled {result.DisabledCount} enabled XA Mod toggle(s) across {definitions.Length} definitions."
+                    : $"Disabled {result.DisabledCount} enabled XA Mod toggle(s); {result.Failures} of {definitions.Length} teardown(s) failed - see the log.";
+                return (result.Failures == 0, resultMessage);
+            },
+            onCompleted,
+            out message);
+    }
+
+    internal bool QueueXAModToggle(
+        string label,
+        bool enabled,
+        Func<bool, bool> apply,
+        Action<bool> store,
+        Action<bool, string>? onCompleted,
+        out string message)
+    {
+        return QueueXAModMutation(
+            $"set XA Mod '{label}' {(enabled ? "on" : "off")}",
+            () =>
+            {
+                var applied = apply(enabled);
+                store(applied);
+                return (applied == enabled, $"XA Mod '{label}' is {(applied ? "enabled" : "disabled")}.");
+            },
+            onCompleted,
+            out message);
     }
 
     public bool LoadModListPreset(string name, out string message)
@@ -4195,38 +4428,160 @@ public sealed class Plugin : IDalamudPlugin
 
     private bool RestoreAllXAMods(out string message)
     {
-        var disabledCount = DisableXAModDefinitions(GetAllXAModDefinitions());
-        Configuration.Save();
-        message = disabledCount > 0
-            ? $"Disabled {disabledCount} XA Mods toggle(s)."
-            : "XA Mods were already off.";
-        return true;
+        return QueueXAModMutation(
+            "restore all XA Mods",
+            () =>
+            {
+                var result = DisableXAModDefinitions(GetAllXAModDefinitions());
+                var resultMessage = result.Failures > 0
+                    ? $"Disabled {result.DisabledCount} XA Mods toggle(s); {result.Failures} teardown(s) failed."
+                    : result.DisabledCount > 0
+                        ? $"Disabled {result.DisabledCount} XA Mods toggle(s)."
+                        : "XA Mods were already off.";
+                return (result.Failures == 0, resultMessage);
+            },
+            null,
+            out message);
     }
 
     private bool RestoreXAModsSection(XAModsRestoreScope scope, out string message)
     {
-        var disabledCount = DisableXAModDefinitions(GetAllXAModDefinitions().Where(definition => definition.Scope == scope));
-        Configuration.Save();
-        message = disabledCount > 0
-            ? $"Disabled {disabledCount} {GetXAModsRestoreScopeLabel(scope)} toggle(s)."
-            : $"{GetXAModsRestoreScopeLabel(scope)} were already off.";
+        var scopeLabel = GetXAModsRestoreScopeLabel(scope);
+        return QueueXAModMutation(
+            $"restore XA Mods section '{scopeLabel}'",
+            () =>
+            {
+                var result = DisableXAModDefinitions(GetAllXAModDefinitions().Where(definition => definition.Scope == scope));
+                var resultMessage = result.Failures > 0
+                    ? $"Disabled {result.DisabledCount} {scopeLabel} toggle(s); {result.Failures} teardown(s) failed."
+                    : result.DisabledCount > 0
+                        ? $"Disabled {result.DisabledCount} {scopeLabel} toggle(s)."
+                        : $"{scopeLabel} were already off.";
+                return (result.Failures == 0, resultMessage);
+            },
+            null,
+            out message);
+    }
+
+    private XAModDisableResult DisableXAModDefinitions(IEnumerable<XAModCommandDefinition> definitions)
+    {
+        var disabledCount = 0;
+        var failures = 0;
+        foreach (var definition in definitions)
+        {
+            var wasEnabled = false;
+            try
+            {
+                wasEnabled = definition.GetCurrent();
+            }
+            catch (Exception ex)
+            {
+                Log.Warning(ex, $"[XASlave] Reading XA Mod '{definition.Key}' state before teardown failed; teardown will still be attempted.");
+            }
+
+            try
+            {
+                var applied = definition.Apply(false);
+                definition.Store(applied);
+                if (wasEnabled && !applied)
+                    disabledCount++;
+            }
+            catch (Exception ex)
+            {
+                failures++;
+                Log.Error(ex, $"[XASlave] Disabling XA Mod '{definition.Key}' failed; continuing with the remaining definitions.");
+            }
+        }
+
+        return new XAModDisableResult(disabledCount, failures);
+    }
+
+    private bool QueueXAModMutation(
+        string operationLabel,
+        Func<(bool Success, string Message)> operation,
+        Action<bool, string>? onCompleted,
+        out string message)
+    {
+        if (isDisposed)
+        {
+            message = $"Could not {operationLabel}: XA Slave is disposing.";
+            return false;
+        }
+
+        if (xaModMutationPending)
+        {
+            message = $"Could not {operationLabel}: another XA Mods change is already queued or running.";
+            return false;
+        }
+
+        xaModMutationPending = true;
+        try
+        {
+            ScheduleOnGameThread(() =>
+            {
+                if (isDisposed)
+                {
+                    xaModMutationPending = false;
+                    return;
+                }
+
+                var success = false;
+                var resultMessage = string.Empty;
+                try
+                {
+                    (success, resultMessage) = operation();
+                }
+                catch (Exception ex)
+                {
+                    resultMessage = $"XA Mods operation '{operationLabel}' failed: {ex.Message}";
+                    Log.Error(ex, $"[XASlave] XA Mods operation '{operationLabel}' failed.");
+                }
+
+                try
+                {
+                    Configuration.Save();
+                }
+                catch (Exception ex)
+                {
+                    success = false;
+                    resultMessage = string.IsNullOrWhiteSpace(resultMessage)
+                        ? $"XA Mods operation '{operationLabel}' completed, but configuration persistence failed: {ex.Message}"
+                        : $"{resultMessage} Configuration persistence failed: {ex.Message}";
+                    Log.Error(ex, $"[XASlave] Saving configuration after XA Mods operation '{operationLabel}' failed.");
+                }
+                finally
+                {
+                    xaModMutationPending = false;
+                }
+
+                if (success)
+                    Log.Information($"[XASlave] {resultMessage}");
+                else
+                    Log.Warning($"[XASlave] {resultMessage}");
+
+                try
+                {
+                    onCompleted?.Invoke(success, resultMessage);
+                }
+                catch (Exception ex)
+                {
+                    Log.Error(ex, $"[XASlave] XA Mods completion callback for '{operationLabel}' failed.");
+                }
+            }, delayTicks: 1);
+        }
+        catch (Exception ex)
+        {
+            xaModMutationPending = false;
+            message = $"Could not queue XA Mods operation '{operationLabel}': {ex.Message}";
+            Log.Error(ex, $"[XASlave] Queuing XA Mods operation '{operationLabel}' failed.");
+            return false;
+        }
+
+        message = $"Queued XA Mods operation: {operationLabel}.";
         return true;
     }
 
-    private static int DisableXAModDefinitions(IEnumerable<XAModCommandDefinition> definitions)
-    {
-        var disabledCount = 0;
-        foreach (var definition in definitions)
-        {
-            if (definition.GetCurrent())
-                disabledCount++;
-
-            definition.Apply(false);
-            definition.Store(false);
-        }
-
-        return disabledCount;
-    }
+    private readonly record struct XAModDisableResult(int DisabledCount, int Failures);
 
     private bool TryHandleXAPeepCommand(string args, out string message)
     {
@@ -5012,5 +5367,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.43";
+    public const string Version = "0.0.0.44";
 }

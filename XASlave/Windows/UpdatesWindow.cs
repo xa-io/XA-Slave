@@ -23,6 +23,66 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.44 - 2026-09-08",
+            Lines =
+            [
+                "Dropbox Queue / Treasure",
+                "- `/xa dbsub <gil>` queues the lowest reachable treasure value at or above the target. Shortages queue all available treasure and report the missing amount; empty inventory does not start a trade.",
+                "- Treasure selection uses local NQ and HQ subaquatic salvage. Results show queue entries, item count, selected value, and any overflow or shortfall.",
+                "- Gil targets accept plain numbers, commas, or underscores. Invalid, zero, and negative targets show usage without changing the queue.",
+                "- Negative `/xa db` quantities queue local stock above the requested reserve. For example, `/xa db 1234:-500` queues stock above 500. NQ and HQ stock are combined, with NQ queued first; a reserve at or above local stock queues nothing. Positive and negative quantities can be mixed.",
+                "- Queue entries remain additive. A negative quantity assumes that item was not already queued. A current player target can start trading automatically; otherwise the queue waits for `/xa db begin`.",
+                "",
+                "Commands / Window Compatibility",
+                "- `XASlave.ExecuteCommand` now supports the full `/xa` command surface with accurate `OK:` or `ERROR:` results, including opening the main window, Update History, and treasure queueing.",
+                "- `/xa res` accepts spaced dimensions such as `720 300` alongside `720x300`. While Custom Resolutions is enabled, `/xa res reset` restores the client size captured when it was enabled, preserving the toggle and saved presets.",
+                "- Window Renamer preserves custom titles, PID prefixes, and character suffixes while supporting XIVWindowResizer. Compatibility problems are shown in the panel, with up to three automatic retries and an Apply Now retry.",
+                "- Restore Default temporarily restores the original game-window title.",
+                "",
+                "Debug / XA Abuse - AutoRetainer",
+                "- Added Expand All Retainers, Collapse All Retainers, Expand All Deployables, and Collapse All Deployables. Open AutoRetainer and the relevant tab once before using these controls.",
+                "- Added Show Alert Deployables Only for unused submarine slots, unchecked submarines on characters enabled for automation, enabled submarines not on voyages, and suboptimal submarine builds.",
+                "- Added Show Only Enabled and Show Only Disabled for characters on both tabs. Disabled also includes characters with an unchecked retainer or submarine, so partially selected characters can appear in either view.",
+                "- Added Show Missing FC Address for Deployables characters without an FC-house registration in Lifestream. A private-house registration alone still counts as missing an FC address.",
+                "- Alert and Missing FC Address filters offer refresh controls; Show All Characters restores the full list. Filters affect the display only and preserve character settings and automation.",
+                "",
+                "Xagman Recovery / Results",
+                "- Relog retries now run preflight before another attempt. Standby rotation signals apply only to the interrupted Tony, preventing delayed signals from rotating its replacement.",
+                "- Update all participating Tony and Franchise Owner clients together; older clients cannot use the revised standby-rotation coordination.",
+                "- Logs and character results survive internal sequences, region changes, Tony rotations, and standby resumes. Notices explain when history is cleared or older entries are omitted.",
+                "- Added regional roster logging, login attempts, confirmed successful logins, and specific character failure reasons.",
+                "- Insufficient teleport gil and unattuned destinations are detected immediately, recorded, and sent through failure recovery. Missing FC housing remains normal behavior.",
+                "- Live AutoRetainer roster checks promptly reject confirmed missing login targets. Unavailable or unreadable roster data retains normal retry handling.",
+                "- Improved Tony failure recovery and replacement selection within the active Server Matching region, with visible errors when safe recovery or an eligible replacement is unavailable.",
+                "- Improved Xagman reconciliation and Outside Network Helper (ONH) cancellation handling so cancelled or halted subtasks are recorded as unsuccessful. Recovery may still encounter issues; monitor character results.",
+                "",
+                "Database / Export Data",
+                "- Corrected Treasure, Repair Kits, and Ceruleum Tanks totals from XA Database inventories. Manual database pulls now wait for a fresh, confirmed save before reloading.",
+                "- Export Data produces proper JSON and extension-appropriate delimited output, rejects unsupported extensions, and asks before overwriting an existing file.",
+                "",
+                "Tasks / Saved Settings",
+                "- Monthly Relogger stops or marks characters incomplete when required duty-exit or homeworld-return steps fail.",
+                "- Refresh Sub/Bell/Chest options and FC Floater timing settings persist across reloads.",
+                "- Improved Dropbox queueing, failed trade-start reporting, IPC handling, disconnected-client handling, and task cancellation.",
+                "- Task starts are rejected when another task is running or there are no steps to perform, preserving current work and auto-collection.",
+                "",
+                "Reference / Debug Diagnostics",
+                "- Debug builds now show the Debug / Test menu automatically, without first using `/xa debug`.",
+                "- Added Reference > IPC Calls > Dalamud Client State diagnostics for login/zone flags and logout type/code.",
+                "- Added Debug > XA Abuse > Dalamud DLL Bypass Checker as a read-only local diagnostic.",
+                "- Added optional logging of delivered chat, system/error messages, and emotes to `/xllog`, including message type, sender, text, and handled state. Enable Log Chat, Messages and Emotes to /xllog in Plugin Operations; it defaults off, applies immediately, and saves across reloads. Xagman error detection remains active when logging is off.",
+                "",
+                "Reliability / Bundled Data",
+                "- Improved configuration upgrades, handling of invalid or newer configurations, saving settings, plugin startup, shutdown, and cleanup.",
+                "- Improved stability when accessing game data and windows, reduced work that can stall the interface, and contained panel errors within the affected panel.",
+                "- Eureka Instance Hunter's Use Current Zone reads the instance ID in the background and reports progress or failure.",
+                "- Fixed Eureka Instance Hunter duty exits getting stuck at the duty menu or confirmation. It now uses the same Leave action as Player State Checker (D), waits for the confirmation, and continues only after leaving the duty.",
+                "- Auto Refuse Trade reports partial availability and retries unavailable functionality when re-enabled.",
+                "- Preserved the bundled Eureka Logogram Creator catalogs for Logograms, item contents, and Logos Actions.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.43 - 2026-08-01",
             Lines =
             [
@@ -30,8 +90,8 @@ public sealed class UpdatesWindow : Window
                 "- Disable All Mods is now locked and grayed out until Ctrl is held. Its tooltip explains that Ctrl+click is required before clearing every enabled XA Mod.",
                 "",
                 "Player Mods & Debug",
-                "- Added Leave Duty Quick beside the existing Debug Leave Duty control. It bypasses the physical/controller U key, opens the game-owned duty menu, sends the server-side leave callback, and confirms only a validated leave-duty prompt.",
-                "- Updated XA Mods > Player Mods > Auto Leave Duty to use the same controller-safe duty-menu agent/callback path instead of pressing U or clicking a hardcoded menu node, while preserving its saved toggle, selected delay, safety blockers, status, and cleanup behavior.",
+                "- Added Leave Duty Quick beside the existing Debug control, with controller support and confirmation of the leave-duty prompt.",
+                "- Auto Leave Duty now supports controller input while retaining its saved settings, selected delay, safety checks, and status.",
                 "",
                 "Window & Plugin Compatibility",
                 "- Window Renamer now keeps the exact native FINAL FANTASY XIV title while XIVWindowResizer is loaded, visibly pauses only the live rename, and reapplies the user's unchanged custom/PID/character title after XIVWindowResizer unloads.",
@@ -41,9 +101,9 @@ public sealed class UpdatesWindow : Window
                 "- The Letter List overlay's Take all action now honors the saved Delete all when finished option, matching Claim Attachments in XA Mods.",
                 "",
                 "Xagman",
-                "- Added a logged-in-only Select Current Character button after Select Matching Items in both role tables. It uses XA Debug's home-world Name@World identity and adds the configured current row without clearing other selections or changing filters.",
-                "- Prioritize Characters Giving Items First is now effective only while that Franchise Owner has an if Subs/Retainers Shared Item policy. A saved hidden preference advertises Off, so all-ordinary lists retain the legacy combined trade flow instead of refusing startup.",
-                "- HQ selection now follows the exact Lumina Item.CanBeHq value. Sheet-declared NQ-only items show a fixed NQ value, while genuinely HQ-capable items retain the checkbox; impossible imported, saved, or peer-provided HQ rows fail closed.",
+                "- Added Select Current Character to both Xagman role tables. It selects the logged-in character without clearing other selections or changing filters.",
+                "- Prioritize Characters Giving Items First now applies only to Franchise Owners with submarine- or retainer-specific item policies. Standard policies retain the normal combined trade flow.",
+                "- HQ selection is available only for items that support HQ. Invalid HQ selections in saved or shared orders are rejected.",
                 "- Elemental shards, crystals, and clusters now use the player's dedicated Crystals inventory for live counts, XA Database matching, forecasts, Dropbox supply, finite-Take baselines, and post-trade reconciliation. Every non-crystal exact item remains limited to Inventory 1-4.",
                 "- Crystal capacity uses each element's dedicated 9,999-unit pouch slot and does not consume or advertise main-bag slots.",
             ],
@@ -54,7 +114,7 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "Eureka Logogram Creator",
-                "- Fixed release preparation and final upload checks so normal and stable/testing packages preserve the three required static catalog JSON files and stop before release when required catalog content is missing, invalid, or empty.",
+                "- Eureka Logogram Creator includes its required catalogs in stable and testing packages and reports missing, invalid, or empty catalog data.",
                 "- Added separate Static Catalog readiness and load-error reporting. Recipes and Logos Actions no longer look silently empty after a catalog failure, and Refresh All Pages or Retry Catalog Load can retry without restarting XA Slave.",
             ],
         },
@@ -64,45 +124,45 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "Patch 7.55 Beta",
-                "- Eureka Logogram Creator now validates Framework, UIModule, RaptureAtkModule, NumberArrayData, IntArray, and shard counts before reading Logogram or Logos Action stock. Unavailable native state fails closed inside the feature.",
+                "- Eureka Logogram Creator handles unavailable game data safely when reading Logogram and Logos Action stock.",
                 "",
                 "Game & Player Mods",
-                "- Added default-off Replace Unowned Mount Hotbars: unowned native Mount slots display and execute Mount Roulette after native action-status checks, while owned mounts, non-Mount slots, and saved hotbar data remain unchanged.",
+                "- Added Replace Unowned Mount Hotbars, disabled by default. Unowned mount shortcuts use Mount Roulette without changing saved hotbars or owned mount shortcuts.",
                 "- Added opt-in Alert When Typing In Combat for the focused ChatLog: local multi-beep and toast alerts with 30-second/exact cooldown controls, 16 pitches, volume, 1-10 beeps, preview, saved-list/startup restore, and `/xa typingcombat on|off`; it sends no chat.",
-                "- Hardened Lock Game Window In Combat, Auto Hide Game Objects, and shop-icon overlays; every supported shop layout is item-count bounded. Skip Dialogue re-arms after toggles, Doze & Sit Anywhere honors both action switches, Auto Leave Duty verifies its prompt, and the disabled chat-render feature no longer polls AutoRetainer every frame.",
+                "- Improved combat window locking, object hiding, and shop overlays. Fixed dialogue skipping after toggles, Sit/Doze options, and leave-duty confirmation; reduced background work when chat rendering is disabled.",
                 "",
                 "Xagman Policies & Coordination",
-                "- Shared Item policies now cover Give, Take, Balance, and TopUp with ordinary, if Subs, and if Retainers applicability. Resolution is Subs > Retainers > fallback; unknown AutoRetainer registration fails closed and tradable stock remains Inventory 1-4 only.",
+                "- Shared Item policies support Give, Take, Balance, and TopUp with default, submarine, or retainer conditions. Submarine rules take priority over retainer rules, then defaults. Unknown AutoRetainer registration blocks those conditional policies; available stock is limited to Inventory 1-4.",
                 "- Added Green Item GC Seals and Green Item FC Credits / Rank Progress targets. Safe green gear must pass trade, binding, collectability, glamour, materia, gearset, AutoRetainer, container, and peer checks; seals use expert-delivery rewards, while FC value is item level x1.5 NQ or x3 HQ.",
-                "- Green targets share one physical Tony pool, reserve exact-item supply first, contribute one transfer to both value targets, persist in schema 3, migrate schema 1/2 exact rows safely, require same-protocol peers, and are refused by Outside Network Helper. (needs further testing, this currently doesn't work as intended with the current implementation.)",
-                "- Franchise Owner-owned Prioritize Characters Giving Items First negotiates protocol 2 before run creation. All Off keeps the legacy flow; unanimous valid On freezes the FO cohort/forecast, runs Give/Balance surplus collection, waits at the global barrier, resets the full Tony/world sweep, runs Take/Balance deficit/TopUp, and requires final cleanup acknowledgements.",
-                "- Mixed, missing, stale, stopped, cancelled, invalid-policy, or old-build peers fail closed and never advance a collection/restock barrier. The Peers table shows Priority state, while the frozen forecast distinguishes Stock Now/After Collect and Short Now/After.",
+                "- Green-item targets share Tony supply, reserve exact-item requests first, and can contribute to both value targets. Saved exact-item requests are preserved when upgrading, and participating clients must use compatible versions. Green-item targets do not yet work reliably and are not supported by Outside Network Helper.",
+                "- Prioritize Characters Giving Items First collects surplus items before distributing requested items. All participating Franchise Owners must enable the option; disabling it retains the normal trade flow.",
+                "- Collection and restocking stop when participating clients are unavailable, incompatible, cancelled, or have conflicting settings. Peer status and forecasts show collection priority and expected stock after collection.",
                 "- Ctrl+click either character table relogs the exact saved character through `/ays relog` only while Xagman and the shared task runner are safe and idle; anonymization never changes the command key.",
                 "- Select Matching Items uses Inventory 1-4 only. Retainers Only, Subs Only, Without Retainers, and Without Subs refresh AutoRetainer registration and preserve the established item-need, Region, Search, and Tony visibility rules without counting retainer stock.",
-                "- Default-off Refuse Trades When Idle coordinates the existing Refuse Trade Request service around Dropbox auto-accept with reflection readback, manual-preference preservation, fail-closed unknown writes, and safe cleanup across normal, Server Matching, ONH, stop, failure, and logout paths.",
+                "- Added Refuse Trades When Idle, disabled by default. It allows Xagman trades while preserving the user's trade-refusal preference when a run ends, stops, or fails.",
                 "",
                 "Xagman Inventory, Forecasts & Results",
-                "- Stop All Clients and Results stops local and connected clients and clears retained orders; Stop All Peers remains stop-only. Add Item searches the current tradeable Lumina Item sheet, with HQ selected by the existing row checkbox.",
+                "- Stop All Clients and Results stops local and connected clients and clears retained orders; Stop All Peers remains stop-only. Add Item searches tradable items and uses each row's HQ selection.",
                 "- Tony and Franchise Owner tables gained saved optional columns with clear chooser labels plus sortable Treasure, Kits, Tanks, Retainers, and Submarines values; hiding columns is presentation-only.",
                 "- Pull XA Database Info performs logged-in Refresh + Save before rereading committed snapshots, while logged-out pulls use saved data. Unavailable, skipped, failed, pending, malformed, or wrong-character saves are reported and never labeled fresh.",
                 "- Connected capacity forecasts separate Server Matching regions or use one fixed-world pool, calculate stack size/partial-stack headroom, distinguish single-item exact capacity from multi-item shared slots, retain low-incoming and unknown/stale warnings, and require real snapshots no more than 45 days old.",
-                "- Franchise Owner Give, Balance, and Take forecasts keep pooled Give targets, per-owner Balance deficits, finite-Take receive capacity, cached pre-connection/ONH views, and conservative unknown handling without changing runtime queues.",
-                "- Finite Take N now keeps one run-scoped owner/item/HQ baseline-to-target ledger, reconciles partial deliveries, survives published-row removal and Tony rotation, completes once at baseline + N, and logs owner/Tony quantities. Take 0, Balance, TopUp, and green-value behavior remain unchanged.",
-                "- Tony supply is labeled Need from Tony Pool with per-Tony availability. Normal terminal Tony completion sends pending peer completion, returns FC when configured, then disconnects before logout/kill/AR actions; collection-first stays connected unless every frozen FO acknowledges cleanup.",
+                "- Improved Give, Balance, and Take forecasts, including shared supply, each owner's remaining need, receive capacity, and cached information before connecting or using ONH.",
+                "- Finite Take requests track partial deliveries across Tony rotations and complete only after the requested quantity is received. Take 0, Balance, TopUp, and green-item targets retain their existing behavior.",
+                "- Tony supply is labeled Need from Tony Pool and shows availability per Tony. Normal completion reports to peers, returns to the FC if configured, and disconnects before logout, game-close, or AutoRetainer actions. Collection-first runs stay connected until all participating owners acknowledge completion.",
                 "",
                 "Xagman Travel & Server Matching",
                 "- Server Matching adds per-data-center meet worlds and a shared location, sweeps Aether/Crystal/Dynamis/Primal then NA/EU/JP/OCE, rotates multiple Tonys within a region, keeps owners on world travel only, marks exhausted-region owners skipped, retains results, and requires the same XA Slave version.",
-                "- Collection, Resupply, and mixed handoffs share the active data-center scope and one exact owner/Tony instance. A depleted replacement rotates immediately; a stocked replacement publishes its live coordinates and waits up to 600 seconds for the owner, including recovery from missed one-shot starts.",
-                "- Server Matching stays latched to a fresh complete committed destination. Owners wait up to 600 seconds without premature IPC, pin each attempt, and use busy observation, three-pass CharacterSafeWait, final world/aetheryte verification, and stable wrong-character/wrong-destination evidence before failing or advancing.",
+                "- Collection and resupply handoffs stay within the active data center. Empty replacements rotate immediately; stocked replacements publish their location and wait up to 600 seconds for the owner.",
+                "- Server Matching waits for a confirmed destination and verifies the character, world, and aetheryte before advancing. Owners can wait up to 600 seconds for a destination to become available.",
                 "- Compound World-plus-aetheryte commands remain in flight through early idle, casting, loading, zoning, and missing player state: Tony gets up to 600 seconds for the world followed by a fresh 60-second local-teleport window without overlapping retries.",
-                "- Route guards use the planned home world: NA/EU/JP can travel within region or to OCE, OCE stays in OCE, and unknown mappings fail closed. Fixed/Server Matching/ONH destinations are snapshotted, peer selection rejects Error/malformed/mismatched/unreachable routes, and collection-first blocks on stale or unacknowledged FO frontiers.",
-                "- Expected-logout markers now cover opted-in cross-data-center meetup/reissue/FC-return paths, bind the outgoing identity and command context, require matching Content ID plus Lifestream-busy evidence, refresh only on successful dispatch, and remain separate from `/ays relog` and completion logout.",
+                "- Travel eligibility uses each character's home world. NA/EU/JP characters can travel within their region or to OCE; OCE characters remain within OCE. Unknown or unreachable routes are rejected.",
+                "- Expected logouts during cross-data-center travel and FC returns no longer trigger incorrect disconnect recovery.",
                 "- Unresolved owners now finish with accurate skipped summaries instead of misleading Tony-finished lines; same-Tony return after selling can be accepted once the old call clears.",
                 "",
                 "Monthly Relogger, Tasks & Diagnostics",
                 "- Monthly Relogger adds a 300-second login timeout, safe pre-flight recovery, red login failures, purple incomplete processing, persistent results with Clear results, AutoRetainer not-found markers, per-character duration, rolling average, remaining count, and ETA.",
-                "- Refresh Sub/Bell/Chest and FC Permissions verify the intended character after relog; failed relogs cannot run against the wrong character. Task progress/counts are accurate and the slave.db handle is released on unload.",
-                "- Xagman peer networking size-limits and validates incoming messages, ignores malformed versions, and contains bad JSON per message; authenticated LAN hub handshakes remain a documented follow-up.",
+                "- Refresh Sub/Bell/Chest and FC Permissions verify the intended character after relog, preventing tasks from running on the wrong character. Progress reporting and reload cleanup are more reliable.",
+                "- Xagman rejects oversized or malformed peer messages. LAN hub connections do not authenticate peers.",
             ],
         },
         new VersionEntry
@@ -113,10 +173,10 @@ public sealed class UpdatesWindow : Window
                 "Plugin Operations",
                 "- New `Custom Resolution on Plugin Load` option (under `Open Plugin on Load`) force-resizes the game window to a saved width and height each time the plugin loads.",
                 "- The width, height, and the `Ignore Minimum Window Size` sub-option stay greyed out until the feature is enabled; the sub-option lowers the client minimum so sizes below 1024x720 hold instead of snapping back.",
-                "- Reuses the same custom-resolution engine as XA Mods, so the on-load resize works without separately enabling Custom Resolutions in XA Mods.",
+                "- Resize on plugin load works without separately enabling Custom Resolutions in XA Mods.",
                 "",
                 "Game Mods",
-                "- `Skip Dialogue` now also skips Craft Leve turn-in dialogue by hooking the `CraftLeveTalk` Lua handler alongside the existing Talk, SystemTalk, ShortTalk, and Guildleve handlers.",
+                "- Skip Dialogue also skips Craft Leve turn-in dialogue.",
                 "- `Close Lobby Errors` now catches lobby error `2021` (`World data could not be obtained. Please try logging in later.`).",
                 "- `Auto Open Moogle Mail` now reports busy through `XASlave.IsBusy` while it claims attachments, so external automation can wait for mail collection to finish.",
                 "- `Auto Open Moogle Mail` adds a `Delete all when finished` sub-option that automatically deletes all opened letters once Claim Attachments finishes collecting everything.",
@@ -129,8 +189,8 @@ public sealed class UpdatesWindow : Window
                 "- If a connected, active Xagman client is running a different XA Slave version, the local Xagman run now halts automatically so out-of-sync clients do not trade against each other.",
                 "",
                 "Dalamud 15.0.2.2 Compatibility",
-                "- Updated `Microsoft.Data.Sqlite` to `10.0.9` with an explicit `SQLitePCLRaw.bundle_e_sqlite3` `3.0.3` reference so strict builds no longer report a vulnerable SQLite transitive package.",
-                "- Eureka Logogram Creator favorites and automation overlays now keep Atk collision inhibition enabled so their invisible buttons no longer click through to the native UI behind them.",
+                "- Updated bundled SQLite dependencies to address a known vulnerability.",
+                "- Eureka Logogram Creator overlay buttons no longer click through to the game controls behind them.",
             ],
         },
         new VersionEntry
@@ -141,7 +201,7 @@ public sealed class UpdatesWindow : Window
                 "Movement Commands",
                 "- `/xa movingcheatersmart`, `/xa movingcheaterfly`, and `/xa movingcheaterwalk` now check whether the player is already mounted before sending Mount Roulette.",
                 "- Already-mounted players now path directly to the current map flag instead of being dismounted before `/vnav flyflag` or `/vnav moveflag` runs.",
-                "- Debug `MovingCheater` buttons now use the same command methods as the matching `/xa movingcheater*` commands.",
+                "- Debug MovingCheater buttons behave consistently with the matching chat commands.",
             ],
         },
         new VersionEntry
@@ -157,14 +217,9 @@ public sealed class UpdatesWindow : Window
                 "- IPC Calls Available and Debug `Check All IPC` now include Honorific availability.",
                 "",
                 "Dalamud API 15.0.2",
-                "- Updated Eureka logogram addon text cleanup to use `AtkValueType.ConstString` instead of the obsolete `String8` alias.",
-                "- Export Data automatic writes now run in the background so the framework tick does not perform synchronous JSON, SQLite, and file-output work.",
-                "- Saved startup restore for hook-heavy XA Mods now prepares Custom Timestamp Format, No UI Fade, Queue Position Display, Auto Skip Cutscenes, and Custom Sight Distance hook surfaces outside the framework tick.",
-                "- Custom Timestamp Format now prepares its saved-startup hook during plugin load so the first post-load activation tick only enables an already-created hook.",
-                "- Allow Multiple Game Instances now runs its launch-lock handle cleanup outside the deferred startup queue.",
-                "- Cancel Login Cooldown now prepares its lobby hook outside the deferred startup framework tick before enabling it.",
-                "- Prevent Game Exiting From Lobby Errors now prepares its lobby error hook outside the deferred startup framework tick before enabling it.",
-                "- Reload validation confirmed the XA deferred startup warnings for Allow Multiple Game Instances, Cancel Login Cooldown, and Auto Skip Cutscenes no longer appear.",
+                "- Updated Eureka Logogram Creator for current Dalamud compatibility.",
+                "- Automatic Export Data writes run in the background to reduce game stutters.",
+                "- Improved startup of saved XA Mods, including chat timestamps, UI fades, queue position, cutscene skipping, sight distance, multiple game instances, and lobby-error controls.",
             ],
         },
         new VersionEntry
@@ -174,7 +229,7 @@ public sealed class UpdatesWindow : Window
             [
                 "Xagman",
                 "- Added `Sell When Inventory Is Full` for Tony runs.",
-                "- When Tony fills inventory in a supported meet zone, XA paths Tony to the local vendor, sends `/ays itemsell`, waits for AutoRetainer item selling to finish, runs CharacterSafeWait, and resumes Xagman.",
+                "- When Tony's inventory fills in a supported meet zone, XA travels to the local vendor, waits for AutoRetainer to finish selling, and resumes Xagman.",
                 "- After Tony sells items, resumed Franchise Owners path to Tony's vendor coordinate with vnav stop distance `2` before targeting Tony and starting the normal trade path.",
                 "- Standby owners stay visible in Tony's queue while moving to that vendor coordinate, so Tony can call the first owner that reaches the sell location.",
                 "- Owners now enter Queue Wait as soon as they reach Tony's sell coordinate, so they do not stay stuck as generic Traveling peers before Tony can call them.",
@@ -184,7 +239,7 @@ public sealed class UpdatesWindow : Window
                 "- After Tony calls an owner, the final live-coordinate approach tightens to `0.5` yalm and can repath by Tony's visible object if the current target is missing or stale.",
                 "- Tony's NPC sell route now randomizes the destination within `0.5` yalm of the configured vendor coordinate instead of stacking every run on the exact same point.",
                 "- Xagman peer connections now retry local hub listener startup while disconnected, so same-PC clients can recover from a transient listener gap instead of staying on `hub connection unavailable`.",
-                "- If NPC item selling hits the gil cap message, XA closes Shop with `callback Shop true -1` and falls back to the normal Tony full-inventory rotation/completion path.",
+                "- If selling reaches the gil cap, XA closes the shop and follows the normal Tony rotation or completion settings.",
                 "- Supported vendor meet locations are listed one per line in the tooltip and shown in green in the meet-location dropdown.",
                 "- Selling is skipped at `990,000,000` gil or higher so Tony does not risk the `999,999,999` gil cap.",
                 "- Unsupported zones, unavailable AutoRetainer/vnav IPC, or sell-cleanup failures fall back to the normal full-inventory behavior: return home, relog the next Tony, or finish with warnings if no Tony remains.",
@@ -196,10 +251,8 @@ public sealed class UpdatesWindow : Window
                 "",
                 "Game Mods",
                 "- `Close Lobby Errors` now closes NoKillPlugin's `No Kill Plugin Panel` if that plugin opens its auth-error settings panel during a monitored lobby Dialogue flow.",
-                "- The NoKill panel close is scoped to the known `NoKillPlugin` / `No Kill Plugin` runtime instance and uses reflection to set `Gui.ConfigWindow.Visible` false.",
-                "- The Close Lobby Errors monitor now waits for addon:Dialogue to contain a supported lobby/networking marker such as `90002`, then opens a 10 second monitor window for popup confirmation and NoKill panel cleanup.",
-                "- The NoKill panel close runs on a throttled framework update during that Dialogue-triggered 10 second window, so it can catch the panel if it opens shortly after the lobby dialog appears.",
-                "- Debug / Test > XA Abuse > Lobby Test now shows whether Dialogue is visible, ready, supported, which marker/text was seen, whether `_TitleMenu` is visible, whether the 10 second monitor window is active, whether the NoKill window is active, and includes a manual close test button.",
+                "- Close Lobby Errors monitors supported lobby dialogs for 10 seconds, allowing it to close related popups and a NoKill panel that appears shortly afterward.",
+                "- Debug / Test > XA Abuse > Lobby Test shows lobby-dialog readiness, detected error text, title-menu visibility, the 10-second monitoring period, and NoKill panel state, with a manual close test button.",
             ],
         },
         new VersionEntry
@@ -224,8 +277,7 @@ public sealed class UpdatesWindow : Window
                 "Dalamud Notifications Suck",
                 "- Fixed `Hide Penumbra/Glamourer/mod alerts` so hidden Penumbra import notifications no longer cancel active mod imports.",
                 "- Matching Penumbra/Glamourer/mod-manager notifications remain visually suppressed.",
-                "- Plugin-owned dismiss callbacks are scrubbed before XA suppresses matching notifications, so Penumbra import/upload flow can continue.",
-                "- Updated the XA Mods help text to call out that matching notifications are hidden without firing plugin-owned dismiss callbacks.",
+                "- Updated notification suppression and its help text so hiding alerts does not interrupt the originating plugin's operation.",
             ],
         },
         new VersionEntry
@@ -236,7 +288,7 @@ public sealed class UpdatesWindow : Window
                 "Player Mods",
                 "- `Show Traveler World Names` now explicitly covers Wanderer, Traveler, and Voyager visitor labels.",
                 "- Voyager visitors follow the same local Name@HomeWorld presentation as existing Wanderer and Traveler labels.",
-                "- The runtime rewrite still uses home-world mismatch and preserves the existing Disable in duties behavior.",
+                "- Visitor labels continue to use the player's home world and respect Disable in duties.",
                 "",
                 "XA Mods",
                 "- Added a dedicated `UI Mods` section for UI overlays, context-menu helpers, nameplate presentation, DTR display helpers, and UI text tweaks.",
@@ -253,9 +305,9 @@ public sealed class UpdatesWindow : Window
                 "Graphic Mods",
                 "- Added `No UI Fade` under XA Mods > Graphic Mods.",
                 "- Moved `Disable Title Screen Movie` and `Hide Unnecessary Popups` into Graphic Mods.",
-                "- The toggle suppresses common middle-back, white fade in/out, and event fade in/out UI transitions through native hooks.",
-                "- Saved `No UI Fade` restores now run through the post-load XA Mod activation phase after the core startup pass instead of the immediate deferred startup queue.",
-                "- Added `/xa nouifade on|off`, startup restore, titlebar favourite, preset, Commands, README, and startup-status coverage.",
+                "- No UI Fade suppresses common UI and event fade transitions.",
+                "- Saved No UI Fade settings restore more reliably after plugin load.",
+                "- Added `/xa nouifade on|off`, saved startup settings, titlebar favourites, and preset support.",
 
             ],
         },
@@ -268,7 +320,7 @@ public sealed class UpdatesWindow : Window
                 "- Added `Show Titles As Playernames` to move visible player titles into the name line without title brackets.",
                 "- Prefix titles now render before the player name; suffix titles render after the player name.",
                 "- `Show Traveler World Names` composes after title placement, so traveler labels append `@HomeWorld` to the title-adjusted name.",
-                "- Added `/xa titlesasplayernames on|off` plus XA Mods, Commands, README, and startup-status coverage.",
+                "- Added `/xa titlesasplayernames on|off` and saved startup settings.",
             ],
         },
         new VersionEntry
@@ -277,18 +329,16 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "Release Highlights",
-                "- Added `Better Highlight Potential Targets` with selectable native highlight colors and stable-client arming before repainting hovered potential targets.",
+                "- Added Better Highlight Potential Targets with selectable highlight colors for hovered targets.",
                 "- Added `Show Traveler World Names` so visible travelers and wanderers can show locally as Name@HomeWorld while home-world FC tags stay unchanged.",
                 "- Expanded `Skip Cutscenes` with category gates, territory whitelist/blacklist controls, MSQ light-party auto-enable, Gold Saucer, PvP, Ocean Fishing, Inn, and buddy-feed options.",
                 "- Added public support access to Debug / Test through `/xa debug`, while keeping the menu hidden until support asks a user to toggle it.",
                 "- Added direct XA movement/support commands for selected Debug / Test actions.",
                 "",
                 "Cutscene, Camera, And Duty Fixes",
-                "- `Auto Skip Cutscenes` now resolves current Lua cutscene handlers before hooking `PlayCutScene`, `PlayStaffRoll`, and `PlayToBeContinued`.",
-                "- `Auto Skip Cutscenes` now handles PointMenu completion through the current agent lifecycle path.",
-                "- `Custom Sight Distance` now tracks active camera changes through `SetActiveCamera` while preserving the existing distance and collision controls.",
-                "- `Better Duty Finder` now tracks Contents Finder and Raid Finder through addon lifecycle draw, refresh, and finalize events, so its inline controls survive the current window lifecycle.",
-                "- `Better Duty Finder` no longer depends on the stale addon value guard that could hide the overlay on current builds.",
+                "- Improved Auto Skip Cutscenes compatibility with current cutscenes, credits, continuation screens, and selection menus.",
+                "- Custom Sight Distance follows camera changes while preserving distance and collision settings.",
+                "- Better Duty Finder controls remain visible and usable when Contents Finder or Raid Finder opens or refreshes.",
                 "",
                 "Debug / Test And Movement Commands",
                 "- `/xa debug` toggles the hidden Debug / Test menu in public builds and stays persistent across plugin reloads until toggled off again.",
@@ -297,10 +347,9 @@ public sealed class UpdatesWindow : Window
                 "- `/xa leaveduty` with no arguments runs the direct leave-duty action; `/xa leaveduty on|off` still controls the existing Auto Leave Duty XA Mod toggle.",
                 "",
                 "Startup, Reload, And Cleanup",
-                "- Xagman peer auto-start, local SQLite schema setup, Eureka Logogram data loading, and Instant Return restore now avoid blocking plugin construction.",
+                "- Reduced plugin startup delays from Xagman, local data initialization, Eureka catalogs, and saved Instant Return settings.",
                 "- Plugin unload now restores live Low Resolution scale, Special Rendering Modes UI/world visibility, and nameplate privacy state before teardown.",
-                "- Remaining obsolete Dalamud scale warnings were cleaned up by moving affected windows to `ImGuiHelpers.GlobalScale`.",
-                "- Public text and metadata were cleaned up to use neutral built-in/plugin wording and the public Aethertek site.",
+                "- Updated public wording and links to the Aethertek website.",
             ],
         },
         new VersionEntry
@@ -314,13 +363,11 @@ public sealed class UpdatesWindow : Window
                 "- The new Game Mods can be saved in XA Mod lists, restored on startup, used as titlebar favourites, and toggled from chat commands.",
                 "",
                 "Smoother Startup",
-                "- Heavy startup work for chat timestamps, cutscene skipping, and custom sight distance now starts after the core plugin load instead of blocking the first load summary.",
-                "- Additional hook-backed restores, including queue position, object hiding, background rendering pause, trade refusal, and map reveal, now use the same post-load activation path.",
-                "- Cutscene and camera hooks now arm over several frames, with clearer logs showing what is still arming and when post-load activation is actually complete.",
+                "- Saved XA Mods activate gradually after plugin load, reducing startup delays and showing clearer activation status.",
                 "",
                 "Game Mod Polish",
                 "- `Display Network Latency` now starts safely even when the DTR bar entry has to be reacquired after reload.",
-                "- `Display Network Latency` now keeps its DTR updates on the framework tick path and shows when the entry is hidden in /xlsettings.",
+                "- Display Network Latency updates more reliably and indicates when its server-bar entry is hidden in /xlsettings.",
                 "- `Notify When Friend Is Near` keeps the toast simple: Friend nearby plus the player's name. It does not send in-game chat messages.",
                 "- `Better Cast Bar` adds the local cast-bar restyle and slidecast marker controls.",
                 "- `Better Duty Finder` now shows its inline Contents Finder and Raid Finder buttons in two compact rows above the normal duty window controls.",
@@ -328,7 +375,7 @@ public sealed class UpdatesWindow : Window
                 "- Debug / Test > XA Abuse now includes `Dalamud Test Notifications`, with three-per-row buttons that create real Dalamud toasts for each notification suppression category.",
                 "",
                 "Shop Icons And Xagman",
-                "- `Enable Item Icon In Shops` now matches the current FreeShop layout and clamps reads and writes to the available AtkValue range.",
+                "- Fixed item icons in the current FreeShop window layout.",
                 "- Xagman targeting now uses built-in target and focus handling, including direct focus assignment and target recovery while Xagman is running.",
             ],
         },
@@ -337,20 +384,16 @@ public sealed class UpdatesWindow : Window
             Header = "v0.0.0.30 - 2026-05-02",
             Lines =
             [
-                "Release Delta",
-                "- Update History and release notes were reconciled against the changelog entries after v0.0.0.29",
-                "",
                 "Dalamud API 15",
-                "- Backend debugger and task helpers now use Dalamud's API 15 IFramework.Run path",
-                "- Infinite Sprint status checks now use API 15 uint status IDs",
+                "- Updated task handling and Infinite Sprint for Dalamud API 15 compatibility.",
                 "",
                 "Game Mods",
                 "- Added `Disable Title Screen Movie` with `/xa titlemovie on|off`",
                 "- `Disable Title Screen Movie` keeps the title-screen lobby idle timer reset so the idle intro movie does not start",
                 "- Added `Auto Display IDs` with `/xa displayids on|off` for item, action, target, weather, zone, and map IDs",
-                "- `Auto Display IDs` owns item tooltip IDs, action IDs, target/weather IDs, and optional zone/map DTR output; disabling the master toggle disables its tooltip hook and subsettings",
+                "- Auto Display IDs supports tooltip, action, target, weather, zone, and map IDs; its master toggle disables all ID displays.",
                 "- Added `Custom Timestamp Format` with `/xa timestampseconds on|off`",
-                "- `Custom Timestamp Format` formats chat timestamps as `[HH:mm:ss]` by default and avoids preview work until chat requests timestamp text",
+                "- Custom Timestamp Format uses `[HH:mm:ss]` by default and reduces unnecessary preview work.",
                 "- Added `Better Inventory Mover` with a configurable Shift/Ctrl/Alt quick-move modifier and destination-aware context-menu moves",
                 "- Added `Better Company Chest` with default-page, right-click store/recover, quantity prompt confirmation, and exchangeable-item gil-value display support",
                 "- `Better Company Chest` now handles Free Company Chest context-menu withdrawals and prompt confirmation more reliably",
@@ -364,8 +407,8 @@ public sealed class UpdatesWindow : Window
                 "",
                 "Plugin Mods",
                 "- Added `Teleport Helper` with `/xa teleporthelper on|off`",
-                "- `Teleport Helper` monitors the aetheryte-ticket `SelectYesNo` teleport prompt directly, defaults to No to reject ticket usage, and can be configured to choose Yes instead",
-                "- The ticket helper no longer depends on plugin busy-state gating and now uses final Teleport Helper naming",
+                "- Teleport Helper answers the aetheryte-ticket confirmation, defaults to No, and can be configured to choose Yes.",
+                "- Teleport Helper handles ticket prompts while other plugin tasks are busy.",
                 "",
                 "Commands",
                 "- `/xa lowres on` now restores the saved Low Resolution slider value and `/xa lowres <scale>` sets and enables the feature from chat",
@@ -377,7 +420,7 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "XA Mods",
-                "- `Low Resolution` now forces the live 3D resolution scale to 1.00 for a render pass before it finishes disabling",
+                "- Disabling Low Resolution restores full 3D rendering resolution.",
                 "- The saved Low Resolution slider value is preserved, so your chosen scale is still ready for the next enable",
                 "- The full-scale disable pass is shared by the XA Mods toggle, `/xa lowres off`, presets, section restore, disable-all, and plugin unload",
             ],
@@ -391,9 +434,8 @@ public sealed class UpdatesWindow : Window
                 "- Added `Log while in duty` so XA Peep can pause duty targeter alerts and history writes unless explicitly enabled",
                 "- XA Peep History columns now sort by Count, Player, Last Seen, or Total, and the window reopens on Last Seen by default",
                 "",
-                "API 15 Follow-up",
-                "- Refuse Trade Request now uses the API 15 InventoryManager trade-request hook path",
-                "- Display Queue Position and protected signatures were refreshed for the API 15 ClientStructs queue/camera paths",
+                "API 15 Compatibility",
+                "- Updated Refuse Trade Request, Display Queue Position, and camera-related features for Dalamud API 15.",
             ],
         },
         new VersionEntry
@@ -402,14 +444,13 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "Dalamud API 15",
-                "- Bumped the source, manifest, SDK, and lockfile to the full Dalamud API 15 structure with DalamudPackager 15.0.0",
-                "- API 15 fixes cover callback values, territory and duty signatures, UI flags, GC rank access, buddy kinds, and unsafe sound calls",
+                "- Updated XA Slave for Dalamud API 15 compatibility.",
                 "",
                 "XA Mods / Fixes",
                 "- `Close Lobby Errors` now catches lobby error `5006` and visiting-character congestion error `3088`",
                 "- Added `Fix /target Command` and `/xa targetfix on|off` to recover failed native `/target` lookups through closest matching game objects",
-                "- `Display MSQ Progress` now uses the adjusted all-MSQ Lumina quest cache for more accurate percentages",
-                "- Eureka Instance Hunter now accepts the `ContentsFinderConfirm` commence prompt after Rodney entry",
+                "- Display MSQ Progress reports more accurate completion percentages.",
+                "- Eureka Instance Hunter accepts the duty-entry confirmation after talking to Rodney.",
                 "- `Refuse Trade Request` and Xagman Dropbox handoff paths are more reliable around requester names, local feedback, and trade timeouts",
             ],
         },
@@ -444,10 +485,10 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "Fixes",
-                "- Startup XA Mods, saved window opens, and some context-specific hooks now arm later when needed, reducing update-time `FrameworkUpdate` hitches",
+                "- Reduced stutters while restoring saved XA Mods and windows after plugin updates.",
                 "- Xagman owner sendoff now waits for a final two-step give/request check before the owner leaves",
                 "- Xagman partial Tony resupply trades now keep the owner in the wait loop with the reduced remaining request",
-                "- Xagman peer start, stop, recall, and completion commands now move their local task and log work back to the framework thread",
+                "- Improved Xagman task and log handling for peer start, stop, recall, and completion commands.",
                 "- `Close Lobby Errors` now catches supported numeric error codes even when those codes appear inside longer dialog text",
                 "",
                 "Quality Of Life",
@@ -465,7 +506,7 @@ public sealed class UpdatesWindow : Window
                 "- Fixed the `Kill Game` titlebar favourite highlight so it refreshes correctly even while the main XA Slave window is collapsed",
                 "- Xagman trading conflicts were hardened with owner-collection and queue-flow fixes so empty or already-satisfied owner passes are less likely to stall follow-up trading work",
                 "- Xagman partial Tony resupply trades now keep the owner waiting with the reduced remaining request instead of yielding too early and missing Tony's immediate follow-up trade request",
-                "- Xagman now performs a two-step whole-flow completion verification before owner sendoff, so a completed trade no longer sends the owner home until both give-side and Tony-supply-side reconciliation checks come back clean",
+                "- Xagman checks both outgoing items and outstanding requests before sending a Franchise Owner home after trading.",
                 "",
                 "New XA Mods / QoL",
                 "- Added `Bailout ESC Menu` to close a stuck `SystemMenu` after the selected timeout",
@@ -487,7 +528,7 @@ public sealed class UpdatesWindow : Window
                 "",
                 "UI / Quality Of Life",
                 "- XA Slave now follows Dalamud interface zoom across the main UI, update history, task tables, and XA Peep overlays",
-                "- Mass-character task tables now support resizable columns with widths preserved through saved ImGui table settings",
+                "- Mass-character task tables support resizable columns with saved widths.",
                 "- The splash screen no longer duplicates a `What's New` section; use `Update History` for release notes instead",
                 "",
                 "XA Mods",
@@ -500,7 +541,7 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "XA Peep",
-                "- XA Peep adds a compact target tracker, a separate history window, cumulative per-player counts, logout-safe cached history, and local persistence through slave.db",
+                "- XA Peep adds a compact target tracker, a separate history window, cumulative per-player counts, logout-safe cached history, and saved local history.",
                 "- Live rows now support hover focus preview, left/right click actions, Ctrl+Left Click examine, Ctrl+Right Click adventurer plate, center-screen alerts, and configurable targeter cards/lines/dots",
                 "- XA Peep alert sounds now play even when the game's own sound channel is muted, include selectable sound slots plus volume control, and the tracker now supports party/alliance/in-combat filters, auto-open on load, resize lock, and reload-safe startup",
                 "",
@@ -565,7 +606,7 @@ public sealed class UpdatesWindow : Window
                 "- One grouped utility panel for game/graphics/player/plugin toggles",
                 "- Presets + clipboard import/export: build a known-good mod set and reuse it across clients",
                 "- Mass reset/restore tools are included (Disable All Mods + section restores) for quick recovery",
-                "- Early beta rollout: monitor usage and reset/disable if a local hook acts up",
+                "- XA Mods remain experimental; disable or reset a mod if it causes problems.",
             ],
         },
         new VersionEntry
@@ -640,12 +681,11 @@ public sealed class UpdatesWindow : Window
             Header = "v0.0.0.10 - 2026-03-08",
             Lines =
             [
-                "- Added slave.db sync tracking for last XA Database save time",
+                "- Added local tracking of the last XA Database save time.",
                 "- AR Pre/Post and login collection now support 6\u201372hr cadence gates",
                 "- Login collection now pauses and safely resumes AR when needed",
                 "- Show Live Pulls now defaults off on every plugin load",
                 "- Optional open-on-load setting can reopen XA Slave on load/login",
-                "- slave.db, cadence gates, and AR Multi detection were verified in-client",
             ],
         },
         new VersionEntry
@@ -663,7 +703,7 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "AR Pre/Post Processing",
-                "- Pre + post hooks around AutoRetainer multi-mode",
+                "- Added data collection before and after AutoRetainer Multi Mode processing.",
                 "- Pre-processing: suppress AR \u2192 collect data \u2192 un-suppress before retainers",
                 "- Post-processing: collect data after retainers, before AR relogs",
                 "",
@@ -682,7 +722,7 @@ public sealed class UpdatesWindow : Window
             [
                 "- Pre-flight: detects movie / char select / main menu before processing",
                 "- Saddlebag/FC guards: graceful skip for missing features",
-                "- Duty guard: step-based, 3\u00d7 SafeWait, 5 retries (no more deadlocks)",
+                "- Duty recovery uses bounded waits and retries to avoid getting stuck.",
                 "- Movement: 0.5y stop distance, 1.0y interact, mount at >20y",
                 "- Mount+path simultaneous, 2s dismount safety delay",
                 "- IPC: XASlave.IsBusy + XASlave.RunTask + /xa run command",
@@ -709,6 +749,12 @@ public sealed class UpdatesWindow : Window
 
     public override void Draw()
     {
+        if (versions.Count == 0)
+        {
+            ImGui.TextDisabled("No version history available.");
+            return;
+        }
+
         var currentVersionIndex = versions.FindIndex(entry => HeaderMatchesRunningVersion(entry.Header));
         if (currentVersionIndex < 0)
             currentVersionIndex = 0;
@@ -721,62 +767,56 @@ public sealed class UpdatesWindow : Window
         ImGui.Separator();
         ImGui.Spacing();
 
-        if (versions.Count == 0)
-        {
-            ImGui.TextDisabled("No version history available.");
-            return;
-        }
-
         for (var i = 0; i < versions.Count; i++)
         {
             var entry = versions[i];
             var isCurrentVersion = i == currentVersionIndex;
 
-            ImGui.PushID(i);
-
-            if (isCurrentVersion)
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.4f, 1.0f, 0.4f, 1.0f));
-
-            if (firstDraw)
-                ImGui.SetNextItemOpen(isCurrentVersion, ImGuiCond.Always);
-            var open = ImGui.CollapsingHeader(entry.Header);
-
-            if (isCurrentVersion)
-                ImGui.PopStyleColor();
-
-            if (open)
+            using (ImRaii.PushId(i))
             {
-                ImGui.Indent(Scale(12f));
-                ImGui.PushTextWrapPos(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - Scale(12f));
-
-                foreach (var line in entry.Lines)
+                bool open;
+                using (ImRaii.PushColor(
+                           ImGuiCol.Text,
+                           new Vector4(0.4f, 1.0f, 0.4f, 1.0f),
+                           isCurrentVersion))
                 {
-                    if (string.IsNullOrWhiteSpace(line))
-                    {
-                        ImGui.Spacing();
-                        continue;
-                    }
-
-                    var trimmed = line.TrimStart();
-
-                    // Sub-header lines (no leading dash)
-                    if (!trimmed.StartsWith("-"))
-                    {
-                        ImGui.TextColored(new Vector4(0.7f, 0.85f, 1.0f, 1.0f), trimmed);
-                        continue;
-                    }
-
-                    // Bullet lines
-                    var bulletText = trimmed.Length > 1 ? trimmed[1..].TrimStart() : string.Empty;
-                    ImGui.TextUnformatted($"• {bulletText}");
+                    if (firstDraw)
+                        ImGui.SetNextItemOpen(isCurrentVersion, ImGuiCond.Always);
+                    open = ImGui.CollapsingHeader(entry.Header);
                 }
 
-                ImGui.PopTextWrapPos();
-                ImGui.Unindent(Scale(12f));
-                ImGui.Spacing();
-            }
+                if (open)
+                {
+                    ImGui.Indent(Scale(12f));
+                    using (ImRaii.TextWrapPos(ImGui.GetContentRegionAvail().X + ImGui.GetCursorPosX() - Scale(12f)))
+                    {
+                        foreach (var line in entry.Lines)
+                        {
+                            if (string.IsNullOrWhiteSpace(line))
+                            {
+                                ImGui.Spacing();
+                                continue;
+                            }
 
-            ImGui.PopID();
+                            var trimmed = line.TrimStart();
+
+                            // Sub-header lines (no leading dash)
+                            if (!trimmed.StartsWith("-"))
+                            {
+                                ImGui.TextColored(new Vector4(0.7f, 0.85f, 1.0f, 1.0f), trimmed);
+                                continue;
+                            }
+
+                            // Bullet lines
+                            var bulletText = trimmed.Length > 1 ? trimmed[1..].TrimStart() : string.Empty;
+                            ImGui.TextUnformatted($"• {bulletText}");
+                        }
+                    }
+
+                    ImGui.Unindent(Scale(12f));
+                    ImGui.Spacing();
+                }
+            }
         }
 
         firstDraw = false;

@@ -156,8 +156,8 @@ public partial class SlaveWindow
         }
         else
         {
-            var selectedChars = dupPlotsSelectedIndices
-                .Where(i => i >= 0 && i < dupPlotsCharList.Count)
+            var selectedChars = Enumerable.Range(0, dupPlotsCharList.Count)
+                .Where(dupPlotsSelectedIndices.Contains)
                 .Select(i => dupPlotsCharList[i].CharName)
                 .ToList();
 
@@ -170,7 +170,7 @@ public partial class SlaveWindow
                 SlaveTask.CheckDuplicatePlots,
                 $"Start ({selectedChars.Count} chars)##dup",
                 canStart,
-                () => StartTaskWithConfig("Check Duplicate Plots", selectedChars, dupPlotsSelectedIndices,
+                () => StartTaskWithConfig("Check Duplicate Plots", selectedChars, dupPlotsCharList, dupPlotsSelectedIndices,
                     dupDoTextAdvance, dupDoRemoveSprout, dupDoOpenInventory, dupDoOpenArmoury,
                     dupDoOpenSaddlebags, dupDoOpenJournal, dupDoReturnToHome, dupDoCollectPersonalPlotInfo,
                     dupDoReturnToFc, dupDoParseForXaDatabase, dupDoLogoutOnComplete, dupDoKillGameOnComplete, dupDoEnableArMulti),
@@ -215,9 +215,10 @@ public partial class SlaveWindow
         anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
-        if (ImGui.BeginTable("DupPlotsTable", 7,
+        using (var imguiScope218 = ImRaii.Table("DupPlotsTable", 7,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
             ScaledVector(0f, 250f)))
+        if (imguiScope218)
         {
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(25f));
@@ -277,7 +278,7 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn(); ImGui.Text(!string.IsNullOrEmpty(info.Apartment) ? info.Apartment : "-");
                 ImGui.TableNextColumn(); ImGui.Text(!string.IsNullOrEmpty(info.FcEstate) ? info.FcEstate : "-");
             }
-            ImGui.EndTable();
+
         }
 
         ImGui.Spacing();

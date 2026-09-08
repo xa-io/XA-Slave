@@ -79,9 +79,10 @@ public sealed class EurekaLogogramCreatorAutomationOverlayWindow : Window
         var textPos = new Vector2(
             min.X + Math.Max(6f, (CancelButtonWidth - textSize.X) * 0.5f),
             min.Y + Math.Max(0f, (CancelButtonHeight - textSize.Y) * 0.5f));
-        ImGui.PushClipRect(min, max, true);
-        drawList.AddText(textPos, textColor, label);
-        ImGui.PopClipRect();
+        using (XASlaveImRaii.ClipRect(min, max, true))
+        {
+            drawList.AddText(textPos, textColor, label);
+        }
 
         if (ImGui.IsItemHovered())
         {

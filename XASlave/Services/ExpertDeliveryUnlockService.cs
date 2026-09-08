@@ -150,8 +150,16 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
 
     private byte GetGrandCompanyRankDetour(PlayerState* playerState)
     {
-        var original = getGrandCompanyRankHook?.Original(playerState) ?? 0;
-        return Math.Max(original, forcedRankFloor);
+        var original = getGrandCompanyRankHook?.OriginalDisposeSafe(playerState) ?? 0;
+        try
+        {
+            return Math.Max(original, forcedRankFloor);
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Expert Delivery Unlock rank detour failed after the original call.");
+            return original;
+        }
     }
 
     private delegate byte GetGrandCompanyRankDelegate(PlayerState* playerState);

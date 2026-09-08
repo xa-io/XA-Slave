@@ -49,25 +49,26 @@ public partial class SlaveWindow
 
         // -- Import / Refresh buttons --
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
-        if (!arConfigExists) ImGui.BeginDisabled();
-        if (ImGui.Button("Import from AutoRetainer##fcPermsImportAR"))
+        using (ImRaii.Disabled(!arConfigExists))
         {
-            try
+            if (ImGui.Button("Import from AutoRetainer##fcPermsImportAR"))
             {
-                var (added, total) = ImportCharactersFromArToList(chars);
-                cfg.Save();
-                arImportStatus = added > 0
-                    ? $"Imported {added} new ({total} total)"
-                    : $"All {total} already in list";
-                arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
-            }
-            catch (Exception ex)
-            {
-                arImportStatus = $"Import failed: {ex.Message}";
-                arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                try
+                {
+                    var (added, total) = ImportCharactersFromArToList(chars);
+                    cfg.Save();
+                    arImportStatus = added > 0
+                        ? $"Imported {added} new ({total} total)"
+                        : $"All {total} already in list";
+                    arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                }
+                catch (Exception ex)
+                {
+                    arImportStatus = $"Import failed: {ex.Message}";
+                    arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                }
             }
         }
-        if (!arConfigExists) ImGui.EndDisabled();
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(arConfigExists
                 ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
@@ -75,10 +76,11 @@ public partial class SlaveWindow
 
         ImGui.SameLine();
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
-        if (!xaDbAvailable) ImGui.BeginDisabled();
-        if (ImGui.Button("Pull XA Database Info##fcPermsPullXA"))
-            PullXaDatabaseInfo();
-        if (!xaDbAvailable) ImGui.EndDisabled();
+        using (ImRaii.Disabled(!xaDbAvailable))
+        {
+            if (ImGui.Button("Pull XA Database Info##fcPermsPullXA"))
+                PullXaDatabaseInfo();
+        }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(xaDbAvailable
                 ? "Read XA Database to update FC name for all characters."
@@ -164,9 +166,10 @@ public partial class SlaveWindow
         // Character table - columns: checkbox, #, character, world, FC name, member rank, FC rank, in FC, remove
         var charInfo = cfg.ReloggerCharacterInfo;
 
-        if (ImGui.BeginTable("FcPermsCharTable", 9,
+        using (var imguiScope167 = ImRaii.Table("FcPermsCharTable", 9,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable,
             ScaledVector(0f, 250f)))
+        if (imguiScope167)
         {
             ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
@@ -287,24 +290,24 @@ public partial class SlaveWindow
 
                 // Remove
                 ImGui.TableNextColumn();
-                ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
-                if (ImGui.SmallButton($"X##fpRm{i}"))
+                using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
-                    chars.RemoveAt(i);
-                    fcPermsSelectedIndices.Remove(i);
-                    var newSet = new HashSet<int>();
-                    foreach (var idx in fcPermsSelectedIndices)
-                        newSet.Add(idx > i ? idx - 1 : idx);
-                    fcPermsSelectedIndices.Clear();
-                    foreach (var idx in newSet) fcPermsSelectedIndices.Add(idx);
-                    cfg.Save();
-                    ImGui.PopStyleColor();
-                    break;
+                    if (ImGui.SmallButton($"X##fpRm{i}"))
+                    {
+                        chars.RemoveAt(i);
+                        fcPermsSelectedIndices.Remove(i);
+                        var newSet = new HashSet<int>();
+                        foreach (var idx in fcPermsSelectedIndices)
+                            newSet.Add(idx > i ? idx - 1 : idx);
+                        fcPermsSelectedIndices.Clear();
+                        foreach (var idx in newSet) fcPermsSelectedIndices.Add(idx);
+                        cfg.Save();
+                        break;
+                    }
                 }
-                ImGui.PopStyleColor();
             }
 
-            ImGui.EndTable();
+
         }
 
         ImGui.Spacing();
@@ -375,26 +378,22 @@ public partial class SlaveWindow
             .Select(i => chars[i])
             .ToList();
 
-        HaltAutoCollectionForPriorityTask("FC Permissions Updater");
-
         var steps = BuildFcPermissionsSteps(selected, plugin.TaskRunner);
 
-        reloggerRunList = new List<string>(selected);
-
-        plugin.TaskRunner.Start("FC Permissions Updater", steps, onLog: (msg) =>
+        if (!plugin.TaskRunner.Start("FC Permissions Updater", steps, onLog: (msg) =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
-        });
+        }, totalItems: selected.Count, suppressLogoutCancel: true))
+            return;
+
+        HaltAutoCollectionForPriorityTask("FC Permissions Updater");
+        reloggerRunList = new List<string>(selected);
     }
 
     private List<TaskStep> BuildFcPermissionsSteps(List<string> characters, TaskRunner runner)
     {
         var cfg = plugin.Configuration;
         var steps = new List<TaskStep>();
-
-        runner.TotalItems = characters.Count;
-        runner.CompletedItems = 0;
-        runner.SuppressLogoutCancel = true;
 
         // Disable AR Multi Mode
         steps.Add(new TaskStep
@@ -476,13 +475,31 @@ public partial class SlaveWindow
                 OnTimeout = () =>
                 {
                     relogFailed = true;
-                    runner.FailedCharacters.Add(charName);
+                    runner.RecordFailedCharacter(charName);
                     runner.AddLog($"FAILED: Could not relog to {charName}. Skipping FC permission edits for this character.");
                 },
             });
 
             // Guard the whole downstream FC-permission sequence behind relog success.
             var downstreamStart = steps.Count;
+            var permissionFlowFailed = false;
+            var ranksNavigationDispatched = false;
+            var rankSelectionDispatched = false;
+            var rankEditDispatched = false;
+            var rankConfirmationDispatched = false;
+            var contextMenuDispatched = false;
+            var permissionsDispatched = false;
+
+            void FailPermissionFlow(string message)
+            {
+                if (permissionFlowFailed)
+                    return;
+
+                permissionFlowFailed = true;
+                if (!runner.IncompleteCharacters.Contains(charName, StringComparer.OrdinalIgnoreCase))
+                    runner.RecordIncompleteCharacter(charName);
+                runner.AddLog($"FAILED: {message} The permission update for {charName} is unverified; remaining callbacks were stopped.");
+            }
 
             // SafeWait 3-pass
             foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"SafeWait ({charName})"))
@@ -501,6 +518,7 @@ public partial class SlaveWindow
                 },
                 IsComplete = () => AddonHelper.IsAddonVisible("FreeCompany"),
                 TimeoutSec = 5f,
+                OnTimeout = () => FailPermissionFlow("The Free Company window did not open."),
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Window: {charName}", 0.5f));
 
@@ -511,10 +529,13 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     runner.AddLog("Navigating to FC ranks...");
-                    AddonHelper.FireCallbackTrueInt("FreeCompany", 0);
+                    ranksNavigationDispatched = AddonHelper.IsAddonReady("FreeCompany") &&
+                                                AddonHelper.FireCallbackTrueInt("FreeCompany", 0);
                 },
-                IsComplete = () => true,
+                IsComplete = () => ranksNavigationDispatched && AddonHelper.IsAddonReady("FreeCompanyRank"),
                 TimeoutSec = 2f,
+                MaxRetries = 1,
+                OnTimeout = () => FailPermissionFlow("The ranks tab did not open after its callback."),
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Ranks Nav: {charName}", 0.3f));
 
@@ -527,10 +548,12 @@ public partial class SlaveWindow
                 {
                     runner.AddLog("Selecting rank for editing...");
                     if (AddonHelper.IsAddonReady("FreeCompanyRank"))
-                        AddonHelper.FireCallback("FreeCompanyRank", 2, 2);
+                        rankSelectionDispatched = AddonHelper.FireCallback("FreeCompanyRank", 2, 2);
                 },
-                IsComplete = () => true,
+                IsComplete = () => rankSelectionDispatched && AddonHelper.IsAddonReady("FreeCompanyRank"),
                 TimeoutSec = 2f,
+                MaxRetries = 1,
+                OnTimeout = () => FailPermissionFlow("The target rank selection callback was not accepted."),
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Rank Select Wait: {charName}", 0.3f));
 
@@ -541,10 +564,12 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     if (AddonHelper.IsAddonReady("FreeCompanyRank"))
-                        AddonHelper.FireCallback("FreeCompanyRank", 4, 3, 1513, 557);
+                        rankEditDispatched = AddonHelper.FireCallback("FreeCompanyRank", 4, 3, 1513, 557);
                 },
-                IsComplete = () => true,
+                IsComplete = () => rankEditDispatched && AddonHelper.IsAddonReady("FreeCompanyRank"),
                 TimeoutSec = 2f,
+                MaxRetries = 1,
+                OnTimeout = () => FailPermissionFlow("The target rank edit callback was not accepted."),
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Rank Edit Wait: {charName}", 0.1f));
 
@@ -555,10 +580,12 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     if (AddonHelper.IsAddonReady("FreeCompanyRank"))
-                        AddonHelper.FireCallback("FreeCompanyRank", 3, 2);
+                        rankConfirmationDispatched = AddonHelper.FireCallback("FreeCompanyRank", 3, 2);
                 },
-                IsComplete = () => true,
+                IsComplete = () => rankConfirmationDispatched && AddonHelper.IsAddonReady("ContextMenu"),
                 TimeoutSec = 2f,
+                MaxRetries = 1,
+                OnTimeout = () => FailPermissionFlow("The selected rank did not expose its context menu."),
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Rank Confirm Wait: {charName}", 0.1f));
 
@@ -569,10 +596,12 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     if (AddonHelper.IsAddonReady("ContextMenu"))
-                        AddonHelper.FireCallback("ContextMenu", 0, 0, 0);
+                        contextMenuDispatched = AddonHelper.FireCallback("ContextMenu", 0, 0, 0);
                 },
-                IsComplete = () => true,
+                IsComplete = () => contextMenuDispatched && AddonHelper.IsAddonReady("FreeCompanyMemberRankEdit"),
                 TimeoutSec = 2f,
+                MaxRetries = 1,
+                OnTimeout = () => FailPermissionFlow("The member-rank permissions editor did not open."),
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Context Wait: {charName}", 0.1f));
 
@@ -583,18 +612,24 @@ public partial class SlaveWindow
                 Name = $"Apply Permissions: {charName}",
                 OnEnter = () =>
                 {
-                    runner.AddLog("Applying all FC permissions...");
-                    if (AddonHelper.IsAddonReady("FreeCompanyMemberRankEdit"))
+                    if (!AddonHelper.IsAddonReady("FreeCompanyMemberRankEdit") ||
+                        !AddonHelper.AddonHasText("FreeCompanyMemberRankEdit", "Member", contains: true))
                     {
-                        // The permission values
-                        AddonHelper.FireCallback("FreeCompanyMemberRankEdit",
-                            0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1,
-                            3, 1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
-                            1, 1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, 1);
+                        FailPermissionFlow("The open permissions editor could not be positively identified as the Member rank.");
+                        return;
                     }
+
+                    runner.AddLog("Applying all FC permissions to the verified Member rank editor...");
+                    permissionsDispatched = AddonHelper.FireCallback("FreeCompanyMemberRankEdit",
+                        0, 0, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 3, 1, 1, 1, 1, 1,
+                        3, 1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+                        1, 1, 1, 1, 1, 1, 1, 1, 1, -1, 1, 1, 1);
                 },
-                IsComplete = () => true,
+                IsComplete = () => permissionFlowFailed ||
+                                   permissionsDispatched && !AddonHelper.IsAddonReady("FreeCompanyMemberRankEdit"),
                 TimeoutSec = 3f,
+                MaxRetries = 1,
+                OnTimeout = () => FailPermissionFlow("The verified Member rank permission callback was not accepted."),
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"Permissions Applied: {charName}", 0.5f));
 
@@ -620,10 +655,10 @@ public partial class SlaveWindow
             });
             steps.Add(MonthlyReloggerTask.MakeDelay($"FC Close 2: {charName}", 0.5f));
 
-            // If the relog failed (wrong character or timed out), skip every FC-permission step
-            // above so the rank edits never run against the wrong character.
+            // If relogging or any expected UI transition fails, skip the remaining permission
+            // sequence so a later callback can never land on a stale or unintended rank editor.
             for (var s = downstreamStart; s < steps.Count; s++)
-                steps[s] = MonthlyReloggerTask.WithSkip(steps[s], () => relogFailed);
+                steps[s] = MonthlyReloggerTask.WithSkip(steps[s], () => relogFailed || permissionFlowFailed);
 
             // Mark complete
             var capturedIndex = charIndex;
@@ -641,6 +676,11 @@ public partial class SlaveWindow
                         runner.AddLog($"Skipped {capturedName} ({capturedIndex}/{charTotal}) - relog failed");
                         return;
                     }
+                    if (permissionFlowFailed)
+                    {
+                        runner.AddLog($"Skipped {capturedName} ({capturedIndex}/{charTotal}) - permission UI verification failed");
+                        return;
+                    }
                     runner.AddLog($"Finished {capturedName} ({capturedIndex}/{charTotal})");
                 },
                 IsComplete = () => true,
@@ -656,7 +696,7 @@ public partial class SlaveWindow
             {
                 if (!MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(cfg.FcPermsLogoutOnComplete, cfg.FcPermsKillGameOnComplete))
                     runner.SuppressLogoutCancel = false;
-                runner.AddLog($"══ SUMMARY: All {characters.Count} character(s) permissions updated ══");
+                runner.AddLog($"══ SUMMARY: processed {characters.Count} character(s); verify failed/incomplete rows above before treating permissions as updated ══");
             },
             IsComplete = () => true,
             TimeoutSec = 1f,

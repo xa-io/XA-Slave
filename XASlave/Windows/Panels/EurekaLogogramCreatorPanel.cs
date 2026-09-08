@@ -14,7 +14,7 @@ public partial class SlaveWindow
     private string eurekaLogogramCreatorActionFilter = string.Empty;
     private string eurekaLogogramCreatorRecipeFilter = string.Empty;
     private string eurekaLogogramCreatorFavoritePlateName = string.Empty;
-    private readonly Dictionary<int, string> eurekaLogogramCreatorFavoritePlateRenameInputs = [];
+    private readonly Dictionary<FavoritePlate, string> eurekaLogogramCreatorFavoritePlateRenameInputs = [];
     private bool eurekaLogogramCreatorHowToUseExpanded = true;
 
     private void DrawEurekaLogogramCreatorTask()
@@ -37,11 +37,12 @@ public partial class SlaveWindow
 
         if (eurekaLogogramCreatorHowToUseExpanded)
         {
-            ImGui.PushTextWrapPos(0f);
-            ImGui.TextDisabled("Go to a Logos Manipulator in Eureka to use the live synthesis and extraction workflow.");
-            ImGui.TextDisabled("Favorites, recipe locks, and source-logogram prices can be managed here even before you walk up to the manipulator.");
-            ImGui.TextDisabled("Once the manipulator is open, XA Slave unlocks the live action list, stock scan, queue processing, and extraction automation tabs.");
-            ImGui.PopTextWrapPos();
+            using (ImRaii.TextWrapPos(0f))
+            {
+                ImGui.TextDisabled("Go to a Logos Manipulator in Eureka to use the live synthesis and extraction workflow.");
+                ImGui.TextDisabled("Favorites, recipe locks, and source-logogram prices can be managed here even before you walk up to the manipulator.");
+                ImGui.TextDisabled("Once the manipulator is open, XA Slave unlocks the live action list, stock scan, queue processing, and extraction automation tabs.");
+            }
         }
 
         ImGui.Separator();
@@ -55,46 +56,48 @@ public partial class SlaveWindow
 
         DrawEurekaLogogramCreatorToolbar(fontScaling, isInManipulator);
 
-        if (!ImGui.BeginTabBar("##EurekaLogogramCreatorTabs"))
+        using var tabBar = ImRaii.TabBar("##EurekaLogogramCreatorTabs");
+        if (!tabBar)
             return;
 
-        if (ImGui.BeginTabItem("Favorites"))
+        using (var favoritesTab = ImRaii.TabItem("Favorites"))
         {
-            DrawEurekaLogogramCreatorFavoritesTab(fontScaling);
-            ImGui.EndTabItem();
+            if (favoritesTab)
+                DrawEurekaLogogramCreatorFavoritesTab(fontScaling);
         }
 
-        if (ImGui.BeginTabItem("Recipes"))
+        using (var recipesTab = ImRaii.TabItem("Recipes"))
         {
-            DrawEurekaLogogramCreatorRecipePreferencesTab(fontScaling);
-            ImGui.EndTabItem();
+            if (recipesTab)
+                DrawEurekaLogogramCreatorRecipePreferencesTab(fontScaling);
         }
 
-        if (ImGui.BeginTabItem("Costs"))
+        using (var costsTab = ImRaii.TabItem("Costs"))
         {
-            DrawEurekaLogogramCreatorCostsTab(fontScaling);
-            ImGui.EndTabItem();
+            if (costsTab)
+                DrawEurekaLogogramCreatorCostsTab(fontScaling);
         }
 
-        if (isInManipulator && ImGui.BeginTabItem("Logos Actions"))
+        if (isInManipulator)
         {
-            DrawEurekaLogogramCreatorLogosActionsTab(fontScaling);
-            ImGui.EndTabItem();
-        }
+            using (var actionsTab = ImRaii.TabItem("Logos Actions"))
+            {
+                if (actionsTab)
+                    DrawEurekaLogogramCreatorLogosActionsTab(fontScaling);
+            }
 
-        if (isInManipulator && ImGui.BeginTabItem("Logogram Inventory"))
-        {
-            DrawEurekaLogogramCreatorInventoryTab(fontScaling);
-            ImGui.EndTabItem();
-        }
+            using (var inventoryTab = ImRaii.TabItem("Logogram Inventory"))
+            {
+                if (inventoryTab)
+                    DrawEurekaLogogramCreatorInventoryTab(fontScaling);
+            }
 
-        if (isInManipulator && ImGui.BeginTabItem("Queue"))
-        {
-            DrawEurekaLogogramCreatorQueueTab(fontScaling);
-            ImGui.EndTabItem();
+            using (var queueTab = ImRaii.TabItem("Queue"))
+            {
+                if (queueTab)
+                    DrawEurekaLogogramCreatorQueueTab(fontScaling);
+            }
         }
-
-        ImGui.EndTabBar();
     }
 
     private void DrawEurekaLogogramCreatorToolbar(float fontScaling, bool isInManipulator)
@@ -165,7 +168,7 @@ public partial class SlaveWindow
 
         ImGui.SetNextItemWidth(210 * fontScaling);
         var queueStepFrameDelay = logogramCreator.QueueStepFrameDelayFrames;
-        if (ImGui.SliderInt("Step Delay (Less is faster)", ref queueStepFrameDelay, 1, 120))
+        if (ImGui.SliderInt("Step Delay (Less is faster)", ref queueStepFrameDelay, 1, 120, "%d", ImGuiSliderFlags.AlwaysClamp))
         {
             logogramCreator.SetQueueStepFrameDelay(queueStepFrameDelay);
         }
@@ -256,12 +259,13 @@ public partial class SlaveWindow
         ImGui.TextColored(craftableColor, $"Current Plate: {logogramCreator.GetPendingPlateDescription()} | Craftable: {craftableCount}");
         ImGui.TextColored(new Vector4(0.9f, 0.8f, 0.45f, 1.0f), $"Current Plate Costs: Bare Minimum {pendingPlateBareMinimumLabel} | Recipe Cost {pendingPlateRecipeCostLabel}");
 
-        ImGui.BeginDisabled(!canStartPlate);
-        if (ImGui.Button("Start", new Vector2(90 * fontScaling, 0)))
+        using (ImRaii.Disabled(!canStartPlate))
         {
-            logogramCreator.QueuePendingPlate();
+            if (ImGui.Button("Start", new Vector2(90 * fontScaling, 0)))
+            {
+                logogramCreator.QueuePendingPlate();
+            }
         }
-        ImGui.EndDisabled();
 
         ImGui.SameLine();
         if (ImGui.Button("Clear Selection", new Vector2(130 * fontScaling, 0)))
@@ -293,9 +297,10 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Favorite plates save one Astral / Umbral build so they can be queued directly from the manipulator.");
         ImGui.TextDisabled("Recipe Cost matches the higher gil basis shown in the Recipes tab. Bare Minimum assumes the fastest successful appraisals.");
 
-        ImGui.PushItemWidth(300 * fontScaling);
-        ImGui.InputTextWithHint("##EurekaLogogramCreatorFavoritePlateName", "Favorite plate name...", ref eurekaLogogramCreatorFavoritePlateName, 100);
-        ImGui.PopItemWidth();
+        using (ImRaii.ItemWidth(300 * fontScaling))
+        {
+            ImGui.InputTextWithHint("##EurekaLogogramCreatorFavoritePlateName", "Favorite plate name...", ref eurekaLogogramCreatorFavoritePlateName, 100);
+        }
 
         ImGui.SameLine();
         if (ImGui.Button("Add Current Selection"))
@@ -324,157 +329,157 @@ public partial class SlaveWindow
             return;
         }
 
-        ImGui.BeginChild("##EurekaLogogramCreatorFavoritePlates", new Vector2(0, 0), true);
-
-        for (var i = 0; i < logogramCreator.Configuration.FavoritePlates.Count; i++)
+        using (ImRaii.Child("##EurekaLogogramCreatorFavoritePlates", new Vector2(0, 0), true))
         {
-            var plate = logogramCreator.Configuration.FavoritePlates[i];
-            var (astralActionId, umbralActionId) = GetEurekaLogogramCreatorFavoriteActionIds(plate);
-            var plateLabel = logogramCreator.DescribeFavoritePlate(plate);
-            var astralSummary = astralActionId.HasValue ? logogramCreator.GetActionName(astralActionId.Value) : "Empty";
-            var umbralSummary = umbralActionId.HasValue ? logogramCreator.GetActionName(umbralActionId.Value) : "Empty";
-            var astralBareMinimumLabel = !astralActionId.HasValue
-                ? "0 gil"
-                : logogramCreator.TryGetActionBareMinimumGilCost(astralActionId.Value, out var astralBareMinimumCost)
-                    ? logogramCreator.FormatGilCost(astralBareMinimumCost)
-                    : "Cost N/A";
-            var astralRecipeCostLabel = !astralActionId.HasValue
-                ? "0 gil"
-                : logogramCreator.TryGetActionRecipeGilCost(astralActionId.Value, out var astralRecipeCost)
-                    ? logogramCreator.FormatGilCost(astralRecipeCost)
-                    : "Cost N/A";
-            var umbralBareMinimumLabel = !umbralActionId.HasValue
-                ? "0 gil"
-                : logogramCreator.TryGetActionBareMinimumGilCost(umbralActionId.Value, out var umbralBareMinimumCost)
-                    ? logogramCreator.FormatGilCost(umbralBareMinimumCost)
-                    : "Cost N/A";
-            var umbralRecipeCostLabel = !umbralActionId.HasValue
-                ? "0 gil"
-                : logogramCreator.TryGetActionRecipeGilCost(umbralActionId.Value, out var umbralRecipeCost)
-                    ? logogramCreator.FormatGilCost(umbralRecipeCost)
-                    : "Cost N/A";
-            var plateBareMinimumLabel = logogramCreator.TryGetFavoritePlateBareMinimumGilCost(plate, out var plateBareMinimumCost)
-                ? logogramCreator.FormatGilCost(plateBareMinimumCost)
-                : "Cost N/A";
-            var plateRecipeCostLabel = logogramCreator.TryGetFavoritePlateRecipeGilCost(plate, out var plateRecipeCost)
-                ? logogramCreator.FormatGilCost(plateRecipeCost)
-                : "Cost N/A";
-            if (!eurekaLogogramCreatorFavoritePlateRenameInputs.TryGetValue(i, out var renameInput))
-            {
-                renameInput = plate.Name;
-            }
 
-            ImGui.PushID(i);
-            ImGui.Text(plateLabel);
-            if (ImGui.BeginDragDropSource())
+            for (var i = 0; i < logogramCreator.Configuration.FavoritePlates.Count; i++)
             {
-                ImGui.SetDragDropPayload(EurekaLogogramCreatorFavoriteDragDropType, BitConverter.GetBytes(i));
-
-                ImGui.TextUnformatted($"Move {plateLabel}");
-                ImGui.EndDragDropSource();
-            }
-
-            if (ImGui.BeginDragDropTarget())
-            {
-                unsafe
+                var plate = logogramCreator.Configuration.FavoritePlates[i];
+                var (astralActionId, umbralActionId) = GetEurekaLogogramCreatorFavoriteActionIds(plate);
+                var plateLabel = logogramCreator.DescribeFavoritePlate(plate);
+                var astralSummary = astralActionId.HasValue ? logogramCreator.GetActionName(astralActionId.Value) : "Empty";
+                var umbralSummary = umbralActionId.HasValue ? logogramCreator.GetActionName(umbralActionId.Value) : "Empty";
+                var astralBareMinimumLabel = !astralActionId.HasValue
+                    ? "0 gil"
+                    : logogramCreator.TryGetActionBareMinimumGilCost(astralActionId.Value, out var astralBareMinimumCost)
+                        ? logogramCreator.FormatGilCost(astralBareMinimumCost)
+                        : "Cost N/A";
+                var astralRecipeCostLabel = !astralActionId.HasValue
+                    ? "0 gil"
+                    : logogramCreator.TryGetActionRecipeGilCost(astralActionId.Value, out var astralRecipeCost)
+                        ? logogramCreator.FormatGilCost(astralRecipeCost)
+                        : "Cost N/A";
+                var umbralBareMinimumLabel = !umbralActionId.HasValue
+                    ? "0 gil"
+                    : logogramCreator.TryGetActionBareMinimumGilCost(umbralActionId.Value, out var umbralBareMinimumCost)
+                        ? logogramCreator.FormatGilCost(umbralBareMinimumCost)
+                        : "Cost N/A";
+                var umbralRecipeCostLabel = !umbralActionId.HasValue
+                    ? "0 gil"
+                    : logogramCreator.TryGetActionRecipeGilCost(umbralActionId.Value, out var umbralRecipeCost)
+                        ? logogramCreator.FormatGilCost(umbralRecipeCost)
+                        : "Cost N/A";
+                var plateBareMinimumLabel = logogramCreator.TryGetFavoritePlateBareMinimumGilCost(plate, out var plateBareMinimumCost)
+                    ? logogramCreator.FormatGilCost(plateBareMinimumCost)
+                    : "Cost N/A";
+                var plateRecipeCostLabel = logogramCreator.TryGetFavoritePlateRecipeGilCost(plate, out var plateRecipeCost)
+                    ? logogramCreator.FormatGilCost(plateRecipeCost)
+                    : "Cost N/A";
+                if (!eurekaLogogramCreatorFavoritePlateRenameInputs.TryGetValue(plate, out var renameInput))
                 {
-                    var payload = ImGui.AcceptDragDropPayload(EurekaLogogramCreatorFavoriteDragDropType);
-                    if (payload.Data != null && payload.DataSize == sizeof(int))
+                    renameInput = plate.Name;
+                }
+
+                using (ImRaii.PushId(i))
+                {
+                    ImGui.Text(plateLabel);
+                    using (var imguiScope369 = ImRaii.DragDropSource())
+                    if (imguiScope369)
                     {
-                        var sourceIndex = Marshal.ReadInt32((IntPtr)payload.Data);
-                        var rowMidpointY = (ImGui.GetItemRectMin().Y + ImGui.GetItemRectMax().Y) * 0.5f;
-                        var insertIndex = ImGui.GetMousePos().Y >= rowMidpointY ? i + 1 : i;
-                        if (logogramCreator.InsertFavoritePlateAt(sourceIndex, insertIndex))
+                        ImGui.SetDragDropPayload(EurekaLogogramCreatorFavoriteDragDropType, BitConverter.GetBytes(i));
+
+                        ImGui.TextUnformatted($"Move {plateLabel}");
+
+                    }
+
+                    using (var imguiScope377 = ImRaii.DragDropTarget())
+                    if (imguiScope377)
+                    {
+                        unsafe
                         {
-                            ResetEurekaLogogramCreatorFavoriteRenameInputs();
-                            ImGui.EndDragDropTarget();
-                            ImGui.PopID();
-                            break;
+                            var payload = ImGui.AcceptDragDropPayload(EurekaLogogramCreatorFavoriteDragDropType);
+                            if (payload.Data != null && payload.DataSize == sizeof(int))
+                            {
+                                var sourceIndex = Marshal.ReadInt32((IntPtr)payload.Data);
+                                var rowMidpointY = (ImGui.GetItemRectMin().Y + ImGui.GetItemRectMax().Y) * 0.5f;
+                                var insertIndex = ImGui.GetMousePos().Y >= rowMidpointY ? i + 1 : i;
+                                if (logogramCreator.InsertFavoritePlateAt(sourceIndex, insertIndex))
+                                {
+                                    ResetEurekaLogogramCreatorFavoriteRenameInputs();
+                                    break;
+                                }
+                            }
+                        }
+
+
+                    }
+
+                    ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"Umbral: {umbralSummary} | Bare Minimum: {umbralBareMinimumLabel} | Recipe Cost: {umbralRecipeCostLabel}");
+                    ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"Astral: {astralSummary} | Bare Minimum: {astralBareMinimumLabel} | Recipe Cost: {astralRecipeCostLabel}");
+                    ImGui.TextColored(new Vector4(0.9f, 0.8f, 0.45f, 1.0f), $"Plate Costs: Bare Minimum {plateBareMinimumLabel} | Recipe Cost {plateRecipeCostLabel}");
+                    ImGui.TextDisabled("Drag this row to reorder it, or use Up / Down.");
+
+                    using (ImRaii.ItemWidth(220 * fontScaling))
+                    {
+                        if (ImGui.InputTextWithHint("##FavoriteRename", "Custom button name...", ref renameInput, 100, ImGuiInputTextFlags.EnterReturnsTrue))
+                        {
+                            logogramCreator.RenameFavoritePlate(i, renameInput);
+                        }
+                        eurekaLogogramCreatorFavoritePlateRenameInputs[plate] = renameInput;
+                    }
+
+                    ImGui.SameLine();
+                    if (ImGui.Button("Rename"))
+                    {
+                        logogramCreator.RenameFavoritePlate(i, renameInput);
+                    }
+
+                    ImGui.SameLine();
+                    using (ImRaii.Disabled(i == 0))
+                    {
+                        if (ImGui.Button("Up"))
+                        {
+                            if (logogramCreator.MoveFavoritePlate(i, i - 1))
+                            {
+                                ResetEurekaLogogramCreatorFavoriteRenameInputs();
+                                break;
+                            }
                         }
                     }
-                }
 
-                ImGui.EndDragDropTarget();
-            }
+                    ImGui.SameLine();
+                    using (ImRaii.Disabled(i >= logogramCreator.Configuration.FavoritePlates.Count - 1))
+                    {
+                        if (ImGui.Button("Down"))
+                        {
+                            if (logogramCreator.MoveFavoritePlate(i, i + 1))
+                            {
+                                ResetEurekaLogogramCreatorFavoriteRenameInputs();
+                                break;
+                            }
+                        }
+                    }
 
-            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"Umbral: {umbralSummary} | Bare Minimum: {umbralBareMinimumLabel} | Recipe Cost: {umbralRecipeCostLabel}");
-            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"Astral: {astralSummary} | Bare Minimum: {astralBareMinimumLabel} | Recipe Cost: {astralRecipeCostLabel}");
-            ImGui.TextColored(new Vector4(0.9f, 0.8f, 0.45f, 1.0f), $"Plate Costs: Bare Minimum {plateBareMinimumLabel} | Recipe Cost {plateRecipeCostLabel}");
-            ImGui.TextDisabled("Drag this row to reorder it, or use Up / Down.");
+                    if (ImGui.Button("Queue Plate"))
+                    {
+                        logogramCreator.QueueFavoritePlate(plate);
+                    }
 
-            ImGui.PushItemWidth(220 * fontScaling);
-            if (ImGui.InputTextWithHint("##FavoriteRename", "Custom button name...", ref renameInput, 100, ImGuiInputTextFlags.EnterReturnsTrue))
-            {
-                logogramCreator.RenameFavoritePlate(i, renameInput);
-            }
-            eurekaLogogramCreatorFavoritePlateRenameInputs[i] = renameInput;
-            ImGui.PopItemWidth();
+                    ImGui.SameLine();
+                    if (ImGui.Button("Update From Selection"))
+                    {
+                        logogramCreator.UpsertFavoritePlate(plate.Name, logogramCreator.PendingAstralActionId, logogramCreator.PendingUmbralActionId);
+                    }
 
-            ImGui.SameLine();
-            if (ImGui.Button("Rename"))
-            {
-                logogramCreator.RenameFavoritePlate(i, renameInput);
-            }
+                    ImGui.SameLine();
+                    if (ImGui.Button("Delete"))
+                    {
+                        logogramCreator.DeleteFavoritePlate(i);
+                        ResetEurekaLogogramCreatorFavoriteRenameInputs();
+                        break;
+                    }
 
-            ImGui.SameLine();
-            ImGui.BeginDisabled(i == 0);
-            if (ImGui.Button("Up"))
-            {
-                if (logogramCreator.MoveFavoritePlate(i, i - 1))
-                {
-                    ResetEurekaLogogramCreatorFavoriteRenameInputs();
-                    ImGui.EndDisabled();
-                    ImGui.PopID();
-                    break;
-                }
-            }
-            ImGui.EndDisabled();
-
-            ImGui.SameLine();
-            ImGui.BeginDisabled(i >= logogramCreator.Configuration.FavoritePlates.Count - 1);
-            if (ImGui.Button("Down"))
-            {
-                if (logogramCreator.MoveFavoritePlate(i, i + 1))
-                {
-                    ResetEurekaLogogramCreatorFavoriteRenameInputs();
-                    ImGui.EndDisabled();
-                    ImGui.PopID();
-                    break;
+                    ImGui.Separator();
                 }
             }
-            ImGui.EndDisabled();
 
-            if (ImGui.Button("Queue Plate"))
+            var validPlates = logogramCreator.Configuration.FavoritePlates;
+            foreach (var staleKey in eurekaLogogramCreatorFavoritePlateRenameInputs.Keys.Where(x => !validPlates.Contains(x)).ToList())
             {
-                logogramCreator.QueueFavoritePlate(plate);
+                eurekaLogogramCreatorFavoritePlateRenameInputs.Remove(staleKey);
             }
 
-            ImGui.SameLine();
-            if (ImGui.Button("Update From Selection"))
-            {
-                logogramCreator.UpsertFavoritePlate(plate.Name, logogramCreator.PendingAstralActionId, logogramCreator.PendingUmbralActionId);
-            }
-
-            ImGui.SameLine();
-            if (ImGui.Button("Delete"))
-            {
-                logogramCreator.DeleteFavoritePlate(i);
-                ResetEurekaLogogramCreatorFavoriteRenameInputs();
-                ImGui.PopID();
-                break;
-            }
-
-            ImGui.Separator();
-            ImGui.PopID();
         }
-
-        var validPlateCount = logogramCreator.Configuration.FavoritePlates.Count;
-        foreach (var staleKey in eurekaLogogramCreatorFavoritePlateRenameInputs.Keys.Where(x => x >= validPlateCount).ToList())
-        {
-            eurekaLogogramCreatorFavoritePlateRenameInputs.Remove(staleKey);
-        }
-
-        ImGui.EndChild();
     }
 
     private void ResetEurekaLogogramCreatorFavoriteRenameInputs()
@@ -494,31 +499,33 @@ public partial class SlaveWindow
 
         DrawEurekaLogogramCreatorPlateBuilder(fontScaling);
 
-        ImGui.PushItemWidth(320 * fontScaling);
-        ImGui.InputTextWithHint("##EurekaLogogramCreatorActionFilter", "Filter actions...", ref eurekaLogogramCreatorActionFilter, 64, ImGuiInputTextFlags.AutoSelectAll);
-        ImGui.PopItemWidth();
+        using (ImRaii.ItemWidth(320 * fontScaling))
+        {
+            ImGui.InputTextWithHint("##EurekaLogogramCreatorActionFilter", "Filter actions...", ref eurekaLogogramCreatorActionFilter, 64, ImGuiInputTextFlags.AutoSelectAll);
+        }
 
         ImGui.Separator();
 
         var actionSheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>();
-        ImGui.BeginChild("##EurekaLogogramCreatorActionsList", new Vector2(0, -30 * fontScaling), true);
-
-        foreach (var action in logogramCreator.LogosActions)
+        using (ImRaii.Child("##EurekaLogogramCreatorActionsList", new Vector2(0, -30 * fontScaling), true))
         {
-            var actionName = actionSheet != null && actionSheet.TryGetRow(action.Id, out var actionRow)
-                ? actionRow.Name.ExtractText()
-                : $"Action {action.Id}";
 
-            if (!string.IsNullOrEmpty(eurekaLogogramCreatorActionFilter) &&
-                !actionName.Contains(eurekaLogogramCreatorActionFilter, StringComparison.OrdinalIgnoreCase))
+            foreach (var action in logogramCreator.LogosActions)
             {
-                continue;
+                var actionName = actionSheet != null && actionSheet.TryGetRow(action.Id, out var actionRow)
+                    ? actionRow.Name.ExtractText()
+                    : $"Action {action.Id}";
+
+                if (!string.IsNullOrEmpty(eurekaLogogramCreatorActionFilter) &&
+                    !actionName.Contains(eurekaLogogramCreatorActionFilter, StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+
+                DrawEurekaLogogramCreatorActionRow(action, actionName, fontScaling);
             }
 
-            DrawEurekaLogogramCreatorActionRow(action, actionName, fontScaling);
         }
-
-        ImGui.EndChild();
 
         if (logogramCreator.IsProcessingQueue)
         {
@@ -552,28 +559,29 @@ public partial class SlaveWindow
         ImGui.Image(texture.Handle, new Vector2(32, 32) * fontScaling);
 
         ImGui.SameLine();
-        ImGui.BeginGroup();
-        ImGui.Text(actionName);
-        ImGui.SameLine();
-        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"(Owned: {currentStock})");
-
-        if (resolvedRecipe != null)
+        using (ImRaii.Group())
         {
-            var recipeText = logogramCreator.FormatRecipe(resolvedRecipe);
-            var bareMinimumCost = logogramCreator.TryGetRecipeBareMinimumGilCost(resolvedRecipe, out var bareMinimumGilCost)
-                ? logogramCreator.FormatGilCost(bareMinimumGilCost)
-                : "Cost N/A";
-            var recipeColor = canCraft
-                ? new Vector4(0.0f, 1.0f, 0.0f, 1.0f)
-                : new Vector4(1.0f, 0.2f, 0.2f, 1.0f);
-            ImGui.TextColored(recipeColor, $"{recipeMode}: {maxCraftable} | Bare Minimum {bareMinimumCost} | {recipeText}");
-        }
-        else
-        {
-            ImGui.TextColored(new Vector4(1.0f, 0.2f, 0.2f, 1.0f), "No recipe data");
-        }
+            ImGui.Text(actionName);
+            ImGui.SameLine();
+            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"(Owned: {currentStock})");
 
-        ImGui.EndGroup();
+            if (resolvedRecipe != null)
+            {
+                var recipeText = logogramCreator.FormatRecipe(resolvedRecipe);
+                var bareMinimumCost = logogramCreator.TryGetRecipeBareMinimumGilCost(resolvedRecipe, out var bareMinimumGilCost)
+                    ? logogramCreator.FormatGilCost(bareMinimumGilCost)
+                    : "Cost N/A";
+                var recipeColor = canCraft
+                    ? new Vector4(0.0f, 1.0f, 0.0f, 1.0f)
+                    : new Vector4(1.0f, 0.2f, 0.2f, 1.0f);
+                ImGui.TextColored(recipeColor, $"{recipeMode}: {maxCraftable} | Bare Minimum {bareMinimumCost} | {recipeText}");
+            }
+            else
+            {
+                ImGui.TextColored(new Vector4(1.0f, 0.2f, 0.2f, 1.0f), "No recipe data");
+            }
+
+        }
 
         var buttonWidth = 70 * fontScaling;
         var soloWidth = 60 * fontScaling;
@@ -603,21 +611,23 @@ public partial class SlaveWindow
             return;
         }
 
-        ImGui.PushStyleVar(ImGuiStyleVar.Alpha, 0.5f);
-        ImGui.Button($"Need Mats##{side}_{actionId}", new Vector2(buttonWidth, buttonHeight));
-        ImGui.PopStyleVar();
+        using (ImRaii.PushStyle(ImGuiStyleVar.Alpha, 0.5f))
+        {
+            ImGui.Button($"Need Mats##{side}_{actionId}", new Vector2(buttonWidth, buttonHeight));
+        }
     }
 
     private void DrawEurekaLogogramCreatorSoloButton(uint actionId, float buttonWidth, float buttonHeight, bool canCraft)
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
 
-        ImGui.BeginDisabled(!canCraft);
-        if (ImGui.Button($"Solo##{actionId}", new Vector2(buttonWidth, buttonHeight)))
+        using (ImRaii.Disabled(!canCraft))
         {
-            logogramCreator.QueueSynthesis(actionId);
+            if (ImGui.Button($"Solo##{actionId}", new Vector2(buttonWidth, buttonHeight)))
+            {
+                logogramCreator.QueueSynthesis(actionId);
+            }
         }
-        ImGui.EndDisabled();
 
         if (ImGui.IsItemHovered())
         {
@@ -637,75 +647,79 @@ public partial class SlaveWindow
         }
 
         ImGui.TextDisabled("Lock a specific synthesis recipe per action. Automatic mode uses Cheapest By Gil and the source-logogram prices from the Costs tab.");
-        ImGui.PushItemWidth(320 * fontScaling);
-        ImGui.InputTextWithHint("##EurekaLogogramCreatorRecipeFilter", "Filter actions...", ref eurekaLogogramCreatorRecipeFilter, 64, ImGuiInputTextFlags.AutoSelectAll);
-        ImGui.PopItemWidth();
+        using (ImRaii.ItemWidth(320 * fontScaling))
+        {
+            ImGui.InputTextWithHint("##EurekaLogogramCreatorRecipeFilter", "Filter actions...", ref eurekaLogogramCreatorRecipeFilter, 64, ImGuiInputTextFlags.AutoSelectAll);
+        }
         ImGui.Separator();
 
         var actionSheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>();
-        ImGui.BeginChild("##EurekaLogogramCreatorRecipePrefs", new Vector2(0, 0), true);
-
-        foreach (var action in logogramCreator.LogosActions)
+        using (ImRaii.Child("##EurekaLogogramCreatorRecipePrefs", new Vector2(0, 0), true))
         {
-            var actionName = actionSheet != null && actionSheet.TryGetRow(action.Id, out var actionRow)
-                ? actionRow.Name.ExtractText()
-                : $"Action {action.Id}";
-            if (!string.IsNullOrEmpty(eurekaLogogramCreatorRecipeFilter) &&
-                !actionName.Contains(eurekaLogogramCreatorRecipeFilter, StringComparison.OrdinalIgnoreCase))
+
+            foreach (var action in logogramCreator.LogosActions)
             {
-                continue;
-            }
-
-            ImGui.PushID((int)action.Id);
-            ImGui.Text(actionName);
-
-            var selectedRecipeIndex = logogramCreator.GetPreferredRecipeIndex(action.Id);
-            var automaticRecipePreview = GetEurekaLogogramCreatorAutomaticRecipePreviewLabel(action, automaticRecipeModeLabel);
-            var preview = selectedRecipeIndex >= 0 && selectedRecipeIndex < action.Recipes.Count
-                ? GetEurekaLogogramCreatorRecipeChoiceLabel(selectedRecipeIndex, action.Recipes[selectedRecipeIndex], logogramCreator.GetCraftableCount(action.Recipes[selectedRecipeIndex]))
-                : automaticRecipePreview;
-
-            if (ImGui.BeginCombo("##RecipeChoice", preview))
-            {
-                var automaticSelected = selectedRecipeIndex < 0;
-                if (ImGui.Selectable(automaticRecipePreview, automaticSelected))
+                var actionName = actionSheet != null && actionSheet.TryGetRow(action.Id, out var actionRow)
+                    ? actionRow.Name.ExtractText()
+                    : $"Action {action.Id}";
+                if (!string.IsNullOrEmpty(eurekaLogogramCreatorRecipeFilter) &&
+                    !actionName.Contains(eurekaLogogramCreatorRecipeFilter, StringComparison.OrdinalIgnoreCase))
                 {
-                    logogramCreator.SetPreferredRecipeIndex(action.Id, -1);
+                    continue;
                 }
 
-                for (var i = 0; i < action.Recipes.Count; i++)
+                using (ImRaii.PushId((int)action.Id))
                 {
-                    var recipe = action.Recipes[i];
-                    var craftableCount = logogramCreator.GetCraftableCount(recipe);
-                    var itemLabel = GetEurekaLogogramCreatorRecipeChoiceLabel(i, recipe, craftableCount);
-                    if (ImGui.Selectable(itemLabel, selectedRecipeIndex == i))
+                    ImGui.Text(actionName);
+
+                    var selectedRecipeIndex = logogramCreator.GetPreferredRecipeIndex(action.Id);
+                    var automaticRecipePreview = GetEurekaLogogramCreatorAutomaticRecipePreviewLabel(action, automaticRecipeModeLabel);
+                    var preview = selectedRecipeIndex >= 0 && selectedRecipeIndex < action.Recipes.Count
+                        ? GetEurekaLogogramCreatorRecipeChoiceLabel(selectedRecipeIndex, action.Recipes[selectedRecipeIndex], logogramCreator.GetCraftableCount(action.Recipes[selectedRecipeIndex]))
+                        : automaticRecipePreview;
+
+                    using (var imguiScope668 = ImRaii.Combo("##RecipeChoice", preview))
+                    if (imguiScope668)
                     {
-                        logogramCreator.SetPreferredRecipeIndex(action.Id, i);
+                        var automaticSelected = selectedRecipeIndex < 0;
+                        if (ImGui.Selectable(automaticRecipePreview, automaticSelected))
+                        {
+                            logogramCreator.SetPreferredRecipeIndex(action.Id, -1);
+                        }
+
+                        for (var i = 0; i < action.Recipes.Count; i++)
+                        {
+                            var recipe = action.Recipes[i];
+                            var craftableCount = logogramCreator.GetCraftableCount(recipe);
+                            var itemLabel = GetEurekaLogogramCreatorRecipeChoiceLabel(i, recipe, craftableCount);
+                            if (ImGui.Selectable(itemLabel, selectedRecipeIndex == i))
+                            {
+                                logogramCreator.SetPreferredRecipeIndex(action.Id, i);
+                            }
+                        }
+
+
                     }
+
+                    var resolvedRecipe = logogramCreator.GetResolvedRecipe(action, out var resolvedRecipeIndex);
+                    if (resolvedRecipe != null)
+                    {
+                        var resolvedRecipeCostLabel = logogramCreator.TryGetRecipeGilCost(resolvedRecipe, out var resolvedRecipeCost)
+                            ? logogramCreator.FormatGilCost(resolvedRecipeCost)
+                            : "Cost N/A";
+                        var recipeColor = logogramCreator.IsRecipeCraftable(resolvedRecipe)
+                            ? new Vector4(0.0f, 1.0f, 0.0f, 1.0f)
+                            : new Vector4(1.0f, 0.2f, 0.2f, 1.0f);
+                        ImGui.TextColored(
+                            recipeColor,
+                            $"{(logogramCreator.GetPreferredRecipeIndex(action.Id) >= 0 ? $"Locked Recipe {resolvedRecipeIndex + 1}" : automaticRecipeModeLabel)}: {resolvedRecipeCostLabel} | {logogramCreator.FormatRecipe(resolvedRecipe)}");
+                    }
+
+                    ImGui.Separator();
                 }
-
-                ImGui.EndCombo();
             }
 
-            var resolvedRecipe = logogramCreator.GetResolvedRecipe(action, out var resolvedRecipeIndex);
-            if (resolvedRecipe != null)
-            {
-                var resolvedRecipeCostLabel = logogramCreator.TryGetRecipeGilCost(resolvedRecipe, out var resolvedRecipeCost)
-                    ? logogramCreator.FormatGilCost(resolvedRecipeCost)
-                    : "Cost N/A";
-                var recipeColor = logogramCreator.IsRecipeCraftable(resolvedRecipe)
-                    ? new Vector4(0.0f, 1.0f, 0.0f, 1.0f)
-                    : new Vector4(1.0f, 0.2f, 0.2f, 1.0f);
-                ImGui.TextColored(
-                    recipeColor,
-                    $"{(logogramCreator.GetPreferredRecipeIndex(action.Id) >= 0 ? $"Locked Recipe {resolvedRecipeIndex + 1}" : automaticRecipeModeLabel)}: {resolvedRecipeCostLabel} | {logogramCreator.FormatRecipe(resolvedRecipe)}");
-            }
-
-            ImGui.Separator();
-            ImGui.PopID();
         }
-
-        ImGui.EndChild();
     }
 
     private void DrawEurekaLogogramCreatorCostsTab(float fontScaling)
@@ -727,45 +741,47 @@ public partial class SlaveWindow
         ImGui.Separator();
         ImGui.TextDisabled("Expected specific mneme cost = source logogram cost x source pool size.");
 
-        ImGui.BeginChild("##EurekaLogogramCreatorCostsTab", new Vector2(0, 0), true);
-
-        if (ImGui.BeginTable("##EurekaLogogramCreatorLogogramCosts", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp))
+        using (ImRaii.Child("##EurekaLogogramCreatorCostsTab", new Vector2(0, 0), true))
         {
-            ImGui.TableSetupColumn("Source");
-            ImGui.TableSetupColumn("Pool");
-            ImGui.TableSetupColumn("Cost Each");
-            ImGui.TableSetupColumn("Specific Mneme Cost");
-            ImGui.TableHeadersRow();
 
-            foreach (var source in logogramCreator.GetLogogramSourceDefinitions())
+            using (var imguiScope732 = ImRaii.Table("##EurekaLogogramCreatorLogogramCosts", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp))
+            if (imguiScope732)
             {
-                var poolSize = logogramCreator.GetLogogramSourcePoolSize(source.ItemId);
-                var configuredCost = logogramCreator.GetConfiguredLogogramSourceGilCost(source.ItemId);
-                var specificMnemeCost = logogramCreator.GetConfiguredSpecificMnemeGilCost(source.ItemId);
+                ImGui.TableSetupColumn("Source");
+                ImGui.TableSetupColumn("Pool");
+                ImGui.TableSetupColumn("Cost Each");
+                ImGui.TableSetupColumn("Specific Mneme Cost");
+                ImGui.TableHeadersRow();
 
-                ImGui.TableNextRow();
-
-                ImGui.TableNextColumn();
-                ImGui.Text(source.Name);
-
-                ImGui.TableNextColumn();
-                ImGui.Text(poolSize > 0 ? poolSize.ToString() : "?");
-
-                ImGui.TableNextColumn();
-                ImGui.SetNextItemWidth(-float.Epsilon);
-                if (ImGui.InputInt($"##SourceCost_{source.ItemId}", ref configuredCost, 100, 1000))
+                foreach (var source in logogramCreator.GetLogogramSourceDefinitions())
                 {
-                    logogramCreator.SetLogogramSourceGilCost(source.ItemId, configuredCost);
+                    var poolSize = logogramCreator.GetLogogramSourcePoolSize(source.ItemId);
+                    var configuredCost = logogramCreator.GetConfiguredLogogramSourceGilCost(source.ItemId);
+                    var specificMnemeCost = logogramCreator.GetConfiguredSpecificMnemeGilCost(source.ItemId);
+
+                    ImGui.TableNextRow();
+
+                    ImGui.TableNextColumn();
+                    ImGui.Text(source.Name);
+
+                    ImGui.TableNextColumn();
+                    ImGui.Text(poolSize > 0 ? poolSize.ToString() : "?");
+
+                    ImGui.TableNextColumn();
+                    ImGui.SetNextItemWidth(-float.Epsilon);
+                    if (ImGui.InputInt($"##SourceCost_{source.ItemId}", ref configuredCost, 100, 1000))
+                    {
+                        logogramCreator.SetLogogramSourceGilCost(source.ItemId, configuredCost);
+                    }
+
+                    ImGui.TableNextColumn();
+                    ImGui.Text(poolSize > 0 ? logogramCreator.FormatGilCost(specificMnemeCost) : "N/A");
                 }
 
-                ImGui.TableNextColumn();
-                ImGui.Text(poolSize > 0 ? logogramCreator.FormatGilCost(specificMnemeCost) : "N/A");
+
             }
 
-            ImGui.EndTable();
         }
-
-        ImGui.EndChild();
     }
 
     private void DrawEurekaLogogramCreatorInventoryTab(float fontScaling)
@@ -779,30 +795,31 @@ public partial class SlaveWindow
         }
 
         ImGui.Separator();
-        ImGui.BeginChild("##EurekaLogogramCreatorLogogramList", new Vector2(0, 0), true);
-        var itemSheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Item>();
-
-        foreach (var kvp in logogramCreator.LogogramStock.OrderBy(x =>
-                     logogramCreator.Logograms.TryGetValue(x.Key, out var knownLogogram) ? knownLogogram.Name : x.Key.ToString()))
+        using (ImRaii.Child("##EurekaLogogramCreatorLogogramList", new Vector2(0, 0), true))
         {
-            if (!logogramCreator.Logograms.TryGetValue(kvp.Key, out var logogram))
+            var itemSheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Item>();
+
+            foreach (var kvp in logogramCreator.LogogramStock.OrderBy(x =>
+                         logogramCreator.Logograms.TryGetValue(x.Key, out var knownLogogram) ? knownLogogram.Name : x.Key.ToString()))
             {
-                continue;
+                if (!logogramCreator.Logograms.TryGetValue(kvp.Key, out var logogram))
+                {
+                    continue;
+                }
+
+                var iconId = 65000u;
+                if (itemSheet != null && itemSheet.TryGetRow((uint)logogram.Id, out var itemRow) && itemRow.Icon > 0)
+                {
+                    iconId = itemRow.Icon;
+                }
+
+                var texture = Plugin.TextureProvider.GetFromGameIcon(iconId).GetWrapOrEmpty();
+                ImGui.Image(texture.Handle, new Vector2(24, 24) * fontScaling);
+                ImGui.SameLine();
+                ImGui.Text($"{logogram.Name}: {kvp.Value}");
             }
 
-            var iconId = 65000u;
-            if (itemSheet != null && itemSheet.TryGetRow((uint)logogram.Id, out var itemRow) && itemRow.Icon > 0)
-            {
-                iconId = itemRow.Icon;
-            }
-
-            var texture = Plugin.TextureProvider.GetFromGameIcon(iconId).GetWrapOrEmpty();
-            ImGui.Image(texture.Handle, new Vector2(24, 24) * fontScaling);
-            ImGui.SameLine();
-            ImGui.Text($"{logogram.Name}: {kvp.Value}");
         }
-
-        ImGui.EndChild();
     }
 
     private void DrawEurekaLogogramCreatorQueueTab(float fontScaling)
@@ -820,31 +837,32 @@ public partial class SlaveWindow
             return;
         }
 
-        ImGui.BeginChild("##EurekaLogogramCreatorQueueList", new Vector2(0, -40 * fontScaling), true);
-
-        var queueList = logogramCreator.SynthesisQueue.ToList();
-        for (var i = 0; i < queueList.Count; i++)
+        using (ImRaii.Child("##EurekaLogogramCreatorQueueList", new Vector2(0, -40 * fontScaling), true))
         {
-            var request = queueList[i];
-            ImGui.Text($"{i + 1}. {request.Label}");
-            if (request.Astral != null)
+
+            var queueList = logogramCreator.SynthesisQueue.ToList();
+            for (var i = 0; i < queueList.Count; i++)
             {
-                ImGui.TextColored(
-                    new Vector4(0.7f, 0.7f, 0.7f, 1.0f),
-                    $"Astral: {request.Astral.ActionName} (Recipe {request.Astral.RecipeIndex + 1}: {logogramCreator.FormatRecipe(request.Astral.Recipe)})");
+                var request = queueList[i];
+                ImGui.Text($"{i + 1}. {request.Label}");
+                if (request.Astral != null)
+                {
+                    ImGui.TextColored(
+                        new Vector4(0.7f, 0.7f, 0.7f, 1.0f),
+                        $"Astral: {request.Astral.ActionName} (Recipe {request.Astral.RecipeIndex + 1}: {logogramCreator.FormatRecipe(request.Astral.Recipe)})");
+                }
+
+                if (request.Umbral != null)
+                {
+                    ImGui.TextColored(
+                        new Vector4(0.7f, 0.7f, 0.7f, 1.0f),
+                        $"Umbral: {request.Umbral.ActionName} (Recipe {request.Umbral.RecipeIndex + 1}: {logogramCreator.FormatRecipe(request.Umbral.Recipe)})");
+                }
+
+                ImGui.Separator();
             }
 
-            if (request.Umbral != null)
-            {
-                ImGui.TextColored(
-                    new Vector4(0.7f, 0.7f, 0.7f, 1.0f),
-                    $"Umbral: {request.Umbral.ActionName} (Recipe {request.Umbral.RecipeIndex + 1}: {logogramCreator.FormatRecipe(request.Umbral.Recipe)})");
-            }
-
-            ImGui.Separator();
         }
-
-        ImGui.EndChild();
 
         if (ImGui.Button("Clear Queue", new Vector2(110 * fontScaling, 0)))
         {

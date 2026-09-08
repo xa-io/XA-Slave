@@ -129,6 +129,10 @@ public static class TitleBarFavSelectionKeys
 [Serializable]
 public class Configuration : IPluginConfiguration
 {
+    /// <summary>Latest ordered configuration schema; increment only with a matching migration step.</summary>
+    public const int CurrentVersion = 1;
+
+    private readonly DeferredSaveCoordinator deferredSaveCoordinator = new();
     public int Version { get; set; } = 0;
     public bool OpenPluginOnLoad { get; set; } = false;
 
@@ -140,6 +144,7 @@ public class Configuration : IPluginConfiguration
     public bool CustomResolutionOnLoadIgnoreMinimumWindowSize { get; set; } = true;
 
     public bool VerboseTaskLogging { get; set; } = false;
+    public bool MessageLogEnabled { get; set; } = false;
     public bool ShowVersionInUpdatesTitle { get; set; } = true;
     public bool ShowVersionInWindowTitleDefaultApplied { get; set; } = false;
     public bool GlobalCharacterListAnonymizeEnabled { get; set; } = false;
@@ -209,6 +214,21 @@ public class Configuration : IPluginConfiguration
     public List<string> RefreshSubsCharacters { get; set; } = new();
     public string RefreshSubsRegionFilter { get; set; } = "All";
     public bool RefreshSubsAnonymizeCharacters { get; set; } = false;
+    public bool RefreshSubsGoWorkshop { get; set; } = true;
+    public float RefreshSubsExtraWaitSeconds { get; set; } = 3.0f;
+    public bool RefreshSubsLogoutOnComplete { get; set; } = false;
+    public bool RefreshSubsKillGameOnComplete { get; set; } = false;
+    public bool RefreshSubsEnableArMultiOnComplete { get; set; } = true;
+    public bool RefreshSubsOpenArmoury { get; set; } = false;
+    public bool RefreshSubsOpenSaddlebags { get; set; } = false;
+    public bool RefreshSubsOpenJournal { get; set; } = false;
+    public bool RefreshSubsReturnToHome { get; set; } = false;
+    public bool RefreshSubsCollectPersonalPlotInfo { get; set; } = false;
+
+    public float FcFloaterCheckIntervalSeconds { get; set; } = 1.0f;
+    public float FcFloaterDialogTimeoutSeconds { get; set; } = 5.0f;
+    public float FcFloaterWaitAfterJoinSeconds { get; set; } = 15.0f;
+    public float FcFloaterIdleTimeoutMinutes { get; set; } = 10.0f;
 
     // -- Prep Logistics --
     public List<string> PrepLogisticsCharacters { get; set; } = new();
@@ -569,6 +589,7 @@ public class Configuration : IPluginConfiguration
     public int ExportDataRunEveryHours { get; set; } = 24;
     public string ExportDataOutputPath { get; set; } = string.Empty;
     public bool ExportDataOverwriteFile { get; set; } = false;
+    public List<string> ExportDataConfirmedOverwritePaths { get; set; } = new();
     public string ExportDataLastSuccessfulRunUtc { get; set; } = string.Empty;
 
     public bool MenuAutomatedTasksExpanded { get; set; } = true;
@@ -600,10 +621,25 @@ public class Configuration : IPluginConfiguration
     public List<TitleBarFavCustomItem> TitleBarFavCustomItems { get; set; } = new();
     public List<TitleBarFavResolutionItem> TitleBarFavResolutionItems { get; set; } = new();
 
-    public void InitializeFloorderDefaults()
+    public bool InitializeFloorderDefaults()
     {
-        if (FloorderInitialized) return;
+        var changed = false;
+        if (FloorderSelectedCities == null)
+        {
+            FloorderSelectedCities = new List<string>();
+            changed = true;
+        }
+        if (FloorderAnnouncements == null)
+        {
+            FloorderAnnouncements = new List<string>();
+            changed = true;
+        }
+
+        if (FloorderInitialized)
+            return changed;
+
         FloorderInitialized = true;
+        changed = true;
         if (FloorderSelectedCities.Count == 0)
         {
             FloorderSelectedCities.AddRange(new[] { "Limsa Lominsa Lower Decks", "New Gridania", "Ul'dah - Steps of Nald" });
@@ -617,7 +653,7 @@ public class Configuration : IPluginConfiguration
                 "I'm just looking for a new sidequest.",
             });
         }
-        Save();
+        return changed;
     }
 
     public bool InitializeAutoGlamWeatherDefaults()
@@ -683,6 +719,33 @@ public class Configuration : IPluginConfiguration
 
     public void Save()
     {
+        deferredSaveCoordinator.Invalidate();
+        Plugin.PluginInterface.SavePluginConfig(this);
+    }
+
+    /// <summary>
+    /// Coalesces high-frequency UI and automation updates into one framework-thread config write.
+    /// Immediate <see cref="Save"/> calls invalidate any older scheduled write.
+    /// </summary>
+    public void SaveDeferred(int delayMilliseconds = 750)
+    {
+        var boundedDelay = Math.Clamp(delayMilliseconds, 100, 5000);
+        var generation = deferredSaveCoordinator.Queue();
+        Plugin.ScheduleOnGameThread(() =>
+        {
+            if (!deferredSaveCoordinator.TryClaim(generation))
+                return;
+
+            Plugin.PluginInterface.SavePluginConfig(this);
+        }, delay: TimeSpan.FromMilliseconds(boundedDelay));
+    }
+
+    /// <summary>Persists a coalesced write synchronously during plugin teardown, if one is pending.</summary>
+    internal void FlushPendingSave()
+    {
+        if (!deferredSaveCoordinator.TryFlush())
+            return;
+
         Plugin.PluginInterface.SavePluginConfig(this);
     }
 }

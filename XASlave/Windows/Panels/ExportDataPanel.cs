@@ -11,6 +11,7 @@ using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
 using Microsoft.Data.Sqlite;
 using XASlave.Data;
+using XASlave.Services;
 
 namespace XASlave.Windows;
 
@@ -30,6 +31,9 @@ public partial class SlaveWindow
     private const string ExportTimestampToken = "{timestamp}";
     private const string ExportRuntimeStateFileName = "ExportData.runtime.json";
     private const uint ExportVentureCofferItemId = 32161;
+    private const int ExportMaxConfirmedOverwritePaths = 32;
+
+    private static readonly string[] AllowedExportExtensions = { ".tsv", ".csv", ".txt", ".json" };
 
     private static readonly string[] ExportBaseHeaderColumns =
     {
@@ -87,6 +91,16 @@ public partial class SlaveWindow
     private bool exportWriteInProgress;
     private ExportWriteResult? exportCompletedWrite;
     private bool exportInitialized;
+    private string exportPathProbeKey = string.Empty;
+    private DateTime exportNextPathProbeUtc = DateTime.MinValue;
+    private bool exportProbedFolderExists;
+    private bool exportProbedTargetExists;
+    private PolledValue<ExportDependencyState>? exportDependencyState;
+
+    private readonly record struct ExportDependencyState(
+        bool AutoRetainerConfigExists,
+        bool LifestreamConfigExists,
+        bool XaDatabaseAvailable);
 
     // -----------------------------------------------
     //  Export Data - lifecycle
@@ -99,12 +113,44 @@ public partial class SlaveWindow
         var autoRetainerPath = plugin.ArConfigReader.GetAutoRetainerConfigPath();
         var configDir = Plugin.PluginInterface.GetPluginConfigDirectory();
         exportPluginConfigsBasePath = Path.GetDirectoryName(Path.GetDirectoryName(autoRetainerPath) ?? configDir) ?? configDir;
+        exportDependencyState = new PolledValue<ExportDependencyState>(
+            "Export Data dependencies",
+            () =>
+            {
+                var xaDatabasePath = plugin.IpcClient.IsXaDatabaseAvailable()
+                    ? plugin.IpcClient.GetDbPath()
+                    : string.Empty;
+                return new ExportDependencyState(
+                    File.Exists(GetExportAutoRetainerConfigPath()),
+                    File.Exists(GetExportLifestreamConfigPath()),
+                    !string.IsNullOrWhiteSpace(xaDatabasePath) && File.Exists(xaDatabasePath));
+            },
+            TimeSpan.FromSeconds(5));
 
         // Migrate legacy separate-file settings into Configuration if output path is still empty
         MigrateExportDataLegacySettings();
+        NormalizeExportOverwriteConfirmations();
         ExportLoadRuntimeState(configDir);
 
         exportInitialized = true;
+    }
+
+    private void NormalizeExportOverwriteConfirmations()
+    {
+        var cfg = plugin.Configuration;
+        var normalized = (cfg.ExportDataConfirmedOverwritePaths ?? new List<string>())
+            .Where(path => !string.IsNullOrWhiteSpace(path))
+            .Select(path => path.Trim())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .TakeLast(ExportMaxConfirmedOverwritePaths)
+            .ToList();
+
+        if (cfg.ExportDataConfirmedOverwritePaths == null ||
+            !cfg.ExportDataConfirmedOverwritePaths.SequenceEqual(normalized, StringComparer.OrdinalIgnoreCase))
+        {
+            cfg.ExportDataConfirmedOverwritePaths = normalized;
+            cfg.Save();
+        }
     }
 
     private void MigrateExportDataLegacySettings()
@@ -208,9 +254,10 @@ public partial class SlaveWindow
         var yellow = new Vector4(1.0f, 0.8f, 0.3f, 1.0f);
         var red = new Vector4(1.0f, 0.4f, 0.4f, 1.0f);
 
-        var arConfigExists = File.Exists(GetExportAutoRetainerConfigPath());
-        var lifestreamExists = File.Exists(GetExportLifestreamConfigPath());
-        var xaDatabaseAvailable = plugin.IpcClient.IsXaDatabaseAvailable() && File.Exists(plugin.IpcClient.GetDbPath());
+        var dependencies = exportDependencyState!.Value;
+        var arConfigExists = dependencies.AutoRetainerConfigExists;
+        var lifestreamExists = dependencies.LifestreamConfigExists;
+        var xaDatabaseAvailable = dependencies.XaDatabaseAvailable;
 
         ImGui.TextColored(cyan, ExportTaskName);
         ImGui.TextDisabled("Reference export panel for persisted character data.");
@@ -268,6 +315,8 @@ public partial class SlaveWindow
         if (ImGui.Checkbox("Overwrite fixed file path when no {timestamp} token is used", ref overwriteFile))
         {
             cfg.ExportDataOverwriteFile = overwriteFile;
+            if (!overwriteFile)
+                cfg.ExportDataConfirmedOverwritePaths.Clear();
             cfg.Save();
             ExportResetSchedulingState();
         }
@@ -278,32 +327,67 @@ public partial class SlaveWindow
         ImGui.TextDisabled(@"Example: E:\gil\pre_{timestamp}_post.tsv");
         ImGui.TextDisabled("Overwrite only applies to fixed file paths. Folder targets and tokenized names still create a new file.");
 
+        var pluginConfigDirectory = Plugin.PluginInterface.GetPluginConfigDirectory();
+        var pathIsValid = ExportTryResolveOutputFilePath(
+            cfg.ExportDataOutputPath,
+            DateTime.UtcNow,
+            cfg.ExportDataOverwriteFile,
+            pluginConfigDirectory,
+            out var resolvedOutputFile,
+            out var pathFailure);
+        var resolvedFolder = pathIsValid ? Path.GetDirectoryName(resolvedOutputFile) : null;
+        var fixedOverwriteTarget = pathIsValid && ExportIsFixedOverwriteTarget(cfg.ExportDataOutputPath, cfg.ExportDataOverwriteFile);
+        ExportRefreshPathProbe(resolvedFolder, fixedOverwriteTarget ? resolvedOutputFile : string.Empty);
+
+        var overwriteConfirmed = fixedOverwriteTarget && ExportIsOverwriteConfirmed(cfg.ExportDataConfirmedOverwritePaths, resolvedOutputFile);
+        if (fixedOverwriteTarget && exportProbedTargetExists)
+        {
+            var confirmOverwrite = overwriteConfirmed;
+            if (ImGui.Checkbox($"I understand this overwrites {resolvedOutputFile}", ref confirmOverwrite))
+            {
+                ExportSetOverwriteConfirmation(cfg, resolvedOutputFile, confirmOverwrite);
+                overwriteConfirmed = confirmOverwrite;
+            }
+
+            if (!overwriteConfirmed)
+                ImGui.TextColored(red, "This existing file will not be replaced until its exact path is confirmed.");
+        }
+
         var writeInProgress = ExportIsWriteInProgress();
-        var canWriteNow = arConfigExists && !writeInProgress && !string.IsNullOrWhiteSpace(cfg.ExportDataOutputPath);
-        if (!canWriteNow)
-            ImGui.BeginDisabled();
-
-        if (ImGui.Button("Write Export Now"))
-            ExportTryQueueSnapshot("Manual");
-
-        if (!canWriteNow)
-            ImGui.EndDisabled();
+        var canWriteNow = arConfigExists && !writeInProgress && pathIsValid &&
+                          (!fixedOverwriteTarget || !exportProbedTargetExists || overwriteConfirmed);
+        using (ImRaii.Disabled(!canWriteNow))
+        {
+            if (ImGui.Button("Write Export Now"))
+                ExportTryQueueSnapshot("Manual");
+        }
 
         ImGui.SameLine();
 
-        var folderToOpen = ExportResolveOutputFolder(cfg.ExportDataOutputPath);
-        var folderExists = !string.IsNullOrWhiteSpace(folderToOpen) && Directory.Exists(folderToOpen);
-        if (!folderExists)
-            ImGui.BeginDisabled();
-
-        if (ImGui.Button("Open Folder"))
+        var folderToOpen = resolvedFolder;
+        var folderExists = pathIsValid && !string.IsNullOrWhiteSpace(folderToOpen) && exportProbedFolderExists;
+        using (ImRaii.Disabled(!folderExists))
         {
-            try { System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo { FileName = folderToOpen!, UseShellExecute = true }); }
-            catch { /* ignore if shell launch fails */ }
-        }
+            if (ImGui.Button("Open Folder"))
+            {
+                try
+                {
+                    if (!Directory.Exists(folderToOpen))
+                        throw new DirectoryNotFoundException($"The export folder no longer exists: {folderToOpen}");
 
-        if (!folderExists)
-            ImGui.EndDisabled();
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = folderToOpen,
+                        UseShellExecute = true,
+                    });
+                }
+                catch (Exception ex)
+                {
+                    ExportSetStatus($"Could not open the export folder: {ex.Message}", red);
+                    exportNextPathProbeUtc = DateTime.MinValue;
+                }
+            }
+        }
 
         ImGui.Spacing();
 
@@ -312,8 +396,12 @@ public partial class SlaveWindow
             ImGui.TextColored(red, "Enter folder location to save data.");
             ImGui.TextDisabled($"You can also enter a full file path and place {ExportTimestampToken} in the file name.");
         }
+        else if (!pathIsValid)
+        {
+            ImGui.TextColored(red, pathFailure);
+        }
         else
-            ImGui.TextDisabled($"Output base: {cfg.ExportDataOutputPath}");
+            ImGui.TextDisabled($"Resolved output: {resolvedOutputFile}");
 
         if (!string.IsNullOrWhiteSpace(cfg.ExportDataLastSuccessfulRunUtc) && ExportParseUtc(cfg.ExportDataLastSuccessfulRunUtc).HasValue)
         {
@@ -383,6 +471,7 @@ public partial class SlaveWindow
                 trigger,
                 cfg.ExportDataOutputPath.Trim(),
                 cfg.ExportDataOverwriteFile,
+                (cfg.ExportDataConfirmedOverwritePaths ?? new List<string>()).ToArray(),
                 cfg.ExportDataRunEveryHours,
                 Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ContentId : 0,
                 Plugin.PluginInterface.GetPluginConfigDirectory(),
@@ -447,11 +536,44 @@ public partial class SlaveWindow
                     DateTime.UtcNow);
             }
 
-            var outputFilePath = ExportBuildOutputFilePath(request.OutputPath, DateTime.UtcNow, request.OverwriteFile, request.PluginConfigDirectory);
-            var delimiter = string.Equals(Path.GetExtension(outputFilePath), ".csv", StringComparison.OrdinalIgnoreCase) ? "," : "\t";
-            var payload = ExportBuildDelimitedOutput(rows, delimiter);
+            if (!ExportTryResolveOutputFilePath(
+                    request.OutputPath,
+                    DateTime.UtcNow,
+                    request.OverwriteFile,
+                    request.PluginConfigDirectory,
+                    out var outputFilePath,
+                    out var pathFailure))
+            {
+                throw new InvalidOperationException(pathFailure);
+            }
 
-            File.WriteAllText(outputFilePath, payload, new UTF8Encoding(false));
+            var outputDirectory = Path.GetDirectoryName(outputFilePath);
+            if (string.IsNullOrWhiteSpace(outputDirectory))
+                throw new InvalidOperationException("The resolved export path has no parent directory.");
+
+            Directory.CreateDirectory(outputDirectory);
+
+            var targetAlreadyExists = File.Exists(outputFilePath);
+            var overwriteAuthorized = targetAlreadyExists && ExportIsOverwriteConfirmed(request.ConfirmedOverwritePaths, outputFilePath);
+            if (targetAlreadyExists && !overwriteAuthorized)
+                throw new IOException($"'{outputFilePath}' already exists. Confirm that exact path in the Export Data panel before replacing it.");
+
+            var extension = Path.GetExtension(outputFilePath);
+            var payload = string.Equals(extension, ".json", StringComparison.OrdinalIgnoreCase)
+                ? JsonSerializer.Serialize(rows, exportJsonOptions)
+                : ExportBuildDelimitedOutput(
+                    rows,
+                    string.Equals(extension, ".csv", StringComparison.OrdinalIgnoreCase) ? "," : "\t");
+
+            using (var stream = new FileStream(
+                       outputFilePath,
+                       overwriteAuthorized ? FileMode.Create : FileMode.CreateNew,
+                       FileAccess.Write,
+                       FileShare.None))
+            using (var writer = new StreamWriter(stream, new UTF8Encoding(false)))
+            {
+                writer.Write(payload);
+            }
             var completedUtc = DateTime.UtcNow;
             var runtimeStatePersisted = ExportPersistRuntimeState(request.PluginConfigDirectory, completedUtc);
 
@@ -842,59 +964,128 @@ public partial class SlaveWindow
         return Path.Combine(exportPluginConfigsBasePath, "Lifestream", "DefaultConfig.json");
     }
 
-    private static string? ExportResolveOutputFolder(string configuredPath)
+    private void ExportRefreshPathProbe(string? folderPath, string targetPath)
     {
-        if (string.IsNullOrWhiteSpace(configuredPath))
-            return null;
+        var probeKey = $"{folderPath}\n{targetPath}";
+        if (!string.Equals(exportPathProbeKey, probeKey, StringComparison.OrdinalIgnoreCase))
+        {
+            exportPathProbeKey = probeKey;
+            exportNextPathProbeUtc = DateTime.MinValue;
+            exportProbedFolderExists = false;
+            exportProbedTargetExists = false;
+        }
 
-        var trimmed = configuredPath.Trim();
+        if (DateTime.UtcNow < exportNextPathProbeUtc)
+            return;
 
-        if (trimmed.EndsWith(Path.DirectorySeparatorChar) || trimmed.EndsWith(Path.AltDirectorySeparatorChar) || !Path.HasExtension(trimmed))
-            return trimmed;
-
-        return Path.GetDirectoryName(trimmed);
+        exportNextPathProbeUtc = DateTime.UtcNow.AddSeconds(5);
+        try
+        {
+            exportProbedFolderExists = !string.IsNullOrWhiteSpace(folderPath) && Directory.Exists(folderPath);
+            exportProbedTargetExists = File.Exists(targetPath);
+        }
+        catch
+        {
+            exportProbedFolderExists = false;
+            exportProbedTargetExists = false;
+        }
     }
 
-    private string ExportBuildOutputFilePath(string configuredPath, DateTime nowUtc, bool overwriteFixedFile, string fallbackDirectory)
+    private static bool ExportIsFixedOverwriteTarget(string configuredPath, bool overwriteFixedFile)
     {
         var trimmed = configuredPath.Trim();
+        return overwriteFixedFile &&
+               Path.HasExtension(trimmed) &&
+               !ExportTimestampTokenRegex.IsMatch(trimmed);
+    }
+
+    private static bool ExportTryResolveOutputFilePath(
+        string configuredPath,
+        DateTime nowUtc,
+        bool overwriteFixedFile,
+        string fallbackDirectory,
+        out string outputFilePath,
+        out string failure)
+    {
+        outputFilePath = string.Empty;
+        failure = string.Empty;
+        var trimmed = configuredPath.Trim();
+        if (trimmed.Length == 0)
+        {
+            failure = "Enter an output folder or file.";
+            return false;
+        }
+
         var timestamp = nowUtc.ToString("yyyy-MM-dd_HH-mm-ss", CultureInfo.InvariantCulture);
+        string candidate;
 
-        if (trimmed.EndsWith(Path.DirectorySeparatorChar) || trimmed.EndsWith(Path.AltDirectorySeparatorChar) || !Path.HasExtension(trimmed))
+        try
         {
-            Directory.CreateDirectory(trimmed);
-            return Path.Combine(trimmed, $"ExportData_{timestamp}.tsv");
+            var isDirectoryTarget = trimmed.EndsWith(Path.DirectorySeparatorChar) ||
+                                    trimmed.EndsWith(Path.AltDirectorySeparatorChar) ||
+                                    !Path.HasExtension(trimmed);
+
+            if (isDirectoryTarget)
+            {
+                var directory = Path.IsPathRooted(trimmed)
+                    ? Path.GetFullPath(trimmed)
+                    : Path.GetFullPath(trimmed, fallbackDirectory);
+                candidate = Path.Combine(directory, $"ExportData_{timestamp}.tsv");
+            }
+            else
+            {
+                var tokenResolvedPath = ExportTimestampTokenRegex.Replace(trimmed, timestamp);
+                candidate = Path.IsPathRooted(tokenResolvedPath)
+                    ? Path.GetFullPath(tokenResolvedPath)
+                    : Path.GetFullPath(tokenResolvedPath, fallbackDirectory);
+
+                if (!overwriteFixedFile && !ExportTimestampTokenRegex.IsMatch(trimmed))
+                {
+                    var directory = Path.GetDirectoryName(candidate) ?? fallbackDirectory;
+                    var fileName = Path.GetFileNameWithoutExtension(candidate);
+                    var extension = Path.GetExtension(candidate);
+                    candidate = Path.Combine(directory, $"{fileName}_{timestamp}{extension}");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            failure = $"Not a usable export path: {ex.Message}";
+            return false;
         }
 
-        if (ExportTimestampTokenRegex.IsMatch(trimmed))
+        var extensionToWrite = Path.GetExtension(candidate);
+        if (!AllowedExportExtensions.Contains(extensionToWrite, StringComparer.OrdinalIgnoreCase))
         {
-            var tokenResolvedPath = ExportTimestampTokenRegex.Replace(trimmed, timestamp);
-            var tokenResolvedDirectory = Path.GetDirectoryName(tokenResolvedPath);
-            if (string.IsNullOrWhiteSpace(tokenResolvedDirectory))
-                tokenResolvedDirectory = fallbackDirectory;
-
-            Directory.CreateDirectory(tokenResolvedDirectory);
-            return Path.IsPathRooted(tokenResolvedPath)
-                ? tokenResolvedPath
-                : Path.Combine(tokenResolvedDirectory, Path.GetFileName(tokenResolvedPath));
+            failure = $"Refusing to write '{extensionToWrite}'. Allowed: {string.Join(", ", AllowedExportExtensions)}.";
+            return false;
         }
 
-        var directory = Path.GetDirectoryName(trimmed);
-        if (string.IsNullOrWhiteSpace(directory))
-            directory = fallbackDirectory;
+        outputFilePath = candidate;
+        return true;
+    }
 
-        Directory.CreateDirectory(directory);
+    private static bool ExportIsOverwriteConfirmed(IEnumerable<string>? confirmedPaths, string path)
+    {
+        return confirmedPaths?.Contains(path, StringComparer.OrdinalIgnoreCase) == true;
+    }
 
-        if (overwriteFixedFile)
+    private static void ExportSetOverwriteConfirmation(Configuration cfg, string path, bool confirmed)
+    {
+        cfg.ExportDataConfirmedOverwritePaths ??= new List<string>();
+        cfg.ExportDataConfirmedOverwritePaths.RemoveAll(existing => string.Equals(existing, path, StringComparison.OrdinalIgnoreCase));
+        if (confirmed)
         {
-            return Path.IsPathRooted(trimmed)
-                ? trimmed
-                : Path.Combine(directory, Path.GetFileName(trimmed));
+            cfg.ExportDataConfirmedOverwritePaths.Add(path);
+            if (cfg.ExportDataConfirmedOverwritePaths.Count > ExportMaxConfirmedOverwritePaths)
+            {
+                cfg.ExportDataConfirmedOverwritePaths.RemoveRange(
+                    0,
+                    cfg.ExportDataConfirmedOverwritePaths.Count - ExportMaxConfirmedOverwritePaths);
+            }
         }
 
-        var fileName = Path.GetFileNameWithoutExtension(trimmed);
-        var extension = Path.GetExtension(trimmed);
-        return Path.Combine(directory, $"{fileName}_{timestamp}{extension}");
+        cfg.Save();
     }
 
     private static List<string> ExportBuildHeaderColumns(int sharedHousingCount)
@@ -1463,6 +1654,7 @@ public partial class SlaveWindow
         string Trigger,
         string OutputPath,
         bool OverwriteFile,
+        IReadOnlyList<string> ConfirmedOverwritePaths,
         int RunEveryHours,
         ulong ContentId,
         string PluginConfigDirectory,

@@ -237,8 +237,17 @@ public unsafe sealed class BuddyFeedCutsceneSkipService : IDisposable
 
     private void PlayFeedBuddySceneDetour(HousingManager* manager)
     {
-        if (!enabled)
-            playFeedBuddySceneHook?.Original(manager);
+        try
+        {
+            if (enabled)
+                return;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Buddy Feed Cutscene Skip detour failed; calling the original.");
+        }
+
+        playFeedBuddySceneHook?.OriginalDisposeSafe(manager);
     }
 
     private delegate void PlayFeedBuddySceneDelegate(HousingManager* manager);

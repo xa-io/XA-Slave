@@ -14,7 +14,8 @@ namespace XASlave.Services;
 
 public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
 {
-    private const string SetContentsFinderSettingsInitSignature =
+    // const strings leak through metadata; runtime initializers allow Obfuscar string hiding.
+    private static readonly string SetContentsFinderSettingsInitSignature =
         "E8 ?? ?? ?? ?? 49 8B 06 45 33 FF 49 8B CE 45 89 7E 20 FF 50 28 B0 01";
     private const string ContentsFinderAddonName = "ContentsFinder";
     private const string RaidFinderAddonName = "RaidFinder";

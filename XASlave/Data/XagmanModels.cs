@@ -206,6 +206,8 @@ public sealed class XagmanPeerPresence
     public string ActiveTradePartner { get; set; } = string.Empty;
     public string ActiveTradePartnerInstanceId { get; set; } = string.Empty;
     public bool TonyRotationReady { get; set; }
+    public string StandbyRotationTonyCharacter { get; set; } = string.Empty;
+    public string StandbyRotationTonyInstanceId { get; set; } = string.Empty;
     public int MainInventoryFreeSlots { get; set; }
     public int Gil { get; set; }
     public int TonyGilMinimum { get; set; } = -1;

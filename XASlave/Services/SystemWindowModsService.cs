@@ -4,7 +4,6 @@ using System.Diagnostics;
 using System.Numerics;
 using System.Runtime.InteropServices;
 using System.Text;
-using System.Threading;
 using Dalamud.Hooking;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Graphics.Kernel;
@@ -75,8 +74,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private bool disableBackgroundRenderingDisableWhenArMultiIsOn;
     private bool backgroundRenderingSuppressed;
     private bool capturedWindowSize;
+    private bool capturedOriginalClientSize;
     private int originalMinWidth;
     private int originalMinHeight;
+    private int originalClientWidth;
+    private int originalClientHeight;
     private long nextBackgroundRenderTick;
     private long autoRetainerMultiModeCacheExpiresAt;
     private bool cachedAutoRetainerMultiModeEnabled;
@@ -99,6 +101,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private System.Threading.Tasks.Task<int>? allowMultipleGameInstancesStartupTask;
     private System.Threading.Tasks.Task<Hook<AgentLobbyUpdateDelegate>?>? cancelLoginCooldownStartupHookTask;
     private System.Threading.Tasks.Task<Hook<AtkMessageBoxReceiveEventDelegate>?>? preventLobbyExitStartupHookTask;
+    private System.Threading.CancellationTokenSource? cancelLoginCooldownStartupHookCancellation;
+    private System.Threading.CancellationTokenSource? preventLobbyExitStartupHookCancellation;
     public SystemWindowModsService(
         ISigScanner sigScanner,
         IGameInteropProvider interopProvider,
@@ -250,9 +254,10 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return true;
         }
 
-        if (!agentLobbyHookInitialized)
+        if (!agentLobbyHookInitialized || agentLobbyUpdateHook == null)
         {
-            CancelLoginCooldownStatusText = "Arming - login cooldown hook is initializing outside the framework tick.";
+            agentLobbyHookInitialized = false;
+            CancelLoginCooldownStatusText = "Arming - login cooldown hook is initializing on the framework thread.";
             StartCancelLoginCooldownStartupHookCreation();
             return true;
         }
@@ -292,10 +297,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         }
 
         CaptureOriginalWindowSize(gameWindow);
+        CaptureOriginalClientSize(gameWindow);
         customResolutionsEnabled = true;
         RefreshWindowSizeLimits(gameWindow);
         PrimeWindowSizeSynchronization(gameWindow);
-        CustomResolutionsStatusText = "Enabled - preset buttons and `/xa res <width>x<height>` can change the client size locally.";
+        CustomResolutionsStatusText = "Enabled - preset buttons and `/xa res <width>x<height>` or `/xa res <width> <height>` can change the client size locally.";
         return true;
     }
 
@@ -398,9 +404,10 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return true;
         }
 
-        if (!atkMessageBoxHookInitialized)
+        if (!atkMessageBoxHookInitialized || atkMessageBoxReceiveEventHook == null)
         {
-            PreventLobbyExitStatusText = "Arming - lobby error hook is initializing outside the framework tick.";
+            atkMessageBoxHookInitialized = false;
+            PreventLobbyExitStatusText = "Arming - lobby error hook is initializing on the framework thread.";
             StartPreventLobbyExitStartupHookCreation();
             return true;
         }
@@ -511,6 +518,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         }
 
         CaptureOriginalWindowSize(gameWindow);
+        CaptureOriginalClientSize(gameWindow);
         RefreshWindowSizeLimits(gameWindow);
 
         if (!TryResizeClientWindow(gameWindow->WindowHandle, normalizedWidth, normalizedHeight))
@@ -534,6 +542,56 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         lastAppliedCustomResolutionHeight = synchronizedHeight;
         CustomResolutionsStatusText = GetCustomResolutionsStatusText();
         message = $"Applied custom resolution {synchronizedWidth}x{synchronizedHeight}.";
+        return true;
+    }
+
+    public bool TryResetCustomResolution(out string message)
+    {
+        if (!customResolutionsEnabled)
+        {
+            message = "Enable Custom Resolutions in XA Mods first.";
+            return false;
+        }
+
+        var gameWindow = GameWindow.Instance();
+        if (gameWindow == null || gameWindow->WindowHandle == nint.Zero)
+        {
+            message = "Game window surface missing.";
+            CustomResolutionsStatusText = "Unavailable - game window surface missing.";
+            return false;
+        }
+
+        CaptureOriginalWindowSize(gameWindow);
+        CaptureOriginalClientSize(gameWindow);
+        if (!capturedOriginalClientSize)
+        {
+            message = "Could not read the original client size for reset.";
+            CustomResolutionsStatusText = "Unavailable - original client size was not captured.";
+            return false;
+        }
+
+        RefreshWindowSizeLimits(gameWindow);
+        if (!TryResizeClientWindow(gameWindow->WindowHandle, originalClientWidth, originalClientHeight))
+        {
+            message = $"Could not reset the client window to {originalClientWidth}x{originalClientHeight}.";
+            CustomResolutionsStatusText = "Unavailable - failed while resetting the client window size.";
+            return false;
+        }
+
+        var synchronizedWidth = originalClientWidth;
+        var synchronizedHeight = originalClientHeight;
+        if (TryGetClientSize(gameWindow->WindowHandle, out var actualWidth, out var actualHeight))
+        {
+            synchronizedWidth = actualWidth;
+            synchronizedHeight = actualHeight;
+        }
+
+        SynchronizeGameWindowSize(gameWindow, synchronizedWidth, synchronizedHeight);
+        UpdateObservedWindowSizeState(synchronizedWidth, synchronizedHeight);
+        lastAppliedCustomResolutionWidth = 0;
+        lastAppliedCustomResolutionHeight = 0;
+        CustomResolutionsStatusText = $"Enabled - reset the client size to the captured original {synchronizedWidth}x{synchronizedHeight}.";
+        message = $"Reset client resolution to {synchronizedWidth}x{synchronizedHeight}.";
         return true;
     }
 
@@ -591,7 +649,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     {
         return lastAppliedCustomResolutionWidth > 0 && lastAppliedCustomResolutionHeight > 0
             ? $"Enabled - last applied custom client size is {lastAppliedCustomResolutionWidth}x{lastAppliedCustomResolutionHeight}."
-            : "Enabled - preset buttons and `/xa res <width>x<height>` can change the client size locally.";
+            : "Enabled - preset buttons and `/xa res <width>x<height>` or `/xa res <width> <height>` can change the client size locally.";
     }
 
     private string GetBackgroundRenderingStatusText()
@@ -685,11 +743,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private void EnsureAgentLobbyHookInitialized()
     {
-        if (agentLobbyHookInitialized)
+        if (agentLobbyHookInitialized && agentLobbyUpdateHook != null)
             return;
 
         agentLobbyHookInitialized = true;
-        agentLobbyUpdateHook = TryCreateHook<AgentLobbyUpdateDelegate>(Sigs.AgentLobbyUpdateSig, AgentLobbyUpdateDetour, "AgentLobbyUpdate");
+        agentLobbyUpdateHook ??= TryCreateHook<AgentLobbyUpdateDelegate>(Sigs.AgentLobbyUpdateSig, AgentLobbyUpdateDetour, "AgentLobbyUpdate");
     }
 
     private Hook<AgentLobbyUpdateDelegate>? CreateAgentLobbyHook()
@@ -702,19 +760,33 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         lock (cancelLoginCooldownStartupArmingLock)
         {
             cancelLoginCooldownStartupArmingPending = true;
-            cancelLoginCooldownStartupHookTask ??= System.Threading.Tasks.Task.Run(CreateAgentLobbyHook);
+            if (cancelLoginCooldownStartupHookTask == null)
+            {
+                cancelLoginCooldownStartupHookCancellation?.Dispose();
+                cancelLoginCooldownStartupHookCancellation = new System.Threading.CancellationTokenSource();
+                cancelLoginCooldownStartupHookTask = Plugin.RunOnGameThread(
+                    CreateAgentLobbyHook,
+                    "Cancel Login Cooldown startup hook creation",
+                    cancelLoginCooldownStartupHookCancellation.Token);
+            }
         }
     }
 
     private void CancelCancelLoginCooldownStartupArming(bool disposeCompletedResult)
     {
         System.Threading.Tasks.Task<Hook<AgentLobbyUpdateDelegate>?>? task;
+        System.Threading.CancellationTokenSource? cancellation;
         lock (cancelLoginCooldownStartupArmingLock)
         {
             cancelLoginCooldownStartupArmingPending = false;
             task = cancelLoginCooldownStartupHookTask;
             cancelLoginCooldownStartupHookTask = null;
+            cancellation = cancelLoginCooldownStartupHookCancellation;
+            cancelLoginCooldownStartupHookCancellation = null;
         }
+
+        cancellation?.Cancel();
+        cancellation?.Dispose();
 
         if (!disposeCompletedResult || task == null)
             return;
@@ -727,7 +799,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (task.IsCompleted)
         {
             if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
-                DisposeHook(task.Result);
+                _ = Plugin.RunOnGameThread(() => DisposeHook(task.Result), "Dispose cancelled Cancel Login Cooldown startup hook");
             return;
         }
 
@@ -735,7 +807,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             completedTask =>
             {
                 if (completedTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
-                    DisposeHook(completedTask.Result);
+                    _ = Plugin.RunOnGameThread(() => DisposeHook(completedTask.Result), "Dispose cancelled Cancel Login Cooldown startup hook");
             },
             System.Threading.Tasks.TaskScheduler.Default);
     }
@@ -766,11 +838,15 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             log.Warning(ex, "[XASlave] Cancel Login Cooldown startup hook initialization failed.");
         }
 
+        System.Threading.CancellationTokenSource? completedCancellation;
         lock (cancelLoginCooldownStartupArmingLock)
         {
             cancelLoginCooldownStartupHookTask = null;
             cancelLoginCooldownStartupArmingPending = false;
+            completedCancellation = cancelLoginCooldownStartupHookCancellation;
+            cancelLoginCooldownStartupHookCancellation = null;
         }
+        completedCancellation?.Dispose();
 
         agentLobbyHookInitialized = true;
 
@@ -796,11 +872,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private void EnsureAtkMessageBoxHookInitialized()
     {
-        if (atkMessageBoxHookInitialized)
+        if (atkMessageBoxHookInitialized && atkMessageBoxReceiveEventHook != null)
             return;
 
         atkMessageBoxHookInitialized = true;
-        atkMessageBoxReceiveEventHook = TryCreateHook<AtkMessageBoxReceiveEventDelegate>(Sigs.AtkMessageBoxReceiveEventSig, AtkMessageBoxReceiveEventDetour, "AtkMessageBoxReceiveEvent");
+        atkMessageBoxReceiveEventHook ??= TryCreateHook<AtkMessageBoxReceiveEventDelegate>(Sigs.AtkMessageBoxReceiveEventSig, AtkMessageBoxReceiveEventDetour, "AtkMessageBoxReceiveEvent");
     }
 
     private Hook<AtkMessageBoxReceiveEventDelegate>? CreateAtkMessageBoxHook()
@@ -813,19 +889,33 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         lock (preventLobbyExitStartupArmingLock)
         {
             preventLobbyExitStartupArmingPending = true;
-            preventLobbyExitStartupHookTask ??= System.Threading.Tasks.Task.Run(CreateAtkMessageBoxHook);
+            if (preventLobbyExitStartupHookTask == null)
+            {
+                preventLobbyExitStartupHookCancellation?.Dispose();
+                preventLobbyExitStartupHookCancellation = new System.Threading.CancellationTokenSource();
+                preventLobbyExitStartupHookTask = Plugin.RunOnGameThread(
+                    CreateAtkMessageBoxHook,
+                    "Prevent Lobby Exit startup hook creation",
+                    preventLobbyExitStartupHookCancellation.Token);
+            }
         }
     }
 
     private void CancelPreventLobbyExitStartupArming(bool disposeCompletedResult)
     {
         System.Threading.Tasks.Task<Hook<AtkMessageBoxReceiveEventDelegate>?>? task;
+        System.Threading.CancellationTokenSource? cancellation;
         lock (preventLobbyExitStartupArmingLock)
         {
             preventLobbyExitStartupArmingPending = false;
             task = preventLobbyExitStartupHookTask;
             preventLobbyExitStartupHookTask = null;
+            cancellation = preventLobbyExitStartupHookCancellation;
+            preventLobbyExitStartupHookCancellation = null;
         }
+
+        cancellation?.Cancel();
+        cancellation?.Dispose();
 
         if (!disposeCompletedResult || task == null)
             return;
@@ -838,7 +928,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (task.IsCompleted)
         {
             if (task.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
-                DisposeHook(task.Result);
+                _ = Plugin.RunOnGameThread(() => DisposeHook(task.Result), "Dispose cancelled Prevent Lobby Exit startup hook");
             return;
         }
 
@@ -846,7 +936,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             completedTask =>
             {
                 if (completedTask.Status == System.Threading.Tasks.TaskStatus.RanToCompletion)
-                    DisposeHook(completedTask.Result);
+                    _ = Plugin.RunOnGameThread(() => DisposeHook(completedTask.Result), "Dispose cancelled Prevent Lobby Exit startup hook");
             },
             System.Threading.Tasks.TaskScheduler.Default);
     }
@@ -877,11 +967,15 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             log.Warning(ex, "[XASlave] Prevent Lobby Exit startup hook initialization failed.");
         }
 
+        System.Threading.CancellationTokenSource? completedCancellation;
         lock (preventLobbyExitStartupArmingLock)
         {
             preventLobbyExitStartupHookTask = null;
             preventLobbyExitStartupArmingPending = false;
+            completedCancellation = preventLobbyExitStartupHookCancellation;
+            preventLobbyExitStartupHookCancellation = null;
         }
+        completedCancellation?.Dispose();
 
         atkMessageBoxHookInitialized = true;
 
@@ -907,31 +1001,31 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private void EnsureAgentMapHookInitialized()
     {
-        if (agentMapHookInitialized)
+        if (agentMapHookInitialized && agentMapUpdateHook != null)
             return;
 
         agentMapHookInitialized = true;
-        agentMapUpdateHook = TryCreateHook<AgentMapUpdateDelegate>(Sigs.AgentMapUpdateSig, AgentMapUpdateDetour, "AgentMapUpdate");
+        agentMapUpdateHook ??= TryCreateHook<AgentMapUpdateDelegate>(Sigs.AgentMapUpdateSig, AgentMapUpdateDetour, "AgentMapUpdate");
     }
 
     private void EnsureBackgroundRenderingHooksInitialized()
     {
-        if (!deviceDx11PostTickHookInitialized)
+        if (!deviceDx11PostTickHookInitialized || deviceDx11PostTickHook == null)
         {
             deviceDx11PostTickHookInitialized = true;
-            deviceDx11PostTickHook = TryCreateHook<DeviceDx11PostTickDelegate>(Sigs.DeviceDx11PostTickSig, DeviceDx11PostTickDetour, "DeviceDX11PostTick");
+            deviceDx11PostTickHook ??= TryCreateHook<DeviceDx11PostTickDelegate>(Sigs.DeviceDx11PostTickSig, DeviceDx11PostTickDetour, "DeviceDX11PostTick");
         }
 
-        if (!namePlateDrawHookInitialized)
+        if (!namePlateDrawHookInitialized || namePlateDrawHook == null)
         {
             namePlateDrawHookInitialized = true;
-            namePlateDrawHook = TryCreateHook<NamePlateDrawDelegate>(Sigs.NamePlateDrawSig, NamePlateDrawDetour, "NamePlateDraw");
+            namePlateDrawHook ??= TryCreateHook<NamePlateDrawDelegate>(Sigs.NamePlateDrawSig, NamePlateDrawDetour, "NamePlateDraw");
         }
     }
 
-    private void EnsureToggleFadeDelegateInitialized()
+    private void EnsureToggleFadeDelegateInitialized(bool retryMissing = false)
     {
-        if (toggleFadeDelegateInitialized)
+        if (toggleFadeDelegateInitialized && !(retryMissing && toggleFadeDelegate == null))
             return;
 
         toggleFadeDelegateInitialized = true;
@@ -944,7 +1038,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             }
             else
             {
-                log.Debug("[XASlave] Special Rendering Modes world fade delegate is unavailable; UI visibility controls remain available.");
+                log.Warning("[XASlave] Special Rendering Modes could not resolve the world fade delegate; UI visibility controls remain available. Retry with a world fade action.");
             }
         }
         catch (Exception ex)
@@ -960,7 +1054,10 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         try
         {
             if (!sigScanner.TryScanText(signature, out var address) || address == nint.Zero)
+            {
+                log.Warning($"[XASlave] System Window Mods could not resolve {label}; retry by disabling and re-enabling the feature.");
                 return null;
+            }
 
             var hook = interopProvider.HookFromAddress<T>(address, detour);
             return hook;
@@ -974,12 +1071,15 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     public bool SetSpecialRenderWorldHidden(bool hidden, Vector4 color)
     {
-        EnsureToggleFadeDelegateInitialized();
+        EnsureToggleFadeDelegateInitialized(retryMissing: true);
         var frameworkInstance = Framework.Instance();
         if (toggleFadeDelegate == null || frameworkInstance == null)
             return false;
 
         var environmentManager = frameworkInstance->EnvironmentManager;
+        if (environmentManager == null)
+            return false;
+
         toggleFadeDelegate(environmentManager, hidden ? 1 : 0, 0.1f, &color);
         return true;
     }
@@ -1075,7 +1175,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         {
             if (!agentLobbyHookInitialized)
             {
-                CancelLoginCooldownStatusText = "Arming - login cooldown hook is initializing outside the framework tick.";
+                CancelLoginCooldownStatusText = "Arming - login cooldown hook is initializing on the framework thread.";
                 StartCancelLoginCooldownStartupHookCreation();
             }
             else
@@ -1092,7 +1192,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         {
             if (!atkMessageBoxHookInitialized)
             {
-                PreventLobbyExitStatusText = "Arming - lobby error hook is initializing outside the framework tick.";
+                PreventLobbyExitStatusText = "Arming - lobby error hook is initializing on the framework thread.";
                 StartPreventLobbyExitStartupHookCreation();
             }
             else
@@ -1176,15 +1276,6 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         var previousValue = cachedAutoRetainerMultiModeEnabled;
         cachedAutoRetainerMultiModeEnabled = disableBackgroundRenderingDisableWhenArMultiIsOn && isAutoRetainerMultiModeEnabled();
         return previousValue != cachedAutoRetainerMultiModeEnabled;
-    }
-
-    private bool ShouldKeepBackgroundRenderingActiveForAutoRetainer()
-    {
-        if (!disableBackgroundRenderingDisableWhenArMultiIsOn)
-            return false;
-
-        RefreshAutoRetainerMultiModeCache(false);
-        return cachedAutoRetainerMultiModeEnabled;
     }
 
     private bool ShouldSynchronizeWindowSize()
@@ -1573,6 +1664,18 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         originalMinHeight = gameWindow->MinHeight;
     }
 
+    private void CaptureOriginalClientSize(GameWindow* gameWindow)
+    {
+        if (capturedOriginalClientSize
+            || gameWindow->WindowHandle == nint.Zero
+            || !TryGetClientSize(gameWindow->WindowHandle, out var clientWidth, out var clientHeight))
+            return;
+
+        capturedOriginalClientSize = true;
+        originalClientWidth = clientWidth;
+        originalClientHeight = clientHeight;
+    }
+
     private void RestoreWindowSizeLimits(bool clampClientToMinimum = false)
     {
         if (!capturedWindowSize)
@@ -1635,97 +1738,149 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     private bool AtkMessageBoxReceiveEventDetour(AtkMessageBoxManager* manager, nint a2, AtkValue* values)
     {
-        if (preventLobbyExitEnabled && values != null)
-            values->UInt = 16000;
+        try
+        {
+            if (preventLobbyExitEnabled && values != null)
+                values->UInt = 16000;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] System Window Mods message-box detour failed; calling the original.");
+        }
 
-        return atkMessageBoxReceiveEventHook?.Original(manager, a2, values) ?? false;
+        return atkMessageBoxReceiveEventHook?.OriginalDisposeSafe(manager, a2, values) ?? false;
     }
 
     private void AgentLobbyUpdateDetour(AgentLobby* agent, uint deltaTime)
     {
-        if (cancelLoginCooldownEnabled && agent != null)
-            agent->TemporaryLocked = false;
+        try
+        {
+            if (cancelLoginCooldownEnabled && agent != null)
+                agent->TemporaryLocked = false;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] System Window Mods lobby detour failed before the original call.");
+        }
 
-        agentLobbyUpdateHook?.Original(agent, deltaTime);
+        agentLobbyUpdateHook?.OriginalDisposeSafe(agent, deltaTime);
 
-        if (cancelLoginCooldownEnabled && agent != null)
-            agent->TemporaryLocked = false;
+        try
+        {
+            if (cancelLoginCooldownEnabled && agent != null)
+                agent->TemporaryLocked = false;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] System Window Mods lobby detour failed after the original call.");
+        }
     }
 
     private void AgentMapUpdateDetour(AgentMap* agent, uint updateCount)
     {
-        if (revealUndiscoveredAreasEnabled && agent != null)
+        try
         {
-            agent->CurrentMapDiscoveryFlag = 0;
-            agent->SelectedMapDiscoveryFlag = 0;
+            if (revealUndiscoveredAreasEnabled && agent != null)
+            {
+                agent->CurrentMapDiscoveryFlag = 0;
+                agent->SelectedMapDiscoveryFlag = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] System Window Mods map detour failed before the original call.");
         }
 
-        agentMapUpdateHook?.Original(agent, updateCount);
+        agentMapUpdateHook?.OriginalDisposeSafe(agent, updateCount);
 
-        if (revealUndiscoveredAreasEnabled && agent != null)
+        try
         {
-            agent->CurrentMapDiscoveryFlag = 0;
-            agent->SelectedMapDiscoveryFlag = 0;
+            if (revealUndiscoveredAreasEnabled && agent != null)
+            {
+                agent->CurrentMapDiscoveryFlag = 0;
+                agent->SelectedMapDiscoveryFlag = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] System Window Mods map detour failed after the original call.");
         }
     }
 
     private void DeviceDx11PostTickDetour(nint instance)
     {
-        if (!disableBackgroundRenderingEnabled)
+        var callOriginal = true;
+        try
+        {
+            if (!disableBackgroundRenderingEnabled)
+            {
+                backgroundRenderingSuppressed = false;
+            }
+            else
+            {
+                var framework = Framework.Instance();
+                if (framework == null || !clientState.IsLoggedIn)
+                {
+                    backgroundRenderingSuppressed = false;
+                }
+                // The cache is refreshed from Framework.Update. Detours must not invoke
+                // cross-plugin IPC or perform any other unbounded external work.
+                else if (disableBackgroundRenderingDisableWhenArMultiIsOn
+                         && cachedAutoRetainerMultiModeEnabled)
+                {
+                    backgroundRenderingSuppressed = false;
+                }
+                else
+                {
+                    var currentTick = Environment.TickCount64;
+                    if (nextBackgroundRenderTick - currentTick < 0)
+                    {
+                        nextBackgroundRenderTick = currentTick + 5_000;
+                        backgroundRenderingSuppressed = false;
+                    }
+                    else
+                    {
+                        var shouldSuppress = disableBackgroundRenderingOnlyWhenMinimized
+                            ? framework->GameWindow != null && IsIconic(framework->GameWindow->WindowHandle)
+                            : framework->WindowInactive;
+
+                        if (shouldSuppress)
+                        {
+                            backgroundRenderingSuppressed = true;
+                            callOriginal = false;
+                        }
+                        else
+                        {
+                            backgroundRenderingSuppressed = false;
+                        }
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
         {
             backgroundRenderingSuppressed = false;
-            deviceDx11PostTickHook?.Original(instance);
-            return;
+            callOriginal = true;
+            log.Warning(ex, "[XASlave] System Window Mods background-render detour failed; calling the original.");
         }
 
-        var framework = Framework.Instance();
-        if (framework == null || !clientState.IsLoggedIn)
-        {
-            backgroundRenderingSuppressed = false;
-            deviceDx11PostTickHook?.Original(instance);
-            return;
-        }
-
-        if (ShouldKeepBackgroundRenderingActiveForAutoRetainer())
-        {
-            backgroundRenderingSuppressed = false;
-            deviceDx11PostTickHook?.Original(instance);
-            return;
-        }
-
-        var currentTick = Environment.TickCount64;
-        if (nextBackgroundRenderTick - currentTick < 0)
-        {
-            nextBackgroundRenderTick = currentTick + 5_000;
-            backgroundRenderingSuppressed = false;
-            deviceDx11PostTickHook?.Original(instance);
-            return;
-        }
-
-        var shouldSuppress = disableBackgroundRenderingOnlyWhenMinimized
-            ? framework->GameWindow != null && IsIconic(framework->GameWindow->WindowHandle)
-            : framework->WindowInactive;
-
-        if (shouldSuppress)
-        {
-            backgroundRenderingSuppressed = true;
-            var uiModule = UIModule.Instance();
-            if (uiModule != null && uiModule->ShouldLimitFps())
-                Thread.Sleep(50);
-
-            return;
-        }
-
-        backgroundRenderingSuppressed = false;
-        deviceDx11PostTickHook?.Original(instance);
+        if (callOriginal)
+            deviceDx11PostTickHook?.OriginalDisposeSafe(instance);
     }
 
     private void NamePlateDrawDetour(AtkUnitBase* addon)
     {
-        if (disableBackgroundRenderingEnabled && backgroundRenderingSuppressed)
-            return;
+        try
+        {
+            if (disableBackgroundRenderingEnabled && backgroundRenderingSuppressed)
+                return;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] System Window Mods nameplate detour failed; calling the original.");
+        }
 
-        namePlateDrawHook?.Original(addon);
+        namePlateDrawHook?.OriginalDisposeSafe(addon);
     }
 
     [DllImport("user32.dll")]
@@ -1785,7 +1940,10 @@ public unsafe sealed class SystemWindowModsService : IDisposable
                 var status = NtQueryInformationProcess(ulong.MaxValue, 51, pBuffer, bufferSize, &returnSize);
                 if ((uint)status == 0xC0000004)
                 {
-                    bufferSize = returnSize;
+                    if (!NativeBufferGrowthPolicy.TryGetNextSize(bufferSize, returnSize, out var nextBufferSize))
+                        throw new InvalidOperationException($"NtQueryInformationProcess returned an invalid buffer growth request ({bufferSize} -> {returnSize}).");
+
+                    bufferSize = nextBufferSize;
                     continue;
                 }
 
