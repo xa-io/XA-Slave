@@ -23,6 +23,19 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.45 - 2026-09-11",
+            Lines =
+            [
+                "XA Mods",
+                "- Fixed Expert Delivery reporting a selection timeout after a successful hand-in or reporting no eligible items during a list refresh. Hand-ins now retain confirmation context, check inventory progress and button readiness, and use shorter action delays while preserving HQ, materia, and seal-cap settings.",
+                "- Added Hide Friends and Hide Party & Alliance Members under Hide Game Objects, both off by default. Hide Players is now Hide Non-Friends and retains your saved setting. All three save with presets; party/alliance membership takes priority over friend status. Occult Crescent rules now honor these choices while retaining their existing player safeguards.",
+                "- Added Hide Beasts and Hide own Beast under XA Mods > Hide Game Objects to control other players' Beastmaster companions and your own independently. Both default off, save with XA Mod presets, and follow existing duty and territory guards. Turn off Hide pets to hide only beasts; beasts with unknown owners remain visible under these options.",
+                "- Added Hide Fashion Accessories under XA Mods > Hide Game Objects as a separate, default-off option that saves with presets and hides fashion accessories, including your own.",
+                "- Hide pets now targets pets/minions and no longer hides fashion accessories. Accessories use their own setting, including with Occult Crescent rules enabled.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.44 - 2026-09-08",
             Lines =
             [

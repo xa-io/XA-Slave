@@ -401,9 +401,14 @@ public class Configuration : IPluginConfiguration
     public bool DisableBackgroundGameRenderingDisableWhenArMultiIsOn { get; set; } = false;
     public bool AutoHideGameObjectsEnabled { get; set; } = false;
     public bool AutoHideGameObjectsHidePlayer { get; set; } = true;
+    public bool AutoHideGameObjectsHideFriends { get; set; } = false;
+    public bool AutoHideGameObjectsHidePartyAllianceMembers { get; set; } = false;
     public bool AutoHideGameObjectsHideUnimportantEnpc { get; set; } = true;
     public bool AutoHideGameObjectsHidePet { get; set; } = true;
     public bool AutoHideGameObjectsHideChocobo { get; set; } = true;
+    public bool AutoHideGameObjectsHideBeasts { get; set; } = false;
+    public bool AutoHideGameObjectsHideOwnBeast { get; set; } = false;
+    public bool AutoHideGameObjectsHideFashionAccessories { get; set; } = false;
     public bool AutoHideGameObjectsDisableInDuties { get; set; } = true;
     public bool AutoHideGameObjectsDisableInIslandSanctuary { get; set; } = true;
     public bool AutoHideGameObjectsUseOccultCrescentRules { get; set; } = true;

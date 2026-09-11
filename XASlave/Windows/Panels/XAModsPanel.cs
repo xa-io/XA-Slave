@@ -285,7 +285,12 @@ public partial class SlaveWindow
                 configuration.AutoHideGameObjectsHideChocobo,
                 configuration.AutoHideGameObjectsDisableInDuties,
                 configuration.AutoHideGameObjectsDisableInIslandSanctuary,
-                configuration.AutoHideGameObjectsUseOccultCrescentRules);
+                configuration.AutoHideGameObjectsUseOccultCrescentRules,
+                configuration.AutoHideGameObjectsHideBeasts,
+                configuration.AutoHideGameObjectsHideFashionAccessories,
+                configuration.AutoHideGameObjectsHideOwnBeast,
+                configuration.AutoHideGameObjectsHideFriends,
+                configuration.AutoHideGameObjectsHidePartyAllianceMembers);
         }
 
         void ApplyAutoDisplayNetworkLatencyConfiguration()
@@ -952,8 +957,22 @@ public partial class SlaveWindow
         {
             var changed = false;
 
+            var hideFriends = configuration.AutoHideGameObjectsHideFriends;
+            if (ImGui.Checkbox("Hide Friends##AutoHideGameObjects", ref hideFriends))
+            {
+                configuration.AutoHideGameObjectsHideFriends = hideFriends;
+                changed = true;
+            }
+
+            var hidePartyAllianceMembers = configuration.AutoHideGameObjectsHidePartyAllianceMembers;
+            if (ImGui.Checkbox("Hide Party & Alliance Members##AutoHideGameObjects", ref hidePartyAllianceMembers))
+            {
+                configuration.AutoHideGameObjectsHidePartyAllianceMembers = hidePartyAllianceMembers;
+                changed = true;
+            }
+
             var hidePlayer = configuration.AutoHideGameObjectsHidePlayer;
-            if (ImGui.Checkbox("Hide players##AutoHideGameObjects", ref hidePlayer))
+            if (ImGui.Checkbox("Hide Non-Friends##AutoHideGameObjects", ref hidePlayer))
             {
                 configuration.AutoHideGameObjectsHidePlayer = hidePlayer;
                 changed = true;
@@ -973,10 +992,31 @@ public partial class SlaveWindow
                 changed = true;
             }
 
+            var hideFashionAccessories = configuration.AutoHideGameObjectsHideFashionAccessories;
+            if (ImGui.Checkbox("Hide Fashion Accessories##AutoHideGameObjects", ref hideFashionAccessories))
+            {
+                configuration.AutoHideGameObjectsHideFashionAccessories = hideFashionAccessories;
+                changed = true;
+            }
+
             var hideChocobo = configuration.AutoHideGameObjectsHideChocobo;
             if (ImGui.Checkbox("Hide chocobos##AutoHideGameObjects", ref hideChocobo))
             {
                 configuration.AutoHideGameObjectsHideChocobo = hideChocobo;
+                changed = true;
+            }
+
+            var hideBeasts = configuration.AutoHideGameObjectsHideBeasts;
+            if (ImGui.Checkbox("Hide Beasts##AutoHideGameObjects", ref hideBeasts))
+            {
+                configuration.AutoHideGameObjectsHideBeasts = hideBeasts;
+                changed = true;
+            }
+
+            var hideOwnBeast = configuration.AutoHideGameObjectsHideOwnBeast;
+            if (ImGui.Checkbox("Hide own Beast##AutoHideGameObjects", ref hideOwnBeast))
+            {
+                configuration.AutoHideGameObjectsHideOwnBeast = hideOwnBeast;
                 changed = true;
             }
 
@@ -1007,7 +1047,7 @@ public partial class SlaveWindow
                 SaveConfiguration();
             }
 
-            ImGui.TextDisabled("Friends, party members, alliance members, icon-marked objects, and your own actor stay visible.");
+            ImGui.TextDisabled("Party and alliance members use their group setting, including friends. Other players use Hide Friends or Hide Non-Friends. Marked objects and your own actor stay visible.");
             ImGui.TextDisabled("Occult Crescent rules keep your current target and dead players visible, then start hiding additional players after the visible count grows.");
         }
 
@@ -2889,9 +2929,9 @@ public partial class SlaveWindow
             plugin.AutoHideGameObjects.SetEnabled,
             applied => configuration.AutoHideGameObjectsEnabled = applied,
             "Locally hides selected object categories from view with duty and territory guards.",
-            "Hides players, pets, chocobos, or low-value NPCs on the local client while leaving party members, alliance members, friends, marked objects, and your own character visible. The extra options can disable the feature in duties or Island Sanctuary, and can apply the safer Occult Crescent filtering rules.",
+            "Hides players, pets/minions, fashion accessories, Beastmaster beasts, chocobos, or low-value NPCs on the local client. Hide Friends and Hide Party & Alliance Members default off; Hide Non-Friends keeps your previous Hide Players setting. Party/alliance members use their group setting even if they are friends; other players use the friend or non-friend setting. Marked objects and your own character stay visible. Fashion accessories, including your own, have a separate switch. Hide Beasts targets other players' BST pets; Hide own Beast controls yours separately. For only beasts, turn off the broader Hide pets option. The extra options can disable the feature in duties or Island Sanctuary. Occult Crescent rules apply your selected player categories after the crowd threshold while keeping dead players and your current target visible.",
             () => plugin.AutoHideGameObjects.StatusText,
-            searchTerms: ["Hide players", "Hide unimportant NPCs", "Hide pets", "Hide chocobos", "Occult Crescent", "Island Sanctuary", "duty"],
+            searchTerms: ["Hide players", "Hide Friends", "Hide Party & Alliance Members", "Hide Non-Friends", "Hide unimportant NPCs", "Hide pets", "minions", "Hide Fashion Accessories", "ornaments", "parasols", "umbrellas", "Hide Beasts", "Hide own Beast", "Beastmaster", "BST", "Hide chocobos", "Occult Crescent", "Island Sanctuary", "duty"],
             drawOptions: DrawAutoHideGameObjectsOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
@@ -3183,8 +3223,8 @@ public partial class SlaveWindow
             () => configuration.AutoUnlockExpertDeliveryEnabled,
             plugin.AutoUnlockExpertDelivery.SetEnabled,
             applied => configuration.AutoUnlockExpertDeliveryEnabled = applied,
-            "Automates Expert Delivery hand-ins for characters that already have the feature unlocked, with local failure, prompt-classification, repeat-scan, and configurable seal-cap handling.",
-            "Automates Expert Delivery hand-ins, handles confirmation prompts, stops when no eligible items remain, and can either respect or ignore the seal cap option below.",
+            "Automates eligible Expert Delivery hand-ins with confirmation, inventory-progress, and configurable seal-cap checks.",
+            "Tracks each hand-in until its confirmation windows and inventory refresh settle, then continues with the next eligible item. Temporary list changes wait instead of reporting exhaustion. Keeps your HQ, materia, and seal-cap choices; failed selections and delivery errors are reported separately.",
             () => plugin.AutoUnlockExpertDelivery.StatusText,
             searchTerms: ["Auto switch on window open", "Landing page", "Skip HQ items", "Skip items with materia", "Ignore seal max and keep selling"],
             drawOptions: DrawExpertDeliveryOptions);

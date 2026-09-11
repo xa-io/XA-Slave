@@ -2669,9 +2669,14 @@ public sealed class Plugin : IDalamudPlugin
                 snapshot = JsonSerializer.SerializeToElement(new XAModAutoHideGameObjectsSettings
                 {
                     HidePlayer = Configuration.AutoHideGameObjectsHidePlayer,
+                    HideFriends = Configuration.AutoHideGameObjectsHideFriends,
+                    HidePartyAllianceMembers = Configuration.AutoHideGameObjectsHidePartyAllianceMembers,
                     HideUnimportantEnpc = Configuration.AutoHideGameObjectsHideUnimportantEnpc,
                     HidePet = Configuration.AutoHideGameObjectsHidePet,
                     HideChocobo = Configuration.AutoHideGameObjectsHideChocobo,
+                    HideBeasts = Configuration.AutoHideGameObjectsHideBeasts,
+                    HideOwnBeast = Configuration.AutoHideGameObjectsHideOwnBeast,
+                    HideFashionAccessories = Configuration.AutoHideGameObjectsHideFashionAccessories,
                     DisableInDuties = Configuration.AutoHideGameObjectsDisableInDuties,
                     DisableInIslandSanctuary = Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
                     UseOccultCrescentRules = Configuration.AutoHideGameObjectsUseOccultCrescentRules,
@@ -3035,9 +3040,14 @@ public sealed class Plugin : IDalamudPlugin
             && autoHideSettings != null)
         {
             Configuration.AutoHideGameObjectsHidePlayer = autoHideSettings.HidePlayer;
+            Configuration.AutoHideGameObjectsHideFriends = autoHideSettings.HideFriends;
+            Configuration.AutoHideGameObjectsHidePartyAllianceMembers = autoHideSettings.HidePartyAllianceMembers;
             Configuration.AutoHideGameObjectsHideUnimportantEnpc = autoHideSettings.HideUnimportantEnpc;
             Configuration.AutoHideGameObjectsHidePet = autoHideSettings.HidePet;
             Configuration.AutoHideGameObjectsHideChocobo = autoHideSettings.HideChocobo;
+            Configuration.AutoHideGameObjectsHideBeasts = autoHideSettings.HideBeasts;
+            Configuration.AutoHideGameObjectsHideOwnBeast = autoHideSettings.HideOwnBeast;
+            Configuration.AutoHideGameObjectsHideFashionAccessories = autoHideSettings.HideFashionAccessories;
             Configuration.AutoHideGameObjectsDisableInDuties = autoHideSettings.DisableInDuties;
             Configuration.AutoHideGameObjectsDisableInIslandSanctuary = autoHideSettings.DisableInIslandSanctuary;
             Configuration.AutoHideGameObjectsUseOccultCrescentRules = autoHideSettings.UseOccultCrescentRules;
@@ -3050,7 +3060,12 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoHideGameObjectsHideChocobo,
                     Configuration.AutoHideGameObjectsDisableInDuties,
                     Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
-                    Configuration.AutoHideGameObjectsUseOccultCrescentRules);
+                    Configuration.AutoHideGameObjectsUseOccultCrescentRules,
+                    Configuration.AutoHideGameObjectsHideBeasts,
+                    Configuration.AutoHideGameObjectsHideFashionAccessories,
+                    Configuration.AutoHideGameObjectsHideOwnBeast,
+                    Configuration.AutoHideGameObjectsHideFriends,
+                    Configuration.AutoHideGameObjectsHidePartyAllianceMembers);
             }
         }
 
@@ -4324,7 +4339,12 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoHideGameObjectsHideChocobo,
                     Configuration.AutoHideGameObjectsDisableInDuties,
                     Configuration.AutoHideGameObjectsDisableInIslandSanctuary,
-                    Configuration.AutoHideGameObjectsUseOccultCrescentRules);
+                    Configuration.AutoHideGameObjectsUseOccultCrescentRules,
+                    Configuration.AutoHideGameObjectsHideBeasts,
+                    Configuration.AutoHideGameObjectsHideFashionAccessories,
+                    Configuration.AutoHideGameObjectsHideOwnBeast,
+                    Configuration.AutoHideGameObjectsHideFriends,
+                    Configuration.AutoHideGameObjectsHidePartyAllianceMembers);
                 break;
             case "auto-hide-unnecessary-popups":
                 PopupCleaner.ApplyConfiguration(Configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled);
@@ -5367,5 +5387,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.44";
+    public const string Version = "0.0.0.45";
 }

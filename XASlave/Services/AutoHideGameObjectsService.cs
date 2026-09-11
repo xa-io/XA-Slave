@@ -8,6 +8,8 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.Object;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
+using ClassJob = Lumina.Excel.Sheets.ClassJob;
+using IPlayerCharacter = Dalamud.Game.ClientState.Objects.SubKinds.IPlayerCharacter;
 using ObjectKind = FFXIVClientStructs.FFXIV.Client.Game.Object.ObjectKind;
 
 namespace XASlave.Services;
@@ -23,7 +25,8 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
     private readonly IPluginLog log;
-    private readonly HashSet<nint> processedObjects = [];
+    private readonly Dictionary<nint, uint> processedObjects = [];
+    private readonly Dictionary<uint, uint> visiblePlayerJobs = [];
 
     private Hook<UpdateObjectArraysDelegate>? updateObjectArraysHook;
 
@@ -32,9 +35,16 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
     private bool detourFaulted;
     private bool subscribed;
     private bool hidePlayer = true;
+    private bool hideFriends;
+    private bool hidePartyAllianceMembers;
     private bool hideUnimportantEnpc = true;
     private bool hidePet = true;
     private bool hideChocobo = true;
+    private bool hideBeasts;
+    private bool hideOwnBeast;
+    private bool hideFashionAccessories;
+    private uint beastmasterJobId;
+    private long nextBeastmasterLookup;
     private bool disableInDuties = true;
     private bool disableInIslandSanctuary = true;
     private bool useOccultCrescentRules = true;
@@ -67,12 +77,22 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         bool hideChocobo,
         bool disableInDuties,
         bool disableInIslandSanctuary,
-        bool useOccultCrescentRules)
+        bool useOccultCrescentRules,
+        bool hideBeasts = false,
+        bool hideFashionAccessories = false,
+        bool hideOwnBeast = false,
+        bool hideFriends = false,
+        bool hidePartyAllianceMembers = false)
     {
         this.hidePlayer = hidePlayer;
+        this.hideFriends = hideFriends;
+        this.hidePartyAllianceMembers = hidePartyAllianceMembers;
         this.hideUnimportantEnpc = hideUnimportantEnpc;
         this.hidePet = hidePet;
         this.hideChocobo = hideChocobo;
+        this.hideBeasts = hideBeasts;
+        this.hideOwnBeast = hideOwnBeast;
+        this.hideFashionAccessories = hideFashionAccessories;
         this.disableInDuties = disableInDuties;
         this.disableInIslandSanctuary = disableInIslandSanctuary;
         this.useOccultCrescentRules = useOccultCrescentRules;
@@ -80,6 +100,8 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         if (!enabled)
             return;
 
+        // Restore before changing the scan range, including beasts/accessories outside the legacy slots.
+        ResetAllObjects();
         zoneRefreshPassesRemaining = 3;
         UpdateAllObjects(GameObjectManager.Instance());
         StatusText = GetEnabledStatusText();
@@ -127,15 +149,25 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
 
     private string GetEnabledStatusText()
     {
-        var categories = new List<string>(4);
+        var categories = new List<string>(9);
+        if (hideFriends)
+            categories.Add("friends");
+        if (hidePartyAllianceMembers)
+            categories.Add("party and alliance members");
         if (hidePlayer)
-            categories.Add("players");
+            categories.Add("non-friends");
         if (hideUnimportantEnpc)
             categories.Add("unimportant NPCs");
         if (hidePet)
             categories.Add("pets");
         if (hideChocobo)
             categories.Add("chocobos");
+        if (hideBeasts)
+            categories.Add(beastmasterJobId != 0 ? "other players' beasts" : "beasts (waiting for BST game data)");
+        if (hideOwnBeast)
+            categories.Add(beastmasterJobId != 0 ? "your beast" : "your beast (waiting for BST game data)");
+        if (hideFashionAccessories)
+            categories.Add("fashion accessories");
 
         if (categories.Count == 0)
             return "Enabled - hook is armed, but no hide categories are selected.";
@@ -322,13 +354,14 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             && gameMain->CurrentTerritoryIntendedUseId == TerritoryIntendedUse.OccultCrescent;
         var targetAddress = targetManager.Target?.Address ?? nint.Zero;
         var playerCount = 0;
+        RefreshBeastOwners();
 
         for (var index = 0; index < manager->Objects.IndexSorted.Length; index++)
         {
-            if (index > 629)
+            if (!hideBeasts && !hideOwnBeast && !hideFashionAccessories && index > 629)
                 break;
 
-            if (index is > 200 and < 489)
+            if (!hideBeasts && !hideOwnBeast && !hideFashionAccessories && index is > 200 and < 489)
             {
                 index = 488;
                 continue;
@@ -339,18 +372,84 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
                 continue;
 
             var address = (nint)gameObject;
+            // A reused table slot is a different actor; never restore its visibility for the old one.
+            if (processedObjects.TryGetValue(address, out var previousEntityId) && previousEntityId != gameObject->EntityId)
+                processedObjects.Remove(address);
+
             if ((useOccultCrescentFilter
                     ? ShouldHideOccultCrescent(gameObject, targetAddress, ref playerCount, (uint)index)
                     : ShouldHide(gameObject, (uint)index)))
             {
                 gameObject->RenderFlags |= (VisibilityFlags)HiddenRenderFlag;
-                processedObjects.Add(address);
+                processedObjects[address] = gameObject->EntityId;
             }
             else if (processedObjects.Remove(address))
             {
                 gameObject->RenderFlags &= ~(VisibilityFlags)HiddenRenderFlag;
             }
         }
+    }
+
+    private void RefreshBeastOwners()
+    {
+        visiblePlayerJobs.Clear();
+        if (!hideBeasts && !hideOwnBeast)
+            return;
+
+        if (beastmasterJobId == 0 && Environment.TickCount64 >= nextBeastmasterLookup)
+        {
+            nextBeastmasterLookup = Environment.TickCount64 + 5000;
+            try
+            {
+                foreach (var job in Plugin.DataManager.GetExcelSheet<ClassJob>())
+                {
+                    if (job.RowId == 0 || !string.Equals(job.Abbreviation.ToString(), "BST", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    beastmasterJobId = job.RowId;
+                    StatusText = GetEnabledStatusText();
+                    break;
+                }
+            }
+            catch (Exception ex)
+            {
+                log.Debug(ex, "[XASlave] Hide Beasts is waiting for ClassJob game data.");
+            }
+        }
+
+        if (beastmasterJobId == 0)
+            return;
+
+        // One owner snapshot per existing object-update pass; no per-pet table searches.
+        foreach (var obj in Plugin.ObjectTable)
+        {
+            if (obj is IPlayerCharacter player)
+                visiblePlayerJobs[player.EntityId] = player.ClassJob.RowId;
+        }
+    }
+
+    private bool ShouldHideBeast(GameObject* gameObject, uint localEntityId)
+    {
+        return beastmasterJobId != 0
+            && gameObject->ObjectKind == ObjectKind.BattleNpc
+            && (BattleNpcSubKind)gameObject->SubKind == BattleNpcSubKind.Pet
+            && (gameObject->OwnerId == localEntityId ? hideOwnBeast : hideBeasts)
+            && gameObject->OwnerId != 0
+            && gameObject->OwnerId != 0xE0000000
+            && visiblePlayerJobs.TryGetValue(gameObject->OwnerId, out var ownerJobId)
+            && ownerJobId == beastmasterJobId;
+    }
+
+    private bool ShouldHidePlayer(BattleChara* player)
+    {
+        // Group membership takes priority when a party/alliance member is also a friend.
+        if (player->IsPartyMember || player->IsAllianceMember)
+            return hidePartyAllianceMembers;
+
+        if (player->IsFriend)
+            return hideFriends;
+
+        return hidePlayer;
     }
 
     private bool ShouldHide(GameObject* gameObject, uint index)
@@ -363,31 +462,36 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             return false;
 
         var localEntityId = playerState->EntityId;
-        if (localEntityId == 0 || gameObject->EntityId == localEntityId)
+        if (localEntityId == 0)
             return false;
 
-        if ((((uint)gameObject->RenderFlags) & HiddenRenderFlag) != 0 && !processedObjects.Contains((nint)gameObject))
+        if ((((uint)gameObject->RenderFlags) & HiddenRenderFlag) != 0 && !processedObjects.ContainsKey((nint)gameObject))
             return false;
 
         if (gameObject->NamePlateIconId != 0)
             return false;
 
-        if (hidePlayer
-            && index <= 200
+        // Apply the ornament switch directly, including local accessories with no usable owner.
+        if (gameObject->ObjectKind == ObjectKind.Ornament)
+            return hideFashionAccessories;
+
+        if (gameObject->EntityId == localEntityId)
+            return false;
+
+        if (ShouldHideBeast(gameObject, localEntityId))
+            return true;
+
+        if (index <= 200
             && index % 2 == 0
             && gameObject->ObjectKind == ObjectKind.Pc)
-        {
-            var player = (BattleChara*)gameObject;
-            if (player->IsFriend || player->IsPartyMember || player->IsAllianceMember)
-                return false;
-
-            return true;
-        }
+            return ShouldHidePlayer((BattleChara*)gameObject);
 
         if (hidePet
             && index <= 200
             && index % 2 == 1
-            && gameObject->ObjectKind != ObjectKind.Mount
+            && (gameObject->ObjectKind == ObjectKind.Companion
+                || (gameObject->ObjectKind == ObjectKind.BattleNpc
+                    && (BattleNpcSubKind)gameObject->SubKind == BattleNpcSubKind.Pet))
             && gameObject->OwnerId != localEntityId)
             return true;
 
@@ -415,14 +519,23 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             return false;
 
         var localEntityId = playerState->EntityId;
-        if (localEntityId == 0 || gameObject->EntityId == localEntityId)
+        if (localEntityId == 0)
             return false;
 
-        if ((((uint)gameObject->RenderFlags) & HiddenRenderFlag) != 0 && !processedObjects.Contains((nint)gameObject))
+        if ((((uint)gameObject->RenderFlags) & HiddenRenderFlag) != 0 && !processedObjects.ContainsKey((nint)gameObject))
             return false;
 
         if (gameObject->NamePlateIconId != 0)
             return false;
+
+        if (gameObject->ObjectKind == ObjectKind.Ornament)
+            return hideFashionAccessories;
+
+        if (gameObject->EntityId == localEntityId)
+            return false;
+
+        if (ShouldHideBeast(gameObject, localEntityId))
+            return true;
 
         if (index <= 200 && index % 2 == 0 && gameObject->ObjectKind == ObjectKind.Pc)
         {
@@ -432,10 +545,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             if (player->IsDead() || (nint)gameObject == targetAddress)
                 return false;
 
-            if (player->IsFriend || player->IsPartyMember || player->IsAllianceMember)
-                return false;
-
-            return playerCount >= 10;
+            return playerCount >= 10 && ShouldHidePlayer(player);
         }
 
         if (hideUnimportantEnpc
@@ -454,6 +564,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
 
     private void ResetAllObjects()
     {
+        visiblePlayerJobs.Clear();
         if (processedObjects.Count == 0)
             return;
 
@@ -470,7 +581,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
                 continue;
 
             var address = (nint)entry.Value;
-            if (!processedObjects.Contains(address))
+            if (!processedObjects.TryGetValue(address, out var entityId) || entityId != entry.Value->EntityId)
                 continue;
 
             entry.Value->RenderFlags &= ~(VisibilityFlags)HiddenRenderFlag;

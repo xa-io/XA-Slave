@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
@@ -20,9 +19,10 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
     private const string UnableToCompleteDeliveryText = "Unable to complete delivery";
     private const uint SupplyListLoadedState = 2;
     private const int ExpertDeliveryTab = 2;
-    private const int RepeatedCandidateScanThreshold = 3;
+    private const int MaximumSelectionAttempts = 3;
+    private const int MaximumVisibleItems = 40;
+    private const int MaximumNativeItems = 1024;
     private const string HighQualityPromptFragment = "high-quality";
-    private static readonly TimeSpan PendingSelectionTimeout = TimeSpan.FromSeconds(2);
 
     private readonly IFramework framework;
     private readonly IDataManager dataManager;
@@ -35,15 +35,18 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
     private bool skipHqItems = true;
     private bool skipMateriaItems = true;
     private bool ignoreSealCap;
+    private bool sealCapRejected;
     private nint openAddonAddress;
     private nint blockedAddonAddress;
-    private DateTime lastActionUtc = DateTime.MinValue;
+    private long nextScanTick;
+    private readonly ExpertDeliveryProgress progress = new();
     private string lastBlockingErrorText = string.Empty;
     private ExpertDeliveryItem? pendingItem;
-    private DateTime pendingItemSelectedUtc = DateTime.MinValue;
+    private string? handledPromptText;
     private readonly HashSet<ExpertDeliveryItemKey> sessionRejectedItems = new();
-    private ExpertDeliveryItemKey? lastScannedItemKey;
-    private int repeatedCandidateScanCount;
+    private readonly HashSet<ExpertDeliveryItemKey> failedItems = new();
+    private readonly Dictionary<ExpertDeliveryItemKey, int> selectionAttempts = new();
+    private readonly Dictionary<ExpertDeliveryItemKey, uint> nativeRewards = new();
 
     public AutoUnlockExpertDeliveryService(IFramework framework, IDataManager dataManager, IPluginLog log)
     {
@@ -63,6 +66,10 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
         this.skipHqItems = skipHqItems;
         this.skipMateriaItems = skipMateriaItems;
         this.ignoreSealCap = ignoreSealCap;
+        if (ignoreSealCap)
+            sealCapRejected = false;
+        progress.ResetEmptyObservation();
+        sessionRejectedItems.Clear();
 
         if (enabled && openAddonAddress == nint.Zero)
             RefreshWaitingStatusText();
@@ -112,135 +119,251 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
     {
         if (!enabled)
             return;
-
-        var addon = AddonHelper.GetAddon(SupplyListAddonName);
-
-        if (IsAddonVisible(addon))
+        try
         {
-            var addonAddress = (nint)addon;
-            if (addonAddress != openAddonAddress)
-            {
-                openAddonAddress = addonAddress;
-                blockedAddonAddress = nint.Zero;
-                lastBlockingErrorText = string.Empty;
-                lastActionUtc = DateTime.MinValue;
-                pendingItem = null;
-                pendingItemSelectedUtc = DateTime.MinValue;
-                sessionRejectedItems.Clear();
-                ResetRepeatedItemTracking();
-            }
-
-            if (TryBlockOnDeliveryError(addonAddress))
-                return;
-
-            if (blockedAddonAddress == addonAddress)
-            {
-                StatusText = $"Enabled - stopped after delivery error: {lastBlockingErrorText}";
-                return;
-            }
+            UpdateDelivery(Environment.TickCount64);
         }
-
-        if (TryHandleSelectYesNoPrompt())
-            return;
-
-        if (TryClickRewardDeliver())
-            return;
-
-        if (pendingItem != null && !AddonHelper.IsAddonVisible(RewardAddonName) && !AddonHelper.IsAddonVisible(SelectYesNoAddonName))
+        catch (Exception ex)
         {
-            if (DateTime.UtcNow - pendingItemSelectedUtc <= PendingSelectionTimeout)
-            {
-                StatusText = "Enabled - waiting for Expert Delivery confirmation window.";
-                return;
-            }
-
-            log.Warning($"[XASlave] Auto Expert Delivery did not receive a reward or SelectYesno window within {PendingSelectionTimeout.TotalSeconds:F1}s after selecting item {(pendingItem?.ItemId ?? 0)}.");
-            pendingItem = null;
-            pendingItemSelectedUtc = DateTime.MinValue;
-            ResetRepeatedItemTracking();
+            StopForWindow("could not safely read or update the delivery window.");
+            log.Warning(ex, "[XASlave] Expert Delivery update failed.");
         }
+    }
 
-        if (AddonHelper.IsAddonVisible(RewardAddonName))
-        {
-            ResetRepeatedItemTracking();
-            StatusText = "Enabled - waiting for Expert Delivery reward window.";
-            return;
-        }
-
-        if (!IsAddonVisible(addon) || !addon->IsReady ||
-            !NativeArrayAccess.TryGetAtkUInt(addon, 0, out var loadedState) ||
-            !NativeArrayAccess.TryGetAtkUInt(addon, 5, out var rawCurrentPage))
+    private void UpdateDelivery(long now)
+    {
+        if (!Plugin.ClientState.IsLoggedIn)
         {
             ResetWindowState();
             RefreshWaitingStatusText();
             return;
         }
 
-        if (loadedState != SupplyListLoadedState)
+        var addon = AddonHelper.GetAddon(SupplyListAddonName);
+        var rewardVisible = AddonHelper.IsAddonVisible(RewardAddonName);
+        var promptVisible = AddonHelper.IsAddonVisible(SelectYesNoAddonName);
+        if (addon == null || (!IsAddonVisible(addon) && !(pendingItem != null && (rewardVisible || promptVisible))))
         {
+            ResetWindowState();
+            RefreshWaitingStatusText();
+            return;
+        }
+
+        var addonAddress = (nint)addon;
+        if (addonAddress != openAddonAddress)
+        {
+            ResetWindowState();
+            openAddonAddress = addonAddress;
+        }
+        if (blockedAddonAddress == addonAddress)
+        {
+            StatusText = $"Enabled - stopped after delivery error: {lastBlockingErrorText}";
+            return;
+        }
+        if (TryBlockOnDeliveryError(addonAddress))
+            return;
+
+        if (pendingItem != null)
+        {
+            if (progress.TransactionTimedOut(now))
+            {
+                StopForWindow("the selected delivery did not settle; reopen the supply window to retry.");
+                return;
+            }
+
+            if (promptVisible)
+            {
+                TryHandleSelectYesNoPrompt(now);
+                return;
+            }
+            handledPromptText = null;
+            if (rewardVisible)
+            {
+                TryClickRewardDeliver(now);
+                return;
+            }
+
+            if (progress.Phase != ExpertDeliveryPhase.Refreshing)
+            {
+                if (!TryReadPendingInventory(out var itemRemoved))
+                {
+                    progress.ResetEmptyObservation();
+                    StatusText = "Enabled - waiting for selected item inventory data.";
+                    return;
+                }
+                if (progress.Rejected || (itemRemoved && (progress.DeliverySent || progress.ConfirmationSent)))
+                {
+                    progress.MarkRefreshing();
+                    nextScanTick = 0;
+                }
+                else if (itemRemoved)
+                {
+                    StopForWindow("the selected inventory item changed before delivery.");
+                    return;
+                }
+                else if (progress.SelectionTimedOut(now))
+                {
+                    var timedOut = pendingItem.Value;
+                    if (selectionAttempts.GetValueOrDefault(timedOut.GetKey()) >= MaximumSelectionAttempts)
+                        failedItems.Add(timedOut.GetKey());
+                    log.Warning($"[XASlave] Expert Delivery selection of item {timedOut.ItemId} did not open a dialog within 2.0s.");
+                    FinishPendingItem(false);
+                    StatusText = "Enabled - waiting to retry an unconfirmed item selection.";
+                    return;
+                }
+                else
+                {
+                    StatusText = progress.DeliverySent || progress.ConfirmationSent
+                        ? "Enabled - waiting for the selected delivery to finish."
+                        : "Enabled - waiting for Expert Delivery confirmation window.";
+                    return;
+                }
+            }
+        }
+        else if (rewardVisible || promptVisible)
+        {
+            // A manually opened or unrelated dialog is not owned by this transaction.
+            progress.ResetEmptyObservation();
+            StatusText = "Enabled - waiting for the open dialog to close.";
+            return;
+        }
+
+        if (!addon->IsReady ||
+            !NativeArrayAccess.TryGetAtkUInt(addon, 0, out var loadedState) ||
+            !NativeArrayAccess.TryGetAtkUInt(addon, 5, out var rawCurrentPage) ||
+            loadedState != SupplyListLoadedState)
+        {
+            progress.ResetEmptyObservation();
             StatusText = "Enabled - waiting for Grand Company delivery data.";
             return;
         }
-
-        var currentPage = NormalizePage((int)rawCurrentPage);
-        if (autoSwitchWhenOpen && currentPage != defaultPage)
+        if (rawCurrentPage > ExpertDeliveryTab)
         {
-            if (CanAct())
-            {
-                AddonHelper.FireCallback(SupplyListAddonName, 0, defaultPage);
-                StatusText = $"Enabled - switching to {GetPageName(defaultPage)}.";
-            }
-
+            progress.ResetEmptyObservation();
+            StatusText = "Enabled - waiting for a valid Grand Company delivery page.";
             return;
         }
 
+        var currentPage = (int)rawCurrentPage;
+        if (pendingItem != null && currentPage != ExpertDeliveryTab)
+        {
+            ResetWindowState();
+            RefreshWaitingStatusText();
+            return;
+        }
+        if (autoSwitchWhenOpen && currentPage != defaultPage)
+        {
+            progress.ResetEmptyObservation();
+            if (!progress.TryBeginAction(ExpertDeliveryAction.SwitchPage, now))
+                return;
+            if (!AddonHelper.FireCallback(SupplyListAddonName, 0, defaultPage))
+            {
+                if (progress.RecordCallbackFailure(ExpertDeliveryAction.SwitchPage))
+                    StopForWindow("the delivery page callback failed three times.");
+                else
+                    StatusText = "Enabled - waiting to switch the delivery page.";
+                return;
+            }
+            progress.ClearCallbackFailures(ExpertDeliveryAction.SwitchPage);
+            StatusText = $"Enabled - switching to {GetPageName(defaultPage)}.";
+            return;
+        }
         if (currentPage != ExpertDeliveryTab)
         {
-            pendingItem = null;
-            pendingItemSelectedUtc = DateTime.MinValue;
-            ResetRepeatedItemTracking();
+            progress.ResetEmptyObservation();
             StatusText = autoSwitchWhenOpen && defaultPage != ExpertDeliveryTab
                 ? $"Enabled - {GetPageName(defaultPage)} selected; Expert Delivery hand-ins are idle."
                 : "Enabled - waiting for the Expert Delivery tab.";
             return;
         }
 
-        var item = GetNextEligibleItem(addon);
-        if (item == null)
+        if (now < nextScanTick)
+            return;
+        nextScanTick = now + ExpertDeliveryProgress.ScanIntervalMilliseconds;
+        var scan = GetNextEligibleItem(addon);
+        if (!scan.Ready)
         {
-            pendingItem = null;
-            pendingItemSelectedUtc = DateTime.MinValue;
-            ResetRepeatedItemTracking();
-            StatusText = "Enabled - no eligible Expert Delivery items found.";
+            progress.ResetEmptyObservation();
+            StatusText = $"Enabled - waiting for delivery list refresh ({scan.WaitReason}).";
             return;
         }
 
-        if (!CanAct())
-            return;
+        if (pendingItem != null)
+            FinishPendingItem(!progress.Rejected);
 
-        var exhaustedAfterRepeatedSelection = false;
-        item = ApplyRepeatedSelectionGuard(addon, item.Value, out exhaustedAfterRepeatedSelection);
-        if (item == null)
-        {
-            pendingItem = null;
-            pendingItemSelectedUtc = DateTime.MinValue;
-            ResetRepeatedItemTracking();
-            StatusText = exhaustedAfterRepeatedSelection
-                ? "Enabled - reached the end of the Expert Delivery list after repeated selection attempts."
-                : "Enabled - no eligible Expert Delivery items found.";
-            return;
-        }
-
-        if (WouldReachSealCap(item.Value.SealReward))
+        if (sealCapRejected && !ignoreSealCap)
         {
             StatusText = "Enabled - stopped before reaching the Company Seal cap.";
             return;
         }
 
-        pendingItem = item.Value;
-        pendingItemSelectedUtc = DateTime.UtcNow;
-        AddonHelper.FireCallback(SupplyListAddonName, 1, item.Value.VisibleIndex);
-        StatusText = $"Enabled - selecting item {item.Value.ItemId} for Expert Delivery.";
+        if (scan.Item is not { } item)
+        {
+            if (!progress.ObserveEmpty(scan.Fingerprint, now))
+            {
+                StatusText = "Enabled - checking the settled Expert Delivery list.";
+                return;
+            }
+            if (scan.HasFailedItems)
+                StopForWindow("remaining items could not be selected after repeated attempts.");
+            else
+                StatusText = "Enabled - no eligible Expert Delivery items found.";
+            return;
+        }
+
+        progress.ResetEmptyObservation();
+        if (WouldReachSealCap(item.SealReward))
+        {
+            StatusText = "Enabled - stopped before reaching the Company Seal cap.";
+            return;
+        }
+        if (!progress.TryBeginAction(ExpertDeliveryAction.Select, now))
+            return;
+
+        var key = item.GetKey();
+        var attempts = selectionAttempts.GetValueOrDefault(key) + 1;
+        selectionAttempts[key] = attempts;
+        if (!AddonHelper.FireCallback(SupplyListAddonName, 1, item.VisibleIndex))
+        {
+            if (attempts >= MaximumSelectionAttempts)
+                failedItems.Add(key);
+            StatusText = $"Enabled - could not select item {item.ItemId}; waiting to rescan.";
+            return;
+        }
+        pendingItem = item;
+        progress.BeginSelection(now);
+        handledPromptText = null;
+        StatusText = $"Enabled - selecting item {item.ItemId} for Expert Delivery.";
+    }
+
+    private bool TryReadPendingInventory(out bool itemRemoved)
+    {
+        itemRemoved = false;
+        if (pendingItem is not { } item ||
+            !NativeArrayAccess.TryGetInventorySlot(InventoryManager.Instance(), item.Container, item.Slot, out var slot))
+            return false;
+        itemRemoved = ExpertDeliveryProgress.ItemWasRemoved(item.ItemId, item.Quantity, slot->ItemId, slot->Quantity);
+        return true;
+    }
+
+    private void FinishPendingItem(bool completed)
+    {
+        if (completed && pendingItem is { } item)
+        {
+            selectionAttempts.Remove(item.GetKey());
+            failedItems.Remove(item.GetKey());
+        }
+        pendingItem = null;
+        handledPromptText = null;
+        progress.FinishTransaction();
+    }
+
+    private void StopForWindow(string reason)
+    {
+        blockedAddonAddress = openAddonAddress;
+        lastBlockingErrorText = reason;
+        progress.ResetEmptyObservation();
+        StatusText = $"Enabled - stopped after delivery error: {reason}";
     }
 
     private void RefreshWaitingStatusText()
@@ -260,12 +383,16 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
     {
         openAddonAddress = nint.Zero;
         blockedAddonAddress = nint.Zero;
-        lastActionUtc = DateTime.MinValue;
+        nextScanTick = 0;
         lastBlockingErrorText = string.Empty;
         pendingItem = null;
-        pendingItemSelectedUtc = DateTime.MinValue;
+        handledPromptText = null;
+        progress.Reset();
+        sealCapRejected = false;
         sessionRejectedItems.Clear();
-        ResetRepeatedItemTracking();
+        failedItems.Clear();
+        selectionAttempts.Clear();
+        nativeRewards.Clear();
     }
 
     private static int NormalizePage(int page)
@@ -288,110 +415,119 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
         return addon != null && addon->IsVisible;
     }
 
-    private bool TryHandleSelectYesNoPrompt()
+    private void TryHandleSelectYesNoPrompt(long now)
     {
-        if (!AddonHelper.IsAddonReady(SelectYesNoAddonName) || !CanAct())
-            return false;
-
-        var rewardVisible = AddonHelper.IsAddonVisible(RewardAddonName);
-        if (!rewardVisible && pendingItem == null)
-            return false;
+        var addon = (AddonSelectYesno*)AddonHelper.GetAddon(SelectYesNoAddonName);
+        if (pendingItem is not { } item || addon == null || !addon->AtkUnitBase.IsReady ||
+            addon->PromptText == null)
+        {
+            StatusText = "Enabled - waiting for the confirmation dialog to become ready.";
+            return;
+        }
 
         var promptText = GetSelectYesNoPromptText();
-        log.Information($"[XASlave] Auto Expert Delivery SelectYesno prompt: '{promptText}'");
-
-        var pending = pendingItem;
-        var isHighQualityPrompt = IsHighQualityPrompt(promptText);
-        var isMateriaPrompt = IsMateriaPrompt(promptText);
-        var isSealCapPrompt = IsSealCapPrompt(promptText);
-
-        if (isSealCapPrompt)
+        if (string.IsNullOrWhiteSpace(promptText) || handledPromptText == promptText)
         {
-            if (ignoreSealCap)
-            {
-                AddonHelper.ClickYesNo(true, false);
-                pendingItemSelectedUtc = DateTime.MinValue;
-                ResetRepeatedItemTracking();
-                StatusText = "Enabled - ignoring Company Seal cap warning and continuing deliveries.";
-                pendingItem = null;
-                return true;
-            }
+            StatusText = "Enabled - waiting for the confirmation dialog to settle.";
+            return;
+        }
 
-            if (pending is { } sealRejectedItem)
+        var isHq = IsHighQualityPrompt(promptText);
+        var isMateria = IsMateriaPrompt(promptText);
+        var isCap = IsSealCapPrompt(promptText);
+        // Only recognized transaction prompts may be accepted.
+        var accept = !progress.Rejected && !ShouldSkipItem(item) && (isCap ? ignoreSealCap
+            : (isHq || isMateria) && !(isHq && skipHqItems) && !(isMateria && skipMateriaItems));
+        var button = accept ? addon->YesButton : addon->NoButton;
+        if (button == null || !button->IsEnabled ||
+            !progress.TryBeginAction(ExpertDeliveryAction.Confirm, now))
+            return;
+        if (!AddonHelper.ClickYesNo(accept, false))
+        {
+            if (progress.RecordCallbackFailure(ExpertDeliveryAction.Confirm))
             {
-                sessionRejectedItems.Add(sealRejectedItem.GetKey());
-                log.Information($"[XASlave] Auto Expert Delivery rejected item {sealRejectedItem.ItemId} after Company Seal cap warning.");
+                StopForWindow("the confirmation callback failed three times.");
+                return;
             }
+            StatusText = "Enabled - waiting to retry the confirmation callback.";
+            return;
+        }
 
-            AddonHelper.ClickYesNo(false, false);
+        progress.ClearCallbackFailures(ExpertDeliveryAction.Confirm);
+        handledPromptText = promptText;
+        progress.MarkConfirmationSent(!accept);
+        if (!accept)
+        {
+            if (isCap && !ignoreSealCap)
+                sealCapRejected = true;
+            sessionRejectedItems.Add(item.GetKey());
+            if (!isHq && !isMateria && !isCap)
+                failedItems.Add(item.GetKey());
             AddonHelper.CloseAddon(RewardAddonName);
-            pendingItemSelectedUtc = DateTime.MinValue;
-            ResetRepeatedItemTracking();
-            StatusText = "Enabled - skipped item because the next turn-in would exceed the Company Seal cap.";
-            pendingItem = null;
-            return true;
         }
-
-        if (pending is { } itemPrompt)
-        {
-            var shouldSkipForPrompt =
-                (isHighQualityPrompt && skipHqItems) ||
-                (isMateriaPrompt && skipMateriaItems) ||
-                (!isHighQualityPrompt && !isMateriaPrompt &&
-                 ((itemPrompt.IsHighQuality && skipHqItems) || (itemPrompt.HasMateria && skipMateriaItems)));
-
-            var shouldConfirmForPrompt =
-                (isHighQualityPrompt && !skipHqItems) ||
-                (isMateriaPrompt && !skipMateriaItems) ||
-                (!isHighQualityPrompt && !isMateriaPrompt &&
-                 ((itemPrompt.IsHighQuality && !skipHqItems) || (itemPrompt.HasMateria && !skipMateriaItems)));
-
-            if (shouldSkipForPrompt)
-            {
-                sessionRejectedItems.Add(itemPrompt.GetKey());
-                log.Information($"[XASlave] Auto Expert Delivery rejected item {itemPrompt.ItemId} after SelectYesno prompt.");
-
-                AddonHelper.ClickYesNo(false, false);
-                AddonHelper.CloseAddon(RewardAddonName);
-                pendingItemSelectedUtc = DateTime.MinValue;
-                ResetRepeatedItemTracking();
-                StatusText = $"Enabled - skipped item {itemPrompt.ItemId} after SelectYesno prompt.";
-                pendingItem = null;
-                return true;
-            }
-
-            if (shouldConfirmForPrompt)
-            {
-                AddonHelper.ClickYesNo(true, false);
-                pendingItemSelectedUtc = DateTime.MinValue;
-                ResetRepeatedItemTracking();
-                StatusText = $"Enabled - confirming prompt for item {itemPrompt.ItemId}.";
-                pendingItem = null;
-                return true;
-            }
-        }
-
-        log.Warning($"[XASlave] Auto Expert Delivery encountered an unclassified SelectYesno prompt and rejected it: '{promptText}'");
-        AddonHelper.ClickYesNo(false, false);
-        AddonHelper.CloseAddon(RewardAddonName);
-        pendingItemSelectedUtc = DateTime.MinValue;
-        ResetRepeatedItemTracking();
-        StatusText = "Enabled - rejected an unclassified Expert Delivery confirmation prompt.";
-        pendingItem = null;
-        return true;
+        log.Information($"[XASlave] Expert Delivery {(accept ? "confirmed" : "rejected")} a prompt for item {item.ItemId}.");
+        StatusText = accept
+            ? $"Enabled - confirming prompt for item {item.ItemId}."
+            : $"Enabled - rejected a confirmation for item {item.ItemId}; waiting for the list.";
     }
 
-    private bool TryClickRewardDeliver()
+    private void TryClickRewardDeliver(long now)
     {
-        var addon = AddonHelper.GetAddon(RewardAddonName);
-        if (!IsAddonVisible(addon) || !addon->IsReady || !CanAct())
-            return false;
-
-        ((AddonGrandCompanySupplyReward*)addon)->AtkUnitBase.FireCallbackInt(0);
-        pendingItemSelectedUtc = DateTime.MinValue;
-        ResetRepeatedItemTracking();
+        if (pendingItem is not { } item)
+            return;
+        var addon = (AddonGrandCompanySupplyReward*)AddonHelper.GetAddon(RewardAddonName);
+        if (addon == null || !addon->AtkUnitBase.IsReady)
+        {
+            StatusText = "Enabled - waiting for Expert Delivery reward window.";
+            return;
+        }
+        if (progress.Rejected)
+        {
+            if (progress.TryBeginAction(ExpertDeliveryAction.Deliver, now))
+                AddonHelper.CloseAddon(RewardAddonName);
+            return;
+        }
+        if (progress.DeliverySent)
+        {
+            StatusText = "Enabled - waiting for the delivery reward window to close.";
+            return;
+        }
+        if (!TryReadPendingInventory(out var itemRemoved))
+        {
+            StatusText = "Enabled - waiting for selected item inventory data.";
+            return;
+        }
+        if (itemRemoved)
+        {
+            StopForWindow("the selected inventory item changed before the Deliver callback.");
+            return;
+        }
+        var wouldReachCap = WouldReachSealCap(item.SealReward);
+        if (ShouldSkipItem(item) || wouldReachCap)
+        {
+            sealCapRejected |= wouldReachCap;
+            sessionRejectedItems.Add(item.GetKey());
+            progress.MarkConfirmationSent(true);
+            AddonHelper.CloseAddon(RewardAddonName);
+            StatusText = "Enabled - skipped the selected item because its protection settings changed.";
+            return;
+        }
+        if (addon->DeliverButton == null || !addon->DeliverButton->IsEnabled ||
+            !progress.TryBeginAction(ExpertDeliveryAction.Deliver, now))
+            return;
+        if (!AddonHelper.FireCallback(RewardAddonName, 0))
+        {
+            if (progress.RecordCallbackFailure(ExpertDeliveryAction.Deliver))
+            {
+                StopForWindow("the Deliver callback failed three times.");
+                return;
+            }
+            StatusText = "Enabled - waiting to retry the Deliver callback.";
+            return;
+        }
+        progress.ClearCallbackFailures(ExpertDeliveryAction.Deliver);
+        progress.MarkDeliverySent();
         StatusText = "Enabled - delivering selected item.";
-        return true;
     }
 
     private bool TryBlockOnDeliveryError(nint supplyAddonAddress)
@@ -406,122 +542,85 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
         return true;
     }
 
-    private bool CanAct()
-    {
-        var now = DateTime.UtcNow;
-        if ((now - lastActionUtc).TotalMilliseconds < 600)
-            return false;
-
-        lastActionUtc = now;
-        return true;
-    }
-
-    private ExpertDeliveryItem? GetNextEligibleItem(AtkUnitBase* addon)
+    private ExpertDeliveryScan GetNextEligibleItem(AtkUnitBase* addon)
     {
         var agent = AgentGrandCompanySupply.Instance();
-        if (agent == null || agent->ItemArray == null)
-            return null;
+        var inventory = InventoryManager.Instance();
+        if (agent == null || agent->ItemArray == null || inventory == null ||
+            agent->NumItems is < 0 or > MaximumNativeItems ||
+            !NativeArrayAccess.TryGetAtkUInt(addon, 6, out var itemCount))
+            return ExpertDeliveryScan.Wait("native list unavailable");
 
-        var items = new List<ExpertDeliveryItem>();
-        for (var i = 0U; i < agent->NumItems; i++)
+        var fingerprint = 14695981039346656037UL;
+        void Observe(uint value) => fingerprint = unchecked((fingerprint ^ value) * 1099511628211UL);
+        Observe((uint)agent->NumItems);
+        Observe(itemCount);
+        var player = PlayerState.Instance();
+        if (player == null || player->GrandCompany == 0)
+            return ExpertDeliveryScan.Wait("player data unavailable");
+        Observe(inventory->GetCompanySeals(player->GrandCompany));
+
+        // Build one native lookup, then read each visible row at most once.
+        nativeRewards.Clear();
+        for (var i = 0; i < agent->NumItems; i++)
         {
-            var item = agent->ItemArray[i];
-            if (item.ItemId == 0 || item.IsBonusReward || item.ExpReward > 0 || item.SealReward <= 0)
+            var native = agent->ItemArray[i];
+            if (native.ItemId == 0 || native.IsBonusReward || native.ExpReward > 0 || native.SealReward <= 0)
                 continue;
+            var key = new ExpertDeliveryItemKey(native.ItemId, native.Inventory, native.Slot);
+            if (!nativeRewards.TryAdd(key, (uint)native.SealReward))
+                return ExpertDeliveryScan.Wait("duplicate native slots");
+            Observe(native.ItemId);
+            Observe((uint)native.Inventory);
+            Observe(native.Slot);
+            Observe((uint)native.SealReward);
+        }
 
-            if (!NativeArrayAccess.TryGetInventorySlot(
-                    InventoryManager.Instance(),
-                    item.Inventory,
-                    item.Slot,
-                    out var inventorySlot))
+        var visibleCount = (int)Math.Min((uint)MaximumVisibleItems, itemCount);
+        if (NativeArrayBounds.ClampElementCount((uint)visibleCount, addon->AtkValuesCount, 425) != visibleCount)
+            return ExpertDeliveryScan.Wait("visible rows unavailable");
+
+        var hasFailedItems = false;
+        for (var i = 0; i < visibleCount; i++)
+        {
+            if (!NativeArrayAccess.TryGetAtkUInt(addon, 265 + i, out var reward) ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 345 + i, out var containerValue) ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 385 + i, out var slotValue) ||
+                !NativeArrayAccess.TryGetAtkUInt(addon, 425 + i, out var itemId) ||
+                itemId == 0 || slotValue > ushort.MaxValue)
+                return ExpertDeliveryScan.Wait("visible row incomplete");
+
+            var container = (InventoryType)containerValue;
+            var key = new ExpertDeliveryItemKey(itemId, container, (ushort)slotValue);
+            if (!nativeRewards.TryGetValue(key, out var nativeReward) || reward != nativeReward)
+                return ExpertDeliveryScan.Wait("native and visible rows differ");
+            if (!NativeArrayAccess.TryGetInventorySlot(inventory, container, (int)slotValue, out var slot) ||
+                slot->ItemId != itemId || slot->Quantity == 0)
+                return ExpertDeliveryScan.Wait("inventory and visible rows differ");
+
+            var item = new ExpertDeliveryItem(itemId, container, (ushort)slotValue, reward, i,
+                slot->Flags.HasFlag(InventoryItem.ItemFlags.HighQuality), HasMateriaAttached(itemId, slot), slot->Quantity);
+            Observe(itemId);
+            Observe(containerValue);
+            Observe(slotValue);
+            Observe(reward);
+            Observe(unchecked((uint)slot->Quantity));
+            Observe((uint)slot->Flags);
+            Observe(item.HasMateria ? 1u : 0u);
+            if (failedItems.Contains(key))
+            {
+                hasFailedItems = true;
                 continue;
-
-            var visibleIndex = ResolveVisibleIndex(addon, item.ItemId, item.Inventory, item.Slot, (uint)item.SealReward);
-            if (visibleIndex < 0)
+            }
+            if (sessionRejectedItems.Contains(key) || ShouldSkipItem(item))
                 continue;
-
-            items.Add(new ExpertDeliveryItem(
-                item.ItemId,
-                item.Inventory,
-                item.Slot,
-                (uint)item.SealReward,
-                visibleIndex,
-                inventorySlot->Flags.HasFlag(InventoryItem.ItemFlags.HighQuality),
-                HasMateriaAttached(item.ItemId, inventorySlot)));
+            return new ExpertDeliveryScan(true, item, fingerprint, false, string.Empty);
         }
 
-        foreach (var item in items)
-        {
-            if (sessionRejectedItems.Contains(item.GetKey()) || ShouldSkipItem(item))
-                continue;
-
-            return item;
-        }
-
-        return null;
-    }
-
-    private ExpertDeliveryItem? ApplyRepeatedSelectionGuard(AtkUnitBase* addon, ExpertDeliveryItem candidate, out bool exhaustedAfterRepeatedSelection)
-    {
-        exhaustedAfterRepeatedSelection = false;
-
-        var key = candidate.GetKey();
-        if (lastScannedItemKey is { } lastKey && lastKey.Equals(key))
-        {
-            repeatedCandidateScanCount++;
-        }
-        else
-        {
-            lastScannedItemKey = key;
-            repeatedCandidateScanCount = 1;
-        }
-
-        if (repeatedCandidateScanCount < RepeatedCandidateScanThreshold)
-            return candidate;
-
-        sessionRejectedItems.Add(key);
-        log.Information($"[XASlave] Auto Expert Delivery tried item {candidate.ItemId} {repeatedCandidateScanCount} times in a row and is treating it as end-of-list for this supply window.");
-        ResetRepeatedItemTracking();
-
-        var nextItem = GetNextEligibleItem(addon);
-        exhaustedAfterRepeatedSelection = nextItem == null;
-        return nextItem;
-    }
-
-    private void ResetRepeatedItemTracking()
-    {
-        lastScannedItemKey = null;
-        repeatedCandidateScanCount = 0;
-    }
-
-    private int ResolveVisibleIndex(AtkUnitBase* addon, uint itemId, InventoryType container, ushort slot, uint sealReward)
-    {
-        if (!NativeArrayAccess.TryGetAtkUInt(addon, 5, out var currentTab) ||
-            !NativeArrayAccess.TryGetAtkUInt(addon, 6, out var itemCount) ||
-            currentTab != ExpertDeliveryTab)
-            return -1;
-
-        if (itemCount == 0 || addon->AtkValuesCount <= 425)
-            return -1;
-
-        var maxVisible = (int)Math.Min(
-            40u,
-            Math.Min(itemCount, (uint)(addon->AtkValuesCount - 425)));
-        for (var i = 0; i < maxVisible; i++)
-        {
-            if (!NativeArrayAccess.TryGetAtkUInt(addon, 265 + i, out var visibleSealReward) ||
-                !NativeArrayAccess.TryGetAtkUInt(addon, 345 + i, out var visibleContainerValue) ||
-                !NativeArrayAccess.TryGetAtkUInt(addon, 385 + i, out var visibleSlotValue) ||
-                !NativeArrayAccess.TryGetAtkUInt(addon, 425 + i, out var visibleItemId))
-                return -1;
-
-            var visibleContainer = (InventoryType)visibleContainerValue;
-            var visibleSlot = (ushort)visibleSlotValue;
-            if (visibleItemId == itemId && visibleContainer == container && visibleSlot == slot && visibleSealReward == sealReward)
-                return i;
-        }
-
-        return -1;
+        // Never infer exhaustion from a partial view whose remaining rows cannot be read.
+        if (itemCount > MaximumVisibleItems)
+            return ExpertDeliveryScan.Wait("additional rows are not available in the current view");
+        return new ExpertDeliveryScan(true, null, fingerprint, hasFailedItems, string.Empty);
     }
 
     private bool ShouldSkipItem(ExpertDeliveryItem item)
@@ -549,7 +648,10 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
         if (!rankSheet.TryGetRow(realRank, out var rank))
             return true;
 
-        var currentSeals = InventoryManager.Instance()->GetCompanySeals(playerState->GrandCompany);
+        var inventory = InventoryManager.Instance();
+        if (inventory == null)
+            return true;
+        var currentSeals = inventory->GetCompanySeals(playerState->GrandCompany);
         return currentSeals + sealReward > rank.MaxSeals;
     }
 
@@ -623,9 +725,14 @@ public unsafe sealed class AutoUnlockExpertDeliveryService : IDisposable
         };
     }
 
+    private readonly record struct ExpertDeliveryScan(bool Ready, ExpertDeliveryItem? Item, ulong Fingerprint, bool HasFailedItems, string WaitReason)
+    {
+        public static ExpertDeliveryScan Wait(string reason) => new(false, null, 0, false, reason);
+    }
+
     private readonly record struct ExpertDeliveryItemKey(uint ItemId, InventoryType Container, ushort Slot);
 
-    private readonly record struct ExpertDeliveryItem(uint ItemId, InventoryType Container, ushort Slot, uint SealReward, int VisibleIndex, bool IsHighQuality, bool HasMateria)
+    private readonly record struct ExpertDeliveryItem(uint ItemId, InventoryType Container, ushort Slot, uint SealReward, int VisibleIndex, bool IsHighQuality, bool HasMateria, int Quantity)
     {
         public ExpertDeliveryItemKey GetKey()
         {

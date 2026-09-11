@@ -65,9 +65,14 @@ public sealed class XAModDalamudLogDisablerSettings
 public sealed class XAModAutoHideGameObjectsSettings
 {
     public bool HidePlayer { get; set; }
+    public bool HideFriends { get; set; }
+    public bool HidePartyAllianceMembers { get; set; }
     public bool HideUnimportantEnpc { get; set; }
     public bool HidePet { get; set; }
     public bool HideChocobo { get; set; }
+    public bool HideBeasts { get; set; }
+    public bool HideOwnBeast { get; set; }
+    public bool HideFashionAccessories { get; set; }
     public bool DisableInDuties { get; set; }
     public bool DisableInIslandSanctuary { get; set; }
     public bool UseOccultCrescentRules { get; set; }
