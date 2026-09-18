@@ -145,6 +145,7 @@ public class Configuration : IPluginConfiguration
 
     public bool VerboseTaskLogging { get; set; } = false;
     public bool MessageLogEnabled { get; set; } = false;
+    public HashSet<ushort> MessageLogDisabledTypes { get; set; } = new();
     public bool ShowVersionInUpdatesTitle { get; set; } = true;
     public bool ShowVersionInWindowTitleDefaultApplied { get; set; } = false;
     public bool GlobalCharacterListAnonymizeEnabled { get; set; } = false;
@@ -252,6 +253,7 @@ public class Configuration : IPluginConfiguration
     public string XagmanTargetAetheryte { get; set; } = string.Empty;
     public int XagmanTonyGilMinimum { get; set; } = 10000;
     public bool XagmanSellWhenInventoryFull { get; set; } = false;
+    public bool XagmanUseDirectNpcSell { get; set; } = false;
     public bool XagmanEnableArMultiOnComplete { get; set; } = true;
     public bool XagmanLogoutOnComplete { get; set; } = false;
     public bool XagmanKillGameOnComplete { get; set; } = false;
@@ -377,6 +379,9 @@ public class Configuration : IPluginConfiguration
     public string AutoDisplayNetworkLatencyFormat { get; set; } = "Ping: {0} ms";
     public bool CustomTimestampFormatEnabled { get; set; } = false;
     public string CustomTimestampFormat { get; set; } = ChatTimestampFormatService.DefaultFormat;
+    public bool InstantTeleportEnabled { get; set; } = false;
+    public bool InstantTeleportSoloOnly { get; set; } = true;
+    public float InstantTeleportSafeDistanceYalms { get; set; } = 100f;
     public bool NoUiFadeEnabled { get; set; } = false;
     public bool AutoSkipCutscenesFeedingChocoboEnabled { get; set; } = false;
     public bool AutoIgnoreMinimumWindowSizeEnabled { get; set; } = false;
@@ -417,6 +422,8 @@ public class Configuration : IPluginConfiguration
     public bool NotifyWhenFriendIsNearEnabled { get; set; } = false;
     public List<string> NotifyWhenFriendIsNearPatterns { get; set; } = new();
     public int NotifyWhenFriendIsNearCooldownSeconds { get; set; } = 300;
+    public int? NotifyWhenFriendIsNearSchemaVersion { get; set; }
+    public List<NearbyPlayerNotificationRule>? NotifyWhenFriendIsNearRules { get; set; }
     public bool AlertWhenTypingInCombatEnabled { get; set; } = false;
     public int AlertWhenTypingInCombatCooldownSeconds { get; set; } = AlertWhenTypingInCombatService.DefaultCooldownSeconds;
     public int AlertWhenTypingInCombatToneId { get; set; } = AlertWhenTypingInCombatService.DefaultToneId;
@@ -465,6 +472,7 @@ public class Configuration : IPluginConfiguration
     public bool SpecialRenderHideActionBarsEnabled { get; set; } = false;
     public bool SpecialRenderHideTargetInfoEnabled { get; set; } = false;
     public bool SpecialRenderHideNameplatesEnabled { get; set; } = false;
+    public bool EstateTeleportationContextMenuEnabled { get; set; } = false;
     public bool ExpandedPlayerRightClickMenuSearchEnabled { get; set; } = false;
     public bool ExpandedPlayerRightClickMenuSearchFflogsEnabled { get; set; } = true;
     public bool ExpandedPlayerRightClickMenuSearchLodestoneEnabled { get; set; } = true;
@@ -498,6 +506,9 @@ public class Configuration : IPluginConfiguration
     public bool AutoDutyCommenceEnabled { get; set; } = false;
     public bool AutoLeaveDutyEnabled { get; set; } = false;
     public int AutoLeaveDutyDelaySeconds { get; set; } = AutoLeaveDutyService.DelaySecondsDefault;
+    public bool FieldOperationsInstanceDisplayEnabled { get; set; } = false;
+    public bool FieldOperationsInstanceDisplayShowInDtr { get; set; } = true;
+    public bool FieldOperationsInstanceDisplayChat { get; set; } = true;
     public bool EurekaInstanceIdEnabled { get; set; } = false;
     public int EurekaInstanceIdZone { get; set; } = (int)EurekaInstanceIdService.DefaultZone;
     public int EurekaInstanceIdBaselineInstanceId { get; set; } = 0;
@@ -526,6 +537,11 @@ public class Configuration : IPluginConfiguration
     public int QueueStepFrameDelay { get; set; } = 20;
     public bool EurekaLogogramCreatorDefaultSettingsMigrationApplied { get; set; } = false;
     public bool AutoMergeEnabled { get; set; } = false;
+    public bool AutoSortItemsEnabled { get; set; } = false;
+    public AutoSortItemsSettings AutoSortItemsSettings { get; set; } = new();
+
+    public bool AutoRestoreFurnitureEnabled { get; set; } = false;
+    public bool InspectOutfitTryOnEnabled { get; set; } = false;
     public bool QuickReturnEnabled { get; set; } = false;
     public bool UnlockExpertDeliveryEnabled { get; set; } = false;
     public int UnlockExpertDeliveryForcedRankFloor { get; set; } = ExpertDeliveryUnlockService.DefaultForcedRankFloor;
@@ -543,6 +559,8 @@ public class Configuration : IPluginConfiguration
     public float InfiniteSprintDelaySeconds { get; set; } = 2.0f;
     public bool InstantLogoutEnabled { get; set; } = false;
     public bool ItemCommandsEnabled { get; set; } = false;
+    public NearbyPlayersSettings NearbyPlayers { get; set; } = new();
+
     public bool XAPeepEnabled { get; set; } = false;
     public bool XAPeepWindowOpen { get; set; } = false;
     public bool XAPeepHistoryWindowOpen { get; set; } = false;

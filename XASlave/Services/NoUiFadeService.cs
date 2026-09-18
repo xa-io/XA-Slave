@@ -8,6 +8,8 @@ namespace XASlave.Services;
 
 public unsafe sealed class NoUiFadeService : IDisposable
 {
+    private readonly Dalamud.Plugin.Ipc.ICallGateProvider<bool>? readinessProvider;
+    public bool IsReady => !disposed && framework.IsInFrameworkUpdateThread && enabled && CountActiveHookSurfaces() == TotalHookSurfaces;
     private readonly IFramework framework;
     private readonly ISigScanner sigScanner;
     private readonly IGameInteropProvider interopProvider;
@@ -35,12 +37,18 @@ public unsafe sealed class NoUiFadeService : IDisposable
         IFramework framework,
         ISigScanner sigScanner,
         IGameInteropProvider interopProvider,
-        IPluginLog log)
+        IPluginLog log,
+        Dalamud.Plugin.IDalamudPluginInterface? pluginInterface = null)
     {
         this.framework = framework;
         this.sigScanner = sigScanner;
         this.interopProvider = interopProvider;
         this.log = log;
+        if (pluginInterface != null)
+        {
+            readinessProvider = pluginInterface.GetIpcProvider<bool>("XASlave.NoUiFade.IsReady.v1");
+            readinessProvider.RegisterFunc(() => IsReady);
+        }
     }
 
     public string StatusText { get; private set; } = "Disabled";
@@ -105,6 +113,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
 
     public void Dispose()
     {
+        readinessProvider?.UnregisterFunc();
         disposed = true;
         CancelStartupArming(disposeCompletedResult: true);
         enabled = false;

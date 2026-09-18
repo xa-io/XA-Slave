@@ -6,183 +6,110 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 
 ## Key Features
 
-- **AutoRetainer Tasks** - Run pre-processing, post-processing, bailout recovery, startup recovery, sync cadence gates, and optional collection from one panel. Includes a workshop-only FC Chest gil sync to XA Database before AutoRetainer continues.
-- **Save to XA Database** - Push character data into XA Database on demand or through cadence-gated login collection, with task logs for save/debug visibility.
-- **Auto-Glam Weather** - Pick valid glamour plates from per-weather lists and apply them automatically when the active weather changes.
-- **City Chat Flooder** - Send announcements across selected worlds and cities with loop and delay controls.
-- **Xagman** - Coordinate automated item transfers between Tony collectors/suppliers and Franchise Owner characters. Supports fixed-world, Server Matching, and Outside Network Helper runs, item policies, forecasts, peer coordination, recovery, and Dropbox trade reconciliation.
-- **Message Log** - Enable **Log Chat, Messages and Emotes to /xllog** in **Plugin Operations** to write delivered chat, system/error messages, and emotes to the Dalamud log as `[XA Slave] [Message Log]`. This defaults off, applies immediately, and saves across reloads. Enabled logging includes sender names and message text, including private chat. The observer never handles or suppresses chat and retains only the latest 512 records in memory. Xagman's detection of insufficient teleport gil and unattuned destinations remains active when log output is off.
+XA Nearby shows the total player count in its window title, leaving the full list area available for names.
 
-   <details>
-   <summary>How to use Xagman</summary>
+XA Mods checkboxes retain your selection while a queued change is applied, then reflect its result.
 
-   Open `XA Slave > FC Relations > Xagman` to coordinate repeatable item transfers between
-   Franchise Owner characters and one or more Tony characters. Xagman handles relogging, travel,
-   partner selection, Dropbox trade queues, inventory reconciliation, Tony rotation, and retained
-   results.
+Disabled XA Mods show only their checkbox, name and help marker. Select a mod to reveal its description, status and additional settings.
 
-   > **Beta:** Do not leave Xagman unmonitored.
+Auto Skip Cutscenes shares one native hook for normal and general cutscene handling, while retaining category settings and zone exclusions.
 
-   Xagman requires AutoRetainer, Lifestream, XA Database, Dropbox, and vnavmesh.
+- **Character Automation** - Relog character rosters, prepare travel, return alts home, and run recurring tasks with AutoRetainer integration. Shared task controls provide progress, results, cancellation, and completion actions.
+- **FC & Housing Management** - Manage FC invitations and permissions, check housing plots, refresh workshops, bells, and chests, and handle furniture tasks across your characters.
+- **Xagman Item Transfers** - Coordinate collection and restocking across characters, worlds, and participating clients. Configure item policies, review stock forecasts, and rotate collectors through fixed-world, Server Matching, or Outside Network Helper runs.
+- **XA Mods** - Over 60 searchable quality-of-life mods covering gameplay, UI, graphics, inventory, player utilities, and plugin integrations. Browse categorized settings, filter enabled mods, and save or share presets.
+- **Field Operations** - Hunt and track Eureka instances, configure instance alerts, and automate Logos Manipulator work with favorites, recipe selection, and crafting queues.
+- **Chat & Notifications** - Send city announcements across selected worlds with timing and loop controls, configure player alerts, and optionally log chat, messages, and emotes to `/xllog` by category, including private chat.
+- **Data & Exports** - Save character data to XA Database on demand or during login collection. Export roster information to CSV, TSV, TXT, or JSON, with optional database and Lifestream details.
+- **Plugin Tools** - Customize startup behavior and quick actions, browse plugin repositories and the command reference, and access task controls, update history, and IPC integrations.
 
-   ### Roles and item policies
+Open `/xa` to browse the task panels, or `/xa mods` to search the available mods and their settings.
 
-   | Role | Responsibility |
-   | --- | --- |
-   | **Tony** | Receives owner surplus, supplies owner shortages, and rotates when stock or inventory space runs out. |
-   | **Franchise Owner** | Runs the configured Shared Item List against each selected owner character. |
+## Xagman
 
-   Ordinary exact-item work treats NQ and HQ separately and uses only `Inventory 1` through
-   `Inventory 4`. Retainer, saddlebag, market, equipped, Armoury, and other stored quantities do not
-   become ordinary tradable stock.
+Open `FC Relations > Xagman` to coordinate item transfers between **Tony** collectors/suppliers and **Franchise Owner** characters. Configure your characters, meetup location, and item policies, then start the participating clients. Supports fixed-world meetups, Server Matching, character rotation, and collection or restocking runs.
 
-   | Policy | Amount greater than zero | Amount `0` |
-   | --- | --- | --- |
-   | `Give` | Give up to that amount from each applicable owner. | Give all matching owner stock. |
-   | `Take` | Receive one additional batch of that amount during the run. | Take all matching supply the active Tony can safely offer. |
-   | `Balance` | Give or receive until the owner ends at that amount. | Give all matching owner stock. |
-   | `TopUp` | Receive only the shortage needed to reach at least that amount; never return surplus. | Do nothing. |
+**Outside Network Helper** lets two players coordinate transfers without sharing a peer network. Import each other's rosters, set the same meetup, and use the in-game tell and gil-trade coordination. Both sides need compatible versions; green-value targets are unavailable in this mode.
 
-   The same Item ID and quality can have ordinary, `if Subs`, and `if Retainers` policies. A matching
-   submarine policy wins first, then a matching retainer policy, then the ordinary fallback. These
-   conditions use AutoRetainer registration only; they do not make retainer-held items tradable.
-   Unknown registration skips that conditional item group instead of applying a potentially unsafe
-   fallback.
+**Beta:** Monitor Xagman while it runs. It requires AutoRetainer, Lifestream, XA Database, Dropbox, and vnavmesh.
 
-   Connected-peer runs can also use `Green Item GC Seals` and
-   `Green Item FC Credits / Rank Progress` as aggregate `TopUp` targets. These targets apply stricter
-   gear, container, gearset, binding, glamour, materia, and AutoRetainer protection checks and remain
-   unavailable in Outside Network Helper.
+<details>
+<summary>How to use Xagman</summary>
 
-   ### Run types
+### Before you start
 
-   | Run type | Use it when |
-   | --- | --- |
-   | **Fixed world** | Selected participating clients use one configured meetup world and location. |
-   | **Server Matching** | Owners span multiple data centers. Configure one meet world per data center (called a server in the Xagman UI) plus one shared location; Tony sweeps the required routes while each owner stays within its own data center. |
-   | **Outside Network Helper** | Two different players on separate machines cannot share the peer network. Exchange selected rosters by clipboard and coordinate the owner-to-Tony transfer through the in-game one-gil start/done handshake. This mode supports `Give` and `Balance` surplus only; it does not supply owners or use collection-first scheduling. |
+Install and enable AutoRetainer, Lifestream, XA Database, Dropbox, and vnavmesh on the participating clients. Use compatible XA Slave versions, confirm that selected characters can reach the meetup, and leave enough inventory space and travel gil. Monitor the run while Xagman is in beta.
 
-   Multiple Tonys can rotate as they fill or deplete. Connected Server Matching keeps replacement
-   Tonys within the active region, while fixed-world runs use the combined selected pool. Standby
-   cancellation is scoped to the interrupted Tony character and client instance, so a replacement
-   Tony ignores the predecessor's signal and resumes the waiting owner; missing identity or mixed
-   coordination protocols fail closed. Optional
-   Tony selling-when-full is limited to supported ARR city or hamlet routes; normal rotation remains
-   the fallback.
+### Roles and meetup
 
-   ### Basic connected workflow
+| Role | What it does |
+| --- | --- |
+| **Tony** | Waits at the meetup, receives surplus items, supplies requested stock, and rotates to another selected Tony when needed. |
+| **Franchise Owner** | Relogs through selected owner characters, travels to Tony, gives or receives items according to the Shared Item List, and checks the resulting inventory. |
 
-   1. Assign each client the Tony or Franchise Owner role, then connect the participating peers.
-   2. Select the characters and configure either a fixed meetup or Server Matching destination.
-   3. Configure the Franchise Owner Shared Item List and, when useful, the Tony Search Item List.
-   4. Use `Pull XA Database Info`, then `Select Matching Items` or select the characters manually.
-   5. Start Tony with `Start Tony (N)`. At the meetup, Tony signals the connected owners to begin;
-      `Start All Peers` can rebroadcast the current run when needed.
-   6. Use the peer controls to stop the run or clear retained results, then review the Tony Order and
-      Franchise Owner Order output.
+For a **fixed-world** run, choose one meetup world and location for the participating clients. For **Server Matching**, configure a meetup world for each participating data center and a shared location. Tony follows the required routes while owners stay within their own data center.
 
-   `Prioritize Characters Giving Items First` is an optional, default-off Franchise Owner setting that
-   appears with conditional policies. When every participating Franchise Owner client enables it and
-   advertises compatible conditional-policy support, Xagman completes one global
-   `Give`/`Balance`-surplus collection pass before restarting the roster for
-   `Take`/`Balance`-deficit/`TopUp` restocking. All owners off keeps the normal combined flow. Mixed
-   preferences, missing conditional policies, or incompatible protocols block startup; a frozen run
-   stops safely if an expected peer disappears or goes stale.
+### Configure item policies
 
-   ### Planning, controls, and safety
+Set the **Franchise Owner Shared Item List** to describe what each owner should give or receive. Amounts apply per character; NQ and HQ are separate selections.
 
-   - `Pull XA Database Info` refreshes and saves the logged-in character before reloading snapshots.
-   While logged out, it uses the last saved data.
-   - Forecasts show expected collection space, stock, and shortages. They are advisory; live
-   inventory changes and reconciliation decide whether a trade completed.
-   - `Add Item` searches the current tradeable Lumina Item sheet. XA Database supplies character
-   ownership, stock, AutoRetainer registration, matching, and forecast data.
-   - Ctrl+click a character name to send `/ays relog FirstLast@World` for that saved row while Xagman
-   and the shared task runner are idle.
-   - Automated Xagman relogs use up to three 600-second attempts. Before attempts 2 and 3, XA runs
-   the shared pre-flight: a logged-in character is normalized through the normal safety path,
-   character select backs out to the title screen, and the main-menu movie is escaped before XA
-   sends a fresh relog command. Every attempt, confirmed login, and terminal failure is logged with
-   the character name. A character confirmed missing from AutoRetainer fails immediately with a
-   specific reason; an unreadable roster is reported as unknown and keeps the bounded retry path.
-   Otherwise, only the final failed attempt marks the character red and advances.
-   - Xagman's task log keeps earlier characters and failure results through Tony rotation, owner
-   standby/resume, and internal sequences. Starting a new run or clearing the log leaves an explicit
-   marker; if the 8,000-entry limit removes older lines, the log reports the omitted count. Initial
-   and resumed rosters include their regions to make a missing batch easier to investigate.
-   - During Xagman travel, `Unable to teleport. Insufficient gil.` records `not enough gil`, and
-   `No attuned Aetheryte found for ...` records `unable to teleport to location`. The affected owner
-   is marked failed and proceeds through cleanup to the next character without waiting for the
-   normal travel timeout. `/li fc` remains a home-world return: `Could not find free company house`
-   is normal when the character has no FC house and is not treated as a failure.
-   - `Refuse Trades When Idle` optionally reuses XA's Refuse Trade Request protection while preserving
-   the saved manual preference around Dropbox auto-accept windows.
-   - The normal Xagman `Stop` control stops one client. `Stop All Peers` stops connected clients and
-   preserves their results. `Stop All Clients and Results` also clears retained Tony and Franchise
-   Owner orders.
-   - Routes, destinations, participating peers, and collection-first phases are pinned for the active
-   run. Unknown, stale, unreachable, mismatched, or unsafe state fails closed instead of silently
-   advancing, rerouting, or treating a coordination message as proof of a trade.
+| Policy | Amount greater than zero | Amount `0` |
+| --- | --- | --- |
+| **Give** | Give up to this many items. | Give all matching stock. |
+| **Take** | Receive this many additional items during the run. | Take all matching supply the active Tony can safely offer. |
+| **Balance** | Give or receive until the owner holds this amount. | Give all matching stock. |
+| **TopUp** | Receive enough to reach this amount, without giving away surplus. | Do nothing. |
 
-   </details>
+For example, an owner holding 30 items with `Balance 100` requests 70. With `Take 100`, that same owner requests 100 additional items. An owner holding 150 with `TopUp 100` keeps all 150.
 
-- **Monthly Relogger** - Cycle through characters with AutoRetainer support, XA Database rank and plot visibility, optional per-character actions, and shared completion actions. A 300-second login timeout recovers safely and continues if a character cannot load. Results flag failed or unfinished characters, show timing and ETA, and remain available until cleared. Characters missing AutoRetainer data are marked `(not found in AR)` and skipped.
-- **Shared Task Completion Options** - Major task panels share one completion footer for `Logout`, `Kill Game`, and `Enable AR Multi Mode`. `Kill Game` uses XA's hard logout and close-client flow even when `Instant Logout` is disabled.
-- **Prep Logistics** - Relog selected characters, check main-inventory space, move them to a target world or location, and finish with shared completion actions.
-- **Auto-Accept FC Invites** - Accept FC invitations automatically, wait for a configured period, and optionally leave again through the floater-assist flow.
-- **FC Permissions Updater** - Review FC rosters with member-rank and FC-rank visibility before applying shared permission updates.
-- **Check Duplicate Plots** - Scan characters for duplicate housing plots and optionally rerun follow-up actions with the shared completion flow.
-- **Return Alts To Homeworlds** - Send characters back to their home worlds with the shared task action flow.
-- **Refresh Sub/Bell/Chest** - Refresh workshop and bell interactions with prep actions, region filters, bell-only mode, safer menu recovery, optional Company Chest gil sync, and shared completion actions.
-- **Field Operations** - Eureka tools for instance tracking and Logos Manipulator automation. `Instance Hunter` handles per-zone InstanceID, Rodney controls, duty-ready commence, alerts, and rollover until new instances are found. `Logogram Creator` adds favorites, recipe selection, stock scanning, queue and extraction automation, overlays, a floating cancel control, separate `Static Catalog` and `Live Stock Cache` status, and a `Retry Catalog Load` action when packaged catalog data cannot load.
-- **Window Renamer** - Rename the FFXIV game window with a custom title, process-ID prefix, or current-character suffix. When XIVWindowResizer is loaded, XA primes its cached current-process handle without resizing so the custom title and later resize commands can coexist; private-layout drift leaves the title active and shows a visible warning.
-- **Auto Open Moogle Mail** - Queue Letter List actions for taking attachments, deleting opened letters, deleting opened NPC letters, and requesting delivery, with cleanup between letters and an in-window Stop control.
-- **XA Mods** - Searchable mod manager with categorized sections, persistent collapse state, enabled-only filtering, bulk disable, presets, clipboard import/export, inline help, and `/xa xamods` navigation.
+Ordinary items come from the four main inventory bags; shards, crystals, and clusters use the crystal inventory. Retainers, saddlebags, equipped gear, and other stored items are not ordinary trade stock.
 
-  <details>
-  <summary>XA Mods</summary>
+Optional **if Subs** and **if Retainers** policies use AutoRetainer registration. A matching submarine policy takes priority, followed by a matching retainer policy, then the ordinary policy. Unknown registration skips the conditional item group. Connected runs also support green-item seal and FC-credit targets, which apply additional gear protections and are unavailable in Outside Network Helper.
 
-  | Game Mods | UI Mods | Graphic Mods | Player Mods | Plugin Mods | Eureka Mods |
-  | --- | --- | --- | --- | --- | --- |
-  | Allow Multiple Game Instances | Anonymous Mode | Custom Resolutions | Anti-AFK | Anonymize Character Lists | Field Operations Entry Command |
-  | Cancel Login Cooldown | Auto Display IDs | Disable Background Rendering | Auto Duty Commence | ARealmRecorded All Zones | Instance ID |
-  | Close Lobby Errors | Bailout ESC Menu | Disable Title Screen Movie | Auto Leave Duty | Force PeepingTom |  |
-  | Display Actual Queue Position | Better Cast Bar | Hide Game Objects | Auto Merge | Teleport Helper |  |
-  | Fix /target Command | Better Duty Finder | Hide Unnecessary Popups | Auto Open Moogle Mail |  |  |
-  | Lock Game Window In Combat | Better Highlight Potential Targets | Ignore Minimum Window Size | Automate Expert Delivery |  |  |
-  | Prevent Game Exiting From Lobby Errors | Copy Item Name For All | Low Resolution | Better Company Chest |  |  |
-  | Replace Unowned Mount Hotbars | Custom Timestamp Format | No UI Fade | Better Inventory Mover |  |  |
-  | Skip Cutscenes | Dalamud Notifications Suck | Special Rendering Modes | Clear Teleportation Lock |  |  |
-  | Skip Dialogue | Display MSQ Progress |  | Custom Sight Distance |  |  |
-  | Dalamud Log Disabler | Display Network Latency |  | Doze & Sit Anywhere |  |  |
-  |  | Enable Item Icon In Shops |  | Infinite Sprint |  |  |
-  |  | Expanded Player Right-Click Menu Search |  | Item Commands |  |  |
-  |  |  |  | Notify When Friend Is Near |  |  |
-  |  |  |  | Alert When Typing In Combat |  |  |
-  |  |  |  | Refuse Trade Request |  |  |
-  |  |  |  | Reveal Undiscovered Areas |  |  |
-  |  |  |  | Show Blacklisted Playername In Party |  |  |
-  |  |  |  | Show Titles As Playernames |  |  |
-  |  |  |  | Show Traveler World Names |  |  |
-  |  |  |  | XA Peep |  |  |
+### Start a connected run
 
-  </details>
+1. Open `FC Relations > Xagman` on each client, assign Tony or Franchise Owner roles, and connect the participating peers.
+2. Select the characters for each role and configure the meetup or Server Matching destinations.
+3. Set the owner Shared Item List. Use the Tony Search Item List when selecting collectors or suppliers by stock.
+4. Use **Pull XA Database Info** to refresh character snapshots, then **Select Matching Items** or select characters manually. Review available stock and inventory-space forecasts before starting; forecasts are estimates.
+5. Start Tony with **Start Tony (N)**, then use **Start All Peers** to start the connected owners. Watch the task status as characters relog, travel, and trade.
+6. Review **Tony Order**, **Franchise Owner Order**, and the task log for completed, failed, skipped, or unfinished characters.
 
-- **Plugin Operations** - Manage startup behavior (including Open Plugin on Load and Custom Resolution on Plugin Load, which force-resizes the game window to a saved width/height with an optional Ignore Minimum Window Size sub-option), verbose task logging, optional chat/message/emote logging to `/xllog`, titlebar favourites, version display, update history, and quick actions such as presets, rendering presets, Sit/Doze, All XA Mods Off, task stop, Xagman disconnect, and Kill Game.
-- **Export Data** - Export AutoRetainer, Lifestream, and XA Database tables to timestamped TSV/CSV files or overwrite a fixed path for automation.
-- **Repo List** - Review all plugins from the referenced repositories in one sortable table with group, author, plugin status, installer/settings shortcuts, and copy-to-clipboard repo actions.
-- **IPC Calls Available** - Check supported IPC integrations, live/cached plugin availability, XA Slave provider channels, and direct examples such as `XASlave.ExecuteCommand("xamods")`. The final Dalamud Client State table shows the public login flag, the last logout event observed this session, and native `AgentLobby` login/zone/logout values while warning that stored logout parameters can be default or stale.
-- **IPC and Dropbox Safety** - XA Slave registers its four provider channels atomically, rolls back a partial registration, disposes them in reverse order, and marshals provider work to the framework thread. Manual Dropbox queue commands add to existing quantities with saturating arithmetic, skip empty work, and report whether trading started, was already busy, lacked a partner, or was declined.
-- **Commands** - Browse the current `/xa` command surface in searchable grouped tables for general commands, XA Mods categories, Dropbox queueing, movement helpers, and item commands.
-- **Support Diagnostics** - Debug builds show the Debug / Test menu automatically; `/xa debug` toggles it during the current session. Debug / Test actions are unavailable in Release builds. `XA Abuse > Dalamud DLL Bypass Checker` performs inert local path, SHA-256, loaded-version metadata, and process-timestamp checks; it classifies only exact reviewed launcher DLL hashes and leaves unknown files unresolved without loading the assembly or using the network.
-- **Lifecycle Safety** - XA Slave applies saved-configuration migrations in order, normalizes legacy/null state before services start, refuses to load a configuration schema newer than it supports before the older plugin can save over unknown settings, coalesces high-frequency configuration writes on the framework thread, rolls back partial construction, and flushes pending state during unload.
-- **UI and Draw Safety** - Shared RAII owners balance ImGui window, table, child, popup, tree, style, and clip scopes; one panel failure is contained instead of taking down the full window. Debug jobs are cancellation-owned and marshal game state back to the framework thread, while Monthly Relogger performs XA Database reads through one background single-flight pull and applies a deferred save after returning to the game thread.
-- **Priority Tasks** - Long-running automation tasks share one explicit active-task owner, bounded logs, detached result snapshots, cross-panel stop controls, pulsing menu status, and clearer DTR visibility. Busy or empty starts are rejected without running completion continuations, and cancellation or a safety halt is kept distinct from successful completion.
-- **XA Mods Native Hooks** - 50+ local QoL hooks cover multi-instance handling, login/queue cleanup, menu and duty recovery, inventory actions, return/logout shortcuts, rendering, camera controls, teleport-lock recovery, and other client utilities. Hook creation and cancelled teardown stay on the game thread, detours preserve disposal-safe Original calls, native arrays/scans/layouts fail closed behind shared bounds, and addon buttons resolve by text or stable node id before an observable numeric fallback. Startup prioritizes safety hooks, defers heavier work, and restores live rendering, UI visibility, and nameplate privacy on unload.
+**Prioritize Characters Giving Items First** optionally collects surplus across the connected roster before starting a separate restocking pass. Enable it on every participating Franchise Owner client when using it; mixed settings or incompatible peers block that run. Leave it off for the normal combined collection-and-supply flow.
+
+### Outside Network Helper
+
+Use this mode when two players on separate machines cannot share the peer network. It coordinates through in-game tells and separate gil trades.
+
+1. Enable **Outside Network Helper** on both sides and choose the Tony and Franchise Owner roles.
+2. Exchange the selected character rosters through the clipboard, import your partner's roster, and configure the same meetup world and location.
+3. Configure owner item policies and select the participating characters. Give Tony stock for any requested supplies and enough free space for collection.
+4. Keep at least 5,000 gil on Tony, or the higher configured minimum. Each owner needs at least 2 gil for failure signals.
+5. Start both sides. Tony queues nearby owners and invites one with a 1-gil trade. The owner gives collection items, sends its supply request by tell, and confirms with 1 gil. Tony supplies available items and sends a separate final 1 gil. Xagman manages these signals automatically.
+6. Watch the results as owners verify their inventory, return home, and advance. Even an empty supply request completes the handshake.
+
+A Tony unable to continue can signal rotation with 2 gil; the owner retains outstanding work for the next Tony. An owner unable to receive more signals failure with 2 gil and advances after returning home. Both sides must use compatible versions. Green-value targets and connected collection-first scheduling are unavailable in this mode.
+
+### Inventory space and rotation
+
+Select multiple Tonys to allow rotation when stock or space runs out. **Sell When Inventory Is Full** can recover space using the configured seller before continuing. In Outside Network Helper, successful selling resumes with the same Tony; otherwise the run can fall back to rotation. Uncertain cleanup stops the run for review.
+
+**Use XA NPC seller (bypass AR sell rules)** sells subaquatic salvage directly and bypasses AutoRetainer's item-selection rules. Leave it off to use AutoRetainer's configured selling rules. Review this choice before enabling automatic selling.
+
+### Stop and review
+
+- **Stop** stops the current client.
+- **Stop All Peers** stops connected clients while preserving their results.
+- **Stop All Clients and Results** also clears retained Tony and Franchise Owner orders.
+- Review retained results and logs before starting a new run or clearing them. A stopped or failed task does not mean every character finished.
+
+Waiting can mean that Xagman is awaiting a meetup, an available Tony, travel completion, or the active trade partner. Check the current task and partner status before intervening. If the run enters Error, inspect the logged reason, resolve the travel, stock, space, or connection issue, and confirm that outstanding travel and trades have stopped before restarting. Inventory reconciliation determines completion; a finished trade animation alone is not proof that every requested item moved.
+
+</details>
 
 ## Commands
 
-The in-plugin `Reference > Commands` page is the full index for command descriptions and notes. The same XA command surface can also be used over IPC through `XASlave.ExecuteCommand`: empty `/xa` toggles the main window, every named direct route is mirrored, and IPC returns an `OK:` or `ERROR:` result string after the command runs on the framework thread. For queue-and-start Dropbox commands, `OK:` means trading actually started; `ERROR:` can still report that entries were added but Dropbox was already busy, no partner was targeted/focused, or Dropbox declined the start.
+The in-plugin `Reference > Commands` page contains the full command index and usage notes. Commands are also available through `XASlave.ExecuteCommand` IPC.
 
 <details>
 <summary>General</summary>
@@ -201,6 +128,7 @@ The in-plugin `Reference > Commands` page is the full index for command descript
 | `/xa db subloot` | Shortcut for `/xa db 22500:99999 ... 22507:99999` (item IDs 22500-22507); adds those items from local inventory and reports their total vendor gil value in chat. Trading starts when a player is targeted/focus-targeted; without a partner the queue is retained and the result says trading did not start, so `/xa db begin` can be used later. |
 | `/xa dbsub <gil-value>` | Add a minimum-overflow mixture of locally held subaquatic salvage (item IDs 22500-22507) whose vendor value is the smallest reachable total at or above the positive gil target. The result reports selected item count, value, overflow/shortfall, and the exact start outcome. Existing Dropbox queue entries are preserved; without a partner the selected entries remain queued for a later `/xa db begin`. |
 | `/xa debug` | Toggle the Debug / Test menu during the current session in Debug builds, where it starts visible. Unavailable in Release builds. |
+| `/xa sort` | Trigger Auto Sort Items > Sort now using saved settings. Requires Auto Sort Items enabled. |
 | `/xa preset list` | List saved XA Mods presets. |
 | `/xa preset load <name>` | Load a saved XA Mods preset, including the supported subsettings captured for the enabled mods. |
 | `/xa preset save <name>` | Save the current XA Mods selection and the supported subsettings for the enabled mods as a preset. |
@@ -216,7 +144,7 @@ The in-plugin `Reference > Commands` page is the full index for command descript
 | --- | --- |
 | `/xa chocobocutscene on/off` | Toggle `Skip Cutscenes` > `Skip Feeding Chocobo`. |
 | `/xa closeerrors on/off` | Toggle `Close Lobby Errors`. |
-| `/xa disablelogs on/off` | Toggle `Dalamud Log Disabler`, filtering selected plugins' output to the Dalamud log (/xllog and the log file) by log level (e.g. keep Warning/Error/Fatal, blacklist Info/Debug/Verbose). |
+| `/xa disablelogs on/off` | Toggle `Dalamud Log Disabler`, filtering selected plugins' output to the Dalamud log (/xllog and the log file) by log level (e.g. keep Warning/Error/Fatal, blacklist Info/Debug/Verbose). Expand the Plugin list in XA Mods to access plugin checkboxes, filtering and bulk selection. |
 | `/xa gamerestore` | Disable the current Game Mods toggles. |
 | `/xa lockcombat on/off` | Toggle `Lock Game Window In Combat`. |
 | `/xa logincooldown on/off` | Toggle `Cancel Login Cooldown`. |
@@ -277,6 +205,8 @@ The in-plugin `Reference > Commands` page is the full index for command descript
 <details>
 <summary>Player Mods</summary>
 
+`XA Mods > Player Mods > Estate Teleportation Context Menu` is off by default. Enable it to add `Estate Teleportation` to supported player right-click menus, including the party list, for friends whose home world is your current world. The friend list must be loaded; open Social > Friend List if needed. This opens the game's estate selector and leaves destination selection and access permissions to the game. The existing Friend List menu is unchanged.
+
 | Command | Purpose |
 | --- | --- |
 | `/xa antiafk on/off` | Toggle `Anti-AFK`; while enabled XA refreshes the local AFK timer every 2 minutes. |
@@ -291,7 +221,9 @@ The in-plugin `Reference > Commands` page is the full index for command descript
 | `/xa itemcommands on/off` | Toggle `Item Commands`. |
 | `/xa leaveduty on/off` | Toggle `Auto Leave Duty` (`/xa autoleaveduty` is also accepted). |
 | `/xa automerge on/off` | Toggle `Auto Merge`. |
+| `/xa mail` | Open Moogle Mail directly; no mail automation toggle required. |
 | `/xa mooglemail on/off` | Toggle `Auto Open Moogle Mail` Letter List actions. |
+| `/xa nearby [on/off]` | Show or hide a searchable nearby-player list with distance, targeting, and player actions. |
 | `/xa peep [on/off/clear]` | Open XA Peep's small list, toggle its tracker, or clear its stored history; turning XA Peep off also hides the compact window if it is open. Its history window can sort by count, player, last seen, or total time. |
 | `/xa playerrestore` | Disable the current Player Mods toggles. |
 | `/xa refusetrade on/off` | Toggle `Refuse Trade Request`. |
@@ -353,13 +285,15 @@ The in-plugin `Reference > Commands` page is the full index for command descript
 ## Dependencies
 
 - **Xagman requires:** AutoRetainer, Lifestream, XA Database, Dropbox, and vnavmesh.
-- **XA Database:** [XA Database](https://github.com/xa-io/XA-Database) provides snapshots for Save to XA Database, IPC collection, and Xagman's character ownership, stock matching, AutoRetainer data, and forecasts. Xagman item lookup itself uses Lumina.
+- **XA Database:** [XA Database](https://github.com/xa-io/XA-Database) provides character snapshots for data collection, exports, and Xagman planning.
 
 ## This Plugin is in Development
 
 This means that there are still features being implemented and enhanced. Suggestions and feature requests are welcome via GitHub issues or by visiting the Discord server for direct support.
 
 ## Installation
+
+Native inventory, furniture, sorting, nearby-player and try-on features require a matching supported game and Dalamud build. Their compatibility checks reject unsupported native bindings.
 
 1. Install [FFXIVQuickLauncher](https://github.com/goatcorp/FFXIVQuickLauncher) and enable Dalamud in its settings. You must run the game through FFXIVQuickLauncher for plugins to work.
 2. Open Dalamud settings by typing `/xlsettings` in game chat.

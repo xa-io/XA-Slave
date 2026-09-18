@@ -235,7 +235,8 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
             }
         }
 
-        if (!CanQueueManualOperation)
+        var disableActions = !CanQueueManualOperation;
+        if (disableActions)
             ImGui.BeginDisabled();
 
         if (DrawOverlayButton("Take all", "TakeAll"))
@@ -249,7 +250,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         if (DrawOverlayButton("Delete NPC", "DeleteNpc"))
             QueueDeleteNonPlayerLetters();
 
-        if (!CanQueueManualOperation)
+        if (disableActions)
             ImGui.EndDisabled();
 
         ImGui.End();

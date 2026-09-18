@@ -1,13 +1,14 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
-using System.Text.RegularExpressions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
+using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Plugin.Services;
 
 namespace XASlave.Services;
 
-public sealed class NotifyWhenFriendIsNearService : IDisposable
+public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNotificationOutput
 {
     private readonly IFramework framework;
     private readonly IClientState clientState;
@@ -15,193 +16,179 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable
     private readonly IToastGui toastGui;
     private readonly IChatGui chatGui;
     private readonly IPluginLog log;
-    private readonly List<PlayerPatternRule> rules = [];
-    private readonly Dictionary<string, DateTime> cooldownsByName = new(StringComparer.OrdinalIgnoreCase);
-    private bool enabled;
-    private bool subscribed;
-    private int cooldownSeconds = 300;
-    private DateTime lastScanUtc = DateTime.MinValue;
+    private readonly Func<string, bool>? speak;
+    private readonly object sync = new();
+    private readonly NearbyPlayerScanEngine scanner = new();
+    private readonly NearbyPlayerActionDispatcher dispatcher;
+    private NearbyPlayerRuleSnapshot rules = NearbyPlayerRuleSnapshot.Create(null, null, Array.Empty<string>(), 300, false);
+    private bool enabled, subscribed, disposed;
+    private long loginGeneration, nextScan;
+    private uint scanTerritory;
+    private string configurationError = string.Empty;
 
-    public NotifyWhenFriendIsNearService(
-        IFramework framework,
-        IClientState clientState,
-        IObjectTable objectTable,
-        IToastGui toastGui,
-        IChatGui chatGui,
-        IPluginLog log)
+    public NotifyWhenFriendIsNearService(IFramework framework, IClientState clientState, IObjectTable objectTable,
+        IToastGui toastGui, IChatGui chatGui, IPluginLog log, Func<string, bool>? speak = null)
     {
-        this.framework = framework;
-        this.clientState = clientState;
-        this.objectTable = objectTable;
-        this.toastGui = toastGui;
-        this.chatGui = chatGui;
-        this.log = log;
+        this.framework = framework; this.clientState = clientState; this.objectTable = objectTable;
+        this.toastGui = toastGui; this.chatGui = chatGui; this.log = log; this.speak = speak;
+        dispatcher = new NearbyPlayerActionDispatcher(this);
     }
 
     public string StatusText { get; private set; } = "Disabled";
     public string LastActionText { get; private set; } = "No actions yet.";
     public string LastMatchedPlayer { get; private set; } = "None";
-    public int PatternCount => rules.Count;
-
-    public static int NormalizeCooldownSeconds(int value)
-    {
-        return Math.Clamp(value, 10, 3600);
-    }
+    public string SpeechStatus { get { lock (sync) return dispatcher.SpeechStatus; } }
+    public int PatternCount { get { lock (sync) return rules.Rules.Count(rule => rule.LegacyGroup); } }
+    public int RuleCount { get { lock (sync) return rules.Rules.Count; } }
+    public static int NormalizeCooldownSeconds(int value) => Math.Clamp(value, 10, 3600);
+    private static long Now() => (long)(Stopwatch.GetTimestamp() * (1000.0 / Stopwatch.Frequency));
 
     public void ApplyConfiguration(IEnumerable<string> patterns, int cooldownSeconds)
+        => ApplyConfiguration(NearbyPlayerRuleSnapshot.Create(null, null, patterns, cooldownSeconds, false));
+
+    internal void ApplyConfiguration(NearbyPlayerRuleSnapshot validated, Guid? changedRule = null)
     {
-        rules.Clear();
-        foreach (var pattern in patterns
-                     .Select(x => x.Trim())
-                     .Where(x => !string.IsNullOrWhiteSpace(x))
-                     .Distinct(StringComparer.OrdinalIgnoreCase))
+        lock (sync)
         {
-            rules.Add(PlayerPatternRule.Create(pattern));
+            if (disposed) return;
+            // Validation occurs before publication. Cooldowns survive configuration
+            // replacement; queued/partial work belongs to the prior generation.
+            if (changedRule.HasValue) { dispatcher.CancelRule(changedRule.Value); scanner.ChangeRule(changedRule.Value); }
+            else { dispatcher.Cancel(); scanner.CancelPass(); }
+            rules = validated; nextScan = 0; configurationError = string.Empty;
+            StatusText = enabled ? $"Enabled: {rules.Rules.Count} player notification rule(s)." : "Disabled";
         }
+    }
 
-        this.cooldownSeconds = NormalizeCooldownSeconds(cooldownSeconds);
-
-        if (enabled)
-            StatusText = BuildStatusText();
+    internal void ReportConfigurationError(string text)
+    {
+        lock (sync) { configurationError = "Configuration rejected: " + (text.Length <= 256 ? text : text[..256]); StatusText = configurationError; }
     }
 
     public bool SetEnabled(bool value)
     {
-        if (value == enabled)
-            return enabled;
-
-        if (!value)
+        lock (sync)
         {
-            enabled = false;
-            Unsubscribe();
-            cooldownsByName.Clear();
-            StatusText = "Disabled";
-            return false;
+            if (disposed) return false;
+            if (value == enabled) return enabled;
+            enabled = value; ClearSession();
+            if (value) Subscribe(); else Unsubscribe();
+            StatusText = value ? $"Enabled: {rules.Rules.Count} player notification rule(s)." : "Disabled";
+            return value;
         }
-
-        enabled = true;
-        Subscribe();
-        StatusText = BuildStatusText();
-        return true;
-    }
-
-    public void Dispose()
-    {
-        enabled = false;
-        Unsubscribe();
-        cooldownsByName.Clear();
-    }
-
-    private string BuildStatusText()
-    {
-        return $"Enabled - scanning for {rules.Count} friend pattern(s) with a {cooldownSeconds}s cooldown.";
     }
 
     private void Subscribe()
     {
-        if (subscribed)
-            return;
-
+        if (subscribed) return;
         framework.Update += OnFrameworkUpdate;
+        clientState.Login += OnLogin;
+        clientState.Logout += OnLogout;
+        clientState.TerritoryChanged += OnTerritoryChanged;
         subscribed = true;
     }
-
     private void Unsubscribe()
     {
-        if (!subscribed)
-            return;
-
+        if (!subscribed) return;
         framework.Update -= OnFrameworkUpdate;
+        clientState.Login -= OnLogin;
+        clientState.Logout -= OnLogout;
+        clientState.TerritoryChanged -= OnTerritoryChanged;
         subscribed = false;
+    }
+    private void ClearSession()
+    {
+        dispatcher.Cancel(); scanner.Reset(++loginGeneration); nextScan = 0;
+        LastMatchedPlayer = "None"; LastActionText = "No actions yet.";
+    }
+    private void OnLogin() { lock (sync) { if (!disposed) ClearSession(); } }
+    private void OnLogout(int _, int __) { lock (sync) { if (!disposed) { ClearSession(); StatusText = enabled ? "Waiting for login" : "Disabled"; } } }
+    private void OnTerritoryChanged(uint _)
+    {
+        lock (sync)
+        {
+            if (disposed) return;
+            dispatcher.Cancel(); scanner.CancelPass(); nextScan = 0;
+        }
     }
 
     private void OnFrameworkUpdate(IFramework _)
     {
-        if (!enabled || !clientState.IsLoggedIn || rules.Count == 0)
-            return;
-
-        if ((DateTime.UtcNow - lastScanUtc).TotalMilliseconds < 2000)
-            return;
-
-        lastScanUtc = DateTime.UtcNow;
-
-        try
+        lock (sync)
         {
-            var localPlayer = objectTable.LocalPlayer;
-            if (localPlayer == null)
-                return;
-
-            foreach (var obj in objectTable)
+            if (disposed || !enabled || !framework.IsInFrameworkUpdateThread) return;
+            if (!clientState.IsLoggedIn || objectTable.LocalPlayer == null)
             {
-                if (obj is not IPlayerCharacter player)
-                    continue;
-
-                if (player.GameObjectId == localPlayer.GameObjectId)
-                    continue;
-
-                var playerName = player.Name.TextValue;
-                if (string.IsNullOrWhiteSpace(playerName))
-                    continue;
-
-                if (!rules.Any(rule => rule.IsMatch(playerName)))
-                    continue;
-
-                if (cooldownsByName.TryGetValue(playerName, out var nextAllowedUtc) && DateTime.UtcNow < nextAllowedUtc)
-                    continue;
-
-                cooldownsByName[playerName] = DateTime.UtcNow.AddSeconds(cooldownSeconds);
-                LastMatchedPlayer = playerName;
-                ShowLocalSystemNotification(playerName);
-                LastActionText = $"Last action: detected friend '{playerName}' nearby at {DateTime.Now:HH:mm:ss}.";
+                // A missing/aborted snapshot is not an unmatched scan.
+                dispatcher.Cancel(); scanner.CancelPass(); StatusText = "Waiting for a valid local player"; return;
             }
-        }
-        catch (Exception ex)
-        {
-            log.Warning(ex, "[XASlave] Notify When Friend Is Near failed during object-table scanning.");
+            try
+            {
+                var now = Now();
+                if (!scanner.Pending && now >= nextScan)
+                {
+                    var observations = SnapshotPlayers();
+                    scanTerritory = clientState.TerritoryType;
+                    scanner.Begin(rules, observations, loginGeneration, scanTerritory, now, dispatcher.FreeJobs);
+                    nextScan = now + 2000;
+                }
+                var completed = scanner.Advance(Now);
+                if (completed != null)
+                {
+                    if (completed.Count != 0) LastMatchedPlayer = completed[^1].Player.Name;
+                    dispatcher.Enqueue(completed, Now());
+                }
+                var admittedLogin = loginGeneration;
+                dispatcher.Drain(Now());
+                if (disposed || !enabled || loginGeneration != admittedLogin) return;
+                var regexIssue = rules.Rules.FirstOrDefault(rule => rule.Diagnostic.Length != 0)?.Diagnostic;
+                StatusText = scanner.Status.Length != 0 ? scanner.Status : regexIssue ?? (scanner.Pending ? "Scanning nearby players..." : $"Enabled: {rules.Rules.Count} player notification rule(s).");
+                if (configurationError.Length != 0) StatusText = configurationError;
+                if (dispatcher.Status.Length != 0) LastActionText = dispatcher.Status;
+            }
+            catch (Exception error)
+            {
+                dispatcher.Cancel(); scanner.CancelPass(); nextScan = Now() + 2000;
+                StatusText = "Scan failed; waiting for the next complete snapshot.";
+                log.Warning(error, "[XASlave] Player notification scan failed.");
+            }
         }
     }
 
-    private void ShowLocalSystemNotification(string playerName)
+    private IReadOnlyList<NearbyPlayerObservation> SnapshotPlayers()
     {
-        var message = $"Friend nearby: {playerName}";
-        toastGui.ShowNormal(message);
-        chatGui.Print($"[XASlave] {message}");
+        var local = objectTable.LocalPlayer ?? throw new InvalidOperationException("Local player unavailable.");
+        var result = new List<NearbyPlayerObservation>();
+        foreach (var obj in objectTable)
+        {
+            if (obj is not IPlayerCharacter player || player.GameObjectId == local.GameObjectId) continue;
+            var world = player.HomeWorld;
+            if (world.RowId == 0 || world.RowId == ushort.MaxValue || !world.IsValid) continue;
+            var name = player.Name.TextValue;
+            var worldName = world.Value.Name.ExtractText();
+            if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(worldName)) continue;
+            result.Add(new(name, world.RowId, worldName, player.OnlineStatus.RowId, player.GameObjectId));
+        }
+        return result;
     }
 
-    private sealed class PlayerPatternRule
+    bool INearbyPlayerNotificationOutput.IsCurrent(NearbyPlayerEmission emission, Guid ruleId)
+        => !disposed && enabled && framework.IsInFrameworkUpdateThread && clientState.IsLoggedIn
+            && clientState.TerritoryType == scanTerritory && emission.Key.Login == loginGeneration
+            && scanner.StillMatches(emission, ruleId);
+    void INearbyPlayerNotificationOutput.LocalChat(string text) => chatGui.Print("[XASlave] " + text);
+    void INearbyPlayerNotificationOutput.Toast(string text) => toastGui.ShowNormal(text);
+    void INearbyPlayerNotificationOutput.Notification(string text) => Plugin.NotificationManager.AddNotification(new Notification
+        { Title = "Nearby players", Content = text, Type = NotificationType.Info });
+    bool INearbyPlayerNotificationOutput.Speech(string text) => speak?.Invoke(text) == true;
+    bool INearbyPlayerNotificationOutput.SendEntry(string text) => ChatHelper.TrySend(text);
+
+    public void Dispose()
     {
-        private readonly string pattern;
-        private readonly Regex? regex;
-
-        private PlayerPatternRule(string pattern, Regex? regex)
+        lock (sync)
         {
-            this.pattern = pattern;
-            this.regex = regex;
-        }
-
-        public static PlayerPatternRule Create(string pattern)
-        {
-            if (pattern.Length > 2 && pattern[0] == '/' && pattern[^1] == '/')
-            {
-                try
-                {
-                    return new PlayerPatternRule(pattern, new Regex(pattern[1..^1], RegexOptions.IgnoreCase | RegexOptions.Compiled));
-                }
-                catch
-                {
-                    return new PlayerPatternRule(pattern, null);
-                }
-            }
-
-            return new PlayerPatternRule(pattern, null);
-        }
-
-        public bool IsMatch(string value)
-        {
-            if (regex != null)
-                return regex.IsMatch(value);
-
-            return value.Equals(pattern, StringComparison.OrdinalIgnoreCase);
+            if (disposed) return;
+            disposed = true; enabled = false; ClearSession(); Unsubscribe(); StatusText = "Disabled";
         }
     }
 }

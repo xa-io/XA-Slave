@@ -14,7 +14,7 @@ namespace XASlave.Windows;
 // Normal Xagman coordinates Tony and Franchise Owner clients over a local TCP peer hub
 // (XagmanPeerService). ONH mode is for two DIFFERENT players on DIFFERENT machines with no
 // shared peer network: coordination happens in game via proximity + 1-gil trade handshakes
-// instead of peer messages. Franchise Owner gives items; Tony only receives.
+// instead of peer messages. Tony invites one owner, collects, then supplies its tell request.
 //
 // This file holds the additive UI + clipboard character-list plumbing. The runtime handshake
 // state machine (1-gil start/resume + done signals, proximity movement, gil/inventory
@@ -93,7 +93,9 @@ public partial class SlaveWindow
             ImGui.SetTooltip(
                 "Outside Network Helper: transfer items with another player who is NOT on your peer network\n" +
                 "(a different person on a different PC). There is no peer connection - you coordinate in game.\n" +
-                "Franchise Owner gives items; Tony only receives. A 1-gil trade is the ready/done handshake.\n" +
+                "Tony invites one queued owner with 1 gil. Owner gives items, then requests supplies by tell + 1 gil.\n" +
+                "Tony returns 1 gil when finished, or 2 gil to rotate. Owner sends 2 gil if full.\n" +
+                "Tony keeps at least 5000 gil; owners need 2 gil reserved for failure signals.\n" +
                 "Export your selected characters and send the list to your partner; import the list they send you.\n" +
                 "Each side picks their own meet world and location. Peer networking is disabled in this mode.");
         }
@@ -261,9 +263,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled($"{list.Count} character(s) imported.");
     }
 
-    // The queue section is repurposed to show the imported partner roster. The handshake runtime
-    // (XagmanPanel.OnhRuntime.cs) drives live status via xagmanStatusText / the task log; per-row
-    // completion marks in this table are not wired yet.
+    // Show imported names alongside the live offline queue and run-local outcomes.
     private void DrawXagmanOnhQueueView(Configuration cfg)
     {
         var (list, label) = GetXagmanOnhFriendContext(cfg);
@@ -289,7 +289,14 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(list[i]);
                 ImGui.TableNextColumn();
-                ImGui.TextDisabled("Pending");
+                var name = GetCharacterNameFromKey(list[i]);
+                var position = onhWaitingOwners.FindIndex(x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
+                var status = onhFailedOwners.Contains(name) ? "Failed"
+                    : onhRetiredTonys.Contains(name) ? "Retired/full"
+                    : xagmanOnhCompletedPartners.Contains(name) ? "Completed"
+                    : name.Equals(xagmanOnhEngagedPartner, StringComparison.OrdinalIgnoreCase) ? "Active"
+                    : position >= 0 ? $"Queued #{position + 1}" : "Pending";
+                ImGui.TextDisabled(status);
             }
 
         }

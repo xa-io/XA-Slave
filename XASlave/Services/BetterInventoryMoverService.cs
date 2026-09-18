@@ -68,6 +68,14 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
     private readonly IDataManager dataManager;
     private readonly IPluginLog log;
     private bool enabled;
+    private bool disposed;
+    private long generation;
+    private InventoryShuttleContext? access;
+    private string preparingSourceAddon = string.Empty;
+    private InventoryShuttleNativeBinding? mergeBinding;
+    private bool mergeBindingUnavailable;
+    private InventoryShuttleSequence? transfer;
+    private long transferGeneration;
     private bool subscribed;
     private BetterInventoryMoverModifierKey quickMoveModifier = BetterInventoryMoverModifierKey.LeftShift;
 
@@ -89,9 +97,11 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
     public int AvailableDestinationCount { get; private set; }
     public BetterInventoryMoverModifierKey QuickMoveModifier => quickMoveModifier;
     public string QuickMoveModifierLabel => GetModifierLabel(quickMoveModifier);
+    public string OccupiedStackStatus { get; private set; } = "Occupied-stack binding has not been inspected.";
 
     public void ApplyConfiguration(BetterInventoryMoverModifierKey quickMoveModifier)
     {
+        CancelTransfer("Configuration changed."); generation++;
         this.quickMoveModifier = NormalizeModifier(quickMoveModifier);
         if (enabled)
             StatusText = BuildStatusText();
@@ -99,9 +109,11 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
 
     public bool SetEnabled(bool value)
     {
+        if (disposed) return false;
         if (value == enabled)
             return enabled;
 
+        CancelTransfer("Inventory mover enable state changed."); generation++;
         if (!value)
         {
             enabled = false;
@@ -118,6 +130,8 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
 
     public void Dispose()
     {
+        if (disposed) return;
+        CancelTransfer("Inventory mover disposed."); disposed = true; generation++;
         enabled = false;
         Unsubscribe();
     }
@@ -127,7 +141,9 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         if (subscribed)
             return;
 
+        access = new InventoryShuttleContext(Plugin.AddonLifecycle, () => { CancelTransfer("Inventory access was revoked."); generation++; });
         contextMenu.OnMenuOpened += OnMenuOpened;
+        Plugin.Framework.Update += UpdateTransfer;
         subscribed = true;
     }
 
@@ -137,12 +153,17 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
             return;
 
         contextMenu.OnMenuOpened -= OnMenuOpened;
+        Plugin.Framework.Update -= UpdateTransfer;
+        access?.Dispose(); access = null;
         subscribed = false;
     }
 
     private void OnMenuOpened(IMenuOpenedArgs args)
     {
-        if (!enabled ||
+        CancelTransfer("A new context menu revoked the previous transfer.");
+        var menuGeneration = ++generation;
+        access?.Reset();
+        if (disposed || !enabled ||
             args is not
             {
                 MenuType: ContextMenuType.Inventory,
@@ -158,27 +179,29 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
 
         try
         {
+            preparingSourceAddon = addonName;
             LastSourceAddon = addonName;
             LastItemId = item.ItemId;
 
-            var destinations = ResolveDestinations(addonName, item);
+            if (!TryCaptureSource(addonName, item, out var source)) return;
+            var destinations = ResolveDestinations(addonName, source);
             AvailableDestinationCount = destinations.Count;
             if (destinations.Count > 0 && IsQuickMoveModifierHeld())
             {
-                ExecuteMove(item, destinations[0]);
+                ExecuteMove(source, addonName, menuGeneration, destinations[0]);
                 return;
             }
 
             foreach (var destination in destinations)
             {
-                var sourceItem = item;
+                var sourceItem = source;
                 var shuttleDestination = destination;
                 args.AddMenuItem(new MenuItem
                 {
                     Name = new SeStringBuilder().AddText(shuttleDestination.MenuLabel).Build(),
                     UseDefaultPrefix = true,
                     Priority = 1,
-                    OnClicked = _ => ExecuteMove(sourceItem, shuttleDestination),
+                    OnClicked = _ => ExecuteMove(sourceItem, addonName, menuGeneration, shuttleDestination),
                 });
             }
         }
@@ -223,34 +246,34 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         };
     }
 
-    private List<ShuttleDestination> ResolveDestinations(string addonName, GameInventoryItem item)
+    private List<ShuttleDestination> ResolveDestinations(string addonName, InventoryShuttleSource item)
     {
         var destinations = new List<ShuttleDestination>(3);
 
         if (PlayerAddonNames.Contains(addonName))
         {
-            TryAddDestination("InventoryBuddy", item, "Move To Saddlebag", SaddlebagInventories, destinations);
-            TryAddDestination("InventoryBuddy2", item, "Move To Premium Saddlebag", PremiumSaddlebagInventories, destinations);
-            TryAddDestination("InventoryRetainer", item, "Move To Retainer", RetainerInventories, destinations);
-            TryAddDestination("InventoryRetainerLarge", item, "Move To Retainer", RetainerInventories, destinations, requireDistinctLabel: false);
+            TryAddDestination("InventoryBuddy", item, SaddlebagInventories, destinations);
+            TryAddDestination("InventoryBuddy2", item, PremiumSaddlebagInventories, destinations);
+            TryAddDestination("InventoryRetainer", item, RetainerInventories, destinations);
+            TryAddDestination("InventoryRetainerLarge", item, RetainerInventories, destinations);
         }
         else if (addonName.Equals("InventoryBuddy", StringComparison.Ordinal))
         {
-            TryAddDestination("Inventory", item, "Move To Inventory", PlayerInventories, destinations);
-            TryAddDestination("InventoryLarge", item, "Move To Inventory", PlayerInventories, destinations, requireDistinctLabel: false);
-            TryAddDestination("InventoryExpansion", item, "Move To Inventory", PlayerInventories, destinations, requireDistinctLabel: false);
+            TryAddDestination("Inventory", item, PlayerInventories, destinations);
+            TryAddDestination("InventoryLarge", item, PlayerInventories, destinations);
+            TryAddDestination("InventoryExpansion", item, PlayerInventories, destinations);
         }
         else if (addonName.Equals("InventoryBuddy2", StringComparison.Ordinal))
         {
-            TryAddDestination("Inventory", item, "Move To Inventory", PlayerInventories, destinations);
-            TryAddDestination("InventoryLarge", item, "Move To Inventory", PlayerInventories, destinations, requireDistinctLabel: false);
-            TryAddDestination("InventoryExpansion", item, "Move To Inventory", PlayerInventories, destinations, requireDistinctLabel: false);
+            TryAddDestination("Inventory", item, PlayerInventories, destinations);
+            TryAddDestination("InventoryLarge", item, PlayerInventories, destinations);
+            TryAddDestination("InventoryExpansion", item, PlayerInventories, destinations);
         }
         else if (RetainerAddonNames.Contains(addonName))
         {
-            TryAddDestination("Inventory", item, "Move To Inventory", PlayerInventories, destinations);
-            TryAddDestination("InventoryLarge", item, "Move To Inventory", PlayerInventories, destinations, requireDistinctLabel: false);
-            TryAddDestination("InventoryExpansion", item, "Move To Inventory", PlayerInventories, destinations, requireDistinctLabel: false);
+            TryAddDestination("Inventory", item, PlayerInventories, destinations);
+            TryAddDestination("InventoryLarge", item, PlayerInventories, destinations);
+            TryAddDestination("InventoryExpansion", item, PlayerInventories, destinations);
         }
 
         return destinations;
@@ -258,103 +281,164 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
 
     private void TryAddDestination(
         string requiredAddonName,
-        GameInventoryItem item,
-        string menuLabel,
+        InventoryShuttleSource item,
         InventoryType[] destinationInventories,
-        List<ShuttleDestination> destinations,
-        bool requireDistinctLabel = true)
+        List<ShuttleDestination> destinations)
     {
         if (!AddonHelper.IsAddonVisible(requiredAddonName))
             return;
+        if (access == null || !access.IsReady(requiredAddonName) || !access.IsReady(preparingSourceAddon))
+            return;
 
-        if (requireDistinctLabel && destinations.Exists(destination => destination.MenuLabel.Equals(menuLabel, StringComparison.Ordinal)))
+        var family = Family(destinationInventories);
+        if (destinations.Exists(destination => destination.Family == family))
             return;
 
         if (!TryFindTargetSlot(destinationInventories, item, out var targetSlot))
             return;
 
-        destinations.Add(new ShuttleDestination(menuLabel, targetSlot.InventoryType, targetSlot.Slot));
+        var context = access!.Capture(preparingSourceAddon, requiredAddonName, family == InventoryShuttleFamily.Retainer || RetainerAddonNames.Contains(preparingSourceAddon));
+        destinations.Add(new ShuttleDestination(family, InventoryShuttleLabels.Destination(family, Plugin.ClientState.ClientLanguage), destinationInventories, context));
     }
 
-    private bool TryFindTargetSlot(InventoryType[] destinationInventories, GameInventoryItem item, out TargetSlot targetSlot)
+    private bool TryFindTargetSlot(InventoryType[] destinationInventories, InventoryShuttleSource item, out InventoryShuttleTarget targetSlot)
     {
         targetSlot = default;
         var manager = InventoryManager.Instance();
-        if (manager == null)
-            return false;
-
-        var itemSheet = dataManager.GetExcelSheet<Item>();
-        if (!itemSheet.TryGetRow(item.BaseItemId, out var itemData))
-            return false;
-
-        foreach (var inventoryType in destinationInventories)
+        if (manager == null || !dataManager.GetExcelSheet<Item>().TryGetRow(item.State.BaseId, out var data)) return false;
+        var capacity = checked((int)data.StackSize);
+        if (capacity < 1 || item.Quantity < 1 || item.Quantity > capacity) return false;
+        var ordinary = capacity > 1 && !item.State.Flags.HasFlag(InventoryItem.ItemFlags.Collectable);
+        InventoryShuttleTarget? empty = null, partialTarget = null;
+        foreach (var inventory in destinationInventories)
         {
-            if (!NativeArrayAccess.TryGetInventoryContainer(manager, inventoryType, out var container))
-                continue;
-
-            for (var index = 0; index < container->Size; index++)
+            if (!NativeArrayAccess.TryGetInventoryContainer(manager, inventory, out var container)) continue;
+            for (var index = 0; index < container->Size && index <= ushort.MaxValue; index++)
             {
-                if (!NativeArrayAccess.TryGetInventorySlot(container, index, out var slot) || !IsSameItem(slot, item))
-                    continue;
-
-                if (slot->Quantity < itemData.StackSize)
+                if (inventory == item.Inventory && index == item.Slot) continue;
+                if (!NativeArrayAccess.TryGetInventorySlot(container, index, out var slot) || slot->IsSymbolic) continue;
+                if (slot->GetItemId() == 0)
                 {
-                    targetSlot = new TargetSlot(inventoryType, (ushort)slot->Slot);
-                    return true;
-                }
-            }
-        }
-
-        foreach (var inventoryType in destinationInventories)
-        {
-            if (!NativeArrayAccess.TryGetInventoryContainer(manager, inventoryType, out var container))
-                continue;
-
-            for (var index = 0; index < container->Size; index++)
-            {
-                if (!NativeArrayAccess.TryGetInventorySlot(container, index, out var slot) || slot->GetItemId() != 0)
+                    empty ??= new InventoryShuttleTarget(new(inventory, (ushort)index, 0, default), capacity);
                     continue;
-
-                targetSlot = new TargetSlot(inventoryType, (ushort)slot->Slot);
-                return true;
+                }
+                if (!ordinary || slot->Quantity <= 0 || slot->Quantity >= capacity || !IsSameItem(slot, item)) continue;
+                var candidate = new InventoryShuttleTarget(new(inventory, (ushort)index, slot->Quantity, InventoryShuttleItemState.Read(slot)), capacity);
+                if (capacity - slot->Quantity >= item.Quantity) { targetSlot = candidate; return true; }
+                partialTarget ??= candidate;
             }
         }
-
+        if (empty is { } vacant) { targetSlot = vacant; return true; }
+        if (partialTarget is { } merge) { targetSlot = merge; return true; }
         return false;
     }
 
-    private void ExecuteMove(GameInventoryItem sourceItem, ShuttleDestination destination)
+    private void ExecuteMove(InventoryShuttleSource sourceItem, string sourceAddon, long menuGeneration, ShuttleDestination destination)
     {
+        if (disposed || !enabled || menuGeneration != generation || (transfer != null && !transfer.Terminal)) return;
         try
         {
-            if (!TryFindTargetSlot([destination.InventoryType], sourceItem, out var refreshedTarget))
-            {
-                LastActionText = $"Last action: no destination slot was available for item {sourceItem.ItemId} at {DateTime.Now:HH:mm:ss}.";
-                return;
-            }
-
-            var manager = InventoryManager.Instance();
-            if (manager == null)
-                return;
-
-            var sourceInventory = (InventoryType)sourceItem.ContainerType;
-            var sourceSlot = (ushort)sourceItem.InventorySlot;
-            if (TryGetInventorySource(out var liveSourceInventory, out var liveSourceSlot))
-            {
-                sourceInventory = liveSourceInventory;
-                sourceSlot = liveSourceSlot;
-            }
-
-            manager->MoveItemSlot(sourceInventory, sourceSlot, refreshedTarget.InventoryType, refreshedTarget.Slot, true);
-            AddonHelper.CloseAddon("ContextMenu");
-            LastDestinationLabel = destination.MenuLabel;
-            LastItemId = sourceItem.ItemId;
-            LastActionText = $"Last action: moved item {sourceItem.ItemId} from {sourceInventory} to {destination.MenuLabel} at {DateTime.Now:HH:mm:ss}.";
+            Plugin.AssertGameThread(); access!.Require(destination.Access);
+            if (!AddonHelper.IsAddonVisible(sourceAddon) || !DestinationOpen(destination.Family)
+                || !TryGetInventorySource(out var currentInventory, out var currentSlot)
+                || currentInventory != sourceItem.Inventory || currentSlot != sourceItem.Slot)
+                throw new InvalidOperationException("The captured inventory context changed.");
+            if (ReadSlot(sourceItem.Inventory, sourceItem.Slot) != sourceItem) throw new InvalidOperationException("The captured source item changed.");
+            transferGeneration = ++generation;
+            transfer = new(new TransferAdapter(this, destination), sourceItem, Environment.TickCount64);
+            LastDestinationLabel = destination.MenuLabel; LastItemId = sourceItem.State.FullId;
+            PublishTransfer();
+            // The first framework update follows menu setup, allowing an exact close stamp.
         }
-        catch (Exception ex)
+        catch (Exception error) { LastActionText = "Failed: " + error.Message; log.Warning(error, "Inventory transfer admission refused."); }
+    }
+
+    private static InventoryShuttleSource ReadSlot(InventoryType inventory, ushort index)
+    {
+        if (!NativeArrayAccess.TryGetInventorySlot(InventoryManager.Instance(), inventory, index, out var slot) || slot->IsSymbolic)
+            throw new InvalidOperationException("The required inventory slot is unavailable.");
+        return slot->GetItemId() == 0 ? new(inventory, index, 0, default)
+            : new(inventory, index, slot->Quantity, InventoryShuttleItemState.Read(slot));
+    }
+
+    private void UpdateTransfer(IFramework framework)
+    {
+        if (disposed || !enabled || transfer == null) return;
+        if (transferGeneration != generation) transfer.Cancel("Transfer generation was revoked.");
+        else transfer.Tick(Environment.TickCount64);
+        PublishTransfer();
+    }
+
+    private void CancelTransfer(string reason)
+    {
+        if (transfer == null) return;
+        transfer.Cancel(reason); PublishTransfer(); transfer = null;
+    }
+
+    private void PublishTransfer()
+    {
+        if (transfer == null) return;
+        LastActionText = $"{transfer.Outcome}: {transfer.Moved} observed locally, {transfer.Remaining} remaining. {transfer.Detail}";
+        if (transfer.NativeCode is { } code) LastActionText += $" Native code: {code}.";
+    }
+
+    private sealed class TransferAdapter(BetterInventoryMoverService owner, ShuttleDestination destination) : IInventoryShuttleAdapter
+    {
+        private bool menuBound;
+        public void Validate()
         {
-            log.Warning(ex, "[XASlave] Better Inventory Mover failed while moving an item.");
+            if (owner.disposed || !owner.enabled || owner.transferGeneration != owner.generation)
+                throw new InvalidOperationException("Inventory transfer ownership ended.");
+            owner.access!.Require(destination.Access);
+            if (!menuBound) { owner.access.BindMenu(); menuBound = true; }
         }
+        public InventoryShuttleSource Read(InventoryType inventory, ushort slot) => ReadSlot(inventory, slot);
+        public InventoryShuttleTarget? Find(InventoryShuttleSource source)
+            => owner.TryFindTargetSlot(destination.Inventories, source, out var candidate) ? candidate : null;
+        public int Submit(InventoryShuttleSource source, InventoryShuttleTarget target)
+        {
+            Validate();
+            if (Read(source.Inventory, source.Slot) != source || Read(target.Before.Inventory, target.Before.Slot) != target.Before)
+                throw new InvalidOperationException("Inventory changed before native entry.");
+            var manager = InventoryManager.Instance();
+            if (!owner.dataManager.GetExcelSheet<Item>().TryGetRow(source.State.BaseId, out var data) || data.StackSize != target.Capacity)
+                throw new InvalidOperationException("Item stack capacity changed.");
+            if (target.Before.Quantity > 0)
+            {
+                if (target.Capacity <= 1 || source.Quantity > target.Capacity || target.Before.Quantity >= target.Capacity
+                    || !NativeArrayAccess.TryGetInventorySlot(manager, target.Before.Inventory, target.Before.Slot, out var slot) || !owner.IsSameItem(slot, source))
+                    throw new InvalidOperationException("Occupied destination no longer permits an equivalent-state transfer.");
+            }
+            Validate();
+            return manager->MoveItemSlot(source.Inventory, source.Slot, target.Before.Inventory, target.Before.Slot, true);
+        }
+        public void CloseOwnedMenu() { Validate(); owner.access!.CloseOwnedMenu(); }
+    }
+
+    private static InventoryShuttleFamily Family(InventoryType[] inventories)
+        => ReferenceEquals(inventories, SaddlebagInventories) ? InventoryShuttleFamily.Saddlebag
+            : ReferenceEquals(inventories, PremiumSaddlebagInventories) ? InventoryShuttleFamily.PremiumSaddlebag
+            : ReferenceEquals(inventories, RetainerInventories) ? InventoryShuttleFamily.Retainer : InventoryShuttleFamily.Player;
+
+    private static bool DestinationOpen(InventoryShuttleFamily family) => family switch
+    {
+        InventoryShuttleFamily.Saddlebag => AddonHelper.IsAddonVisible("InventoryBuddy"),
+        InventoryShuttleFamily.PremiumSaddlebag => AddonHelper.IsAddonVisible("InventoryBuddy2"),
+        InventoryShuttleFamily.Retainer => AddonHelper.IsAddonVisible("InventoryRetainer") || AddonHelper.IsAddonVisible("InventoryRetainerLarge"),
+        _ => AddonHelper.IsAddonVisible("Inventory") || AddonHelper.IsAddonVisible("InventoryLarge") || AddonHelper.IsAddonVisible("InventoryExpansion"),
+    };
+
+    private static bool TryCaptureSource(string addon, GameInventoryItem item, out InventoryShuttleSource source)
+    {
+        source = default;
+        var inventory = (InventoryType)item.ContainerType;
+        var family = PlayerAddonNames.Contains(addon) ? PlayerInventories : RetainerAddonNames.Contains(addon) ? RetainerInventories
+            : addon == "InventoryBuddy" ? SaddlebagInventories : addon == "InventoryBuddy2" ? PremiumSaddlebagInventories : Array.Empty<InventoryType>();
+        if (Array.IndexOf(family, inventory) < 0 || item.InventorySlot > ushort.MaxValue || item.Quantity <= 0) return false;
+        if (!NativeArrayAccess.TryGetInventorySlot(InventoryManager.Instance(), inventory, (int)item.InventorySlot, out var slot)
+            || slot->IsSymbolic || slot->Quantity != item.Quantity || slot->GetItemId() != item.ItemId) return false;
+        source = new(inventory, (ushort)item.InventorySlot, slot->Quantity, InventoryShuttleItemState.Read(slot));
+        return true;
     }
 
     private static bool TryGetInventorySource(out InventoryType sourceInventory, out ushort sourceSlot)
@@ -363,7 +447,8 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         sourceSlot = 0;
 
         var agent = AgentInventoryContext.Instance();
-        if (agent == null || agent->TargetInventorySlot == null || agent->TargetInventorySlot->ItemId == 0)
+        if (agent == null || agent->TargetInventorySlot == null || agent->TargetInventorySlot->ItemId == 0
+            || agent->TargetInventorySlotId < 0 || agent->TargetInventorySlotId > ushort.MaxValue)
             return false;
 
         sourceInventory = agent->TargetInventoryId;
@@ -371,19 +456,29 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         return sourceInventory != InventoryType.Invalid;
     }
 
-    private static bool IsSameItem(InventoryItem* slot, GameInventoryItem item)
+    private bool IsSameItem(InventoryItem* slot, InventoryShuttleSource item)
     {
-        if (slot == null || slot->GetItemId() == 0)
+        if (slot == null || slot->IsSymbolic || slot->GetItemId() == 0 || slot->Flags.HasFlag(InventoryItem.ItemFlags.Collectable)
+            || InventoryShuttleItemState.Read(slot) != item.State || mergeBindingUnavailable) return false;
+        try
+        {
+            if (!NativeArrayAccess.TryGetInventorySlot(InventoryManager.Instance(), item.Inventory, item.Slot, out var source)
+                || source->IsSymbolic || source->Quantity != item.Quantity || InventoryShuttleItemState.Read(source) != item.State) return false;
+            mergeBinding ??= new InventoryShuttleNativeBinding();
+            var equal = mergeBinding.ReadSlot20(source) == mergeBinding.ReadSlot20(slot);
+            OccupiedStackStatus = "Pinned occupied-stack comparison available.";
+            return equal;
+        }
+        catch (Exception error)
+        {
+            mergeBindingUnavailable = true;
+            OccupiedStackStatus = "Occupied-stack transfer unavailable; empty destinations only: " + error.Message;
             return false;
-
-        var isHq = slot->Flags.HasFlag(InventoryItem.ItemFlags.HighQuality);
-        var isCollectable = slot->Flags.HasFlag(InventoryItem.ItemFlags.Collectable);
-        return slot->GetBaseItemId() == item.BaseItemId && isHq == item.IsHq && isCollectable == item.IsCollectable;
+        }
     }
 
-    private readonly record struct ShuttleDestination(string MenuLabel, InventoryType InventoryType, ushort Slot);
+    private readonly record struct ShuttleDestination(InventoryShuttleFamily Family, string MenuLabel, InventoryType[] Inventories, InventoryShuttleAccess Access);
 
-    private readonly record struct TargetSlot(InventoryType InventoryType, ushort Slot);
 }
 
 public enum BetterInventoryMoverModifierKey

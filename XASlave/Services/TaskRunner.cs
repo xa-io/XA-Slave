@@ -24,6 +24,10 @@ public sealed class TaskRunner : IDisposable
     private readonly StepMachine stepMachine;
     private bool hasActiveRun;
     private Action? onFinished;
+    private Action? onTerminal;
+    private bool terminating;
+    private bool disposed;
+    private long runGeneration;
     private Action<string>? onLog;
     private bool suppressCompletionReport;
     private bool haltRequested;
@@ -32,6 +36,8 @@ public sealed class TaskRunner : IDisposable
     private int historySequenceNumber;
 
     public bool IsRunning => hasActiveRun;
+    /// <summary>Identity of the last successfully admitted run; rejected starts never advance it.</summary>
+    public long CurrentRunId { get; private set; }
 
     /// <summary>
     /// When true, the logout handler should NOT cancel this task.
@@ -106,8 +112,11 @@ public sealed class TaskRunner : IDisposable
         bool suppressCompletionReport = false,
         int? totalItems = null,
         bool? suppressLogoutCancel = null,
-        bool preserveRunHistory = false)
+        bool preserveRunHistory = false,
+        Action? onTerminal = null,
+        bool haltOnStepError = false)
     {
+        if (disposed || terminating) return false;
         var normalizedSteps = taskSteps ?? [];
         var startDecision = TaskRunnerStartPolicy.Evaluate(hasActiveRun, normalizedSteps.Count);
         if (startDecision == TaskRunnerStartDecision.Busy)
@@ -122,42 +131,63 @@ public sealed class TaskRunner : IDisposable
             return false;
         }
 
-        this.onFinished = onFinished;
-        this.onLog = onLog;
-        this.suppressCompletionReport = suppressCompletionReport;
-        haltRequested = false;
-        haltReason = string.Empty;
-        CurrentTaskName = taskName;
-        CompletedItems = 0;
-        if (totalItems.HasValue)
-            TotalItems = Math.Max(0, totalItems.Value);
-        if (suppressLogoutCancel.HasValue)
-            SuppressLogoutCancel = suppressLogoutCancel.Value;
-        // Some dynamic owners (notably Xagman) establish progress before Start. Preserve that
-        // value when totalItems is omitted; Cancel/Finish clear it before the next idle run.
-        CurrentItemLabel = string.Empty;
-        if (!preserveRunHistory)
+        var acceptedGeneration = runGeneration + 1;
+        try
         {
-            logMessages.Clear();
-            taskRunResults.Clear();
-            historySequenceNumber = 0;
+            this.onFinished = onFinished;
+            this.onTerminal = onTerminal;
+            runGeneration++;
+            stepMachine.HaltOnError = haltOnStepError;
+            this.onLog = onLog;
+            this.suppressCompletionReport = suppressCompletionReport;
+            haltRequested = false;
+            haltReason = string.Empty;
+            CurrentTaskName = taskName;
+            CompletedItems = 0;
+            if (totalItems.HasValue)
+                TotalItems = Math.Max(0, totalItems.Value);
+            if (suppressLogoutCancel.HasValue)
+                SuppressLogoutCancel = suppressLogoutCancel.Value;
+            // Some dynamic owners (notably Xagman) establish progress before Start. Preserve that
+            // value when totalItems is omitted; Cancel/Finish clear it before the next idle run.
+            CurrentItemLabel = string.Empty;
+            if (!preserveRunHistory)
+            {
+                logMessages.Clear();
+                taskRunResults.Clear();
+                historySequenceNumber = 0;
+            }
+            historySequenceNumber++;
+
+            stepMachine.Start(normalizedSteps);
+            hasActiveRun = true;
+            StatusText = stepMachine.CurrentStepName;
+            framework.Update += OnTick;
+
+            AddLog(preserveRunHistory
+                ? $"[{taskName}] Starting sequence {historySequenceNumber}; earlier log entries and character results retained."
+                : $"[{taskName}] Starting sequence {historySequenceNumber} of a new run; earlier log entries and character results cleared.");
+            if (!hasActiveRun || runGeneration != acceptedGeneration) return false;
+            AddLog($"[{taskName}] Started with {stepMachine.TotalSteps} steps.");
+            if (!hasActiveRun || runGeneration != acceptedGeneration) return false;
+            log.Information($"[XASlave] TaskRunner: '{taskName}' started with {stepMachine.TotalSteps} steps.");
+
+            // Show DTR bar progress
+            UpdateDtrBar();
+            if (!hasActiveRun || runGeneration != acceptedGeneration) return false;
+            CurrentRunId++;
+            return true;
         }
-        historySequenceNumber++;
-
-        stepMachine.Start(normalizedSteps);
-        hasActiveRun = true;
-        StatusText = stepMachine.CurrentStepName;
-        framework.Update += OnTick;
-
-        AddLog(preserveRunHistory
-            ? $"[{taskName}] Starting sequence {historySequenceNumber}; earlier log entries and character results retained."
-            : $"[{taskName}] Starting sequence {historySequenceNumber} of a new run; earlier log entries and character results cleared.");
-        AddLog($"[{taskName}] Started with {stepMachine.TotalSteps} steps.");
-        log.Information($"[XASlave] TaskRunner: '{taskName}' started with {stepMachine.TotalSteps} steps.");
-
-        // Show DTR bar progress
-        UpdateDtrBar();
-        return true;
+        catch (Exception ex)
+        {
+            if (runGeneration == acceptedGeneration)
+            {
+                if (hasActiveRun) Cancel();
+                else InvokeTerminal();
+            }
+            log.Error($"[XASlave] TaskRunner start failed: {ex.Message}");
+            return false;
+        }
     }
 
     /// <summary>Append additional steps to a running task (for dynamic character rotation).</summary>
@@ -169,6 +199,20 @@ public sealed class TaskRunner : IDisposable
     public void Cancel()
     {
         if (!hasActiveRun) return;
+        var wasTerminating = terminating;
+        terminating = true;
+        try { CancelCore(); }
+        finally
+        {
+            onFinished = null;
+            onLog = null;
+            InvokeTerminal();
+            terminating = wasTerminating;
+        }
+    }
+
+    private void CancelCore()
+    {
         stepMachine.Stop();
         hasActiveRun = false;
         framework.Update -= OnTick;
@@ -184,7 +228,7 @@ public sealed class TaskRunner : IDisposable
         // *continuation* as onFinished (e.g. the Xagman Tony item-sell task schedules a
         // full-inventory fallback that can broadcast peer completion), which must run only on
         // natural completion — never when a run is cancelled or auto-cancelled by logout.
-        // Callers that need cleanup on cancel perform it in their own stop path.
+        // The optional terminal callback releases ownership independently of continuations.
         SetDtrIdle();
     }
 
@@ -197,10 +241,20 @@ public sealed class TaskRunner : IDisposable
         if (!hasActiveRun || haltRequested)
             return;
 
+        var wasTerminating = terminating;
+        terminating = true;
+        try { RequestHaltCore(reason); }
+        finally { terminating = wasTerminating; }
+    }
+
+    private void RequestHaltCore(string reason)
+    {
+
         haltRequested = true;
         haltReason = string.IsNullOrWhiteSpace(reason) ? "A safety requirement failed." : reason.Trim();
         stepMachine.Stop();
         StatusText = "Halted";
+        InvokeTerminal();
         AddLog($"[{CurrentTaskName}] Halted: {haltReason}");
         log.Warning($"[XASlave] TaskRunner: '{CurrentTaskName}' halted: {haltReason}");
     }
@@ -208,7 +262,8 @@ public sealed class TaskRunner : IDisposable
     public void AddLog(string message)
     {
         logMessages.Add($"[{DateTime.Now:HH:mm:ss}] {message}");
-        onLog?.Invoke(message);
+        try { onLog?.Invoke(message); }
+        catch (Exception ex) { log.Error($"[XASlave] TaskRunner onLog error: {ex.Message}"); }
     }
 
     public bool VerboseTaskLoggingEnabled => IsVerboseTaskLoggingEnabled();
@@ -291,6 +346,18 @@ public sealed class TaskRunner : IDisposable
     /// </summary>
     internal void ProcessTick()
     {
+        var tickGeneration = runGeneration;
+        try { ProcessTickCore(); }
+        catch (Exception ex)
+        {
+            if (runGeneration != tickGeneration) return;
+            RequestHalt($"Task callback failed: {ex.Message}");
+            FinalizeHalt();
+        }
+    }
+
+    private void ProcessTickCore()
+    {
         if (!hasActiveRun)
             return;
 
@@ -300,6 +367,7 @@ public sealed class TaskRunner : IDisposable
             return;
         }
 
+        var tickGeneration = runGeneration;
         var previousStep = stepMachine.CurrentStep;
         var result = stepMachine.Tick(
             onStepStarted: LogStepStart,
@@ -315,6 +383,9 @@ public sealed class TaskRunner : IDisposable
                 log.Warning($"[XASlave] TaskRunner step '{step.Name}' timed out after {step.TimeoutSec}s.");
             });
 
+        if (!hasActiveRun || tickGeneration != runGeneration) return;
+        if (stepMachine.LastError != null)
+            RequestHalt(stepMachine.LastError);
         if (haltRequested)
         {
             FinalizeHalt();
@@ -336,6 +407,32 @@ public sealed class TaskRunner : IDisposable
     {
         if (!hasActiveRun)
             return;
+
+        var finished = onFinished;
+        var finishedGeneration = runGeneration;
+        onFinished = null;
+        terminating = true;
+        try { FinishCore(); }
+        finally
+        {
+            onLog = null;
+            InvokeTerminal();
+            terminating = false;
+        }
+        try { if (!disposed) finished?.Invoke(); }
+        catch (Exception ex) { log.Error($"[XASlave] TaskRunner onFinished error: {ex.Message}"); }
+        finally
+        {
+            if (runGeneration == finishedGeneration)
+            {
+                suppressCompletionReport = false;
+                TotalItems = 0;
+            }
+        }
+    }
+
+    private void FinishCore()
+    {
 
         hasActiveRun = false;
         framework.Update -= OnTick;
@@ -377,9 +474,6 @@ public sealed class TaskRunner : IDisposable
         }
         catch { /* toast may fail silently */ }
 
-        try { onFinished?.Invoke(); }
-        catch (Exception ex) { log.Error($"[XASlave] TaskRunner onFinished error: {ex.Message}"); }
-        finally { suppressCompletionReport = false; TotalItems = 0; }
     }
 
     private void FinalizeHalt()
@@ -397,7 +491,24 @@ public sealed class TaskRunner : IDisposable
         TotalItems = 0;
         haltRequested = false;
         haltReason = string.Empty;
+        onFinished = null;
+        onLog = null;
         SetDtrIdle();
+        InvokeTerminal();
+    }
+
+    // Detach before invocation: reentrant cancellation/disposal cannot run cleanup twice.
+    // Start is rejected during cleanup; a success continuation may start after it returns.
+    private void InvokeTerminal()
+    {
+        var terminal = onTerminal;
+        onTerminal = null;
+        if (terminal == null) return;
+        var wasTerminating = terminating;
+        terminating = true;
+        try { terminal(); }
+        catch (Exception ex) { log.Error($"[XASlave] TaskRunner terminal cleanup error: {ex.Message}"); }
+        finally { terminating = wasTerminating; }
     }
 
     /// <summary>Initialize DTR bar entry - always visible, shows "Idle" by default.</summary>
@@ -456,6 +567,7 @@ public sealed class TaskRunner : IDisposable
 
     public void Dispose()
     {
+        disposed = true;
         if (hasActiveRun)
         {
             stepMachine.Stop();
@@ -465,6 +577,7 @@ public sealed class TaskRunner : IDisposable
         haltRequested = false;
         haltReason = string.Empty;
         RemoveDtrBar();
+        InvokeTerminal();
     }
 }
 

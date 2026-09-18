@@ -28,19 +28,21 @@ internal sealed class MessageLogService : IDisposable
     private readonly IChatGui chatGui;
     private readonly IPluginLog log;
     private readonly Func<bool> loggingEnabled;
+    private readonly Func<XivChatType, bool> typeEnabled;
     private readonly object syncRoot = new();
     private readonly Queue<MessageLogEntry> recentEntries = new(MaxRecentEntries);
     private bool disposed;
 
-    internal MessageLogService(IChatGui chatGui, IPluginLog log, Func<bool> loggingEnabled)
+    internal MessageLogService(IChatGui chatGui, IPluginLog log, Func<bool> loggingEnabled, Func<XivChatType, bool>? typeEnabled = null)
     {
         this.chatGui = chatGui ?? throw new ArgumentNullException(nameof(chatGui));
         this.log = log ?? throw new ArgumentNullException(nameof(log));
         this.loggingEnabled = loggingEnabled ?? throw new ArgumentNullException(nameof(loggingEnabled));
+        this.typeEnabled = typeEnabled ?? (_ => true);
 
         chatGui.CheckMessageHandled += OnChatMessageHandled;
         if (loggingEnabled())
-            log.Information("[XA Slave] [Message Log] Logging enabled for all chat types.");
+            log.Information("[XA Slave] [Message Log] Logging enabled for selected message types.");
     }
 
     /// <summary>
@@ -147,7 +149,7 @@ internal sealed class MessageLogService : IDisposable
                 recentEntries.Enqueue(entry);
             }
 
-            if (loggingEnabled())
+            if (loggingEnabled() && typeEnabled(entry.ChatType))
                 log.Information(FormatForLog(entry));
             NotifyObservers(entry);
         }

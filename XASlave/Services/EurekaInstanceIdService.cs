@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Runtime.InteropServices;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.Gui.Dtr;
 using Dalamud.Hooking;
@@ -78,6 +79,10 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     private readonly IFramework framework;
     private readonly IPluginLog log;
     private readonly IDtrBar dtrBar;
+    private readonly ZoneInitObservationService zoneObservation;
+    private NearbyZoneNativeGate? zonePacketGate;
+    private nint zonePacketEntry;
+    private bool packetHookDisabled, disposing;
 
     private Hook<UIModule.Delegates.HandlePacket>? uiModuleHandlePacketHook;
     private IDtrBarEntry? dtrEntry;
@@ -100,6 +105,14 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     private long leaveDutyRequestedAtTick;
     private bool leaveDutyConfirmationSent;
     private string pendingLeaveReason = string.Empty;
+    private string legacyDtrText = string.Empty;
+    private bool legacyDtrShown, fieldOperationsOwnsDtr, fieldOperationsDtrShown, fieldEntryEvaluationPending;
+    private string fieldOperationsDtrText = string.Empty, fieldOperationsDtrTooltip = string.Empty;
+    private Action<DtrInteractionEvent>? fieldOperationsDtrClick;
+    public Func<string>? FieldOperationsAnnouncementSuffix { get; set; }
+    public Action? FieldOperationsAnnouncementPublished { get; set; }
+    public bool FieldOperationsAnnouncementPending => scannerRunning && fieldEntryEvaluationPending &&
+        TryResolveEurekaZoneByTerritoryType(clientState.TerritoryType, out var zone) && IsZoneEnabled(zone);
     private string lastDtrText = string.Empty;
     private bool lastDtrShown;
     private EurekaZone lastObservedZone = DefaultZone;
@@ -118,7 +131,8 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         ICondition condition,
         IFramework framework,
         IPluginLog log,
-        IDtrBar dtrBar)
+        IDtrBar dtrBar,
+        ZoneInitObservationService zoneObservation)
     {
         this.configuration = configuration;
         this.clientState = clientState;
@@ -127,6 +141,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         this.framework = framework;
         this.log = log;
         this.dtrBar = dtrBar;
+        this.zoneObservation = zoneObservation;
         lastZoneInitSnapshot = new ZoneInitSnapshot(
             HookActive: false,
             HasCapturedPacket: false,
@@ -269,6 +284,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         }
 
         scannerRunning = true;
+        fieldEntryEvaluationPending = TryResolveEurekaZoneByTerritoryType(clientState.TerritoryType, out _);
         ResetProgress(true);
         ResetCurrentTargetZoneToFirstEnabled();
         ArmDisplayRefresh();
@@ -292,6 +308,10 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
 
     public void Dispose()
     {
+        if (disposing) return;
+        disposing = true;
+        zonePacketGate?.Deactivate();
+        zoneObservation.SetHookAvailable(false);
         enabled = false;
         scannerRunning = false;
         displayRefreshPending = false;
@@ -303,8 +323,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         }
         ResetProgress(false);
         UpdateSubscription(false);
-        uiModuleHandlePacketHook?.Dispose();
-        uiModuleHandlePacketHook = null;
+        FinishZonePacketRetirement();
         RemoveDtrEntry();
         UpdateStatusText();
     }
@@ -330,6 +349,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
 
     private void OnTerritoryChanged(uint territoryType)
     {
+        fieldEntryEvaluationPending = scannerRunning && TryResolveEurekaZoneByTerritoryType(territoryType, out _);
         if (!enabled)
             return;
 
@@ -471,6 +491,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         var zoneLabel = GetZoneLabel(currentZone);
         if (!IsZoneEnabled(currentZone))
         {
+            fieldEntryEvaluationPending = false;
             ScheduleLeaveFromCurrentZone(currentZone, $"Current Eureka {zoneLabel} is not enabled.");
             UpdateStatusText();
             return;
@@ -485,13 +506,15 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
             return;
         }
 
+        fieldEntryEvaluationPending = false;
         var currentInstanceId = NormalizeInstanceId((int)resolution.InstanceId);
         var baselineInstanceId = GetZoneBaselineInstanceId(currentZone);
         if (baselineInstanceId <= 0)
         {
             SaveZoneBaseline(currentZone, currentInstanceId);
             pendingLeaveReason = $"Captured Eureka {zoneLabel} baseline {currentInstanceId}{BuildResolutionSourceSuffix(resolution)}.";
-            Plugin.ChatGui.Print($"[XASlave] {zoneLabel} baseline instance set to {currentInstanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}");
+            Plugin.ChatGui.Print($"[XASlave] {zoneLabel} baseline instance set to {currentInstanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}{GetFieldOperationsAnnouncementSuffix()}");
+            ConfirmFieldOperationsAnnouncement();
             ScheduleLeaveFromCurrentZone(currentZone, pendingLeaveReason);
             UpdateStatusText();
             return;
@@ -1242,20 +1265,71 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     {
         try
         {
+            if (AppDomain.CurrentDomain.GetData("XASlave.ZoneInitObservation.RetainedOwner.v1") != null)
+            {
+                log.Warning("[XASlave] A prior zone-init observer has unresolved retirement; the existing farming resolver remains available without this observer.");
+                return;
+            }
             if (UIModule.StaticVirtualTablePointer == null)
             {
                 log.Warning("[XASlave] Eureka Instance ID could not start the zone-init packet hook because UIModule.StaticVirtualTablePointer was null.");
                 return;
             }
 
-            uiModuleHandlePacketHook = Plugin.GameInterop.HookFromAddress<UIModule.Delegates.HandlePacket>(
-                (nint)UIModule.StaticVirtualTablePointer->HandlePacket,
-                UIModuleHandlePacketDetour);
+            zonePacketEntry = (nint)UIModule.StaticVirtualTablePointer->HandlePacket;
+            // This existing relay preserves all four Windows x64 register arguments; no stack arguments are present.
+            zonePacketGate = new NearbyZoneNativeGate((UIModule.Delegates.HandlePacket)UIModuleHandlePacketDetour);
+            var nativeEntry = Marshal.GetDelegateForFunctionPointer<UIModule.Delegates.HandlePacket>(zonePacketGate.Entry);
+            uiModuleHandlePacketHook = Plugin.GameInterop.HookFromAddress<UIModule.Delegates.HandlePacket>(zonePacketEntry, nativeEntry);
+            zonePacketGate.SetOriginal(Marshal.GetFunctionPointerForDelegate(uiModuleHandlePacketHook.OriginalDisposeSafe));
             uiModuleHandlePacketHook.Enable();
+            zonePacketGate.Activate();
+            zoneObservation.SetHookAvailable(true);
         }
         catch (Exception ex)
         {
+            zonePacketGate?.Deactivate();
+            zoneObservation.SetHookAvailable(false);
+            FinishZonePacketRetirement();
             log.Warning(ex, "[XASlave] Eureka Instance ID failed to install the zone-init packet hook.");
+        }
+    }
+
+    private void FinishZonePacketRetirement()
+    {
+        try
+        {
+            if (!framework.IsInFrameworkUpdateThread || zonePacketGate?.InFlight > 0)
+            {
+                AppDomain.CurrentDomain.SetData("XASlave.ZoneInitObservation.RetainedOwner.v1", this);
+                framework.RunOnTick(FinishZonePacketRetirement, TimeSpan.FromMilliseconds(250));
+                return;
+            }
+            if (uiModuleHandlePacketHook != null && !packetHookDisabled)
+            {
+                uiModuleHandlePacketHook.Disable();
+                packetHookDisabled = true;
+                zonePacketGate?.RedirectInactiveOriginal(zonePacketEntry);
+            }
+            // The redirect fence precedes this second drain. Future arrivals use the restored entry, not the old trampoline.
+            if (zonePacketGate?.InFlight > 0)
+            {
+                AppDomain.CurrentDomain.SetData("XASlave.ZoneInitObservation.RetainedOwner.v1", this);
+                framework.RunOnTick(FinishZonePacketRetirement, TimeSpan.FromMilliseconds(250));
+                return;
+            }
+            uiModuleHandlePacketHook?.Dispose();
+            uiModuleHandlePacketHook = null;
+            zonePacketGate?.Dispose();
+            zonePacketGate = null;
+            if (ReferenceEquals(AppDomain.CurrentDomain.GetData("XASlave.ZoneInitObservation.RetainedOwner.v1"), this))
+                AppDomain.CurrentDomain.SetData("XASlave.ZoneInitObservation.RetainedOwner.v1", null);
+        }
+        catch (Exception ex)
+        {
+            // Keep the revoked relay/SDK owner rooted when shutdown cannot complete native retirement.
+            AppDomain.CurrentDomain.SetData("XASlave.ZoneInitObservation.RetainedOwner.v1", this);
+            log.Warning(ex, "[XASlave] Zone-init packet retirement is incomplete; retaining the owner.");
         }
     }
 
@@ -1531,22 +1605,20 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         try
         {
             var zoneInitPacket = (ZoneInitPacket*)packet;
-            lock (gate)
-            {
-                lastZoneInitSnapshot = new ZoneInitSnapshot(
-                    HookActive: true,
-                    HasCapturedPacket: true,
-                    CapturedAtUtc: DateTime.UtcNow,
-                    ServerId: zoneInitPacket->ServerId,
-                    TerritoryTypeId: zoneInitPacket->TerritoryTypeId,
-                    PacketInstance: zoneInitPacket->Instance,
-                    ContentFinderConditionId: zoneInitPacket->ContentFinderConditionId,
-                    PopRangeId: zoneInitPacket->PopRangeId,
-                    Flags: zoneInitPacket->Flags);
-            }
-
-            if (enabled && TryResolveEurekaZoneByTerritoryType(zoneInitPacket->TerritoryTypeId, out _))
+            var snapshot = new ZoneInitSnapshot(
+                HookActive: true,
+                HasCapturedPacket: true,
+                CapturedAtUtc: DateTime.UtcNow,
+                ServerId: zoneInitPacket->ServerId,
+                TerritoryTypeId: zoneInitPacket->TerritoryTypeId,
+                PacketInstance: zoneInitPacket->Instance,
+                ContentFinderConditionId: zoneInitPacket->ContentFinderConditionId,
+                PopRangeId: zoneInitPacket->PopRangeId,
+                Flags: zoneInitPacket->Flags);
+            lock (gate) lastZoneInitSnapshot = snapshot;
+            if (enabled && TryResolveEurekaZoneByTerritoryType(snapshot.TerritoryTypeId, out _))
                 displayRefreshPending = true;
+            zoneObservation.Capture(snapshot.ServerId, snapshot.PacketInstance, snapshot.TerritoryTypeId, condition[ConditionFlag.DutyRecorderPlayback]);
         }
         catch (Exception ex)
         {
@@ -1709,7 +1781,8 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     private void AnnounceNewInstance(EurekaZone zone, EurekaInstanceResolution resolution)
     {
         var zoneLabel = GetZoneLabel(zone);
-        Plugin.ChatGui.Print($"[XASlave] {zoneLabel} Instance: {resolution.InstanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}. Baseline updated.");
+        Plugin.ChatGui.Print($"[XASlave] {zoneLabel} Instance: {resolution.InstanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}. Baseline updated.{GetFieldOperationsAnnouncementSuffix()}");
+        ConfirmFieldOperationsAnnouncement();
         if (configuration.EurekaInstanceIdPlaySound)
             XAPeepSoundPlayer.TryPlayAlert(configuration.EurekaInstanceIdSoundEffectId, configuration.EurekaInstanceIdSoundVolume, log);
     }
@@ -1762,10 +1835,49 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         SetDtrState(text, true);
     }
 
+    public string FieldOperationsLegacyTooltip()
+    {
+        if (!TryResolveEurekaZoneByTerritoryType(clientState.TerritoryType, out var zone) || zone != lastObservedZone) return string.Empty;
+        return $"Ordinary Eureka instance: {lastObservedInstanceId} ({lastObservedInstanceSource})";
+    }
+
+    private string GetFieldOperationsAnnouncementSuffix()
+    {
+        try { return FieldOperationsAnnouncementSuffix?.Invoke() ?? string.Empty; }
+        catch { return string.Empty; }
+    }
+
+    private void ConfirmFieldOperationsAnnouncement()
+    {
+        try { FieldOperationsAnnouncementPublished?.Invoke(); }
+        catch { }
+    }
+
+    public void SetFieldOperationsDtr(bool owns, string text, bool shown, string tooltip, Action<DtrInteractionEvent>? click)
+    {
+        if (disposing) return;
+        fieldOperationsOwnsDtr = owns; fieldOperationsDtrText = text; fieldOperationsDtrShown = shown;
+        fieldOperationsDtrTooltip = tooltip; fieldOperationsDtrClick = click;
+        ApplyDtrState();
+    }
+
     private void SetDtrState(string text, bool shown)
     {
+        legacyDtrText = text; legacyDtrShown = shown;
+        ApplyDtrState();
+    }
+
+    private void ApplyDtrState()
+    {
+        var text = fieldOperationsOwnsDtr ? fieldOperationsDtrText : legacyDtrText;
+        var shown = fieldOperationsOwnsDtr ? fieldOperationsDtrShown : legacyDtrShown;
         try
         {
+            if (dtrEntry != null)
+            {
+                dtrEntry.OnClick = fieldOperationsOwnsDtr ? fieldOperationsDtrClick : null;
+                dtrEntry.Tooltip = fieldOperationsOwnsDtr ? fieldOperationsDtrTooltip : string.Empty;
+            }
             if (!shown)
             {
                 if (lastDtrShown && dtrEntry != null)
@@ -1777,6 +1889,8 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
             }
 
             dtrEntry ??= dtrBar.Get("XA Eureka");
+            dtrEntry.OnClick = fieldOperationsOwnsDtr ? fieldOperationsDtrClick : null;
+            dtrEntry.Tooltip = fieldOperationsOwnsDtr ? fieldOperationsDtrTooltip : string.Empty;
             if (!lastDtrShown || !string.Equals(lastDtrText, text, StringComparison.Ordinal))
                 dtrEntry.Text = text;
 

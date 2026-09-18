@@ -28,6 +28,9 @@ public sealed class XAPeepService : IDisposable
     private readonly IClientState clientState;
     private readonly ICondition condition;
     private readonly IObjectTable objectTable;
+    private readonly PlayerObservationProvider observations;
+    private readonly PlayerTargetingCoordinator targeting;
+    internal Func<ulong, bool>? SharedTargeterVisual { get; set; }
     private readonly IGameGui gameGui;
     private readonly IPluginLog log;
     private readonly SlaveDatabaseService slaveDatabase;
@@ -54,7 +57,9 @@ public sealed class XAPeepService : IDisposable
         IGameGui gameGui,
         IPluginLog log,
         SlaveDatabaseService slaveDatabase,
-        Configuration configuration)
+        Configuration configuration,
+        PlayerObservationProvider observations,
+        PlayerTargetingCoordinator targeting)
     {
         this.framework = framework;
         this.clientState = clientState;
@@ -64,6 +69,8 @@ public sealed class XAPeepService : IDisposable
         this.log = log;
         this.slaveDatabase = slaveDatabase;
         this.configuration = configuration;
+        this.observations = observations;
+        this.targeting = targeting;
 
         RefreshHistoryCache();
         UpdateStatusText();
@@ -72,6 +79,9 @@ public sealed class XAPeepService : IDisposable
     public bool IsEnabled => enabled;
 
     public int ActiveCount => activeTargeters.Count;
+
+    internal bool HasTargeterVisual(ulong id) => enabled && clientState.IsLoggedIn && activeTargeters.ContainsKey(id)
+        && (configuration.XAPeepShowTargeterLine || configuration.XAPeepShowTargeterDot || configuration.XAPeepShowTargetersCard);
 
     public string StatusText { get; private set; } = "Disabled";
 
@@ -240,16 +250,10 @@ public sealed class XAPeepService : IDisposable
             DrawOverlayTag(drawList, localScreenPos + ScaledVector(18f, -42f), summaryText, headerColor, boxColor, outlineColor);
         }
 
-        var actorsById = new Dictionary<ulong, IPlayerCharacter>();
-        foreach (var obj in objectTable)
-        {
-            if (obj is IPlayerCharacter player && !actorsById.ContainsKey(player.GameObjectId))
-                actorsById[player.GameObjectId] = player;
-        }
-
         foreach (var view in liveTargeters)
         {
-            if (!actorsById.TryGetValue(view.GameObjectId, out var actor))
+            if (SharedTargeterVisual?.Invoke(view.GameObjectId) == true) continue;
+            if (!activeTargeters.TryGetValue(view.GameObjectId, out var actor))
                 continue;
 
             if (!gameGui.WorldToScreen(actor.Position, out var targetScreenPos))
@@ -307,6 +311,7 @@ public sealed class XAPeepService : IDisposable
 
     private void OnLogout(int type, int code)
     {
+        observations.Invalidate();
         FinalizeAllActiveTargeters(DateTime.UtcNow);
         centerNotificationText = string.Empty;
         centerNotificationUntilUtc = DateTime.MinValue;
@@ -330,16 +335,10 @@ public sealed class XAPeepService : IDisposable
             return;
         }
 
-        IPlayerCharacter? localPlayer;
-        try
-        {
-            localPlayer = objectTable.LocalPlayer;
-        }
-        catch (InvalidOperationException ex) when (IsNotOnMainThreadException(ex))
-        {
-            return;
-        }
-
+        PlayerObservationSnapshot snapshot;
+        try { snapshot = observations.CapturePeep(); }
+        catch (InvalidOperationException ex) when (IsNotOnMainThreadException(ex)) { return; }
+        var localPlayer = snapshot.LocalPlayer;
         if (!clientState.IsLoggedIn || localPlayer == null)
         {
             UpdateStatusText();
@@ -354,8 +353,12 @@ public sealed class XAPeepService : IDisposable
         }
 
         var visibleTargeterIds = new HashSet<ulong>();
+        var trackedPlayers = new List<PlayerObservation>();
+        foreach (var player in snapshot.Players)
+            if (ShouldTrackPlayer(player, localPlayer.GameObjectId)) trackedPlayers.Add(player);
+        targeting.Observe(TargetingConsumer.Peep, snapshot.Generation, trackedPlayers);
 
-        foreach (var player in EnumerateTrackedPlayers(localPlayer.GameObjectId))
+        foreach (var player in trackedPlayers)
         {
             visibleTargeterIds.Add(player.GameObjectId);
 
@@ -363,8 +366,11 @@ public sealed class XAPeepService : IDisposable
             {
                 state = CreateState(player, nowUtc);
                 activeTargeters[player.GameObjectId] = state;
-                ShowCenterNotification(state, nowUtc);
-                ShowChatNotification(state);
+                var key = PlayerObservationKey.From(snapshot.Generation, player);
+                if (configuration.XAPeepShowCenterNotification && targeting.TryClaim(key, TargetingOutput.Notification))
+                    ShowCenterNotification(state, nowUtc);
+                if (configuration.XAPeepShowChatNotification && targeting.TryClaim(key, TargetingOutput.Chat))
+                    ShowChatNotification(state);
                 TryPlayTargetSound(nowUtc);
             }
 
@@ -377,19 +383,7 @@ public sealed class XAPeepService : IDisposable
         UpdateStatusText();
     }
 
-    private IEnumerable<IPlayerCharacter> EnumerateTrackedPlayers(ulong localPlayerGameObjectId)
-    {
-        foreach (var obj in objectTable)
-        {
-            if (obj is not IPlayerCharacter player)
-                continue;
-
-            if (ShouldTrackPlayer(player, localPlayerGameObjectId))
-                yield return player;
-        }
-    }
-
-    private bool ShouldTrackPlayer(IPlayerCharacter player, ulong localPlayerGameObjectId)
+    private bool ShouldTrackPlayer(PlayerObservation player, ulong localPlayerGameObjectId)
     {
         if (player.GameObjectId == 0 || player.GameObjectId == localPlayerGameObjectId)
             return false;
@@ -417,10 +411,10 @@ public sealed class XAPeepService : IDisposable
         return !configuration.XAPeepLogInDuty && condition[ConditionFlag.BoundByDuty];
     }
 
-    private ActiveTargeterState CreateState(IPlayerCharacter player, DateTime nowUtc)
+    private ActiveTargeterState CreateState(PlayerObservation player, DateTime nowUtc)
     {
-        var name = player.Name.TextValue;
-        var homeWorldId = player.HomeWorld.RowId;
+        var name = player.Name;
+        var homeWorldId = player.HomeWorldId;
         var playerKey = XAPeepData.NormalizePlayerKey(name, homeWorldId);
 
         if (!playerSummaryCache.TryGetValue(playerKey, out var summary))
@@ -436,7 +430,7 @@ public sealed class XAPeepService : IDisposable
             playerKey,
             name,
             homeWorldId,
-            player.ClassJob.RowId,
+            player.JobId,
             player.GameObjectId,
             nowUtc,
             summary?.FirstTargetedUtc ?? DateTime.MinValue,
@@ -448,6 +442,7 @@ public sealed class XAPeepService : IDisposable
     {
         foreach (var gameObjectId in activeTargeters.Keys.ToArray())
             FinalizeTargeter(gameObjectId, nowUtc);
+        targeting.Release(TargetingConsumer.Peep);
     }
 
     private void FinalizeTargeter(ulong gameObjectId, DateTime nowUtc)
@@ -665,6 +660,8 @@ public sealed class XAPeepService : IDisposable
 
         public ulong GameObjectId { get; private set; }
 
+        public Vector3 Position { get; private set; }
+
         public DateTime StartedUtc { get; }
 
         public DateTime LastSeenUtc { get; private set; }
@@ -675,12 +672,13 @@ public sealed class XAPeepService : IDisposable
 
         public double PriorTargetDurationSeconds { get; private set; }
 
-        public void Refresh(IPlayerCharacter player, DateTime nowUtc)
+        public void Refresh(PlayerObservation player, DateTime nowUtc)
         {
-            Name = player.Name.TextValue;
-            HomeWorldId = player.HomeWorld.RowId;
-            JobId = player.ClassJob.RowId;
+            Name = player.Name;
+            HomeWorldId = player.HomeWorldId;
+            JobId = player.JobId;
             GameObjectId = player.GameObjectId;
+            Position = player.Position;
             LastSeenUtc = nowUtc;
             if (FirstTargetedUtc == DateTime.MinValue)
                 FirstTargetedUtc = StartedUtc;

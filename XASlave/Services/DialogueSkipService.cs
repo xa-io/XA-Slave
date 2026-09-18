@@ -33,6 +33,45 @@ public unsafe sealed class DialogueSkipService : IDisposable
     private bool subscribed;
     private long lastAdvanceTick;
     private int availableHookSurfaces;
+    private bool disposed;
+    private long talkEpoch;
+    private nint currentTalk;
+    private TalkLease? talkLease;
+
+    // Framework-thread lease; admission revalidates the owning run and current scene.
+    internal IDisposable AcquireTalkLease(Func<nint, long, bool> admission)
+    {
+        if (disposed) throw new ObjectDisposedException(nameof(DialogueSkipService));
+        if (talkLease != null) throw new InvalidOperationException("Talk already has a scoped owner.");
+        var lease = new TalkLease(this, admission, talkEpoch);
+        talkLease = lease;
+        try { UpdateSubscription(true); }
+        catch { talkLease = null; throw; }
+        return lease;
+    }
+
+    private sealed class TalkLease : IDisposable
+    {
+        private DialogueSkipService? owner;
+        internal readonly Func<nint, long, bool> Admission;
+        internal readonly long Floor;
+
+        internal TalkLease(DialogueSkipService owner, Func<nint, long, bool> admission, long floor)
+        {
+            this.owner = owner;
+            Admission = admission ?? throw new ArgumentNullException(nameof(admission));
+            Floor = floor;
+        }
+
+        public void Dispose()
+        {
+            var service = owner;
+            owner = null;
+            if (service == null || service.talkLease != this) return;
+            service.talkLease = null;
+            service.UpdateSubscription(service.enabled);
+        }
+    }
 
     public DialogueSkipService(IAddonLifecycle addonLifecycle, ISigScanner sigScanner, IGameInteropProvider interopProvider, IPluginLog log)
     {
@@ -48,6 +87,7 @@ public unsafe sealed class DialogueSkipService : IDisposable
 
     public bool SetEnabled(bool value)
     {
+        if (disposed) return false;
         if (value == enabled)
         {
             RefreshStatusText();
@@ -58,7 +98,7 @@ public unsafe sealed class DialogueSkipService : IDisposable
         {
             enabled = false;
             UpdateHookState(false);
-            UpdateSubscription(false);
+            UpdateSubscription(talkLease != null);
             StatusText = "Disabled";
             return false;
         }
@@ -80,6 +120,10 @@ public unsafe sealed class DialogueSkipService : IDisposable
 
     public void Dispose()
     {
+        disposed = true;
+        talkLease = null;
+        currentTalk = 0;
+        talkEpoch++;
         enabled = false;
         UpdateHookState(false);
         UpdateSubscription(false);
@@ -174,9 +218,27 @@ public unsafe sealed class DialogueSkipService : IDisposable
             return;
 
         if (targetEnabled)
-            addonLifecycle.RegisterListener(AddonEvent.PreDraw, "Talk", OnTalkAddon);
+        {
+            try
+            {
+                addonLifecycle.RegisterListener(AddonEvent.PostSetup, "Talk", OnTalkLifecycle);
+                addonLifecycle.RegisterListener(AddonEvent.PreFinalize, "Talk", OnTalkLifecycle);
+                addonLifecycle.RegisterListener(AddonEvent.PreDraw, "Talk", OnTalkAddon);
+            }
+            catch
+            {
+                addonLifecycle.UnregisterListener(OnTalkLifecycle);
+                addonLifecycle.UnregisterListener(OnTalkAddon);
+                throw;
+            }
+        }
         else
+        {
             addonLifecycle.UnregisterListener(OnTalkAddon);
+            addonLifecycle.UnregisterListener(OnTalkLifecycle);
+            currentTalk = 0;
+            talkEpoch++;
+        }
 
         subscribed = targetEnabled;
     }
@@ -355,12 +417,31 @@ public unsafe sealed class DialogueSkipService : IDisposable
         hook = null;
     }
 
+    private void OnTalkLifecycle(AddonEvent kind, AddonArgs args)
+    {
+        talkEpoch++;
+        currentTalk = kind == AddonEvent.PostSetup ? args.Addon.Address : 0;
+    }
+
+    private bool CanAdvanceTalk(nint address)
+    {
+        if (disposed) return false;
+        var lease = talkLease;
+        if (lease == null) return enabled;
+        var epoch = talkEpoch;
+        // While a task owns Talk, narrow the synthetic fallback to its correlated addon.
+        // The operator continues to control the separate general native skip hooks.
+        return address != 0 && address == currentTalk && epoch > lease.Floor
+            && lease.Admission(address, epoch) && talkLease == lease
+            && talkEpoch == epoch && currentTalk == address && !disposed;
+    }
+
     private void OnTalkAddon(AddonEvent _, AddonArgs args)
     {
-        if (!enabled || args.Addon.IsNull)
+        if (args.Addon.IsNull)
             return;
 
-        if (!initialized)
+        if (enabled && !initialized)
         {
             EnsureInitialized();
             UpdateHookState(true);
@@ -373,6 +454,8 @@ public unsafe sealed class DialogueSkipService : IDisposable
 
         try
         {
+            if (!CanAdvanceTalk(args.Addon.Address)) return;
+            var epoch = talkEpoch;
             var addon = (AtkUnitBase*)args.Addon.Address;
             if (addon == null || !addon->IsReady || !addon->IsVisible || addon->RootNode == null)
                 return;
@@ -395,9 +478,11 @@ public unsafe sealed class DialogueSkipService : IDisposable
                 ((byte*)data)[i] = 0;
 
             addon->ReceiveEvent(AtkEventType.MouseDown, 0, evt, data);
+            if (epoch != talkEpoch || !CanAdvanceTalk(args.Addon.Address)) return;
             addon->ReceiveEvent(AtkEventType.MouseClick, 0, evt, data);
-            addon->ReceiveEvent(AtkEventType.MouseUp, 0, evt, data);
             lastAdvanceTick = now;
+            if (epoch != talkEpoch || !CanAdvanceTalk(args.Addon.Address)) return;
+            addon->ReceiveEvent(AtkEventType.MouseUp, 0, evt, data);
         }
         catch (Exception ex)
         {

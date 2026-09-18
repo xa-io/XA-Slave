@@ -109,6 +109,26 @@ public partial class SlaveWindow
     private void DrawEurekaInstanceIdSharedDisplayOptions(string idSuffix)
     {
         var configuration = plugin.Configuration;
+        var fieldEnabled = configuration.FieldOperationsInstanceDisplayEnabled;
+        if (ImGui.Checkbox($"Field Operations server ID (Eureka / Bozja / Occult)##{idSuffix}", ref fieldEnabled))
+        {
+            configuration.FieldOperationsInstanceDisplayEnabled = fieldEnabled;
+            plugin.FieldOperationsInstanceDisplay.ApplyConfiguration(); configuration.SaveDeferred();
+        }
+        var fieldDtr = configuration.FieldOperationsInstanceDisplayShowInDtr;
+        if (ImGui.Checkbox($"Show composite server ID in shared DTR##{idSuffix}", ref fieldDtr))
+        {
+            configuration.FieldOperationsInstanceDisplayShowInDtr = fieldDtr;
+            plugin.FieldOperationsInstanceDisplay.ApplyConfiguration(); configuration.SaveDeferred();
+        }
+        var fieldChat = configuration.FieldOperationsInstanceDisplayChat;
+        if (ImGui.Checkbox($"Announce live Field Operations entry##{idSuffix}", ref fieldChat))
+        {
+            configuration.FieldOperationsInstanceDisplayChat = fieldChat;
+            plugin.FieldOperationsInstanceDisplay.ApplyConfiguration(); configuration.SaveDeferred();
+        }
+        ImGui.TextWrapped(plugin.FieldOperationsInstanceDisplay.StatusText);
+        ImGui.TextDisabled("Composite server ID is separate from Eureka farming baselines. DTR: left click copies; right click opens the external crowdsource page.");
         var showInDtr = configuration.EurekaInstanceIdShowInDtr;
         if (ImGui.Checkbox($"Show live instance in DTR##{idSuffix}", ref showInDtr))
         {

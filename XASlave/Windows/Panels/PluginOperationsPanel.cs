@@ -244,6 +244,43 @@ public partial class SlaveWindow
         ImGui.TextWrapped("Writes delivered chat, system/error messages, and emotes to the Dalamud log, including sender names and private chat text.");
         ImGui.TextDisabled("Off by default. Applies immediately and saves across reloads. Xagman error detection stays active.");
 
+        if (ImGui.TreeNode("Logged message categories"))
+        {
+            cfg.MessageLogDisabledTypes ??= new();
+            ImGui.TextWrapped("Uncheck Action and GainBuff to hide the crafting/action and buff messages shown in the log. These filters affect log output only.");
+            if (ImGui.Button("Enable all##MessageLog"))
+            {
+                cfg.MessageLogDisabledTypes.Clear();
+                cfg.Save();
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Disable all##MessageLog"))
+            {
+                foreach (var type in Enum.GetValues<Dalamud.Game.Text.XivChatType>())
+                    cfg.MessageLogDisabledTypes.Add((ushort)type);
+                cfg.Save();
+            }
+            if (ImGui.BeginTable("MessageLogCategories", 2))
+            {
+                var seen = new HashSet<ushort>();
+                foreach (var type in Enum.GetValues<Dalamud.Game.Text.XivChatType>())
+                {
+                    var id = (ushort)type;
+                    if (!seen.Add(id)) continue;
+                    ImGui.TableNextColumn();
+                    var enabled = !cfg.MessageLogDisabledTypes.Contains(id);
+                    if (ImGui.Checkbox($"{type} ({id})##MessageLogType", ref enabled))
+                    {
+                        if (enabled) cfg.MessageLogDisabledTypes.Remove(id);
+                        else cfg.MessageLogDisabledTypes.Add(id);
+                        cfg.Save();
+                    }
+                }
+                ImGui.EndTable();
+            }
+            ImGui.TreePop();
+        }
+
         ImGui.Spacing();
 
         if (ImGui.Button("⬆  Show Updates"))

@@ -26,6 +26,12 @@ internal sealed class StepMachine
     private int stepIndex = -1;
     private DateTime stepStartUtc;
     private bool stepActionDone;
+    private long generation;
+
+    // Opt-in strict owners stop on the first callback error. Existing consumers retain
+    // their historical log-and-continue policy.
+    public bool HaltOnError { get; set; }
+    public string? LastError { get; private set; }
 
     public StepMachine(IPluginLog log, string ownerLabel, Action<string>? activityLog = null)
         : this(
@@ -57,6 +63,8 @@ internal sealed class StepMachine
 
     public void Start(IEnumerable<TaskStep> source)
     {
+        generation++;
+        LastError = null;
         steps.Clear();
         steps.AddRange(source);
         foreach (var step in steps)
@@ -79,6 +87,7 @@ internal sealed class StepMachine
 
     public void Stop()
     {
+        generation++;
         IsRunning = false;
         stepIndex = -1;
         stepActionDone = false;
@@ -92,6 +101,8 @@ internal sealed class StepMachine
     {
         if (!IsRunning || (uint)stepIndex >= (uint)steps.Count)
             return Complete();
+
+        var tickGeneration = generation;
 
         var skipped = 0;
         while (IsRunning && (uint)stepIndex < (uint)steps.Count)
@@ -108,6 +119,8 @@ internal sealed class StepMachine
                 shouldSkip = false;
             }
 
+            if (!IsRunning || generation != tickGeneration)
+                return StepMachineTickResult.Running;
             if (!shouldSkip)
                 break;
 
@@ -124,6 +137,8 @@ internal sealed class StepMachine
         if (!stepActionDone)
         {
             onStepStarted?.Invoke(stepIndex, step);
+            if (!IsRunning || generation != tickGeneration)
+                return StepMachineTickResult.Running;
             if (step.OnEnter != null)
             {
                 try
@@ -136,14 +151,21 @@ internal sealed class StepMachine
                 }
             }
 
+            if (!IsRunning || generation != tickGeneration)
+                return StepMachineTickResult.Running;
             stepActionDone = true;
         }
 
         try
         {
-            if (step.IsComplete())
+            var complete = step.IsComplete();
+            if (!IsRunning || generation != tickGeneration)
+                return StepMachineTickResult.Running;
+            if (complete)
             {
                 onStepCompleted?.Invoke(stepIndex, step, elapsed);
+                if (!IsRunning || generation != tickGeneration)
+                    return StepMachineTickResult.Running;
                 Advance();
                 return IsRunning ? StepMachineTickResult.Advanced : StepMachineTickResult.Completed;
             }
@@ -153,6 +175,8 @@ internal sealed class StepMachine
             ReportError($"step '{step.Name}' check", ex, $"Check error in '{step.Name}': {ex.Message}");
         }
 
+        if (!IsRunning || generation != tickGeneration)
+            return StepMachineTickResult.Running;
         if (elapsed <= step.TimeoutSec)
             return StepMachineTickResult.Running;
 
@@ -166,6 +190,8 @@ internal sealed class StepMachine
         }
 
         onTimeout?.Invoke(stepIndex, step, elapsed);
+        if (!IsRunning || generation != tickGeneration)
+            return StepMachineTickResult.Running;
         try
         {
             step.OnTimeout?.Invoke();
@@ -175,8 +201,8 @@ internal sealed class StepMachine
             ReportError($"step '{step.Name}' timeout handler", ex, $"Timeout-handler error in '{step.Name}': {ex.Message}");
         }
 
-        if (!IsRunning)
-            return StepMachineTickResult.Completed;
+        if (!IsRunning || generation != tickGeneration)
+            return StepMachineTickResult.Running;
 
         Advance();
         return IsRunning ? StepMachineTickResult.Advanced : StepMachineTickResult.Completed;
@@ -203,6 +229,11 @@ internal sealed class StepMachine
 
     private void ReportError(string context, Exception exception, string activity)
     {
+        if (HaltOnError)
+        {
+            LastError = $"{context}: {exception.Message}";
+            Stop();
+        }
         logError(context, exception);
         activityLog?.Invoke(activity);
     }

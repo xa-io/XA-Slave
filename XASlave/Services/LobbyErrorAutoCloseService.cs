@@ -257,10 +257,13 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
             if (!ShouldConfirmDialogue())
                 return;
 
+            // Preserve the evidence before OK removes the addon; chat monitoring cannot see lobby UI.
+            TryGetSupportedDialogue(out var dialogueMarker, out var dialogueText);
             if (!AddonHelper.ClickAddonText(DialogueAddonName, "OK"))
                 return;
 
             lastConfirmAttemptUtc = now;
+            log.Information($"[XASlave] Disconnect/lobby Dialogue: marker={dialogueMarker}; text={dialogueText.Replace('\r', ' ').Replace('\n', ' ')}");
             log.Information(closedNoKillPanel
                 ? "[XASlave] Auto-confirmed a disconnect/lobby Dialogue popup and closed the No Kill Plugin Panel."
                 : "[XASlave] Auto-confirmed a disconnect/lobby Dialogue popup.");

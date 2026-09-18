@@ -34,6 +34,40 @@ public sealed class ToonModsListPackage
 }
 
 [Serializable]
+public sealed class XAModAutoSortItemsSettings
+{
+    public bool SortOnEnable { get; set; } = true;
+    public bool SortAfterZoneChange { get; set; } = true;
+    public int ArmouryId { get; set; } = 0;
+    public int ArmouryItemLevel { get; set; } = 0;
+    public int ArmouryCategory { get; set; } = 0;
+    public int InventoryHq { get; set; } = 0;
+    public int InventoryId { get; set; } = 0;
+    public int InventoryItemLevel { get; set; } = 0;
+    public int InventoryCategory { get; set; } = 0;
+    public int InventoryTabs { get; set; } = 0;
+    public bool SendChat { get; set; } = false;
+    public bool SendNotification { get; set; } = true;
+
+    public XASlave.Services.AutoSortItemsSettings ToSettings() => new(SortOnEnable, SortAfterZoneChange, ArmouryId, ArmouryItemLevel, ArmouryCategory, InventoryHq, InventoryId, InventoryItemLevel, InventoryCategory, InventoryTabs, SendChat, SendNotification);
+    public static XAModAutoSortItemsSettings From(XASlave.Services.AutoSortItemsSettings settings) => new()
+    {
+        SortOnEnable = settings.SortOnEnable,
+        SortAfterZoneChange = settings.SortAfterZoneChange,
+        ArmouryId = settings.ArmouryId,
+        ArmouryItemLevel = settings.ArmouryItemLevel,
+        ArmouryCategory = settings.ArmouryCategory,
+        InventoryHq = settings.InventoryHq,
+        InventoryId = settings.InventoryId,
+        InventoryItemLevel = settings.InventoryItemLevel,
+        InventoryCategory = settings.InventoryCategory,
+        InventoryTabs = settings.InventoryTabs,
+        SendChat = settings.SendChat,
+        SendNotification = settings.SendNotification,
+    };
+}
+
+[Serializable]
 public sealed class XAModResolutionPreset
 {
     public int Width { get; set; }
@@ -181,6 +215,8 @@ public sealed class XAModNetworkLatencySettings
 [Serializable]
 public sealed class XAModNotifyWhenFriendIsNearSettings
 {
+    public int? SchemaVersion { get; set; }
+    public List<NearbyPlayerNotificationRule>? Rules { get; set; }
     public List<string> Patterns { get; set; } = new();
     public int CooldownSeconds { get; set; }
 }
@@ -222,7 +258,6 @@ public sealed class XAModBetterCastBarSettings
     public XAModColorSettings SlidecastReadyColor { get; set; } = new();
 }
 
-[Serializable]
 public sealed class XAModBetterInventoryMoverSettings
 {
     public string QuickMoveModifier { get; set; } = "LeftShift";

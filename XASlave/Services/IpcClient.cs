@@ -38,6 +38,13 @@ public sealed class IpcClient
     private static readonly TimeSpan HonorificAvailabilityCacheDuration = TimeSpan.FromSeconds(5);
 
     private readonly IPluginLog log;
+    private readonly Lazy<ICallGateSubscriber<string, object>> nearbyPlayerSpeech;
+
+    internal bool TrySpeakNearbyPlayerNotification(string text)
+    {
+        try { nearbyPlayerSpeech.Value.InvokeAction(text); return true; }
+        catch { return false; }
+    }
 
     // -- XA Database --
     private readonly ICallGateSubscriber<object> xaSaveSubscriber;
@@ -163,6 +170,7 @@ public sealed class IpcClient
     public IpcClient(IDalamudPluginInterface pluginInterface, IPluginLog log)
     {
         this.log = log;
+        nearbyPlayerSpeech = new(() => pluginInterface.GetIpcSubscriber<string, object>("EdgeTTS.Speak"));
 
         // XA Database
         xaSaveSubscriber = pluginInterface.GetIpcSubscriber<object>("XA.Database.Save");
@@ -713,6 +721,13 @@ public sealed class IpcClient
         catch { return false; }
     }
 
+    public bool TryGetAutoRetainerBusy(out bool busy)
+    {
+        busy = false;
+        try { busy = arPluginStateIsBusySubscriber.InvokeFunc(); return true; }
+        catch { return false; }
+    }
+
     public bool AutoRetainerPluginStateAreAnyRetainersAvailableForCurrentChara()
     {
         try { return arPluginStateAreAnyRetainersAvailableForCurrentCharaSubscriber.InvokeFunc(); }
@@ -895,6 +910,13 @@ public sealed class IpcClient
     public bool LifestreamIsBusy()
     {
         try { return lsIsBusySubscriber.InvokeFunc(); }
+        catch { return false; }
+    }
+
+    public bool TryGetLifestreamBusy(out bool busy)
+    {
+        busy = false;
+        try { busy = lsIsBusySubscriber.InvokeFunc(); return true; }
         catch { return false; }
     }
 

@@ -53,6 +53,34 @@ internal static class AutoRetainerUiReflectionService
     public static AutoRetainerCharacterFilterMode CharacterFilterMode => characterFilterMode;
     public static bool DeployablesAttentionFilterEnabled => characterFilterMode == AutoRetainerCharacterFilterMode.Attention;
 
+    // Read the effective plan (including additions), never the plan selected in AR's editor.
+    // GetIMSettings is an extension method, exposed as a static method on Utils at runtime.
+    public static string InspectNpcSellSettings()
+    {
+        try
+        {
+            var instance = TryGetAutoRetainerPluginInstance();
+            if (instance == null) return "AR sell settings unavailable: runtime instance not found.";
+            var type = instance.GetType();
+            var data = type.GetProperty("Data", StaticBindings)?.GetValue(null);
+            var utils = type.Assembly.GetType("AutoRetainer.Helpers.Utils");
+            var method = utils?.GetMethods(StaticBindings).FirstOrDefault(m =>
+                m.Name == "GetIMSettings" && m.GetParameters().Length == 2
+                && data != null && m.GetParameters()[0].ParameterType.IsInstanceOfType(data)
+                && m.GetParameters()[1].ParameterType == typeof(bool));
+            var plan = method?.Invoke(null, new object?[] { data, false });
+            if (plan == null) return "AR effective sell plan unavailable: runtime contract not recognized.";
+            string Value(string name) => GetMemberValue(plan, name)?.ToString() ?? "unknown";
+            string Ids(string name) => GetMemberValue(plan, name) is IEnumerable values
+                ? string.Join(",", values.Cast<object>().Take(256).Select(v => v.ToString())) : "unknown";
+            return $"AR effective NPC sell plan: enabled={Value("IMEnableNpcSell")}, maximum stack limit={Value("IMAutoVendorHardStackLimit")} (quantity must be strictly below limit unless exempt), hard sell IDs=[{Ids("IMAutoVendorHard")}], protected IDs=[{Ids("IMProtectList")}], stack-exempt IDs=[{Ids("IMAutoVendorHardIgnoreStack")}].";
+        }
+        catch (Exception ex)
+        {
+            return $"AR sell settings unavailable ({ex.GetType().Name}); inventory recovery must still be verified.";
+        }
+    }
+
     /// <summary>
     /// Inspects the same live OfflineData roster used by /ays relog without changing it or dispatching
     /// a command. Found proves only an exact target exists, not that AutoRetainer can log into it now.

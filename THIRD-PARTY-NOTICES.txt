@@ -26,6 +26,16 @@ The SQLitePCLRaw packages inspected contain no separate NOTICE file. If a
 future pinned package includes one, preserve it verbatim and extend the exact
 package allowlist. Additional dependencies require a new notice audit.
 
+Source-included native UI dependency (2026-09-13):
+- KamiToolKit: MIT. Copyright (c) 2024 MidoriKami.
+  https://github.com/MidoriKami/KamiToolKit
+  Reuses the vetted source revision d1a671a62935c5432f4b8c9934071af7b927f5f4
+  and its local lifecycle/resource adaptations. Exact input hashes are preserved
+  in xapr/native-overlay-source-manifest.json; the complete upstream license is
+  embedded as XASlave.KamiToolKit.LICENSE. These sources are included in the
+  existing private source backup/recovery workflow. No separate toolkit DLL is
+  added to the package.
+
 Host-supplied references are not bundled by this release profile: Dalamud,
 FFXIVClientStructs, InteropGenerator.Runtime, Lumina/Lumina.Excel and host
 framework libraries. They retain their upstream licenses and notices. Review

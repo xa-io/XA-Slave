@@ -23,6 +23,30 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.46",
+            Lines =
+            [
+                "- Estate Teleportation Context Menu: Added an optional Player Mods toggle that opens eligible friends' estate teleportation windows from party and other player context menus. Requires a loaded friend list and the friend's home world to be your current world; estate access remains controlled by the game.",
+                "- Auto Restore Furniture: Added batch moves from placed furniture to the storeroom/inventory and storeroom to inventory, with destination checks, Stop controls and individual results. Stacked all five toolbar buttons above the furnishings menu with status text on top, corrected input routing, and fixed an indoor-territory layout validation error. Removal warnings remain manual.",
+                "- Inspect Outfit Try-on: Added Try On All for gear appearances, both dyes and duplicate rings, plus inspected facewear when unlocked. Added Clear in the fitting-room title bar, reset on close and unavailable-inspection diagnostics. Fixed restarting Try On All after Clear with the room open. Fixed preview updates interrupting the outfit after one item and extra readiness checks blocking loaded inspections.",
+                "- Auto Sort Items: Added inventory/armoury sorting by ID, item level, category and HQ, with tab settings and manual, on-enable or after-zoning triggers. Added /xa sort for Sort now. Waits for active sorts and clears idle pending rules before applying settings.",
+                "- XA Nearby: Added a compact searchable player list with optional sortable columns, camera-relative directions, map links, player actions, friend highlighting/sorting, saved visibility, resize lock, optional lines and server-bar counts. Shows the total player count in the window title instead of a footer, leaving more room for names. Shares loaded-player tracking with XA Peep without an XA 99-player cap.",
+                "- Player Notifications: Added name/regex matching, world/territory/status filters, appearance/periodic triggers, selectable outputs, optional EdgeTTS speech, opt-in command templates and presets.",
+                "- Better Inventory Mover: Added quantity-limited, paced inventory/retainer/saddlebag transfers with improved destination checks and progress reporting.",
+                "- Xagman Login: Switched to Lifestream for login/world travel, with readiness checks, bounded retries and recovery that skips failed owners after successful cleanup. Added camera resets before trades.",
+                "- Xagman ONH: Added queued Tony invitations, tell-based resupply, partner-only trades, verified 1/2-gil signals and rotation/failure handling. Tony keeps at least 5,000 gil; FOs reserve 2 gil. Update all participating clients together.",
+                "- XA Treasure Selling: Added optional Xagman selling and /xa npcsell for IDs 22500-22507, with subloot as a shortcut for all eight IDs, independent of AutoRetainer sell rules. Includes gil/error/no-progress checks, verified inventory recovery, Tony rotation and owner return-home/logout handling on failure.",
+                "- Export Data: Improved shared FC matching and older/newer XA Database snapshot support for FC, housing, submarine and inventory details.",
+                "- Field Operations: Updated server-instance identification and display for Eureka, Bozja and Occult Crescent.",
+                "- XA Mods: Load List now shows X, mod count, Load, Export and name. Export copies a saved list and its settings without loading it. Preset results identify unavailable mods and unknown keys. Disabled mods collapse their additional information and settings; checkboxes retain the requested state while changes are queued.",
+                "- Instant Teleport: Added optional cast skipping with proximity checks, cancellation and recovery handling. Falls back to ordinary teleport when unavailable; enabling requires Ctrl+Shift.",
+                "- Compatibility: Updated native bindings for Dalamud 15.0.3.5 and the September 15 game patch. Consolidated overlapping normal/general cutscene handling while retaining category settings and zone exclusions.",
+                "- Logging: Added saved message-category controls, lobby-popup text logging before dismissal and a collapsible plugin list in Dalamud Log Disabler.",
+                "- Reliability: Improved combat window locking, task-scoped dialogue advancement and Better Cast Bar cleanup during shutdown; corrected Moogle Mail button states.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.45 - 2026-09-11",
             Lines =
             [

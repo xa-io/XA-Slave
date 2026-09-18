@@ -41,6 +41,33 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     private long lastAutoRefuseMs;
     private uint lastIncomingTradeEntityId;
     private long lastIncomingTradeEntityMs;
+    private Func<uint, bool>? onhTradeAdmission;
+    private Action<uint>? onhTradeStarted;
+
+    // ONH owns this temporary filter only while running. Unknown actors fail closed.
+    public bool SetOnhTradeAdmission(Func<uint, bool>? admission, Action<uint>? started = null)
+    {
+        onhTradeAdmission = admission;
+        onhTradeStarted = started;
+        if (admission != null)
+        {
+            EnsureInitialized(retryMissing: initialized);
+            if (tradeStatusUpdateHook == null || sendTradeRequestHook == null)
+            {
+                onhTradeAdmission = null;
+                onhTradeStarted = null;
+                return false;
+            }
+            // A retry may have created the status hook while manual refusal was already active.
+            // RefreshEffectiveState's enabled fast path must not leave that new hook disabled.
+            if (enabled)
+            {
+                if (!DisableHooks()) return false;
+                enabled = false;
+            }
+        }
+        return RefreshEffectiveState();
+    }
 
     public AutoRefuseTradeService(
         ISigScanner sigScanner,
@@ -105,6 +132,8 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
     public void Dispose()
     {
+        onhTradeAdmission = null;
+        onhTradeStarted = null;
         manualEnabled = false;
         xagmanOverride = XagmanTradeRefusalOverride.Inactive;
         enabled = false;
@@ -128,8 +157,9 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
     private bool RefreshEffectiveState()
     {
-        var shouldEnable = xagmanOverride != XagmanTradeRefusalOverride.DropboxAutoAcceptSuppression
-            && (manualEnabled || xagmanOverride == XagmanTradeRefusalOverride.IdleDemand);
+        var shouldEnable = onhTradeAdmission != null
+            || (xagmanOverride != XagmanTradeRefusalOverride.DropboxAutoAcceptSuppression
+                && (manualEnabled || xagmanOverride == XagmanTradeRefusalOverride.IdleDemand));
         if (!shouldEnable)
         {
             enabled = false;
@@ -316,6 +346,11 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
     private void RefreshStatusText()
     {
+        if (onhTradeAdmission != null)
+        {
+            StatusText = "ONH partner filter active - only the selected trade partner is admitted.";
+            return;
+        }
         if (xagmanOverride == XagmanTradeRefusalOverride.DropboxAutoAcceptSuppression)
         {
             StatusText = "Temporarily suspended by Xagman - Dropbox auto-accept may be active; the saved manual preference is unchanged.";
@@ -363,6 +398,12 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         try
         {
             lastOutgoingTradeMs = Environment.TickCount64;
+            if (onhTradeAdmission != null)
+            {
+                if (!onhTradeAdmission(entityId))
+                    return;
+                onhTradeStarted?.Invoke(entityId);
+            }
         }
         catch (Exception ex)
         {
@@ -382,7 +423,8 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
         try
         {
-            if (IsLikelyIncomingTrade() && TryRefuseIncomingTrade())
+            var permitted = onhTradeAdmission?.Invoke(GetCurrentTraderEntityId(0, Environment.TickCount64)) ?? false;
+            if (!permitted && IsLikelyIncomingTrade() && TryRefuseIncomingTrade())
                 return;
         }
         catch (Exception ex)
@@ -395,6 +437,21 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
     private nint TradeStatusUpdateDetour(InventoryManager* manager, nint entityId, nint packet)
     {
+        // Record admission before Original can show Trade and Dropbox can confirm it.
+        if (onhTradeAdmission != null && packet != nint.Zero && Marshal.ReadByte(packet + 4) == 1)
+        {
+            try
+            {
+                var trader = ReadTradePacketEntityId(packet);
+                RememberIncomingTrader(trader);
+                if (onhTradeAdmission(trader))
+                    onhTradeStarted?.Invoke(trader);
+            }
+            catch (Exception ex)
+            {
+                log.Warning(ex, "[XASlave] ONH trade admission observation failed.");
+            }
+        }
         var result = tradeStatusUpdateHook?.OriginalDisposeSafe(manager, entityId, packet) ?? 0;
 
         if (!enabled || packet == nint.Zero)
@@ -406,11 +463,13 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
             if (eventType != 1)
                 return result;
 
-            if (!IsLikelyIncomingTrade())
+            if (onhTradeAdmission == null && !IsLikelyIncomingTrade())
                 return result;
 
             var traderEntityId = ReadTradePacketEntityId(packet);
             RememberIncomingTrader(traderEntityId);
+            if (onhTradeAdmission?.Invoke(traderEntityId) == true)
+                return result;
             TryRefuseIncomingTrade(traderEntityId);
         }
         catch (Exception ex)
@@ -429,7 +488,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     private bool TryRefuseIncomingTrade(uint traderEntityId = 0)
     {
         var nowMs = Environment.TickCount64;
-        if (nowMs - lastAutoRefuseMs <= 1000)
+        if (onhTradeAdmission == null && nowMs - lastAutoRefuseMs <= 1000)
             return false;
 
         lastAutoRefuseMs = nowMs;
@@ -443,7 +502,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         }
 
         inventoryManager->RefuseTrade();
-        ReportTradeRefused(traderName);
+        if (onhTradeAdmission == null) ReportTradeRefused(traderName);
         return true;
     }
 

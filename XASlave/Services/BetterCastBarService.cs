@@ -183,9 +183,25 @@ public unsafe sealed class BetterCastBarService : IDisposable
     public void Dispose()
     {
         enabled = false;
-        RestoreVisibleCastBar();
         Unsubscribe();
-        ClearCastState();
+        try
+        {
+            // Partial construction never touched the addon; do not query game UI during rollback.
+            if (!nodeStateCaptured) return;
+            if (Plugin.Framework.IsInFrameworkUpdateThread)
+                RestoreVisibleCastBar();
+            else if (!Plugin.Framework.IsFrameworkUnloading)
+                Plugin.Framework.RunOnFrameworkThread(() =>
+                {
+                    // Dalamud may execute inline if shutdown starts after the outer check.
+                    // Avoid the assert-first game gateway here; restoration must check the actual thread.
+                    if (Plugin.Framework.IsInFrameworkUpdateThread) RestoreVisibleCastBar();
+                    else ClearTrackedNodeState();
+                }).GetAwaiter().GetResult();
+            else
+                ClearTrackedNodeState(); // The game UI is shutting down and no framework work can be queued.
+        }
+        finally { ClearCastState(); }
     }
 
     private string BuildStatusText()
@@ -331,6 +347,7 @@ public unsafe sealed class BetterCastBarService : IDisposable
 
     private void RestoreVisibleCastBar()
     {
+        if (!nodeStateCaptured) return;
         var addon = AddonHelper.GetAddon(CastBarAddonName);
         if (addon == null)
         {

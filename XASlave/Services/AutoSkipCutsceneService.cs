@@ -31,19 +31,11 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private const string MsqContentDirectorLabel = "MSQ/Gold Saucer/Ocean/PvP content director";
     private const string MassivePcContentDirectorLabel = "Massive PC content director";
     private const string CustomTalkContentDirectorLabel = "Custom Talk content director";
-    private const string NormalCutscenesLabel = "Normal cutscenes";
     private const string InnContentDirectorLabel = "Inn content director";
 
     private static readonly ushort[] PraetoriumTerritoryIds = [1044, 1045];
     private static readonly ushort[] CastrumTerritoryIds = [1043];
     private static readonly ushort[] PortaDecumanaTerritoryIds = [1046];
-
-    // const strings leak through metadata; runtime initializers allow Obfuscar string hiding.
-    private static readonly string MsqContentDirectorSig = "48 89 5C 24 ?? 57 48 83 EC 50 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? BA ?? ?? ?? ?? B3 01 E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? 48 8B F8 E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 84 99 ?? ?? ?? ??";
-    private static readonly string MassivePcContentDirectorSig = "48 89 5C 24 ?? 57 48 83 EC 50 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? BA ?? ?? ?? ?? B3 01 E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? 48 8B F8 E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 48 8B 11";
-    private static readonly string CustomTalkContentDirectorSig = "48 83 EC 58 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? 48 8B 08 48 85 C9 74 06";
-    private static readonly string NormalCutscenesSig = "40 53 55 57 41 56 48 81 EC ?? ?? ?? ?? 48 8B 05 ?? ?? ?? ?? 48 33 C4 48 89 84 24 ?? ?? ?? ?? 48 8B 59 08";
-    private static readonly string InnContentDirectorSig = "48 83 EC 58 48 8B D1 48 8D 4C 24 ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ?? 4C 8B C0 BA ?? ?? ?? ?? E8 ?? ?? ?? ?? BA ?? ?? ?? ?? 48 8D 4C 24 ?? E8 ?? ?? ?? ?? 48 8B 4C 24 ??";
 
     private readonly ICondition condition;
     private readonly IFramework framework;
@@ -66,7 +58,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     private Hook<ContentDirectorDelegate>? massivePcContentDirectorHook;
     private Hook<ContentDirectorDelegate>? goldSaucerContentDirectorHook;
     private Hook<ContentDirectorDelegate>? customTalkContentDirectorHook;
-    private Hook<NormalCutscenesDelegate>? normalCutscenesHook;
     private Hook<ContentDirectorDelegate>? innContentDirectorHook;
 
     private nint cutsceneUnskippablePatchAddress;
@@ -255,7 +246,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         DisposeHook(ref massivePcContentDirectorHook);
         DisposeHook(ref goldSaucerContentDirectorHook);
         DisposeHook(ref customTalkContentDirectorHook);
-        DisposeHook(ref normalCutscenesHook);
         DisposeHook(ref innContentDirectorHook);
     }
 
@@ -297,7 +287,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         ToggleHook(massivePcContentDirectorHook, false, "Massive PC content director");
         ToggleHook(goldSaucerContentDirectorHook, false, "Gold Saucer content director");
         ToggleHook(customTalkContentDirectorHook, false, "Custom Talk content director");
-        ToggleHook(normalCutscenesHook, false, "Normal cutscenes");
         ToggleHook(innContentDirectorHook, false, "Inn content director");
         RestoreCutsceneUnskippablePatch();
     }
@@ -335,7 +324,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         var armMsqContentDirector = ShouldArmMsqHook() || ShouldArmGoldSaucerHook();
         var armMassivePcContentDirector = skipMassivePc;
         var armCustomTalkContentDirector = skipCustomTalk;
-        var armNormalCutscenes = skipNormalCutscenes;
         var armInnContentDirector = skipInn;
 
         return new StartupHookResult(
@@ -347,15 +335,13 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             TryCreateLuaFunctionHook<LuaFunctionDelegate>(Sigs.LuaBaseSig02, "PlayToBeContinued", PlayToBeContinuedDetour, "PlayToBeContinued"),
             patchAddress,
             armMsqContentDirector,
-            armMsqContentDirector ? TryCreateContentDirectorHook(MsqContentDirectorSig, MsqContentDirectorDetour, MsqContentDirectorLabel) : null,
+            armMsqContentDirector ? TryCreateContentDirectorHook(Sigs.CutsceneMsqContentDirectorSig, MsqContentDirectorDetour, MsqContentDirectorLabel) : null,
             armMassivePcContentDirector,
-            armMassivePcContentDirector ? TryCreateContentDirectorHook(MassivePcContentDirectorSig, MassivePcContentDirectorDetour, MassivePcContentDirectorLabel) : null,
+            armMassivePcContentDirector ? TryCreateContentDirectorHook(Sigs.CutsceneMassivePcContentDirectorSig, MassivePcContentDirectorDetour, MassivePcContentDirectorLabel) : null,
             armCustomTalkContentDirector,
-            armCustomTalkContentDirector ? TryCreateContentDirectorHook(CustomTalkContentDirectorSig, CustomTalkContentDirectorDetour, CustomTalkContentDirectorLabel) : null,
-            armNormalCutscenes,
-            armNormalCutscenes ? TryCreateNormalCutscenesHook() : null,
+            armCustomTalkContentDirector ? TryCreateContentDirectorHook(Sigs.CutsceneCustomTalkContentDirectorSig, CustomTalkContentDirectorDetour, CustomTalkContentDirectorLabel) : null,
             armInnContentDirector,
-            armInnContentDirector ? TryCreateContentDirectorHook(InnContentDirectorSig, InnContentDirectorDetour, InnContentDirectorLabel) : null);
+            armInnContentDirector ? TryCreateContentDirectorHook(Sigs.CutsceneInnContentDirectorSig, InnContentDirectorDetour, InnContentDirectorLabel) : null);
     }
 
     private void EnsureInitializedForEnabledState(bool retryMissing = false)
@@ -576,28 +562,15 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         return actual[^1] == 0 && actual.AsSpan(0, expectedBytes.Length).SequenceEqual(expectedBytes);
     }
 
-    private Hook<ContentDirectorDelegate>? TryCreateContentDirectorHook(string signature, ContentDirectorDelegate detour, string label)
+    private Hook<ContentDirectorDelegate>? TryCreateContentDirectorHook(ProtectedSig signature, ContentDirectorDelegate detour, string label)
     {
         try
         {
-            return interopProvider.HookFromSignature(signature, detour);
+            return interopProvider.HookFromAddress(sigScanner.ScanText(signature), detour);
         }
         catch (Exception ex)
         {
             log.Warning(ex, $"[XASlave] Auto Skip Cutscenes could not create optional {label} hook.");
-            return null;
-        }
-    }
-
-    private Hook<NormalCutscenesDelegate>? TryCreateNormalCutscenesHook()
-    {
-        try
-        {
-            return interopProvider.HookFromSignature<NormalCutscenesDelegate>(NormalCutscenesSig, NormalCutscenesDetour);
-        }
-        catch (Exception ex)
-        {
-            log.Warning(ex, "[XASlave] Auto Skip Cutscenes could not create optional Normal cutscenes hook.");
             return null;
         }
     }
@@ -643,17 +616,16 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             return;
 
         availableOptionalSurfaceCount = 0;
-        availableOptionalSurfaceCount += RefreshContentDirectorHook(ref msqContentDirectorHook, MsqContentDirectorSig, ShouldArmMsqHook() || ShouldArmGoldSaucerHook(), MsqContentDirectorDetour, MsqContentDirectorLabel);
-        availableOptionalSurfaceCount += RefreshContentDirectorHook(ref massivePcContentDirectorHook, MassivePcContentDirectorSig, skipMassivePc, MassivePcContentDirectorDetour, MassivePcContentDirectorLabel);
+        availableOptionalSurfaceCount += RefreshContentDirectorHook(ref msqContentDirectorHook, Sigs.CutsceneMsqContentDirectorSig, ShouldArmMsqHook() || ShouldArmGoldSaucerHook(), MsqContentDirectorDetour, MsqContentDirectorLabel);
+        availableOptionalSurfaceCount += RefreshContentDirectorHook(ref massivePcContentDirectorHook, Sigs.CutsceneMassivePcContentDirectorSig, skipMassivePc, MassivePcContentDirectorDetour, MassivePcContentDirectorLabel);
         ToggleHook(goldSaucerContentDirectorHook, false, "Gold Saucer content director");
-        availableOptionalSurfaceCount += RefreshContentDirectorHook(ref customTalkContentDirectorHook, CustomTalkContentDirectorSig, skipCustomTalk, CustomTalkContentDirectorDetour, CustomTalkContentDirectorLabel);
-        availableOptionalSurfaceCount += RefreshNormalCutscenesHook();
-        availableOptionalSurfaceCount += RefreshContentDirectorHook(ref innContentDirectorHook, InnContentDirectorSig, skipInn, InnContentDirectorDetour, InnContentDirectorLabel);
+        availableOptionalSurfaceCount += RefreshContentDirectorHook(ref customTalkContentDirectorHook, Sigs.CutsceneCustomTalkContentDirectorSig, skipCustomTalk, CustomTalkContentDirectorDetour, CustomTalkContentDirectorLabel);
+        availableOptionalSurfaceCount += RefreshContentDirectorHook(ref innContentDirectorHook, Sigs.CutsceneInnContentDirectorSig, skipInn, InnContentDirectorDetour, InnContentDirectorLabel);
     }
 
     private int RefreshContentDirectorHook(
         ref Hook<ContentDirectorDelegate>? hook,
-        string signature,
+        ProtectedSig signature,
         bool targetEnabled,
         ContentDirectorDelegate detour,
         string label)
@@ -668,7 +640,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         {
             try
             {
-                hook = interopProvider.HookFromSignature(signature, detour);
+                hook = interopProvider.HookFromAddress(sigScanner.ScanText(signature), detour);
             }
             catch (Exception ex)
             {
@@ -679,32 +651,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         }
 
         return ToggleHook(hook, true, label);
-    }
-
-    private int RefreshNormalCutscenesHook()
-    {
-        if (!skipNormalCutscenes)
-        {
-            ToggleHook(normalCutscenesHook, false, "Normal cutscenes");
-            return 0;
-        }
-
-        const string label = NormalCutscenesLabel;
-        if (normalCutscenesHook == null && !unavailableOptionalHooks.Contains(label))
-        {
-            try
-            {
-                normalCutscenesHook = interopProvider.HookFromSignature<NormalCutscenesDelegate>(NormalCutscenesSig, NormalCutscenesDetour);
-            }
-            catch (Exception ex)
-            {
-                unavailableOptionalHooks.Add(label);
-                log.Warning(ex, "[XASlave] Auto Skip Cutscenes could not create optional Normal cutscenes hook.");
-                return 0;
-            }
-        }
-
-        return ToggleHook(normalCutscenesHook, true, label);
     }
 
     private int ToggleHook<T>(Hook<T>? hook, bool targetEnabled, string label)
@@ -992,13 +938,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             customTalkContentDirectorHook = result.CustomTalkContentDirectorHook;
             if (customTalkContentDirectorHook == null)
                 unavailableOptionalHooks.Add(CustomTalkContentDirectorLabel);
-        }
-
-        if (result.NormalCutscenesAttempted)
-        {
-            normalCutscenesHook = result.NormalCutscenesHook;
-            if (normalCutscenesHook == null)
-                unavailableOptionalHooks.Add(NormalCutscenesLabel);
         }
 
         if (result.InnContentDirectorAttempted)
@@ -1606,7 +1545,10 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     {
         try
         {
-            if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic))
+            // Both protected locators identify this entry point on the supported game.
+            // One owner preserves both category decisions without chaining our own hooks.
+            if (IsEffectivelyEnabled(CutsceneSkipCategory.Generic)
+                || IsEffectivelyEnabled(CutsceneSkipCategory.NormalCutscenes))
                 return 1;
         }
         catch (Exception ex)
@@ -1752,21 +1694,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         return customTalkContentDirectorHook?.OriginalDisposeSafe(luaState) ?? 0;
     }
 
-    private long NormalCutscenesDetour(nint luaState1, nint luaState2)
-    {
-        try
-        {
-            if (IsEffectivelyEnabled(CutsceneSkipCategory.NormalCutscenes))
-                return 1;
-        }
-        catch (Exception ex)
-        {
-            log.Warning(ex, "[XASlave] Auto Skip Cutscenes normal-cutscene detour failed; calling the original.");
-        }
-
-        return normalCutscenesHook?.OriginalDisposeSafe(luaState1, luaState2) ?? 0;
-    }
-
     private long InnContentDirectorDetour(nint luaState)
     {
         try
@@ -1792,8 +1719,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
 
     private delegate long ContentDirectorDelegate(nint luaState);
 
-    private delegate long NormalCutscenesDelegate(nint luaState1, nint luaState2);
-
     private sealed record StartupHookResult(
         Hook<CutsceneHandleInputDelegate>? CutsceneHandleInputHook,
         Hook<PlayCutsceneDelegate>? PlayCutsceneHook,
@@ -1808,8 +1733,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         Hook<ContentDirectorDelegate>? MassivePcContentDirectorHook,
         bool CustomTalkContentDirectorAttempted,
         Hook<ContentDirectorDelegate>? CustomTalkContentDirectorHook,
-        bool NormalCutscenesAttempted,
-        Hook<NormalCutscenesDelegate>? NormalCutscenesHook,
         bool InnContentDirectorAttempted,
         Hook<ContentDirectorDelegate>? InnContentDirectorHook)
     {
@@ -1834,7 +1757,6 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             DisposeHook(MsqContentDirectorHook);
             DisposeHook(MassivePcContentDirectorHook);
             DisposeHook(CustomTalkContentDirectorHook);
-            DisposeHook(NormalCutscenesHook);
             DisposeHook(InnContentDirectorHook);
         }
     }

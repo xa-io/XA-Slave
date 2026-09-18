@@ -262,6 +262,7 @@ public partial class SlaveWindow
         ImGui.TextColored(cyan, ExportTaskName);
         ImGui.TextDisabled("Reference export panel for persisted character data.");
         ImGui.TextDisabled("Writes a timestamped table file using AutoRetainer, Lifestream, and XA Database data when available.");
+        ImGui.TextDisabled("One row per AutoRetainer character; shared FC details are matched by FC ID.");
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -576,14 +577,16 @@ public partial class SlaveWindow
             }
             var completedUtc = DateTime.UtcNow;
             var runtimeStatePersisted = ExportPersistRuntimeState(request.PluginConfigDirectory, completedUtc);
+            var databaseUnavailable = string.IsNullOrWhiteSpace(request.XaDatabasePath);
+            var databaseWarning = databaseUnavailable ? " XA Database unavailable; database-only fields may be blank." : string.Empty;
 
             return new ExportWriteResult(
                 request,
                 true,
                 runtimeStatePersisted
-                    ? $"{ExportTaskName} {request.Trigger} write complete: {rows.Count} row(s) -> {outputFilePath}"
+                    ? $"{ExportTaskName} {request.Trigger} write complete: {rows.Count} character row(s) -> {outputFilePath}{databaseWarning}"
                     : $"{ExportTaskName} wrote {rows.Count} row(s), but the schedule checkpoint could not be saved; it will retry.",
-                runtimeStatePersisted
+                runtimeStatePersisted && !databaseUnavailable
                     ? new Vector4(0.4f, 1.0f, 0.4f, 1.0f)
                     : new Vector4(1.0f, 0.75f, 0.25f, 1.0f),
                 completedUtc,
@@ -697,6 +700,11 @@ public partial class SlaveWindow
         var autoRetainerCharacters = ExportLoadAutoRetainerCharacters(request.AutoRetainerConfigPath);
         var housingMap = ExportLoadLifestreamHousing(request.LifestreamConfigPath);
         var snapshotMap = ExportLoadXaSnapshotSupplements(request.XaDatabasePath);
+        // Only FC-owned fields may be shared between character rows. The loader
+        // orders newest first, so the first usable observation wins per field.
+        var fcSnapshots = snapshotMap.Values.Where(value => value.FcId != 0)
+            .GroupBy(value => value.FcId)
+            .ToDictionary(group => group.Key, group => group.ToList());
 
         return autoRetainerCharacters
             .OrderBy(character => WorldData.GetSortKey(character.World))
@@ -705,11 +713,18 @@ public partial class SlaveWindow
             {
                 snapshotMap.TryGetValue(character.ContentId, out var snapshot);
                 housingMap.TryGetValue(character.ContentId, out var mappedHousing);
+                var fcId = character.FcId != 0 ? character.FcId : snapshot?.FcId ?? 0;
+                var sharedFc = fcSnapshots.GetValueOrDefault(fcId) ?? new List<ExportSnapshotSupplement>();
+                var fcName = sharedFc.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value.FcName))?.FcName;
+                var fcTag = sharedFc.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value.FcTag))?.FcTag;
+                var fcRank = sharedFc.FirstOrDefault(value => value.FcRank > 0)?.FcRank ?? 0;
+                var fcPoints = sharedFc.FirstOrDefault(value => value.FcPoints > 0)?.FcPoints ?? 0;
+                var fcEstate = sharedFc.FirstOrDefault(value => !string.IsNullOrWhiteSpace(value.FcEstate))?.FcEstate;
 
-                var fcHousing = ExportResolveHousing(snapshot?.FcEstate ?? string.Empty, mappedHousing?.Fc);
+                var fcHousing = ExportResolveHousing(fcEstate ?? string.Empty, mappedHousing?.Fc);
                 var personalHousing = ExportResolveHousing(snapshot?.PersonalEstate ?? string.Empty, mappedHousing?.Private);
                 var sharedHousing = snapshot?.SharedEstates ?? new List<ExportSharedHousingEntry>();
-                var submarines = snapshot?.Submarines ?? Array.Empty<string>();
+                var submarines = sharedFc.FirstOrDefault(value => value.Submarines.Any(part => !string.IsNullOrWhiteSpace(part)))?.Submarines ?? Array.Empty<string>();
 
                 return new ExportRow
                 {
@@ -719,16 +734,16 @@ public partial class SlaveWindow
                     Gil = character.Gil,
                     Rgil = snapshot?.RetainerGil > 0 ? snapshot.RetainerGil : character.RetainerGil,
                     Trs = snapshot?.TreasureValue ?? 0,
-                    Fcp = snapshot?.FcPoints > 0 ? snapshot.FcPoints : character.FcPoints,
+                    Fcp = fcPoints > 0 ? fcPoints : character.FcPoints,
                     Mgp = snapshot?.Mgp ?? 0,
                     Vc = snapshot?.VentureCoffers > 0 ? snapshot.VentureCoffers : character.VentureCoffers,
                     Cf = character.Ceruleum,
                     Mrk = character.RepairKits,
                     Hjl = snapshot?.HighestJobLevel > 0 ? snapshot.HighestJobLevel : character.HighestJobLevel,
                     Gcr = character.GcRank,
-                    Fcr = snapshot?.FcRank ?? 0,
-                    Fcs = snapshot?.FcTag ?? string.Empty,
-                    Fcl = !string.IsNullOrWhiteSpace(snapshot?.FcName) ? snapshot!.FcName : character.FcName,
+                    Fcr = fcRank,
+                    Fcs = fcTag ?? string.Empty,
+                    Fcl = fcName ?? character.FcName,
                     LeveA = snapshot?.LeveAllowances ?? character.LeveAllowances,
                     S1 = submarines.Length > 0 ? submarines[0] : string.Empty,
                     S2 = submarines.Length > 1 ? submarines[1] : string.Empty,
@@ -774,7 +789,8 @@ public partial class SlaveWindow
             if (contentId == 0 || string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(world))
                 continue;
 
-            fcLookup.TryGetValue(contentId, out var fcData);
+            var fcId = ExportGetLong(entry, "FCID");
+            fcLookup.TryGetValue(fcId, out var fcData);
 
             characters.Add(new ExportAutoRetainerCharacter
             {
@@ -782,7 +798,7 @@ public partial class SlaveWindow
                 Name = name,
                 World = world,
                 Gil = ExportGetInt(entry, "Gil"),
-                FcId = ExportGetLong(entry, "FCID"),
+                FcId = fcId,
                 FcName = fcData?.Name ?? string.Empty,
                 FcPoints = fcData?.Points ?? 0,
                 HighestJobLevel = ExportGetHighestJobLevel(entry),
@@ -875,8 +891,16 @@ public partial class SlaveWindow
                    listings_json,
                    retainer_items_json,
                    voyages_json,
-                   free_company_json
-            FROM xa_characters";
+                   free_company_json,
+                   fc_id,
+                   snapshot_version,
+                   inventory_json,
+                   saddlebag_json,
+                   crystals_json,
+                   armoury_json,
+                   equipped_json
+            FROM xa_characters
+            ORDER BY julianday(updated_utc) DESC, content_id ASC";
 
         using var reader = command.ExecuteReader();
         while (reader.Read())
@@ -899,11 +923,17 @@ public partial class SlaveWindow
             var retainerItemsJson = reader.IsDBNull(12) ? "[]" : reader.GetString(12);
             var voyagesJson = reader.IsDBNull(13) ? "null" : reader.GetString(13);
             var freeCompanyJson = reader.IsDBNull(14) ? "null" : reader.GetString(14);
+            var fcId = reader.IsDBNull(15) ? 0L : reader.GetInt64(15);
+            var snapshotVersion = reader.IsDBNull(16) ? 0 : reader.GetInt32(16);
+            var splitItems = Enumerable.Range(17, 5)
+                .Select(index => reader.IsDBNull(index) ? "[]" : reader.GetString(index));
+            itemsJson = ExportReconstructItemsJson(snapshotVersion, itemsJson, splitItems);
 
             var freeCompany = ExportDeserializeOrDefault<ExportFreeCompanySnapshot>(freeCompanyJson);
 
             result[contentId] = new ExportSnapshotSupplement
             {
+                FcId = fcId,
                 HighestJobLevel = highestJobLevel,
                 RetainerGil = retainerGil,
                 Mgp = ExportCalculateMgp(currenciesJson, itemsJson),
@@ -922,6 +952,22 @@ public partial class SlaveWindow
         }
 
         return result;
+    }
+
+    private string ExportReconstructItemsJson(int snapshotVersion, string legacyJson, IEnumerable<string> splitJson)
+    {
+        // v1/v2 items_json is the combined list; v3 stores only unclassified
+        // items there. Parse strictly so corrupt input cannot become a zero export.
+        var legacy = JsonSerializer.Deserialize<List<ExportItemSnapshot>>(legacyJson, exportJsonOptions)
+            ?? throw new InvalidDataException("XA Database items_json is null.");
+        if (snapshotVersion < 3 && legacy.Count > 0)
+            return legacyJson;
+        var items = splitJson.SelectMany(json =>
+            JsonSerializer.Deserialize<List<ExportItemSnapshot>>(json, exportJsonOptions)
+            ?? throw new InvalidDataException("XA Database item section is null.")).ToList();
+        if (snapshotVersion >= 3)
+            items.AddRange(legacy);
+        return JsonSerializer.Serialize(items, exportJsonOptions);
     }
 
     // -----------------------------------------------
@@ -1497,12 +1543,11 @@ public partial class SlaveWindow
         switch (element.ValueKind)
         {
             case JsonValueKind.Object:
-                if (ExportTryGetLong(element, "HolderChara", out var holderChara) && holderChara != 0)
+                if (element.TryGetProperty("HolderChara", out _) && ExportTryGetLong(element, "ID", out var fcId))
                 {
                     var fcName = ExportGetString(element, "Name");
                     var fcPoints = ExportGetInt(element, "FCPoints");
-                    var fcId = ExportGetLong(element, "ID");
-                    lookup[holderChara] = new ExportFcLookup(fcId, fcName, fcPoints);
+                    lookup[fcId] = new ExportFcLookup(fcId, fcName, fcPoints);
                 }
 
                 foreach (var property in element.EnumerateObject())
@@ -1583,8 +1628,15 @@ public partial class SlaveWindow
             if (property.ValueKind == JsonValueKind.Number && property.TryGetInt64(out var directLong))
                 return directLong;
 
+            // SQLite stores unsigned game identities as their signed bit pattern.
+            if (property.ValueKind == JsonValueKind.Number && property.TryGetUInt64(out var unsignedLong))
+                return unchecked((long)unsignedLong);
+
             if (property.ValueKind == JsonValueKind.String && long.TryParse(property.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed))
                 return parsed;
+
+            if (property.ValueKind == JsonValueKind.String && ulong.TryParse(property.GetString(), NumberStyles.Integer, CultureInfo.InvariantCulture, out var unsignedParsed))
+                return unchecked((long)unsignedParsed);
         }
 
         return 0;
@@ -1700,6 +1752,7 @@ public partial class SlaveWindow
 
     private sealed class ExportSnapshotSupplement
     {
+        public long FcId { get; init; }
         public int HighestJobLevel { get; init; }
         public long RetainerGil { get; init; }
         public int Mgp { get; init; }

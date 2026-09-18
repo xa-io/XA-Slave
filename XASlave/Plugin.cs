@@ -204,6 +204,7 @@ public sealed class Plugin : IDalamudPlugin
     private SlaveWindow SlaveWindow { get; init; }
     public UpdatesWindow UpdatesWindow { get; init; }
     public XAPeepWindow XAPeepWindow { get; init; }
+    public NearbyPlayersWindow NearbyPlayersWindow { get; init; }
     public XAPeepHistoryWindow XAPeepHistoryWindow { get; init; }
     public EurekaLogogramCreatorFavoritesOverlayWindow EurekaLogogramCreatorFavoritesOverlayWindow { get; init; }
     public EurekaLogogramCreatorAutomationOverlayWindow EurekaLogogramCreatorAutomationOverlayWindow { get; init; }
@@ -233,6 +234,7 @@ public sealed class Plugin : IDalamudPlugin
     public AutoDisplayIdsService AutoDisplayIds { get; init; }
     public AutoDisplayNetworkLatencyService AutoDisplayNetworkLatency { get; init; }
     public ChatTimestampFormatService ChatTimestampFormat { get; init; }
+    public InstantTeleportService InstantTeleport { get; init; }
     public NoUiFadeService NoUiFade { get; init; }
     public AutoHideGameObjectsService AutoHideGameObjects { get; init; }
     public DialogueSkipService DialogueSkip { get; init; }
@@ -244,6 +246,7 @@ public sealed class Plugin : IDalamudPlugin
     public CopyItemNameContextMenuService CopyItemNameContextMenu { get; init; }
     public SightDistanceService SightDistance { get; init; }
     public PlayerSearchContextMenuService PlayerSearchContextMenu { get; init; }
+    public EstateTeleportationContextMenuService EstateTeleportationContextMenu { get; init; }
     public NameplatePrivacyService NameplatePrivacy { get; init; }
     public BlacklistedPartyNameService BlacklistedPartyName { get; init; }
     public AutoUnlockExpertDeliveryService AutoUnlockExpertDelivery { get; init; }
@@ -259,8 +262,14 @@ public sealed class Plugin : IDalamudPlugin
     public EnableItemIconInShopsService EnableItemIconInShops { get; init; }
     public FieldEntryCommandService FieldEntryCommand { get; init; }
     public EurekaInstanceIdService EurekaInstanceId { get; init; }
+    public ZoneInitObservationService ZoneInitObservations { get; init; }
+    public FieldOperationsInstanceDisplayService FieldOperationsInstanceDisplay { get; init; }
     public EurekaLogogramCreatorService EurekaLogogramCreator { get; init; }
     public AutoMergeService AutoMerge { get; init; }
+    internal AutoSortItemsService AutoSortItems { get; init; }
+    internal SlaveNativeUiLibrary NativeUiLibrary { get; init; }
+    internal InspectOutfitTryOnService InspectOutfitTryOn { get; init; }
+    internal AutoRestoreFurnitureService AutoRestoreFurniture { get; init; }
     public ItemCommandsService ItemCommands { get; init; }
     public QuickReturnService QuickReturn { get; init; }
     public PlayerModsService PlayerMods { get; init; }
@@ -269,6 +278,9 @@ public sealed class Plugin : IDalamudPlugin
     public TeleportLockClearService TeleportLockClear { get; init; }
     public EscMenuBailoutService EscMenuBailout { get; init; }
     public XAPeepService XAPeep { get; init; }
+    internal PlayerObservationProvider PlayerObservations { get; init; }
+    internal PlayerTargetingCoordinator PlayerTargeting { get; init; }
+    public NearbyPlayersService NearbyPlayers { get; init; }
     public PeepingTomIntegrationService PeepingTomIntegration { get; init; }
     public ARealmRecordedIntegrationService ARealmRecordedIntegration { get; init; }
     public TeleportHelperService TeleportHelper { get; init; }
@@ -341,7 +353,8 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
 
         IpcClient = new IpcClient(PluginInterface, Log);
-        MessageLog = new MessageLogService(ChatGui, Log, () => Configuration.MessageLogEnabled);
+        MessageLog = new MessageLogService(ChatGui, Log, () => Configuration.MessageLogEnabled,
+            type => Configuration.MessageLogDisabledTypes?.Contains((ushort)type) != true);
         DropboxQueue = new DropboxQueueService(PluginInterface, IpcClient, Log);
         SlaveDatabase = new SlaveDatabaseService(PluginInterface, Log);
         AutoCollector = new AutoCollectionService(this, Condition, Framework, ObjectTable, Log);
@@ -364,17 +377,20 @@ public sealed class Plugin : IDalamudPlugin
         AutoDisplayIds = new AutoDisplayIdsService(AddonLifecycle, Framework, ClientState, DataManager, TargetManager, DtrBar, Log);
         AutoDisplayNetworkLatency = new AutoDisplayNetworkLatencyService(Framework, ClientState, DtrBar, Log);
         ChatTimestampFormat = new ChatTimestampFormatService(Framework, SigScanner, GameInterop, Log);
-        NoUiFade = new NoUiFadeService(Framework, SigScanner, GameInterop, Log);
+        InstantTeleport = new InstantTeleportService(Configuration, GameInterop, SigScanner, Framework, ClientState, Condition, ObjectTable, PartyList, ChatGui, Log, PluginInterface);
+        InstantTeleport.InitializePreference(Configuration.InstantTeleportEnabled);
+        NoUiFade = new NoUiFadeService(Framework, SigScanner, GameInterop, Log, PluginInterface);
         AutoHideGameObjects = new AutoHideGameObjectsService(Framework, ClientState, Condition, TargetManager, SigScanner, GameInterop, Log);
         DialogueSkip = new DialogueSkipService(AddonLifecycle, SigScanner, GameInterop, Log);
         AutoLockGameWindow = new AutoLockGameWindowService(Condition, Log);
-        NotifyWhenFriendIsNear = new NotifyWhenFriendIsNearService(Framework, ClientState, ObjectTable, ToastGui, ChatGui, Log);
+        NotifyWhenFriendIsNear = new NotifyWhenFriendIsNearService(Framework, ClientState, ObjectTable, ToastGui, ChatGui, Log, IpcClient.TrySpeakNearbyPlayerNotification);
         AlertWhenTypingInCombat = new AlertWhenTypingInCombatService(Framework, ClientState, Condition, ToastGui, Log);
         BetterCastBar = new BetterCastBarService(AddonLifecycle, ObjectTable, DataManager, Log);
         BetterDutyFinder = new BetterDutyFinderSettingsService(AddonLifecycle, SigScanner, GameConfig, Log);
         CopyItemNameContextMenu = new CopyItemNameContextMenuService(ContextMenu, DataManager, Log);
         SightDistance = new SightDistanceService(Framework, SigScanner, GameInterop, Log);
         PlayerSearchContextMenu = new PlayerSearchContextMenuService(ContextMenu, DataManager, Log);
+        EstateTeleportationContextMenu = new EstateTeleportationContextMenuService(ContextMenu, Log);
         NameplatePrivacy = new NameplatePrivacyService(NamePlateGui, IpcClient, Log);
         BlacklistedPartyName = new BlacklistedPartyNameService(Framework, Log);
         AutoUnlockExpertDelivery = new AutoUnlockExpertDeliveryService(Framework, DataManager, Log);
@@ -390,9 +406,15 @@ public sealed class Plugin : IDalamudPlugin
         AutoOpenMoogleMail = new AutoOpenMoogleMailService(Framework, Log);
         EnableItemIconInShops = new EnableItemIconInShopsService(AddonLifecycle, DataManager, Log);
         FieldEntryCommand = new FieldEntryCommandService(Framework, DataManager, ClientState, IpcClient, Log);
-        EurekaInstanceId = new EurekaInstanceIdService(Configuration, ClientState, PlayerState, Condition, Framework, Log, DtrBar);
+        ZoneInitObservations = new ZoneInitObservationService(ClientState, PlayerState, ObjectTable, Condition, Framework);
+        EurekaInstanceId = new EurekaInstanceIdService(Configuration, ClientState, PlayerState, Condition, Framework, Log, DtrBar, ZoneInitObservations);
+        FieldOperationsInstanceDisplay = new FieldOperationsInstanceDisplayService(Configuration, ZoneInitObservations, EurekaInstanceId, Framework);
         EurekaLogogramCreator = new EurekaLogogramCreatorService(Configuration);
         AutoMerge = new AutoMergeService(AddonLifecycle, Framework, ClientState, Condition, DataManager, Log);
+        AutoSortItems = new AutoSortItemsService(Configuration, TaskRunner);
+        NativeUiLibrary = new SlaveNativeUiLibrary(RetireNativeControls);
+        InspectOutfitTryOn = new InspectOutfitTryOnService(NativeUiLibrary, () => { Configuration.InspectOutfitTryOnEnabled = false; Configuration.Save(); });
+        AutoRestoreFurniture = new AutoRestoreFurnitureService(TaskRunner, MessageLog, () => { Configuration.AutoRestoreFurnitureEnabled = false; Configuration.Save(); });
         ItemCommands = new ItemCommandsService(DataManager, PlayerState);
         QuickReturn = new QuickReturnService(ClientState, GameInterop, Log);
         PlayerMods = new PlayerModsService(Framework, Condition, SigScanner, GameInterop, Log);
@@ -400,7 +422,10 @@ public sealed class Plugin : IDalamudPlugin
         InstantLogout = new InstantLogoutService(ClientState, Framework, SigScanner, Log, LobbyErrorAutoClose);
         TeleportLockClear = new TeleportLockClearService(ChatGui, Log);
         EscMenuBailout = new EscMenuBailoutService(Framework, Log);
-        XAPeep = new XAPeepService(Framework, ClientState, Condition, ObjectTable, GameGui, Log, SlaveDatabase, Configuration);
+        PlayerObservations = new PlayerObservationProvider(Framework, ClientState, ObjectTable, Condition);
+        PlayerTargeting = new PlayerTargetingCoordinator();
+        XAPeep = new XAPeepService(Framework, ClientState, Condition, ObjectTable, GameGui, Log, SlaveDatabase, Configuration, PlayerObservations, PlayerTargeting);
+        NearbyPlayers = new NearbyPlayersService(this, PlayerObservations, PlayerTargeting);
         PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, Log);
         ARealmRecordedIntegration = new ARealmRecordedIntegrationService(PluginInterface, Framework, ClientState, Condition, DataManager, Log);
         TeleportHelper = new TeleportHelperService(Framework, ClientState, PlayerState, Log);
@@ -804,6 +829,14 @@ public sealed class Plugin : IDalamudPlugin
         }
         QueueDeferredStartupAction(() =>
         {
+            if (Configuration.EstateTeleportationContextMenuEnabled && !EstateTeleportationContextMenu.SetEnabled(true))
+            {
+                Configuration.EstateTeleportationContextMenuEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
             if (!Configuration.ExpandedPlayerRightClickMenuSearchEnabled)
                 return;
 
@@ -954,6 +987,21 @@ public sealed class Plugin : IDalamudPlugin
         });
         QueueDeferredStartupAction(() =>
         {
+            if (Configuration.AutoSortItemsEnabled && !AutoSortItems.SetEnabled(true))
+            {
+                Configuration.AutoSortItemsEnabled = false;
+                Configuration.Save();
+            }
+            if (Configuration.AutoRestoreFurnitureEnabled && !AutoRestoreFurniture.SetEnabled(true))
+            {
+                Configuration.AutoRestoreFurnitureEnabled = false;
+                Configuration.Save();
+            }
+            if (Configuration.InspectOutfitTryOnEnabled && !InspectOutfitTryOn.SetEnabled(true))
+            {
+                Configuration.InspectOutfitTryOnEnabled = false;
+                Configuration.Save();
+            }
             if (Configuration.AutoMergeEnabled && !AutoMerge.SetEnabled(true))
             {
                 Configuration.AutoMergeEnabled = false;
@@ -1088,6 +1136,10 @@ public sealed class Plugin : IDalamudPlugin
         });
         QueueDeferredStartupAction(() =>
         {
+            if (Configuration.NearbyPlayers.Enabled) NearbyPlayers.SetEnabled(true);
+        });
+        QueueDeferredStartupAction(() =>
+        {
             if (!Configuration.XAPeepEnabled)
                 return;
 
@@ -1156,6 +1208,9 @@ public sealed class Plugin : IDalamudPlugin
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
 
+        NearbyPlayersWindow = new NearbyPlayersWindow(NearbyPlayers, XAPeep);
+        WindowSystem.AddWindow(NearbyPlayersWindow);
+        // Nearby owns only optional nearby lines; targeting visuals remain with Peep.
         XAPeepWindow = new XAPeepWindow(this);
         WindowSystem.AddWindow(XAPeepWindow);
         XAPeepHistoryWindow = new XAPeepHistoryWindow(this);
@@ -1206,17 +1261,19 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, updates, db, dbsub, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands.",
+            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, nearby, updates, db, dbsub, npcsell, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands.",
             AllowedInMacros = true,
         });
 
         PluginInterface.UiBuilder.Draw += UpdateEurekaLogogramCreatorOverlayWindows;
+        PluginInterface.UiBuilder.Draw += NearbyPlayersWindow.PrepareDraw;
         PluginInterface.UiBuilder.Draw += DrawWindowSystemOnGameThread;
         PluginInterface.UiBuilder.Draw += BetterCompanyChest.DrawOverlay;
         PluginInterface.UiBuilder.Draw += AutoOpenMoogleMail.DrawOverlay;
         PluginInterface.UiBuilder.Draw += BetterCastBar.DrawOverlay;
         PluginInterface.UiBuilder.Draw += BetterDutyFinder.DrawOverlay;
         PluginInterface.UiBuilder.Draw += XAPeep.DrawOverlay;
+        PluginInterface.UiBuilder.Draw += NearbyPlayersWindow.DrawOverlay;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleMainUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
@@ -1251,7 +1308,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private void DrawWindowSystemOnGameThread()
     {
-        RunOnGameThread(WindowSystem.Draw).GetAwaiter().GetResult();
+        RunOnGameThread(() => { WindowSystem.Draw(); AutoRestoreFurniture.DrawResults(); }).GetAwaiter().GetResult();
     }
 
     private void QueueDeferredStartupAction(string name, Action action, [CallerLineNumber] int lineNumber = 0)
@@ -1598,6 +1655,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Auto Display IDs", Configuration.AutoDisplayIdsEnabled, AutoDisplayIds.StatusText);
         yield return CreateStartupSurfaceStatus("Display Network Latency", Configuration.AutoDisplayNetworkLatencyEnabled, AutoDisplayNetworkLatency.StatusText);
         yield return CreateStartupSurfaceStatus("Custom Timestamp Format", Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.StatusText, "CustomTimestampFormatEnabled");
+        yield return CreateStartupSurfaceStatus("Instant Teleport", Configuration.InstantTeleportEnabled, InstantTeleport.StatusText);
         yield return CreateStartupSurfaceStatus("No UI Fade", Configuration.NoUiFadeEnabled, NoUiFade.StatusText, "NoUiFadeEnabled");
         yield return CreateStartupSurfaceStatus("Better Highlight Potential Targets", Configuration.BetterHighlightPotentialTargetsEnabled, BetterHighlightPotentialTargets.StatusText, "BetterHighlightPotentialTargetsEnabled");
         yield return CreateStartupSurfaceStatus("Auto Hide Game Objects", Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.StatusText, "AutoHideGameObjectsEnabled");
@@ -1686,6 +1744,9 @@ public sealed class Plugin : IDalamudPlugin
         TryCleanup("UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay);
         TryCleanup("UiBuilder.Draw -= BetterCastBar.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterCastBar.DrawOverlay);
         TryCleanup("UiBuilder.Draw -= BetterDutyFinder.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterDutyFinder.DrawOverlay);
+        TryCleanup("UiBuilder.Draw -= NearbyPlayersWindow.PrepareDraw", () => PluginInterface.UiBuilder.Draw -= NearbyPlayersWindow.PrepareDraw);
+        TryCleanup("UiBuilder.Draw -= NearbyPlayersWindow.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= NearbyPlayersWindow.DrawOverlay);
+        TryCleanup("Clear shared Peep visual", () => XAPeep.SharedTargeterVisual = null);
         TryCleanup("UiBuilder.Draw -= XAPeep.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= XAPeep.DrawOverlay);
         TryCleanup("UiBuilder.OpenConfigUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainUi);
         TryCleanup("UiBuilder.OpenMainUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi);
@@ -1693,6 +1754,10 @@ public sealed class Plugin : IDalamudPlugin
         TryCleanup("ClientState.Logout -= OnLogout", () => ClientState.Logout -= OnLogout);
         TryCleanup($"CommandManager.RemoveHandler({CommandName})", () => CommandManager.RemoveHandler(CommandName));
         TryDispose("IpcProvider", IpcProvider);
+        TryDispose("AutoSortItems", AutoSortItems);
+        TryDispose("AutoRestoreFurniture", AutoRestoreFurniture);
+        TryDispose("InspectOutfitTryOn", InspectOutfitTryOn);
+        TryDispose("NativeUiLibrary", NativeUiLibrary);
         TryDispose("MessageLog", MessageLog);
         TryCleanup("WindowSystem.RemoveAllWindows", () => WindowSystem?.RemoveAllWindows());
         TryCleanup("RestoreSpecialRenderModes", () =>
@@ -1721,6 +1786,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoDisplayIds", AutoDisplayIds);
         TryDispose("AutoDisplayNetworkLatency", AutoDisplayNetworkLatency);
         TryDispose("ChatTimestampFormat", ChatTimestampFormat);
+        TryDispose("InstantTeleport", InstantTeleport);
         TryDispose("NoUiFade", NoUiFade);
         TryDispose("AutoHideGameObjects", AutoHideGameObjects);
         TryDispose("DialogueSkip", DialogueSkip);
@@ -1732,6 +1798,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("CopyItemNameContextMenu", CopyItemNameContextMenu);
         TryDispose("SightDistance", SightDistance);
         TryDispose("PlayerSearchContextMenu", PlayerSearchContextMenu);
+        TryDispose("EstateTeleportationContextMenu", EstateTeleportationContextMenu);
         TryDispose("NameplatePrivacy", NameplatePrivacy);
         TryDispose("BlacklistedPartyName", BlacklistedPartyName);
         TryDispose("AutoUnlockExpertDelivery", AutoUnlockExpertDelivery);
@@ -1746,7 +1813,9 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoOpenMoogleMail", AutoOpenMoogleMail);
         TryDispose("EnableItemIconInShops", EnableItemIconInShops);
         TryDispose("FieldEntryCommand", FieldEntryCommand);
+        TryDispose("FieldOperationsInstanceDisplay", FieldOperationsInstanceDisplay);
         TryDispose("EurekaInstanceId", EurekaInstanceId);
+        TryDispose("ZoneInitObservations", ZoneInitObservations);
         TryDispose("EurekaLogogramCreator", EurekaLogogramCreator);
         TryDispose("AutoMerge", AutoMerge);
         TryDispose("ItemCommands", ItemCommands);
@@ -1756,6 +1825,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("InstantLogout", InstantLogout);
         TryDispose("TeleportLockClear", TeleportLockClear);
         TryDispose("EscMenuBailout", EscMenuBailout);
+        TryDispose("NearbyPlayers", NearbyPlayers);
         TryDispose("XAPeep", XAPeep);
         TryDispose("PeepingTomIntegration", PeepingTomIntegration);
         TryDispose("ARealmRecordedIntegration", ARealmRecordedIntegration);
@@ -1946,6 +2016,12 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("nearby", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(TryHandleNearbyPlayersCommand(subcommandArgs, out var message), message);
+            return;
+        }
+
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(TryHandleXAPeepCommand(subcommandArgs, out var message), message);
@@ -1961,6 +2037,18 @@ public sealed class Plugin : IDalamudPlugin
         if (subcommand.Equals("db", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(DropboxQueue.TryExecute(subcommandArgs, out var message), message);
+            return;
+        }
+
+        if (subcommand.Equals("npcsell", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(SlaveWindow.TryExecuteNpcSellCommand(subcommandArgs, out var message), message);
+            return;
+        }
+
+        if (subcommand.Equals("sort", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(TryRequestItemSort(subcommandArgs, out var message), message);
             return;
         }
 
@@ -2107,7 +2195,7 @@ public sealed class Plugin : IDalamudPlugin
         return started;
     }
 
-    private bool TryOpenMoogleMailCommand(string arguments, out string message)
+    private unsafe bool TryOpenMoogleMailCommand(string arguments, out string message)
     {
         if (!string.IsNullOrWhiteSpace(arguments))
         {
@@ -2115,11 +2203,66 @@ public sealed class Plugin : IDalamudPlugin
             return false;
         }
 
-        var opened = AutoOpenMoogleMail.TryOpenLetterListFromCommand();
-        message = opened
-            ? "Opened Moogle Mail."
-            : AutoOpenMoogleMail.LastActionText.Replace("Last action: ", string.Empty, StringComparison.Ordinal);
-        return opened;
+        if (!ClientState.IsLoggedIn)
+        {
+            message = "Log in before opening Moogle Mail.";
+            return false;
+        }
+
+        try
+        {
+            if (AddonHelper.IsAddonVisible("LetterList"))
+            {
+                message = "Moogle Mail is already open.";
+                return true;
+            }
+
+            var agentModule = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentModule.Instance();
+            if (agentModule == null)
+            {
+                message = "Moogle Mail is unavailable: AgentModule could not be resolved.";
+                return false;
+            }
+
+            var agent = agentModule->GetAgentByInternalId(FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentId.Letter);
+            if (agent == null)
+            {
+                message = "Moogle Mail is unavailable: the Letter List agent could not be resolved.";
+                return false;
+            }
+
+            agent->Show();
+            message = "Requested the Moogle Mail window.";
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Log.Warning(ex, "[XASlave] Failed to open Moogle Mail from /xa mail.");
+            message = "Moogle Mail could not be opened; see the plugin log.";
+            return false;
+        }
+    }
+
+    private bool TryRequestItemSort(string arguments, out string message)
+    {
+        if (!string.IsNullOrWhiteSpace(arguments))
+        {
+            message = "Usage: /xa sort.";
+            return false;
+        }
+        if (!Configuration.AutoSortItemsEnabled)
+        {
+            message = "Enable Auto Sort Items in XA Mods before using /xa sort.";
+            return false;
+        }
+        if (AutoSortItems.IsRunning)
+        {
+            message = "Auto Sort Items already has a pending or running request.";
+            return false;
+        }
+        AutoSortItems.SortNow();
+        message = AutoSortItems.StatusText;
+        return AutoSortItems.IsRunning;
     }
 
     public bool TryExecuteXaCommandFromIpc(string rawCommand, out string message)
@@ -2163,6 +2306,9 @@ public sealed class Plugin : IDalamudPlugin
             return true;
         }
 
+        if (subcommand.Equals("nearby", StringComparison.OrdinalIgnoreCase))
+            return TryHandleNearbyPlayersCommand(subcommandArgs, out message);
+
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
             return TryHandleXAPeepCommand(subcommandArgs, out message);
 
@@ -2174,6 +2320,12 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("dbsub", StringComparison.OrdinalIgnoreCase))
             return DropboxQueue.TryQueueSublootValue(subcommandArgs, out message);
+
+        if (subcommand.Equals("npcsell", StringComparison.OrdinalIgnoreCase))
+            return SlaveWindow.TryExecuteNpcSellCommand(subcommandArgs, out message);
+
+        if (subcommand.Equals("sort", StringComparison.OrdinalIgnoreCase))
+            return TryRequestItemSort(subcommandArgs, out message);
 
         if (subcommand.Equals("sit", StringComparison.OrdinalIgnoreCase))
         {
@@ -2602,18 +2754,22 @@ public sealed class Plugin : IDalamudPlugin
         var appliedCount = 0;
         var unavailableCount = 0;
         var unknownCount = 0;
+        var unavailableMods = new List<string>();
+        var unknownMods = new List<string>();
 
         foreach (var key in requestedKeys)
         {
             if (!definitionsByKey.TryGetValue(key, out var definition))
             {
                 unknownCount++;
+                unknownMods.Add(key);
                 continue;
             }
 
             if (definition.Scope == XAModsRestoreScope.Illegal)
             {
                 unavailableCount++;
+                unavailableMods.Add($"{definition.DisplayName} ({key}: cannot be enabled by a preset)");
                 continue;
             }
 
@@ -2624,11 +2780,15 @@ public sealed class Plugin : IDalamudPlugin
                 if (applied)
                     appliedCount++;
                 else
+                {
                     unavailableCount++;
+                    unavailableMods.Add($"{definition.DisplayName} ({key})");
+                }
             }
             catch (Exception ex)
             {
                 unavailableCount++;
+                unavailableMods.Add($"{definition.DisplayName} ({key}: {ex.Message})");
                 Log.Error(ex, $"[XASlave] Enabling XA Mod '{definition.Key}' from preset '{title}' failed.");
             }
         }
@@ -2637,6 +2797,10 @@ public sealed class Plugin : IDalamudPlugin
         message = unknownCount > 0 || unavailableCount > 0 || disableResult.Failures > 0
             ? $"Loaded XA Mods preset '{title}' ({appliedCount} applied, {unavailableCount} unavailable, {unknownCount} unknown, {disableResult.Failures} teardown failures)."
             : $"Loaded XA Mods preset '{title}' ({appliedCount} mod(s)).";
+        if (unavailableMods.Count > 0)
+            message += $" Unavailable: {string.Join("; ", unavailableMods)}.";
+        if (unknownMods.Count > 0)
+            message += $" Unknown mod keys: {string.Join(", ", unknownMods)}.";
         return unknownCount == 0 && unavailableCount == 0 && disableResult.Failures == 0;
     }
 
@@ -2644,6 +2808,9 @@ public sealed class Plugin : IDalamudPlugin
     {
         switch (key)
         {
+            case "auto-sort-items":
+                snapshot = JsonSerializer.SerializeToElement(XAModAutoSortItemsSettings.From(AutoSortItems.Settings), ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "disable-background-game-rendering":
                 snapshot = JsonSerializer.SerializeToElement(new XAModDisableBackgroundRenderingSettings
                 {
@@ -2754,6 +2921,8 @@ public sealed class Plugin : IDalamudPlugin
             case "notify-when-friend-is-near":
                 snapshot = JsonSerializer.SerializeToElement(new XAModNotifyWhenFriendIsNearSettings
                 {
+                    SchemaVersion = Configuration.NotifyWhenFriendIsNearSchemaVersion,
+                    Rules = Configuration.NotifyWhenFriendIsNearRules?.Select(NearbyPlayerRuleSnapshot.Clone).ToList(),
                     Patterns = Configuration.NotifyWhenFriendIsNearPatterns.ToList(),
                     CooldownSeconds = Configuration.NotifyWhenFriendIsNearCooldownSeconds,
                 }, ToonModsPresetSerialization.JsonOptions);
@@ -3002,6 +3171,9 @@ public sealed class Plugin : IDalamudPlugin
         if (modSettings == null || modSettings.Count == 0)
             return;
 
+        if (TryDeserializeXAModSettings(modSettings, "auto-sort-items", out XAModAutoSortItemsSettings? autoSortItemsSettings) && autoSortItemsSettings != null)
+            AutoSortItems.ReplaceSettings(autoSortItemsSettings.ToSettings(), importingPreset: true);
+
         if (TryDeserializeXAModSettings(modSettings, "disable-background-game-rendering", out XAModDisableBackgroundRenderingSettings? backgroundRenderingSettings)
             && backgroundRenderingSettings != null)
         {
@@ -3187,15 +3359,13 @@ public sealed class Plugin : IDalamudPlugin
         if (TryDeserializeXAModSettings(modSettings, "notify-when-friend-is-near", out XAModNotifyWhenFriendIsNearSettings? friendNearSettings)
             && friendNearSettings != null)
         {
-            Configuration.NotifyWhenFriendIsNearPatterns = (friendNearSettings.Patterns ?? [])
-                .Select(pattern => pattern.Trim())
-                .Where(pattern => !string.IsNullOrWhiteSpace(pattern))
-                .Distinct(StringComparer.OrdinalIgnoreCase)
-                .ToList();
-            Configuration.NotifyWhenFriendIsNearCooldownSeconds = NotifyWhenFriendIsNearService.NormalizeCooldownSeconds(friendNearSettings.CooldownSeconds);
-            NotifyWhenFriendIsNear.ApplyConfiguration(
-                Configuration.NotifyWhenFriendIsNearPatterns,
-                Configuration.NotifyWhenFriendIsNearCooldownSeconds);
+            try
+            {
+                var validated = NearbyPlayerRuleSnapshot.Create(friendNearSettings.SchemaVersion, friendNearSettings.Rules,
+                    friendNearSettings.Patterns ?? [], friendNearSettings.CooldownSeconds, explicitApply: true);
+                PublishNearbyPlayerRules(validated, friendNearSettings.CooldownSeconds, save: false);
+            }
+            catch (ArgumentException error) { NotifyWhenFriendIsNear.ReportConfigurationError(error.Message); }
         }
 
         if (TryDeserializeXAModSettings(modSettings, "alert-when-typing-in-combat", out XAModAlertWhenTypingInCombatSettings? typingCombatSettings)
@@ -4142,20 +4312,45 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
     }
 
-    internal void ApplyNotifyWhenFriendIsNearConfiguration(bool save = true)
+    internal void ApplyNotifyWhenFriendIsNearConfiguration(bool save = true, bool legacyEdit = false)
     {
-        Configuration.NotifyWhenFriendIsNearPatterns = Configuration.NotifyWhenFriendIsNearPatterns
-            .Select(pattern => pattern.Trim())
-            .Where(pattern => !string.IsNullOrWhiteSpace(pattern))
-            .Distinct(StringComparer.OrdinalIgnoreCase)
-            .ToList();
-        Configuration.NotifyWhenFriendIsNearCooldownSeconds = NotifyWhenFriendIsNearService.NormalizeCooldownSeconds(Configuration.NotifyWhenFriendIsNearCooldownSeconds);
-        NotifyWhenFriendIsNear.ApplyConfiguration(
-            Configuration.NotifyWhenFriendIsNearPatterns,
-            Configuration.NotifyWhenFriendIsNearCooldownSeconds);
+        try
+        {
+            var schema = Configuration.NotifyWhenFriendIsNearSchemaVersion;
+            var configured = Configuration.NotifyWhenFriendIsNearRules;
+            if (legacyEdit && schema == NearbyPlayerRuleSnapshot.SchemaVersion)
+            {
+                var legacy = NearbyPlayerRuleSnapshot.Create(null, null, Configuration.NotifyWhenFriendIsNearPatterns,
+                    Configuration.NotifyWhenFriendIsNearCooldownSeconds, explicitApply: false).Export();
+                foreach (var rule in legacy)
+                {
+                    var previous = configured?.FirstOrDefault(old => old.LegacyGroup && old.NameMode == rule.NameMode
+                        && string.Equals(old.Pattern, rule.Pattern, StringComparison.OrdinalIgnoreCase));
+                    if (previous != null) { rule.RuleId = previous.RuleId; rule.Enabled = previous.Enabled; }
+                }
+                configured = (configured ?? []).Where(rule => !rule.LegacyGroup || (!rule.Enabled && !legacy.Any(updated => updated.RuleId == rule.RuleId)))
+                    .Select(NearbyPlayerRuleSnapshot.Clone).Concat(legacy).ToList();
+                foreach (var rule in configured.Where(rule => rule.LegacyGroup))
+                    rule.CooldownSeconds = NotifyWhenFriendIsNearService.NormalizeCooldownSeconds(Configuration.NotifyWhenFriendIsNearCooldownSeconds);
+            }
+            var validated = NearbyPlayerRuleSnapshot.Create(schema, configured, Configuration.NotifyWhenFriendIsNearPatterns,
+                Configuration.NotifyWhenFriendIsNearCooldownSeconds, explicitApply: true);
+            PublishNearbyPlayerRules(validated, Configuration.NotifyWhenFriendIsNearCooldownSeconds, save || validated.Migrated);
+        }
+        catch (ArgumentException error) { NotifyWhenFriendIsNear.ReportConfigurationError(error.Message); }
+    }
 
-        if (save)
-            Configuration.Save();
+    internal void PublishNearbyPlayerRules(NearbyPlayerRuleSnapshot validated, int legacyCooldown, bool save, Guid? changedRule = null)
+    {
+        var normalized = validated.Export();
+        var patterns = validated.LegacyPatterns();
+        NotifyWhenFriendIsNear.ApplyConfiguration(validated, changedRule);
+        Configuration.NotifyWhenFriendIsNearSchemaVersion = NearbyPlayerRuleSnapshot.SchemaVersion;
+        Configuration.NotifyWhenFriendIsNearRules = normalized;
+        Configuration.NotifyWhenFriendIsNearPatterns = patterns;
+        Configuration.NotifyWhenFriendIsNearCooldownSeconds = normalized.FirstOrDefault(rule => rule.LegacyGroup)?.CooldownSeconds
+            ?? NotifyWhenFriendIsNearService.NormalizeCooldownSeconds(legacyCooldown);
+        if (save) Configuration.Save();
     }
 
     internal void ApplyAlertWhenTypingInCombatConfiguration(bool save = true)
@@ -4320,10 +4515,20 @@ public sealed class Plugin : IDalamudPlugin
         return success;
     }
 
+    private void RetireNativeControls()
+    {
+        try { AutoRestoreFurniture.RetireControls(); }
+        finally { InspectOutfitTryOn.RetireAllControls(); }
+    }
+
     private void ApplyStoredXAModConfiguration(string key)
     {
         switch (key.ToLowerInvariant())
         {
+            case "auto-sort-items":
+                if (Configuration.AutoSortItemsSettings != AutoSortItems.Settings)
+                    AutoSortItems.ReplaceSettings(AutoSortItems.Settings);
+                break;
             case "auto-skip-cutscenes":
                 AutoSkipCutscenes.ApplyConfiguration(Configuration);
                 break;
@@ -4603,6 +4808,16 @@ public sealed class Plugin : IDalamudPlugin
 
     private readonly record struct XAModDisableResult(int DisabledCount, int Failures);
 
+    private bool TryHandleNearbyPlayersCommand(string args, out string message)
+    {
+        var command = args.Trim().ToLowerInvariant();
+        if (command.Length == 0) { NearbyPlayers.WindowOpen = !NearbyPlayers.WindowOpen; message = "Toggled Nearby Players."; return true; }
+        if (command is "on" or "off") { NearbyPlayers.SetEnabled(command == "on"); message = "Nearby Players change queued."; return true; }
+        if (command == "clear") { NearbyPlayers.ClearHistory(); message = "Nearby history clear queued; Peep history is preserved."; return true; }
+        message = "Usage: /xa nearby [on|off|clear]";
+        return false;
+    }
+
     private bool TryHandleXAPeepCommand(string args, out string message)
     {
         var trimmed = args.Trim();
@@ -4649,6 +4864,7 @@ public sealed class Plugin : IDalamudPlugin
     {
         yield return new("auto-allow-multiple-game-instances", "Allow Multiple Game Instances", XAModsRestoreScope.Game, () => Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.SetAllowMultipleGameInstancesEnabled, applied => Configuration.AutoAllowMultipleGameInstancesEnabled = applied, () => SystemWindowMods.AllowMultipleGameInstancesStatusText);
         yield return new("auto-cancel-login-cooldown", "Cancel Login Cooldown", XAModsRestoreScope.Game, () => Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.SetCancelLoginCooldownEnabled, applied => Configuration.AutoCancelLoginCooldownEnabled = applied, () => SystemWindowMods.CancelLoginCooldownStatusText);
+        yield return new("inspect-outfit-try-on", "Inspect Outfit Try-on", XAModsRestoreScope.Ui, () => Configuration.InspectOutfitTryOnEnabled, InspectOutfitTryOn.SetEnabled, applied => Configuration.InspectOutfitTryOnEnabled = applied, () => InspectOutfitTryOn.StatusText);
         yield return new("auto-display-msq-progress", "Display MSQ Progress", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayMsqProgressEnabled, MsqProgressDisplay.SetEnabled, applied => Configuration.AutoDisplayMsqProgressEnabled = applied, () => MsqProgressDisplay.StatusText);
         yield return new("disable-title-screen-movie", "Disable Title Screen Movie", XAModsRestoreScope.Graphic, () => Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.SetDisableTitleScreenMovieEnabled, applied => Configuration.DisableTitleScreenMovieEnabled = applied, () => SystemWindowMods.DisableTitleScreenMovieStatusText);
         yield return new("auto-display-ids", "Auto Display IDs", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayIdsEnabled, value =>
@@ -4667,6 +4883,7 @@ public sealed class Plugin : IDalamudPlugin
             return AutoDisplayNetworkLatency.SetEnabled(value);
         }, applied => Configuration.AutoDisplayNetworkLatencyEnabled = applied, () => AutoDisplayNetworkLatency.StatusText);
         yield return new("custom-timestamp-format", "Custom Timestamp Format", XAModsRestoreScope.Ui, () => Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.SetEnabled, applied => Configuration.CustomTimestampFormatEnabled = applied, () => ChatTimestampFormat.StatusText);
+        yield return new("instant-teleport", "Instant Teleport", XAModsRestoreScope.Illegal, () => Configuration.InstantTeleportEnabled, InstantTeleport.SetEnabled, applied => Configuration.InstantTeleportEnabled = applied, () => InstantTeleport.StatusText);
         yield return new("no-ui-fade", "No UI Fade", XAModsRestoreScope.Graphic, () => Configuration.NoUiFadeEnabled, NoUiFade.SetEnabled, applied => Configuration.NoUiFadeEnabled = applied, () => NoUiFade.StatusText);
         yield return new("auto-skip-cutscenes", "Skip Cutscenes", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesEnabled, value =>
         {
@@ -4716,6 +4933,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("target-command-fix", "Fix /target Command", XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusText);
         yield return new("copy-item-name-for-all", "Copy Item Name For All", XAModsRestoreScope.Ui, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusText);
         yield return new("expanded-player-right-click-menu-search", "Expanded Player Right-Click Menu Search", XAModsRestoreScope.Ui, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusText);
+        yield return new("estate-teleportation-context-menu", "Estate Teleportation Context Menu", XAModsRestoreScope.Player, () => Configuration.EstateTeleportationContextMenuEnabled, EstateTeleportationContextMenu.SetEnabled, applied => Configuration.EstateTeleportationContextMenuEnabled = applied, () => EstateTeleportationContextMenu.StatusText);
         yield return new("live-anonymous-mode", "Anonymous Mode", XAModsRestoreScope.Ui, () => Configuration.LiveAnonymousModeEnabled, NameplatePrivacy.SetAnonymousModeEnabled, applied => Configuration.LiveAnonymousModeEnabled = applied, () => NameplatePrivacy.AnonymousModeStatusText);
         yield return new("better-inventory-mover", "Better Inventory Mover", XAModsRestoreScope.Player, () => Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.SetEnabled, applied => Configuration.BetterInventoryMoverEnabled = applied, () => BetterInventoryMover.StatusText);
         yield return new("better-company-chest", "Better Company Chest", XAModsRestoreScope.Player, () => Configuration.BetterCompanyChestEnabled, BetterCompanyChest.SetEnabled, applied => Configuration.BetterCompanyChestEnabled = applied, () => BetterCompanyChest.StatusText);
@@ -4735,6 +4953,8 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("auto-expert-delivery", "Automate Expert Delivery", XAModsRestoreScope.Player, () => Configuration.AutoUnlockExpertDeliveryEnabled, AutoUnlockExpertDelivery.SetEnabled, applied => Configuration.AutoUnlockExpertDeliveryEnabled = applied, () => AutoUnlockExpertDelivery.StatusText);
         yield return new("auto-leave-duty", "Auto Leave Duty", XAModsRestoreScope.Player, () => Configuration.AutoLeaveDutyEnabled, AutoLeaveDuty.SetEnabled, applied => Configuration.AutoLeaveDutyEnabled = applied, () => AutoLeaveDuty.StatusText);
         yield return new("auto-merge", "Auto Merge", XAModsRestoreScope.Player, () => Configuration.AutoMergeEnabled, AutoMerge.SetEnabled, applied => Configuration.AutoMergeEnabled = applied, () => AutoMerge.StatusText);
+        yield return new("auto-sort-items", "Auto Sort Items", XAModsRestoreScope.Player, () => Configuration.AutoSortItemsEnabled, AutoSortItems.SetEnabled, applied => Configuration.AutoSortItemsEnabled = applied, () => AutoSortItems.StatusText);
+        yield return new("auto-restore-furniture", "Auto Restore Furniture", XAModsRestoreScope.Player, () => Configuration.AutoRestoreFurnitureEnabled, AutoRestoreFurniture.SetEnabled, applied => Configuration.AutoRestoreFurnitureEnabled = applied, () => AutoRestoreFurniture.StatusText);
         yield return new("quick-return", "Instant Return", XAModsRestoreScope.Illegal, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusText);
         yield return new("auto-refuse-trade-request", "Refuse Trade Request", XAModsRestoreScope.Player, () => Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.SetEnabled, applied => Configuration.AutoRefuseTradeRequestEnabled = applied, () => AutoRefuseTrade.StatusText);
         yield return new("show-titles-as-playernames", "Show Titles As Playernames", XAModsRestoreScope.Player, () => Configuration.ShowTitlesAsPlayernamesEnabled, NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled, applied => Configuration.ShowTitlesAsPlayernamesEnabled = applied, () => NameplatePrivacy.ShowTitlesAsPlayernamesStatusText);
@@ -4753,6 +4973,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("infinite-sprint", "Infinite Sprint", XAModsRestoreScope.Player, () => Configuration.InfiniteSprintEnabled, PlayerMods.SetInfiniteSprintEnabled, applied => Configuration.InfiniteSprintEnabled = applied, () => PlayerMods.InfiniteSprintStatusText);
         yield return new("instant-logout", "Instant Logout", XAModsRestoreScope.Illegal, () => Configuration.InstantLogoutEnabled, InstantLogout.SetEnabled, applied => Configuration.InstantLogoutEnabled = applied, () => InstantLogout.StatusText);
         yield return new("item-commands", "Item Commands", XAModsRestoreScope.Player, () => Configuration.ItemCommandsEnabled, ItemCommands.SetEnabled, applied => Configuration.ItemCommandsEnabled = applied, () => ItemCommands.StatusText);
+        yield return new("nearby-players", "Nearby Players", XAModsRestoreScope.Player, () => Configuration.NearbyPlayers.Enabled, NearbyPlayers.SetEnabled, applied => Configuration.NearbyPlayers.Enabled = applied, () => NearbyPlayers.StatusText);
         yield return new("xa-peep", "XA Peep", XAModsRestoreScope.Player, () => Configuration.XAPeepEnabled, SetXAPeepEnabled, applied => Configuration.XAPeepEnabled = applied, () => XAPeep.StatusText);
 
         yield return new(
@@ -5387,5 +5608,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.45";
+    public const string Version = "0.0.0.46";
 }

@@ -71,6 +71,15 @@ public partial class SlaveWindow
     private readonly Dictionary<XAModCatalogueEntry, bool> xaModVisibilityFrame = [];
     private IReadOnlyList<ToonModSavedList>? toonModsSortedSavedLists;
     private bool xaModCatalogueBuilt;
+    private sealed record PendingXAModToggle(string Label, bool Value);
+    private PendingXAModToggle? xaModPendingToggle;
+
+    private bool GetDisplayedXAModValue(string label, bool currentValue)
+    {
+        var pending = System.Threading.Volatile.Read(ref xaModPendingToggle);
+        return pending != null && pending.Label == label ? pending.Value : currentValue;
+    }
+
     private float toonModsSectionsScrollY;
     private static readonly JsonSerializerOptions toonModsListJsonOptions = ToonModsPresetSerialization.JsonOptions;
 
@@ -300,7 +309,7 @@ public partial class SlaveWindow
 
         void ApplyNotifyWhenFriendIsNearConfiguration()
         {
-            plugin.ApplyNotifyWhenFriendIsNearConfiguration();
+            plugin.ApplyNotifyWhenFriendIsNearConfiguration(legacyEdit: true);
         }
 
         void ApplyAlertWhenTypingInCombatConfiguration()
@@ -422,14 +431,13 @@ public partial class SlaveWindow
             string status,
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
-            System.Action? drawOptions = null,
-            bool showOptionsWhenDisabled = false)
+            System.Action? drawOptions = null)
         {
-            var value = currentValue;
+            var value = GetDisplayedXAModValue(label, currentValue);
             var modifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
             var toggled = false;
 
-            var enableBlocked = requireCtrlShiftToEnable && !currentValue && !modifierHeld;
+            var enableBlocked = requireCtrlShiftToEnable && !value && !modifierHeld;
             using (ImRaii.Disabled(enableBlocked))
                 toggled = ImGui.Checkbox(label, ref value);
 
@@ -445,28 +453,42 @@ public partial class SlaveWindow
 
             if (toggled)
             {
-                var queued = plugin.QueueXAModToggle(
+                // Keep the requested value visible across frames until the game-thread
+                // mutation reports its result. The configuration remains authoritative.
+                var pending = new PendingXAModToggle(label, value);
+                var previous = System.Threading.Interlocked.CompareExchange(ref xaModPendingToggle, pending, null);
+                var queueMessage = "Another XA Mods change is already queued or running.";
+                var queued = previous == null && plugin.QueueXAModToggle(
                     label,
                     value,
                     apply,
                     store,
-                    (success, resultMessage) => SetToonModsStatus($"XA Mods: {resultMessage}", !success),
-                    out var queueMessage);
+                    (success, resultMessage) =>
+                    {
+                        System.Threading.Interlocked.CompareExchange(ref xaModPendingToggle, null, pending);
+                        SetToonModsStatus($"XA Mods: {resultMessage}", !success);
+                    },
+                    out queueMessage);
+                if (!queued)
+                    System.Threading.Interlocked.CompareExchange(ref xaModPendingToggle, null, pending);
                 SetToonModsStatus($"XA Mods: {queueMessage}", !queued);
             }
 
             ImGui.SameLine(0f, 6f);
             DrawHelpMarker(helpText);
 
-            ImGui.TextDisabled(description);
-            ImGui.TextDisabled($"Status: {status}");
-            DrawWarningText(warningText ?? string.Empty);
-
-            if ((value || showOptionsWhenDisabled) && drawOptions != null)
+            if (value)
             {
-                ImGui.Indent();
-                drawOptions();
-                ImGui.Unindent();
+                ImGui.TextDisabled(description);
+                ImGui.TextDisabled($"Status: {status}");
+                DrawWarningText(warningText ?? string.Empty);
+
+                if (drawOptions != null)
+                {
+                    ImGui.Indent();
+                    drawOptions();
+                    ImGui.Unindent();
+                }
             }
 
             ImGui.Spacing();
@@ -504,8 +526,7 @@ public partial class SlaveWindow
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
             string[]? searchTerms = null,
-            Action? drawOptions = null,
-            bool showOptionsWhenDisabled = false)
+            Action? drawOptions = null)
         {
             var searchHaystack = BuildToonModsSearchHaystack(label, description, helpText, searchTerms);
             featureEntries.Add(new XAModCatalogueEntry(
@@ -523,8 +544,7 @@ public partial class SlaveWindow
                     getStatus(),
                     warningText,
                     requireCtrlShiftToEnable,
-                    drawOptions,
-                    showOptionsWhenDisabled)));
+                    drawOptions)));
         }
 
         void AddSavedFeatureEntry(
@@ -540,11 +560,10 @@ public partial class SlaveWindow
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
             string[]? searchTerms = null,
-            Action? drawOptions = null,
-            bool showOptionsWhenDisabled = false)
+            Action? drawOptions = null)
         {
             toonModDefinitions.Add((key, getCurrent, apply, store));
-            AddFeatureEntry(section, label, getCurrent, apply, store, description, helpText, getStatus, warningText, requireCtrlShiftToEnable, searchTerms, drawOptions, showOptionsWhenDisabled);
+            AddFeatureEntry(section, label, getCurrent, apply, store, description, helpText, getStatus, warningText, requireCtrlShiftToEnable, searchTerms, drawOptions);
         }
 
         List<string> GetCurrentToonModKeys()
@@ -617,6 +636,21 @@ public partial class SlaveWindow
 
             ImGui.SetClipboardText(JsonSerializer.Serialize(package, toonModsListJsonOptions));
             SetToonModsStatus($"XA Mods: copied '{package.Title}' JSON ({package.ModKeys.Count} mods) to clipboard.");
+        }
+
+        void ExportSavedToonModsList(ToonModSavedList saved)
+        {
+            var package = new ToonModsListPackage
+            {
+                ListId = Guid.NewGuid().ToString("N"),
+                Title = saved.Name,
+                ExportedAtUtc = DateTime.UtcNow,
+                ModKeys = saved.ModKeys,
+                ModSettings = saved.ModSettings,
+            };
+
+            ImGui.SetClipboardText(JsonSerializer.Serialize(package, toonModsListJsonOptions));
+            SetToonModsStatus($"XA Mods: copied saved list '{package.Title}' JSON ({package.ModKeys.Count} mods) to clipboard.");
         }
 
         void ImportCurrentToonModsList()
@@ -776,12 +810,6 @@ public partial class SlaveWindow
                 .ToArray();
             foreach (var saved in toonModsSortedSavedLists)
             {
-                ImGui.TextUnformatted(saved.Name);
-                ImGui.SameLine();
-                if (ImGui.SmallButton($"Load##ToonModsLoad{saved.Name}"))
-                    ApplyToonModsList(saved.Name, saved.ModKeys, saved.ModSettings);
-
-                ImGui.SameLine();
                 using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
                     if (ImGui.SmallButton($"X##ToonModsDelete{saved.Name}"))
@@ -793,6 +821,18 @@ public partial class SlaveWindow
                         break;
                     }
                 }
+                ImGui.SameLine();
+                ImGui.TextDisabled($"{saved.ModKeys.Count} mods");
+                ImGui.SameLine();
+                if (ImGui.SmallButton($"Load##ToonModsLoad{saved.Name}"))
+                    ApplyToonModsList(saved.Name, saved.ModKeys, saved.ModSettings);
+
+                ImGui.SameLine();
+                if (ImGui.SmallButton($"Export##ToonModsExportSaved{saved.Name}"))
+                    ExportSavedToonModsList(saved);
+
+                ImGui.SameLine();
+                ImGui.TextUnformatted(saved.Name);
             }
         }
 
@@ -808,7 +848,7 @@ public partial class SlaveWindow
             if (xaModCurrentStateFrame.TryGetValue(entry, out var current))
                 return current;
 
-            current = entry.GetCurrent();
+            current = GetDisplayedXAModValue(entry.Label, entry.GetCurrent());
             xaModCurrentStateFrame[entry] = current;
             return current;
         }
@@ -1641,6 +1681,9 @@ public partial class SlaveWindow
             ImGui.TextDisabled("Alerts use only local XA Slave toast/chat output. No in-game chat command is sent.");
             ImGui.TextDisabled($"Configured patterns: {plugin.NotifyWhenFriendIsNear.PatternCount}");
             ImGui.TextDisabled($"Last matched player: {plugin.NotifyWhenFriendIsNear.LastMatchedPlayer}");
+            ImGui.TextWrapped(plugin.NotifyWhenFriendIsNear.LastActionText);
+            if (plugin.NotifyWhenFriendIsNear.SpeechStatus.Length != 0) ImGui.TextWrapped(plugin.NotifyWhenFriendIsNear.SpeechStatus);
+            DrawNearbyPlayerAdvancedRules();
 
             if (configuration.NotifyWhenFriendIsNearPatterns.Count == 0)
             {
@@ -1847,6 +1890,10 @@ public partial class SlaveWindow
             ImGui.TextDisabled($"Hold {plugin.BetterInventoryMover.QuickMoveModifierLabel} and right-click an item while both the source and destination inventory windows are open.");
             ImGui.TextDisabled("Without the modifier, XA still adds destination-aware context-menu move entries.");
             ImGui.TextDisabled("Supported pairs: inventory <-> retainer and inventory <-> saddlebag or premium saddlebag.");
+            ImGui.TextWrapped(plugin.BetterInventoryMover.OccupiedStackStatus);
+            ImGui.TextWrapped(plugin.BetterInventoryMover.LastActionText);
+            ImGui.TextDisabled("Moves only the selected quantity, in distinct chunks at least 250 ms apart, for up to 10 seconds.");
+            ImGui.TextDisabled("Observed quantities are local client updates; server acceptance is not confirmed.");
             ImGui.TextDisabled($"Last source addon: {plugin.BetterInventoryMover.LastSourceAddon}");
             ImGui.TextDisabled($"Last destination: {plugin.BetterInventoryMover.LastDestinationLabel}");
             ImGui.TextDisabled($"Last item ID: {plugin.BetterInventoryMover.LastItemId}");
@@ -2751,8 +2798,7 @@ public partial class SlaveWindow
             "Shows item IDs on item tooltips, action IDs on action details, target data IDs on target info, weather IDs on weather tooltips when available, and optional live zone/map IDs in DTR.",
             () => plugin.AutoDisplayIds.StatusText,
             searchTerms: ["tooltip", "skill id", "action id", "target data id", "weather id", "zone id", "map id"],
-            drawOptions: DrawAutoDisplayIdsOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawAutoDisplayIdsOptions);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "display-network-latency",
@@ -2768,8 +2814,7 @@ public partial class SlaveWindow
             "Detects the live game TCP endpoint for this process, resolves local loopback proxy hops when possible, pings the effective endpoint once per second, and displays the result in the server-info bar.",
             () => plugin.AutoDisplayNetworkLatency.StatusText,
             searchTerms: ["ping", "latency", "DTR", "server", "network"],
-            drawOptions: DrawAutoDisplayNetworkLatencyOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawAutoDisplayNetworkLatencyOptions);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "custom-timestamp-format",
@@ -2782,8 +2827,7 @@ public partial class SlaveWindow
             () => plugin.ChatTimestampFormat.StatusText,
             warningText: "Disable other chat timestamp formatter tweaks before enabling this hook.",
             searchTerms: ["chat", "timestamp", "seconds", "time", "7840", "7841"],
-            drawOptions: DrawCustomTimestampFormatOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawCustomTimestampFormatOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
             "no-ui-fade",
@@ -2828,8 +2872,7 @@ public partial class SlaveWindow
             autoSkipCutsceneHelpText,
             () => plugin.AutoSkipCutscenes.StatusText,
             searchTerms: autoSkipCutsceneSearchTerms,
-            drawOptions: DrawAutoSkipCutsceneOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawAutoSkipCutsceneOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
             "auto-ignore-minimum-window-size",
@@ -2868,8 +2911,7 @@ public partial class SlaveWindow
             () => plugin.DalamudNotificationsSuck.StatusText,
             warningText: "Uses Dalamud internals; if Dalamud changes this will report unavailable instead of crashing.",
             searchTerms: ["Dalamud", "notification", "toast", "plugin error", "plugin load", "Penumbra", "Glamourer", "mod failed", "update alert"],
-            drawOptions: DrawDalamudNotificationsSuckOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawDalamudNotificationsSuckOptions);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "better-highlight-potential-targets",
@@ -2886,8 +2928,7 @@ public partial class SlaveWindow
             () => plugin.BetterHighlightPotentialTargets.StatusText,
             warningText: "Safety-gated: this arms last after plugin load, waits about 5 seconds plus 30 stable frames and a brief stable hover after enable, and suspends during login, logout, territory changes, and unload. For no yellow pre-flash, unselect FFXIV Character Configuration > Control Settings > Target > Highlight Potential Targets.",
             searchTerms: ["highlight", "target highlight", "mouseover", "mouse over", "hover", "yellow outline", "potential target", "ObjectHighlightColor"],
-            drawOptions: DrawBetterHighlightPotentialTargetsOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawBetterHighlightPotentialTargetsOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "auto-prevent-game-exiting-from-lobby-errors",
@@ -2982,8 +3023,7 @@ public partial class SlaveWindow
             "Scans visible player objects every two seconds for exact-name or `/regex/` patterns and prints only local XA Slave system/toast notifications. It never sends an in-game chat message.",
             () => plugin.NotifyWhenFriendIsNear.StatusText,
             searchTerms: ["friend", "near", "player", "notify", "regex", "system message"],
-            drawOptions: DrawNotifyWhenFriendIsNearOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawNotifyWhenFriendIsNearOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "alert-when-typing-in-combat",
@@ -2999,8 +3039,7 @@ public partial class SlaveWindow
             "Checks ConditionFlag.InCombat and the focused ChatLog addon on the framework thread. A configurable cooldown suppresses repeated warnings, while the tone, volume, and beep count can be previewed locally without sending chat.",
             () => plugin.AlertWhenTypingInCombat.StatusText,
             searchTerms: ["combat", "typing", "ChatLog", "chat box", "toast", "sound", "tone", "pitch", "beeps", "cooldown", "/xa typingcombat"],
-            drawOptions: DrawAlertWhenTypingInCombatOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawAlertWhenTypingInCombatOptions);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "better-cast-bar",
@@ -3016,8 +3055,7 @@ public partial class SlaveWindow
             "Updates `_CastBar` node layout locally and draws a configurable slidecast zone or line over the cast-progress bar. Original node layout is restored when the cast bar finalizes or the mod is disabled.",
             () => plugin.BetterCastBar.StatusText,
             searchTerms: ["_CastBar", "slidecast", "cast", "casting", "marker", "spell"],
-            drawOptions: DrawBetterCastBarOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawBetterCastBarOptions);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "better-duty-finder",
@@ -3132,6 +3170,17 @@ public partial class SlaveWindow
             () => plugin.NameplatePrivacy.AnonymousModeStatusText);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
+            "estate-teleportation-context-menu",
+            "Estate Teleportation Context Menu",
+            () => configuration.EstateTeleportationContextMenuEnabled,
+            plugin.EstateTeleportationContextMenu.SetEnabled,
+            applied => configuration.EstateTeleportationContextMenuEnabled = applied,
+            "Adds Estate Teleportation to eligible friends' player context menus.",
+            "Right-click a friend in the party list or another supported player menu to open their estate teleportation window. Their home world must be your current world and the friend list must be loaded. The game controls estate access and destination selection. The existing Friend List menu is unchanged.",
+            () => plugin.EstateTeleportationContextMenu.StatusText,
+            searchTerms: ["housing", "estate", "teleport", "friend", "party", "right click"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
             "better-inventory-mover",
             "Better Inventory Mover",
             () => configuration.BetterInventoryMoverEnabled,
@@ -3153,8 +3202,7 @@ public partial class SlaveWindow
             "Improves the Company Chest surface with a saved default page, right-click inventory quick move, optional auto-confirm for quantity prompts, and an optional exchangeable-value overlay on the chest window.",
             () => plugin.BetterCompanyChest.StatusText,
             searchTerms: ["Company Chest", "FC chest", "free company chest", "quick move", "quantity", "exchangeable", "crystals"],
-            drawOptions: DrawBetterCompanyChestOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawBetterCompanyChestOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "auto-open-moogle-mail",
@@ -3166,8 +3214,7 @@ public partial class SlaveWindow
             "XA can queue manual actions for claiming attachments, deleting opened letters, deleting opened NPC letters, and requesting delivery from the Letter List.",
             () => plugin.AutoOpenMoogleMail.StatusText,
             searchTerms: ["Moogle Mail", "Delivery Moogle", "letters", "attachments", "request delivery", "delete letters"],
-            drawOptions: DrawAutoOpenMoogleMailOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawAutoOpenMoogleMailOptions);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "enable-item-icon-in-shops",
@@ -3191,8 +3238,7 @@ public partial class SlaveWindow
             "Queues the requested Eureka entry, requests Pier #1 staging travel when Rodney is not locally reachable, routes to Rodney, and advances supported entry dialogs.",
             () => plugin.FieldEntryCommand.StatusText,
             searchTerms: ["/xa fe", "field entry", "field operations", "Eureka", "Anemos", "Pagos", "Pyros", "Hydatos", "Rodney"],
-            drawOptions: DrawFieldEntryCommandOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawFieldEntryCommandOptions);
 
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
@@ -3241,8 +3287,7 @@ public partial class SlaveWindow
             warningText: "DO NOT USE IF YOUR LODESTONE IS NOT SET TO PRIVATE! You take the risk of revealing your character on the leaderboards by using this. If you're not the actual proper rank, it's easy to determine if you're using this.",
             requireCtrlShiftToEnable: true,
             searchTerms: ["GC rank floor", "Grand Company rank", "rank 0", "rank 19", "Storm Captain", "Storm Champion"],
-            drawOptions: DrawUnlockExpertDeliveryOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawUnlockExpertDeliveryOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "auto-refuse-trade-request",
@@ -3266,8 +3311,7 @@ public partial class SlaveWindow
             "Moves prefix titles before the player name and suffix titles after the player name, then hides the native title line. If Support Honorific is enabled, XA uses Honorific's resolved custom title when available before falling back to the native title. If Show Traveler World Names is also enabled, @HomeWorld is appended after the title-adjusted name.",
             () => plugin.NameplatePrivacy.ShowTitlesAsPlayernamesStatusText,
             searchTerms: ["title", "titles", "player title", "prefix title", "suffix title", "nameplate", "playernames", "Honorific", "custom title", "traveler"],
-            drawOptions: DrawShowTitlesAsPlayernamesOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawShowTitlesAsPlayernamesOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "show-blacklisted-playername-in-party",
@@ -3324,6 +3368,42 @@ public partial class SlaveWindow
             () => plugin.AutoLeaveDuty.StatusText,
             searchTerms: ["completed duty", "leave duty", "instance", "dungeon", "raid", "delay", "1-10 sec", "duty menu", "controller", "no U"],
             drawOptions: DrawAutoLeaveDutyOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "auto-sort-items",
+            "Auto Sort Items",
+            () => configuration.AutoSortItemsEnabled,
+            plugin.AutoSortItems.SetEnabled,
+            applied => configuration.AutoSortItemsEnabled = applied,
+            "Sorts normal inventory and the current armoury chest.",
+            "Uses your ID, item-level, category, HQ and tab settings. Supports sorting on enable, after zoning and manually, with Stop and verified local completion messages.",
+            () => plugin.AutoSortItems.StatusText,
+            searchTerms: ["inventory", "armoury", "sort", "itemsort", "HQ", "tabs", "category", "item level"],
+            drawOptions: plugin.AutoSortItems.DrawOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.UiMods,
+            "inspect-outfit-try-on",
+            "Inspect Outfit Try-on",
+            () => configuration.InspectOutfitTryOnEnabled,
+            plugin.InspectOutfitTryOn.SetEnabled,
+            applied => configuration.InspectOutfitTryOnEnabled = applied,
+            "Adds Try On All and Stop to a player inspection.",
+            "Sends the inspected equipment appearances and both dyes to the fitting room, then tries inspected facewear if unlocked on this character. Unavailable facewear is skipped; soul crystals and empty gear slots are ignored. Clear in the fitting room resets the preview without closing it. Enabling this option does not start a preview.",
+            () => plugin.InspectOutfitTryOn.StatusText,
+            searchTerms: ["inspect", "outfit", "try on", "fitting room", "glamour", "dyes"],
+            drawOptions: plugin.InspectOutfitTryOn.DrawOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "auto-restore-furniture",
+            "Auto Restore Furniture",
+            () => configuration.AutoRestoreFurnitureEnabled,
+            plugin.AutoRestoreFurniture.SetEnabled,
+            applied => configuration.AutoRestoreFurnitureEnabled = applied,
+            "Adds three full-batch furniture transfer modes to HousingGoods.",
+            "Moves the fixed initial placed or stored furniture set through the native housing rules, with destination checks, paced requests, manual native warnings, Stop and a result for every initial item.",
+            () => plugin.AutoRestoreFurniture.StatusText,
+            searchTerms: ["housing", "furniture", "storeroom", "inventory", "restore", "batch"],
+            drawOptions: plugin.AutoRestoreFurniture.DrawOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "auto-merge",
@@ -3409,6 +3489,30 @@ public partial class SlaveWindow
             searchTerms: ["/xa equip", "equip item id", "armory"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
+            "nearby-players",
+            "XA Nearby",
+            () => configuration.NearbyPlayers.Enabled,
+            plugin.NearbyPlayers.SetEnabled,
+            applied => configuration.NearbyPlayers.Enabled = applied,
+            "Compact nearby player list with direction, distance and optional radar lines.",
+            "Sort by clicking a column heading; right-click headings to choose columns and players for Locate, Target or Examine. Direction is relative to the camera. The title-bar lock controls resizing; the bookmark toggles search. Nearby includes all loaded players without a 99-player cap. Targeting alerts and history belong to XA Peep.",
+            () => plugin.NearbyPlayers.StatusText,
+            searchTerms: ["nearby", "radar", "/xa nearby", "distance", "columns", "zone"],
+            drawOptions: () =>
+            {
+                if (ImGui.Button("Open XA Nearby")) plugin.NearbyPlayers.WindowOpen = true;
+                var settings = configuration.NearbyPlayers;
+                var friendsFirst = settings.ShowFriendsOnTop;
+                if (ImGui.Checkbox("Show friends on top", ref friendsFirst)) plugin.NearbyPlayers.ChangeSettings(s => s.ShowFriendsOnTop = friendsFirst);
+                var dtr = settings.ShowDtr;
+                if (ImGui.Checkbox("Server bar eye and nearby count", ref dtr)) plugin.NearbyPlayers.ChangeSettings(s => s.ShowDtr = dtr);
+                var lines = settings.ShowNearbyLines;
+                if (ImGui.Checkbox("Draw lines to nearby players while the list is open", ref lines)) plugin.NearbyPlayers.ChangeSettings(s => s.ShowNearbyLines = lines);
+                var scale = settings.Scale;
+                if (ImGui.DragFloat("Nearby line scale", ref scale, 0.05f, 0.1f, 5f)) plugin.NearbyPlayers.ChangeSettings(s => s.Scale = scale);
+            });
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
             "xa-peep",
             "XA Peep",
             () => configuration.XAPeepEnabled,
@@ -3418,8 +3522,53 @@ public partial class SlaveWindow
             "Tracks players targeting you in all areas, including PvP, keeps the small XA Peep list and the separate history window available through logout, records cumulative per-player counts in XA Slave's local database, and can show purple cards, lines, dots, center-screen notifications, prefixed chat notifications, and selectable XA alert sounds that still play even if the game's own sound channel is muted. XA Peep can be filtered to skip party, alliance, in-combat, or in-duty targeters, can auto-open its compact window on plugin load, and lets you lock or unlock window resizing from the title bar. Use `/xa peep` to open the small window or `/xa peep on|off` to toggle tracking from chat.",
             () => plugin.XAPeep.StatusText,
             searchTerms: ["Show card when targeted", "Show Targeter's Line", "Show targeter's dot", "targeter line color", "targeter dot color", "targeter dot size", "Show targeters card", "Show center-screen notification", "Print chat notification", "is targeting you", "Log party members", "Log alliance members", "Log players in combat", "Log while in duty", "Auto open XA Peep on plugin load", "lock", "resize", "/xa peep", "history", "PvP", "sound", "window"],
-            drawOptions: DrawXAPeepOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawXAPeepOptions);
+    void DrawInstantTeleportOptions()
+    {
+        if (plugin.Configuration.InstantTeleportEnabled && !plugin.InstantTeleport.IsEnabled && ImGui.Button("Retry activation##InstantTeleport"))
+            plugin.InstantTeleport.SetEnabled(true);
+        var soloOnly = plugin.Configuration.InstantTeleportSoloOnly;
+        if (ImGui.Checkbox("Only when alone (no party; nearby-player distance below)##instantTeleportSolo", ref soloOnly))
+        {
+            plugin.Configuration.InstantTeleportSoloOnly = soloOnly;
+            plugin.Configuration.Save();
+        }
+        var safeDistance = TeleportProximity.ClampDistance(plugin.Configuration.InstantTeleportSafeDistanceYalms);
+        ImGui.BeginDisabled(!soloOnly);
+        if (ImGui.SliderFloat("Safe distance (yalms)##instantTeleportDistance", ref safeDistance, 1f, 300f, "%.0f"))
+        {
+            plugin.Configuration.InstantTeleportSafeDistanceYalms = TeleportProximity.ClampDistance(safeDistance);
+            plugin.Configuration.Save();
+        }
+        ImGui.EndDisabled();
+        ImGui.TextWrapped("Only when alone blocks party use and players closer than this horizontal distance. Players at or beyond it are allowed; only loaded players can be checked.");
+        ImGui.TextWrapped(plugin.InstantTeleport.ProximityText);
+        ImGui.TextWrapped(plugin.InstantTeleport.ReadinessText);
+        ImGui.TextWrapped("No movement is required when current player state is available. Mounted, airborne, combat, duty and Invulnerable Mode use falls back to normal teleport.");
+        ImGui.TextWrapped("Use Cancel pending teleport here to stop a bypass. Native cast-cancel commands are blocked while it is pending.");
+        ImGui.TextWrapped("Pending work stops after six seconds. Area transport counts do not confirm arrival.");
+        if (plugin.InstantTeleport.IsTeleporting && ImGui.Button("Cancel pending teleport##instantTeleportCancel"))
+            plugin.InstantTeleport.RequestCancel();
+        if (ImGui.TreeNode("Diagnostics##instantTeleportDiagnostics"))
+        {
+            ImGui.TextWrapped(plugin.InstantTeleport.DiagnosticsText);
+            ImGui.TreePop();
+        }
+    }
+
+        AddSavedFeatureEntry(
+            ToonModsSection.IllegalMods,
+            "instant-teleport",
+            "Instant Teleport",
+            () => configuration.InstantTeleportEnabled,
+            plugin.InstantTeleport.SetEnabled,
+            applied => configuration.InstantTeleportEnabled = applied,
+            "Bypasses the cast of an eligible teleport.",
+            "Retains nearby-player checks, cancellation and recovery handling. Uses ordinary teleport when unavailable.",
+            () => plugin.InstantTeleport.StatusText,
+            searchTerms: ["instant", "teleport"],
+            drawOptions: DrawInstantTeleportOptions,
+            requireCtrlShiftToEnable: true);
         AddSavedFeatureEntry(
             ToonModsSection.IllegalMods,
             "moveable-after-death",
@@ -3468,8 +3617,7 @@ public partial class SlaveWindow
                 ? "Yes mode allows aetheryte ticket prompts instead of rejecting them."
                 : "This will reject using any aetheryte ticket usage.",
             searchTerms: ["SelectYesNo", "SelectYesno", "aetheryte ticket", "teleport", "ticket", "Yes", "No"],
-            drawOptions: DrawTeleportHelperOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawTeleportHelperOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PluginMods,
             "force-peepingtom",
@@ -3581,6 +3729,10 @@ public partial class SlaveWindow
 
                 dalamudLogDisablerAddInput = string.Empty;
             }
+
+            ImGui.Spacing();
+            if (!ImGui.CollapsingHeader("Plugin list##DalamudLogDisablerPluginList"))
+                return;
 
             var loadedPlugins = plugin.DalamudLogDisabler.GetLoadedPlugins();
             var loadedKeys = new HashSet<string>(
@@ -3825,8 +3977,7 @@ public partial class SlaveWindow
             "Pick plugins whose log spam you want gone, and choose which levels to keep. XA sets the chosen plugin's Dalamud per-plugin log level, which is a single threshold - keeping the selected level and everything more severe while blacklisting everything below it. 'Allow Warning and above' keeps Warning/Error/Fatal and blacklists Information/Debug/Verbose; 'Block all logs' mutes completely. The plugin keeps running normally - only its logging is filtered - and the original level is restored when you untick it or turn this mod off. Reloaded plugins are re-applied automatically. Plugins that log through means other than Dalamud's IPluginLog cannot be filtered this way.",
             () => plugin.DalamudLogDisabler.StatusText,
             searchTerms: ["Dalamud", "log", "logging", "xllog", "logger", "serilog", "mute", "silence", "spam", "verbose", "debug", "warning", "error", "fatal", "level", "disable logs", "blacklist"],
-            drawOptions: DrawDalamudLogDisablerOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawDalamudLogDisablerOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PluginMods,
             "arealmrecorded-all-zones",
@@ -3843,8 +3994,7 @@ public partial class SlaveWindow
             () => plugin.ARealmRecordedIntegration.StatusText,
             warningText: "Forcing the Duty Recorder in field operations is unsupported by the game. If a zone-in bounces you back to town or force-logs you, make sure the plugin state below shows Idle (use Force Stop Recording if it is stuck Armed) before re-entering. Force-started recordings can carry a false location and may be unplayable.",
             searchTerms: ["ARealmRecorded", "A Realm Recorded", "duty recorder", "replay", "recording", "Eureka", "Carnivale", "Bozja", "whitelist", "bounce", "zone-in", "plugin state"],
-            drawOptions: DrawARealmRecordedStateOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawARealmRecordedStateOptions);
         AddSavedFeatureEntry(
             ToonModsSection.EurekaMods,
             "eureka-instance-id",
@@ -3856,8 +4006,7 @@ public partial class SlaveWindow
             "Turn this on to enable the live Eureka instance surface and the optional DTR entry. The actual Rodney farming loop now lives in `Field Operations` -> `Eureka Instance Hunter`, where XA can scan any mix of `Anemos`, `Pagos`, `Pyros`, and `Hydatos`, use per-zone baselines, leave duplicate runs through the duty menu with a configurable delay, run CharacterSafeWait in Kugane before Rodney interaction, and stop once a selected zone lands on a different instance.",
             () => plugin.EurekaInstanceId.StatusText,
             searchTerms: ["Eureka", "instance", "DTR", "server bar", "Field Operations", "Eureka Instance Hunter", "Rodney", "Anemos", "Pagos", "Pyros", "Hydatos", "farming"],
-            drawOptions: DrawEurekaInstanceIdOptions,
-            showOptionsWhenDisabled: true);
+            drawOptions: DrawEurekaInstanceIdOptions);
 
         xaModCatalogueBySection = featureEntries
             .GroupBy(entry => entry.Section)

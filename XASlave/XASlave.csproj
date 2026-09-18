@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.0.0.45</Version>
+    <Version>0.0.0.46</Version>
+    <LangVersion>preview</LangVersion>
     <PackageProjectUrl>https://aethertek.io/</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
@@ -26,7 +27,19 @@
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
   </ItemGroup>
   <ItemGroup>
+    <Reference Include="Iced" HintPath="$(DalamudLibPath)Iced.dll" Private="false" />
+    <Reference Include="goatcorp.Reloaded.Hooks" HintPath="$(DalamudLibPath)goatcorp.Reloaded.Hooks.dll" Private="false" />
+    <Reference Include="Reloaded.Hooks.Definitions" HintPath="$(DalamudLibPath)Reloaded.Hooks.Definitions.dll" Private="false" />
+  </ItemGroup>
+  <ItemGroup>
     <None Include="images\**" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Data\EurekaLogogramCreator\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Pinned native UI source capture, inventoried and recovered with ignored xapr/. -->
+    <Compile Include="..\xapr\dependencies\KamiToolKit\**\*.cs" Exclude="..\xapr\dependencies\KamiToolKit\**\backups\**;..\xapr\dependencies\KamiToolKit\bin\**;..\xapr\dependencies\KamiToolKit\obj\**" LinkBase="Dependencies\KamiToolKit" />
+    <EmbeddedResource Include="..\xapr\dependencies\KamiToolKit\Assets\**\*.png" LogicalName="SlaveOverlay.Asset.%(RecursiveDir)%(Filename)%(Extension)" />
+    <EmbeddedResource Include="..\xapr\dependencies\KamiToolKit\LICENSE" LogicalName="XASlave.KamiToolKit.LICENSE" />
+    <EmbeddedResource Include="..\xapr\native-overlay-source-manifest.json" LogicalName="XASlave.KamiToolKit.Provenance" />
   </ItemGroup>
 </Project>
