@@ -115,6 +115,7 @@ public partial class SlaveWindow
         new("/xa sit", "Trigger Sit Anywhere.", "Requires `Doze & Sit Anywhere` to be enabled."),
         new("/xa nearby [on|off]", "Open the compact XA Nearby list or toggle it.", "Sort and choose table columns; right-click a player to locate, target or examine. Configure the server-bar eye/count and nearby lines in XA Mods. Targeting alerts and history remain in XA Peep."),
         new("/xa peep [on|off|clear]", "Open XA Peep or control its XA target tracker.", "Without arguments it toggles the XA Peep window. `on/off` enables or disables tracking, and `clear` wipes the stored XA Peep history."),
+        new("/xa outfits [player]", "Open saved outfit history, optionally filtered by player or world.", "Inspect players with Inspect Outfit Try-on enabled to save outfits. Use Try On or Remove per entry; hover a player for gear and dye details. History keeps the 500 most recently seen outfits locally."),
         new("/xa playerrestore", "Disable the current top-level Player Mods toggles.", "Useful for dropping movement, sprint, sit/doze, sight-distance, and other standard player-side XA Mods back to off."),
         new("/xa refusetrade on|off", "Toggle `Refuse Trade Request`.", "Uses the trade-window and status-update refusal surfaces plus the current local feedback and extra-command options."),
         new("/xa revealmap on|off", "Toggle `Reveal Undiscovered Areas`.", "Clears local map-discovery flags when the map agent refreshes."),

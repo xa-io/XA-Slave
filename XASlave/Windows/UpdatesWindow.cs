@@ -23,7 +23,31 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
-            Header = "v0.0.0.46",
+            Header = "v0.0.0.47 - 2026-09-25",
+            Lines =
+            [
+                "- Updated Automate Expert Delivery: Improved Deliver handling, scans beyond 40 items, seal-cap selection and localized confirmations.",
+                "- Added Expert Delivery Controls: Normal, Fast and Conservative pacing, inventory/armoury scope, configurable gear-set protection, protected IDs and optional AutoRetainer checks; all saved in presets.",
+                "- Added Expert Delivery Results: Live counts, run duration and separate completion, protected-only, seal-cap, cancellation and failure outcomes, with optional local-chat messages.",
+                "- Added Expert Delivery Completion Controls: Optional closing and commands on successful completion; Start new run restarts delivery without reopening the window.",
+                "- Updated Expert Delivery Compatibility: Waits while AutoRetainer GC delivery runs; includes status and results in activity reporting.",
+                "- Added Debug / Test > XA Abuse > Input Windows: Manual injection with editable targets, field detection, optional second field and FC name/tag preset.",
+                "- Added Input Windows > Max Characters: Adjustable per-field limits default to 20/5, with live counters; typing and paste limits include spaces.",
+                "- Added Input Windows > Test OK / Cancel: Submit or close the English FC name/tag dialog; disabled game buttons remain blocked.",
+                "- Added Debug / Test > XA Abuse > Free Company: Gray dropdown with Open/Close controls, tab tests and Leave Company; tests require matching English controls, respect disabled buttons and leave confirmation manual.",
+                "- Updated Xagman Pre-flight: Disables and verifies AutoRetainer Multi before and during runs; blocks busy/unverifiable starts and preserves optional Multi-on-completion.",
+                "- Fixed Xagman Results: Tonys with confirmed full inventories finish green; login and meetup failures remain red.",
+                "- Added Xagman > Auto clean queue list: Optional cleanup at normal completion clears successful/unused results, retaining failures, unresolved skips, saved rosters and logs.",
+                "- Updated Close Lobby Errors: Recognizes Data Center Travel error 505 and more supported popup formats.",
+                "- Added Xagman Travel Recovery: Retries supported lobby failures after 30 seconds without activity and verified Lifestream cancellation; restores the original character when needed.",
+                "- Added Debug / Test > XA Abuse > Lifestream: Cancel Task button and live busy status in a matching gray dropdown.",
+                "- Updated Inspect Outfit Try-on: Locally saves up to 500 recent outfits, including gear appearances, dyes and ring slots, for later try-on.",
+                "- Added Outfit History: Compact window with player/world filters, gear/dye details and Try On/Stop/Remove; open from mod options or /xa outfits [player].",
+            ],
+        },
+        new VersionEntry
+        {
+            Header = "v0.0.0.46 - 2026-09-18",
             Lines =
             [
                 "- Estate Teleportation Context Menu: Added an optional Player Mods toggle that opens eligible friends' estate teleportation windows from party and other player context menus. Requires a loaded friend list and the friend's home world to be your current world; estate access remains controlled by the game.",

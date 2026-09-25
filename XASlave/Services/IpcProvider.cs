@@ -69,7 +69,8 @@ public sealed class IpcProvider : IDisposable
         return plugin.TaskRunner.IsRunning
             || plugin.ArPostProcessor.IsRunning
             || plugin.AutoCollector.IsRunning
-            || plugin.AutoOpenMoogleMail.IsProcessing;
+            || plugin.AutoOpenMoogleMail.IsProcessing
+            || plugin.AutoUnlockExpertDelivery?.IsProcessing == true;
     }
 
     private string GetActivityJson()
@@ -102,6 +103,11 @@ public sealed class IpcProvider : IDisposable
             detail = plugin.AutoOpenMoogleMail.StatusText;
         }
 
+        if (source.Length == 0 && plugin.AutoUnlockExpertDelivery?.IsProcessing == true)
+        {
+            source = "Expert Delivery";
+            detail = plugin.AutoUnlockExpertDelivery.StatusText;
+        }
         return JsonSerializer.Serialize(new
         {
             available = true,
@@ -136,6 +142,17 @@ public sealed class IpcProvider : IDisposable
                 running = plugin.AutoOpenMoogleMail.IsProcessing,
                 status = plugin.AutoOpenMoogleMail.StatusText,
                 lastAction = plugin.AutoOpenMoogleMail.LastActionText,
+            },
+            expertDelivery = new
+            {
+                running = plugin.AutoUnlockExpertDelivery?.IsProcessing == true,
+                runId = plugin.AutoUnlockExpertDelivery?.RunId ?? 0,
+                status = plugin.AutoUnlockExpertDelivery?.StatusText ?? "Unavailable",
+                delivered = plugin.AutoUnlockExpertDelivery?.DeliveredCount ?? 0,
+                summary = plugin.AutoUnlockExpertDelivery?.ListSummary ?? string.Empty,
+                outcome = plugin.AutoUnlockExpertDelivery?.LastResult is { } deliveryResult && deliveryResult.RunId == plugin.AutoUnlockExpertDelivery.RunId && !plugin.AutoUnlockExpertDelivery.IsProcessing
+                    ? deliveryResult.Outcome.ToString() : null,
+                result = plugin.AutoUnlockExpertDelivery?.LastResult,
             },
             error = string.Empty,
         });

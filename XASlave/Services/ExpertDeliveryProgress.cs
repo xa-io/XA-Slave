@@ -19,6 +19,9 @@ internal sealed class ExpertDeliveryProgress
     private long? emptySince;
     private ulong emptyFingerprint;
     private int emptyObservations;
+    private long lastDeliveryTick;
+    private int deliveryAttempts;
+    public int ActionInterval { get; set; } = ActionIntervalMilliseconds;
 
     public ExpertDeliveryPhase Phase { get; private set; }
     public bool DeliverySent { get; private set; }
@@ -32,11 +35,16 @@ internal sealed class ExpertDeliveryProgress
         Phase = ExpertDeliveryPhase.Selecting;
     }
 
-    public void MarkDeliverySent()
+    public void MarkDeliverySent(long now = 0)
     {
         DeliverySent = true;
+        lastDeliveryTick = now;
+        deliveryAttempts++;
         Phase = ExpertDeliveryPhase.Delivering;
     }
+
+    public bool CanRetryDelivery(long now)
+        => DeliverySent && !ConfirmationSent && deliveryAttempts < 3 && now - lastDeliveryTick >= 750;
 
     public void MarkConfirmationSent(bool rejected)
     {
@@ -61,7 +69,7 @@ internal sealed class ExpertDeliveryProgress
         var index = (int)action;
         if (now < nextActions[index])
             return false;
-        nextActions[index] = now + ActionIntervalMilliseconds;
+        nextActions[index] = now + Math.Clamp(ActionInterval, 100, 250);
         return true;
     }
 
@@ -108,6 +116,8 @@ internal sealed class ExpertDeliveryProgress
         ConfirmationSent = false;
         Rejected = false;
         transactionStarted = 0;
+        lastDeliveryTick = 0;
+        deliveryAttempts = 0;
         Array.Clear(callbackFailures);
         ResetEmptyObservation();
     }

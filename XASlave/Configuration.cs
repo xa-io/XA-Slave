@@ -144,6 +144,10 @@ public class Configuration : IPluginConfiguration
     public bool CustomResolutionOnLoadIgnoreMinimumWindowSize { get; set; } = true;
 
     public bool VerboseTaskLogging { get; set; } = false;
+    // Inert migration payload only: preserve old settings until imported by XA Zod.
+    [Newtonsoft.Json.JsonProperty("AutoFcCreation", NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
+    public Newtonsoft.Json.Linq.JToken? LegacyZodAutoFcSettings { get; set; }
+
     public bool MessageLogEnabled { get; set; } = false;
     public HashSet<ushort> MessageLogDisabledTypes { get; set; } = new();
     public bool ShowVersionInUpdatesTitle { get; set; } = true;
@@ -254,6 +258,7 @@ public class Configuration : IPluginConfiguration
     public int XagmanTonyGilMinimum { get; set; } = 10000;
     public bool XagmanSellWhenInventoryFull { get; set; } = false;
     public bool XagmanUseDirectNpcSell { get; set; } = false;
+    public bool XagmanAutoCleanQueueList { get; set; } = false;
     public bool XagmanEnableArMultiOnComplete { get; set; } = true;
     public bool XagmanLogoutOnComplete { get; set; } = false;
     public bool XagmanKillGameOnComplete { get; set; } = false;
@@ -502,6 +507,14 @@ public class Configuration : IPluginConfiguration
     public bool AutoUnlockExpertDeliverySkipHq { get; set; } = true;
     public bool AutoUnlockExpertDeliverySkipMateria { get; set; } = true;
     public bool AutoUnlockExpertDeliveryIgnoreSealCap { get; set; } = false;
+    public int AutoUnlockExpertDeliverySpeedProfile { get; set; } = 0;
+    public int AutoUnlockExpertDeliveryItemScope { get; set; } = 1;
+    public bool AutoUnlockExpertDeliveryUseArProtection { get; set; } = false;
+    public string AutoUnlockExpertDeliveryProtectedItemIds { get; set; } = string.Empty;
+    public bool AutoUnlockExpertDeliveryCloseOnCompletion { get; set; } = false;
+    public bool AutoUnlockExpertDeliveryNotifyOutcome { get; set; } = false;
+    public bool AutoUnlockExpertDeliveryRunCompletionCommand { get; set; } = false;
+    public string AutoUnlockExpertDeliveryCompletionCommand { get; set; } = string.Empty;
     public bool AntiAfkEnabled { get; set; } = false;
     public bool AutoDutyCommenceEnabled { get; set; } = false;
     public bool AutoLeaveDutyEnabled { get; set; } = false;
@@ -542,6 +555,7 @@ public class Configuration : IPluginConfiguration
 
     public bool AutoRestoreFurnitureEnabled { get; set; } = false;
     public bool InspectOutfitTryOnEnabled { get; set; } = false;
+    public List<InspectOutfitHistoryEntry> InspectOutfitHistory { get; set; } = new();
     public bool QuickReturnEnabled { get; set; } = false;
     public bool UnlockExpertDeliveryEnabled { get; set; } = false;
     public int UnlockExpertDeliveryForcedRankFloor { get; set; } = ExpertDeliveryUnlockService.DefaultForcedRankFloor;

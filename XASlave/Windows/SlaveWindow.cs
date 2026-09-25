@@ -62,6 +62,7 @@ public partial class SlaveWindow : Window, IDisposable
         RefreshArSubsBell,
         MultiFcPermissions,
         AutoAcceptFcInvite,
+        // Append task identities to preserve existing persisted enum values.
         // Field Operations
         EurekaInstanceHunter,
         EurekaLogogramCreator,
@@ -1459,6 +1460,7 @@ public partial class SlaveWindow : Window, IDisposable
                             case SlaveTask.RefreshArSubsBell:
                                 DrawRefreshArSubsBellTask();
                                 break;
+
                             case SlaveTask.AutoAcceptFcInvite:
                                 DrawAutoAcceptFcInviteTask();
                                 break;
@@ -1581,6 +1583,7 @@ public partial class SlaveWindow : Window, IDisposable
             case "FC Floater: Process Invite":
                 task = SlaveTask.AutoAcceptFcInvite;
                 return true;
+
             case "Monthly Relogger":
                 task = SlaveTask.MonthlyRelogger;
                 return true;
@@ -1709,6 +1712,7 @@ public partial class SlaveWindow : Window, IDisposable
 
     private void StopPriorityTask(SlaveTask task)
     {
+
         if (task == SlaveTask.AutoGlamWeather)
         {
             StopAutoGlamWeatherTask();

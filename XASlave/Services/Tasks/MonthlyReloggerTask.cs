@@ -1908,9 +1908,27 @@ public sealed class MonthlyReloggerTask
         };
     }
 
-    public List<TaskStep> BuildPreFlightOnlySteps(List<string> characters, TaskRunner runner)
+    public List<TaskStep> BuildPreFlightOnlySteps(List<string> characters, TaskRunner runner,
+        Func<bool>? disableArMultiAndVerify = null)
     {
-        return BuildPreFlightSteps(characters, runner);
+        var steps = new List<TaskStep>();
+        if (disableArMultiAndVerify != null)
+        {
+            steps.Add(new TaskStep
+            {
+                Name = "Pre-flight: Disable AR Multi",
+                OnEnter = () =>
+                {
+                    runner.AddLog("Pre-flight: disabling and verifying AutoRetainer Multi before game-state detection...");
+                    if (!disableArMultiAndVerify())
+                        runner.Cancel();
+                },
+                IsComplete = () => true,
+                TimeoutSec = 3f,
+            });
+        }
+        steps.AddRange(BuildPreFlightSteps(characters, runner));
+        return steps;
     }
 
     public static void AddLogoutOnCompleteSteps(List<TaskStep> steps, TaskRunner runner)

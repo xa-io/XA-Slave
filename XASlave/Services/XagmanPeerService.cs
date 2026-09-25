@@ -43,6 +43,7 @@ public sealed class XagmanPeerService : IDisposable
     public event Action? OnTaskStopAndClearResultsRequested;
     public event Action? OnTaskRecallRequested;
     public event Action<XagmanPeerMessage>? OnTaskCompleteRequested;
+    // Transport callbacks run on the socket worker. Consumers must queue work on the game thread.
 
     // Sequential ping scheduling to prevent message overlap
     private readonly object pingScheduleLock = new();
@@ -607,8 +608,12 @@ public sealed class XagmanPeerService : IDisposable
             case XagmanPeerMessageTypes.CompleteTask:
                 await RouteHubControlMessageAsync(message, cancellationToken).ConfigureAwait(false);
                 break;
+
+
         }
     }
+
+
 
     private async Task RouteHubControlMessageAsync(XagmanPeerMessage message, CancellationToken cancellationToken)
     {
@@ -885,6 +890,8 @@ public sealed class XagmanPeerService : IDisposable
     {
         switch (message.MessageType)
         {
+
+
             case XagmanPeerMessageTypes.PeerList:
                 UpdatePeers((message.Peers ?? new List<XagmanPeerPresence>())
                     .Where(peer => !peer.InstanceId.Equals(localInstanceId, StringComparison.OrdinalIgnoreCase))

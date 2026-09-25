@@ -35,6 +35,10 @@ public sealed class TaskRunner : IDisposable
     private readonly TaskRunResults taskRunResults = new();
     private int historySequenceNumber;
 
+    // An owning operation may suspend polling while recovering an external task.
+    internal Func<bool>? SuspendTick { get; set; }
+    private bool tickWasSuspended;
+    internal void ResumeAtStep(int index) => stepMachine.ResumeAtStep(index);
     public bool IsRunning => hasActiveRun;
     /// <summary>Identity of the last successfully admitted run; rejected starts never advance it.</summary>
     public long CurrentRunId { get; private set; }
@@ -368,6 +372,18 @@ public sealed class TaskRunner : IDisposable
         }
 
         var tickGeneration = runGeneration;
+        if (SuspendTick?.Invoke() == true)
+        {
+            if (hasActiveRun && !haltRequested && tickGeneration == runGeneration)
+                tickWasSuspended = true;
+            return;
+        }
+        if (!hasActiveRun || haltRequested || tickGeneration != runGeneration) return;
+        if (tickWasSuspended)
+        {
+            stepMachine.RestartCurrentStepClock();
+            tickWasSuspended = false;
+        }
         var previousStep = stepMachine.CurrentStep;
         var result = stepMachine.Tick(
             onStepStarted: LogStepStart,
@@ -501,6 +517,8 @@ public sealed class TaskRunner : IDisposable
     // Start is rejected during cleanup; a success continuation may start after it returns.
     private void InvokeTerminal()
     {
+        SuspendTick = null;
+        tickWasSuspended = false;
         var terminal = onTerminal;
         onTerminal = null;
         if (terminal == null) return;

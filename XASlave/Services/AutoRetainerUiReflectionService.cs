@@ -839,6 +839,19 @@ internal static class AutoRetainerUiReflectionService
         return characterIds.OrderBy(x => x).ToList();
     }
 
+    internal static bool? GetGcDeliveryOperation()
+    {
+        // Read the exact loaded instance; never toggle another plugin's operation.
+        if (!Plugin.PluginInterface.InstalledPlugins.Any(x => x.InternalName == AutoRetainerInternalName && x.IsLoaded)) return false;
+        try
+        {
+            var instance = TryGetAutoRetainerPluginInstance();
+            return instance?.GetType().Assembly.GetType("AutoRetainer.Modules.GcHandin.AutoGCHandin")?
+                .GetField("Operation", StaticBindings)?.GetValue(null) is bool running ? running : null;
+        }
+        catch { return null; }
+    }
+
     private static object? TryGetAutoRetainerPluginInstance()
         => TryGetPluginInstance(AutoRetainerInternalName, AutoRetainerPluginTypeName);
 

@@ -206,6 +206,7 @@ public sealed class Plugin : IDalamudPlugin
     public XAPeepWindow XAPeepWindow { get; init; }
     public NearbyPlayersWindow NearbyPlayersWindow { get; init; }
     public XAPeepHistoryWindow XAPeepHistoryWindow { get; init; }
+    internal InspectOutfitHistoryWindow InspectOutfitHistoryWindow { get; init; }
     public EurekaLogogramCreatorFavoritesOverlayWindow EurekaLogogramCreatorFavoritesOverlayWindow { get; init; }
     public EurekaLogogramCreatorAutomationOverlayWindow EurekaLogogramCreatorAutomationOverlayWindow { get; init; }
 
@@ -393,7 +394,9 @@ public sealed class Plugin : IDalamudPlugin
         EstateTeleportationContextMenu = new EstateTeleportationContextMenuService(ContextMenu, Log);
         NameplatePrivacy = new NameplatePrivacyService(NamePlateGui, IpcClient, Log);
         BlacklistedPartyName = new BlacklistedPartyNameService(Framework, Log);
-        AutoUnlockExpertDelivery = new AutoUnlockExpertDeliveryService(Framework, DataManager, Log);
+        AutoUnlockExpertDelivery = new AutoUnlockExpertDeliveryService(Framework, DataManager, Log,
+            AutoRetainerUiReflectionService.GetGcDeliveryOperation,
+            itemId => IpcClient.TryAutoRetainerPluginStateIsItemProtected(itemId, out var value) ? value : (bool?)null);
         ExpertDeliveryUnlock = new ExpertDeliveryUnlockService(GameInterop, Log);
         ExpertDeliveryUnlock.ApplyConfiguration(Configuration.UnlockExpertDeliveryForcedRankFloor);
         AutoRefuseTrade = new AutoRefuseTradeService(SigScanner, GameInterop, Log);
@@ -413,7 +416,7 @@ public sealed class Plugin : IDalamudPlugin
         AutoMerge = new AutoMergeService(AddonLifecycle, Framework, ClientState, Condition, DataManager, Log);
         AutoSortItems = new AutoSortItemsService(Configuration, TaskRunner);
         NativeUiLibrary = new SlaveNativeUiLibrary(RetireNativeControls);
-        InspectOutfitTryOn = new InspectOutfitTryOnService(NativeUiLibrary, () => { Configuration.InspectOutfitTryOnEnabled = false; Configuration.Save(); });
+        InspectOutfitTryOn = new InspectOutfitTryOnService(NativeUiLibrary, () => { Configuration.InspectOutfitTryOnEnabled = false; Configuration.Save(); }, Configuration, () => InspectOutfitHistoryWindow?.Open());
         AutoRestoreFurniture = new AutoRestoreFurnitureService(TaskRunner, MessageLog, () => { Configuration.AutoRestoreFurnitureEnabled = false; Configuration.Save(); });
         ItemCommands = new ItemCommandsService(DataManager, PlayerState);
         QuickReturn = new QuickReturnService(ClientState, GameInterop, Log);
@@ -1215,6 +1218,8 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(XAPeepWindow);
         XAPeepHistoryWindow = new XAPeepHistoryWindow(this);
         WindowSystem.AddWindow(XAPeepHistoryWindow);
+        InspectOutfitHistoryWindow = new InspectOutfitHistoryWindow(InspectOutfitTryOn);
+        WindowSystem.AddWindow(InspectOutfitHistoryWindow);
         EurekaLogogramCreatorFavoritesOverlayWindow = new EurekaLogogramCreatorFavoritesOverlayWindow(this);
         WindowSystem.AddWindow(EurekaLogogramCreatorFavoritesOverlayWindow);
         EurekaLogogramCreatorAutomationOverlayWindow = new EurekaLogogramCreatorAutomationOverlayWindow(this);
@@ -1261,7 +1266,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, nearby, updates, db, dbsub, npcsell, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands.",
+            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, outfits, nearby, updates, db, dbsub, npcsell, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands.",
             AllowedInMacros = true,
         });
 
@@ -2028,6 +2033,12 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("outfits", StringComparison.OrdinalIgnoreCase))
+        {
+            InspectOutfitHistoryWindow.Open(subcommandArgs);
+            return;
+        }
+
         if (subcommand.Equals("mail", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(TryOpenMoogleMailCommand(subcommandArgs, out var message), message);
@@ -2311,6 +2322,13 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
             return TryHandleXAPeepCommand(subcommandArgs, out message);
+
+        if (subcommand.Equals("outfits", StringComparison.OrdinalIgnoreCase))
+        {
+            InspectOutfitHistoryWindow.Open(subcommandArgs);
+            message = "Opened outfit history.";
+            return true;
+        }
 
         if (subcommand.Equals("mail", StringComparison.OrdinalIgnoreCase))
             return TryOpenMoogleMailCommand(subcommandArgs, out message);
@@ -3019,6 +3037,14 @@ public sealed class Plugin : IDalamudPlugin
                     SkipHq = Configuration.AutoUnlockExpertDeliverySkipHq,
                     SkipMateria = Configuration.AutoUnlockExpertDeliverySkipMateria,
                     IgnoreSealCap = Configuration.AutoUnlockExpertDeliveryIgnoreSealCap,
+                    SpeedProfile = Configuration.AutoUnlockExpertDeliverySpeedProfile,
+                    ItemScope = Configuration.AutoUnlockExpertDeliveryItemScope,
+                    UseArProtection = Configuration.AutoUnlockExpertDeliveryUseArProtection,
+                    ProtectedItemIds = Configuration.AutoUnlockExpertDeliveryProtectedItemIds,
+                    CloseOnCompletion = Configuration.AutoUnlockExpertDeliveryCloseOnCompletion,
+                    NotifyOutcome = Configuration.AutoUnlockExpertDeliveryNotifyOutcome,
+                    RunCompletionCommand = Configuration.AutoUnlockExpertDeliveryRunCompletionCommand,
+                    CompletionCommand = Configuration.AutoUnlockExpertDeliveryCompletionCommand,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
             case "auto-unlock-expert-delivery":
@@ -3481,6 +3507,14 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.AutoUnlockExpertDeliverySkipHq = expertDeliverySettings.SkipHq;
             Configuration.AutoUnlockExpertDeliverySkipMateria = expertDeliverySettings.SkipMateria;
             Configuration.AutoUnlockExpertDeliveryIgnoreSealCap = expertDeliverySettings.IgnoreSealCap;
+            Configuration.AutoUnlockExpertDeliverySpeedProfile = expertDeliverySettings.SpeedProfile;
+            Configuration.AutoUnlockExpertDeliveryItemScope = expertDeliverySettings.ItemScope;
+            Configuration.AutoUnlockExpertDeliveryUseArProtection = expertDeliverySettings.UseArProtection;
+            Configuration.AutoUnlockExpertDeliveryProtectedItemIds = expertDeliverySettings.ProtectedItemIds;
+            Configuration.AutoUnlockExpertDeliveryCloseOnCompletion = expertDeliverySettings.CloseOnCompletion;
+            Configuration.AutoUnlockExpertDeliveryNotifyOutcome = expertDeliverySettings.NotifyOutcome;
+            Configuration.AutoUnlockExpertDeliveryRunCompletionCommand = expertDeliverySettings.RunCompletionCommand;
+            Configuration.AutoUnlockExpertDeliveryCompletionCommand = expertDeliverySettings.CompletionCommand;
             if (Configuration.AutoUnlockExpertDeliveryEnabled)
             {
                 AutoUnlockExpertDelivery.ApplyConfiguration(
@@ -3488,7 +3522,15 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoUnlockExpertDeliveryDefaultPage,
                     Configuration.AutoUnlockExpertDeliverySkipHq,
                     Configuration.AutoUnlockExpertDeliverySkipMateria,
-                    Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+                    Configuration.AutoUnlockExpertDeliveryIgnoreSealCap,
+                    Configuration.AutoUnlockExpertDeliverySpeedProfile,
+                    Configuration.AutoUnlockExpertDeliveryItemScope,
+                    Configuration.AutoUnlockExpertDeliveryUseArProtection,
+                    Configuration.AutoUnlockExpertDeliveryProtectedItemIds,
+                    Configuration.AutoUnlockExpertDeliveryCloseOnCompletion,
+                    Configuration.AutoUnlockExpertDeliveryNotifyOutcome,
+                    Configuration.AutoUnlockExpertDeliveryRunCompletionCommand,
+                    Configuration.AutoUnlockExpertDeliveryCompletionCommand);
             }
         }
 
@@ -4610,7 +4652,15 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoUnlockExpertDeliveryDefaultPage,
                     Configuration.AutoUnlockExpertDeliverySkipHq,
                     Configuration.AutoUnlockExpertDeliverySkipMateria,
-                    Configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+                    Configuration.AutoUnlockExpertDeliveryIgnoreSealCap,
+                    Configuration.AutoUnlockExpertDeliverySpeedProfile,
+                    Configuration.AutoUnlockExpertDeliveryItemScope,
+                    Configuration.AutoUnlockExpertDeliveryUseArProtection,
+                    Configuration.AutoUnlockExpertDeliveryProtectedItemIds,
+                    Configuration.AutoUnlockExpertDeliveryCloseOnCompletion,
+                    Configuration.AutoUnlockExpertDeliveryNotifyOutcome,
+                    Configuration.AutoUnlockExpertDeliveryRunCompletionCommand,
+                    Configuration.AutoUnlockExpertDeliveryCompletionCommand);
                 break;
             case "auto-unlock-expert-delivery":
                 ExpertDeliveryUnlock.ApplyConfiguration(Configuration.UnlockExpertDeliveryForcedRankFloor);
@@ -5608,5 +5658,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.46";
+    public const string Version = "0.0.0.47";
 }

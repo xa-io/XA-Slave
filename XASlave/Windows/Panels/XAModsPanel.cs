@@ -338,7 +338,15 @@ public partial class SlaveWindow
                 configuration.AutoUnlockExpertDeliveryDefaultPage,
                 configuration.AutoUnlockExpertDeliverySkipHq,
                 configuration.AutoUnlockExpertDeliverySkipMateria,
-                configuration.AutoUnlockExpertDeliveryIgnoreSealCap);
+                configuration.AutoUnlockExpertDeliveryIgnoreSealCap,
+                configuration.AutoUnlockExpertDeliverySpeedProfile,
+                configuration.AutoUnlockExpertDeliveryItemScope,
+                configuration.AutoUnlockExpertDeliveryUseArProtection,
+                configuration.AutoUnlockExpertDeliveryProtectedItemIds,
+                configuration.AutoUnlockExpertDeliveryCloseOnCompletion,
+                configuration.AutoUnlockExpertDeliveryNotifyOutcome,
+                configuration.AutoUnlockExpertDeliveryRunCompletionCommand,
+                configuration.AutoUnlockExpertDeliveryCompletionCommand);
         }
 
         void ApplyUnlockExpertDeliveryConfiguration()
@@ -2153,6 +2161,68 @@ public partial class SlaveWindow
                 SaveConfiguration();
             }
 
+            var speed = Math.Clamp(configuration.AutoUnlockExpertDeliverySpeedProfile, 0, 2);
+            if (ImGui.Combo("Speed##ExpertDelivery", ref speed, "Normal (150 ms)\0Fast (100 ms)\0Conservative (250 ms)\0"))
+            {
+                configuration.AutoUnlockExpertDeliverySpeedProfile = speed;
+                ApplyExpertDeliveryConfiguration(); SaveConfiguration();
+            }
+            var scope = Math.Clamp(configuration.AutoUnlockExpertDeliveryItemScope, 0, 2);
+            if (ImGui.Combo("Allowed items##ExpertDelivery", ref scope, "Inventory only (exclude gear sets)\0Inventory + armoury (exclude gear sets)\0All listed items (including gear sets)\0"))
+            {
+                configuration.AutoUnlockExpertDeliveryItemScope = scope;
+                ApplyExpertDeliveryConfiguration(); SaveConfiguration();
+            }
+            ImGui.TextDisabled("The game's selected filter still limits the list. XA never expands it automatically.");
+            var useAr = configuration.AutoUnlockExpertDeliveryUseArProtection;
+            if (ImGui.Checkbox("Honor external protected items##ExpertDelivery", ref useAr))
+            {
+                configuration.AutoUnlockExpertDeliveryUseArProtection = useAr;
+                ApplyExpertDeliveryConfiguration(); SaveConfiguration();
+            }
+            var protectedIds = configuration.AutoUnlockExpertDeliveryProtectedItemIds ?? string.Empty;
+            if (ImGui.InputText("Protected item IDs##ExpertDelivery", ref protectedIds, 4096))
+            {
+                configuration.AutoUnlockExpertDeliveryProtectedItemIds = protectedIds;
+                ApplyExpertDeliveryConfiguration(); SaveConfiguration();
+            }
+            if (!ExpertDeliveryPolicy.TryParseProtectedIds(protectedIds, out _))
+                ImGui.TextWrapped("Enter base item IDs separated by spaces or commas. Delivery waits until this list is valid.");
+            var close = configuration.AutoUnlockExpertDeliveryCloseOnCompletion;
+            if (ImGui.Checkbox("Close window on completion##ExpertDelivery", ref close))
+            {
+                configuration.AutoUnlockExpertDeliveryCloseOnCompletion = close;
+                ApplyExpertDeliveryConfiguration(); SaveConfiguration();
+            }
+            var notify = configuration.AutoUnlockExpertDeliveryNotifyOutcome;
+            if (ImGui.Checkbox("Print run outcome in local chat##ExpertDelivery", ref notify))
+            {
+                configuration.AutoUnlockExpertDeliveryNotifyOutcome = notify;
+                ApplyExpertDeliveryConfiguration(); SaveConfiguration();
+            }
+            var runCommand = configuration.AutoUnlockExpertDeliveryRunCompletionCommand;
+            if (ImGui.Checkbox("Run command on successful completion##ExpertDelivery", ref runCommand))
+            {
+                configuration.AutoUnlockExpertDeliveryRunCompletionCommand = runCommand;
+                ApplyExpertDeliveryConfiguration(); SaveConfiguration();
+            }
+            if (runCommand)
+            {
+                var command = configuration.AutoUnlockExpertDeliveryCompletionCommand ?? string.Empty;
+                if (ImGui.InputText("Completion command##ExpertDelivery", ref command, 500))
+                {
+                    configuration.AutoUnlockExpertDeliveryCompletionCommand = command;
+                    ApplyExpertDeliveryConfiguration(); SaveConfiguration();
+                }
+                if (!ExpertDeliveryPolicy.IsValidCommand(command)) ImGui.TextWrapped("Enter one slash command, up to 500 UTF-8 bytes. Invalid commands are not run.");
+            }
+            ImGui.TextDisabled("Only Completed runs close the window or run the command; protected/capped/cancelled/failed runs do not.");
+            ImGui.TextWrapped(plugin.AutoUnlockExpertDelivery.ListSummary);
+            ImGui.TextDisabled($"Run {plugin.AutoUnlockExpertDelivery.RunId}: {plugin.AutoUnlockExpertDelivery.DeliveredCount} delivered.");
+            if (plugin.AutoUnlockExpertDelivery.LastResult is { } result)
+                ImGui.TextWrapped($"Last run {result.RunId}: {result.Outcome}, {result.Delivered} delivered in {result.ElapsedMilliseconds / 1000.0:F1}s.");
+            if (ImGui.Button("Start new run##ExpertDelivery")) plugin.AutoUnlockExpertDelivery.RequestNewRun();
+
             ImGui.TextDisabled(ignoreSealCap
                 ? "Allows Expert Delivery hand-ins to continue even when the next item would overcap Company Seals. Excess seals will be lost."
                 : "Hand-ins stop before the next selected item would exceed the real Company Seal cap.");
@@ -2946,10 +3016,10 @@ public partial class SlaveWindow
             () => configuration.AutoCloseLobbyErrorsEnabled,
             plugin.LobbyErrorAutoClose.SetEnabled,
             applied => configuration.AutoCloseLobbyErrorsEnabled = applied,
-            "Confirms supported lobby Dialogue popups and closes NoKillPlugin's auth-error panel automatically.",
-            "Waits for addon:Dialogue to show a supported lobby/networking marker. When `Dialogue` contains a marker such as `3088`, `5006`, `90002`, `3102`, `Connection with the server was lost.`, or `You are still logged into the game.`, XA opens a 10 second monitor window, clicks the live `OK` button automatically, and closes NoKillPlugin's `No Kill Plugin Panel` through reflection if it opens during that same window. The monitor is idle until a matching `Dialogue` appears. `Instant Logout` also enables this same Dialogue-triggered monitor briefly even when this toggle is off.",
+            "Confirms supported lobby Dialogue and SelectOk popups, including error 505, and closes NoKillPlugin's auth-error panel automatically.",
+            "Waits for Dialogue or SelectOk to show a supported lobby/networking marker, including Data Center Travel error 505. Xagman monitors its own Lifestream operations even when this toggle is off and can retry interrupted commands after 30 seconds without activity. When `Dialogue` contains a marker such as `3088`, `5006`, `90002`, `3102`, `Connection with the server was lost.`, or `You are still logged into the game.`, XA opens a 10 second monitor window, clicks the live `OK` button automatically, and closes NoKillPlugin's `No Kill Plugin Panel` through reflection if it opens during that same window. The monitor is idle until a matching `Dialogue` appears. `Instant Logout` also enables this same Dialogue-triggered monitor briefly even when this toggle is off.",
             () => plugin.LobbyErrorAutoClose.StatusText,
-            searchTerms: ["3088", "5006", "90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK", "NoKillPlugin", "nokill", "No Kill Plugin Panel", "auth error"]);
+            searchTerms: ["505", "Data Center Travel", "SelectOk", "Xagman", "3088", "5006", "90002", "3102", "Connection with the server was lost.", "You are still logged into the game.", "Dialogue", "OK", "NoKillPlugin", "nokill", "No Kill Plugin Panel", "auth error"]);
         AddSavedFeatureEntry(
             ToonModsSection.UiMods,
             "bailout-esc-menu",
@@ -3387,10 +3457,10 @@ public partial class SlaveWindow
             () => configuration.InspectOutfitTryOnEnabled,
             plugin.InspectOutfitTryOn.SetEnabled,
             applied => configuration.InspectOutfitTryOnEnabled = applied,
-            "Adds Try On All and Stop to a player inspection.",
-            "Sends the inspected equipment appearances and both dyes to the fitting room, then tries inspected facewear if unlocked on this character. Unavailable facewear is skipped; soul crystals and empty gear slots are ignored. Clear in the fitting room resets the preview without closing it. Enabling this option does not start a preview.",
+            "Adds Try On All and Stop to a player inspection and saves outfit history.",
+            "Sends the inspected equipment appearances and both dyes to the fitting room, then tries inspected facewear if unlocked on this character. Unavailable facewear is skipped; soul crystals and empty gear slots are ignored. Clear in the fitting room resets the preview without closing it. Stable player inspections save up to 500 recent outfits locally. Open Outfit History or /xa outfits [player] to filter, try on previous outfits or remove entries, even after the inspected player leaves. Enabling this option does not start a preview.",
             () => plugin.InspectOutfitTryOn.StatusText,
-            searchTerms: ["inspect", "outfit", "try on", "fitting room", "glamour", "dyes"],
+            searchTerms: ["inspect", "outfit", "try on", "fitting room", "glamour", "dyes", "history", "saved", "/xa outfits"],
             drawOptions: plugin.InspectOutfitTryOn.DrawOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,

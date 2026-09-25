@@ -417,7 +417,7 @@ public partial class SlaveWindow
         bool ShouldSkipStartup() => xagmanOnhSubTaskFailed;
 
         if (plugin.Configuration.XagmanUsePreflightOnFirstCharacter && xagmanOnhIndex == 0)
-            steps.AddRange(helper.BuildPreFlightOnlySteps(new List<string> { charKey }, runner));
+            steps.AddRange(helper.BuildPreFlightOnlySteps(new List<string> { charKey }, runner, RunXagmanPreflightArMultiGuard));
 
         AddXagmanRelogSteps(
             steps,
@@ -654,6 +654,7 @@ public partial class SlaveWindow
         xagmanStatus = XagmanStatus.Completed;
         xagmanStatusText = $"Outside Network Helper finished ({reason}).";
         SetXagmanOnhPhase(XagmanOnhPhase.Completed);
+        AutoCleanXagmanQueueResults();
         StopXagmanTask();
     }
 

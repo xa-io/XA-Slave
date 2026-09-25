@@ -304,6 +304,14 @@ public sealed class XAModExpertDeliverySettings
     public bool SkipHq { get; set; }
     public bool SkipMateria { get; set; }
     public bool IgnoreSealCap { get; set; }
+    public int SpeedProfile { get; set; } = 0;
+    public int ItemScope { get; set; } = 1;
+    public bool UseArProtection { get; set; } = false;
+    public string ProtectedItemIds { get; set; } = string.Empty;
+    public bool CloseOnCompletion { get; set; } = false;
+    public bool NotifyOutcome { get; set; } = false;
+    public bool RunCompletionCommand { get; set; } = false;
+    public string CompletionCommand { get; set; } = string.Empty;
 }
 
 [Serializable]

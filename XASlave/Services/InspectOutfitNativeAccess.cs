@@ -21,11 +21,11 @@ internal sealed record InspectOutfitNativeState(InspectOutfitPreview Preview, by
 internal sealed unsafe class InspectOutfitNativeAccess
 {
     private readonly InspectOutfitNativeBinding binding;
-    private readonly InspectOutfitWorld world;
+    private readonly IInspectOutfitSource world;
     private readonly Func<long> session, frame;
     private readonly Func<long, bool> requestAlive;
 
-    internal InspectOutfitNativeAccess(InspectOutfitNativeBinding binding, InspectOutfitWorld world,
+    internal InspectOutfitNativeAccess(InspectOutfitNativeBinding binding, IInspectOutfitSource world,
         Func<long> session, Func<long> frame, Func<long, bool> requestAlive)
     { this.binding = binding; this.world = world; this.session = session; this.frame = frame; this.requestAlive = requestAlive; }
 

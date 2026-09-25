@@ -5,7 +5,7 @@ using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 
 namespace XASlave.Services;
 
-internal sealed unsafe class InspectOutfitWorld
+internal sealed unsafe class InspectOutfitWorld : IInspectOutfitSource
 {
     private readonly Action requireSupported;
     private readonly Func<long> frameworkFrame;
@@ -44,7 +44,7 @@ internal sealed unsafe class InspectOutfitWorld
         return UIState.Instance()->Inspect.GlassesIds[0];
     }
 
-    internal InspectOutfitSnapshot? Capture(InspectOutfitHost host, InspectOutfitIdentity identity)
+    public InspectOutfitSnapshot? Capture(InspectOutfitHost host, InspectOutfitIdentity identity)
     {
         if (!Ready()) return null;
         if (InspectOutfitControls.Resolve(host.Generation) != host || Identity() != identity)

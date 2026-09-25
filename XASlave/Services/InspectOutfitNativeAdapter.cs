@@ -4,11 +4,11 @@ namespace XASlave.Services;
 
 internal sealed class InspectOutfitNativeAdapter : IInspectOutfitAdapter
 {
-    private readonly InspectOutfitWorld world;
+    private readonly IInspectOutfitSource world;
     private readonly InspectOutfitNativeAccess native;
     private InspectOutfitNativeState? last, insertion, settled;
 
-    internal InspectOutfitNativeAdapter(InspectOutfitWorld world, InspectOutfitNativeAccess native)
+    internal InspectOutfitNativeAdapter(IInspectOutfitSource world, InspectOutfitNativeAccess native)
     { this.world = world; this.native = native; }
 
     public InspectOutfitSnapshot? CaptureSource(InspectOutfitHost host, InspectOutfitIdentity identity) => world.Capture(host, identity);

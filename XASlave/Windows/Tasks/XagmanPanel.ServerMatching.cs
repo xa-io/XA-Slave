@@ -1009,6 +1009,8 @@ public partial class SlaveWindow
 
     // ---- Post-completion snapshot ----
 
+    private bool xagmanQueueResultsCleaned;
+
     private void CaptureXagmanRunSnapshot()
     {
         FinalizeXagmanOwnerSkippedRemainder();
@@ -1038,11 +1040,22 @@ public partial class SlaveWindow
         foreach (var skipped in xagmanSkippedCharacters)
             xagmanLastRunSkippedCharacters.Add(skipped);
 
+        if (xagmanQueueResultsCleaned)
+        {
+            // Filter only the displayed snapshot; live plans, progress, selections and logs remain intact.
+            bool NeedsAttention(string character) => xagmanLastRunFailedCharacters.Contains(character)
+                || xagmanLastRunSkippedCharacters.Contains(character);
+            xagmanLastRunOwnerPlan = xagmanLastRunOwnerPlan.Where(NeedsAttention).ToList();
+            xagmanLastRunTonyPlan = xagmanLastRunTonyPlan.Where(NeedsAttention).ToList();
+            xagmanLastRunOwnerCompleted = 0;
+            xagmanLastRunTonyCompleted = 0;
+        }
         xagmanHasLastRunSnapshot = (xagmanLastRunOwnerPlan.Count + xagmanLastRunTonyPlan.Count) > 0;
     }
 
     private void ClearXagmanRunSnapshot()
     {
+        xagmanQueueResultsCleaned = false;
         xagmanHasLastRunSnapshot = false;
         xagmanLastRunOwnerPlan = Array.Empty<string>();
         xagmanLastRunTonyPlan = Array.Empty<string>();

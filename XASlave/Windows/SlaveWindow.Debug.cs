@@ -1950,6 +1950,18 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
+        if (ImGui.CollapsingHeader("Lifestream##xaAbuse"))
+        {
+            var readable = plugin.IpcClient.TryGetLifestreamBusy(out var busy);
+            ImGui.TextUnformatted(readable ? $"Busy: {busy}" : "Busy: unavailable");
+            if (ImGui.Button("Cancel Task##XaAbuseLifestream"))
+            {
+                CancelLifestreamTask(out var message);
+                SetDebugResult(message);
+            }
+            ImGui.Spacing();
+        }
+
         if (ImGui.CollapsingHeader("Lobby Test##xaAbuse"))
         {
             DrawXaAbuseLobbyTest();
@@ -1959,6 +1971,18 @@ public partial class SlaveWindow
         if (ImGui.CollapsingHeader("Dalamud DLL Bypass Checker##xaAbuse"))
         {
             DrawXaAbuseDalamudDllBypassChecker();
+            ImGui.Spacing();
+        }
+
+        if (ImGui.CollapsingHeader("Input Windows##xaAbuse"))
+        {
+            DrawXaAbuseInputWindows();
+            ImGui.Spacing();
+        }
+
+        if (ImGui.CollapsingHeader("Free Company##xaAbuse"))
+        {
+            DrawXaAbuseFreeCompany();
             ImGui.Spacing();
         }
 

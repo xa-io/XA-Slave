@@ -85,6 +85,17 @@ internal sealed class StepMachine
         }
     }
 
+    public void ResumeAtStep(int index)
+    {
+        if (!IsRunning || (uint)index >= (uint)steps.Count) throw new ArgumentOutOfRangeException(nameof(index));
+        generation++;
+        stepIndex = index;
+        stepActionDone = false;
+        stepStartUtc = utcNow();
+    }
+
+    public void RestartCurrentStepClock() => stepStartUtc = utcNow();
+
     public void Stop()
     {
         generation++;

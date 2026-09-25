@@ -721,6 +721,13 @@ public sealed class IpcClient
         catch { return false; }
     }
 
+    public bool TryGetAutoRetainerMultiModeEnabled(out bool enabled)
+    {
+        enabled = false;
+        try { enabled = arGetMultiModeEnabledSubscriber.InvokeFunc(); return true; }
+        catch { return false; }
+    }
+
     public bool TryGetAutoRetainerBusy(out bool busy)
     {
         busy = false;

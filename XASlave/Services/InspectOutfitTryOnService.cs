@@ -6,7 +6,7 @@ using Dalamud.Plugin.Services;
 
 namespace XASlave.Services;
 
-internal sealed class InspectOutfitTryOnService : IDisposable
+internal sealed partial class InspectOutfitTryOnService : IDisposable
 {
     private readonly SlaveNativeUiLibrary library;
     private readonly Action unavailable;
@@ -22,8 +22,12 @@ internal sealed class InspectOutfitTryOnService : IDisposable
     internal string StatusText { get; private set; } = "Disabled";
     internal bool IsRunning => queue is { Terminal: false };
 
-    internal InspectOutfitTryOnService(SlaveNativeUiLibrary library, Action unavailable)
-    { this.library = library; this.unavailable = unavailable; }
+    internal InspectOutfitTryOnService(SlaveNativeUiLibrary library, Action unavailable, Configuration configuration, Action openHistory)
+    {
+        this.library = library; this.unavailable = unavailable;
+        History = new InspectOutfitHistory(configuration);
+        this.openHistory = openHistory;
+    }
 
     internal bool SetEnabled(bool value)
     {
@@ -42,6 +46,7 @@ internal sealed class InspectOutfitTryOnService : IDisposable
         }
         else
         {
+            ResetHistoryObservation();
             resetPreviewOnClose = false; previewWasActive = false;
             Stop("Disabled");
             Plugin.Framework.Update -= Update;
@@ -57,11 +62,13 @@ internal sealed class InspectOutfitTryOnService : IDisposable
     {
         generation++;
         queue?.Cancel(reason); queue = null;
+        savedSource = null; pendingHistoryId = null;
         StatusText = reason;
     }
 
     private void Logout(int type, int code)
     {
+        ResetHistoryObservation();
         resetPreviewOnClose = false; previewWasActive = false;
         session++;
         Stop("Logged out; inspection try-on cancelled.");
@@ -133,16 +140,21 @@ internal sealed class InspectOutfitTryOnService : IDisposable
         {
             ObservePreviewClose();
             UpdateFittingControls();
+            StartPendingHistory();
             var host = InspectOutfitControls.Resolve(hostEpoch, false);
             if (controls != null && controls.Host != host)
             {
-                hostEpoch++; Stop("The inspection window changed."); RetireControls();
+                hostEpoch++;
+                if (savedSource == null) Stop("The inspection window changed.");
+                ResetHistoryObservation(); RetireControls();
             }
-            if (InspectOutfitControls.Resolve(hostEpoch) == null)
+            var visibleHost = InspectOutfitControls.Resolve(hostEpoch);
+            ObserveHistory(visibleHost);
+            if (visibleHost == null)
             {
-                if (IsRunning) Stop("Inspection hidden; try-on cancelled.");
+                if (IsRunning && savedSource == null) Stop("Inspection hidden; try-on cancelled.");
                 controls?.Update(false, false);
-                return;
+                if (savedSource == null) return;
             }
             var active = queue;
             if (active == null) return;
@@ -153,13 +165,13 @@ internal sealed class InspectOutfitTryOnService : IDisposable
             {
                 // Retire before logging so the same failure is reported only once.
                 queue = null;
-                if (active.CompletedSource is { } source && binding != null && world != null)
+                if (active.CompletedSource is { } source && binding != null && (savedSource != null || world != null))
                 {
                     var owner = generation;
                     var epoch = session;
                     try
                     {
-                        var result = binding.TryOnOwnedFacewear(world.Facewear(source),
+                        var result = binding.TryOnOwnedFacewear(savedSource?.Facewear ?? world!.Facewear(source),
                             () => enabled && !disposed && generation == owner && session == epoch);
                         if (generation == owner && session == epoch && !string.IsNullOrEmpty(result)) StatusText += " " + result;
                     }
@@ -169,6 +181,7 @@ internal sealed class InspectOutfitTryOnService : IDisposable
                         if (generation == owner && session == epoch) StatusText += " Facewear could not be applied.";
                     }
                 }
+                savedSource = null;
                 if (!active.Completed)
                 {
                     if (active.Failure != null) Plugin.Log.Warning(active.Failure, "Inspection try-on failed: {Status}", active.Status);
@@ -187,19 +200,26 @@ internal sealed class InspectOutfitTryOnService : IDisposable
             if (kind == AddonEvent.PreFinalize)
             {
                 if (controls != null && controls.Host.Addon != args.Addon.Address) return;
-                Stop("Inspection finalized; try-on cancelled.");
+                if (savedSource == null) Stop("Inspection finalized; try-on cancelled.");
+                ResetHistoryObservation();
                 RetireControls(); hostEpoch++;
                 return;
             }
             if (kind == AddonEvent.PostSetup)
             {
-                hostEpoch++; Stop("Inspection ready; choose Try On All."); RetireControls(); return;
+                hostEpoch++;
+                if (savedSource == null) Stop("Inspection ready; choose Try On All.");
+                ResetHistoryObservation(); RetireControls(); return;
             }
             if (kind != AddonEvent.PostDraw || retiring) return;
             var host = InspectOutfitControls.Resolve(hostEpoch);
             if (host == null) return;
             if (controls != null && controls.Host != host)
-            { hostEpoch++; Stop("The inspection layout changed."); RetireControls(); return; }
+            {
+                hostEpoch++;
+                if (savedSource == null) Stop("The inspection layout changed.");
+                ResetHistoryObservation(); RetireControls(); return;
+            }
             if (!library.EnsureReady()) { StatusText = "Preparing native inspection controls."; return; }
             if (!enabled || disposed) return;
             binding ??= new InspectOutfitNativeBinding();
@@ -301,6 +321,8 @@ internal sealed class InspectOutfitTryOnService : IDisposable
     {
         ImGui.TextWrapped(StatusText);
         ImGui.TextWrapped("Use Try On All on a player inspection. Both dyes and duplicate rings are retained; incompatible gear may be replaced by the game. Owned facewear is tried after the gear; unavailable facewear is skipped. Use Clear in the fitting room to start a fresh preview.");
+        if (ImGui.Button("Outfit History##InspectOutfit")) openHistory();
+        ImGui.SameLine();
         ImGui.BeginDisabled(!IsRunning);
         if (ImGui.Button("Stop##InspectOutfit")) Stop();
         ImGui.EndDisabled();

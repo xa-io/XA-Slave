@@ -2,7 +2,7 @@
 
 A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character workflows - relogging, world travel, chat announcements, housing checks, and more. Works alongside **XA Database** to collect and push character data hands-free.
 
-- View all our utilities & plugins here: https://aethertek.io/
+- [XA Slave features and usage](https://aethertek.io/plugins/xa-slave.html) · [All utilities and plugins](https://aethertek.io/)
 
 ## Key Features
 

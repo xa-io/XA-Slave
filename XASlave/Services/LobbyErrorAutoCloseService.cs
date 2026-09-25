@@ -38,6 +38,8 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
         "3102",
         "5006",
         "2021",
+        "505",
+        "Unable to successfully complete Data Center Travel request.",
         "World data could not be obtained. Please try logging in later.",
         "Connection with the server was lost.",
         "You are still logged into the game.",
@@ -50,6 +52,30 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
     private readonly IPluginLog log;
 
     private bool enabled;
+    private bool requiredByXagman;
+    private string observedDialogue = string.Empty;
+    public long ErrorSequence { get; private set; }
+    public string LastErrorText { get; private set; } = string.Empty;
+    public bool HasSupportedError => TryGetSupportedDialogue(out _, out _);
+
+    public void SetRequiredByXagman(bool value)
+    {
+        requiredByXagman = value;
+        UpdateSubscription();
+    }
+
+    public void ObserveDialogue()
+    {
+        if (!TryGetSupportedDialogue(out _, out var text))
+        {
+            observedDialogue = string.Empty;
+            return;
+        }
+        if (text == observedDialogue) return;
+        observedDialogue = text;
+        LastErrorText = text;
+        ErrorSequence++;
+    }
     private bool dialogueListenerSubscribed;
     private bool frameworkSubscribed;
     private bool noKillReflectionFailureLogged;
@@ -109,7 +135,7 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
         {
             enabled = true;
             UpdateSubscription();
-            StatusText = "Enabled - waits for addon:Dialogue, then monitors lobby/networking errors and NoKill for 10 seconds.";
+            StatusText = "Enabled - waits for Dialogue/SelectOk, then monitors lobby/networking errors and NoKill for 10 seconds.";
             return true;
         }
         catch (Exception ex)
@@ -141,6 +167,7 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
 
     public void Dispose()
     {
+        requiredByXagman = false;
         enabled = false;
         temporaryMonitorUntilUtc = DateTime.MinValue;
         dialogueMonitorUntilUtc = DateTime.MinValue;
@@ -172,20 +199,23 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
         var now = DateTime.UtcNow;
         var temporaryMonitorActive = IsTemporaryMonitorActive(now);
         var dialogueMonitorActive = IsDialogueMonitorActive(now);
-        var monitorRequested = enabled || temporaryMonitorActive || dialogueMonitorActive;
+        var monitorRequested = enabled || requiredByXagman || temporaryMonitorActive || dialogueMonitorActive;
 
         var shouldListenForDialogue = monitorRequested;
         if (dialogueListenerSubscribed != shouldListenForDialogue)
         {
             if (shouldListenForDialogue)
+            {
                 addonLifecycle.RegisterListener(AddonEvent.PreDraw, DialogueAddonName, OnDialogueAddon);
+                addonLifecycle.RegisterListener(AddonEvent.PreDraw, "SelectOk", OnDialogueAddon);
+            }
             else
                 addonLifecycle.UnregisterListener(OnDialogueAddon);
 
             dialogueListenerSubscribed = shouldListenForDialogue;
         }
 
-        var shouldRunFramework = IsAnyMonitorWindowActive(now);
+        var shouldRunFramework = requiredByXagman || IsAnyMonitorWindowActive(now);
         if (frameworkSubscribed == shouldRunFramework)
             return;
 
@@ -204,7 +234,8 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
     private void OnFrameworkUpdate(IFramework _)
     {
         var now = DateTime.UtcNow;
-        if (!enabled && !IsAnyMonitorWindowActive(now))
+        ObserveDialogue();
+        if (!enabled && !requiredByXagman && !IsAnyMonitorWindowActive(now))
         {
             UpdateSubscription();
             return;
@@ -225,12 +256,13 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
             return;
 
         var now = DateTime.UtcNow;
-        if (!enabled && !IsTemporaryMonitorActive(now) && !IsDialogueMonitorActive(now))
+        if (!enabled && !requiredByXagman && !IsTemporaryMonitorActive(now) && !IsDialogueMonitorActive(now))
         {
             UpdateSubscription();
             return;
         }
 
+        ObserveDialogue();
         if (TryGetSupportedDialogue(out var ignoredDialogueMarker, out var ignoredDialogueText))
             ArmDialogueTriggeredMonitor(now);
 
@@ -258,8 +290,8 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
                 return;
 
             // Preserve the evidence before OK removes the addon; chat monitoring cannot see lobby UI.
-            TryGetSupportedDialogue(out var dialogueMarker, out var dialogueText);
-            if (!AddonHelper.ClickAddonText(DialogueAddonName, "OK"))
+            TryGetSupportedDialogue(out var dialogueMarker, out var dialogueText, out var errorAddon);
+            if (!AddonHelper.ClickAddonText(errorAddon, "OK"))
                 return;
 
             lastConfirmAttemptUtc = now;
@@ -292,27 +324,32 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
     }
 
     private static bool TryGetSupportedDialogue(out string matchedMarker, out string dialogueText)
+        => TryGetSupportedDialogue(out matchedMarker, out dialogueText, out _);
+
+    private static bool TryGetSupportedDialogue(out string matchedMarker, out string dialogueText, out string addonName)
     {
-        matchedMarker = string.Empty;
-        dialogueText = string.Empty;
-
-        if (!AddonHelper.IsAddonReady(DialogueAddonName))
-            return false;
-
-        var entries = AddonHelper.GetAddonTextEntries(DialogueAddonName);
-        dialogueText = SummarizeDialogueEntries(entries);
-        if (!ContainsText(entries, "OK"))
-            return false;
-
-        foreach (var marker in DialogueMarkers)
+        matchedMarker = dialogueText = addonName = string.Empty;
+        foreach (var candidate in new[] { DialogueAddonName, "SelectOk" })
         {
-            if (ContainsText(entries, marker))
+            if (!AddonHelper.IsAddonVisible(candidate) || !AddonHelper.IsAddonReady(candidate)) continue;
+            var entries = AddonHelper.GetAddonTextEntries(candidate);
+            if (!ContainsText(entries, "OK")) continue;
+            foreach (var marker in DialogueMarkers)
             {
+                // Numeric codes must be whole numbers (505 must not match 15050).
+                var numeric = int.TryParse(marker, out _);
+                var matches = false;
+                foreach (var entry in entries)
+                    matches |= numeric
+                        ? System.Text.RegularExpressions.Regex.IsMatch(entry, @"(?<!\d)" + marker + @"(?!\d)")
+                        : entry.Contains(marker, StringComparison.OrdinalIgnoreCase);
+                if (!matches) continue;
                 matchedMarker = marker;
+                dialogueText = SummarizeDialogueEntries(entries);
+                addonName = candidate;
                 return true;
             }
         }
-
         return false;
     }
 
@@ -408,20 +445,20 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
 
     private bool ShouldRunActiveMonitor(DateTime now)
     {
-        return GetLobbyMonitorDebugStatus(now).ShouldMonitor;
+        return (requiredByXagman && HasSupportedError) || GetLobbyMonitorDebugStatus(now).ShouldMonitor;
     }
 
     private LobbyMonitorDebugStatus GetLobbyMonitorDebugStatus(DateTime now)
     {
         var temporaryMonitorActive = IsTemporaryMonitorActive(now);
         var dialogueMonitorActive = IsDialogueMonitorActive(now);
-        var monitorRequested = enabled || temporaryMonitorActive || dialogueMonitorActive;
-        var dialogueVisible = AddonHelper.IsAddonVisible(DialogueAddonName);
-        var dialogueReady = AddonHelper.IsAddonReady(DialogueAddonName);
+        var monitorRequested = enabled || requiredByXagman || temporaryMonitorActive || dialogueMonitorActive;
+        var dialogueVisible = AddonHelper.IsAddonVisible(DialogueAddonName) || AddonHelper.IsAddonVisible("SelectOk");
+        var dialogueReady = AddonHelper.IsAddonReady(DialogueAddonName) || AddonHelper.IsAddonReady("SelectOk");
         var dialogueSupported = TryGetSupportedDialogue(out var dialogueMatch, out var dialogueText);
         var titleMenuVisible = AddonHelper.IsAddonVisible(TitleMenuAddonName);
         var secondsRemaining = Math.Max(0, (dialogueMonitorUntilUtc - now).TotalSeconds);
-        var shouldMonitor = monitorRequested && dialogueMonitorActive;
+        var shouldMonitor = monitorRequested && (dialogueMonitorActive || (requiredByXagman && dialogueSupported));
 
         var detail = !monitorRequested
             ? "Close Lobby Errors monitor requested: false."
