@@ -46,6 +46,7 @@ public partial class SlaveWindow
 
     private static readonly CommandReferenceEntry[] GameModsCommandEntries =
     {
+        new("/xa clearlog", "Archive and clear the active Dalamud log file.", "Manual Dalamud Log Cleaner action. Keeps up to 10 MiB in the old log and resumes writing through the existing logger. Does not clear the /xllog display. Also available through XASlave.ExecuteCommand(\"clearlog\")."),
         new("/xa chocobocutscene on|off", "Toggle `Skip Cutscenes` > `Skip Feeding Chocobo`.", "Only affects the companion-feeding cutscene surface."),
         new("/xa closeerrors on|off", "Toggle `Close Lobby Errors`.", "When addon:Dialogue contains a supported lobby/networking marker, auto-confirms the popup for up to 10 seconds and closes NoKillPlugin's `No Kill Plugin Panel` during that same window."),
         new("/xa gamerestore", "Disable the current top-level Game Mods toggles.", "Turns off the current Game Mods section in one command."),

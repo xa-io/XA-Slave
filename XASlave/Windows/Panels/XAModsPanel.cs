@@ -3739,6 +3739,51 @@ public partial class SlaveWindow
             SaveConfiguration();
         }
 
+        void DrawDalamudLogCleaner()
+        {
+            ImGui.TextUnformatted("Dalamud Log Cleaner");
+            using (ImRaii.TextWrapPos(0f))
+                ImGui.TextDisabled("Clear this client's active log and keep up to 10 MiB of recent output in the old log. New entries continue normally.");
+            var automatic = configuration.DalamudLogCleanerAutomaticEnabled;
+            if (ImGui.Checkbox("Automatic cleanup##DalamudLogCleaner", ref automatic))
+            {
+                configuration.DalamudLogCleanerAutomaticEnabled = plugin.SetDalamudLogCleanerAutomatic(automatic);
+                SaveConfiguration();
+            }
+            var interval = configuration.DalamudLogCleanerCheckIntervalMinutes;
+            ImGui.SetNextItemWidth(Scale(120f));
+            if (ImGui.InputInt("Check every (minutes)##DalamudLogCleaner", ref interval))
+            {
+                configuration.DalamudLogCleanerCheckIntervalMinutes = DalamudLogCleanerService.NormalizeCheckInterval(interval);
+                plugin.SetDalamudLogCleanerAutomatic(configuration.DalamudLogCleanerAutomaticEnabled);
+                SaveConfiguration();
+            }
+            using (ImRaii.TextWrapPos(0f))
+            {
+                ImGui.TextDisabled("Default: 15 minutes (1-1440). Each check clears the log if it is 90 MiB or larger. Changing settings restarts the interval.");
+                ImGui.TextDisabled(plugin.DalamudLogCleaner.AutomaticStatusText);
+            }
+            if (ImGui.Button("Check Log Size##DalamudLogCleaner"))
+            {
+                var success = plugin.DalamudLogCleaner.TryCheckSize(out var message);
+                SetToonModsStatus(message, !success);
+            }
+            using (ImRaii.TextWrapPos(0f))
+                ImGui.TextUnformatted(plugin.DalamudLogCleaner.SizeStatusText);
+            using (ImRaii.Disabled(plugin.DalamudLogCleaner.IsCleaning))
+            {
+                if (ImGui.Button("Archive and Clear Log##DalamudLogCleaner"))
+                {
+                    var success = plugin.DalamudLogCleaner.TryClean(string.Empty, out var message);
+                    SetToonModsStatus(message, !success);
+                }
+            }
+            using (ImRaii.TextWrapPos(0f))
+                ImGui.TextDisabled(plugin.DalamudLogCleaner.StatusText);
+            ImGui.TextDisabled("Command: /xa clearlog");
+            ImGui.Spacing();
+        }
+
         void DrawDalamudLogDisablerOptions()
         {
             ImGui.TextDisabled("Tick a plugin to filter its output to Dalamud's log (/xllog window and the log file). Uses Dalamud's per-plugin log level; the plugin keeps working, only its logging is filtered.");
@@ -4032,6 +4077,16 @@ public partial class SlaveWindow
                 ImGui.TextDisabled($"Last action: {lastForceAction}");
         }
 
+        toonModDefinitions.Add(("dalamud-log-cleaner",
+            () => configuration.DalamudLogCleanerAutomaticEnabled,
+            plugin.SetDalamudLogCleanerAutomatic,
+            applied => configuration.DalamudLogCleanerAutomaticEnabled = applied));
+        featureEntries.Add(new XAModCatalogueEntry(
+            ToonModsSection.GameMods,
+            "Dalamud Log Cleaner",
+            BuildToonModsSearchHaystack("Dalamud Log Cleaner", "Archive and clear the active log file", "Manual action: /xa clearlog. Optional automatic cleanup at 90 MiB, checked every 15 minutes by default.", ["logging", "dalamud.log", "cache", "reset", "clearlog", "automatic", "interval"]),
+            () => configuration.DalamudLogCleanerAutomaticEnabled,
+            DrawDalamudLogCleaner));
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "dalamud-log-disabler",

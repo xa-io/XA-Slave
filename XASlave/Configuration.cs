@@ -603,6 +603,8 @@ public class Configuration : IPluginConfiguration
     public bool ARealmRecordedAllZonesAllContentTypes { get; set; } = true;
     public List<uint> ARealmRecordedAllZonesSelectedContentTypes { get; set; } = new();
     public bool DalamudLogDisablerEnabled { get; set; } = false;
+    public bool DalamudLogCleanerAutomaticEnabled { get; set; } = false;
+    public int DalamudLogCleanerCheckIntervalMinutes { get; set; } = 15;
     public List<string> DalamudLogDisablerBlockedPlugins { get; set; } = new();
     // Serilog LogEventLevel minimum kept for filtered plugins: 0=Verbose..5=Fatal, 6=block all. Default full mute.
     public int DalamudLogDisablerMinimumKeptLevel { get; set; } = 6;

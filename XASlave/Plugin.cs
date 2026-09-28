@@ -225,6 +225,7 @@ public sealed class Plugin : IDalamudPlugin
     public PopupCleanerService PopupCleaner { get; init; }
     public DalamudNotificationSuppressorService DalamudNotificationsSuck { get; init; }
     public DalamudLogDisablerService DalamudLogDisabler { get; init; }
+    public DalamudLogCleanerService DalamudLogCleaner { get; } = new();
     public BetterHighlightPotentialTargetsService BetterHighlightPotentialTargets { get; init; }
     public SystemWindowModsService SystemWindowMods { get; init; }
     public ReplaceUnownedMountHotbarsService ReplaceUnownedMountHotbars { get; init; }
@@ -645,6 +646,13 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.DalamudLogDisablerEnabled = false;
                 Configuration.Save();
             }
+        });
+        QueueDeferredStartupAction("DalamudLogCleanerAutomaticEnabled", () =>
+        {
+            var savedInterval = Configuration.DalamudLogCleanerCheckIntervalMinutes;
+            Configuration.DalamudLogCleanerAutomaticEnabled = SetDalamudLogCleanerAutomatic(Configuration.DalamudLogCleanerAutomaticEnabled);
+            if (savedInterval != Configuration.DalamudLogCleanerCheckIntervalMinutes)
+                Configuration.Save();
         });
         if (Configuration.BetterHighlightPotentialTargetsEnabled)
         {
@@ -1759,6 +1767,7 @@ public sealed class Plugin : IDalamudPlugin
         TryCleanup("ClientState.Logout -= OnLogout", () => ClientState.Logout -= OnLogout);
         TryCleanup($"CommandManager.RemoveHandler({CommandName})", () => CommandManager.RemoveHandler(CommandName));
         TryDispose("IpcProvider", IpcProvider);
+        TryDispose("DalamudLogCleaner", DalamudLogCleaner);
         TryDispose("AutoSortItems", AutoSortItems);
         TryDispose("AutoRestoreFurniture", AutoRestoreFurniture);
         TryDispose("InspectOutfitTryOn", InspectOutfitTryOn);
@@ -1962,6 +1971,12 @@ public sealed class Plugin : IDalamudPlugin
         SaveToXaDatabaseAndRecordSync(contentId, characterName);
     }
 
+    internal bool SetDalamudLogCleanerAutomatic(bool enabled)
+    {
+        Configuration.DalamudLogCleanerCheckIntervalMinutes = DalamudLogCleanerService.NormalizeCheckInterval(Configuration.DalamudLogCleanerCheckIntervalMinutes);
+        return DalamudLogCleaner.ConfigureAutomatic(enabled, Configuration.DalamudLogCleanerCheckIntervalMinutes);
+    }
+
     private void OnCommand(string command, string args)
     {
         var trimmed = args.Trim();
@@ -2108,6 +2123,12 @@ public sealed class Plugin : IDalamudPlugin
         if (subcommand.Equals("res", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(TryHandleResolutionCommand(subcommandArgs, out var message), message);
+            return;
+        }
+
+        if (subcommand.Equals("clearlog", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(DalamudLogCleaner.TryClean(subcommandArgs, out var message), message);
             return;
         }
 
@@ -2383,6 +2404,9 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("res", StringComparison.OrdinalIgnoreCase))
             return TryHandleResolutionCommand(subcommandArgs, out message);
+
+        if (subcommand.Equals("clearlog", StringComparison.OrdinalIgnoreCase))
+            return DalamudLogCleaner.TryClean(subcommandArgs, out message);
 
         if (subcommand.Equals("equip", StringComparison.OrdinalIgnoreCase))
             return ItemCommands.TryExecuteEquipCommand(subcommandArgs, out message);
@@ -2843,6 +2867,12 @@ public sealed class Plugin : IDalamudPlugin
                     SelectedContentTypes = Configuration.ARealmRecordedAllZonesSelectedContentTypes.ToList(),
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "dalamud-log-cleaner":
+                snapshot = JsonSerializer.SerializeToElement(new XAModDalamudLogCleanerSettings
+                {
+                    CheckIntervalMinutes = Configuration.DalamudLogCleanerCheckIntervalMinutes,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "dalamud-log-disabler":
                 snapshot = JsonSerializer.SerializeToElement(new XAModDalamudLogDisablerSettings
                 {
@@ -3220,6 +3250,13 @@ public sealed class Plugin : IDalamudPlugin
             ARealmRecordedIntegration.ApplyConfiguration(
                 Configuration.ARealmRecordedAllZonesAllContentTypes,
                 Configuration.ARealmRecordedAllZonesSelectedContentTypes);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "dalamud-log-cleaner", out XAModDalamudLogCleanerSettings? dalamudLogCleanerSettings)
+            && dalamudLogCleanerSettings != null)
+        {
+            Configuration.DalamudLogCleanerCheckIntervalMinutes = DalamudLogCleanerService.NormalizeCheckInterval(dalamudLogCleanerSettings.CheckIntervalMinutes);
+            SetDalamudLogCleanerAutomatic(Configuration.DalamudLogCleanerAutomaticEnabled);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "dalamud-log-disabler", out XAModDalamudLogDisablerSettings? dalamudLogDisablerSettings)
@@ -4947,6 +4984,7 @@ public sealed class Plugin : IDalamudPlugin
             ApplyDalamudNotificationsSuckConfiguration(save: false);
             return DalamudNotificationsSuck.SetEnabled(value);
         }, applied => Configuration.DalamudNotificationsSuckEnabled = applied, () => DalamudNotificationsSuck.StatusText);
+        yield return new("dalamud-log-cleaner", "Dalamud Log Cleaner", XAModsRestoreScope.Game, () => Configuration.DalamudLogCleanerAutomaticEnabled, SetDalamudLogCleanerAutomatic, applied => Configuration.DalamudLogCleanerAutomaticEnabled = applied, () => DalamudLogCleaner.AutomaticStatusText);
         yield return new("dalamud-log-disabler", "Dalamud Log Disabler", XAModsRestoreScope.Game, () => Configuration.DalamudLogDisablerEnabled, value =>
         {
             DalamudLogDisabler.ApplyConfiguration(Configuration.DalamudLogDisablerBlockedPlugins, Configuration.DalamudLogDisablerMinimumKeptLevel);
@@ -5658,5 +5696,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.47";
+    public const string Version = "0.0.0.48";
 }

@@ -23,6 +23,16 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.48 - 2026-09-27",
+            Lines =
+            [
+                "- Added XA Mods > Game Mods > Dalamud Log Cleaner: Archive and Clear Log keeps up to 10 MiB of recent output in the old log and clears the active file while logging continues. Also available through /xa clearlog and XASlave.ExecuteCommand(\"clearlog\").",
+                "- Added optional automatic log cleanup, off by default: Check the active log every configurable number of minutes (15 by default) and archive/clear it at 90 MiB. Settings save with presets; manual cleanup remains available.",
+                "- Added Check Log Size to Dalamud Log Cleaner: Show the active log's size in MiB and bytes with the check time, without clearing it or changing the automatic schedule.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.47 - 2026-09-25",
             Lines =
             [

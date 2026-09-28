@@ -215,6 +215,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Example IPC usage:");
         ImGui.BulletText("XASlave.IsBusy()");
         ImGui.BulletText("XASlave.ExecuteCommand(\"xamods\")");
+        ImGui.BulletText("XASlave.ExecuteCommand(\"clearlog\") - archive and clear the active Dalamud log; returns OK: or ERROR:");
         ImGui.BulletText("XASlave.ExecuteCommand(\"dbsub 5000000\")");
         ImGui.BulletText("XASlave.ExecuteCommand(\"sprint on\")");
         ImGui.BulletText("XASlave.ExecuteCommand(\"killgame\")");

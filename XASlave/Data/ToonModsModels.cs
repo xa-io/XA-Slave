@@ -89,6 +89,12 @@ public sealed class XAModARealmRecordedAllZonesSettings
 }
 
 [Serializable]
+public sealed class XAModDalamudLogCleanerSettings
+{
+    public int CheckIntervalMinutes { get; set; } = 15;
+}
+
+[Serializable]
 public sealed class XAModDalamudLogDisablerSettings
 {
     public List<string> BlockedPlugins { get; set; } = new();
