@@ -202,6 +202,7 @@ public sealed class Plugin : IDalamudPlugin
 
     public readonly WindowSystem WindowSystem = new("XASlave");
     private SlaveWindow SlaveWindow { get; init; }
+    private XagmanMiniWindow XagmanMiniWindow { get; init; }
     public UpdatesWindow UpdatesWindow { get; init; }
     public XAPeepWindow XAPeepWindow { get; init; }
     public NearbyPlayersWindow NearbyPlayersWindow { get; init; }
@@ -213,6 +214,7 @@ public sealed class Plugin : IDalamudPlugin
     // Services
     public IpcClient IpcClient { get; init; }
     internal MessageLogService MessageLog { get; init; }
+    internal CleanChatService CleanChat { get; init; }
     public DropboxQueueService DropboxQueue { get; init; }
     public IpcProvider IpcProvider { get; init; }
     public AutoCollectionService AutoCollector { get; init; }
@@ -357,6 +359,7 @@ public sealed class Plugin : IDalamudPlugin
         IpcClient = new IpcClient(PluginInterface, Log);
         MessageLog = new MessageLogService(ChatGui, Log, () => Configuration.MessageLogEnabled,
             type => Configuration.MessageLogDisabledTypes?.Contains((ushort)type) != true);
+        CleanChat = new CleanChatService(ChatGui);
         DropboxQueue = new DropboxQueueService(PluginInterface, IpcClient, Log);
         SlaveDatabase = new SlaveDatabaseService(PluginInterface, Log);
         AutoCollector = new AutoCollectionService(this, Condition, Framework, ObjectTable, Log);
@@ -393,7 +396,7 @@ public sealed class Plugin : IDalamudPlugin
         SightDistance = new SightDistanceService(Framework, SigScanner, GameInterop, Log);
         PlayerSearchContextMenu = new PlayerSearchContextMenuService(ContextMenu, DataManager, Log);
         EstateTeleportationContextMenu = new EstateTeleportationContextMenuService(ContextMenu, Log);
-        NameplatePrivacy = new NameplatePrivacyService(NamePlateGui, IpcClient, Log);
+        NameplatePrivacy = new NameplatePrivacyService(NamePlateGui, IpcClient, Log, DataManager);
         BlacklistedPartyName = new BlacklistedPartyNameService(Framework, Log);
         AutoUnlockExpertDelivery = new AutoUnlockExpertDeliveryService(Framework, DataManager, Log,
             AutoRetainerUiReflectionService.GetGcDeliveryOperation,
@@ -654,6 +657,7 @@ public sealed class Plugin : IDalamudPlugin
             if (savedInterval != Configuration.DalamudLogCleanerCheckIntervalMinutes)
                 Configuration.Save();
         });
+        QueueDeferredStartupAction("CleanChatEnabled", () => SetCleanChatEnabled(Configuration.CleanChatEnabled));
         if (Configuration.BetterHighlightPotentialTargetsEnabled)
         {
             QueuePostLoadXAModActivation("BetterHighlightPotentialTargetsEnabled", "Better Highlight Potential Targets", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 8), () =>
@@ -698,8 +702,7 @@ public sealed class Plugin : IDalamudPlugin
         {
             QueuePostLoadXAModActivation("AutoHideGameObjectsEnabled", "Auto Hide Game Objects", PostLoadXAModActivationInitialDelaySeconds + (PostLoadXAModActivationSpacingSeconds * 4), () =>
             {
-                ApplyStoredXAModConfiguration("auto-hide-game-objects");
-                if (!AutoHideGameObjects.SetEnabled(true))
+                if (!SetAutoHideGameObjectsEnabled(true))
                 {
                     Configuration.AutoHideGameObjectsEnabled = false;
                     Configuration.Save();
@@ -867,6 +870,18 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.ShowTravelerWorldNamesAddSpacer);
             NameplatePrivacy.ApplyShowTitlesAsPlayernamesConfiguration(
                 Configuration.ShowTitlesAsPlayernamesHonorificSupportEnabled);
+
+            NameplatePrivacy.ApplyStatusIconConfiguration(Configuration.HiddenNameplateStatusIds);
+            if (Configuration.HideNameplateStatusIconsEnabled && !NameplatePrivacy.SetHideStatusIconsEnabled(true))
+            {
+                Configuration.HideNameplateStatusIconsEnabled = false;
+                changed = true;
+            }
+            if (Configuration.RemoveNameplateFcTagEnabled && !NameplatePrivacy.SetRemoveFcTagEnabled(true))
+            {
+                Configuration.RemoveNameplateFcTagEnabled = false;
+                changed = true;
+            }
 
             if (Configuration.LiveAnonymousModeEnabled && !NameplatePrivacy.SetAnonymousModeEnabled(true))
             {
@@ -1218,6 +1233,8 @@ public sealed class Plugin : IDalamudPlugin
         });
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
+        XagmanMiniWindow = new XagmanMiniWindow(SlaveWindow.GetXagmanMiniSnapshot);
+        WindowSystem.AddWindow(XagmanMiniWindow);
 
         NearbyPlayersWindow = new NearbyPlayersWindow(NearbyPlayers, XAPeep);
         WindowSystem.AddWindow(NearbyPlayersWindow);
@@ -1683,6 +1700,9 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Instant Return", Configuration.QuickReturnEnabled, QuickReturn.StatusText, "QuickReturnEnabled");
         yield return CreateStartupSurfaceStatus("Auto Refuse Trade", Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.StatusText, "AutoRefuseTradeRequestEnabled");
         yield return CreateStartupSurfaceStatus("Show Titles As Playernames", Configuration.ShowTitlesAsPlayernamesEnabled, NameplatePrivacy.ShowTitlesAsPlayernamesStatusText);
+        yield return CreateStartupSurfaceStatus("Hide Nameplate Status Icons", Configuration.HideNameplateStatusIconsEnabled, NameplatePrivacy.HideStatusIconsStatusText);
+        yield return CreateStartupSurfaceStatus("Clean Chat", Configuration.CleanChatEnabled, CleanChat.StatusText);
+        yield return CreateStartupSurfaceStatus("Remove FC Tag", Configuration.RemoveNameplateFcTagEnabled, NameplatePrivacy.RemoveFcTagStatusText);
         yield return CreateStartupSurfaceStatus("Show Blacklisted Playername In Party", Configuration.ShowBlacklistedPlayernameInPartyEnabled, BlacklistedPartyName.StatusText);
         yield return CreateStartupSurfaceStatus("Show Traveler World Names", Configuration.ShowTravelerWorldNamesEnabled, NameplatePrivacy.ShowTravelerWorldNamesStatusText);
         yield return CreateStartupSurfaceStatus("Fix /target Command", Configuration.TargetCommandFixEnabled, TargetCommandFix.StatusText);
@@ -1768,6 +1788,7 @@ public sealed class Plugin : IDalamudPlugin
         TryCleanup($"CommandManager.RemoveHandler({CommandName})", () => CommandManager.RemoveHandler(CommandName));
         TryDispose("IpcProvider", IpcProvider);
         TryDispose("DalamudLogCleaner", DalamudLogCleaner);
+        TryDispose("CleanChat", CleanChat);
         TryDispose("AutoSortItems", AutoSortItems);
         TryDispose("AutoRestoreFurniture", AutoRestoreFurniture);
         TryDispose("InspectOutfitTryOn", InspectOutfitTryOn);
@@ -1977,6 +1998,13 @@ public sealed class Plugin : IDalamudPlugin
         return DalamudLogCleaner.ConfigureAutomatic(enabled, Configuration.DalamudLogCleanerCheckIntervalMinutes);
     }
 
+    internal bool SetCleanChatEnabled(bool enabled)
+    {
+        Configuration.CleanChatSettings ??= new CleanChatSettings();
+        CleanChat.ApplyConfiguration(Configuration.CleanChatSettings);
+        return CleanChat.SetEnabled(enabled);
+    }
+
     private void OnCommand(string command, string args)
     {
         var trimmed = args.Trim();
@@ -1989,6 +2017,16 @@ public sealed class Plugin : IDalamudPlugin
         var firstSpaceIndex = trimmed.IndexOf(' ');
         var subcommand = firstSpaceIndex >= 0 ? trimmed[..firstSpaceIndex].Trim() : trimmed;
         var subcommandArgs = firstSpaceIndex >= 0 ? trimmed[(firstSpaceIndex + 1)..].Trim() : string.Empty;
+
+        if (subcommand.Equals("xagman", StringComparison.OrdinalIgnoreCase))
+        {
+            if (subcommandArgs.Equals("mini", StringComparison.OrdinalIgnoreCase)
+                || subcommandArgs.Equals("m", StringComparison.OrdinalIgnoreCase))
+                XagmanMiniWindow.Toggle();
+            else
+                PrintCommandResult(false, "Usage: /xa xagman mini (or /xa xagman m)");
+            return;
+        }
 
 #if false
         // /xa run <task> test IPC RunTask locally
@@ -2881,11 +2919,16 @@ public sealed class Plugin : IDalamudPlugin
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
             case "auto-hide-game-objects":
+                NormalizeAutoHideGameObjectsDistances();
                 snapshot = JsonSerializer.SerializeToElement(new XAModAutoHideGameObjectsSettings
                 {
                     HidePlayer = Configuration.AutoHideGameObjectsHidePlayer,
                     HideFriends = Configuration.AutoHideGameObjectsHideFriends,
                     HidePartyAllianceMembers = Configuration.AutoHideGameObjectsHidePartyAllianceMembers,
+                    UsePlayerDistance = Configuration.AutoHideGameObjectsUsePlayerDistance,
+                    HonorSanctuaryMinimums = Configuration.AutoHideGameObjectsHonorSanctuaryMinimums,
+                    SanctuaryDistance = Configuration.AutoHideGameObjectsSanctuaryDistance,
+                    MaxDistance = Configuration.AutoHideGameObjectsMaxDistance,
                     HideUnimportantEnpc = Configuration.AutoHideGameObjectsHideUnimportantEnpc,
                     HidePet = Configuration.AutoHideGameObjectsHidePet,
                     HideChocobo = Configuration.AutoHideGameObjectsHideChocobo,
@@ -3120,6 +3163,15 @@ public sealed class Plugin : IDalamudPlugin
                     AddSpacer = Configuration.ShowTravelerWorldNamesAddSpacer,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "clean-chat":
+                snapshot = JsonSerializer.SerializeToElement(Configuration.CleanChatSettings ?? new CleanChatSettings(), ToonModsPresetSerialization.JsonOptions);
+                return true;
+            case "hide-nameplate-status-icons":
+                snapshot = JsonSerializer.SerializeToElement(new XAModNameplateStatusIconsSettings
+                {
+                    HiddenStatusIds = Configuration.HiddenNameplateStatusIds ?? new HashSet<uint>(),
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "show-titles-as-playernames":
                 snapshot = JsonSerializer.SerializeToElement(new XAModShowTitlesAsPlayernamesSettings
                 {
@@ -3258,6 +3310,12 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.DalamudLogCleanerCheckIntervalMinutes = DalamudLogCleanerService.NormalizeCheckInterval(dalamudLogCleanerSettings.CheckIntervalMinutes);
             SetDalamudLogCleanerAutomatic(Configuration.DalamudLogCleanerAutomaticEnabled);
         }
+        if (TryDeserializeXAModSettings(modSettings, "clean-chat", out CleanChatSettings? cleanChatSettings)
+            && cleanChatSettings != null)
+        {
+            Configuration.CleanChatSettings = cleanChatSettings;
+            CleanChat.ApplyConfiguration(cleanChatSettings);
+        }
 
         if (TryDeserializeXAModSettings(modSettings, "dalamud-log-disabler", out XAModDalamudLogDisablerSettings? dalamudLogDisablerSettings)
             && dalamudLogDisablerSettings != null)
@@ -3277,6 +3335,11 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.AutoHideGameObjectsHidePlayer = autoHideSettings.HidePlayer;
             Configuration.AutoHideGameObjectsHideFriends = autoHideSettings.HideFriends;
             Configuration.AutoHideGameObjectsHidePartyAllianceMembers = autoHideSettings.HidePartyAllianceMembers;
+            Configuration.AutoHideGameObjectsUsePlayerDistance = autoHideSettings.UsePlayerDistance;
+            Configuration.AutoHideGameObjectsHonorSanctuaryMinimums = autoHideSettings.HonorSanctuaryMinimums;
+            Configuration.AutoHideGameObjectsSanctuaryDistance = autoHideSettings.SanctuaryDistance;
+            Configuration.AutoHideGameObjectsMaxDistance = autoHideSettings.MaxDistance;
+            NormalizeAutoHideGameObjectsDistances();
             Configuration.AutoHideGameObjectsHideUnimportantEnpc = autoHideSettings.HideUnimportantEnpc;
             Configuration.AutoHideGameObjectsHidePet = autoHideSettings.HidePet;
             Configuration.AutoHideGameObjectsHideChocobo = autoHideSettings.HideChocobo;
@@ -3300,7 +3363,11 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoHideGameObjectsHideFashionAccessories,
                     Configuration.AutoHideGameObjectsHideOwnBeast,
                     Configuration.AutoHideGameObjectsHideFriends,
-                    Configuration.AutoHideGameObjectsHidePartyAllianceMembers);
+                    Configuration.AutoHideGameObjectsHidePartyAllianceMembers,
+                    usePlayerDistance: Configuration.AutoHideGameObjectsUsePlayerDistance,
+                    honorSanctuaryMinimums: Configuration.AutoHideGameObjectsHonorSanctuaryMinimums,
+                    sanctuaryDistance: Configuration.AutoHideGameObjectsSanctuaryDistance,
+                    maxDistance: Configuration.AutoHideGameObjectsMaxDistance);
             }
         }
 
@@ -3360,6 +3427,13 @@ public sealed class Plugin : IDalamudPlugin
         {
             Configuration.BetterHighlightPotentialTargetsColor = BetterHighlightPotentialTargetsService.NormalizeHighlightColor(betterHighlightSettings.Color);
             ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "hide-nameplate-status-icons", out XAModNameplateStatusIconsSettings? statusIconSettings)
+            && statusIconSettings != null)
+        {
+            Configuration.HiddenNameplateStatusIds = statusIconSettings.HiddenStatusIds ?? new HashSet<uint>();
+            NameplatePrivacy.ApplyStatusIconConfiguration(Configuration.HiddenNameplateStatusIds);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "show-traveler-world-names", out XAModShowTravelerWorldNamesSettings? travelerWorldNamesSettings)
@@ -4328,6 +4402,22 @@ public sealed class Plugin : IDalamudPlugin
         return success;
     }
 
+    internal bool SetAutoHideGameObjectsEnabled(bool value)
+    {
+        if (value)
+            ApplyStoredXAModConfiguration("auto-hide-game-objects");
+        return AutoHideGameObjects.SetEnabled(value);
+    }
+
+    internal void NormalizeAutoHideGameObjectsDistances()
+    {
+        var sanctuaryDistance = Configuration.AutoHideGameObjectsSanctuaryDistance;
+        var maxDistance = Configuration.AutoHideGameObjectsMaxDistance;
+        AutoHideGameObjectsService.NormalizePlayerDistances(ref sanctuaryDistance, ref maxDistance);
+        Configuration.AutoHideGameObjectsSanctuaryDistance = sanctuaryDistance;
+        Configuration.AutoHideGameObjectsMaxDistance = maxDistance;
+    }
+
     internal void ApplyAutoDisplayIdsConfiguration(bool save = true)
     {
         var itemIdsShouldRun = Configuration.AutoDisplayIdsEnabled && Configuration.AutoDisplayIdsShowItemId;
@@ -4616,6 +4706,7 @@ public sealed class Plugin : IDalamudPlugin
                 SystemWindowMods.SetDisableBackgroundRenderingDisableWhenArMultiIsOn(Configuration.DisableBackgroundGameRenderingDisableWhenArMultiIsOn);
                 break;
             case "auto-hide-game-objects":
+                NormalizeAutoHideGameObjectsDistances();
                 AutoHideGameObjects.ApplyConfiguration(
                     Configuration.AutoHideGameObjectsHidePlayer,
                     Configuration.AutoHideGameObjectsHideUnimportantEnpc,
@@ -4628,7 +4719,11 @@ public sealed class Plugin : IDalamudPlugin
                     Configuration.AutoHideGameObjectsHideFashionAccessories,
                     Configuration.AutoHideGameObjectsHideOwnBeast,
                     Configuration.AutoHideGameObjectsHideFriends,
-                    Configuration.AutoHideGameObjectsHidePartyAllianceMembers);
+                    Configuration.AutoHideGameObjectsHidePartyAllianceMembers,
+                    usePlayerDistance: Configuration.AutoHideGameObjectsUsePlayerDistance,
+                    honorSanctuaryMinimums: Configuration.AutoHideGameObjectsHonorSanctuaryMinimums,
+                    sanctuaryDistance: Configuration.AutoHideGameObjectsSanctuaryDistance,
+                    maxDistance: Configuration.AutoHideGameObjectsMaxDistance);
                 break;
             case "auto-hide-unnecessary-popups":
                 PopupCleaner.ApplyConfiguration(Configuration.AutoHideUnnecessaryPopupsHideHowToNoticeEnabled);
@@ -4649,6 +4744,12 @@ public sealed class Plugin : IDalamudPlugin
                 NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(
                     Configuration.ShowTravelerWorldNamesDisableInDuties,
                     Configuration.ShowTravelerWorldNamesAddSpacer);
+                break;
+            case "hide-nameplate-status-icons":
+                NameplatePrivacy.ApplyStatusIconConfiguration(Configuration.HiddenNameplateStatusIds);
+                break;
+            case "clean-chat":
+                CleanChat.ApplyConfiguration(Configuration.CleanChatSettings);
                 break;
             case "show-titles-as-playernames":
                 NameplatePrivacy.ApplyShowTitlesAsPlayernamesConfiguration(
@@ -4985,6 +5086,7 @@ public sealed class Plugin : IDalamudPlugin
             return DalamudNotificationsSuck.SetEnabled(value);
         }, applied => Configuration.DalamudNotificationsSuckEnabled = applied, () => DalamudNotificationsSuck.StatusText);
         yield return new("dalamud-log-cleaner", "Dalamud Log Cleaner", XAModsRestoreScope.Game, () => Configuration.DalamudLogCleanerAutomaticEnabled, SetDalamudLogCleanerAutomatic, applied => Configuration.DalamudLogCleanerAutomaticEnabled = applied, () => DalamudLogCleaner.AutomaticStatusText);
+        yield return new("clean-chat", "Clean Chat", XAModsRestoreScope.Game, () => Configuration.CleanChatEnabled, SetCleanChatEnabled, applied => Configuration.CleanChatEnabled = applied, () => CleanChat.StatusText);
         yield return new("dalamud-log-disabler", "Dalamud Log Disabler", XAModsRestoreScope.Game, () => Configuration.DalamudLogDisablerEnabled, value =>
         {
             DalamudLogDisabler.ApplyConfiguration(Configuration.DalamudLogDisablerBlockedPlugins, Configuration.DalamudLogDisablerMinimumKeptLevel);
@@ -5030,7 +5132,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("field-operations-entry-command", "Field Operations Entry Command", XAModsRestoreScope.Eureka, () => Configuration.FieldEntryCommandEnabled, FieldEntryCommand.SetEnabled, applied => Configuration.FieldEntryCommandEnabled = applied, () => FieldEntryCommand.StatusText);
 
         yield return new("auto-ignore-minimum-window-size", "Ignore Minimum Window Size", XAModsRestoreScope.Graphic, () => Configuration.AutoIgnoreMinimumWindowSizeEnabled, SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled, applied => Configuration.AutoIgnoreMinimumWindowSizeEnabled = applied, () => SystemWindowMods.IgnoreMinimumWindowSizeStatusText);
-        yield return new("auto-hide-game-objects", "Hide Game Objects", XAModsRestoreScope.Graphic, () => Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.SetEnabled, applied => Configuration.AutoHideGameObjectsEnabled = applied, () => AutoHideGameObjects.StatusText);
+        yield return new("auto-hide-game-objects", "Hide Game Objects", XAModsRestoreScope.Graphic, () => Configuration.AutoHideGameObjectsEnabled, SetAutoHideGameObjectsEnabled, applied => Configuration.AutoHideGameObjectsEnabled = applied, () => AutoHideGameObjects.StatusText);
         yield return new("custom-resolutions", "Custom Resolutions", XAModsRestoreScope.Graphic, () => Configuration.CustomResolutionsEnabled, SystemWindowMods.SetCustomResolutionsEnabled, applied => Configuration.CustomResolutionsEnabled = applied, () => SystemWindowMods.CustomResolutionsStatusText);
         yield return new("disable-background-game-rendering", "Disable Background Rendering", XAModsRestoreScope.Graphic, () => Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.SetDisableBackgroundRenderingEnabled, applied => Configuration.DisableBackgroundGameRenderingEnabled = applied, () => SystemWindowMods.DisableBackgroundRenderingStatusText);
         yield return new("low-resolution", "Low Resolution", XAModsRestoreScope.Graphic, () => Configuration.LowResolutionEnabled, SystemWindowMods.SetLowResolutionEnabled, applied => Configuration.LowResolutionEnabled = applied, () => SystemWindowMods.LowResolutionStatusText);
@@ -5046,6 +5148,12 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("quick-return", "Instant Return", XAModsRestoreScope.Illegal, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusText);
         yield return new("auto-refuse-trade-request", "Refuse Trade Request", XAModsRestoreScope.Player, () => Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.SetEnabled, applied => Configuration.AutoRefuseTradeRequestEnabled = applied, () => AutoRefuseTrade.StatusText);
         yield return new("show-titles-as-playernames", "Show Titles As Playernames", XAModsRestoreScope.Player, () => Configuration.ShowTitlesAsPlayernamesEnabled, NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled, applied => Configuration.ShowTitlesAsPlayernamesEnabled = applied, () => NameplatePrivacy.ShowTitlesAsPlayernamesStatusText);
+        yield return new("hide-nameplate-status-icons", "Hide Nameplate Status Icons", XAModsRestoreScope.Player, () => Configuration.HideNameplateStatusIconsEnabled, value =>
+        {
+            NameplatePrivacy.ApplyStatusIconConfiguration(Configuration.HiddenNameplateStatusIds);
+            return NameplatePrivacy.SetHideStatusIconsEnabled(value);
+        }, applied => Configuration.HideNameplateStatusIconsEnabled = applied, () => NameplatePrivacy.HideStatusIconsStatusText);
+        yield return new("remove-nameplate-fc-tag", "Remove FC Tag", XAModsRestoreScope.Player, () => Configuration.RemoveNameplateFcTagEnabled, NameplatePrivacy.SetRemoveFcTagEnabled, applied => Configuration.RemoveNameplateFcTagEnabled = applied, () => NameplatePrivacy.RemoveFcTagStatusText);
         yield return new("show-blacklisted-playername-in-party", "Show Blacklisted Playername In Party", XAModsRestoreScope.Player, () => Configuration.ShowBlacklistedPlayernameInPartyEnabled, BlacklistedPartyName.SetEnabled, applied => Configuration.ShowBlacklistedPlayernameInPartyEnabled = applied, () => BlacklistedPartyName.StatusText);
         yield return new("show-traveler-world-names", "Show Traveler World Names", XAModsRestoreScope.Player, () => Configuration.ShowTravelerWorldNamesEnabled, value =>
         {
@@ -5696,5 +5804,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.48";
+    public const string Version = "0.0.0.49";
 }

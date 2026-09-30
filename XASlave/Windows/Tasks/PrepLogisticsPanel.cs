@@ -48,11 +48,13 @@ public partial class SlaveWindow
             {
                 try
                 {
-                    var (added, total) = ImportCharactersFromArToList(chars);
+                    var (added, total) = ImportCharactersFromArToList(chars, cfg.PrepLogisticsHonorArExclusions);
                     cfg.Save();
                     arImportStatus = added > 0
                         ? $"Imported {added} new ({total} total)"
                         : $"All {total} already in list";
+                    if (cfg.PrepLogisticsHonorArExclusions)
+                        arImportStatus += plugin.ArConfigReader.ExclusionStatusSuffix;
                     arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 }
                 catch (Exception ex)
@@ -67,7 +69,11 @@ public partial class SlaveWindow
                 ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
                 : "AutoRetainer config not found.\nExpected: " + plugin.ArConfigReader.GetAutoRetainerConfigPath());
 
-        ImGui.SameLine();
+        DrawHonorAutoRetainerExclusions("prepLogistics", cfg.PrepLogisticsHonorArExclusions,
+            value => cfg.PrepLogisticsHonorArExclusions = value,
+            () => PruneAutoRetainerExcludedSelections(chars, prepLogisticsSelectedIndices, cfg.PrepLogisticsHonorArExclusions));
+        PruneAutoRetainerExcludedSelections(chars, prepLogisticsSelectedIndices, cfg.PrepLogisticsHonorArExclusions);
+
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
         using (ImRaii.Disabled(!xaDbAvailable))
         {
@@ -189,6 +195,8 @@ public partial class SlaveWindow
             for (var idx = 0; idx < chars.Count; idx++)
             {
                 var charName = chars[idx];
+                if (!IsAutoRetainerCharacterAllowed(charName, cfg.PrepLogisticsHonorArExclusions))
+                    continue;
                 var world = GetWorldFromKey(charName);
                 var regionDc = WorldData.GetRegionDcLabel(world);
 
@@ -495,7 +503,8 @@ public partial class SlaveWindow
     {
         var chars = plugin.Configuration.PrepLogisticsCharacters;
         return prepLogisticsSelectedIndices
-            .Where(i => i >= 0 && i < chars.Count)
+            .Where(i => i >= 0 && i < chars.Count
+                && IsAutoRetainerCharacterAllowed(chars[i], plugin.Configuration.PrepLogisticsHonorArExclusions))
             .OrderBy(i => i)
             .Select(i => chars[i])
             .ToList();
@@ -508,6 +517,8 @@ public partial class SlaveWindow
         for (var i = 0; i < chars.Count; i++)
         {
             var charName = chars[i];
+            if (!IsAutoRetainerCharacterAllowed(charName, cfg.PrepLogisticsHonorArExclusions))
+                continue;
             var world = GetWorldFromKey(charName);
             var regionDc = WorldData.GetRegionDcLabel(world);
             if (!MatchesRegionFilter(world, cfg.PrepLogisticsRegionFilter))

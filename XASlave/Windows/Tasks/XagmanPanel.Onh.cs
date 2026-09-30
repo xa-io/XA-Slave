@@ -273,11 +273,14 @@ public partial class SlaveWindow
             ImGui.TextDisabled("No imported characters yet. Import a partner list in the section above.");
             return;
         }
-        using (var imguiScope275 = ImRaii.Table("xagmanOnhQueueTable", 3, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, ScaledVector(0f, 150f)))
+        ImGui.TextDisabled("Drag column borders to resize; right-click headers or body to show or hide columns.");
+        using (var imguiScope275 = ImRaii.Table("xagmanOnhQueueTable", 3,
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable |
+            ImGuiTableFlags.Hideable | ImGuiTableFlags.ContextMenuInBody, ScaledVector(0f, 150f)))
         if (imguiScope275)
         {
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, Scale(30f));
-            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoHide);
             ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();

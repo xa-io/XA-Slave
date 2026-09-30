@@ -88,6 +88,9 @@ public partial class SlaveWindow
         if (xagmanRunning)
             return;
 
+        if (!TryCaptureXagmanCustomMeetingSettings())
+            return;
+
         if (!HasXagmanOnhMeetDestination(cfg))
         {
             SetXagmanOnhUiStatus("Xagman ONH: set your meet world and location first.");
@@ -468,6 +471,8 @@ public partial class SlaveWindow
             expectCrossDataCenterLogout: true,
             travelSourceCharacterProvider: () => charKey,
             travelDestinationWorldProvider: GetXagmanActiveMeetWorld);
+
+        AddXagmanCustomMeetingStep(steps, charKey, ShouldSkipStartup);
 
         // Both roles must have Dropbox ready before the first invitation.
         {

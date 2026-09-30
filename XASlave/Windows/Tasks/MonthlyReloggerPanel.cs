@@ -40,6 +40,7 @@ public partial class SlaveWindow
     private readonly object xaDbPullSync = new();
     private readonly List<Action> xaDbPullCallbacks = new();
     private int xaDbPullRunning;
+    private bool xaDbPullHasManualRequest;
 
     // -----------------------------------------------
     //  Task: Monthly Relogger
@@ -76,16 +77,20 @@ public partial class SlaveWindow
         using (ImRaii.Disabled(!arConfigExists))
         {
             if (ImGui.Button("Import from AutoRetainer"))
-                ImportFromAutoRetainer();
+                ImportFromAutoRetainer(cfg.ReloggerHonorArExclusions);
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(arConfigExists
                 ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
                 : "AutoRetainer config not found.\nExpected: " + plugin.ArConfigReader.GetAutoRetainerConfigPath());
 
-        ImGui.SameLine();
+        DrawHonorAutoRetainerExclusions("relogger", cfg.ReloggerHonorArExclusions,
+            value => cfg.ReloggerHonorArExclusions = value,
+            () => PruneAutoRetainerExcludedSelections(chars, reloggerSelectedIndices, cfg.ReloggerHonorArExclusions));
+        PruneAutoRetainerExcludedSelections(chars, reloggerSelectedIndices, cfg.ReloggerHonorArExclusions);
+
         if (ImGui.Button("Refresh AR Data"))
-            RefreshArCharacterCache();
+            RefreshArCharacterCache(cfg.ReloggerHonorArExclusions);
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Reload character details (Lv, Gil, FC) from AutoRetainer config without adding/removing characters.");
 
@@ -244,6 +249,8 @@ public partial class SlaveWindow
             for (int idx = 0; idx < chars.Count; idx++)
             {
                 var charName = chars[idx];
+                if (!IsAutoRetainerCharacterAllowed(charName, cfg.ReloggerHonorArExclusions))
+                    continue;
                 var nameParts = charName.Split('@');
                 var world = nameParts.Length > 1 ? nameParts[1] : "";
                 var regionDc = WorldData.GetRegionDcLabel(world);
@@ -499,6 +506,8 @@ public partial class SlaveWindow
         var v11 = cfg.ReloggerDoLogoutOnComplete;
         var v12 = cfg.ReloggerDoKillGameOnComplete;
         var v13 = cfg.ReloggerDoEnableArMultiOnComplete;
+        var discardItems = cfg.ReloggerDoDiscardItems;
+        var expertDelivery = cfg.ReloggerDoExpertDelivery;
 
         changed |= ImGui.Checkbox("Enable TextAdvance (/at y)", ref v1);
         changed |= ImGui.Checkbox("Remove Sprout (/nastatus off)", ref v2);
@@ -506,6 +515,14 @@ public partial class SlaveWindow
         changed |= ImGui.Checkbox("Open Armoury Chest", ref v4);
         changed |= ImGui.Checkbox("Open Saddlebags", ref v5);
         changed |= ImGui.Checkbox("Open Journal", ref v6);
+        changed |= ImGui.Checkbox("Discard Items (AutoRetainer)", ref discardItems);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Run AutoRetainer's configured discard policy before housing visits.\nUses its item protections and discard settings; disabled by default.");
+        changed |= ImGui.Checkbox("Expert Delivery (AutoRetainer)", ref expertDelivery);
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip("Run AutoRetainer's configured Grand Company delivery and exchange policy before housing visits.\nConfigure delivery for each character in AutoRetainer; disabled by default.");
+        if (discardItems || expertDelivery)
+            ImGui.TextDisabled("Stopping this task stops character rotation; active AutoRetainer/Lifestream work may need a separate stop.");
         changed |= ImGui.Checkbox("Teleport Home (Lifestream)", ref v7);
         changed |= ImGui.Checkbox("Collect Personal Plot Info (/housing -> signboard -> save)", ref v8);
         if (ImGui.IsItemHovered())
@@ -524,6 +541,8 @@ public partial class SlaveWindow
             cfg.ReloggerDoOpenArmouryChest = v4;
             cfg.ReloggerDoOpenSaddlebags = v5;
             cfg.ReloggerDoOpenJournal = v6;
+            cfg.ReloggerDoDiscardItems = discardItems;
+            cfg.ReloggerDoExpertDelivery = expertDelivery;
             cfg.ReloggerDoReturnToHome = v7;
             cfg.ReloggerDoCollectPersonalPlotInfo = v8;
             cfg.ReloggerDoReturnToFc = v9;
@@ -610,7 +629,8 @@ public partial class SlaveWindow
     {
         var chars = plugin.Configuration.ReloggerCharacters;
         return reloggerSelectedIndices
-            .Where(i => i >= 0 && i < chars.Count)
+            .Where(i => i >= 0 && i < chars.Count
+                && IsAutoRetainerCharacterAllowed(chars[i], plugin.Configuration.ReloggerHonorArExclusions))
             .OrderBy(i =>
             {
                 var parts = chars[i].Split('@');
@@ -629,6 +649,8 @@ public partial class SlaveWindow
         for (int i = 0; i < chars.Count; i++)
         {
             var cn = chars[i];
+            if (!IsAutoRetainerCharacterAllowed(cn, cfg.ReloggerHonorArExclusions))
+                continue;
             cfg.ReloggerCharacterInfo.TryGetValue(cn, out var info);
             if (info == null || info.LastLoggedIn == default)
             {
@@ -648,6 +670,8 @@ public partial class SlaveWindow
         for (int i = 0; i < chars.Count; i++)
         {
             var charName = chars[i];
+            if (!IsAutoRetainerCharacterAllowed(charName, cfg.ReloggerHonorArExclusions))
+                continue;
             var world = GetWorldFromKey(charName);
             var regionDc = WorldData.GetRegionDcLabel(world);
             if (!MatchesRegionFilter(world, cfg.ReloggerRegionFilter))
@@ -676,6 +700,11 @@ public partial class SlaveWindow
     /// <summary>Start the Monthly Relogger task with the given character list.</summary>
     private void StartMonthlyRelogger(List<string> characters)
     {
+        characters = characters.Where(character =>
+            IsAutoRetainerCharacterAllowed(character, plugin.Configuration.ReloggerHonorArExclusions)).ToList();
+        if (characters.Count == 0)
+            return;
+
         reloggerTask = new MonthlyReloggerTask(plugin)
         {
             DoEnableTextAdvance = plugin.Configuration.ReloggerDoTextAdvance,
@@ -684,6 +713,8 @@ public partial class SlaveWindow
             DoOpenArmouryChest = plugin.Configuration.ReloggerDoOpenArmouryChest,
             DoOpenSaddlebags = plugin.Configuration.ReloggerDoOpenSaddlebags,
             DoOpenJournal = plugin.Configuration.ReloggerDoOpenJournal,
+            DoDiscardItems = plugin.Configuration.ReloggerDoDiscardItems,
+            DoExpertDelivery = plugin.Configuration.ReloggerDoExpertDelivery,
             DoReturnToHome = plugin.Configuration.ReloggerDoReturnToHome,
             DoCollectPersonalPlotInfo = plugin.Configuration.ReloggerDoCollectPersonalPlotInfo,
             DoReturnToFc = plugin.Configuration.ReloggerDoReturnToFc,
@@ -696,7 +727,8 @@ public partial class SlaveWindow
         // Store the full ordered list for UI display during the run
         reloggerRunList = new List<string>(characters);
 
-        var steps = reloggerTask.BuildSteps(characters, plugin.TaskRunner, onCharacterCompleted: (charName) =>
+        var runTask = reloggerTask;
+        var steps = runTask.BuildSteps(characters, plugin.TaskRunner, onCharacterCompleted: (charName) =>
         {
             // Deselect by finding the index of charName in the full list and removing from selected set
             var allChars = plugin.Configuration.ReloggerCharacters;
@@ -704,7 +736,8 @@ public partial class SlaveWindow
             if (idx >= 0)
                 reloggerSelectedIndices.Remove(idx);
         });
-        if (plugin.TaskRunner.Start("Monthly Relogger", steps, totalItems: characters.Count, suppressLogoutCancel: true))
+        if (plugin.TaskRunner.Start("Monthly Relogger", steps, totalItems: characters.Count, suppressLogoutCancel: true,
+            onTerminal: runTask.EndInventoryOperation, haltOnStepError: runTask.DoDiscardItems || runTask.DoExpertDelivery))
         {
             HaltAutoCollectionForPriorityTask("Monthly Relogger");
             AutoOpenTaskLogIfVerbose(ref reloggerShowLog);
@@ -716,14 +749,14 @@ public partial class SlaveWindow
     /// Reads OfflineData entries and adds them as "Name@World" to the character list.
     /// Persists AR data (Lv, Gil, FC, FCID) into ReloggerCharacterInfo for permanent display.
     /// </summary>
-    private void ImportFromAutoRetainer()
+    private void ImportFromAutoRetainer(bool honorExclusions)
     {
         try
         {
-            var arChars = plugin.ArConfigReader.ReadCharacters();
+            var arChars = ReadAutoRetainerCharactersForTask(honorExclusions);
             if (arChars.Count == 0)
             {
-                arImportStatus = "No characters found in AR config.";
+                arImportStatus = "No characters found in AR config." + (honorExclusions ? plugin.ArConfigReader.ExclusionStatusSuffix : string.Empty);
                 arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 return;
             }
@@ -757,6 +790,8 @@ public partial class SlaveWindow
             arImportStatus = added > 0
                 ? $"Imported {added} new ({arChars.Count} total)"
                 : $"All {arChars.Count} already in list";
+            if (honorExclusions)
+                arImportStatus += plugin.ArConfigReader.ExclusionStatusSuffix;
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
 
             Plugin.Log.Information($"[XASlave] AR Import: {arChars.Count} characters loaded, {added} new added, persistent data updated.");
@@ -773,11 +808,11 @@ public partial class SlaveWindow
     /// Refresh AR data for all characters in the list.
     /// Updates persistent Lv/Gil/FC columns without adding/removing characters.
     /// </summary>
-    private void RefreshArCharacterCache()
+    private void RefreshArCharacterCache(bool honorExclusions)
     {
         try
         {
-            var arChars = plugin.ArConfigReader.ReadCharacters();
+            var arChars = ReadAutoRetainerCharactersForTask(honorExclusions);
             var cfg = plugin.Configuration;
             var updated = 0;
 
@@ -797,6 +832,8 @@ public partial class SlaveWindow
             arImportStatus = notFound > 0
                 ? $"Refreshed {updated} characters ({notFound} not in AR)"
                 : $"Refreshed {updated} characters";
+            if (honorExclusions)
+                arImportStatus += plugin.ArConfigReader.ExclusionStatusSuffix;
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
         }
         catch (Exception ex)
@@ -878,9 +915,9 @@ public partial class SlaveWindow
     /// Shared helper: import characters from AutoRetainer into a target list and update shared data.
     /// Returns (added, total) count.
     /// </summary>
-    private (int Added, int Total) ImportCharactersFromArToList(List<string> targetList)
+    private (int Added, int Total) ImportCharactersFromArToList(List<string> targetList, bool honorExclusions = false)
     {
-        var arChars = plugin.ArConfigReader.ReadCharacters();
+        var arChars = ReadAutoRetainerCharactersForTask(honorExclusions);
         var cfg = plugin.Configuration;
         var added = 0;
 
@@ -907,8 +944,12 @@ public partial class SlaveWindow
     /// and repair kit / ceruleum tank counts for all known characters.
     /// Uses the DB path from XA.Database.GetDbPath IPC, then reads SQLite directly.
     /// </summary>
-    private void PullXaDatabaseInfo(Action? afterApply = null)
+    private void PullXaDatabaseInfo(Action? afterApply = null, Func<bool>? shouldApply = null)
     {
+        if (isDisposed || workerCts.IsCancellationRequested)
+            return;
+        if (shouldApply == null)
+            xaDbPullHasManualRequest = true;
         if (afterApply != null)
         {
             lock (xaDbPullSync)
@@ -926,14 +967,52 @@ public partial class SlaveWindow
         arImportStatusExpiry = DateTime.UtcNow.AddSeconds(30);
         if (!RunWorker("XA Database pull", async token =>
         {
+            var finishedOnGameThread = false;
             try
             {
-                var dbPath = await Plugin.RunOnGameThread(() => plugin.IpcClient.GetDbPath());
+                var pathRequest = await Plugin.RunOnGameThread(() =>
+                {
+                    token.ThrowIfCancellationRequested();
+                    if (isDisposed || (!xaDbPullHasManualRequest && !(shouldApply?.Invoke() ?? true)))
+                    {
+                        // Release while still on the game thread so a later manual request
+                        // starts its own read instead of joining this discarded request.
+                        FinishXaDatabasePull();
+                        finishedOnGameThread = true;
+                        return (ShouldRead: false, Path: string.Empty);
+                    }
+                    return (ShouldRead: true, Path: plugin.IpcClient.GetDbPath());
+                });
+                if (!pathRequest.ShouldRead)
+                    return;
+                var dbPath = pathRequest.Path;
                 if (string.IsNullOrWhiteSpace(dbPath) || !System.IO.File.Exists(dbPath))
                     throw new System.IO.FileNotFoundException("XA Database file not found.", dbPath);
 
                 var rows = ReadXaDatabaseRows(dbPath, token);
-                await Plugin.RunOnGameThread(() => ApplyXaDatabaseRows(rows, dbPath));
+                await Plugin.RunOnGameThread(() =>
+                {
+                    try
+                    {
+                        token.ThrowIfCancellationRequested();
+                        if (!isDisposed && (xaDbPullHasManualRequest || (shouldApply?.Invoke() ?? true)))
+                            ApplyXaDatabaseRows(rows, dbPath);
+                    }
+                    catch (Exception ex) when (!token.IsCancellationRequested)
+                    {
+                        if (!isDisposed)
+                        {
+                            arImportStatus = $"XA DB pull failed: {ex.Message}";
+                            arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                            Plugin.Log.Error(ex, "[XASlave] Applying XA Database rows failed.");
+                        }
+                    }
+                    finally
+                    {
+                        FinishXaDatabasePull();
+                        finishedOnGameThread = true;
+                    }
+                });
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
@@ -943,19 +1022,40 @@ public partial class SlaveWindow
             {
                 await Plugin.RunOnGameThread(() =>
                 {
-                    arImportStatus = $"XA DB pull failed: {ex.Message}";
-                    arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
-                    Plugin.Log.Error(ex, "[XASlave] PullXaDatabaseInfo failed.");
+                    try
+                    {
+                        if (!isDisposed && !token.IsCancellationRequested && (xaDbPullHasManualRequest || (shouldApply?.Invoke() ?? true)))
+                        {
+                            arImportStatus = $"XA DB pull failed: {ex.Message}";
+                            arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+                            Plugin.Log.Error(ex, "[XASlave] PullXaDatabaseInfo failed.");
+                        }
+                    }
+                    finally
+                    {
+                        FinishXaDatabasePull();
+                        finishedOnGameThread = true;
+                    }
                 });
             }
             finally
             {
-                System.Threading.Interlocked.Exchange(ref xaDbPullRunning, 0);
+                if (!finishedOnGameThread)
+                    FinishXaDatabasePull();
             }
         }))
         {
-            System.Threading.Interlocked.Exchange(ref xaDbPullRunning, 0);
+            FinishXaDatabasePull();
         }
+    }
+
+    private void FinishXaDatabasePull()
+    {
+        // Failed, cancelled or rejected reads must not leak callbacks into a later read.
+        lock (xaDbPullSync)
+            xaDbPullCallbacks.Clear();
+        xaDbPullHasManualRequest = false;
+        System.Threading.Interlocked.Exchange(ref xaDbPullRunning, 0);
     }
 
     private static List<XaDatabaseCharacterRow> ReadXaDatabaseRows(

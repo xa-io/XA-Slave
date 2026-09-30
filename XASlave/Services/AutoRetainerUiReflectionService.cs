@@ -852,10 +852,10 @@ internal static class AutoRetainerUiReflectionService
         catch { return null; }
     }
 
-    private static object? TryGetAutoRetainerPluginInstance()
-        => TryGetPluginInstance(AutoRetainerInternalName, AutoRetainerPluginTypeName);
+    internal static object? TryGetAutoRetainerPluginInstance(bool allowAssemblyFallback = true)
+        => TryGetPluginInstance(AutoRetainerInternalName, AutoRetainerPluginTypeName, allowAssemblyFallback);
 
-    private static object? TryGetPluginInstance(string internalName, string pluginTypeName)
+    private static object? TryGetPluginInstance(string internalName, string pluginTypeName, bool allowAssemblyFallback = true)
     {
         try
         {
@@ -893,6 +893,11 @@ internal static class AutoRetainerUiReflectionService
         {
             // Fall back to the plugin's own static live-instance field below.
         }
+
+        // Mutating inventory operations require the actual loaded manager instance;
+        // an old assembly can retain its static P field after a provider reload.
+        if (!allowAssemblyFallback)
+            return null;
 
         foreach (var assembly in AppDomain.CurrentDomain.GetAssemblies()
                      .Where(x => string.Equals(x.GetName().Name, internalName, StringComparison.OrdinalIgnoreCase)))

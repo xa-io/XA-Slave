@@ -4,8 +4,10 @@ using System.Globalization;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using System.Threading;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.Enums;
+using Dalamud.Game.Text.SeStringHandling;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using FFXIVClientStructs.FFXIV.Client.Game.Control;
 using Lumina.Excel;
@@ -17,7 +19,7 @@ namespace XASlave.Services;
 // AutoRetainer/Internal/Memory.cs (AGPL-3.0), checked 2026-09-12:
 // https://github.com/PunishXIV/AutoRetainer/blob/master/AutoRetainer/Internal/Memory.cs
 // No AutoRetainer runtime, sell plan, task manager, or hooks are used.
-internal unsafe sealed class NpcSellSession
+internal unsafe sealed class NpcSellSession : IDisposable
 {
     public const string TreasureItemIds = "22500,22501,22502,22503,22504,22505,22506,22507";
     private delegate void SellSlotDelegate(uint slot, InventoryType inventory, uint unknown);
@@ -31,7 +33,10 @@ internal unsafe sealed class NpcSellSession
     private SellSlotDelegate? sellSlot;
     private static HashSet<uint>? vendorIds;
     private static HashSet<string>? purchaseNames;
-    private (InventoryType Bag, int Slot, uint Id, int Quantity, long Gil)? pending;
+    private (InventoryType Bag, int Slot, uint Id, int Quantity, InventoryItem.ItemFlags Flags, long Gil)? pending;
+    private readonly NpcSellRetryState retry = new();
+    private int observingSale;
+    private int retrievalErrorObserved;
     private string previousError;
     private bool shopOpened;
     private bool ownsVendorInteraction;
@@ -51,6 +56,7 @@ internal unsafe sealed class NpcSellSession
         character = Tasks.MonthlyReloggerTask.GetCurrentCharacterNameWorld();
         territory = Plugin.ClientState.TerritoryType;
         previousError = ReadError();
+        Plugin.ToastGui.ErrorToast += OnErrorToast;
     }
 
     public static bool TryParseIds(string text, out HashSet<uint> ids, out string error)
@@ -80,12 +86,29 @@ internal unsafe sealed class NpcSellSession
     private static string ReadError() => AddonHelper.IsAddonVisible(AddonHelper.TextErrorAddonName)
         ? string.Join(" | ", AddonHelper.GetAddonTextEntries(AddonHelper.TextErrorAddonName)) : string.Empty;
 
+    private void OnErrorToast(ref SeString message, ref bool isHandled)
+    {
+        // Capture identical repeated toasts even when the addon never becomes hidden between them.
+        // Only Tick reconciles inventory or dispatches native actions; leave the game's toast visible.
+        if (Volatile.Read(ref observingSale) != 0 && NpcSellRetryState.IsInventoryRetrievalError(message.TextValue))
+            Interlocked.Exchange(ref retrievalErrorObserved, 1);
+    }
+
+    public void Dispose()
+    {
+        Volatile.Write(ref observingSale, 0);
+        Plugin.ToastGui.ErrorToast -= OnErrorToast;
+        if (!Finished) Result = $"NPC selling cancelled after {SoldUnits:N0} units.";
+        Finished = true;
+    }
+
     public void Abort(string reason)
     {
         if (Finished) return;
         Result = $"NPC selling failed after {SoldUnits:N0} units: {reason}";
         Succeeded = false;
         Finished = true;
+        Dispose();
         CloseOwnedShop();
         log(Result);
     }
@@ -123,8 +146,15 @@ internal unsafe sealed class NpcSellSession
                 && (!ipc.TryGetAutoRetainerBusy(out var arBusy) || arBusy))
             { Abort("AutoRetainer became busy or its state is unknown; refusing concurrent automation"); return true; }
             var error = ReadError();
-            if (error.Length > 0 && error != previousError) { Abort($"game reported '{error}'"); return true; }
+            var retrievalError = Interlocked.Exchange(ref retrievalErrorObserved, 0) != 0;
+            if (error.Length > 0 && error != previousError)
+            {
+                if (!NpcSellRetryState.IsInventoryRetrievalError(error)) { Abort($"game reported '{error}'"); return true; }
+                retrievalError = true;
+            }
             previousError = error;
+            if (pending != null && retrievalError && retry.RecordRetrievalError(DateTime.UtcNow))
+                log($"NPC selling: inventory retrieval busy ({retry.ConsecutiveFailures}/{NpcSellRetryState.MaximumConsecutiveFailures} consecutive rejected attempts); waiting for inventory and gil to settle.");
             if ((DateTime.UtcNow - lastProgress).TotalSeconds > 30) { Abort("no sale or shop progress for 30 seconds"); return true; }
             if (closing)
             {
@@ -132,6 +162,7 @@ internal unsafe sealed class NpcSellSession
                 if (!CharacterSafetyHelper.IsCharacterSafeWaitReady()) return false;
                 Succeeded = true;
                 Finished = true;
+                Dispose();
                 Result = $"NPC selling finished: {SoldUnits:N0} units sold; no listed items remain in the four main bags.";
                 log(Result);
                 return true;
@@ -147,10 +178,24 @@ internal unsafe sealed class NpcSellSession
             {
                 var slot = manager->GetInventoryContainer(sale.Bag)->GetInventorySlot(sale.Slot);
                 if (slot == null) { Abort("pending inventory slot unavailable"); return true; }
-                if (slot->ItemId == sale.Id && slot->Quantity >= sale.Quantity) return false;
-                if (manager->GetInventoryItemCount(1) <= sale.Gil) return false;
+                var gil = (long)manager->GetInventoryItemCount(1);
+                var inventoryChanged = slot->ItemId != sale.Id || slot->Quantity < sale.Quantity;
+                var unchanged = slot->ItemId == sale.Id && slot->Quantity == sale.Quantity && slot->Flags == sale.Flags && gil == sale.Gil;
+                var action = retry.Evaluate(DateTime.UtcNow, inventoryChanged, gil > sale.Gil, unchanged, HasPendingInventoryOperations(manager));
+                if (action == NpcSellPendingAction.Wait) return false;
+                if (action == NpcSellPendingAction.Stop)
+                { Abort($"game reported '{NpcSellRetryState.InventoryRetrievalMessage}' on 3 consecutive sale attempts"); return true; }
+                if (action == NpcSellPendingAction.Retry)
+                {
+                    if (!AddonHelper.IsAddonReady("Shop")) { Abort("shop closed before selling finished"); return true; }
+                    log($"NPC selling: retrying rejected sale after inventory retrieval wait ({retry.ConsecutiveFailures}/{NpcSellRetryState.MaximumConsecutiveFailures}).");
+                    SellInventorySlot(manager, sale.Bag, sale.Slot, slot);
+                    return Finished;
+                }
                 SoldUnits += slot->ItemId == sale.Id ? sale.Quantity - slot->Quantity : sale.Quantity;
+                Volatile.Write(ref observingSale, 0);
                 pending = null;
+                retry.ConfirmProgress();
                 lastProgress = DateTime.UtcNow;
             }
             if (!AddonHelper.IsAddonReady("Shop"))
@@ -167,19 +212,8 @@ internal unsafe sealed class NpcSellSession
                 {
                     var slot = container->GetInventorySlot(index);
                     if (slot == null || !itemIds.Contains(slot->ItemId) || slot->Quantity == 0) continue;
-                    var row = Plugin.DataManager.GetExcelSheet<Item>().GetRowOrDefault(slot->ItemId);
-                    if (row == null || row.Value.PriceLow == 0) { Abort($"item {slot->ItemId} cannot be sold"); return true; }
-                    var gil = (long)manager->GetInventoryItemCount(1);
-                    if (gil < 0) { Abort("gil could not be read"); return true; }
-                    // Round HQ upward for a conservative upper bound before selling an entire stack.
-                    var price = (long)row.Value.PriceLow;
-                    if ((slot->Flags & InventoryItem.ItemFlags.HighQuality) != 0) price = (price * 11 + 9) / 10;
-                    if (gil >= 990_000_000 || gil + price * slot->Quantity > 999_999_999)
-                    { Abort("gil limit reached or the next stack could exceed maximum gil"); return true; }
-                    sellSlot ??= Marshal.GetDelegateForFunctionPointer<SellSlotDelegate>(Plugin.SigScanner.ScanText(Sigs.NpcSellSlotSig));
-                    pending = (bag, index, slot->ItemId, slot->Quantity, gil);
-                    sellSlot((uint)index, bag, 0);
-                    return false;
+                    SellInventorySlot(manager, bag, index, slot);
+                    return Finished;
                 }
             }
             closing = true;
@@ -187,6 +221,35 @@ internal unsafe sealed class NpcSellSession
             return false;
         }
         catch (Exception ex) { Abort($"{ex.GetType().Name}: {ex.Message}"); return true; }
+    }
+
+    private void SellInventorySlot(InventoryManager* manager, InventoryType bag, int index, InventoryItem* slot)
+    {
+        // The client tracks requests awaiting a server response, including delayed sales.
+        // Never add a sale while that queue is occupied, even when visible balances look unchanged.
+        if (HasPendingInventoryOperations(manager)) return;
+        var row = Plugin.DataManager.GetExcelSheet<Item>().GetRowOrDefault(slot->ItemId);
+        if (row == null || row.Value.PriceLow == 0) { Abort($"item {slot->ItemId} cannot be sold"); return; }
+        var gil = (long)manager->GetInventoryItemCount(1);
+        if (gil < 0) { Abort("gil could not be read"); return; }
+        // Round HQ upward for a conservative upper bound before selling an entire stack.
+        var price = (long)row.Value.PriceLow;
+        if ((slot->Flags & InventoryItem.ItemFlags.HighQuality) != 0) price = (price * 11 + 9) / 10;
+        if (gil >= 990_000_000 || gil + price * slot->Quantity > 999_999_999)
+        { Abort("gil limit reached or the next stack could exceed maximum gil"); return; }
+        sellSlot ??= Marshal.GetDelegateForFunctionPointer<SellSlotDelegate>(Plugin.SigScanner.ScanText(Sigs.NpcSellSlotSig));
+        pending = (bag, index, slot->ItemId, slot->Quantity, slot->Flags, gil);
+        retry.BeginAttempt();
+        Interlocked.Exchange(ref retrievalErrorObserved, 0);
+        Volatile.Write(ref observingSale, 1);
+        sellSlot((uint)index, bag, 0);
+    }
+
+    private static bool HasPendingInventoryOperations(InventoryManager* manager)
+    {
+        foreach (var operation in manager->PendingOperations)
+            if (!operation.IsEmpty) return true;
+        return false;
     }
 
     private void OpenNearbyVendor()

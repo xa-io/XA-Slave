@@ -46,8 +46,16 @@ public partial class SlaveWindow
                     if (!session.Succeeded) runner.RequestHalt(session.Result);
                 },
             },
-        }, onFinished: () => manualNpcSell = null);
-        if (!started) manualNpcSell = null;
+        }, onTerminal: () =>
+        {
+            session.Dispose();
+            if (ReferenceEquals(manualNpcSell, session)) manualNpcSell = null;
+        });
+        if (!started)
+        {
+            session.Dispose();
+            if (ReferenceEquals(manualNpcSell, session)) manualNpcSell = null;
+        }
         message = started ? "NPC selling started for the selected treasure IDs only. Use /xa npcsell stop to stop." : "NPC selling could not acquire the task runner.";
         return started;
     }

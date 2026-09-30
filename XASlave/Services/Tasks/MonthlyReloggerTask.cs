@@ -19,6 +19,7 @@ namespace XASlave.Services.Tasks;
 public sealed class MonthlyReloggerTask
 {
     private readonly Plugin plugin;
+    private InventoryOperationContext? activeInventoryOperation;
 
     // -- Configurable actions per character --
     public bool DoEnableTextAdvance { get; set; } = true;
@@ -27,6 +28,8 @@ public sealed class MonthlyReloggerTask
     public bool DoOpenArmouryChest { get; set; } = true;
     public bool DoOpenSaddlebags { get; set; } = true;
     public bool DoOpenJournal { get; set; } = true;
+    public bool DoDiscardItems { get; set; } = false;
+    public bool DoExpertDelivery { get; set; } = false;
     public bool DoReturnToHome { get; set; } = true;
     public bool DoCollectPersonalPlotInfo { get; set; } = true;
     public bool DoReturnToFc { get; set; } = true;
@@ -118,7 +121,7 @@ public sealed class MonthlyReloggerTask
 
             // Per-character actions - built inline so ordering is correct
             // Each action step is gated by relog success
-            var perCharActions = BuildPerCharacterActions(charName, charIndex, charTotal, runner);
+            var perCharActions = BuildPerCharacterActions(charName, charIndex, charTotal, runner, relogState);
             foreach (var action in perCharActions)
             {
                 var origEnter = action.OnEnter;
@@ -553,10 +556,89 @@ public sealed class MonthlyReloggerTask
         return steps;
     }
 
+    private sealed class InventoryOperationContext
+    {
+        internal readonly AutoRetainerInventoryOperation Operation;
+        internal readonly TaskRunner Runner;
+        internal readonly RelogState Relog;
+        internal readonly string Character;
+
+        internal InventoryOperationContext(AutoRetainerInventoryOperation operation, TaskRunner runner, RelogState relog, string character)
+        {
+            Operation = operation;
+            Runner = runner;
+            Relog = relog;
+            Character = character;
+        }
+    }
+
+    /// <summary>Stops our observation only; AutoRetainer has no scoped cancellation endpoint.</summary>
+    public void EndInventoryOperation()
+    {
+        var context = activeInventoryOperation;
+        activeInventoryOperation = null;
+        if (context == null) return;
+        // Terminal callbacks can run during logout or disposal. Use only recorded state;
+        // never dereference a provider, abort its global queue, or modify its configuration.
+        RecordRelogIncomplete(context.Runner, context.Relog, context.Character,
+            $"Monthly Relogger stopped before the inventory pass finished for {context.Character}; character remains selected.");
+        if (context.Operation.MayStillBeRunning)
+            context.Runner.AddLog("AutoRetainer/Lifestream may still be running; stop them there before another relogger run.");
+    }
+
+    private TaskStep BuildInventoryOperationStep(AutoRetainerInventoryOperation.Kind kind, string charName, TaskRunner runner, RelogState relogState)
+    {
+        AutoRetainerInventoryOperation? operation = null;
+        var previousLogoutSuppression = false;
+        var label = kind == AutoRetainerInventoryOperation.Kind.Discard ? "Discard Items" : "Expert Delivery";
+
+        void Halt(string reason)
+        {
+            runner.AddLog($"{label}: {reason}");
+            EndInventoryOperation();
+            runner.RequestHalt($"{label} did not finish for {charName}.");
+        }
+
+        return new TaskStep
+        {
+            Name = label,
+            OnEnter = () =>
+            {
+                previousLogoutSuppression = runner.SuppressLogoutCancel;
+                runner.SuppressLogoutCancel = false;
+                operation = new AutoRetainerInventoryOperation(plugin.IpcClient, kind,
+                    () => GetCurrentCharacterNameWorld().Equals(charName, StringComparison.OrdinalIgnoreCase));
+                activeInventoryOperation = new InventoryOperationContext(operation, runner, relogState, charName);
+                runner.AddLog($"Starting AutoRetainer {label} for {charName} using its configured item rules...");
+                if (operation.Start() == AutoRetainerInventoryOperation.State.Failed)
+                    Halt(operation.Status);
+                else
+                    runner.AddLog(operation.Status);
+            },
+            IsComplete = () =>
+            {
+                if (operation == null || activeInventoryOperation == null) return false;
+                var result = operation.Poll();
+                if (result == AutoRetainerInventoryOperation.State.Failed)
+                {
+                    Halt(operation.Status);
+                    return false;
+                }
+                if (result != AutoRetainerInventoryOperation.State.Finished) return false;
+                activeInventoryOperation = null;
+                runner.SuppressLogoutCancel = previousLogoutSuppression;
+                runner.AddLog($"{label}: {operation.Status}");
+                return true;
+            },
+            TimeoutSec = kind == AutoRetainerInventoryOperation.Kind.Discard ? 305f : 905f,
+            OnTimeout = () => Halt("Timed out waiting for provider completion."),
+        };
+    }
+
     /// <summary>
     /// Builds the per-character action steps.
     /// </summary>
-    private List<TaskStep> BuildPerCharacterActions(string charName, int idx, int total, TaskRunner runner)
+    private List<TaskStep> BuildPerCharacterActions(string charName, int idx, int total, TaskRunner runner, RelogState relogState)
     {
         var steps = new List<TaskStep>();
 
@@ -680,6 +762,11 @@ public sealed class MonthlyReloggerTask
                 steps.Add(MakeDelay("Journal Save Delay", 0.5f, () => !AddonHelper.IsAddonVisible("Journal")));
             }
         }
+
+        if (DoDiscardItems)
+            steps.Add(BuildInventoryOperationStep(AutoRetainerInventoryOperation.Kind.Discard, charName, runner, relogState));
+        if (DoExpertDelivery)
+            steps.Add(BuildInventoryOperationStep(AutoRetainerInventoryOperation.Kind.ExpertDelivery, charName, runner, relogState));
 
         // return_to_homeXA() → Lifestream: /li home
         // Short timeout (5s) for "wait busy" - if char has no house, Lifestream never becomes busy

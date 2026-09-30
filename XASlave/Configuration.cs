@@ -174,6 +174,12 @@ public class Configuration : IPluginConfiguration
     // -- Monthly Relogger --
     // Character list in "Name@World" format persisted across sessions
     public List<string> ReloggerCharacters { get; set; } = new();
+    public bool ReloggerHonorArExclusions { get; set; } = false;
+    public bool ReturnAltsHonorArExclusions { get; set; } = false;
+    public bool FcPermsHonorArExclusions { get; set; } = false;
+    public bool PrepLogisticsHonorArExclusions { get; set; } = false;
+    public bool RefreshSubsHonorArExclusions { get; set; } = false;
+    public bool XagmanHonorArExclusions { get; set; } = false;
 
     // -- Auto-Glam Weather --
     public int AutoGlamWeatherClassJob { get; set; } = 1;
@@ -195,6 +201,8 @@ public class Configuration : IPluginConfiguration
     public bool ReloggerDoOpenArmouryChest { get; set; } = true;
     public bool ReloggerDoOpenSaddlebags { get; set; } = true;
     public bool ReloggerDoOpenJournal { get; set; } = true;
+    public bool ReloggerDoDiscardItems { get; set; } = false;
+    public bool ReloggerDoExpertDelivery { get; set; } = false;
     public bool ReloggerDoReturnToHome { get; set; } = true;
     public bool ReloggerDoCollectPersonalPlotInfo { get; set; } = true;
     public bool ReloggerDoReturnToFc { get; set; } = true;
@@ -255,6 +263,9 @@ public class Configuration : IPluginConfiguration
     public bool XagmanSharedItemsMigrationComplete { get; set; }
     public string XagmanTargetWorld { get; set; } = string.Empty;
     public string XagmanTargetAetheryte { get; set; } = string.Empty;
+    public bool XagmanCustomMeetingCoordinatesEnabled { get; set; } = false;
+    public string XagmanCustomMeetingCoordinates { get; set; } = string.Empty;
+    public uint XagmanCustomMeetingTerritoryId { get; set; }
     public int XagmanTonyGilMinimum { get; set; } = 10000;
     public bool XagmanSellWhenInventoryFull { get; set; } = false;
     public bool XagmanUseDirectNpcSell { get; set; } = false;
@@ -413,6 +424,10 @@ public class Configuration : IPluginConfiguration
     public bool AutoHideGameObjectsHidePlayer { get; set; } = true;
     public bool AutoHideGameObjectsHideFriends { get; set; } = false;
     public bool AutoHideGameObjectsHidePartyAllianceMembers { get; set; } = false;
+    public bool AutoHideGameObjectsUsePlayerDistance { get; set; } = false;
+    public bool AutoHideGameObjectsHonorSanctuaryMinimums { get; set; } = false;
+    public float AutoHideGameObjectsSanctuaryDistance { get; set; } = AutoHideGameObjectsService.DefaultSanctuaryDistance;
+    public float AutoHideGameObjectsMaxDistance { get; set; } = AutoHideGameObjectsService.DefaultMaxDistance;
     public bool AutoHideGameObjectsHideUnimportantEnpc { get; set; } = true;
     public bool AutoHideGameObjectsHidePet { get; set; } = true;
     public bool AutoHideGameObjectsHideChocobo { get; set; } = true;
@@ -484,6 +499,9 @@ public class Configuration : IPluginConfiguration
     public bool ExpandedPlayerRightClickMenuSearchLalachievementsEnabled { get; set; } = true;
     public bool ExpandedPlayerRightClickMenuSearchOpenAllEnabled { get; set; } = true;
     public bool LiveAnonymousModeEnabled { get; set; } = false;
+    public bool HideNameplateStatusIconsEnabled { get; set; } = false;
+    public HashSet<uint> HiddenNameplateStatusIds { get; set; } = new();
+    public bool RemoveNameplateFcTagEnabled { get; set; } = false;
     public bool ShowTravelerWorldNamesEnabled { get; set; } = false;
     public bool ShowTravelerWorldNamesDisableInDuties { get; set; } = true;
     public bool ShowTravelerWorldNamesAddSpacer { get; set; } = false;
@@ -604,6 +622,8 @@ public class Configuration : IPluginConfiguration
     public List<uint> ARealmRecordedAllZonesSelectedContentTypes { get; set; } = new();
     public bool DalamudLogDisablerEnabled { get; set; } = false;
     public bool DalamudLogCleanerAutomaticEnabled { get; set; } = false;
+    public bool CleanChatEnabled { get; set; } = false;
+    public CleanChatSettings CleanChatSettings { get; set; } = new();
     public int DalamudLogCleanerCheckIntervalMinutes { get; set; } = 15;
     public List<string> DalamudLogDisablerBlockedPlugins { get; set; } = new();
     // Serilog LogEventLevel minimum kept for filtered plugins: 0=Verbose..5=Fatal, 6=block all. Default full mute.

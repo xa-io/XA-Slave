@@ -1204,6 +1204,7 @@ public partial class SlaveWindow : Window, IDisposable
             ? Stopwatch.StartNew()
             : null;
         MeasureFrameworkUpdateStep("SlaveWindow.EnforceSpecialRenderSafety", plugin.EnforceSpecialRenderSafetyOnFrameworkTick);
+        MeasureFrameworkUpdateStep("SlaveWindow.UpdateAutoGlamForecast", UpdateAutoGlamForecast);
         MeasureFrameworkUpdateStep("SlaveWindow.UpdatePriorityTaskMonitors", UpdatePriorityTaskMonitors);
         MeasureFrameworkUpdateStep("SlaveWindow.UpdatePriorityTaskExternalStatus", UpdatePriorityTaskExternalStatus);
         MeasureFrameworkUpdateStep("SlaveWindow.OnExportDataFrameworkTick", OnExportDataFrameworkTick);

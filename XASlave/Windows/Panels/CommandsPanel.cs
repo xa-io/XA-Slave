@@ -24,6 +24,7 @@ public partial class SlaveWindow
     private static readonly CommandReferenceEntry[] GeneralCommandEntries =
     {
         new("/xa", "Toggle the XA Slave window.", "This is the root command when entered without a subcommand."),
+        new("/xa xagman mini | /xa xagman m", "Toggle the compact Xagman progress window.", "Shows local progress, retained results and available owner timing estimates while the main window is closed. Tony and unknown estimates stay unavailable; this window does not control the run."),
         new("/xa allrestore", "Disable every top-level XA Mod toggle.", "Chat equivalent of the `Disable All Mods` button."),
         new("/xa commands", "Open the window directly to `References > Commands`.", "Useful when you want the command inventory instead of just toggling the main window."),
         new("/xa updates", "Open the version history window.", "Shows the plugin changelog as collapsible version entries. Also accessible from Plugin Operations > Show Updates."),

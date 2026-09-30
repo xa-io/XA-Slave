@@ -267,6 +267,12 @@ public partial class SlaveWindow
                 configuration.ShowTravelerWorldNamesAddSpacer);
         }
 
+        bool SetHideNameplateStatusIconsEnabled(bool value)
+        {
+            plugin.NameplatePrivacy.ApplyStatusIconConfiguration(configuration.HiddenNameplateStatusIds);
+            return plugin.NameplatePrivacy.SetHideStatusIconsEnabled(value);
+        }
+
         void ApplyShowTitlesAsPlayernamesConfiguration()
         {
             plugin.NameplatePrivacy.ApplyShowTitlesAsPlayernamesConfiguration(
@@ -287,6 +293,7 @@ public partial class SlaveWindow
 
         void ApplyAutoHideGameObjectsConfiguration()
         {
+            plugin.NormalizeAutoHideGameObjectsDistances();
             plugin.AutoHideGameObjects.ApplyConfiguration(
                 configuration.AutoHideGameObjectsHidePlayer,
                 configuration.AutoHideGameObjectsHideUnimportantEnpc,
@@ -299,7 +306,11 @@ public partial class SlaveWindow
                 configuration.AutoHideGameObjectsHideFashionAccessories,
                 configuration.AutoHideGameObjectsHideOwnBeast,
                 configuration.AutoHideGameObjectsHideFriends,
-                configuration.AutoHideGameObjectsHidePartyAllianceMembers);
+                configuration.AutoHideGameObjectsHidePartyAllianceMembers,
+                usePlayerDistance: configuration.AutoHideGameObjectsUsePlayerDistance,
+                honorSanctuaryMinimums: configuration.AutoHideGameObjectsHonorSanctuaryMinimums,
+                sanctuaryDistance: configuration.AutoHideGameObjectsSanctuaryDistance,
+                maxDistance: configuration.AutoHideGameObjectsMaxDistance);
         }
 
         void ApplyAutoDisplayNetworkLatencyConfiguration()
@@ -1024,6 +1035,60 @@ public partial class SlaveWindow
             {
                 configuration.AutoHideGameObjectsHidePlayer = hidePlayer;
                 changed = true;
+            }
+
+            var usePlayerDistance = configuration.AutoHideGameObjectsUsePlayerDistance;
+            if (ImGui.Checkbox("Only Hide Players Beyond Distance##AutoHideGameObjects", ref usePlayerDistance))
+            {
+                configuration.AutoHideGameObjectsUsePlayerDistance = usePlayerDistance;
+                changed = true;
+            }
+
+            using (ImRaii.Disabled(!usePlayerDistance))
+            {
+                var honorSanctuaryMinimums = configuration.AutoHideGameObjectsHonorSanctuaryMinimums;
+                if (ImGui.Checkbox("Honor Sanctuary Minimums##AutoHideGameObjects", ref honorSanctuaryMinimums))
+                {
+                    configuration.AutoHideGameObjectsHonorSanctuaryMinimums = honorSanctuaryMinimums;
+                    changed = true;
+                }
+
+                var sanctuaryDistance = configuration.AutoHideGameObjectsSanctuaryDistance;
+                var maxDistance = configuration.AutoHideGameObjectsMaxDistance;
+                AutoHideGameObjectsService.NormalizePlayerDistances(ref sanctuaryDistance, ref maxDistance);
+                var distanceChanged = false;
+                using (ImRaii.Disabled(!honorSanctuaryMinimums))
+                {
+                    distanceChanged |= ImGui.SliderFloat(
+                        "Sanctuary Distance (yalms)##AutoHideGameObjects",
+                        ref sanctuaryDistance,
+                        AutoHideGameObjectsService.MinimumPlayerDistance,
+                        maxDistance,
+                        "%.1f",
+                        ImGuiSliderFlags.AlwaysClamp);
+                }
+
+                distanceChanged |= ImGui.SliderFloat(
+                    "Max Distance (yalms)##AutoHideGameObjects",
+                    ref maxDistance,
+                    AutoHideGameObjectsService.MinimumPlayerDistance,
+                    AutoHideGameObjectsService.MaximumPlayerDistance,
+                    "%.1f",
+                    ImGuiSliderFlags.AlwaysClamp);
+                if (distanceChanged)
+                {
+                    AutoHideGameObjectsService.NormalizePlayerDistances(ref sanctuaryDistance, ref maxDistance);
+                    configuration.AutoHideGameObjectsSanctuaryDistance = sanctuaryDistance;
+                    configuration.AutoHideGameObjectsMaxDistance = maxDistance;
+                    changed = true;
+                }
+            }
+
+            using (ImRaii.TextWrapPos(0f))
+            {
+                ImGui.TextDisabled("Distance filtering keeps nearby players visible in the selected player categories. Turning it off returns to hiding those categories at every distance.");
+                ImGui.TextDisabled("Honor Sanctuary Minimums uses Sanctuary Distance inside a sanctuary and Max Distance outside. When off, Max Distance is always used.");
+                ImGui.TextDisabled("Distances include height and range from 1 to 300 yalms. Sanctuary Distance cannot exceed Max Distance. Other object categories keep their own settings.");
             }
 
             var hideUnimportantEnpc = configuration.AutoHideGameObjectsHideUnimportantEnpc;
@@ -2580,6 +2645,53 @@ public partial class SlaveWindow
             DrawHelpMarker("Available colors are the fixed backend values exposed by the game: red, green, blue, orange, and magenta.");
         }
 
+        void DrawNameplateStatusIconOptions()
+        {
+            ImGui.TextWrapped("Choose each status icon to hide. Statuses sharing the same visual icon are hidden together. Quest and target markers are unchanged.");
+            if (ImGui.Button("Refresh status list##NameplateStatuses"))
+                plugin.NameplatePrivacy.RefreshStatusOptions();
+
+            configuration.HiddenNameplateStatusIds ??= new HashSet<uint>();
+            var options = plugin.NameplatePrivacy.StatusOptions;
+            if (options.Count == 0)
+            {
+                ImGui.TextDisabled("Status data is unavailable. Refresh the list once game data is ready.");
+                return;
+            }
+
+            var changed = false;
+            if (ImGui.Button("Select all##NameplateStatuses"))
+            {
+                foreach (var option in options)
+                    configuration.HiddenNameplateStatusIds.Add(option.StatusId);
+                changed = true;
+            }
+            ImGui.SameLine();
+            if (ImGui.Button("Clear selection##NameplateStatuses"))
+            {
+                configuration.HiddenNameplateStatusIds.Clear();
+                changed = true;
+            }
+            foreach (var option in options)
+            {
+                var hide = configuration.HiddenNameplateStatusIds.Contains(option.StatusId);
+                if (ImGui.Checkbox($"{option.Label}##HiddenNameplateStatus{option.StatusId}", ref hide))
+                {
+                    if (hide)
+                        configuration.HiddenNameplateStatusIds.Add(option.StatusId);
+                    else
+                        configuration.HiddenNameplateStatusIds.Remove(option.StatusId);
+                    changed = true;
+                }
+            }
+            if (changed)
+            {
+                plugin.NameplatePrivacy.ApplyStatusIconConfiguration(configuration.HiddenNameplateStatusIds);
+                SaveConfiguration();
+                SetToonModsStatus("XA Mods: Nameplate status icon selection updated.");
+            }
+        }
+
         void DrawShowTravelerWorldNamesOptions()
         {
             var disableInDuties = configuration.ShowTravelerWorldNamesDisableInDuties;
@@ -3037,12 +3149,12 @@ public partial class SlaveWindow
             "auto-hide-game-objects",
             "Hide Game Objects",
             () => configuration.AutoHideGameObjectsEnabled,
-            plugin.AutoHideGameObjects.SetEnabled,
+            plugin.SetAutoHideGameObjectsEnabled,
             applied => configuration.AutoHideGameObjectsEnabled = applied,
-            "Locally hides selected object categories from view with duty and territory guards.",
-            "Hides players, pets/minions, fashion accessories, Beastmaster beasts, chocobos, or low-value NPCs on the local client. Hide Friends and Hide Party & Alliance Members default off; Hide Non-Friends keeps your previous Hide Players setting. Party/alliance members use their group setting even if they are friends; other players use the friend or non-friend setting. Marked objects and your own character stay visible. Fashion accessories, including your own, have a separate switch. Hide Beasts targets other players' BST pets; Hide own Beast controls yours separately. For only beasts, turn off the broader Hide pets option. The extra options can disable the feature in duties or Island Sanctuary. Occult Crescent rules apply your selected player categories after the crowd threshold while keeping dead players and your current target visible.",
+            "Locally hides selected object categories, with optional player distance limits and duty and territory guards.",
+            "Hides players, pets/minions, fashion accessories, Beastmaster beasts, chocobos, or low-value NPCs on the local client. Hide Friends and Hide Party & Alliance Members default off; Hide Non-Friends keeps your previous Hide Players setting. Party/alliance members use their group setting even if they are friends; other players use the friend or non-friend setting. Marked objects and your own character stay visible. Optional player distance limits only hide selected player categories beyond Max Distance. Honor Sanctuary Minimums switches to the shorter Sanctuary Distance inside a sanctuary. Both distance options default off. Sanctuary Distance defaults to 10 yalms and Max Distance to 50. Fashion accessories, including your own, have a separate switch. Hide Beasts targets other players' BST pets; Hide own Beast controls yours separately. For only beasts, turn off the broader Hide pets option. The extra options can disable the feature in duties or Island Sanctuary. Occult Crescent rules apply your selected player categories after the crowd threshold while keeping dead players and your current target visible.",
             () => plugin.AutoHideGameObjects.StatusText,
-            searchTerms: ["Hide players", "Hide Friends", "Hide Party & Alliance Members", "Hide Non-Friends", "Hide unimportant NPCs", "Hide pets", "minions", "Hide Fashion Accessories", "ornaments", "parasols", "umbrellas", "Hide Beasts", "Hide own Beast", "Beastmaster", "BST", "Hide chocobos", "Occult Crescent", "Island Sanctuary", "duty"],
+            searchTerms: ["Hide players", "Hide Friends", "Hide Party & Alliance Members", "Hide Non-Friends", "Only Hide Players Beyond Distance", "Sanctuary Distance", "Max Distance", "Honor Sanctuary Minimums", "yalms", "Hide unimportant NPCs", "Hide pets", "minions", "Hide Fashion Accessories", "ornaments", "parasols", "umbrellas", "Hide Beasts", "Hide own Beast", "Beastmaster", "BST", "Hide chocobos", "Occult Crescent", "Island Sanctuary", "duty"],
             drawOptions: DrawAutoHideGameObjectsOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
@@ -3382,6 +3494,29 @@ public partial class SlaveWindow
             () => plugin.NameplatePrivacy.ShowTitlesAsPlayernamesStatusText,
             searchTerms: ["title", "titles", "player title", "prefix title", "suffix title", "nameplate", "playernames", "Honorific", "custom title", "traveler"],
             drawOptions: DrawShowTitlesAsPlayernamesOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "hide-nameplate-status-icons",
+            "Hide Nameplate Status Icons",
+            () => configuration.HideNameplateStatusIconsEnabled,
+            SetHideNameplateStatusIconsEnabled,
+            applied => configuration.HideNameplateStatusIconsEnabled = applied,
+            "Hide selected player status icons beside names.",
+            "Choose individual statuses such as mentor variants, new adventurer, returner, disconnecting and other available icons. Shared icons are hidden wherever that same status icon appears. This is local nameplate presentation only; status, quest and target data are unchanged.",
+            () => plugin.NameplatePrivacy.HideStatusIconsStatusText,
+            searchTerms: ["nameplate", "status", "mentor", "sprout", "new adventurer", "returner", "disconnect", "busy", "away", "online"],
+            drawOptions: DrawNameplateStatusIconOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "remove-nameplate-fc-tag",
+            "Remove FC Tag",
+            () => configuration.RemoveNameplateFcTagEnabled,
+            plugin.NameplatePrivacy.SetRemoveFcTagEnabled,
+            applied => configuration.RemoveNameplateFcTagEnabled = applied,
+            "Hide the FC or visitor tag on player nameplates.",
+            "Removes the local free-company/visitor tag line while preserving the player name. Disabling restores the game's tag unless Anonymous Mode or Show Traveler World Names still hides it independently.",
+            () => plugin.NameplatePrivacy.RemoveFcTagStatusText,
+            searchTerms: ["nameplate", "free company", "FC", "tag", "wanderer", "traveler", "voyager"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "show-blacklisted-playername-in-party",
@@ -4087,6 +4222,18 @@ public partial class SlaveWindow
             BuildToonModsSearchHaystack("Dalamud Log Cleaner", "Archive and clear the active log file", "Manual action: /xa clearlog. Optional automatic cleanup at 90 MiB, checked every 15 minutes by default.", ["logging", "dalamud.log", "cache", "reset", "clearlog", "automatic", "interval"]),
             () => configuration.DalamudLogCleanerAutomaticEnabled,
             DrawDalamudLogCleaner));
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "clean-chat",
+            "Clean Chat",
+            () => configuration.CleanChatEnabled,
+            plugin.SetCleanChatEnabled,
+            applied => configuration.CleanChatEnabled = applied,
+            "Hide selected login announcements and recognized RMT advertising.",
+            "Default filters cover English welcome, event and phishing announcements plus recognized RMT ads. Optional regex rules use selected channels. Error, GM and XA coordination messages remain available. Off by default; only future messages are affected.",
+            () => plugin.CleanChat.StatusText,
+            searchTerms: ["chat", "spam", "RMT", "regex", "welcome", "event", "phishing", "filter"],
+            drawOptions: DrawCleanChatOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "dalamud-log-disabler",

@@ -55,12 +55,18 @@ public partial class SlaveWindow
         using (ImRaii.Disabled(!arConfigExists))
         {
             if (ImGui.Button("Import from AutoRetainer##ra"))
-            { ImportFromAutoRetainer(); RefreshReturnAltsList(); }
+            { ImportFromAutoRetainer(cfg.ReturnAltsHonorArExclusions); RefreshReturnAltsList(); }
         }
 
-        ImGui.SameLine();
+        DrawHonorAutoRetainerExclusions("returnAlts", cfg.ReturnAltsHonorArExclusions,
+            value => cfg.ReturnAltsHonorArExclusions = value,
+            () => PruneAutoRetainerExcludedSelections(returnAltsCharList.Select(row => row.CharName).ToList(),
+                returnAltsSelectedIndices, cfg.ReturnAltsHonorArExclusions));
+        PruneAutoRetainerExcludedSelections(returnAltsCharList.Select(row => row.CharName).ToList(),
+            returnAltsSelectedIndices, cfg.ReturnAltsHonorArExclusions);
+
         if (ImGui.Button("Refresh AR Data##ra"))
-        { RefreshArCharacterCache(); RefreshReturnAltsList(); }
+        { RefreshArCharacterCache(cfg.ReturnAltsHonorArExclusions); RefreshReturnAltsList(); }
 
         ImGui.SameLine();
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
@@ -110,6 +116,7 @@ public partial class SlaveWindow
         {
             var selectedChars = Enumerable.Range(0, returnAltsCharList.Count)
                 .Where(returnAltsSelectedIndices.Contains)
+                .Where(i => IsAutoRetainerCharacterAllowed(returnAltsCharList[i].CharName, cfg.ReturnAltsHonorArExclusions))
                 .Select(i => returnAltsCharList[i].CharName)
                 .ToList();
 
@@ -132,7 +139,11 @@ public partial class SlaveWindow
 
             ImGui.SameLine();
             if (ImGui.Button("Check All##ra"))
-            { for (int i = 0; i < returnAltsCharList.Count; i++) returnAltsSelectedIndices.Add(i); }
+            {
+                for (int i = 0; i < returnAltsCharList.Count; i++)
+                    if (IsAutoRetainerCharacterAllowed(returnAltsCharList[i].CharName, cfg.ReturnAltsHonorArExclusions))
+                        returnAltsSelectedIndices.Add(i);
+            }
             ImGui.SameLine();
             if (ImGui.Button("Clear All##ra"))
                 returnAltsSelectedIndices.Clear();
@@ -143,7 +154,10 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Character table - only shows non-homeworld characters --
-        DrawCharacterListHeader("Characters Not On Homeworld", $"({returnAltsCharList.Count} shown)", "returnAltsAnonymize");
+        var returnAltsVisibleIndices = Enumerable.Range(0, returnAltsCharList.Count)
+            .Where(i => IsAutoRetainerCharacterAllowed(returnAltsCharList[i].CharName, cfg.ReturnAltsHonorArExclusions))
+            .ToList();
+        DrawCharacterListHeader("Characters Not On Homeworld", $"({returnAltsVisibleIndices.Count} shown)", "returnAltsAnonymize");
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
@@ -161,7 +175,7 @@ public partial class SlaveWindow
             ImGui.TableHeadersRow();
 
             // Sort
-            var sortedRa = Enumerable.Range(0, returnAltsCharList.Count).ToList();
+            var sortedRa = returnAltsVisibleIndices;
             var raSortSpecs = ImGui.TableGetSortSpecs();
             if (raSortSpecs.SpecsDirty) raSortSpecs.SpecsDirty = false;
             if (raSortSpecs.SpecsCount > 0)
@@ -192,8 +206,10 @@ public partial class SlaveWindow
                 }
             }
 
+            var displayIndex = 0;
             foreach (var i in sortedRa)
             {
+                displayIndex++;
                 var (charName, info) = returnAltsCharList[i];
                 var homeworld = GetWorldFromKey(charName);
                 var currentWorld = !string.IsNullOrEmpty(info.CurrentWorld) ? info.CurrentWorld : homeworld;
@@ -206,7 +222,7 @@ public partial class SlaveWindow
                 var selected = returnAltsSelectedIndices.Contains(i);
                 if (ImGui.Checkbox($"##rasel{i}", ref selected))
                 { if (selected) returnAltsSelectedIndices.Add(i); else returnAltsSelectedIndices.Remove(i); }
-                ImGui.TableNextColumn(); ImGui.Text((i + 1).ToString());
+                ImGui.TableNextColumn(); ImGui.Text(displayIndex.ToString());
                 ImGui.TableNextColumn(); ImGui.Text(displayName);
                 ImGui.TableNextColumn(); ImGui.TextDisabled(displayHomeworld);
                 ImGui.TableNextColumn();

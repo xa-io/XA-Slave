@@ -3,18 +3,34 @@ using System.Collections.Generic;
 using Dalamud.Game.ClientState.Objects.SubKinds;
 using Dalamud.Game.Gui.NamePlate;
 using Dalamud.Game.Text.SeStringHandling;
+using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.Game;
+using Lumina.Excel.Sheets;
 
 namespace XASlave.Services;
 
+public sealed record NameplateStatusOption(uint StatusId, string Label);
+
 public sealed class NameplatePrivacyService : IDisposable
 {
+    private sealed record StatusIconMapping(uint TextureIcon, BitmapFontIcon[] BitmapIcons, bool BitmapMappingUnavailable);
+
     private const string RemoteVisitorLabels = "wanderer, traveler, and voyager";
 
     private readonly INamePlateGui namePlateGui;
     private readonly IpcClient ipcClient;
     private readonly IPluginLog log;
+    private readonly IDataManager dataManager;
+
+    private Dictionary<uint, StatusIconMapping> statusIconMappings = new();
+    private HashSet<uint> hiddenStatusIds = new();
+    private HashSet<uint> hiddenTextureIcons = new();
+    private HashSet<BitmapFontIcon> hiddenBitmapIcons = new();
+    private bool statusOptionsAvailable;
+    private bool selectedStatusMappingUnavailable;
+    private bool hideStatusIconsEnabled;
+    private bool removeFcTagEnabled;
 
     private bool anonymousModeEnabled;
     private bool showTravelerWorldNamesEnabled;
@@ -24,16 +40,158 @@ public sealed class NameplatePrivacyService : IDisposable
     private bool showTitlesAsPlayernamesHonorificSupportEnabled = true;
     private bool subscribed;
 
-    public NameplatePrivacyService(INamePlateGui namePlateGui, IpcClient ipcClient, IPluginLog log)
+    public NameplatePrivacyService(INamePlateGui namePlateGui, IpcClient ipcClient, IPluginLog log, IDataManager dataManager)
     {
         this.namePlateGui = namePlateGui;
         this.ipcClient = ipcClient;
         this.log = log;
+        this.dataManager = dataManager;
+        RefreshStatusOptions();
     }
 
     public bool IsAnonymousModeEnabled => anonymousModeEnabled;
     public bool IsShowTravelerWorldNamesEnabled => showTravelerWorldNamesEnabled;
     public bool IsShowTitlesAsPlayernamesEnabled => showTitlesAsPlayernamesEnabled;
+    public IReadOnlyList<NameplateStatusOption> StatusOptions { get; private set; } = Array.Empty<NameplateStatusOption>();
+
+    public string HideStatusIconsStatusText => !hideStatusIconsEnabled
+        ? statusOptionsAvailable ? "Disabled" : "Disabled - status options unavailable; refresh to retry."
+        : !statusOptionsAvailable
+            ? "Enabled - status mappings unavailable; icons remain unchanged. Refresh to retry."
+            : hiddenStatusIds.Count == 0
+                ? "Enabled - no status icons selected."
+                : selectedStatusMappingUnavailable
+                    ? "Enabled - some selected icon mappings are unavailable; unrecognized icons remain visible."
+                    : "Enabled - selected status icons are hidden on player nameplates.";
+
+    public string RemoveFcTagStatusText => removeFcTagEnabled
+        ? "Enabled - FC tags and visitor labels in the same nameplate field are hidden locally."
+        : "Disabled";
+
+    public bool SetHideStatusIconsEnabled(bool value)
+    {
+        if (value && !hideStatusIconsEnabled)
+            RefreshStatusOptions();
+        hideStatusIconsEnabled = value;
+        UpdateSubscription();
+        RequestRedraw();
+        return hideStatusIconsEnabled;
+    }
+
+    public bool SetRemoveFcTagEnabled(bool value)
+    {
+        removeFcTagEnabled = value;
+        UpdateSubscription();
+        RequestRedraw();
+        return removeFcTagEnabled;
+    }
+
+    public void ApplyStatusIconConfiguration(IEnumerable<uint>? selectedStatusIds)
+    {
+        var selected = selectedStatusIds == null ? new HashSet<uint>() : new HashSet<uint>(selectedStatusIds);
+        selected.Remove(0);
+        if (hiddenStatusIds.SetEquals(selected))
+            return;
+
+        hiddenStatusIds = selected;
+        RebuildHiddenStatusIcons();
+        if (hideStatusIconsEnabled)
+            RequestRedraw();
+    }
+
+    // Only startup, explicit refresh, or enabling calls this; rendering and callbacks use cached mappings.
+    public bool RefreshStatusOptions()
+    {
+        try
+        {
+            var statuses = dataManager.GetExcelSheet<OnlineStatus>();
+            var addon = dataManager.GetExcelSheet<Addon>();
+            var options = new List<NameplateStatusOption>();
+            var mappings = new Dictionary<uint, StatusIconMapping>();
+            foreach (var status in statuses)
+            {
+                var label = status.Name.ExtractText().Trim();
+                if (status.RowId == 0 || status.Icon == 0 || string.IsNullOrWhiteSpace(label))
+                    continue;
+
+                var bitmapIcons = new HashSet<BitmapFontIcon>();
+                var bitmapMappingUnavailable = false;
+                // Installed Lumina calls this Unknown0; EXDSchema identifies it as TextIcon -> Addon.
+                // Do not use OnlineStatus.List: that would omit statuses such as Disconnected.
+                if (status.Unknown0 > 0)
+                {
+                    try
+                    {
+                        if (addon.TryGetRow((uint)status.Unknown0, out var textIcon))
+                        {
+                            foreach (var payload in SeString.Parse(textIcon.Text.Data.Span).Payloads)
+                            {
+                                if (payload is IconPayload icon && icon.Icon != BitmapFontIcon.None)
+                                    bitmapIcons.Add(icon.Icon);
+                            }
+                        }
+                        bitmapMappingUnavailable = bitmapIcons.Count == 0;
+                    }
+                    catch (Exception)
+                    {
+                        // Keep the texture mapping usable without guessing at an unreadable text icon.
+                        bitmapMappingUnavailable = true;
+                    }
+                }
+                else if (status.Unknown0 < 0)
+                {
+                    bitmapMappingUnavailable = true;
+                }
+
+                var icons = new BitmapFontIcon[bitmapIcons.Count];
+                bitmapIcons.CopyTo(icons);
+                mappings[status.RowId] = new StatusIconMapping(status.Icon, icons, bitmapMappingUnavailable);
+                options.Add(new NameplateStatusOption(status.RowId, label));
+            }
+
+            options.Sort((left, right) =>
+            {
+                var order = StringComparer.OrdinalIgnoreCase.Compare(left.Label, right.Label);
+                return order != 0 ? order : left.StatusId.CompareTo(right.StatusId);
+            });
+            statusIconMappings = mappings;
+            StatusOptions = options.AsReadOnly();
+            statusOptionsAvailable = options.Count > 0;
+        }
+        catch (Exception ex)
+        {
+            statusIconMappings = new Dictionary<uint, StatusIconMapping>();
+            StatusOptions = Array.Empty<NameplateStatusOption>();
+            statusOptionsAvailable = false;
+            log.Warning(ex, "[XASlave] Nameplate status options are unavailable; use Refresh to retry.");
+        }
+
+        RebuildHiddenStatusIcons();
+        if (hideStatusIconsEnabled)
+            RequestRedraw();
+        return statusOptionsAvailable;
+    }
+
+    private void RebuildHiddenStatusIcons()
+    {
+        var textures = new HashSet<uint>();
+        var bitmaps = new HashSet<BitmapFontIcon>();
+        var unavailable = false;
+        foreach (var statusId in hiddenStatusIds)
+        {
+            if (!statusIconMappings.TryGetValue(statusId, out var mapping))
+            {
+                unavailable = true;
+                continue;
+            }
+            textures.Add(mapping.TextureIcon);
+            bitmaps.UnionWith(mapping.BitmapIcons);
+            unavailable |= mapping.BitmapMappingUnavailable;
+        }
+        hiddenTextureIcons = textures;
+        hiddenBitmapIcons = bitmaps;
+        selectedStatusMappingUnavailable = unavailable;
+    }
 
     private string TravelerWorldNamesFormatLabel => showTravelerWorldNamesAddSpacer ? "Name @ HomeWorld" : "Name@HomeWorld";
 
@@ -125,10 +283,13 @@ public sealed class NameplatePrivacyService : IDisposable
 
     public void Dispose()
     {
-        var wasEnabled = anonymousModeEnabled || showTravelerWorldNamesEnabled || showTitlesAsPlayernamesEnabled;
+        var wasEnabled = anonymousModeEnabled || showTravelerWorldNamesEnabled || showTitlesAsPlayernamesEnabled
+            || hideStatusIconsEnabled || removeFcTagEnabled;
         anonymousModeEnabled = false;
         showTravelerWorldNamesEnabled = false;
         showTitlesAsPlayernamesEnabled = false;
+        hideStatusIconsEnabled = false;
+        removeFcTagEnabled = false;
         if (subscribed)
             namePlateGui.OnDataUpdate -= OnNamePlateUpdate;
 
@@ -139,7 +300,8 @@ public sealed class NameplatePrivacyService : IDisposable
 
     private void UpdateSubscription()
     {
-        var shouldSubscribe = anonymousModeEnabled || showTravelerWorldNamesEnabled || showTitlesAsPlayernamesEnabled;
+        var shouldSubscribe = anonymousModeEnabled || showTravelerWorldNamesEnabled || showTitlesAsPlayernamesEnabled
+            || hideStatusIconsEnabled || removeFcTagEnabled;
         if (shouldSubscribe == subscribed)
             return;
 
@@ -167,7 +329,8 @@ public sealed class NameplatePrivacyService : IDisposable
     {
         var applyTravelerWorldNames = showTravelerWorldNamesEnabled && !IsTravelerWorldNamesDisabledInDuty();
         var applyTitlesAsPlayernames = showTitlesAsPlayernamesEnabled;
-        if (!anonymousModeEnabled && !applyTravelerWorldNames && !applyTitlesAsPlayernames)
+        if (!anonymousModeEnabled && !applyTravelerWorldNames && !applyTitlesAsPlayernames
+            && !hideStatusIconsEnabled && !removeFcTagEnabled)
             return;
 
         foreach (var handler in handlers)
@@ -175,6 +338,11 @@ public sealed class NameplatePrivacyService : IDisposable
             var playerCharacter = handler.PlayerCharacter;
             if (playerCharacter == null)
                 continue;
+
+            if (removeFcTagEnabled)
+                handler.RemoveFreeCompanyTag();
+            if (hideStatusIconsEnabled)
+                HideSelectedStatusIcons(handler);
 
             if (anonymousModeEnabled)
             {
@@ -208,6 +376,37 @@ public sealed class NameplatePrivacyService : IDisposable
 
             if (changedName)
                 handler.Name = new SeStringBuilder().AddText(displayName).Build();
+        }
+    }
+
+    private void HideSelectedStatusIcons(INamePlateUpdateHandler handler)
+    {
+        var textureIcon = handler.NameIconId;
+        if (textureIcon > 0 && hiddenTextureIcons.Contains((uint)textureIcon))
+            handler.NameIconId = -1;
+
+        if (hiddenBitmapIcons.Count == 0)
+            return;
+
+        try
+        {
+            var prefix = handler.StatusPrefix;
+            List<Payload>? retained = null;
+            for (var i = 0; i < prefix.Payloads.Count; i++)
+            {
+                var payload = prefix.Payloads[i];
+                if (payload is IconPayload icon && hiddenBitmapIcons.Contains(icon.Icon))
+                    retained ??= prefix.Payloads.GetRange(0, i);
+                else
+                    retained?.Add(payload);
+            }
+
+            if (retained != null)
+                handler.StatusPrefix = new SeString(retained);
+        }
+        catch (Exception)
+        {
+            // Preserve malformed/unrecognized text prefixes; never log repeatedly from the update callback.
         }
     }
 

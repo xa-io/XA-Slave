@@ -22,6 +22,14 @@ public sealed class AutoRetainerConfigReader
     private readonly IPluginLog log;
     private readonly string pluginConfigsBasePath;
 
+    /// <summary>OfflineData entries matched by exclusions during the last successful honored read.</summary>
+    public int LastExcludedCharacterCount { get; private set; }
+    internal AutoRetainerExclusionSnapshot? LastExclusionSnapshot { get; private set; }
+
+    public string ExclusionStatusSuffix => LastExcludedCharacterCount > 0
+        ? $" ({LastExcludedCharacterCount} excluded by AutoRetainer)"
+        : string.Empty;
+
     /// <summary>Character data extracted from AutoRetainer config.</summary>
     public record ArCharacterInfo(
         string Name,
@@ -64,12 +72,21 @@ public sealed class AutoRetainerConfigReader
         return File.Exists(GetAutoRetainerConfigPath());
     }
 
+    internal AutoRetainerExclusionSnapshot ReadExclusionSnapshot()
+    {
+        using var document = JsonDocument.Parse(File.ReadAllText(GetAutoRetainerConfigPath()));
+        return AutoRetainerExclusionPolicy.ReadSnapshot(document.RootElement);
+    }
+
     /// <summary>
-    /// Reads AutoRetainer's DefaultConfig.json and extracts all character entries.
+    /// Reads AutoRetainer's DefaultConfig.json. Exclusion checks can be disabled, or matched rows retained for reversible list filtering.
     /// Returns a list of ArCharacterInfo records sorted by Region/DC/World.
     /// </summary>
-    public List<ArCharacterInfo> ReadCharacters()
+    /// <exception cref="InvalidDataException">Exclusions cannot be safely checked; callers must preserve existing data.</exception>
+    public List<ArCharacterInfo> ReadCharacters(bool honorExclusions = true, bool retainExcludedCharacters = false)
     {
+        LastExcludedCharacterCount = 0;
+        LastExclusionSnapshot = null;
         var configPath = GetAutoRetainerConfigPath();
         if (!File.Exists(configPath))
         {
@@ -82,6 +99,9 @@ public sealed class AutoRetainerConfigReader
             var json = File.ReadAllText(configPath);
             using var doc = JsonDocument.Parse(json);
             var root = doc.RootElement;
+            var exclusionSnapshot = honorExclusions ? AutoRetainerExclusionPolicy.ReadSnapshot(root) : null;
+            var excludedContentIds = exclusionSnapshot?.ContentIds ?? new HashSet<ulong>();
+            var excludedCount = 0;
 
             // Extract FC data first (recursive search for HolderChara objects)
             var fcData = ExtractFcData(root);
@@ -93,6 +113,14 @@ public sealed class AutoRetainerConfigReader
             {
                 foreach (var entry in offlineData.EnumerateArray())
                 {
+                    // Compare the full unsigned identity before parsing the retained character data.
+                    // Keep this outside its per-entry catch: an unknown identity must cancel the whole import.
+                    if (AutoRetainerExclusionPolicy.ShouldExcludeCharacter(entry, excludedContentIds))
+                    {
+                        excludedCount++;
+                        if (!retainExcludedCharacters)
+                            continue;
+                    }
                     try
                     {
                         var charInfo = ParseCharacterEntry(entry, fcData);
@@ -112,7 +140,17 @@ public sealed class AutoRetainerConfigReader
                 .ThenBy(c => c.Name)
                 .ToList();
 
+            LastExcludedCharacterCount = excludedCount;
+            LastExclusionSnapshot = exclusionSnapshot;
+            if (excludedCount > 0)
+                log.Information($"[XASlave] AR config: {excludedCount} globally excluded character entries ({(retainExcludedCharacters ? "retained for optional list filtering" : "skipped")}).");
             return characters;
+        }
+        catch (InvalidDataException ex)
+        {
+            // Do not turn an unreadable blacklist into an empty successful import/refresh.
+            log.Warning($"[XASlave] AR import cancelled: {ex.Message}");
+            throw;
         }
         catch (Exception ex)
         {
@@ -128,11 +166,13 @@ public sealed class AutoRetainerConfigReader
         if (!entry.TryGetProperty("Name", out var nameProp)) return null;
         if (!entry.TryGetProperty("World", out var worldProp)) return null;
 
-        long cid = 0;
+        ulong unsignedCid = 0;
         if (cidProp.ValueKind == JsonValueKind.Number)
-            cidProp.TryGetInt64(out cid);
+            cidProp.TryGetUInt64(out unsignedCid);
         else if (cidProp.ValueKind == JsonValueKind.String)
-            long.TryParse(cidProp.GetString(), out cid);
+            ulong.TryParse(cidProp.GetString(), out unsignedCid);
+        // Preserve the complete identity in the existing signed configuration field.
+        var cid = unchecked((long)unsignedCid);
         var name = nameProp.GetString() ?? "Unknown";
         var world = worldProp.GetString() ?? "Unknown";
 

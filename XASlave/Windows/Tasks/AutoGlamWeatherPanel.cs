@@ -105,6 +105,8 @@ public partial class SlaveWindow
             ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Monitoring active...");
         }
 
+        DrawAutoGlamForecast();
+
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();

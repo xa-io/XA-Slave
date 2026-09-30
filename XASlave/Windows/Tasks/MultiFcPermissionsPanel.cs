@@ -55,11 +55,13 @@ public partial class SlaveWindow
             {
                 try
                 {
-                    var (added, total) = ImportCharactersFromArToList(chars);
+                    var (added, total) = ImportCharactersFromArToList(chars, cfg.FcPermsHonorArExclusions);
                     cfg.Save();
                     arImportStatus = added > 0
                         ? $"Imported {added} new ({total} total)"
                         : $"All {total} already in list";
+                    if (cfg.FcPermsHonorArExclusions)
+                        arImportStatus += plugin.ArConfigReader.ExclusionStatusSuffix;
                     arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 }
                 catch (Exception ex)
@@ -74,7 +76,11 @@ public partial class SlaveWindow
                 ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
                 : "AutoRetainer config not found.\nExpected: " + plugin.ArConfigReader.GetAutoRetainerConfigPath());
 
-        ImGui.SameLine();
+        DrawHonorAutoRetainerExclusions("fcPerms", cfg.FcPermsHonorArExclusions,
+            value => cfg.FcPermsHonorArExclusions = value,
+            () => PruneAutoRetainerExcludedSelections(chars, fcPermsSelectedIndices, cfg.FcPermsHonorArExclusions));
+        PruneAutoRetainerExcludedSelections(chars, fcPermsSelectedIndices, cfg.FcPermsHonorArExclusions);
+
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
         using (ImRaii.Disabled(!xaDbAvailable))
         {
@@ -188,6 +194,8 @@ public partial class SlaveWindow
             for (int idx = 0; idx < chars.Count; idx++)
             {
                 var charName = chars[idx];
+                if (!IsAutoRetainerCharacterAllowed(charName, cfg.FcPermsHonorArExclusions))
+                    continue;
                 var nameParts = charName.Split('@');
                 var world = nameParts.Length > 1 ? nameParts[1] : "";
 
@@ -345,7 +353,8 @@ public partial class SlaveWindow
     {
         var chars = plugin.Configuration.FcPermsCharacters;
         return fcPermsSelectedIndices
-            .Where(i => i >= 0 && i < chars.Count)
+            .Where(i => i >= 0 && i < chars.Count
+                && IsAutoRetainerCharacterAllowed(chars[i], plugin.Configuration.FcPermsHonorArExclusions))
             .OrderBy(i => i)
             .Select(i => chars[i])
             .ToList();
@@ -358,6 +367,8 @@ public partial class SlaveWindow
         for (var i = 0; i < chars.Count; i++)
         {
             var charName = chars[i];
+            if (!IsAutoRetainerCharacterAllowed(charName, cfg.FcPermsHonorArExclusions))
+                continue;
             var world = GetWorldFromKey(charName);
             if (!MatchesRegionFilter(world, cfg.FcPermsRegionFilter))
                 continue;
@@ -372,11 +383,9 @@ public partial class SlaveWindow
 
     private void StartFcPermissionsUpdater()
     {
-        var chars = plugin.Configuration.FcPermsCharacters;
-        var selected = fcPermsSelectedIndices.OrderBy(i => i)
-            .Where(i => i < chars.Count)
-            .Select(i => chars[i])
-            .ToList();
+        var selected = GetSelectedFcPermsCharacters();
+        if (selected.Count == 0)
+            return;
 
         var steps = BuildFcPermissionsSteps(selected, plugin.TaskRunner);
 

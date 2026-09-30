@@ -18,6 +18,24 @@ using XASlave.Services.Tasks;
 namespace XASlave.Windows;
 public partial class SlaveWindow
 {
+    // Semantic sort IDs keep each header tied to its data when columns are added.
+    // The v2 table IDs prevent old positional layouts from being applied to the split columns.
+    private enum XagmanRosterColumn : uint
+    {
+        Character = 1,
+        Region = 2,
+        DataCenter = 3,
+        Homeworld = 4,
+        Inventory = 5,
+        Gil = 6,
+        Treasure = 7,
+        Kits = 8,
+        Tanks = 9,
+        Retainers = 10,
+        Submarines = 11,
+        Delete = 12,
+    }
+
     private enum XagmanTonyMeetCommandPhase
     {
         None,
@@ -425,6 +443,15 @@ public partial class SlaveWindow
                     ImportXagmanFranchiseCharactersFromAr();
             }
         }
+        DrawHonorAutoRetainerExclusions("xagman", cfg.XagmanHonorArExclusions,
+            value => cfg.XagmanHonorArExclusions = value,
+            PruneXagmanAutoRetainerExclusions,
+            () =>
+            {
+                ClearXagmanMatchingSelectionCaches();
+                StopXagmanTonyAutoSelection("Auto: exclusion settings changed. Run Auto again when idle to check coverage.");
+                InvalidateXagmanTradeCapacityForecast();
+            });
         var manualXaDatabasePullRunning = System.Threading.Volatile.Read(ref xagmanManualXaDatabasePullRunning) != 0;
         using (ImRaii.Disabled(manualXaDatabasePullRunning))
         {
@@ -470,10 +497,11 @@ public partial class SlaveWindow
             if (ImGui.IsItemHovered())
             {
                 ImGui.SetTooltip(
-                    "When Tony's inventory fills, XA paths Tony to a supported vendor and verifies inventory capacity after selling.\n" +
+                    "Connected Xagman preserves stock for owner supply passes and uses collection/supply cycling when capacity is reached.\n" +
+                    "Vendor selling remains available for Outside Network Helper and ordinary trade-failure recovery.\n" +
                     "Supported meet locations:\n" +
                     GetXagmanTonySellSupportedLocationTooltipText() + "\n" +
-                    "If Tony is anywhere else, or Tony has 990,000,000 gil or more, XA uses the normal Tony full-inventory behavior: return home, relog the next Tony, or stop if no Tony remains.");
+                    "Unsupported locations or 990,000,000+ gil prevent vendor selling; Xagman rotates eligible Tonys or reports remaining capacity needs.");
             }
             if (sellWhenInventoryFull)
             {
@@ -527,6 +555,7 @@ public partial class SlaveWindow
         }
         ImGui.Spacing();
         var autoReturnToFc = cfg.XagmanAutoReturnToFc;
+        DrawXagmanCustomMeetingCoordinates(cfg);
         if (ImGui.Checkbox("Return to FC when finished##xagmanReturnFc", ref autoReturnToFc))
         {
             cfg.XagmanAutoReturnToFc = autoReturnToFc;
@@ -780,6 +809,8 @@ public partial class SlaveWindow
         if (role == XagmanRole.Tony)
         {
             ImGui.TextColored(sectionColor, "Tony Setup");
+            ImGui.TextWrapped("Plan Tony stock and free inventory space for faster logistics. Xagman can rotate collectors and suppliers, then revisit partially filled owners for only their unfinished Give and Take/Balance amounts. Unrelated leftovers do not require another pass.");
+            ImGui.TextWrapped("If all selected Tonys are full and no remaining request can free usable space, automatic cycling stops with named capacity and shortage warnings in Results and the task log.");
             ImGui.TextWrapped("1. Optional: create a Tony Search Item List.");
             ImGui.TextWrapped("2. Filter region if needed or use the search bar. Select characters manually, left-click Select Matching Items to select visible Tonys that hold items from the Tony Search Item List, or use Select Current Character while logged in to add that configured home-world character regardless of filters. Right-click Select Matching Items to limit suppliers to Tonys with or without registered retainers or submarines.");
             ImGui.TextWrapped("3. Select a world to meet and a meet location as the set aetheryte.");
@@ -795,7 +826,7 @@ public partial class SlaveWindow
         ImGui.TextWrapped("1. Create a list of items in Shared Item List.");
         ImGui.Indent();
         ImGui.TextWrapped("- Give: give up to the amount to Tony; 0 gives all available stock.");
-        ImGui.TextWrapped("- Take: request the amount from Tony per supply pass; 0 requests all currently tradable Tony stock.");
+        ImGui.TextWrapped("- Take: receive the configured amount across this run's Tony passes; 0 requests all available tradable stock.");
         ImGui.TextWrapped("- Balance: give surplus or request the deficit so the owner ends at the amount. Balance 0 offloads all.");
         ImGui.TextWrapped("- TopUp: request only the deficit to the amount and leave owner surplus untouched. TopUp 0 does nothing.");
         ImGui.TextWrapped("- A plain Give, Take, Balance, or TopUp row is the fallback for every owner. The matching 'if Subs' or 'if Retainers' row overrides it for owners with registered AutoRetainer counts.");
@@ -804,6 +835,7 @@ public partial class SlaveWindow
         ImGui.TextWrapped("- Conditional registration is metadata only. Non-crystal quantities come only from Inventory 1-4; elemental shards, crystals, and clusters use the player's Crystals inventory. If registration cannot be established, that conditional item group is skipped safely.");
         ImGui.TextWrapped("- Example: Ceruleum Tank Give 0 plus Balance if Subs 22,650 makes owners without registered submarines give all, while submarine owners give surplus or request their deficit to 22,650.");
         ImGui.TextWrapped("- Optional Prioritize Characters Giving Items First appears only while conditional policies exist and is owned by this FO client. Its saved value is ignored while no If Subs/Retainers policy exists. Every participating FO must effectively enable it for collection-first; all effectively Off uses legacy, while mixed, invalid, or mismatched-build cohorts are refused before startup.");
+        ImGui.TextWrapped("- If collection fills every eligible Tony, Xagman saves collection progress, delivers useful stock, then resumes collection with recovered space. Partially filled owners are revisited after the current owner traversal and wait at the main menu between supplier passes.");
         ImGui.TextWrapped("- In collection-first mode, Give/Balance-surplus runs across every participating FO client first. Receiver-only clients pause at a visible global barrier; after every expected client acknowledges collection, Tony repeats the full world/DC sweep for Take/Balance-deficit/TopUp.");
         ImGui.TextWrapped("- The forecast shows Tony stock now, projected stock after all collection, shortage now, and projected shortage after collection. The projection is conditional when Tony collection slots, owner snapshots, or Take 0 requests are indeterminate.");
         ImGui.TextWrapped("- Collection-first is not used by Outside Network Helper. Stop/cancel never advances the barrier, and every participating client must use the same build/protocol.");
@@ -861,37 +893,40 @@ public partial class SlaveWindow
         ImGui.Checkbox("Selected Only##xagmanTonySelOnly", ref xagmanTonyShowOnlySelected);
         ImGui.SetNextItemWidth(Scale(240f));
         ImGui.InputTextWithHint("##xagmanTonySearch", "Search Tony name or world...", ref xagmanTonySearchFilter, 128);
+        DrawXagmanTonyAutoSelection();
         ImGui.TextDisabled("Right-click the table headers or body to show or hide columns.");
-        using (var imguiScope836 = ImRaii.Table("XagmanTonyTable", 10,
+        using (var imguiScope836 = ImRaii.Table("XagmanTonyTable.ColumnsV2", 12,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable |
             ImGuiTableFlags.Hideable | ImGuiTableFlags.ContextMenuInBody,
             ScaledVector(0f, 175f)))
         if (imguiScope836)
         {
-            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoHide);
-            ImGui.TableSetupColumn("Region/DC", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
-            ImGui.TableSetupColumn("Inventory", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
-            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
-            ImGui.TableSetupColumn("Treasure", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
-            ImGui.TableSetupColumn("Kits", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
-            ImGui.TableSetupColumn("Tanks", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
-            ImGui.TableSetupColumn("Retainers##xagmanTonyRetainers", ImGuiTableColumnFlags.WidthFixed, Scale(72f));
-            ImGui.TableSetupColumn("Submarines##xagmanTonySubmarines", ImGuiTableColumnFlags.WidthFixed, Scale(84f));
-            ImGui.TableSetupColumn("Delete##xagmanTonyDelete", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.NoHide | ImGuiTableColumnFlags.NoHeaderLabel, Scale(30f));
+            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoHide, 0f, (uint)XagmanRosterColumn.Character);
+            ImGui.TableSetupColumn("Region", ImGuiTableColumnFlags.WidthFixed, Scale(65f), (uint)XagmanRosterColumn.Region);
+            ImGui.TableSetupColumn("Datacenter", ImGuiTableColumnFlags.WidthFixed, Scale(95f), (uint)XagmanRosterColumn.DataCenter);
+            ImGui.TableSetupColumn("Homeworld", ImGuiTableColumnFlags.WidthFixed, Scale(95f), (uint)XagmanRosterColumn.Homeworld);
+            ImGui.TableSetupColumn("Inventory", ImGuiTableColumnFlags.WidthFixed, Scale(80f), (uint)XagmanRosterColumn.Inventory);
+            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(95f), (uint)XagmanRosterColumn.Gil);
+            ImGui.TableSetupColumn("Treasure", ImGuiTableColumnFlags.WidthFixed, Scale(90f), (uint)XagmanRosterColumn.Treasure);
+            ImGui.TableSetupColumn("Kits", ImGuiTableColumnFlags.WidthFixed, Scale(50f), (uint)XagmanRosterColumn.Kits);
+            ImGui.TableSetupColumn("Tanks", ImGuiTableColumnFlags.WidthFixed, Scale(55f), (uint)XagmanRosterColumn.Tanks);
+            ImGui.TableSetupColumn("Retainers##xagmanTonyRetainers", ImGuiTableColumnFlags.WidthFixed, Scale(72f), (uint)XagmanRosterColumn.Retainers);
+            ImGui.TableSetupColumn("Submarines##xagmanTonySubmarines", ImGuiTableColumnFlags.WidthFixed, Scale(84f), (uint)XagmanRosterColumn.Submarines);
+            ImGui.TableSetupColumn("Delete##xagmanTonyDelete", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.NoHide | ImGuiTableColumnFlags.NoHeaderLabel, Scale(30f), (uint)XagmanRosterColumn.Delete);
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
-            var filtered = new List<(int OrigIdx, string CharacterName, string World, string RegionDc, ReloggerCharacterData? Info)>();
+            var filtered = new List<(int OrigIdx, string CharacterName, string World, string Region, string DataCenter, ReloggerCharacterData? Info)>();
             for (var i = 0; i < chars.Count; i++)
             {
                 var entry = chars[i];
                 var charName = entry.CharacterNameWorld;
                 var world = GetWorldFromKey(charName);
-                var regionDc = WorldData.GetRegionDcLabel(world);
+                var worldInfo = WorldData.GetByName(world);
                 if (!IsXagmanTonyCharacterVisible(cfg, entry, i))
                     continue;
                 charInfo.TryGetValue(charName, out var info);
-                filtered.Add((i, charName, world, regionDc, info));
+                filtered.Add((i, charName, world, worldInfo?.Region ?? "Unknown", worldInfo?.DataCenter ?? "Unknown", info));
             }
 
             var sortSpecs = ImGui.TableGetSortSpecs();
@@ -902,21 +937,23 @@ public partial class SlaveWindow
                 unsafe
                 {
                     var spec = sortSpecs.Specs;
-                    var colIdx = spec.ColumnIndex;
+                    var column = (XagmanRosterColumn)spec.ColumnUserID;
                     var ascending = spec.SortDirection == ImGuiSortDirection.Ascending;
                     filtered.Sort((a, b) =>
                     {
-                        var cmp = colIdx switch
+                        var cmp = column switch
                         {
-                            0 => string.Compare(a.CharacterName, b.CharacterName, StringComparison.OrdinalIgnoreCase),
-                            1 => string.Compare(WorldData.GetSortKey(a.World), WorldData.GetSortKey(b.World), StringComparison.Ordinal),
-                            2 => (a.Info?.MainInventoryFreeSlots ?? 0).CompareTo(b.Info?.MainInventoryFreeSlots ?? 0),
-                            3 => (a.Info?.Gil ?? 0).CompareTo(b.Info?.Gil ?? 0),
-                            4 => (a.Info?.TreasureValue ?? 0).CompareTo(b.Info?.TreasureValue ?? 0),
-                            5 => (a.Info?.MagitekRepairKits ?? 0).CompareTo(b.Info?.MagitekRepairKits ?? 0),
-                            6 => (a.Info?.CeruleumTanks ?? 0).CompareTo(b.Info?.CeruleumTanks ?? 0),
-                            7 => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: false).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: false)),
-                            8 => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: true).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: true)),
+                            XagmanRosterColumn.Character => string.Compare(a.CharacterName, b.CharacterName, StringComparison.OrdinalIgnoreCase),
+                            XagmanRosterColumn.Region => (WorldData.GetSweepOrdinalForWorld(a.World) / 100).CompareTo(WorldData.GetSweepOrdinalForWorld(b.World) / 100),
+                            XagmanRosterColumn.DataCenter => WorldData.GetSweepOrdinalForWorld(a.World).CompareTo(WorldData.GetSweepOrdinalForWorld(b.World)),
+                            XagmanRosterColumn.Homeworld => string.Compare(a.World, b.World, StringComparison.OrdinalIgnoreCase),
+                            XagmanRosterColumn.Inventory => (a.Info?.MainInventoryFreeSlots ?? 0).CompareTo(b.Info?.MainInventoryFreeSlots ?? 0),
+                            XagmanRosterColumn.Gil => (a.Info?.Gil ?? 0).CompareTo(b.Info?.Gil ?? 0),
+                            XagmanRosterColumn.Treasure => (a.Info?.TreasureValue ?? 0).CompareTo(b.Info?.TreasureValue ?? 0),
+                            XagmanRosterColumn.Kits => (a.Info?.MagitekRepairKits ?? 0).CompareTo(b.Info?.MagitekRepairKits ?? 0),
+                            XagmanRosterColumn.Tanks => (a.Info?.CeruleumTanks ?? 0).CompareTo(b.Info?.CeruleumTanks ?? 0),
+                            XagmanRosterColumn.Retainers => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: false).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: false)),
+                            XagmanRosterColumn.Submarines => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: true).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: true)),
                             _ => a.OrigIdx.CompareTo(b.OrigIdx),
                         };
 
@@ -936,9 +973,8 @@ public partial class SlaveWindow
             {
                 var i = row.OrigIdx;
                 var charName = row.CharacterName;
-                var regionDc = row.RegionDc;
                 var info = row.Info;
-                var displayName = GetDisplayCharacterKey(charName, anonymizeTonyCharacters);
+                var displayName = GetDisplayCharacterName(charName, anonymizeTonyCharacters);
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 var selected = xagmanTonySelectedIndices.Contains(i);
@@ -951,7 +987,12 @@ public partial class SlaveWindow
                 ImGui.SameLine(0f, ImGui.GetStyle().ItemInnerSpacing.X);
                 DrawXagmanRelogCharacterName(displayName, charName);
                 ImGui.TableNextColumn();
-                ImGui.TextDisabled(regionDc);
+                ImGui.TextDisabled(row.Region);
+                ImGui.TableNextColumn();
+                ImGui.TextDisabled(row.DataCenter);
+                ImGui.TableNextColumn();
+                var homeworld = GetDisplayWorldFromKey(charName, anonymizeTonyCharacters);
+                ImGui.TextDisabled(string.IsNullOrWhiteSpace(homeworld) ? "Unknown" : homeworld);
                 ImGui.TableNextColumn();
                 var inventoryLabel = GetInventoryFreeSlotsLabel(info);
                 if (!string.IsNullOrWhiteSpace(inventoryLabel))
@@ -1060,35 +1101,37 @@ public partial class SlaveWindow
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Refresh AutoRetainer data, then replace the current selection with owners under the active Region and Search filters that have registered submarines.");
         ImGui.TextDisabled("Right-click the table headers or body to show or hide columns.");
-        using (var imguiScope1032 = ImRaii.Table("XagmanOwnerTable", 10,
+        using (var imguiScope1032 = ImRaii.Table("XagmanOwnerTable.ColumnsV2", 12,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable |
             ImGuiTableFlags.Hideable | ImGuiTableFlags.ContextMenuInBody,
             ScaledVector(0f, 175f)))
         if (imguiScope1032)
         {
-            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoHide);
-            ImGui.TableSetupColumn("Region/DC", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
-            ImGui.TableSetupColumn("Inventory", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
-            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
-            ImGui.TableSetupColumn("Treasure", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
-            ImGui.TableSetupColumn("Kits", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
-            ImGui.TableSetupColumn("Tanks", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
-            ImGui.TableSetupColumn("Retainers##xagmanOwnerRetainers", ImGuiTableColumnFlags.WidthFixed, Scale(72f));
-            ImGui.TableSetupColumn("Submarines##xagmanOwnerSubmarines", ImGuiTableColumnFlags.WidthFixed, Scale(84f));
-            ImGui.TableSetupColumn("Delete##xagmanOwnerDelete", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.NoHide | ImGuiTableColumnFlags.NoHeaderLabel, Scale(30f));
+            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoHide, 0f, (uint)XagmanRosterColumn.Character);
+            ImGui.TableSetupColumn("Region", ImGuiTableColumnFlags.WidthFixed, Scale(65f), (uint)XagmanRosterColumn.Region);
+            ImGui.TableSetupColumn("Datacenter", ImGuiTableColumnFlags.WidthFixed, Scale(95f), (uint)XagmanRosterColumn.DataCenter);
+            ImGui.TableSetupColumn("Homeworld", ImGuiTableColumnFlags.WidthFixed, Scale(95f), (uint)XagmanRosterColumn.Homeworld);
+            ImGui.TableSetupColumn("Inventory", ImGuiTableColumnFlags.WidthFixed, Scale(80f), (uint)XagmanRosterColumn.Inventory);
+            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(95f), (uint)XagmanRosterColumn.Gil);
+            ImGui.TableSetupColumn("Treasure", ImGuiTableColumnFlags.WidthFixed, Scale(90f), (uint)XagmanRosterColumn.Treasure);
+            ImGui.TableSetupColumn("Kits", ImGuiTableColumnFlags.WidthFixed, Scale(50f), (uint)XagmanRosterColumn.Kits);
+            ImGui.TableSetupColumn("Tanks", ImGuiTableColumnFlags.WidthFixed, Scale(55f), (uint)XagmanRosterColumn.Tanks);
+            ImGui.TableSetupColumn("Retainers##xagmanOwnerRetainers", ImGuiTableColumnFlags.WidthFixed, Scale(72f), (uint)XagmanRosterColumn.Retainers);
+            ImGui.TableSetupColumn("Submarines##xagmanOwnerSubmarines", ImGuiTableColumnFlags.WidthFixed, Scale(84f), (uint)XagmanRosterColumn.Submarines);
+            ImGui.TableSetupColumn("Delete##xagmanOwnerDelete", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.NoHide | ImGuiTableColumnFlags.NoHeaderLabel, Scale(30f), (uint)XagmanRosterColumn.Delete);
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
 
-            var filtered = new List<(int OrigIdx, string CharacterName, string World, string RegionDc, ReloggerCharacterData? Info)>();
+            var filtered = new List<(int OrigIdx, string CharacterName, string World, string Region, string DataCenter, ReloggerCharacterData? Info)>();
             for (var i = 0; i < chars.Count; i++)
             {
                 var charName = chars[i];
                 var world = GetWorldFromKey(charName);
-                var regionDc = WorldData.GetRegionDcLabel(world);
+                var worldInfo = WorldData.GetByName(world);
                 if (!IsXagmanFranchiseCharacterVisible(cfg, charName, i))
                     continue;
                 charInfo.TryGetValue(charName, out var info);
-                filtered.Add((i, charName, world, regionDc, info));
+                filtered.Add((i, charName, world, worldInfo?.Region ?? "Unknown", worldInfo?.DataCenter ?? "Unknown", info));
             }
 
             var sortSpecs = ImGui.TableGetSortSpecs();
@@ -1099,21 +1142,23 @@ public partial class SlaveWindow
                 unsafe
                 {
                     var spec = sortSpecs.Specs;
-                    var colIdx = spec.ColumnIndex;
+                    var column = (XagmanRosterColumn)spec.ColumnUserID;
                     var ascending = spec.SortDirection == ImGuiSortDirection.Ascending;
                     filtered.Sort((a, b) =>
                     {
-                        var cmp = colIdx switch
+                        var cmp = column switch
                         {
-                            0 => string.Compare(a.CharacterName, b.CharacterName, StringComparison.OrdinalIgnoreCase),
-                            1 => string.Compare(WorldData.GetSortKey(a.World), WorldData.GetSortKey(b.World), StringComparison.Ordinal),
-                            2 => (a.Info?.MainInventoryFreeSlots ?? 0).CompareTo(b.Info?.MainInventoryFreeSlots ?? 0),
-                            3 => (a.Info?.Gil ?? 0).CompareTo(b.Info?.Gil ?? 0),
-                            4 => (a.Info?.TreasureValue ?? 0).CompareTo(b.Info?.TreasureValue ?? 0),
-                            5 => (a.Info?.MagitekRepairKits ?? 0).CompareTo(b.Info?.MagitekRepairKits ?? 0),
-                            6 => (a.Info?.CeruleumTanks ?? 0).CompareTo(b.Info?.CeruleumTanks ?? 0),
-                            7 => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: false).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: false)),
-                            8 => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: true).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: true)),
+                            XagmanRosterColumn.Character => string.Compare(a.CharacterName, b.CharacterName, StringComparison.OrdinalIgnoreCase),
+                            XagmanRosterColumn.Region => (WorldData.GetSweepOrdinalForWorld(a.World) / 100).CompareTo(WorldData.GetSweepOrdinalForWorld(b.World) / 100),
+                            XagmanRosterColumn.DataCenter => WorldData.GetSweepOrdinalForWorld(a.World).CompareTo(WorldData.GetSweepOrdinalForWorld(b.World)),
+                            XagmanRosterColumn.Homeworld => string.Compare(a.World, b.World, StringComparison.OrdinalIgnoreCase),
+                            XagmanRosterColumn.Inventory => (a.Info?.MainInventoryFreeSlots ?? 0).CompareTo(b.Info?.MainInventoryFreeSlots ?? 0),
+                            XagmanRosterColumn.Gil => (a.Info?.Gil ?? 0).CompareTo(b.Info?.Gil ?? 0),
+                            XagmanRosterColumn.Treasure => (a.Info?.TreasureValue ?? 0).CompareTo(b.Info?.TreasureValue ?? 0),
+                            XagmanRosterColumn.Kits => (a.Info?.MagitekRepairKits ?? 0).CompareTo(b.Info?.MagitekRepairKits ?? 0),
+                            XagmanRosterColumn.Tanks => (a.Info?.CeruleumTanks ?? 0).CompareTo(b.Info?.CeruleumTanks ?? 0),
+                            XagmanRosterColumn.Retainers => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: false).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: false)),
+                            XagmanRosterColumn.Submarines => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: true).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: true)),
                             _ => a.OrigIdx.CompareTo(b.OrigIdx),
                         };
 
@@ -1133,9 +1178,8 @@ public partial class SlaveWindow
             {
                 var i = row.OrigIdx;
                 var charName = row.CharacterName;
-                var regionDc = row.RegionDc;
                 var info = row.Info;
-                var displayName = GetDisplayCharacterKey(charName, anonymizeFranchiseCharacters);
+                var displayName = GetDisplayCharacterName(charName, anonymizeFranchiseCharacters);
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 var selected = xagmanFranchiseSelectedIndices.Contains(i);
@@ -1148,7 +1192,12 @@ public partial class SlaveWindow
                 ImGui.SameLine(0f, ImGui.GetStyle().ItemInnerSpacing.X);
                 DrawXagmanRelogCharacterName(displayName, charName);
                 ImGui.TableNextColumn();
-                ImGui.TextDisabled(regionDc);
+                ImGui.TextDisabled(row.Region);
+                ImGui.TableNextColumn();
+                ImGui.TextDisabled(row.DataCenter);
+                ImGui.TableNextColumn();
+                var homeworld = GetDisplayWorldFromKey(charName, anonymizeFranchiseCharacters);
+                ImGui.TextDisabled(string.IsNullOrWhiteSpace(homeworld) ? "Unknown" : homeworld);
                 ImGui.TableNextColumn();
                 var inventoryLabel = GetInventoryFreeSlotsLabel(info);
                 if (!string.IsNullOrWhiteSpace(inventoryLabel))
@@ -1608,7 +1657,8 @@ public partial class SlaveWindow
     }
 
     private bool IsXagmanCollectionFirstCollectionPhase()
-        => IsXagmanCollectionFirstRunActive() && xagmanRunPhase == XagmanRunPhase.Collection;
+        => IsXagmanCollectionFirstRunActive() && xagmanRunPhase == XagmanRunPhase.Collection
+            && !IsXagmanCapacityDrainActive();
 
     private bool IsXagmanCollectionFirstRestockPhase()
         => IsXagmanCollectionFirstRunActive() && xagmanRunPhase == XagmanRunPhase.Restock;
@@ -1740,7 +1790,8 @@ public partial class SlaveWindow
 
     private void ObserveXagmanCollectionFirstPhaseAcknowledgements()
     {
-        if (!IsXagmanCollectionFirstRunActive() || xagmanActiveRole != XagmanRole.Tony)
+        if (!IsXagmanCollectionFirstRunActive() || xagmanActiveRole != XagmanRole.Tony
+            || IsXagmanCapacityDrainActive())
             return;
 
         var acknowledgements = xagmanRunPhase == XagmanRunPhase.Collection
@@ -1967,11 +2018,13 @@ public partial class SlaveWindow
 
         if (xagmanOwnerRunList.Count == 0)
         {
+            // Empty clients still reach the menu and join the frozen barrier without waiting
+            // for a supplier login that an entirely empty restock phase will never need.
             FinalizeXagmanCollectionFirstOwnerSelections();
-            xagmanPhaseComplete = true;
-            xagmanStatus = XagmanStatus.Paused;
-            xagmanStatusText = "No restock candidates on this FO client; waiting for Tony to finish the global restock barrier.";
-            PublishXagmanPresence();
+            xagmanOwnerSupplyTonyInstance = restockTony.InstanceId;
+            xagmanOwnerSupplyPassId = restockTony.SupplyPassId;
+            FinishXagmanOwnerSupplyPass();
+            StartXagmanSupplyMenuWait();
             return true;
         }
 
@@ -2012,7 +2065,7 @@ public partial class SlaveWindow
         var changed = false;
         foreach (var owner in xagmanCollectionFirstOwnerFullPlan)
         {
-            if (failed.Contains(owner) || xagmanSkippedCharacters.Contains(owner))
+            if (failed.Contains(owner) || xagmanSkippedCharacters.Contains(owner) || xagmanPartialOwners.ContainsKey(owner))
                 continue;
             if (xagmanOwnerCompletedKeys.Add(owner))
                 changed = true;
@@ -2200,10 +2253,13 @@ public partial class SlaveWindow
             DrawXagmanMassModePopup(items, id);
 
         var tableColumnCount = searchOnly ? 6 : 8;
-        using (var imguiScope2164 = ImRaii.Table($"{id}Table", tableColumnCount, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, ScaledVector(0f, 150f)))
+        ImGui.TextDisabled("Drag column borders to resize; right-click headers or body to show or hide columns.");
+        using (var imguiScope2164 = ImRaii.Table($"{id}Table", tableColumnCount,
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Resizable |
+            ImGuiTableFlags.Hideable | ImGuiTableFlags.ContextMenuInBody, ScaledVector(0f, 150f)))
         if (imguiScope2164)
         {
-            ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoHide);
             ImGui.TableSetupColumn("ID", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
             ImGui.TableSetupColumn("HQ", ImGuiTableColumnFlags.WidthFixed, Scale(50f));
             ImGui.TableSetupColumn("GC Seals/ea", ImGuiTableColumnFlags.WidthFixed, Scale(85f));
@@ -2213,7 +2269,7 @@ public partial class SlaveWindow
                 ImGui.TableSetupColumn("Mode", ImGuiTableColumnFlags.WidthFixed, Scale(160f));
                 ImGui.TableSetupColumn("Amt", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
             }
-            ImGui.TableSetupColumn(string.Empty, ImGuiTableColumnFlags.WidthFixed, Scale(30f));
+            ImGui.TableSetupColumn($"Delete##{id}Delete", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoHide | ImGuiTableColumnFlags.NoHeaderLabel, Scale(30f));
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
             for (var i = 0; i < items.Count; i++)
@@ -2292,7 +2348,7 @@ public partial class SlaveWindow
                 {
                     ImGui.TableNextColumn();
                     var policyIndex = GetXagmanItemPolicyOptionIndex(item);
-                    ImGui.SetNextItemWidth(Scale(150f));
+                    ImGui.SetNextItemWidth(-1f);
                     var policyOptions = isGreenSelector ? xagmanGreenItemPolicyOptions : xagmanItemPolicyOptions;
                     var policyLabels = isGreenSelector ? xagmanGreenItemPolicyLabels : xagmanItemPolicyLabels;
                     if (ImGui.Combo($"##{id}Mode{i}", ref policyIndex, policyLabels, policyLabels.Length))
@@ -2312,7 +2368,7 @@ public partial class SlaveWindow
                     }
                     ImGui.TableNextColumn();
                     var qty = item.Quantity;
-                    ImGui.SetNextItemWidth(Scale(60f));
+                    ImGui.SetNextItemWidth(-1f);
                     if (ImGui.InputInt($"##{id}Qty{i}", ref qty))
                     {
                         item.Quantity = Math.Max(0, qty);
@@ -2843,11 +2899,14 @@ public partial class SlaveWindow
         var queue = GetXagmanQueueForTony(focusTony);
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Queue");
         ImGui.TextDisabled(string.IsNullOrWhiteSpace(focusTony) ? "No Tony focus selected." : $"Tony Focus: {focusTony}");
-        using (var imguiScope2806 = ImRaii.Table("XagmanQueueTable", 5, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg, ScaledVector(0f, 100f)))
+        ImGui.TextDisabled("Drag column borders to resize; right-click headers or body to show or hide columns.");
+        using (var imguiScope2806 = ImRaii.Table("XagmanQueueTable", 5,
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable |
+            ImGuiTableFlags.Hideable | ImGuiTableFlags.ContextMenuInBody, ScaledVector(0f, 100f)))
         if (imguiScope2806)
         {
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, Scale(35f));
-            ImGui.TableSetupColumn("Owner", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Owner", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoHide);
             ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
             ImGui.TableSetupColumn("Requested", ImGuiTableColumnFlags.WidthFixed, Scale(150f));
             ImGui.TableSetupColumn("Partner", ImGuiTableColumnFlags.WidthStretch);
@@ -2896,7 +2955,7 @@ public partial class SlaveWindow
             plugin.Configuration.Save();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("At completion, remove successful and unused queue results before the final completion actions. Keep failures and skipped characters needing attention. The saved roster and task log are kept.");
+            ImGui.SetTooltip("At completion, remove successful and unused queue results before the final completion actions. Keep failed, skipped and partially filled characters needing attention. The saved roster and task log are kept.");
     }
 
     private void AutoCleanXagmanQueueResults()
@@ -2943,14 +3002,36 @@ public partial class SlaveWindow
                     xagmanActiveRole == XagmanRole.FranchiseOwner ? xagmanActiveCharacter : string.Empty,
                     runner.FailedCharacters,
                     xagmanSkippedCharacters,
-                    xagmanCharDurationSeconds);
+                    xagmanCharDurationSeconds,
+                    xagmanOwnerCompletedKeys,
+                    xagmanPartialOwners);
+            }
+
+            if (xagmanActiveRole == XagmanRole.Tony)
+            {
+                var partialOwners = plugin.XagmanPeers.Peers
+                    .Where(peer => peer.XagmanEnabled && peer.Role == XagmanRole.FranchiseOwner)
+                    .Where(IsXagmanPeerInCurrentRunPhase)
+                    .Where(IsXagmanPeerInSupplyCoordinatorScope)
+                    .OrderByDescending(peer => peer.LastSeenUtc)
+                    .SelectMany(peer => peer.PartialOwners ?? new List<XagmanPartialOwnerState>())
+                    .Where(owner => owner != null && !string.IsNullOrWhiteSpace(owner.CharacterNameWorld))
+                    .GroupBy(owner => owner.CharacterNameWorld, StringComparer.OrdinalIgnoreCase)
+                    .Select(group => group.First())
+                    .ToList();
+                if (partialOwners.Count > 0)
+                {
+                    ImGui.Spacing();
+                    ImGui.TextColored(new Vector4(1.0f, 0.65f, 0.2f, 1.0f), $"{partialOwners.Count} owner(s) still have unfinished trade work:");
+                    foreach (var owner in partialOwners)
+                        ImGui.TextWrapped($"{owner.CharacterNameWorld}: {GetXagmanPartialOwnerDetail(owner)}");
+                }
             }
 
             return;
         }
 
-        // Not running: keep the last completed run visible so failed (red) and skipped (purple)
-        // characters remain reviewable after logout / Enable-AR completion tasks have run.
+        // Keep failed, skipped and partially filled owners reviewable after completion cleanup.
         if (!xagmanHasLastRunSnapshot)
             return;
 
@@ -2986,13 +3067,16 @@ public partial class SlaveWindow
                 string.Empty,
                 xagmanLastRunFailedCharacters,
                 xagmanLastRunSkippedCharacters,
-                xagmanLastRunCharDurations);
+                xagmanLastRunCharDurations,
+                xagmanLastRunOwnerCompletedKeys,
+                xagmanLastRunPartialOwners);
         }
 
         var failedCount = xagmanLastRunFailedCharacters.Count;
         var skippedCount = xagmanLastRunSkippedCharacters.Count;
-        if (failedCount > 0 || skippedCount > 0)
-            ImGui.TextDisabled($"{failedCount} failed (red), {skippedCount} skipped (purple) still need trading.");
+        var partialCount = xagmanLastRunPartialOwners.Count;
+        if (failedCount > 0 || skippedCount > 0 || partialCount > 0)
+            ImGui.TextDisabled($"{failedCount} failed (red), {skippedCount} skipped (purple), {partialCount} unfinished (amber) still need attention.");
         if (!xagmanRunning && !IsXagmanTaskRunnerActive() && ImGui.Button("Clear results##xagmanClearResults"))
             ClearXagmanRunSnapshot();
     }
@@ -3004,7 +3088,9 @@ public partial class SlaveWindow
         string activeCharacter,
         IReadOnlyCollection<string> failedKeys,
         IReadOnlyCollection<string> skippedKeys,
-        IReadOnlyDictionary<string, double>? durations = null)
+        IReadOnlyDictionary<string, double>? durations = null,
+        IReadOnlyCollection<string>? completedKeys = null,
+        IReadOnlyDictionary<string, XagmanPartialOwnerState>? partialOwners = null)
     {
         if (runPlan.Count == 0)
             return;
@@ -3024,11 +3110,21 @@ public partial class SlaveWindow
             return false;
         }
 
-        var safeCompleted = Math.Max(0, Math.Min(completed, runPlan.Count));
-        ImGui.TextDisabled($"{label} ({safeCompleted}/{runPlan.Count})");
+        var safeCompleted = completedKeys == null
+            ? Math.Max(0, Math.Min(completed, runPlan.Count))
+            : runPlan.Count(character => ContainsKey(completedKeys, character)
+                && !(partialOwners?.ContainsKey(character) ?? false)
+                && !ContainsKey(failedKeys, character)
+                && !ContainsKey(skippedKeys, character));
+        var partialCount = runPlan.Count(character => partialOwners?.ContainsKey(character) ?? false);
+        ImGui.TextDisabled(partialCount > 0
+            ? $"{label} ({safeCompleted}/{runPlan.Count} complete, {partialCount} unfinished)"
+            : $"{label} ({safeCompleted}/{runPlan.Count})");
         for (var i = 0; i < runPlan.Count; i++)
         {
             var character = runPlan[i];
+            XagmanPartialOwnerState? partialOwner = null;
+            partialOwners?.TryGetValue(character, out partialOwner);
             var skipped = ContainsKey(skippedKeys, character);
             var failed = !skipped && ContainsKey(failedKeys, character);
             var isActive = !skipped
@@ -3043,12 +3139,17 @@ public partial class SlaveWindow
                 ImGui.TextColored(new Vector4(0.72f, 0.45f, 1.0f, 1.0f), $"  [~] {i + 1}. {character}{timeSuffix}");
             else if (failed)
                 ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), $"  [x] {i + 1}. {character}{timeSuffix}");
+            else if (partialOwner != null)
+                ImGui.TextColored(new Vector4(1.0f, 0.65f, 0.2f, 1.0f), $"  [{(isActive ? ">" : "~")}] {i + 1}. {character}{timeSuffix} - {GetXagmanPartialOwnerLabel(partialOwner)}");
             else if (isActive)
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"  [>] {i + 1}. {character}{timeSuffix}");
-            else if (i < safeCompleted)
+            else if (completedKeys != null ? ContainsKey(completedKeys, character) : i < safeCompleted)
                 ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"  [v] {i + 1}. {character}{timeSuffix}");
             else
                 ImGui.TextDisabled($"  [ ] {i + 1}. {character}{timeSuffix}");
+
+            if (partialOwner != null)
+                ImGui.TextWrapped($"      Remaining work: {GetXagmanPartialOwnerDetail(partialOwner)}");
         }
     }
 
@@ -3229,10 +3330,13 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
-        using (var imguiScope3169 = ImRaii.Table("XagmanPeersTable", 10, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg, ScaledVector(0f, 100f)))
+        ImGui.TextDisabled("Drag column borders to resize; right-click headers or body to show or hide columns.");
+        using (var imguiScope3169 = ImRaii.Table("XagmanPeersTable", 10,
+            ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable |
+            ImGuiTableFlags.Hideable | ImGuiTableFlags.ContextMenuInBody, ScaledVector(0f, 100f)))
         if (imguiScope3169)
         {
-            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
+            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoHide);
             ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
             ImGui.TableSetupColumn("Role", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
             ImGui.TableSetupColumn("Priority", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
@@ -3351,6 +3455,7 @@ public partial class SlaveWindow
 
     private async System.Threading.Tasks.Task StartAllXagmanPeersAsync()
     {
+        if (xagmanRunning && IsXagmanCapacityRecoveryActive()) return;
         if (System.Threading.Interlocked.CompareExchange(ref xagmanStartAllInFlight, 1, 0) != 0)
         {
             await AddXagmanPeerLogAsync(
@@ -3391,7 +3496,16 @@ public partial class SlaveWindow
             var franchisePeers = peers
                 .Where(peer => peer.Role == XagmanRole.FranchiseOwner)
                 .Where(peer => !string.IsNullOrWhiteSpace(peer.InstanceId))
+                .Where(peer => string.IsNullOrWhiteSpace(peer.SupplyCoordinatorInstanceId)
+                    || peer.SupplyCoordinatorInstanceId == plugin.InstanceId)
                 .ToList();
+            if (xagmanRunning && xagmanActiveRole == XagmanRole.Tony
+                && franchisePeers.Any(peer => peer.SupplyCycleRevision != XagmanSupplyCycleRevision))
+            {
+                await RunXagmanPeerUiActionAsync(() => FailXagmanSupplyCycle(
+                    "Start refused: every owner client must support the current partial supply protocol.")).ConfigureAwait(false);
+                return;
+            }
             var negotiateStartupMode = !collectionFirst
                 && !xagmanCollectionFirstStartupModeNegotiated;
             var requestingCollectionFirst = negotiateStartupMode
@@ -3554,6 +3668,11 @@ public partial class SlaveWindow
                 }
             }
 
+            if (IsXagmanSupplyCycleActive() && xagmanActiveRole == XagmanRole.Tony)
+            {
+                await RunXagmanPeerUiActionAsync(() => xagmanSupplyOwnerCohort.UnionWith(
+                    franchisePeers.Select(peer => peer.InstanceId))).ConfigureAwait(false);
+            }
             await AddXagmanPeerLogAsync(cohortAlreadyFrozen
                 ? $"Xagman: rebroadcasting the frozen run directive to {peers.Count} connected peer(s); the {expectedFranchiseOwnerInstanceIds.Count}-client cohort and acknowledgments are unchanged."
                 : $"Xagman: Sending start command to {peers.Count} connected peers...").ConfigureAwait(false);
@@ -3724,21 +3843,33 @@ public partial class SlaveWindow
         }
     }
 
-    private async System.Threading.Tasks.Task<bool> CompleteAllXagmanPeersAsync()
+    private async System.Threading.Tasks.Task<bool> CompleteAllXagmanPeersAsync(
+        string supplyPassId = "", string capacityDrainId = "", int capacityRecoveryEpoch = 0)
     {
-        var coordinatedRestock = IsXagmanCollectionFirstRestockPhase();
-        var completionRunId = coordinatedRestock ? xagmanRunId : string.Empty;
-        var completionExpectedOwners = coordinatedRestock
+        var capacityCompletion = IsXagmanCapacityWarningCompletion()
+            && capacityDrainId == xagmanCapacityDrainId && capacityRecoveryEpoch == xagmanCapacityRecoveryEpoch;
+        var coordinatedCompletion = IsXagmanCollectionFirstRestockPhase() || capacityCompletion;
+        var completionPhase = capacityCompletion ? XagmanRunPhase.Collection : XagmanRunPhase.Restock;
+        var completionRunId = coordinatedCompletion ? xagmanRunId : string.Empty;
+        var completionExpectedOwners = coordinatedCompletion
             ? xagmanExpectedFranchiseOwnerInstanceIds
                 .OrderBy(instanceId => instanceId, StringComparer.OrdinalIgnoreCase)
                 .ToList()
             : new List<string>();
+        // Snapshot on the game thread before awaits. Early departures retain their place
+        // in the immutable cohort; their acknowledged local result satisfies delivery.
+        var completedOwnerIds = xagmanCompletedOwnerClients.Keys.ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var allSupplyOwnersCompleted = xagmanSupplyOwnerCohort.Count > 0
+            && xagmanSupplyOwnerCohort.All(completedOwnerIds.Contains);
         try
         {
+            if (coordinatedCompletion ? completionExpectedOwners.Count > 0 && completionExpectedOwners.All(completedOwnerIds.Contains)
+                : allSupplyOwnersCompleted)
+                return true;
             if (!await EnsureXagmanPeerCommandChannelAsync("completion").ConfigureAwait(false))
                 return false;
 
-            if (!coordinatedRestock)
+            if (!coordinatedCompletion)
             {
                 var peers = await WaitForXagmanCommandTargetPeersAsync(1.0).ConfigureAwait(false);
                 if (peers.Count == 0)
@@ -3748,7 +3879,8 @@ public partial class SlaveWindow
                 }
 
                 await AddXagmanPeerLogAsync($"Xagman: Sending completion command to {peers.Count} connected peers...").ConfigureAwait(false);
-                var sent = await plugin.XagmanPeers.SendCompleteTaskToAllPeersAsync().ConfigureAwait(false);
+                var sent = await plugin.XagmanPeers.SendCompleteTaskToAllPeersAsync(
+                    supplyPassId: supplyPassId).ConfigureAwait(false);
                 await AddXagmanPeerLogAsync(sent
                     ? "Xagman: Completion command sent successfully"
                     : $"Xagman: Failed to send completion command to peers ({plugin.XagmanPeers.LastStatus})").ConfigureAwait(false);
@@ -3762,7 +3894,7 @@ public partial class SlaveWindow
                 return false;
             }
 
-            var acknowledgedOwners = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var acknowledgedOwners = new HashSet<string>(completedOwnerIds, StringComparer.OrdinalIgnoreCase);
             var deadlineUtc = DateTime.UtcNow.AddSeconds(XagmanCompletionAckTimeoutSeconds);
             var nextBroadcastUtc = DateTime.MinValue;
             var broadcastAttempt = 0;
@@ -3776,8 +3908,14 @@ public partial class SlaveWindow
                              .Where(peer => IsXagmanPeerInRun(
                                  peer,
                                  completionRunId,
-                                 XagmanRunPhase.Restock))
-                             .Where(peer => peer.CompletionDirectiveAcknowledged))
+                                  completionPhase))
+                              .Where(peer => IsXagmanPeerFresh(peer))
+                              .Where(peer => peer.SupplyPassId == supplyPassId)
+                              .Where(peer => !capacityCompletion || (peer.CapacityDrainId == capacityDrainId
+                                  && peer.CapacityRecoveryEpoch == capacityRecoveryEpoch
+                                  && peer.CapacityRecoveryCoordinatorInstanceId == plugin.InstanceId
+                                  && peer.SupplyPassComplete))
+                              .Where(peer => peer.CompletionDirectiveAcknowledged))
                 {
                     acknowledgedOwners.Add(peer.InstanceId);
                 }
@@ -3795,9 +3933,12 @@ public partial class SlaveWindow
                     var sent = await plugin.XagmanPeers.SendCompleteTaskToAllPeersAsync(
                             completionRunId,
                             true,
-                            XagmanRunPhase.Restock,
+                            completionPhase,
                             XagmanCollectionFirstCoordinationProtocolRevision,
-                            completionExpectedOwners)
+                            completionExpectedOwners,
+                            supplyPassId: supplyPassId,
+                            capacityDrainId: capacityDrainId,
+                            capacityRecoveryEpoch: capacityRecoveryEpoch)
                         .ConfigureAwait(false);
                     if (broadcastAttempt == 1)
                     {
@@ -3856,15 +3997,29 @@ public partial class SlaveWindow
             {
                 try
                 {
+                    if (xagmanRunning && IsXagmanCapacityRecoveryActive()) return;
                     // Check if this is a Franchise Owner and can start
                     if (plugin.Configuration.XagmanRole == XagmanRole.FranchiseOwner)
                     {
+                        if ((xagmanRunning || plugin.TaskRunner.IsRunning) && !string.IsNullOrWhiteSpace(xagmanOwnerCompletionToken)) return;
                         if (HasXagmanGreenValueSelectors(plugin.Configuration.XagmanItems)
                             && startDirective.GreenValueProtocolRevision != XagmanGreenValueProtocolRevision)
                         {
                             plugin.TaskRunner.AddLog(
                                 $"Xagman: refused peer start because Tony did not advertise green-value protocol {XagmanGreenValueProtocolRevision}. Reload every participating client from the same source.");
                             return;
+                        }
+                        if (xagmanRunning)
+                        {
+                            var samePriorityRun = !startDirective.CollectionFirstEnabled
+                                || (IsXagmanCollectionFirstRunActive()
+                                    && startDirective.RunId.Equals(xagmanRunId, StringComparison.OrdinalIgnoreCase));
+                            if (!samePriorityRun)
+                            {
+                                plugin.TaskRunner.AddLog($"Xagman: ignored start for run {startDirective.RunId} because this client is already handling run {xagmanRunId}.");
+                                return;
+                            }
+                            if (!TryRememberXagmanOwnerSupplyStart(startDirective)) return;
                         }
                         xagmanOwnerStartRequested = true;
                         if (!xagmanRunning)
@@ -3877,14 +4032,7 @@ public partial class SlaveWindow
 
                         if (xagmanRunning)
                         {
-                            var samePriorityRun = !startDirective.CollectionFirstEnabled
-                                || (IsXagmanCollectionFirstRunActive()
-                                    && startDirective.RunId.Equals(xagmanRunId, StringComparison.OrdinalIgnoreCase));
-                            plugin.TaskRunner.AddLog(samePriorityRun
-                                ? "Xagman: Received start signal from Tony."
-                                : $"Xagman: ignored start for run {startDirective.RunId} because this client is already handling run {xagmanRunId}.");
-                            if (!samePriorityRun)
-                                return;
+                            plugin.TaskRunner.AddLog("Xagman: Received start signal from Tony.");
                             if (xagmanOwnerStandbyPending && !plugin.TaskRunner.IsRunning)
                             {
                                 if (!TryResumeXagmanOwnerStandbyFromCallingTony())
@@ -3905,10 +4053,11 @@ public partial class SlaveWindow
                                 // Select all available Franchise Owner characters
                                 for (int i = 0; i < allFranchiseChars.Count; i++)
                                 {
-                                    xagmanFranchiseSelectedIndices.Add(i);
+                                    if (IsAutoRetainerCharacterAllowed(allFranchiseChars[i], plugin.Configuration.XagmanHonorArExclusions))
+                                        xagmanFranchiseSelectedIndices.Add(i);
                                 }
                                 selectedFranchiseChars = GetSelectedXagmanFranchiseCharacters();
-                                plugin.TaskRunner.AddLog($"Xagman: Auto-selected {allFranchiseChars.Count} Franchise Owner characters via peer command");
+                                plugin.TaskRunner.AddLog($"Xagman: Auto-selected {selectedFranchiseChars.Count} Franchise Owner characters via peer command");
                             }
                         }
 
@@ -4026,24 +4175,29 @@ public partial class SlaveWindow
                 {
                     if (!xagmanRunning || xagmanActiveRole != XagmanRole.FranchiseOwner)
                         return;
+                    if (!string.IsNullOrWhiteSpace(xagmanOwnerCompletionToken)) return;
+                    var capacityCompletion = false;
                     if (completionDirective.CollectionFirstEnabled)
                     {
                         var matchesFrozenRestockRun = IsXagmanCollectionFirstRestockPhase()
-                            && completionDirective.CoordinationProtocolRevision == XagmanCollectionFirstCoordinationProtocolRevision
                             && completionDirective.RunPhase == XagmanRunPhase.Restock
+                            && string.IsNullOrWhiteSpace(completionDirective.CapacityDrainId)
+                            && completionDirective.CapacityRecoveryEpoch == 0;
+                        capacityCompletion = MatchesXagmanCapacityWarningCompletion(completionDirective);
+                        var matchesFrozenCompletion = (matchesFrozenRestockRun || capacityCompletion)
+                            && completionDirective.CoordinationProtocolRevision == XagmanCollectionFirstCoordinationProtocolRevision
                             && completionDirective.RunId.Equals(xagmanRunId, StringComparison.OrdinalIgnoreCase)
                             && completionDirective.ExpectedFranchiseOwnerInstanceIds.Contains(
                                 plugin.InstanceId,
                                 StringComparer.OrdinalIgnoreCase);
-                        if (!matchesFrozenRestockRun)
+                        if (!matchesFrozenCompletion)
                         {
                             plugin.TaskRunner.AddLog(
                                 $"Xagman: ignored completion for collection-first run {completionDirective.RunId}; this client is handling {xagmanRunId} phase {xagmanRunPhase}.");
                             return;
                         }
 
-                        xagmanCompletionDirectiveAcknowledged = true;
-                        PublishXagmanPresence();
+
                     }
                     else if (IsXagmanCollectionFirstRunActive())
                     {
@@ -4052,7 +4206,39 @@ public partial class SlaveWindow
                         return;
                     }
 
-                    var completionReason = completionDirective.CollectionFirstEnabled
+                    if (IsXagmanSupplyCycleActive())
+                    {
+                        if (completionDirective.SenderInstanceId != xagmanOwnerSupplyTonyInstance
+                            || completionDirective.SupplyPassId != xagmanOwnerSupplyPassId
+                            || !xagmanOwnerSupplyPassComplete)
+                        {
+                            plugin.TaskRunner.AddLog("Xagman: ignored completion from an unbound Tony or before the owner supply pass finished.");
+                            return;
+                        }
+                        if (capacityCompletion)
+                        {
+                            if (!PrepareXagmanCapacityOwnerWarningCompletion()) return;
+                        }
+                        else FinalizeXagmanOpenEndedSupplyRequests();
+                        foreach (var state in xagmanPartialOwners.Values)
+                        {
+                            if (!capacityCompletion)
+                                state.Reason = "selected suppliers exhausted; remaining items unavailable in this run";
+                            plugin.TaskRunner.AddLog($"Xagman: partial owner {state.CharacterNameWorld}: {GetXagmanPartialOwnerDetail(state)}");
+                        }
+                        xagmanPhaseComplete = IsXagmanCollectionFirstRestockPhase();
+                        if (xagmanPhaseComplete) FinalizeXagmanCollectionFirstOwnerSelections();
+                    }
+                    if (completionDirective.CollectionFirstEnabled)
+                    {
+                        xagmanCompletionDirectiveAcknowledged = true;
+                        PublishXagmanPresence();
+                    }
+                    var completionReason = capacityCompletion
+                        ? $"Xagman: collection stopped with capacity warnings; preserving {xagmanPartialOwners.Count} incomplete owner result(s) before final cleanup."
+                        : IsXagmanSupplyCycleActive()
+                        ? $"Xagman: supplier passes finished with {xagmanPartialOwners.Count} partially filled owner(s); starting final cleanup."
+                        : completionDirective.CollectionFirstEnabled
                         ? "Xagman: every expected FO client completed the global collection and restock barriers; starting owner completion cleanup."
                         : "Xagman: Tony supply is depleted across all selected Tonys; starting owner completion cleanup.";
                     StartXagmanFranchiseCompletionTask(completionReason);
@@ -4257,12 +4443,23 @@ public partial class SlaveWindow
         xagmanAetheryteNames = names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
         return xagmanAetheryteNames;
     }
+    private void PruneXagmanAutoRetainerExclusions()
+    {
+        if (xagmanRunning || plugin.TaskRunner.IsRunning || xagmanTradeSafetySessionActive)
+            return;
+        var cfg = plugin.Configuration;
+        PruneAutoRetainerExcludedSelections(
+            cfg.XagmanTonyCharacters.Select(entry => entry.CharacterNameWorld).ToList(),
+            xagmanTonySelectedIndices, cfg.XagmanHonorArExclusions);
+        PruneAutoRetainerExcludedSelections(
+            cfg.XagmanFranchiseCharacters, xagmanFranchiseSelectedIndices, cfg.XagmanHonorArExclusions);
+    }
     private void ImportXagmanTonyCharactersFromAr()
     {
         try
         {
-            var arChars = plugin.ArConfigReader.ReadCharacters();
             var cfg = plugin.Configuration;
+            var arChars = ReadAutoRetainerCharactersForTask(cfg.XagmanHonorArExclusions);
             var added = 0;
             foreach (var c in arChars)
             {
@@ -4279,8 +4476,10 @@ public partial class SlaveWindow
                 UpdateCharacterInfo(cfg, key, c);
             }
             MigrateLegacyLastSeen(cfg, arChars);
+            PruneXagmanAutoRetainerExclusions();
             cfg.Save();
-            arImportStatus = $"Xagman: added {added} Tony entries from AutoRetainer";
+            arImportStatus = $"Xagman: added {added} Tony entries from AutoRetainer"
+                + (cfg.XagmanHonorArExclusions ? plugin.ArConfigReader.ExclusionStatusSuffix : string.Empty);
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
         }
         catch (Exception ex)
@@ -4293,8 +4492,11 @@ public partial class SlaveWindow
     {
         try
         {
-            var (added, total) = ImportCharactersFromArToList(plugin.Configuration.XagmanFranchiseCharacters);
-            arImportStatus = $"Xagman: added {added}/{total} owner entries from AutoRetainer";
+            var cfg = plugin.Configuration;
+            var (added, total) = ImportCharactersFromArToList(cfg.XagmanFranchiseCharacters, cfg.XagmanHonorArExclusions);
+            PruneXagmanAutoRetainerExclusions();
+            arImportStatus = $"Xagman: added {added}/{total} owner entries from AutoRetainer"
+                + (cfg.XagmanHonorArExclusions ? plugin.ArConfigReader.ExclusionStatusSuffix : string.Empty);
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
         }
         catch (Exception ex)
@@ -4306,6 +4508,8 @@ public partial class SlaveWindow
     private bool IsXagmanTonyCharacterVisible(Configuration cfg, XagmanTonyCharacterEntry entry, int index)
     {
         var charName = entry.CharacterNameWorld;
+        if (!IsAutoRetainerCharacterAllowed(charName, cfg.XagmanHonorArExclusions))
+            return false;
         var world = GetWorldFromKey(charName);
         var regionDc = WorldData.GetRegionDcLabel(world);
         if (!MatchesRegionFilter(world, cfg.XagmanRegionFilter))
@@ -4319,6 +4523,8 @@ public partial class SlaveWindow
     }
     private bool MatchesXagmanFranchiseCharacterFilters(Configuration cfg, string charName)
     {
+        if (!IsAutoRetainerCharacterAllowed(charName, cfg.XagmanHonorArExclusions))
+            return false;
         var world = GetWorldFromKey(charName);
         var regionDc = WorldData.GetRegionDcLabel(world);
         if (!MatchesRegionFilter(world, cfg.XagmanRegionFilter))
@@ -4361,6 +4567,12 @@ public partial class SlaveWindow
     {
         ResetXagmanMatchingCharacterSelection();
         var cfg = plugin.Configuration;
+        if (!IsAutoRetainerCharacterAllowed(currentCharacter, cfg.XagmanHonorArExclusions))
+        {
+            arImportStatus = "Xagman: the logged-in character cannot be selected while Honor Exclusions hides it.";
+            arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
+            return;
+        }
         var index = target == XagmanMatchSelectionTarget.Tony
             ? cfg.XagmanTonyCharacters.FindIndex(entry =>
                 entry.CharacterNameWorld.Equals(currentCharacter, StringComparison.OrdinalIgnoreCase))
@@ -4475,7 +4687,8 @@ public partial class SlaveWindow
         var selectionLabel = target == XagmanMatchSelectionTarget.Tony ? "Tony" : "Franchise Owner";
         try
         {
-            var arCharacters = plugin.ArConfigReader.ReadCharacters();
+            // Registration refresh also runs during active plans; preserve their exclusion snapshot.
+            var arCharacters = plugin.ArConfigReader.ReadCharacters(honorExclusions: false);
             if (arCharacters.Count == 0)
             {
                 if (target == XagmanMatchSelectionTarget.FranchiseOwner)
@@ -4514,6 +4727,7 @@ public partial class SlaveWindow
                 UpdateCharacterInfo(cfg, charName, arInfo);
             }
 
+            PruneXagmanAutoRetainerExclusions();
             cfg.Save();
             if (target == XagmanMatchSelectionTarget.FranchiseOwner)
             {
@@ -4536,20 +4750,24 @@ public partial class SlaveWindow
     }
     private List<XagmanTonyCharacterEntry> GetSelectedXagmanTonyCharacters()
     {
-        var chars = plugin.Configuration.XagmanTonyCharacters;
+        var cfg = plugin.Configuration;
+        var chars = cfg.XagmanTonyCharacters;
         return xagmanTonySelectedIndices
             .Where(index => index >= 0 && index < chars.Count)
             .OrderBy(index => index)
             .Select(index => chars[index])
+            .Where(entry => IsAutoRetainerCharacterAllowed(entry.CharacterNameWorld, cfg.XagmanHonorArExclusions))
             .ToList();
     }
     private List<string> GetSelectedXagmanFranchiseCharacters()
     {
-        var chars = plugin.Configuration.XagmanFranchiseCharacters;
+        var cfg = plugin.Configuration;
+        var chars = cfg.XagmanFranchiseCharacters;
         return xagmanFranchiseSelectedIndices
             .Where(index => index >= 0 && index < chars.Count)
             .OrderBy(index => index)
             .Select(index => chars[index])
+            .Where(character => IsAutoRetainerCharacterAllowed(character, cfg.XagmanHonorArExclusions))
             .ToList();
     }
     private void SelectXagmanTonyCharactersWithMatchingItems(XagmanAutoRetainerMatchScope scope)
@@ -4810,7 +5028,8 @@ public partial class SlaveWindow
             var chars = plugin.Configuration.XagmanTonyCharacters;
             for (var i = 0; i < chars.Count; i++)
             {
-                if (!visibleMatches.Contains(chars[i].CharacterNameWorld))
+                if (!visibleMatches.Contains(chars[i].CharacterNameWorld)
+                    || !IsAutoRetainerCharacterAllowed(chars[i].CharacterNameWorld, plugin.Configuration.XagmanHonorArExclusions))
                     continue;
                 xagmanTonySelectedIndices.Add(i);
                 selectedCount++;
@@ -4822,7 +5041,8 @@ public partial class SlaveWindow
             var chars = plugin.Configuration.XagmanFranchiseCharacters;
             for (var i = 0; i < chars.Count; i++)
             {
-                if (!visibleMatches.Contains(chars[i]))
+                if (!visibleMatches.Contains(chars[i])
+                    || !IsAutoRetainerCharacterAllowed(chars[i], plugin.Configuration.XagmanHonorArExclusions))
                     continue;
                 xagmanFranchiseSelectedIndices.Add(i);
                 selectedCount++;
@@ -5379,6 +5599,8 @@ public partial class SlaveWindow
         var hasSingleMeet = !string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld) && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte);
         if (selected.Count == 0 || (!serverMatching && !hasSingleMeet))
             return;
+        if (!TryCaptureXagmanCustomMeetingSettings())
+            return;
         PinXagmanMeetRouteSnapshot(serverMatching);
         if (serverMatching)
         {
@@ -5415,6 +5637,7 @@ public partial class SlaveWindow
         ClearXagmanRunSnapshot();
         ClearXagmanOwnerPolicyRunCapabilities();
         ResetXagmanFiniteTakeGoals();
+        ResetXagmanSupplyCycle();
         ResetXagmanCollectionFirstRunState();
         ResetXagmanServerMatchingRunState();
         HaltAutoCollectionForPriorityTask("Xagman");
@@ -5507,18 +5730,23 @@ public partial class SlaveWindow
             : GetSelectedXagmanFranchiseCharacters();
         if (!resumeFromStandby)
         {
+            if (!TryCaptureXagmanCustomMeetingSettings())
+                return false;
             ClearXagmanRunSnapshot();
             ClearXagmanOwnerPolicyRunCapabilities();
             ResetXagmanFiniteTakeGoals();
+            ResetXagmanSupplyCycle();
             ResetXagmanServerMatchingRunState();
             ResetXagmanOwnerTimings();
             if (!TryValidateXagmanGreenValueOwnerStart(startDirective))
                 return false;
             if (!TryConfigureXagmanCollectionFirstOwnerRun(startDirective))
                 return false;
+            if (startDirective != null && !TryRememberXagmanOwnerSupplyStart(startDirective))
+                return false;
             // When a Server Matching Tony is already advertising, process owners in Region -> Server
             // sweep order so each character waits the minimum time for its server's turn.
-            if (HasXagmanServerMatchingMeetConfig() || IsXagmanOwnerServerMatchingActive())
+            if (selected.Count > 0)
             {
                 selected = selected
                     .OrderBy(key => WorldData.GetSweepOrdinalForWorld(GetWorldFromKey(key)))
@@ -5709,6 +5937,10 @@ public partial class SlaveWindow
     {
         if (!value)
         {
+            StopXagmanCustomMeetingMovement();
+            if (xagmanRunning && (xagmanMiniSnapshot.Running || !xagmanMiniSnapshot.HasRun))
+                UpdateXagmanMiniSnapshot(true);
+            ResetXagmanRelogDatabasePull();
             xagmanArMultiGuardActive = false;
             EndXagmanLobbyOperation();
             ClearXagmanExpectedTravelLogoutWindow();
@@ -5776,6 +6008,11 @@ public partial class SlaveWindow
         }
 
         xagmanActiveCharacter = entry.CharacterNameWorld;
+        ResetXagmanTonySupplyDrain();
+        // Standby belongs to the outgoing receiver. Keep the consumed request key so
+        // replayed acknowledgements cannot rotate this fresh replacement either.
+        xagmanTonyRotationRequestedByOwnerStandby = false;
+        BeginXagmanTonySupplyPass();
         xagmanPreferredTonyCharacter = entry.CharacterNameWorld;
         xagmanTonyMode = entry.Mode;
         xagmanTonyObservedOwnerWork = false;
@@ -6025,6 +6262,7 @@ public partial class SlaveWindow
             expectCrossDataCenterLogout: true,
             travelSourceCharacterProvider: () => entry.CharacterNameWorld,
             travelDestinationWorldProvider: GetXagmanActiveMeetWorld);
+        AddXagmanCustomMeetingStep(steps, entry.CharacterNameWorld, ShouldSkipTonyStartupPostTravel);
         steps.Add(new TaskStep
         {
             Name = $"Xagman Tony Ready: {entry.CharacterNameWorld}",
@@ -6093,6 +6331,7 @@ public partial class SlaveWindow
         xagmanExpectedLogout = false;
         if (xagmanRunning || xagmanOwnerRunPlan.Count > 0 || xagmanTonyRunPlan.Count > 0)
             CaptureXagmanRunSnapshot();
+        RetainXagmanMiniResultBeforeStop();
         if (plugin.TaskRunner.IsRunning && plugin.TaskRunner.CurrentTaskName.Equals("Xagman", StringComparison.OrdinalIgnoreCase))
             plugin.TaskRunner.Cancel();
         ResetXagmanTonyMeetRetryState();
@@ -6235,7 +6474,7 @@ public partial class SlaveWindow
         if (wasPresent)
             xagmanTonyCompletedCharacters = Math.Min(GetXagmanLocalTonyTotalCharacters(), xagmanTonyCompletedCharacters + 1);
         xagmanCurrentTonyIndex = xagmanTonyRunList.Count > 0 ? 0 : -1;
-        if (IsXagmanCollectionFirstCollectionPhase())
+        if (IsXagmanCollectionFirstCollectionPhase() || IsXagmanCapacityDrainActive())
             return;
         for (var index = 0; index < plugin.Configuration.XagmanTonyCharacters.Count; index++)
         {
@@ -6258,6 +6497,7 @@ public partial class SlaveWindow
         var query = plugin.XagmanPeers.Peers
             .Where(peer => peer.Role == XagmanRole.FranchiseOwner)
             .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
             .Where(peer => string.IsNullOrWhiteSpace(tonyCharacter)
                 || string.IsNullOrWhiteSpace(peer.PreferredTonyCharacter)
                 || peer.PreferredTonyCharacter.Equals(tonyCharacter, StringComparison.OrdinalIgnoreCase));
@@ -6306,6 +6546,27 @@ public partial class SlaveWindow
         if (remainingTonys.Count > 0)
             lines.Add($"Unprocessed Tonys: {string.Join(", ", remainingTonys)}");
 
+        var partialOwners = plugin.XagmanPeers.Peers
+            .Where(peer => peer.Role == XagmanRole.FranchiseOwner)
+            .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
+            .OrderByDescending(peer => peer.LastSeenUtc)
+            .SelectMany(peer => peer.PartialOwners ?? new List<XagmanPartialOwnerState>())
+            .Concat(xagmanPartialOwners.Values)
+            .Where(owner => owner != null && !string.IsNullOrWhiteSpace(owner.CharacterNameWorld))
+            .GroupBy(owner => owner.CharacterNameWorld, StringComparer.OrdinalIgnoreCase)
+            .Select(group => new XagmanPartialOwnerState
+            {
+                CharacterNameWorld = group.First().CharacterNameWorld,
+                Reason = group.First().Reason,
+                RequestedItems = CloneXagmanTradeRequests(group.First().RequestedItems.Where(request => !IsXagmanOpenEndedSupplyRequest(request)).ToList()),
+                PendingGiveItems = CloneXagmanTradeRequests(group.First().PendingGiveItems),
+            })
+            .Where(owner => owner.RequestedItems.Count > 0 || owner.PendingGiveItems.Count > 0)
+            .ToList();
+        foreach (var owner in partialOwners)
+            lines.Add($"{GetXagmanPartialOwnerLabel(owner)} owner {owner.CharacterNameWorld}: {GetXagmanPartialOwnerDetail(owner)}");
+
         var unresolvedOwnerStates = GetXagmanRelevantOwnerPeersForTony(tonyCharacter, true)
             .Select(peer =>
             {
@@ -6314,9 +6575,9 @@ public partial class SlaveWindow
                 var requestedUnits = peer.RequestedItems == null
                     ? 0
                     : peer.RequestedItems.Sum(request => Math.Max(0, request.Quantity));
-                var remainingCharacters = Math.Max(0, peer.TotalCharacters - peer.CompletedCharacters);
+                var remainingCharacters = GetXagmanFinalUnresolvedOwnerCount(peer);
                 var hasQueuedWork = peer.QueueRequestedAtUtc > DateTime.MinValue;
-                var hasActiveStatus = peer.Status is XagmanStatus.ReadyForQueue or XagmanStatus.WaitingRoom or XagmanStatus.Queued or XagmanStatus.Called or XagmanStatus.Trading or XagmanStatus.Standby or XagmanStatus.Paused;
+                var hasActiveStatus = !peer.SupplyPassComplete && peer.Status is XagmanStatus.ReadyForQueue or XagmanStatus.WaitingRoom or XagmanStatus.Queued or XagmanStatus.Called or XagmanStatus.Trading or XagmanStatus.Standby or XagmanStatus.Paused;
                 if (string.IsNullOrWhiteSpace(name) || (!hasQueuedWork && !hasActiveStatus && requestedCount == 0 && remainingCharacters == 0))
                     return string.Empty;
 
@@ -6341,6 +6602,43 @@ public partial class SlaveWindow
             lines.Add($"Unresolved owner/item state: {string.Join("; ", unresolvedOwnerStates)}");
 
         return lines;
+    }
+
+    private static bool IsXagmanOpenEndedSupplyRequest(XagmanTradeRequestEntry request)
+        => request.SelectorKind == XagmanItemSelectorKind.ExactItem
+            && request.Mode == XagmanItemMode.Take && request.TargetQuantity == 0;
+
+    private static int GetXagmanFinalUnresolvedOwnerCount(XagmanPeerPresence peer)
+    {
+        var allAvailableOnly = peer.PartialOwners.Count(state => state.PendingGiveItems.Count == 0 && state.RequestedItems.Count > 0
+            && state.RequestedItems.All(IsXagmanOpenEndedSupplyRequest));
+        return Math.Max(0, peer.TotalCharacters - peer.CompletedCharacters - allAvailableOnly);
+    }
+
+    private void FinalizeXagmanOpenEndedSupplyRequests()
+    {
+        // Take 0 remains eligible for every supplier, but has no finite shortage after the last pass.
+        foreach (var state in xagmanPartialOwners.Values.ToList())
+        {
+            state.RequestedItems.RemoveAll(IsXagmanOpenEndedSupplyRequest);
+            if (state.RequestedItems.Count != 0 || state.PendingGiveItems.Count != 0) continue;
+            xagmanPartialOwners.Remove(state.CharacterNameWorld);
+            if (plugin.TaskRunner.FailedCharacters.Contains(state.CharacterNameWorld)
+                || xagmanSkippedCharacters.Contains(state.CharacterNameWorld)) continue;
+            xagmanOwnerCompletedKeys.Add(state.CharacterNameWorld);
+            if (xagmanActiveRole == XagmanRole.FranchiseOwner)
+            {
+                xagmanFranchiseSelectedIndices.RemoveWhere(index => index >= 0
+                    && index < plugin.Configuration.XagmanFranchiseCharacters.Count
+                    && plugin.Configuration.XagmanFranchiseCharacters[index].Equals(state.CharacterNameWorld, StringComparison.OrdinalIgnoreCase));
+                plugin.TaskRunner.AddLog($"Xagman: owner {state.CharacterNameWorld} finished all-available requests across the selected suppliers; no finite shortage remains.");
+            }
+        }
+        if (xagmanActiveRole == XagmanRole.FranchiseOwner)
+        {
+            xagmanOwnerCompletedCharacters = xagmanOwnerCompletedKeys.Count;
+            plugin.TaskRunner.CompletedItems = xagmanOwnerCompletedCharacters;
+        }
     }
 
     private static bool HasXagmanPendingOwnerWork(XagmanPeerPresence peer)
@@ -6515,13 +6813,15 @@ public partial class SlaveWindow
         plugin.TaskRunner.Start("Xagman", steps, onFinished: () => FinalizeXagmanLocalShutdown("failure recall"), onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"), preserveRunHistory: true);
     }
 
-    private void StartXagmanFranchiseCompletionTask(string reason)
+    private void StartXagmanFranchiseCompletionTask(string reason, bool localOwnersFinished = false)
     {
         if (!xagmanRunning || xagmanActiveRole != XagmanRole.FranchiseOwner)
             return;
         if (plugin.TaskRunner.IsRunning && plugin.TaskRunner.CurrentTaskName.Equals("Xagman", StringComparison.OrdinalIgnoreCase))
             plugin.TaskRunner.Cancel();
 
+        var completingSupplyCycle = IsXagmanSupplyCycleActive();
+        var alreadyAtMenu = completingSupplyCycle && !Plugin.ClientState.IsLoggedIn;
         var cfg = plugin.Configuration;
         var runner = plugin.TaskRunner;
         var localCharacter = string.IsNullOrWhiteSpace(xagmanActiveCharacter)
@@ -6559,7 +6859,7 @@ public partial class SlaveWindow
                 xagmanTradeQuantitySnapshot.Clear();
                 SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
                 runner.TotalItems = GetXagmanLocalOwnerTotalCharacters();
-                runner.CompletedItems = runner.TotalItems;
+                runner.CompletedItems = completingSupplyCycle ? xagmanOwnerCompletedKeys.Count : runner.TotalItems;
                 runner.AddLog(reason);
                 if (stoppedQueue)
                     runner.AddLog("Xagman: stopped Dropbox item trade queue before owner completion cleanup.");
@@ -6570,7 +6870,8 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
-        if (IsXagmanCollectionFirstRestockPhase() && xagmanCompletionDirectiveAcknowledged)
+        if ((IsXagmanCollectionFirstRestockPhase() || IsXagmanCapacityWarningCompletion())
+            && xagmanCompletionDirectiveAcknowledged)
         {
             // Keep the peer connected long enough for the hub and Tony to observe the scoped
             // acknowledgement before optional FC return or local peer shutdown begins.
@@ -6578,7 +6879,7 @@ public partial class SlaveWindow
                 "Xagman Franchise Completion Ack Relay",
                 2.5f));
         }
-        if (cfg.XagmanAutoReturnToFc)
+        if (cfg.XagmanAutoReturnToFc && !alreadyAtMenu && !localOwnersFinished)
         {
             AddXagmanTeleportSteps(
                 steps,
@@ -6620,8 +6921,8 @@ public partial class SlaveWindow
             steps,
             runner,
             "Franchise Owner peer completion",
-            MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete));
-        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete);
+            MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(cfg.XagmanLogoutOnComplete && !alreadyAtMenu, cfg.XagmanKillGameOnComplete));
+        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete && !alreadyAtMenu, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete);
         plugin.TaskRunner.Start("Xagman", steps, onFinished: () => FinalizeXagmanLocalShutdown("Franchise Owner peer completion"), onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"), preserveRunHistory: true);
     }
 
@@ -6632,9 +6933,11 @@ public partial class SlaveWindow
         var helper = new MonthlyReloggerTask(plugin);
         var steps = new List<TaskStep>();
         var collectionOnly = IsXagmanCollectionFirstCollectionPhase();
-        var restockOnly = IsXagmanCollectionFirstRestockPhase();
-        runner.TotalItems = characters.Count;
-        runner.CompletedItems = Math.Max(0, Math.Min(startIndex, characters.Count));
+        var capacityDrain = IsXagmanCapacityDrainActive();
+        var restockOnly = IsXagmanCollectionFirstRestockPhase() || capacityDrain;
+        var supplyCycle = IsXagmanSupplyCycleActive();
+        runner.TotalItems = supplyCycle ? xagmanOwnerRunPlan.Count : characters.Count;
+        runner.CompletedItems = supplyCycle ? xagmanOwnerCompletedKeys.Count : Math.Max(0, Math.Min(startIndex, characters.Count));
         runner.SuppressLogoutCancel = true;
         steps.Add(new TaskStep
         {
@@ -6650,7 +6953,9 @@ public partial class SlaveWindow
                     ? "Xagman: Franchise Owner is waiting for Tony to start and relay meetup data."
                     : $"Xagman: Franchise Owner is waiting for Tony {partnerName} to start and relay meetup data.");
             },
-            IsComplete = () => xagmanOwnerStartRequested && IsXagmanFranchiseStartupReady(),
+            IsComplete = () => xagmanOwnerStartRequested
+                && (!supplyCycle || TryBindXagmanOwnerSupplyPass())
+                && ((supplyCycle && characters.Count == 0) || IsXagmanFranchiseStartupReady()),
             TimeoutSec = 86400f,
         });
         steps.AddRange(helper.BuildPreFlightOnlySteps(characters.Skip(startIndex).ToList(), runner, RunXagmanPreflightArMultiGuard));
@@ -6662,6 +6967,16 @@ public partial class SlaveWindow
             var relogFailed = false;
             var standbyRequested = false;
             var charSkipped = false;
+            var passDeferred = false;
+            var ownerPartial = false;
+            steps.Add(new TaskStep
+            {
+                Name = $"Xagman Owner Supply Pass Gate: {charName}",
+                OnEnter = () => passDeferred = supplyCycle && ShouldDeferXagmanOwnerForSupplyPass(charName),
+                IsComplete = () => true,
+                TimeoutSec = 1f,
+            });
+            var ownerStepsStart = steps.Count;
             var resumingStandbyOwner = xagmanQueueRequestedAtUtc > DateTime.MinValue
                 && xagmanActiveCharacter.Equals(charName, StringComparison.OrdinalIgnoreCase);
             const float ownerTradeStopDistance = 1.5f;
@@ -6779,9 +7094,21 @@ public partial class SlaveWindow
 
             bool TryEnterStandby()
             {
+                if (ownerPartial || passDeferred)
+                    return false;
                 if (standbyRequested || relogFailed || !ShouldXagmanOwnerStandbyForTonyRotation(charName))
                     return standbyRequested;
                 return BeginStandbyForTonyRotation(string.Empty);
+            }
+
+            bool TryDeferOwnerForSupplyPass()
+            {
+                if (ownerPartial)
+                    return true;
+                if (!supplyCycle || passDeferred || relogFailed || standbyRequested || charSkipped)
+                    return false;
+                ownerPartial = TryAcceptXagmanPartialDeferral(charName);
+                return ownerPartial;
             }
 
             bool YieldOwnerTradeLockIfNeeded()
@@ -6795,7 +7122,10 @@ public partial class SlaveWindow
 
             bool ShouldSkipTradeFlow()
             {
-                if (!xagmanRunning || relogFailed || standbyRequested || charSkipped || xagmanOwnerPauseForTonyRotationRequested)
+                if (!xagmanRunning || relogFailed || standbyRequested || charSkipped || passDeferred
+                    || ownerPartial || xagmanOwnerPauseForTonyRotationRequested)
+                    return true;
+                if (TryDeferOwnerForSupplyPass())
                     return true;
                 if (YieldOwnerTradeLockIfNeeded())
                     return true;
@@ -6804,12 +7134,13 @@ public partial class SlaveWindow
 
             bool ShouldSkipOwnerCollectionTradeExecution()
             {
-                return restockOnly || ShouldSkipTradeFlow() || ownerCollectionQueuedEntries <= 0;
+                return restockOnly || IsXagmanOwnerSupplyDraining() || ShouldSkipTradeFlow() || ownerCollectionQueuedEntries <= 0;
             }
 
             bool ShouldSkipOwnerCollectionSetup()
             {
-                return restockOnly || ShouldSkipTradeFlow();
+                return restockOnly || IsXagmanOwnerSupplyDraining() || (supplyCycle && xagmanOwnerCollectionCompletedKeys.Contains(charName))
+                    || ShouldSkipTradeFlow();
             }
 
             bool ShouldSkipRequestedTradeFlow()
@@ -6818,7 +7149,8 @@ public partial class SlaveWindow
             }
 
             bool ShouldArmOwnerAutoAcceptForPendingTonySupply()
-                => !collectionOnly && ShouldPreArmXagmanOwnerAutoAcceptForPendingTonySupply(charName);
+                => !collectionOnly && !ownerPartial && !passDeferred
+                    && ShouldPreArmXagmanOwnerAutoAcceptForPendingTonySupply(charName);
 
             void AdvertiseOwnerTradeLockWait(string phaseLabel)
             {
@@ -6847,6 +7179,7 @@ public partial class SlaveWindow
                             AdvertiseOwnerTradeLockWait(phaseLabel);
                     },
                     IsComplete = () => shouldSkip()
+                        || TryDeferOwnerForSupplyPass()
                         || HasXagmanActiveTonyTradeLock(charName)
                         || TryEnterStandby(),
                     TimeoutSec = 60f,
@@ -6866,7 +7199,7 @@ public partial class SlaveWindow
                     return true;
 
                 standbyRequested = true;
-                xagmanOwnerCurrentCharacterIndex = i;
+                xagmanOwnerCurrentCharacterIndex = charIndex - 1;
                 var dropboxBusy = plugin.IpcClient.DropboxIsBusy();
                 var tradeWindowVisible = AddonHelper.IsAddonVisible("Trade");
                 var shouldStopQueue = xagmanObservedDropboxBusy || dropboxBusy;
@@ -6919,8 +7252,27 @@ public partial class SlaveWindow
                 PublishXagmanPresence();
             }
 
+            var ownerDrainCleanupSinceUtc = DateTime.MinValue;
             bool PollOwnerTradeWait()
             {
+                if (IsXagmanOwnerSupplyDraining())
+                {
+                    BuildXagmanPendingGiveItems(charName);
+                    if (ownerDrainCleanupSinceUtc == DateTime.MinValue) ownerDrainCleanupSinceUtc = DateTime.UtcNow;
+                    if (!TryStopXagmanDropboxTradeQueue())
+                    {
+                        FailXagmanSupplyCycle($"Could not confirm owner {charName}'s collection queue stopped before supply drain.");
+                        return false;
+                    }
+                    if (AddonHelper.IsAddonVisible("Trade")) TryAbortXagmanTradeWindow();
+                    if ((DateTime.UtcNow - ownerDrainCleanupSinceUtc).TotalSeconds > 15)
+                    {
+                        FailXagmanSupplyCycle($"Owner {charName}'s collection trade did not close before supply drain; unfinished Give work remains pending.");
+                        return false;
+                    }
+                    ownerCollectionRetryRequested = false;
+                    return !plugin.IpcClient.DropboxIsBusy() && !AddonHelper.IsAddonVisible("Trade");
+                }
                 var failureKind = GetXagmanTradeFailureKind(out var matchedText);
                 if (failureKind != XagmanTradeFailureKind.None)
                 {
@@ -6981,6 +7333,9 @@ public partial class SlaveWindow
                     xagmanObservedDropboxBusy = true;
                     return false;
                 }
+
+                if (TryDeferOwnerForSupplyPass())
+                    return true;
 
                 var previousTony = xagmanActiveTradePartner;
                 var previousTonyInstanceId = xagmanActiveTradePartnerInstanceId;
@@ -7065,14 +7420,20 @@ public partial class SlaveWindow
 
             void EvaluateOwnerCollectionRetry(int collectionPassNumber)
             {
-                if (restockOnly)
+                if (restockOnly || IsXagmanOwnerSupplyDraining())
                 {
+                    BuildXagmanPendingGiveItems(charName);
                     ownerCollectionRetryRequested = false;
                     return;
                 }
                 ownerCollectionRetryRequested = HasXagmanOwnerCollectionItemsRemaining(cfg.XagmanItems, charName);
+                if (xagmanStatus == XagmanStatus.Error) return;
                 if (!ownerCollectionRetryRequested)
+                {
+                    if (supplyCycle)
+                        xagmanOwnerCollectionCompletedKeys.Add(charName);
                     return;
+                }
 
                 SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
                 if (collectionPassNumber >= maxOwnerCollectionTradePasses)
@@ -7092,11 +7453,13 @@ public partial class SlaveWindow
             bool EvaluateOwnerSendoffReconciliation(int verificationPassNumber, bool yieldOnFailure)
             {
                 ownerSendoffVerified = false;
+                if (TryDeferOwnerForSupplyPass()) return true;
                 ownerCollectionRetryRequested = !restockOnly
                     && HasXagmanOwnerCollectionItemsRemaining(cfg.XagmanItems, charName);
                 var remainingRequestedItems = collectionOnly
                     ? new List<XagmanTradeRequestEntry>()
                     : BuildXagmanOwnerTradeRequests(cfg.XagmanItems, charName, false);
+                if (xagmanStatus == XagmanStatus.Error) return false;
                 if (FailOwnerOnIncompleteGreenScan(remainingRequestedItems))
                     return true;
                 if (!ownerCollectionRetryRequested && remainingRequestedItems.Count == 0)
@@ -7139,7 +7502,7 @@ public partial class SlaveWindow
 
                 bool ShouldSkipRepeatedTradeFlow()
                 {
-                    if (!ownerCollectionRetryRequested)
+                    if (!ownerCollectionRetryRequested || IsXagmanOwnerSupplyDraining())
                         return true;
                     return ShouldSkipTradeFlow();
                 }
@@ -7455,7 +7818,7 @@ public partial class SlaveWindow
                     runner.CurrentItemLabel = $"[{charIndex}/{charTotal}] {charName}";
                     runner.AddLog($"Xagman: processing owner {charName} ({charIndex}/{charTotal}).");
                     xagmanActiveCharacter = charName;
-                    xagmanOwnerCurrentCharacterIndex = i;
+                    xagmanOwnerCurrentCharacterIndex = charIndex - 1;
                     xagmanStatus = XagmanStatus.Relogging;
                     xagmanStatusText = $"Relogging owner {charName}.";
                     if (string.IsNullOrWhiteSpace(xagmanPreferredTonyCharacter))
@@ -7550,6 +7913,7 @@ public partial class SlaveWindow
                     xagmanStatusText = $"Owner {charName} skipped: {reason}.";
                 },
                 () => relogFailed || charSkipped);
+            AddXagmanCustomMeetingStep(steps, charName, () => relogFailed || charSkipped);
             steps.Add(new TaskStep
             {
                 Name = $"Xagman Wait For Tony Available: {charName}",
@@ -8066,9 +8430,9 @@ public partial class SlaveWindow
             steps.Add(new TaskStep
             {
                 Name = $"Xagman Requested Trade Wait: {charName}",
-                ShouldSkip = () => relogFailed || standbyRequested || xagmanOwnerRequestedItems.Count == 0,
+                ShouldSkip = () => relogFailed || standbyRequested || ownerPartial || xagmanOwnerRequestedItems.Count == 0,
                 OnEnter = () => xagmanObservedDropboxBusy = false,
-                IsComplete = () => relogFailed || standbyRequested || xagmanOwnerRequestedItems.Count == 0 || PollOwnerRequestedTradeWait() || TryEnterStandby(),
+                IsComplete = () => relogFailed || standbyRequested || ownerPartial || xagmanOwnerRequestedItems.Count == 0 || PollOwnerRequestedTradeWait() || TryEnterStandby(),
                 TimeoutSec = 600f,
                 OnTimeout = () =>
                 {
@@ -8086,7 +8450,7 @@ public partial class SlaveWindow
             steps.Add(new TaskStep
             {
                 Name = $"Xagman Completion Verify 1: {charName}",
-                ShouldSkip = () => relogFailed || standbyRequested,
+                ShouldSkip = () => relogFailed || standbyRequested || TryDeferOwnerForSupplyPass(),
                 OnEnter = () =>
                 {
                     xagmanObservedDropboxBusy = false;
@@ -8095,11 +8459,11 @@ public partial class SlaveWindow
                 IsComplete = () => true,
                 TimeoutSec = 1f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Xagman Completion Verify Wait: {charName}", 0.75f, () => relogFailed || standbyRequested));
+            steps.Add(MonthlyReloggerTask.MakeDelay($"Xagman Completion Verify Wait: {charName}", 0.75f, () => relogFailed || standbyRequested || ownerPartial));
             steps.Add(new TaskStep
             {
                 Name = $"Xagman Completion Verify 2: {charName}",
-                ShouldSkip = () => relogFailed || standbyRequested,
+                ShouldSkip = () => relogFailed || standbyRequested || TryDeferOwnerForSupplyPass(),
                 OnEnter = () =>
                 {
                     xagmanObservedDropboxBusy = false;
@@ -8111,7 +8475,7 @@ public partial class SlaveWindow
             steps.Add(new TaskStep
             {
                 Name = $"Xagman Trade Release Queue Slot: {charName}",
-                ShouldSkip = () => relogFailed || standbyRequested || !ownerSendoffVerified,
+                ShouldSkip = () => relogFailed || standbyRequested || (!ownerSendoffVerified && !ownerPartial),
                 OnEnter = () =>
                 {
                     SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
@@ -8168,12 +8532,25 @@ public partial class SlaveWindow
                 ShouldSkip = () => relogFailed || standbyRequested || charSkipped,
                 OnEnter = () =>
                 {
-                    if (!collectionOnly && xagmanOwnerCompletedKeys.Add(charName))
+                    if (collectionOnly)
+                    {
+                        xagmanOwnerCollectionCompletedKeys.Add(charName);
+                        if (xagmanPartialOwners.TryGetValue(charName, out var collectedState))
+                        {
+                            collectedState.PendingGiveItems.Clear();
+                            if (collectedState.RequestedItems.Count == 0) xagmanPartialOwners.Remove(charName);
+                        }
+                    }
+                    if (!ownerPartial && !collectionOnly && !capacityDrain && xagmanOwnerCompletedKeys.Add(charName))
                         InvalidateXagmanTradeCapacityForecast();
-                    xagmanOwnerCompletedCharacters = charIndex;
-                    if (IsXagmanCollectionFirstRunActive())
+                    if (capacityDrain && (!ownerPartial || (xagmanPartialOwners.TryGetValue(charName, out var drainState)
+                            && drainState.RequestedItems.Count == 0))) RecordXagmanCapacityDrainOwnerFilled(charName);
+                    if (supplyCycle)
+                        CompleteXagmanOwnerSupplyVisit(charName, ownerPartial);
+                    xagmanOwnerCompletedCharacters = supplyCycle ? xagmanOwnerCompletedKeys.Count : charIndex;
+                    if (IsXagmanCollectionFirstRunActive() && !supplyCycle)
                         xagmanPhaseResolvedCharacters = Math.Max(xagmanPhaseResolvedCharacters, charIndex);
-                    runner.CompletedItems = charIndex;
+                    runner.CompletedItems = xagmanOwnerCompletedCharacters;
                     runner.TotalItems = GetXagmanLocalOwnerTotalCharacters();
                     xagmanOwnerCurrentCharacterIndex = charIndex;
                     xagmanQueueRequestedAtUtc = DateTime.MinValue;
@@ -8184,10 +8561,12 @@ public partial class SlaveWindow
                     SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
                     if (!relogFailed)
                     {
-                        xagmanStatus = charIndex >= charTotal ? XagmanStatus.Completed : XagmanStatus.Idle;
-                        xagmanStatusText = $"Owner {charName} completed successfully.";
+                        xagmanStatus = !supplyCycle && charIndex >= charTotal ? XagmanStatus.Completed : XagmanStatus.Idle;
+                        xagmanStatusText = ownerPartial
+                            ? $"Owner {charName} has unfinished trade work saved for a later Tony."
+                            : $"Owner {charName} completed successfully.";
                     }
-                    if (!collectionOnly)
+                    if (!collectionOnly && !capacityDrain && !ownerPartial)
                     {
                         try
                         {
@@ -8222,6 +8601,10 @@ public partial class SlaveWindow
                     }
                     else if (charSkipped)
                         runner.AddLog($"Xagman: owner {charName} skipped; continuing the remaining roster.");
+                    else if (ownerPartial)
+                        runner.AddLog($"Xagman: owner {charName} has unfinished trade work; continuing the remaining roster before retrying outstanding items with a later Tony.");
+                    else if (capacityDrain)
+                        runner.AddLog($"Xagman: owner {charName} supply pass finished; collection progress is retained for the collection phase.");
                     else
                         runner.AddLog($"Xagman: owner {charName} completed successfully.");
                 },
@@ -8236,6 +8619,11 @@ public partial class SlaveWindow
                 IsComplete = () => true,
                 TimeoutSec = 1f,
             });
+            // A pass deferral is a scheduling decision, not an owner outcome. Guard every
+            // generated travel/trade/sendoff step so another region or already served owner
+            // cannot inherit the previous owner's active character or completion state.
+            for (var ownerStepIndex = ownerStepsStart; ownerStepIndex < steps.Count; ownerStepIndex++)
+                steps[ownerStepIndex] = MonthlyReloggerTask.WithSkip(steps[ownerStepIndex], () => passDeferred);
         }
         steps.Add(new TaskStep
         {
@@ -8243,6 +8631,11 @@ public partial class SlaveWindow
             ShouldSkip = () => xagmanOwnerStandbyPending,
             OnEnter = () =>
             {
+                if (supplyCycle)
+                {
+                    FinishXagmanOwnerSupplyPass();
+                    return;
+                }
                 if ((collectionOnly || restockOnly) && xagmanTravelRouteFatalError)
                 {
                     xagmanPhaseComplete = false;
@@ -8322,6 +8715,11 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
+        if (supplyCycle)
+        {
+            AddXagmanSupplyPassMenuWaitSteps(steps);
+            return steps;
+        }
         if (collectionOnly || restockOnly)
         {
             // Coordinated phases must remain connected with trade-safety state intact while Tony
@@ -8470,6 +8868,7 @@ public partial class SlaveWindow
         var nextDestinationPollUtc = DateTime.MinValue;
         var lastDestinationWaitReason = string.Empty;
         var loginCommandSent = false;
+        var relogDatabasePullRequested = false;
         bool ShouldExternalSkip() => externalSkip?.Invoke() ?? false;
         void FailLogin(string reason)
         {
@@ -8700,6 +9099,11 @@ public partial class SlaveWindow
                         completed: () => GetCurrentWorldName().Equals(loginWorld, StringComparison.OrdinalIgnoreCase));
                     if (!plugin.IpcClient.LifestreamExecuteCommand(command))
                         FailLogin("Lifestream rejected the character/world command IPC call");
+                    else if (!relogDatabasePullRequested)
+                    {
+                        relogDatabasePullRequested = true;
+                        QueueXagmanRelogDatabasePull();
+                    }
                 },
                 IsComplete = ObserveLoginReady,
                 TimeoutSec = XagmanRelogTimeoutSeconds,
@@ -9920,6 +10324,9 @@ public partial class SlaveWindow
 
     private void UpdateXagmanFrameworkTick()
     {
+        UpdateXagmanCustomMovementOwnership();
+        UpdateXagmanMiniSnapshot();
+        ProcessXagmanRelogDatabasePull();
         if (xagmanRunning && xagmanArMultiGuardActive
             && Environment.TickCount64 >= xagmanArMultiNextCheck)
         {
@@ -9937,6 +10344,8 @@ public partial class SlaveWindow
         if (xagmanLobbyOperation is { } lobbyOp
             && (plugin.TaskRunner.CurrentRunId != lobbyOp.RunId || (lobbyOp.RunnerOwned && !plugin.TaskRunner.IsRunning)))
             EndXagmanLobbyOperation();
+        // Completion receipts remain live even while lobby recovery owns task dispatch.
+        ObserveXagmanOwnerClientCompletions();
         var lobbyRecoveryOwnsTick = xagmanLobbyOperation != null && !plugin.TaskRunner.IsRunning && PollXagmanLobbyRecovery();
         if (lobbyRecoveryOwnsTick || xagmanLobbyOperation?.Pending == true)
         {
@@ -9955,7 +10364,13 @@ public partial class SlaveWindow
         }
         MeasureFrameworkUpdateStep("Xagman.ProcessPendingMatchSelection", ProcessXagmanPendingMatchSelection);
         MeasureFrameworkUpdateStep("Xagman.UpdateTradeCapacityForecast", UpdateXagmanTradeCapacityForecast);
-        if (xagmanRunning && plugin.Configuration.XagmanOutsideNetworkHelper)
+        var capacityRecoveryOwnsTick = xagmanRunning && !plugin.Configuration.XagmanOutsideNetworkHelper
+            && UpdateXagmanCapacityRecovery();
+        if (capacityRecoveryOwnsTick)
+        {
+            // Recovery keeps publishing scoped progress while normal task dispatch is held.
+        }
+        else if (xagmanRunning && plugin.Configuration.XagmanOutsideNetworkHelper)
         {
             // Outside Network Helper has no peer network; it drives its own self-hosted state
             // machine and never publishes presence.
@@ -9970,7 +10385,11 @@ public partial class SlaveWindow
                 "Xagman.StartCollectionFirstOwnerRestock",
                 () => startedRestock = TryStartXagmanCollectionFirstOwnerRestockPhase());
             if (!startedRestock)
-                MeasureFrameworkUpdateStep("Xagman.ResumeStandbyOwnerOnTonyCall", () => TryResumeXagmanOwnerStandbyFromCallingTony());
+            {
+                MeasureFrameworkUpdateStep("Xagman.UpdateOwnerSupplyCycle", UpdateXagmanOwnerSupplyCycle);
+                if (!xagmanOwnerSupplyWaiting)
+                    MeasureFrameworkUpdateStep("Xagman.ResumeStandbyOwnerOnTonyCall", () => TryResumeXagmanOwnerStandbyFromCallingTony());
+            }
         }
         var publishInterval = xagmanRunning ? 1.0 : 5.0;
         if ((!plugin.Configuration.XagmanOutsideNetworkHelper)
@@ -10036,7 +10455,11 @@ public partial class SlaveWindow
 
         // Require positive fresh peer evidence that the prior call was cleared. A transient hub gap
         // cannot unlock the old identity and recreate the cancel/resume race.
-        return priorTonyPeers.All(peer => !peer.ActiveTradePartner.Equals(xagmanActiveCharacter, StringComparison.OrdinalIgnoreCase)
+        return priorTonyPeers.All(peer => (peer.SupplyDrainOnly
+                && peer.InstanceId == xagmanOwnerSupplyTonyInstance
+                && peer.SupplyPassId == xagmanOwnerSupplyPassId
+                && peer.SupplyInventoryComplete)
+            || !peer.ActiveTradePartner.Equals(xagmanActiveCharacter, StringComparison.OrdinalIgnoreCase)
             || !peer.ActiveTradePartnerInstanceId.Equals(plugin.InstanceId, StringComparison.OrdinalIgnoreCase));
     }
 
@@ -10096,7 +10519,7 @@ public partial class SlaveWindow
             EndXagmanTravelFailure(xagmanTravelFailureToken);
             ClearXagmanExpectedTravelLogoutWindow();
             ResetXagmanTonyMeetRetryState();
-            return false;
+            return ReassertXagmanCustomMeetingPoint();
         }
 
         var now = DateTime.UtcNow;
@@ -10184,6 +10607,7 @@ public partial class SlaveWindow
     {
         if (!xagmanRunning || xagmanActiveRole != XagmanRole.Tony)
             return;
+        if (IsXagmanSupplyCycleActive() && string.IsNullOrWhiteSpace(xagmanSupplyPassId) && !xagmanSweepAwaitingStart) BeginXagmanTonySupplyPass();
         if (xagmanTonyCharacterFailurePending)
         {
             AdvanceXagmanTonyAfterCharacterFailure();
@@ -10191,6 +10615,7 @@ public partial class SlaveWindow
         }
         if (xagmanStatus == XagmanStatus.Error)
             return;
+        if (UpdateXagmanTonySupplyDrain()) return;
         ObserveXagmanCollectionFirstPhaseAcknowledgements();
         if (xagmanSweepAwaitingStart)
         {
@@ -10223,6 +10648,12 @@ public partial class SlaveWindow
         UpdateXagmanTonyOwnerDisconnectCompletionState(liveRelevantOwnerPeers);
         if (TryReassertXagmanTonyMeetup())
             return;
+        if (IsXagmanSupplyCycleActive())
+        {
+            if (plugin.IpcClient.DropboxIsBusy() || AddonHelper.IsAddonVisible("Trade"))
+                xagmanSupplyInventoryUnreadableSinceUtc = DateTime.MinValue;
+            else if (!ObserveXagmanSupplyCohort() || HoldXagmanSupplyDeferral()) return;
+        }
         var queue = GetXagmanQueueForTony(xagmanActiveCharacter);
         if (!xagmanTonyObservedOwnerWork)
         {
@@ -10249,6 +10680,7 @@ public partial class SlaveWindow
         }
         if (xagmanObservedDropboxBusy)
         {
+            if (!xagmanSupplyDrainOnly && !IsXagmanCapacityDrainActive() && TryBeginXagmanTonySupplyDrain()) return;
             xagmanObservedDropboxBusy = false;
             if (!string.IsNullOrWhiteSpace(xagmanActiveTradePartner))
             {
@@ -10268,6 +10700,7 @@ public partial class SlaveWindow
             return;
         if (TryRotateXagmanTonyForPendingOwnerStandbyRequest())
             return;
+        if (!xagmanSupplyDrainOnly && !IsXagmanCapacityDrainActive() && TryBeginXagmanTonySupplyDrain()) return;
         if (TryReleaseXagmanTonyStalePartner())
         {
             if (!xagmanRunning)
@@ -10288,7 +10721,8 @@ public partial class SlaveWindow
         {
             // All Franchise Owners are relogging with none ready to trade; use the idle window to sell Tony's inventory.
             xagmanTonyOpportunisticSellArmed = false;
-            if (plugin.Configuration.XagmanSellWhenInventoryFull)
+            if (plugin.Configuration.XagmanSellWhenInventoryFull && !IsXagmanSupplyCycleActive()
+                && !IsXagmanCollectionFirstRunActive())
             {
                 if (GetXagmanLiveLocalItemQuantity(1, false) >= XagmanTonySellGilLimit)
                 {
@@ -10368,7 +10802,8 @@ public partial class SlaveWindow
             {
                 xagmanActiveTradePartner = inFlightOwner.ActiveCharacter;
                 xagmanActiveTradePartnerInstanceId = inFlightOwner.InstanceId;
-                if (!TryRequireXagmanReceiverAutoAccept($"Tony receiving from {inFlightOwner.ActiveCharacter}"))
+                if (!xagmanSupplyDrainOnly && !IsXagmanCapacityDrainActive()
+                    && !TryRequireXagmanReceiverAutoAccept($"Tony receiving from {inFlightOwner.ActiveCharacter}"))
                     return;
             }
             xagmanStatus = inFlightOwner.Status == XagmanStatus.Trading ? XagmanStatus.Trading : XagmanStatus.Called;
@@ -10377,6 +10812,7 @@ public partial class SlaveWindow
         }
         if (queue.Count == 0)
         {
+            if (!xagmanServerMatchingActive && TryAdvanceXagmanSupplyCycle()) return;
             if (IsXagmanCollectionFirstCollectionPhase()
                 && TryAdvanceXagmanCollectionFirstTonyToRestock())
             {
@@ -10403,6 +10839,17 @@ public partial class SlaveWindow
                         if (IsXagmanCollectionFirstCollectionPhase())
                         {
                             UpdateXagmanCollectionFirstBarrierStatus(XagmanRunPhase.Collection);
+                            return;
+                        }
+                        if (IsXagmanSupplyCycleActive())
+                        {
+                            var hasShortages = xagmanPartialOwners.Values.Any(state => state.PendingGiveItems.Count > 0 || state.RequestedItems.Any(request => !IsXagmanOpenEndedSupplyRequest(request)))
+                                || plugin.XagmanPeers.Peers.Any(peer => peer.Role == XagmanRole.FranchiseOwner
+                                    && peer.XagmanEnabled && IsXagmanPeerInCurrentRunPhase(peer)
+                                    && IsXagmanPeerInSupplyCoordinatorScope(peer)
+                                    && GetXagmanFinalUnresolvedOwnerCount(peer) > 0);
+                            StartXagmanTonyCompletionTask(string.Empty, autoDetectedNoRemainingOwners: !hasShortages,
+                                completedWithWarnings: hasShortages, broadcastPeerCompletion: true);
                             return;
                         }
                         if (IsXagmanCollectionFirstRestockPhase())
@@ -10450,7 +10897,7 @@ public partial class SlaveWindow
             return;
         xagmanActiveTradePartner = next.ActiveCharacter;
         xagmanActiveTradePartnerInstanceId = next.InstanceId;
-        if (!hasRequestedItems)
+        if (!hasRequestedItems && !xagmanSupplyDrainOnly && !IsXagmanCapacityDrainActive())
         {
             if (!TryRequireXagmanReceiverAutoAccept($"Tony receiving from {next.ActiveCharacter}"))
                 return;
@@ -10502,7 +10949,7 @@ public partial class SlaveWindow
 
         if (!xagmanRunning || xagmanActiveRole != XagmanRole.Tony || plugin.TaskRunner.IsRunning)
             return false;
-        if (IsXagmanCollectionFirstCollectionPhase())
+        if (IsXagmanCollectionFirstCollectionPhase() || IsXagmanCapacityRecoveryActive())
             return false;
         if (IsXagmanCollectionFirstRestockPhase())
         {
@@ -10568,10 +11015,16 @@ public partial class SlaveWindow
     {
         if (!xagmanRunning || xagmanActiveRole != XagmanRole.Tony || plugin.TaskRunner.IsRunning)
             return;
+        if (HoldXagmanFinalCompletionDelivery()) return;
         var cfg = plugin.Configuration;
         var runner = plugin.TaskRunner;
         var tonyCharacter = xagmanActiveCharacter;
-        var coordinatedCompletion = broadcastPeerCompletion && IsXagmanCollectionFirstRestockPhase();
+        var capacityCompletion = IsXagmanCapacityWarningCompletion();
+        var coordinatedCompletion = broadcastPeerCompletion && (IsXagmanCollectionFirstRestockPhase() || capacityCompletion);
+        var supplyCompletion = IsXagmanSupplyCycleActive();
+        var completionSupplyPassId = supplyCompletion ? xagmanSupplyPassId : string.Empty;
+        var completionCapacityDrainId = capacityCompletion ? xagmanCapacityDrainId : string.Empty;
+        var completionCapacityRecoveryEpoch = capacityCompletion ? xagmanCapacityRecoveryEpoch : 0;
         System.Threading.Tasks.Task<bool>? peerCompletionTask = null;
         var peerCompletionDeliveryFailed = false;
         var steps = new List<TaskStep>();
@@ -10623,8 +11076,10 @@ public partial class SlaveWindow
                 if (!TrySetXagmanDropboxAutoAcceptOrStop(false, $"Tony completion {tonyCharacter}"))
                     return;
                 ClearXagmanDropbox();
+                if (supplyCompletion && !capacityCompletion) FinalizeXagmanOpenEndedSupplyRequests();
                 if (broadcastPeerCompletion)
-                    peerCompletionTask ??= CompleteAllXagmanPeersAsync();
+                    peerCompletionTask ??= CompleteAllXagmanPeersAsync(
+                        completionSupplyPassId, completionCapacityDrainId, completionCapacityRecoveryEpoch);
                 MarkXagmanTonyConsumed(tonyCharacter);
                 var warningLines = completedWithWarnings
                     ? BuildXagmanCompletionWarningSummaryLines(tonyCharacter)
@@ -10643,7 +11098,7 @@ public partial class SlaveWindow
                             ? $"Tony {tonyCharacter} completed."
                             : $"Tony {tonyCharacter} completed after {requestedBy} finished.");
                 runner.AddLog(completedWithWarnings
-                    ? $"Xagman: Tony {tonyCharacter} is completing with warning summary after Tony capacity exhaustion."
+                    ? $"Xagman: Tony {tonyCharacter} is completing with unresolved owner work after the selected supplier passes."
                     : autoDetectedNoRemainingOwners
                         ? $"Xagman: Tony {tonyCharacter} detected 0 remaining Franchise Owners and is completing."
                         : (string.IsNullOrWhiteSpace(requestedBy)
@@ -10651,6 +11106,8 @@ public partial class SlaveWindow
                             : $"Xagman: Tony {tonyCharacter} received completion signal from {requestedBy}.")); 
                 if (completedWithWarnings)
                 {
+                    if (capacityCompletion && !string.IsNullOrWhiteSpace(xagmanCapacityWarningReason))
+                        runner.AddLog($"Xagman: completion warning: {xagmanCapacityWarningReason}");
                     if (warningLines.Count == 0)
                     {
                         runner.AddLog("Xagman: completion warning: Tony capacity cleanup finished with unresolved work, but no detailed owner summary was available.");
@@ -10699,7 +11156,8 @@ public partial class SlaveWindow
             steps.Add(new TaskStep
             {
                 Name = "Xagman Tony Wait For Peer Completion",
-                OnEnter = () => peerCompletionTask ??= CompleteAllXagmanPeersAsync(),
+                OnEnter = () => peerCompletionTask ??= CompleteAllXagmanPeersAsync(
+                    completionSupplyPassId, completionCapacityDrainId, completionCapacityRecoveryEpoch),
                 IsComplete = PollPeerCompletionDelivery,
                 TimeoutSec = 40f,
                 OnTimeout = () => MarkPeerCompletionDeliveryFailed(
@@ -10779,6 +11237,7 @@ public partial class SlaveWindow
         if (!xagmanRunning || xagmanActiveRole != XagmanRole.Tony || plugin.TaskRunner.IsRunning)
             return;
 
+        if (TryDeferXagmanTonySupplyOwner()) return;
         var requestedEntries = requestedItems.Count(IsValidXagmanTradeRequest);
         var requestedUnits = requestedItems
             .Where(IsValidXagmanTradeRequest)
@@ -11748,6 +12207,7 @@ public partial class SlaveWindow
             .Where(peer => peer.XagmanEnabled)
             .Where(peer => peer.Role == XagmanRole.Tony)
              .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
              .Where(peer => IsXagmanPeerFresh(peer))
              .Where(peer => !string.IsNullOrWhiteSpace(peer.ActiveCharacter))
              .Where(peer => IsXagmanTonyPeerReachableFromOwner(peer))
@@ -11771,6 +12231,7 @@ public partial class SlaveWindow
             .Where(peer => peer.XagmanEnabled)
             .Where(peer => peer.Role == XagmanRole.Tony)
             .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
             .Where(peer => IsXagmanPeerFresh(peer))
              .Where(peer => peer.Status == XagmanStatus.AtMeetSpot)
              .Where(peer => !string.IsNullOrWhiteSpace(peer.ActiveCharacter))
@@ -11795,6 +12256,7 @@ public partial class SlaveWindow
             .Where(peer => peer.XagmanEnabled)
             .Where(peer => peer.Role == XagmanRole.Tony)
             .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
             .Where(peer => IsXagmanPeerFresh(peer))
              .Where(peer => peer.Status is XagmanStatus.AtMeetSpot or XagmanStatus.Called or XagmanStatus.Trading)
              .Where(peer => !string.IsNullOrWhiteSpace(peer.ActiveCharacter))
@@ -11823,6 +12285,7 @@ public partial class SlaveWindow
             .Where(peer => peer.XagmanEnabled)
             .Where(peer => peer.Role == XagmanRole.Tony)
             .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
             .Where(peer => IsXagmanPeerFresh(peer))
              .Where(peer => peer.Status is XagmanStatus.AtMeetSpot or XagmanStatus.Called or XagmanStatus.Trading)
              .Where(peer => !string.IsNullOrWhiteSpace(peer.ActiveCharacter))
@@ -12013,6 +12476,7 @@ public partial class SlaveWindow
         var tonyPeer = plugin.XagmanPeers.Peers
             .Where(peer => peer.XagmanEnabled && peer.Role == XagmanRole.Tony)
             .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
             .Where(peer => !peer.ServerMatchingEnabled)
             .Where(peer => IsXagmanPeerFresh(peer))
             .Where(peer => IsXagmanTonyPeerReachableFromOwner(peer, ownerCharacter))
@@ -12195,6 +12659,7 @@ public partial class SlaveWindow
                 greenValueScan.Snapshot,
                 activeKey);
         }
+        var supplyInventoryComplete = TryCaptureXagmanSupplyInventory(out var supplyInventory);
         var queueNumber = GetXagmanLocalQueueNumber();
         var tonyRotationReady = IsXagmanOwnerReadyToRotateTony();
         var totalCharacters = xagmanRunning
@@ -12309,6 +12774,35 @@ public partial class SlaveWindow
                     .Distinct()
                     .ToList(),
                 RequestedItems = requestedItems,
+                SupplyCycleRevision = XagmanSupplyCycleRevision,
+                SupplyReceivingPolicyRegions = GetXagmanSupplyReceivingPolicyRegions(),
+                SupplyPassId = role == XagmanRole.Tony ? xagmanSupplyPassId : xagmanOwnerSupplyPassId,
+                SupplyCoordinatorInstanceId = role == XagmanRole.Tony ? plugin.InstanceId : xagmanOwnerSupplyTonyInstance,
+                SupplyPassComplete = role == XagmanRole.FranchiseOwner && xagmanOwnerSupplyPassComplete,
+                OwnerCompletionRevision = XagmanOwnerCompletionRevision,
+                OwnerCompletionToken = role == XagmanRole.FranchiseOwner ? xagmanOwnerCompletionToken : string.Empty,
+                OwnerCompletionAckReceived = role == XagmanRole.FranchiseOwner && xagmanOwnerCompletionAckReceived,
+                OwnerCompletionAcknowledgements = role == XagmanRole.Tony
+                    ? new Dictionary<string, string>(xagmanCompletedOwnerClients) : new Dictionary<string, string>(),
+                SupplyDrainOnly = role == XagmanRole.Tony && (xagmanSupplyDrainOnly || IsXagmanCapacityDrainActive()),
+                CapacityDrainId = xagmanCapacityDrainId,
+                CapacityRecoveryEpoch = xagmanCapacityRecoveryEpoch,
+                CapacityRecoveryCoordinatorInstanceId = xagmanCapacityRecoveryCoordinatorInstanceId,
+                CapacityRecoveryRegion = xagmanCapacityRecoveryRegion,
+                CapacityDrainReady = xagmanCapacityDrainReady,
+                CapacityCollectionRestored = xagmanCapacityCollectionRestored,
+                SupplyInventoryComplete = supplyInventoryComplete,
+                SupplyInventory = supplyInventory,
+                PartialOwners = xagmanPartialOwners.Values.Select(state => new XagmanPartialOwnerState
+                {
+                    CharacterNameWorld = state.CharacterNameWorld,
+                    RequestedItems = CloneXagmanTradeRequests(state.RequestedItems),
+                    PendingGiveItems = CloneXagmanTradeRequests(state.PendingGiveItems),
+                    Reason = state.Reason,
+                }).ToList(),
+                SupplyDeferredOwner = xagmanDeferredOwnerCharacter,
+                SupplyDeferredOwnerInstanceId = xagmanDeferredOwnerInstanceId,
+                SupplyPendingDataCenters = GetXagmanSupplyPendingDataCenters(),
                 GreenValueSnapshot = greenValueSnapshot,
                 TradeCapacityForecast = GetXagmanLocalTradeCapacityForecastForPresence(),
             });
@@ -12325,9 +12819,10 @@ public partial class SlaveWindow
         var selected = GetSelectedXagmanTonyCharacters();
         if (selected.Count > 0)
             return selected[0].CharacterNameWorld;
-        if (plugin.Configuration.XagmanTonyCharacters.Count > 0)
-            return plugin.Configuration.XagmanTonyCharacters[0].CharacterNameWorld;
-        return string.Empty;
+        return plugin.Configuration.XagmanTonyCharacters
+            .FirstOrDefault(entry => IsAutoRetainerCharacterAllowed(
+                entry.CharacterNameWorld, plugin.Configuration.XagmanHonorArExclusions))?.CharacterNameWorld
+            ?? string.Empty;
     }
 
     private string GetXagmanQueueFocusTony()
@@ -12413,6 +12908,7 @@ public partial class SlaveWindow
               .Where(peer => peer.XagmanEnabled)
               .Where(peer => peer.Role == XagmanRole.FranchiseOwner)
               .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
               .Where(peer => IsXagmanPeerFresh(peer))
              .Where(peer => peer.QueueRequestedAtUtc > DateTime.MinValue)
               .Where(peer => string.IsNullOrWhiteSpace(tonyCharacter)
@@ -12434,6 +12930,7 @@ public partial class SlaveWindow
               .Where(peer => peer.XagmanEnabled)
               .Where(peer => peer.Role == XagmanRole.FranchiseOwner)
               .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
               .Where(peer => peer.QueueRequestedAtUtc > DateTime.MinValue)
              .Where(peer => string.IsNullOrWhiteSpace(tonyCharacter)
                  || string.IsNullOrWhiteSpace(peer.PreferredTonyCharacter)
@@ -12471,6 +12968,7 @@ public partial class SlaveWindow
          return plugin.XagmanPeers.Peers
              .Where(peer => peer.XagmanEnabled && peer.Role == XagmanRole.Tony)
              .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
              .Where(peer => IsXagmanPeerFresh(peer))
             .Where(peer => IsXagmanTonyPeerReachableFromOwner(peer, characterNameWorld))
             .Where(peer => peer.ActiveTradePartner.Equals(characterNameWorld, StringComparison.OrdinalIgnoreCase))
@@ -12504,6 +13002,10 @@ public partial class SlaveWindow
         changed = !xagmanPreferredTonyCharacter.Equals(tonyPeer.ActiveCharacter, StringComparison.OrdinalIgnoreCase)
             || !xagmanActiveTradePartner.Equals(tonyPeer.ActiveCharacter, StringComparison.OrdinalIgnoreCase)
             || !xagmanActiveTradePartnerInstanceId.Equals(tonyPeer.InstanceId, StringComparison.OrdinalIgnoreCase);
+        if (IsXagmanSupplyCycleActive() && tonyPeer.SupplyPassId != xagmanOwnerSupplyPassId)
+        {
+            if (!TryBindXagmanOwnerSupplyPass()) return false;
+        }
         xagmanPreferredTonyCharacter = tonyPeer.ActiveCharacter;
         xagmanActiveTradePartner = tonyPeer.ActiveCharacter;
         xagmanActiveTradePartnerInstanceId = tonyPeer.InstanceId;
@@ -12562,7 +13064,7 @@ public partial class SlaveWindow
             && xagmanActiveRole == XagmanRole.FranchiseOwner
             && !string.IsNullOrWhiteSpace(characterNameWorld)
             && xagmanOwnerRequestedItems.Count > 0
-            && (IsXagmanCollectionFirstRestockPhase()
+            && (IsXagmanCollectionFirstRestockPhase() || IsXagmanCapacityDrainActive() || IsXagmanOwnerSupplyDraining()
                 || !HasXagmanOwnerCollectionItemsRemaining(plugin.Configuration.XagmanItems, characterNameWorld));
     }
 
@@ -13777,7 +14279,7 @@ public partial class SlaveWindow
                     if (requestedQuantity <= 0)
                         continue;
                 }
-                if (IsXagmanGilItem(item.ItemId))
+                if (IsXagmanGilItem(item.ItemId) && !IsXagmanSupplyCycleActive())
                 {
                     requestedQuantity = item.Quantity <= 0
                         ? tonyTradableQuantity
@@ -13801,7 +14303,7 @@ public partial class SlaveWindow
                 continue;
             }
             var neededQuantity = Math.Max(0, item.Quantity - currentQuantity);
-            if (IsXagmanGilItem(item.ItemId))
+            if (IsXagmanGilItem(item.ItemId) && !IsXagmanSupplyCycleActive())
             {
                 neededQuantity = Math.Min(neededQuantity, tonyTradableQuantity);
                 if (neededQuantity <= 0 && item.Quantity > currentQuantity)
@@ -13828,37 +14330,16 @@ public partial class SlaveWindow
 
      private bool HasXagmanOwnerCollectionItemsRemaining(IReadOnlyList<XagmanItemEntry> items, string ownerCharacter)
     {
+        if (IsXagmanSupplyCycleActive() && xagmanOwnerCollectionCompletedKeys.Contains(ownerCharacter))
+            return false;
         var effectiveItems = ResolveXagmanItemsForOwner(items, ownerCharacter);
         foreach (var item in effectiveItems)
         {
             if (item.Mode is not (XagmanItemMode.Give or XagmanItemMode.Balance))
                 continue;
             var currentQuantity = GetXagmanCharacterItemQuantity(ownerCharacter, item.ItemId, item.IsHq, item.ItemName);
-            var pendingQuantity = 0;
-            if (item.Mode == XagmanItemMode.Give)
-            {
-                if (item.Quantity <= 0)
-                {
-                    pendingQuantity = currentQuantity;
-                }
-                else
-                {
-                    var snapshotKey = GetXagmanTradeSnapshotKey(item.ItemId, item.IsHq);
-                    if (xagmanTradeQuantitySnapshot.TryGetValue(snapshotKey, out var capturedQuantity))
-                    {
-                        var expectedRemaining = Math.Max(0, capturedQuantity - Math.Max(0, item.Quantity));
-                        pendingQuantity = Math.Max(0, currentQuantity - expectedRemaining);
-                    }
-                    else
-                    {
-                        pendingQuantity = Math.Min(currentQuantity, item.Quantity);
-                    }
-                }
-            }
-            else if (item.Mode == XagmanItemMode.Balance)
-            {
-                pendingQuantity = Math.Max(0, currentQuantity - Math.Max(0, item.Quantity));
-            }
+            var pendingQuantity = GetXagmanPendingGiveQuantity(ownerCharacter, item, currentQuantity);
+            if (xagmanStatus == XagmanStatus.Error) return true;
             if (pendingQuantity > 0)
                 return true;
         }
@@ -14058,25 +14539,16 @@ public partial class SlaveWindow
 
      private bool HasXagmanOwnerCollectionTradeCompleted(IReadOnlyList<XagmanItemEntry> items, string ownerCharacter)
     {
+        if (IsXagmanSupplyCycleActive() && xagmanOwnerCollectionCompletedKeys.Contains(ownerCharacter))
+            return true;
         var effectiveItems = ResolveXagmanItemsForOwner(items, ownerCharacter);
         foreach (var item in effectiveItems)
         {
             if (item.Mode is not (XagmanItemMode.Give or XagmanItemMode.Balance))
                 continue;
             var currentQuantity = GetXagmanCharacterItemQuantity(ownerCharacter, item.ItemId, item.IsHq, item.ItemName);
-            var snapshotKey = GetXagmanTradeSnapshotKey(item.ItemId, item.IsHq);
-            var startingQuantity = xagmanTradeQuantitySnapshot.TryGetValue(snapshotKey, out var capturedQuantity)
-                ? capturedQuantity
-                : currentQuantity;
-            var expectedRemaining = item.Mode switch
-            {
-                XagmanItemMode.Give => item.Quantity <= 0
-                    ? 0
-                    : Math.Max(0, startingQuantity - Math.Max(0, item.Quantity)),
-                XagmanItemMode.Balance => Math.Min(startingQuantity, Math.Max(0, item.Quantity)),
-                _ => currentQuantity,
-            };
-            if (currentQuantity > expectedRemaining)
+            if (GetXagmanPendingGiveQuantity(ownerCharacter, item, currentQuantity) > 0
+                || xagmanStatus == XagmanStatus.Error)
                 return false;
         }
         return true;
@@ -14281,6 +14753,8 @@ public partial class SlaveWindow
         var localCharacter = string.IsNullOrWhiteSpace(xagmanActiveCharacter)
             ? MonthlyReloggerTask.GetCurrentCharacterNameWorld()
             : xagmanActiveCharacter;
+        if (IsXagmanSupplyCycleActive() && xagmanOwnerCollectionCompletedKeys.Contains(localCharacter))
+            return 0;
         var effectiveItems = ResolveXagmanItemsForOwner(items, localCharacter, out var skippedUnknownConditionalGroup);
         if (skippedUnknownConditionalGroup)
             plugin.TaskRunner.AddLog($"Xagman: skipped conditional Shared Item policies for {localCharacter} because AutoRetainer registration is unknown.");
@@ -14298,12 +14772,8 @@ public partial class SlaveWindow
             var itemLabel = GetXagmanTradeItemLabel(item);
             var policyLabel = GetXagmanItemPolicyLabel(item);
             var limitLabel = GetXagmanTradeLimitLabel(item);
-            var quantity = item.Mode switch
-            {
-                XagmanItemMode.Give => item.Quantity <= 0 ? localAvailable : Math.Min(localAvailable, item.Quantity),
-                XagmanItemMode.Balance => Math.Max(0, localAvailable - Math.Max(0, item.Quantity)),
-                _ => 0,
-            };
+            var quantity = GetXagmanPendingGiveQuantity(localCharacter, item, localAvailable);
+            if (xagmanStatus == XagmanStatus.Error) return 0;
             if (quantity <= 0)
             {
                 plugin.TaskRunner.AddLog($"Xagman: queue {itemLabel} => 0 (policy={policyLabel}, limit={limitLabel}, local={localAvailable}, partner=0).");
@@ -14614,6 +15084,7 @@ public partial class SlaveWindow
          return plugin.XagmanPeers.Peers
              .Where(peer => peer.XagmanEnabled && peer.Role == XagmanRole.Tony)
              .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
              .Where(peer => string.IsNullOrWhiteSpace(preferredTony) || peer.ActiveCharacter.Equals(preferredTony, StringComparison.OrdinalIgnoreCase))
             .OrderByDescending(peer => !string.IsNullOrWhiteSpace(xagmanActiveTradePartnerInstanceId)
                 && peer.InstanceId.Equals(xagmanActiveTradePartnerInstanceId, StringComparison.OrdinalIgnoreCase))
@@ -15055,7 +15526,12 @@ public partial class SlaveWindow
             },
             onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"),
             suppressCompletionReport: true,
-            preserveRunHistory: true);
+            preserveRunHistory: true,
+            onTerminal: () =>
+            {
+                npcSell?.Dispose();
+                if (ReferenceEquals(xagmanNpcSell, npcSell)) xagmanNpcSell = null;
+            });
     }
 
      private void ScheduleXagmanTonyFullInventoryFallback(string activePartner, string fallbackReason)
@@ -15081,17 +15557,22 @@ public partial class SlaveWindow
 
      private void StartXagmanTonyFullInventoryFallback(string activePartner, string? fallbackReason = null)
     {
+        if (!xagmanSupplyCapacityRotationPending && TryBeginXagmanTonySupplyDrain()) return;
+        if (IsXagmanCollectionFirstCollectionPhase() && !CanRotateXagmanTonyInCurrentScope()
+            && TryBeginXagmanCapacityRecovery()) return;
         ResetXagmanTonySellLocation();
         if (!string.IsNullOrWhiteSpace(fallbackReason))
             plugin.TaskRunner.AddLog(fallbackReason);
 
-        // A full receiver has completed its job. An unknown inventory or a generic owner
+        // A receiver at verified item or collection gil capacity has completed its job. An unknown inventory or a generic owner
         // standby request is not sufficient evidence to turn a real failure green.
         var completedAtCapacity = IsXagmanCurrentLocalCharacter(xagmanActiveCharacter)
-            && TryGetXagmanLiveLocalMainInventoryFreeSlots(out var freeSlots)
-            && freeSlots == 0;
+            && ((TryGetXagmanLiveLocalMainInventoryFreeSlots(out var freeSlots) && freeSlots == 0)
+                || (!plugin.Configuration.XagmanOutsideNetworkHelper
+                    && (IsXagmanCollectionFirstCollectionPhase() || xagmanSupplyCapacityRotationPending)
+                    && TryGetXagmanLiveGil(out var currentGil) && currentGil >= XagmanTonySellGilLimit));
         var fallbackContext = completedAtCapacity
-            ? $"Xagman: Tony {xagmanActiveCharacter} completed receiving with a full inventory (0 free slots)."
+            ? $"Xagman: Tony {xagmanActiveCharacter} completed receiving at verified capacity."
             : string.IsNullOrWhiteSpace(activePartner)
             ? $"Xagman: Tony {xagmanActiveCharacter} hit a full-inventory/standby rotation."
             : $"Xagman: owner {activePartner} requested Tony rotation after trade failure.";
@@ -15109,7 +15590,7 @@ public partial class SlaveWindow
 
         xagmanStatus = XagmanStatus.Error;
         xagmanStatusText = completedAtCapacity
-            ? $"Tony {xagmanActiveCharacter} completed at full inventory, but no eligible replacement Tony remains. Owners still need service and are being recalled home to log out."
+            ? $"Tony {xagmanActiveCharacter} completed at receiving capacity, but no eligible replacement Tony remains. Owners still need service and are being recalled home to log out."
             : $"Tony {xagmanActiveCharacter} is full and no eligible replacement Tony remains. Run failed; owners are being recalled home to log out.";
         if (completedAtCapacity)
             MarkXagmanTonyConsumed(xagmanActiveCharacter);
@@ -15128,6 +15609,9 @@ public partial class SlaveWindow
         if (!xagmanTonyRotationRequestedByOwnerStandby || !xagmanRunning || xagmanActiveRole != XagmanRole.Tony || plugin.TaskRunner.IsRunning)
             return false;
 
+        if (TryBeginXagmanTonySupplyDrain()) return true;
+        if (IsXagmanCollectionFirstCollectionPhase() && !CanRotateXagmanTonyInCurrentScope()
+            && TryBeginXagmanCapacityRecovery()) return true;
         xagmanTonyRotationRequestedByOwnerStandby = false;
         var activePartner = xagmanActiveTradePartner;
         xagmanObservedDropboxBusy = false;
@@ -15135,7 +15619,9 @@ public partial class SlaveWindow
         xagmanActiveTradePartnerInstanceId = string.Empty;
         xagmanLastTonyActionAtUtc = DateTime.UtcNow;
 
-        if (TryStartXagmanTonySellWhenInventoryFull(activePartner))
+        // Preserve collected stock for the later supply phase; another selected receiver
+        // is tried before capacity recovery recalls these stocked Tonys.
+        if (!IsXagmanCollectionFirstRunActive() && TryStartXagmanTonySellWhenInventoryFull(activePartner))
             return true;
 
         StartXagmanTonyFullInventoryFallback(activePartner);

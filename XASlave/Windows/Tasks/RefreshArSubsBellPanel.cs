@@ -112,11 +112,13 @@ public partial class SlaveWindow
             {
                 try
                 {
-                    var (added, total) = ImportCharactersFromArToList(chars);
+                    var (added, total) = ImportCharactersFromArToList(chars, cfg.RefreshSubsHonorArExclusions);
                     cfg.Save();
                     arImportStatus = added > 0
                         ? $"Imported {added} new ({total} total)"
                         : $"All {total} already in list";
+                    if (cfg.RefreshSubsHonorArExclusions)
+                        arImportStatus += plugin.ArConfigReader.ExclusionStatusSuffix;
                     arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 }
                 catch (Exception ex)
@@ -130,6 +132,11 @@ public partial class SlaveWindow
             ImGui.SetTooltip(arConfigExists
                 ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
                 : "AutoRetainer config not found.\nExpected: " + plugin.ArConfigReader.GetAutoRetainerConfigPath());
+
+        DrawHonorAutoRetainerExclusions("refreshSubs", cfg.RefreshSubsHonorArExclusions,
+            value => cfg.RefreshSubsHonorArExclusions = value,
+            () => PruneAutoRetainerExcludedSelections(chars, refreshSubsSelectedIndices, cfg.RefreshSubsHonorArExclusions));
+        PruneAutoRetainerExcludedSelections(chars, refreshSubsSelectedIndices, cfg.RefreshSubsHonorArExclusions);
 
         ImGui.SameLine();
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
@@ -281,6 +288,8 @@ public partial class SlaveWindow
             for (int idx = 0; idx < chars.Count; idx++)
             {
                 var charName = chars[idx];
+                if (!IsAutoRetainerCharacterAllowed(charName, cfg.RefreshSubsHonorArExclusions))
+                    continue;
                 var nameParts = charName.Split('@');
                 var world = nameParts.Length > 1 ? nameParts[1] : "";
                 var regionDc = WorldData.GetRegionDcLabel(world);
@@ -449,7 +458,8 @@ public partial class SlaveWindow
     {
         var chars = plugin.Configuration.RefreshSubsCharacters;
         return refreshSubsSelectedIndices
-            .Where(i => i >= 0 && i < chars.Count)
+            .Where(i => i >= 0 && i < chars.Count
+                && IsAutoRetainerCharacterAllowed(chars[i], plugin.Configuration.RefreshSubsHonorArExclusions))
             .OrderBy(i => i)
             .Select(i => chars[i])
             .ToList();
@@ -462,6 +472,8 @@ public partial class SlaveWindow
         for (var i = 0; i < chars.Count; i++)
         {
             var charName = chars[i];
+            if (!IsAutoRetainerCharacterAllowed(charName, cfg.RefreshSubsHonorArExclusions))
+                continue;
             var world = GetWorldFromKey(charName);
             var regionDc = WorldData.GetRegionDcLabel(world);
             if (!MatchesRegionFilter(world, cfg.RefreshSubsRegionFilter))
@@ -478,11 +490,9 @@ public partial class SlaveWindow
 
     private void StartRefreshArSubsBell()
     {
-        var chars = plugin.Configuration.RefreshSubsCharacters;
-        var selected = refreshSubsSelectedIndices.OrderBy(i => i)
-            .Where(i => i < chars.Count)
-            .Select(i => chars[i])
-            .ToList();
+        var selected = GetSelectedRefreshSubsCharacters();
+        if (selected.Count == 0)
+            return;
 
         var steps = BuildRefreshSubsBellSteps(selected, plugin.TaskRunner);
 

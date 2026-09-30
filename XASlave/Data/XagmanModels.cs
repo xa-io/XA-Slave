@@ -107,6 +107,14 @@ public sealed class XagmanTradeRequestEntry
     public string GreenScanError { get; set; } = string.Empty;
 }
 
+public sealed class XagmanPartialOwnerState
+{
+    public string CharacterNameWorld { get; set; } = string.Empty;
+    public List<XagmanTradeRequestEntry> RequestedItems { get; set; } = new();
+    public List<XagmanTradeRequestEntry> PendingGiveItems { get; set; } = new();
+    public string Reason { get; set; } = string.Empty;
+}
+
 public sealed class XagmanGreenValueSnapshot
 {
     public DateTime GeneratedAtUtc { get; set; }
@@ -133,6 +141,7 @@ public sealed class XagmanTradeCapacityForecast
     public int KnownOwnerCount { get; set; }
     public int UnknownOwnerCount { get; set; }
     public bool IsTruncated { get; set; }
+    public bool SchedulingPoliciesComplete { get; set; }
     public List<string> SelectedOwnerKeys { get; set; } = new();
     public List<XagmanTradeCapacityForecastItem> Items { get; set; } = new();
 }
@@ -219,6 +228,30 @@ public sealed class XagmanPeerPresence
     public float TonySellLocationZ { get; set; }
     public List<uint> ItemIds { get; set; } = new();
     public List<XagmanTradeRequestEntry> RequestedItems { get; set; } = new();
+    // Supply passes are distinct from a collection-first phase and survive individual owner relogs.
+    public int SupplyCycleRevision { get; set; }
+    public string SupplyPassId { get; set; } = string.Empty;
+    public string SupplyCoordinatorInstanceId { get; set; } = string.Empty;
+    public bool SupplyPassComplete { get; set; }
+    public int OwnerCompletionRevision { get; set; }
+    public string OwnerCompletionToken { get; set; } = string.Empty;
+    public bool OwnerCompletionAckReceived { get; set; }
+    public Dictionary<string, string> OwnerCompletionAcknowledgements { get; set; } = new();
+    public bool SupplyDrainOnly { get; set; }
+    // Null is unknown/uninitialized; an empty list explicitly means no unresolved receiving policies.
+    public List<string>? SupplyReceivingPolicyRegions { get; set; }
+    public string CapacityDrainId { get; set; } = string.Empty;
+    public int CapacityRecoveryEpoch { get; set; }
+    public string CapacityRecoveryCoordinatorInstanceId { get; set; } = string.Empty;
+    public string CapacityRecoveryRegion { get; set; } = string.Empty;
+    public bool CapacityDrainReady { get; set; }
+    public bool CapacityCollectionRestored { get; set; }
+    public bool SupplyInventoryComplete { get; set; }
+    public List<XagmanTradeRequestEntry> SupplyInventory { get; set; } = new();
+    public List<XagmanPartialOwnerState> PartialOwners { get; set; } = new();
+    public string SupplyDeferredOwner { get; set; } = string.Empty;
+    public string SupplyDeferredOwnerInstanceId { get; set; } = string.Empty;
+    public List<string> SupplyPendingDataCenters { get; set; } = new();
     public XagmanGreenValueSnapshot? GreenValueSnapshot { get; set; }
     public XagmanTradeCapacityForecast? TradeCapacityForecast { get; set; }
 }
@@ -232,6 +265,10 @@ public sealed class XagmanPeerMessage
     // Optional stop-task behavior. Keeping the established message type lets older clients
     // still stop safely even though they cannot perform the newer result clear.
     public bool ClearResults { get; set; }
+    public string SupplyPassId { get; set; } = string.Empty;
+    // A terminal capacity drain still belongs to its frozen Collection phase.
+    public string CapacityDrainId { get; set; } = string.Empty;
+    public int CapacityRecoveryEpoch { get; set; }
     public int CoordinationProtocolRevision { get; set; }
     public int GreenValueProtocolRevision { get; set; }
     public string RunId { get; set; } = string.Empty;

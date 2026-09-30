@@ -645,6 +645,9 @@ public sealed class XagmanPeerService : IDisposable
                 TargetInstanceId = targetPresence.InstanceId,
                 SentAtUtc = DateTime.UtcNow,
                 ClearResults = message.ClearResults,
+                SupplyPassId = message.SupplyPassId,
+                CapacityDrainId = message.CapacityDrainId,
+                CapacityRecoveryEpoch = message.CapacityRecoveryEpoch,
                 CoordinationProtocolRevision = message.CoordinationProtocolRevision,
                 GreenValueProtocolRevision = message.GreenValueProtocolRevision,
                 RunId = message.RunId,
@@ -1235,8 +1238,53 @@ public sealed class XagmanPeerService : IDisposable
                 : record.RequestedItems
                     .Select(CloneTradeRequest)
                     .ToList(),
+            SupplyCycleRevision = record.SupplyCycleRevision,
+            SupplyPassId = record.SupplyPassId ?? string.Empty,
+            SupplyCoordinatorInstanceId = record.SupplyCoordinatorInstanceId ?? string.Empty,
+            SupplyPassComplete = record.SupplyPassComplete,
+            OwnerCompletionRevision = record.OwnerCompletionRevision,
+            OwnerCompletionToken = record.OwnerCompletionToken ?? string.Empty,
+            OwnerCompletionAckReceived = record.OwnerCompletionAckReceived,
+            OwnerCompletionAcknowledgements = record.OwnerCompletionAcknowledgements == null
+                ? new Dictionary<string, string>() : new Dictionary<string, string>(record.OwnerCompletionAcknowledgements),
+            SupplyDrainOnly = record.SupplyDrainOnly,
+            SupplyReceivingPolicyRegions = record.SupplyReceivingPolicyRegions == null
+                ? null : new List<string>(record.SupplyReceivingPolicyRegions),
+            CapacityDrainId = record.CapacityDrainId ?? string.Empty,
+            CapacityRecoveryEpoch = record.CapacityRecoveryEpoch,
+            CapacityRecoveryCoordinatorInstanceId = record.CapacityRecoveryCoordinatorInstanceId ?? string.Empty,
+            CapacityRecoveryRegion = record.CapacityRecoveryRegion ?? string.Empty,
+            CapacityDrainReady = record.CapacityDrainReady,
+            CapacityCollectionRestored = record.CapacityCollectionRestored,
+            SupplyInventoryComplete = record.SupplyInventoryComplete,
+            SupplyInventory = record.SupplyInventory == null
+                ? new List<XagmanTradeRequestEntry>()
+                : record.SupplyInventory.Select(CloneTradeRequest).ToList(),
+            PartialOwners = record.PartialOwners == null
+                ? new List<XagmanPartialOwnerState>()
+                : record.PartialOwners.Select(ClonePartialOwnerState).ToList(),
+            SupplyDeferredOwner = record.SupplyDeferredOwner ?? string.Empty,
+            SupplyDeferredOwnerInstanceId = record.SupplyDeferredOwnerInstanceId ?? string.Empty,
+            SupplyPendingDataCenters = record.SupplyPendingDataCenters == null
+                ? new List<string>()
+                : new List<string>(record.SupplyPendingDataCenters),
             GreenValueSnapshot = CloneGreenValueSnapshot(record.GreenValueSnapshot),
             TradeCapacityForecast = CloneTradeCapacityForecast(record.TradeCapacityForecast),
+        };
+    }
+
+    private static XagmanPartialOwnerState ClonePartialOwnerState(XagmanPartialOwnerState? state)
+    {
+        return new XagmanPartialOwnerState
+        {
+            PendingGiveItems = state?.PendingGiveItems == null
+                ? new List<XagmanTradeRequestEntry>()
+                : state.PendingGiveItems.Select(CloneTradeRequest).ToList(),
+            CharacterNameWorld = state?.CharacterNameWorld ?? string.Empty,
+            Reason = state?.Reason ?? string.Empty,
+            RequestedItems = state?.RequestedItems == null
+                ? new List<XagmanTradeRequestEntry> { CloneTradeRequest(null) }
+                : state.RequestedItems.Select(CloneTradeRequest).ToList(),
         };
     }
 
@@ -1309,6 +1357,7 @@ public sealed class XagmanPeerService : IDisposable
             KnownOwnerCount = forecast.KnownOwnerCount,
             UnknownOwnerCount = forecast.UnknownOwnerCount,
             IsTruncated = forecast.IsTruncated,
+            SchedulingPoliciesComplete = forecast.SchedulingPoliciesComplete,
             SelectedOwnerKeys = forecast.SelectedOwnerKeys == null
                 ? new List<string>()
                 : new List<string>(forecast.SelectedOwnerKeys),
@@ -1508,7 +1557,10 @@ public sealed class XagmanPeerService : IDisposable
         XagmanRunPhase runPhase = XagmanRunPhase.Legacy,
         int coordinationProtocolRevision = 0,
         IReadOnlyCollection<string>? expectedFranchiseOwnerInstanceIds = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string supplyPassId = "",
+        string capacityDrainId = "",
+        int capacityRecoveryEpoch = 0)
     {
         if (!started)
             return false;
@@ -1516,6 +1568,9 @@ public sealed class XagmanPeerService : IDisposable
         return await SendToHubAsync(new XagmanPeerMessage
         {
             MessageType = XagmanPeerMessageTypes.CompleteTask,
+            SupplyPassId = supplyPassId,
+            CapacityDrainId = capacityDrainId,
+            CapacityRecoveryEpoch = capacityRecoveryEpoch,
             SenderInstanceId = localInstanceId,
             TargetInstanceId = string.Empty,
             SentAtUtc = DateTime.UtcNow,

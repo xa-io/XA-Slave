@@ -107,6 +107,10 @@ public sealed class XAModAutoHideGameObjectsSettings
     public bool HidePlayer { get; set; }
     public bool HideFriends { get; set; }
     public bool HidePartyAllianceMembers { get; set; }
+    public bool UsePlayerDistance { get; set; } = false;
+    public bool HonorSanctuaryMinimums { get; set; } = false;
+    public float SanctuaryDistance { get; set; } = XASlave.Services.AutoHideGameObjectsService.DefaultSanctuaryDistance;
+    public float MaxDistance { get; set; } = XASlave.Services.AutoHideGameObjectsService.DefaultMaxDistance;
     public bool HideUnimportantEnpc { get; set; }
     public bool HidePet { get; set; }
     public bool HideChocobo { get; set; }
@@ -181,6 +185,12 @@ public sealed class XAModDalamudNotificationsSuckSettings
 public sealed class XAModBetterHighlightPotentialTargetsSettings
 {
     public int Color { get; set; } = 6;
+}
+
+[Serializable]
+public sealed class XAModNameplateStatusIconsSettings
+{
+    public HashSet<uint> HiddenStatusIds { get; set; } = new();
 }
 
 [Serializable]

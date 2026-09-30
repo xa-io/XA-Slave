@@ -23,6 +23,39 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.49 - 2026-09-30",
+            Lines =
+            [
+                "- Updated Xagman Tables: Resize and toggle optional columns in Shared Items, Tony Search, Queue and Peers.",
+                "- Updated Xagman Character Lists: Separate sortable Region, Datacenter and Homeworld columns; Homeworld supports Anonymize.",
+                "- Updated Xagman Relogs: Reload saved XA Database character and inventory data during relogs.",
+                "- Added Xagman Compact Progress: Local progress and available owner ETA through /xa xagman mini or /xa xagman m.",
+                "- Updated Xagman Waiting Status: Show Tony’s location, the owner’s next destination and remaining work.",
+                "- Added Xagman Partial Results: Keep missing items and quantities visible in amber results and logs.",
+                "- Added Xagman Meeting Coordinates: Optional XYZ/territory settings; match across clients. NPC-selling locations take priority.",
+                "- Added Xagman Tony Auto: Select by supported forecasts, supplies and space; requires connected idle clients, known inventory and 5,000 gil.",
+                "- Fixed Xagman Startup: Keep owners linked to Tony across character and server changes.",
+                "- Updated Xagman Supply: Serve other owners during shortages, then revisit unfinished requests.",
+                "- Updated Xagman Owner Cycling: Preserve Give/Take progress, finish each character and wait at the menu between suppliers.",
+                "- Updated Xagman Capacity Recovery: Redistribute useful stock and resume collection when space becomes available.",
+                "- Fixed Xagman Give-only Rotation: Keep unfinished owners waiting while another Tony replaces a full collector.",
+                "- Fixed Xagman Tony Results: Prevent replacement Tonys from being incorrectly skipped or failed.",
+                "- Fixed Xagman Take All: Prevent false quantity shortages for open-ended requests.",
+                "- Updated Xagman Tony Completion: Skip unnecessary relogs when complete forecasts show no remaining useful work.",
+                "- Fixed Xagman Client Completion: Fully completed owner clients disconnect and run Task Completion after Tony confirms.",
+                "- Added Task Import > Honor Exclusions: Default-off, per-task hiding and deselection; disabling reveals characters without selecting them.",
+                "- Updated Task Import Controls: Move refresh/database buttons below imports in Monthly Relogger, Return Alts, Prep Logistics and FC Permissions.",
+                "- Added Monthly Relogger Actions: Default-off Discard Items and Expert Delivery using AutoRetainer’s rules.",
+                "- Fixed NPC Selling: Retry the English inventory-retrieval error twice; stop after three consecutive rejected sales.",
+                "- Added Auto-Glam Future Weather: Show six upcoming normal weather periods with local and Eorzea times.",
+                "- Added XA Mods > Player Mods > Hide Nameplate Status Icons: Hide individually selected status icons; defaults off.",
+                "- Added XA Mods > Player Mods > Remove FC Tag: Hide FC and visitor tags; defaults off.",
+                "- Updated XA Mods > Graphic Mods > Hide Game Objects: Optional Max/Sanctuary distances; Honor Sanctuary Minimums switches ranges, otherwise Max applies everywhere.",
+                "- Added XA Mods > Game Mods > Clean Chat: Default-off English announcement/RMT filters and optional regex rules with channel selection.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.48 - 2026-09-27",
             Lines =
             [

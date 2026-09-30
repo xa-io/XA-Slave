@@ -630,6 +630,7 @@ public partial class SlaveWindow
                 if (!IsXagmanAtMeetDestination(GetXagmanActiveMeetWorld(), GetXagmanActiveMeetAetheryte())) onhSaleReturnFailed = true;
             },
             () => onhSaleReturnFailed = true, expectCrossDataCenterLogout: true);
+        AddXagmanCustomMeetingStep(steps, xagmanActiveCharacter, () => onhSaleReturnFailed);
         if (TryStartXagmanOnhSubTask(steps)) SetXagmanOnhPhase(XagmanOnhPhase.TonyReturnFromSale);
     }
 

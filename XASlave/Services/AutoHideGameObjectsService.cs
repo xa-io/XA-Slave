@@ -17,6 +17,10 @@ namespace XASlave.Services;
 public unsafe sealed class AutoHideGameObjectsService : IDisposable
 {
     private const int HiddenRenderFlag = 256;
+    internal const float DefaultSanctuaryDistance = 10f;
+    internal const float DefaultMaxDistance = 50f;
+    internal const float MinimumPlayerDistance = 1f;
+    internal const float MaximumPlayerDistance = 300f;
 
     private readonly IFramework framework;
     private readonly IClientState clientState;
@@ -37,6 +41,13 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
     private bool hidePlayer = true;
     private bool hideFriends;
     private bool hidePartyAllianceMembers;
+    private bool usePlayerDistance;
+    private bool honorSanctuaryMinimums;
+    private float sanctuaryDistance = DefaultSanctuaryDistance;
+    private float maxDistance = DefaultMaxDistance;
+    private float activePlayerDistance = DefaultMaxDistance;
+    private System.Numerics.Vector3? playerDistanceOrigin;
+    private long nextDistanceRefresh;
     private bool hideUnimportantEnpc = true;
     private bool hidePet = true;
     private bool hideChocobo = true;
@@ -82,11 +93,20 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         bool hideFashionAccessories = false,
         bool hideOwnBeast = false,
         bool hideFriends = false,
-        bool hidePartyAllianceMembers = false)
+        bool hidePartyAllianceMembers = false,
+        bool usePlayerDistance = false,
+        bool honorSanctuaryMinimums = false,
+        float sanctuaryDistance = DefaultSanctuaryDistance,
+        float maxDistance = DefaultMaxDistance)
     {
         this.hidePlayer = hidePlayer;
         this.hideFriends = hideFriends;
         this.hidePartyAllianceMembers = hidePartyAllianceMembers;
+        NormalizePlayerDistances(ref sanctuaryDistance, ref maxDistance);
+        this.usePlayerDistance = usePlayerDistance;
+        this.honorSanctuaryMinimums = honorSanctuaryMinimums;
+        this.sanctuaryDistance = sanctuaryDistance;
+        this.maxDistance = maxDistance;
         this.hideUnimportantEnpc = hideUnimportantEnpc;
         this.hidePet = hidePet;
         this.hideChocobo = hideChocobo;
@@ -180,9 +200,14 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         if (useOccultCrescentRules)
             protections.Add("Occult Crescent rules");
 
-        return protections.Count > 0
+        var status = protections.Count > 0
             ? $"Enabled - hiding {string.Join(", ", categories)} locally with {string.Join(", ", protections)}."
             : $"Enabled - hiding {string.Join(", ", categories)} locally.";
+        if (usePlayerDistance && (hidePlayer || hideFriends || hidePartyAllianceMembers))
+            status += honorSanctuaryMinimums
+                ? $" Selected players: beyond {sanctuaryDistance:0.#} yalms in sanctuaries, {maxDistance:0.#} elsewhere."
+                : $" Selected players: beyond {maxDistance:0.#} yalms.";
+        return status;
     }
 
     private void EnsureInitialized()
@@ -307,10 +332,12 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             return;
         }
 
-        if (zoneRefreshPassesRemaining <= 0)
+        // The native hook normally refreshes movement. Only scan here if it has gone quiet.
+        if (zoneRefreshPassesRemaining <= 0 && (!usePlayerDistance || Environment.TickCount64 < nextDistanceRefresh))
             return;
 
-        zoneRefreshPassesRemaining--;
+        if (zoneRefreshPassesRemaining > 0)
+            zoneRefreshPassesRemaining--;
         UpdateAllObjects(GameObjectManager.Instance());
     }
 
@@ -354,6 +381,8 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             && gameMain->CurrentTerritoryIntendedUseId == TerritoryIntendedUse.OccultCrescent;
         var targetAddress = targetManager.Target?.Address ?? nint.Zero;
         var playerCount = 0;
+        nextDistanceRefresh = Environment.TickCount64 + 250;
+        RefreshPlayerDistanceState();
         RefreshBeastOwners();
 
         for (var index = 0; index < manager->Objects.IndexSorted.Length; index++)
@@ -440,6 +469,58 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             && ownerJobId == beastmasterJobId;
     }
 
+    internal static void NormalizePlayerDistances(ref float sanctuaryDistance, ref float maxDistance)
+    {
+        maxDistance = float.IsFinite(maxDistance)
+            ? Math.Clamp(maxDistance, MinimumPlayerDistance, MaximumPlayerDistance)
+            : DefaultMaxDistance;
+        sanctuaryDistance = float.IsFinite(sanctuaryDistance)
+            ? Math.Clamp(sanctuaryDistance, MinimumPlayerDistance, maxDistance)
+            : Math.Min(DefaultSanctuaryDistance, maxDistance);
+    }
+
+    private void RefreshPlayerDistanceState()
+    {
+        playerDistanceOrigin = null;
+        if (!usePlayerDistance)
+            return;
+
+        playerDistanceOrigin = Plugin.ObjectTable.LocalPlayer?.Position;
+        var territoryInfo = TerritoryInfo.Instance();
+        activePlayerDistance = SelectPlayerDistance(honorSanctuaryMinimums,
+            territoryInfo != null && territoryInfo->InSanctuary, sanctuaryDistance, maxDistance);
+    }
+
+    internal static float SelectPlayerDistance(bool honorSanctuaryMinimums, bool inSanctuary, float sanctuaryDistance, float maxDistance)
+    {
+        return honorSanctuaryMinimums && inSanctuary ? sanctuaryDistance : maxDistance;
+    }
+
+    internal static bool IsBeyondPlayerDistance(float localX, float localY, float localZ, float playerX, float playerY, float playerZ, float distance)
+    {
+        // Unknown/invalid positions must leave players visible. Boundary players remain visible too.
+        if (!float.IsFinite(localX) || !float.IsFinite(localY) || !float.IsFinite(localZ)
+            || !float.IsFinite(playerX) || !float.IsFinite(playerY) || !float.IsFinite(playerZ))
+            return false;
+
+        var dx = (double)playerX - localX;
+        var dy = (double)playerY - localY;
+        var dz = (double)playerZ - localZ;
+        return dx * dx + dy * dy + dz * dz > (double)distance * distance;
+    }
+
+    private bool IsPlayerBeyondDistance(GameObject* gameObject)
+    {
+        if (!usePlayerDistance)
+            return true;
+
+        if (playerDistanceOrigin is not { } origin)
+            return false;
+
+        return IsBeyondPlayerDistance(origin.X, origin.Y, origin.Z,
+            gameObject->Position.X, gameObject->Position.Y, gameObject->Position.Z, activePlayerDistance);
+    }
+
     private bool ShouldHidePlayer(BattleChara* player)
     {
         // Group membership takes priority when a party/alliance member is also a friend.
@@ -484,7 +565,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         if (index <= 200
             && index % 2 == 0
             && gameObject->ObjectKind == ObjectKind.Pc)
-            return ShouldHidePlayer((BattleChara*)gameObject);
+            return ShouldHidePlayer((BattleChara*)gameObject) && IsPlayerBeyondDistance(gameObject);
 
         if (hidePet
             && index <= 200
@@ -545,7 +626,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             if (player->IsDead() || (nint)gameObject == targetAddress)
                 return false;
 
-            return playerCount >= 10 && ShouldHidePlayer(player);
+            return playerCount >= 10 && ShouldHidePlayer(player) && IsPlayerBeyondDistance(gameObject);
         }
 
         if (hideUnimportantEnpc

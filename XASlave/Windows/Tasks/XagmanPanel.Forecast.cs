@@ -360,6 +360,7 @@ public partial class SlaveWindow
     private void UpdateXagmanTradeCapacityForecast()
     {
         var now = DateTime.UtcNow;
+        CheckXagmanTonyAutoSelectionState(now);
         // Forecasts are advisory and may cold-JIT or query cached inventory data. Keep that work
         // out of the immediate plugin-load window, but never delay an operator-started Xagman run.
         if (!xagmanRunning && now < xagmanTradeCapacityStartupNotBeforeUtc)
@@ -416,7 +417,10 @@ public partial class SlaveWindow
             {
                 xagmanLocalTradeCapacityForecast = null;
                 xagmanOwnerForecastView = null;
-                xagmanTradeCapacityView = BuildXagmanTonyTradeCapacityView(now);
+                var ownerPeers = plugin.XagmanPeers.Peers
+                    .Where(peer => peer.Role == XagmanRole.FranchiseOwner).ToList();
+                xagmanTradeCapacityView = BuildXagmanTonyTradeCapacityView(now, ownerPeers);
+                UpdateXagmanTonyAutoSelection(now, ownerPeers);
             }
             if (xagmanTradeCapacityQueryDeferred)
                 xagmanTradeCapacityNextRefreshUtc = now.AddSeconds(XagmanTradeCapacityQueryStepDelaySeconds);
@@ -426,6 +430,8 @@ public partial class SlaveWindow
         catch (Exception ex)
         {
             Plugin.Log.Warning(ex, "[Xagman] Trade-capacity forecast refresh failed");
+            if (xagmanTonyAutoPending || xagmanTonyAutoTracking)
+                StopXagmanTonyAutoSelection("Auto: forecast refresh failed. Existing selection kept; refresh and try again.");
             xagmanLocalTradeCapacityForecast = null;
             xagmanTradeCapacityView = null;
             xagmanOwnerForecastView = null;
@@ -569,6 +575,11 @@ public partial class SlaveWindow
             KnownOwnerCount = knownOwners,
             UnknownOwnerCount = selectedOwners.Count - knownOwners,
             IsTruncated = isTruncated,
+            // Green-value selectors and unsupported definitions are not represented by
+            // these exact-item rows. Their absence cannot authorize Tony retirement.
+            SchedulingPoliciesComplete = configuredItems
+                .All(item => item.SelectorKind == XagmanItemSelectorKind.ExactItem
+                    && definitionByKey.ContainsKey(new XagmanForecastItemKey(item.ItemId, item.IsHq))),
             SelectedOwnerKeys = selectedOwners.Take(XagmanTradeCapacityMaxPublishedOwnerKeys).ToList(),
             Items = orderedRows.Take(XagmanTradeCapacityMaxPublishedItemRows).ToList(),
         };
@@ -587,18 +598,14 @@ public partial class SlaveWindow
             && xagmanActiveRole == XagmanRole.FranchiseOwner
             && xagmanOwnerRunPlan.Count > 0)
         {
-            // FailedCharacters is scoped to the current TaskRunner segment and is cleared when a
-            // standby owner resumes. The current-character index is the persistent run-plan frontier,
-            // so skipping its completed prefix keeps earlier failed attempts out after that reset.
-            var firstPendingIndex = Math.Clamp(
-                xagmanOwnerCurrentCharacterIndex,
-                0,
-                xagmanOwnerRunPlan.Count);
+            // Earlier partial owners remain pending after the current pass advances beyond them.
+            // They must stay in the forecast until their remaining requests are actually fulfilled.
             var failedOwnerKeys = plugin.TaskRunner.FailedCharacters
                 .Where(key => !string.IsNullOrWhiteSpace(key))
                 .ToHashSet(StringComparer.OrdinalIgnoreCase);
             return xagmanOwnerRunPlan
-                .Skip(firstPendingIndex)
+                .Concat(xagmanPartialOwners.Keys)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
                 .Where(key => !xagmanOwnerCompletedKeys.Contains(key))
                 .Where(key => !xagmanSkippedCharacters.Contains(key))
                 .Where(key => !failedOwnerKeys.Contains(key))
@@ -883,11 +890,9 @@ public partial class SlaveWindow
         };
     }
 
-    private XagmanTradeCapacityView BuildXagmanTonyTradeCapacityView(DateTime now)
+    private XagmanTradeCapacityView BuildXagmanTonyTradeCapacityView(
+        DateTime now, IReadOnlyList<XagmanPeerPresence> allOwnerPeers)
     {
-        var allOwnerPeers = plugin.XagmanPeers.Peers
-            .Where(peer => peer.Role == XagmanRole.FranchiseOwner)
-            .ToList();
         var liveOwnerPeers = allOwnerPeers
             .Where(peer => IsXagmanTradeCapacityPeerFresh(peer, now))
             .ToList();

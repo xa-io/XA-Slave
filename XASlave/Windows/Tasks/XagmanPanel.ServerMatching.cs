@@ -57,6 +57,9 @@ public partial class SlaveWindow
     private int xagmanLastRunTonyCompleted;
     private readonly HashSet<string> xagmanLastRunFailedCharacters = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> xagmanLastRunSkippedCharacters = new(StringComparer.OrdinalIgnoreCase);
+    private readonly HashSet<string> xagmanLastRunOwnerCompletedKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, XagmanPartialOwnerState> xagmanLastRunPartialOwners =
+        new(StringComparer.OrdinalIgnoreCase);
 
     // Per-character active processing time: started at the /ays relog login attempt (which happens
     // AFTER the wait-for-server gate, so the idle "waiting for Tony to reach my server" time is not
@@ -352,7 +355,27 @@ public partial class SlaveWindow
     // Servers (data centers) that currently have at least one pending Franchise Owner AND a configured
     // meet world, in Region -> Server sweep order. This is the live frontier the Tony actually needs to
     // visit; servers with no owners are never visited.
-    private List<string> GetXagmanFoNeededServers()
+    private bool IsXagmanSweepOwnerInCoordinatorScope(XagmanPeerPresence peer)
+    {
+        if (IsXagmanOwnerClientCompleted(peer.InstanceId)) return false;
+        if (!IsXagmanSupplyCycleActive())
+            return true;
+        if (!string.IsNullOrWhiteSpace(peer.SupplyCoordinatorInstanceId))
+            return peer.SupplyCoordinatorInstanceId.Equals(plugin.InstanceId, StringComparison.Ordinal);
+        // Before the first meetup, unbound running owners publish their routes for discovery.
+        // Once a supplier pass starts, another coordinator's owners cannot drive this sweep.
+        return xagmanSweepAwaitingStart || xagmanSupplyOwnerCohort.Contains(peer.InstanceId);
+    }
+
+    private IEnumerable<string> GetXagmanPeerPendingDataCenters(XagmanPeerPresence peer)
+    {
+        if (peer.TotalCharacters <= 0) return Enumerable.Empty<string>();
+        if (IsXagmanSupplyCycleActive() && peer.SupplyCycleRevision == XagmanSupplyCycleRevision)
+            return peer.SupplyPendingDataCenters ?? Enumerable.Empty<string>();
+        return new[] { peer.ServerMatchingPendingDataCenter };
+    }
+
+    private List<string> GetXagmanFoNeededServers(bool includeCompletedSupplyPasses = false)
     {
         var configured = new HashSet<string>(GetXagmanConfiguredSweepServers(), StringComparer.OrdinalIgnoreCase);
         if (configured.Count == 0)
@@ -360,7 +383,12 @@ public partial class SlaveWindow
         return plugin.XagmanPeers.Peers
             .Where(peer => peer.Role == XagmanRole.FranchiseOwner && peer.XagmanEnabled && IsXagmanPeerFresh(peer))
             .Where(IsXagmanPeerInCurrentRunPhase)
-            .Select(peer => peer.ServerMatchingPendingDataCenter)
+            .Where(IsXagmanSweepOwnerInCoordinatorScope)
+            // A completed supplier pass may retain earlier partial DCs for the next Tony. They
+            // must not pull the current Tony's sweep backwards or keep its current DC occupied.
+            .Where(peer => includeCompletedSupplyPasses || !IsXagmanSupplyCycleActive()
+                || peer.SupplyCycleRevision != XagmanSupplyCycleRevision || !peer.SupplyPassComplete)
+            .SelectMany(GetXagmanPeerPendingDataCenters)
             .Where(dc => !string.IsNullOrWhiteSpace(dc) && configured.Contains(dc))
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .OrderBy(dc => WorldData.GetSweepOrdinal(dc))
@@ -375,22 +403,36 @@ public partial class SlaveWindow
         return plugin.XagmanPeers.Peers
             .Where(peer => peer.Role == XagmanRole.FranchiseOwner
                 && peer.XagmanEnabled
+                && peer.TotalCharacters > 0
                 && !peer.PhaseComplete
                 && IsXagmanPeerFresh(peer))
             .Where(IsXagmanPeerInCurrentRunPhase)
-            .Where(peer => string.IsNullOrWhiteSpace(peer.ServerMatchingPendingDataCenter)
-                || WorldData.GetRegionOfDataCenter(peer.ServerMatchingPendingDataCenter) == null
-                || !configured.Contains(peer.ServerMatchingPendingDataCenter))
+            .Where(IsXagmanSweepOwnerInCoordinatorScope)
+            .Where(peer =>
+            {
+                var pending = GetXagmanPeerPendingDataCenters(peer).ToList();
+                if (pending.Count == 0)
+                    return !(IsXagmanSupplyCycleActive() && peer.SupplyCycleRevision == XagmanSupplyCycleRevision
+                        && (peer.SupplyPassComplete || peer.CompletedCharacters >= peer.TotalCharacters));
+                return pending.Any(dc => string.IsNullOrWhiteSpace(dc)
+                    || WorldData.GetRegionOfDataCenter(dc) == null
+                    || !configured.Contains(dc));
+            })
             .ToList();
     }
 
-    private static string DescribeXagmanInvalidPendingServerPeers(
+    private string DescribeXagmanInvalidPendingServerPeers(
         IReadOnlyList<XagmanPeerPresence> peers)
     {
         return string.Join(
             ", ",
             peers.Select(peer =>
-                $"{peer.InstanceId}:{(string.IsNullOrWhiteSpace(peer.ServerMatchingPendingDataCenter) ? "<blank>" : peer.ServerMatchingPendingDataCenter)}"));
+            {
+                var pending = GetXagmanPeerPendingDataCenters(peer)
+                    .Select(dc => string.IsNullOrWhiteSpace(dc) ? "<blank>" : dc)
+                    .ToList();
+                return $"{peer.InstanceId}:{(pending.Count == 0 ? "<blank>" : string.Join("/", pending))}";
+            }));
     }
 
     private bool XagmanRunListHasRegionTony(string region)
@@ -464,7 +506,7 @@ public partial class SlaveWindow
     // consume earlier unneeded Tonys, and commit the sweep + Tony to it. Returns false if no such region.
     private XagmanSweepCommitResult TryCommitXagmanSweepToFirstNeededRegion(string? excludeRegion)
     {
-        var needed = GetXagmanFoNeededServers();
+        var needed = GetXagmanFoNeededServers(includeCompletedSupplyPasses: true);
         if (needed.Count == 0)
             return XagmanSweepCommitResult.NoCandidate;
         foreach (var region in WorldData.RegionOrder)
@@ -521,13 +563,13 @@ public partial class SlaveWindow
             && (DateTime.UtcNow - xagmanSweepDiscoveryStartedUtc).TotalSeconds >= XagmanSweepDiscoveryGiveUpSeconds)
         {
             xagmanSweepAwaitingStart = false;
-            if (IsXagmanCollectionFirstCollectionPhase())
+            if (invalidPendingPeers.Count > 0 || IsXagmanCollectionFirstCollectionPhase() || IsXagmanSupplyCycleActive())
             {
                 var invalidDetail = invalidPendingPeers.Count == 0
                     ? string.Empty
                     : $" Invalid pending FO servers: {DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers)}.";
                 ReportXagmanTravelRouteError(
-                    "collection pass cannot continue because one or more waiting FO regions have no selected Tony or no known configured home server."
+                    "Server Matching cannot continue because waiting FO clients have unknown or unconfigured home servers, or their regions have no selected Tony."
                     + invalidDetail);
                 return;
             }
@@ -552,7 +594,11 @@ public partial class SlaveWindow
         var pendingOnServer = plugin.XagmanPeers.Peers
             .Where(peer => peer.Role == XagmanRole.FranchiseOwner && peer.XagmanEnabled && IsXagmanPeerFresh(peer))
             .Where(IsXagmanPeerInCurrentRunPhase)
-            .Any(peer => string.Equals(peer.ServerMatchingPendingDataCenter, xagmanSweepDataCenter, StringComparison.OrdinalIgnoreCase));
+            .Where(IsXagmanSweepOwnerInCoordinatorScope)
+            .Where(peer => !IsXagmanSupplyCycleActive() || peer.SupplyCycleRevision != XagmanSupplyCycleRevision
+                || !peer.SupplyPassComplete)
+            .Any(peer => GetXagmanPeerPendingDataCenters(peer)
+                .Any(dc => string.Equals(dc, xagmanSweepDataCenter, StringComparison.OrdinalIgnoreCase)));
         return !pendingOnServer;
     }
 
@@ -614,7 +660,7 @@ public partial class SlaveWindow
         if (TryHoldXagmanCollectionSweepForUnavailableExpectedPeers())
             return XagmanSweepStep.Blocked;
 
-        if (IsXagmanCollectionFirstCollectionPhase())
+        if (IsXagmanCollectionFirstCollectionPhase() || IsXagmanSupplyCycleActive())
         {
             var invalidPendingPeers = GetXagmanInvalidPendingServerPeers();
             if (invalidPendingPeers.Count > 0)
@@ -623,14 +669,14 @@ public partial class SlaveWindow
                 {
                     xagmanInvalidPendingServerPeerSinceUtc = DateTime.UtcNow;
                     plugin.TaskRunner.AddLog(
-                        "Xagman: collection sweep is holding before server advance because FO clients published blank, unknown, or unconfigured pending servers: "
+                        "Xagman: Server Matching is holding before server advance because FO clients published blank, unknown, or unconfigured pending servers: "
                         + DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers));
                 }
 
                 xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;
                 xagmanStatus = XagmanStatus.Paused;
                 xagmanStatusText =
-                    "Collection sweep is holding for Franchise Owners to publish known configured home servers.";
+                    "Server Matching is holding for Franchise Owners to publish known configured home servers.";
                 if ((DateTime.UtcNow - xagmanInvalidPendingServerPeerSinceUtc).TotalSeconds
                     < XagmanSweepDiscoveryGiveUpSeconds)
                 {
@@ -638,7 +684,7 @@ public partial class SlaveWindow
                 }
 
                 ReportXagmanTravelRouteError(
-                    "collection sweep cannot advance while expected FO clients have blank, unknown, or unconfigured pending servers: "
+                    "Server Matching cannot advance while expected FO clients have blank, unknown, or unconfigured pending servers: "
                     + DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers));
                 return XagmanSweepStep.Error;
             }
@@ -692,8 +738,20 @@ public partial class SlaveWindow
             return XagmanSweepStep.Advanced;
         }
 
-        // No more owners in this region -> region complete -> move to the next region that has owners.
-        return TryAdvanceXagmanSweepToNextNeededRegion("fully served")
+        // A supplier pass can finish while its owners still need other items. The coordinator
+        // waits for the whole cohort, then rotates within this region before advancing regions.
+        // Blocked preserves its status text and any new task it starts on this same framework tick.
+        if (TryAdvanceXagmanSupplyCycle())
+            return XagmanSweepStep.Blocked;
+
+        // Every selected supplier in this region has had its useful pass. Missing item types
+        // remain partial results, and must not make the region's status claim full fulfilment.
+        var unresolvedSupply = IsXagmanSupplyCycleActive()
+            && GetXagmanFoNeededServers(includeCompletedSupplyPasses: true)
+                .Any(dc => string.Equals(WorldData.GetRegionOfDataCenter(dc), xagmanSweepRegion, StringComparison.OrdinalIgnoreCase));
+        return TryAdvanceXagmanSweepToNextNeededRegion(unresolvedSupply
+            ? "finished all selected supplier passes with unresolved item needs"
+            : "fully served")
             ? XagmanSweepStep.Advanced
             : XagmanSweepStep.Finished;
     }
@@ -759,7 +817,7 @@ public partial class SlaveWindow
         {
             if (string.IsNullOrWhiteSpace(key))
                 continue;
-            if (xagmanOwnerCompletedKeys.Contains(key))
+            if (xagmanOwnerCompletedKeys.Contains(key) || xagmanPartialOwners.ContainsKey(key))
                 continue;
             if (plugin.TaskRunner.FailedCharacters.Contains(key))
                 continue;
@@ -780,25 +838,27 @@ public partial class SlaveWindow
     {
         var leavingRegion = xagmanSweepRegion;
         var invalidPendingPeers = GetXagmanInvalidPendingServerPeers();
-        if (IsXagmanCollectionFirstCollectionPhase() && invalidPendingPeers.Count > 0)
+        if ((IsXagmanCollectionFirstCollectionPhase() || IsXagmanSupplyCycleActive())
+            && invalidPendingPeers.Count > 0)
         {
-            var discoveryAgeSeconds = xagmanSweepDiscoveryStartedUtc == DateTime.MinValue
-                ? 0.0
-                : (DateTime.UtcNow - xagmanSweepDiscoveryStartedUtc).TotalSeconds;
-            if (discoveryAgeSeconds < XagmanSweepDiscoveryGiveUpSeconds)
+            if (xagmanInvalidPendingServerPeerSinceUtc == DateTime.MinValue)
+                xagmanInvalidPendingServerPeerSinceUtc = DateTime.UtcNow;
+            if ((DateTime.UtcNow - xagmanInvalidPendingServerPeerSinceUtc).TotalSeconds < XagmanSweepDiscoveryGiveUpSeconds)
             {
                 xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;
                 xagmanStatus = XagmanStatus.Paused;
                 xagmanStatusText =
-                    "Collection sweep is holding for Franchise Owners to publish known configured home servers.";
+                    "Server Matching is holding for Franchise Owners to publish known configured home servers.";
                 return true;
             }
 
             ReportXagmanTravelRouteError(
-                "collection sweep cannot advance while expected FO clients have blank, unknown, or unconfigured pending servers: "
+                "Server Matching cannot advance while expected FO clients have blank, unknown, or unconfigured pending servers: "
                 + DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers));
             return true;
         }
+
+        xagmanInvalidPendingServerPeerSinceUtc = DateTime.MinValue;
 
         // The current region is done; any remaining Tonys in it are no longer needed.
         var redundantTonys = xagmanTonyRunList
@@ -820,6 +880,7 @@ public partial class SlaveWindow
             .Where(peer => peer.Role == XagmanRole.Tony && peer.XagmanEnabled && peer.ServerMatchingEnabled && IsXagmanPeerFresh(peer))
             .Where(peer => peer.Status != XagmanStatus.Error)
             .Where(IsXagmanPeerInCurrentRunPhase)
+            .Where(IsXagmanPeerInSupplyCoordinatorScope)
             .OrderByDescending(peer => IsXagmanServerMatchingTonyMeetReady(peer, out _))
             .ThenByDescending(peer => peer.LastSeenUtc)
             .FirstOrDefault();
@@ -907,7 +968,7 @@ public partial class SlaveWindow
         if (string.IsNullOrWhiteSpace(myDataCenter))
         {
             reason = "home server is unknown, so Server Matching cannot route this owner safely";
-            return IsXagmanCollectionFirstRunActive()
+            return IsXagmanCollectionFirstRunActive() || IsXagmanSupplyCycleActive()
                 ? XagmanOwnerServerGate.RouteError
                 : XagmanOwnerServerGate.Skip;
         }
@@ -927,15 +988,34 @@ public partial class SlaveWindow
             return XagmanOwnerServerGate.Wait;
         }
 
+        if (IsXagmanOwnerAwaitingSupplySweep(characterNameWorld, tony))
+        {
+            reason = $"waiting for the supply sweep to revisit outstanding owner work on {myDataCenter}";
+            return XagmanOwnerServerGate.Wait;
+        }
+
         reason = $"server {myDataCenter} already processed (Tony on {tony.ServerMatchingActiveDataCenter})";
         return XagmanOwnerServerGate.Skip;
     }
 
-    // True once the sweeping Tony has moved past this owner character's server without serving it.
+    private bool IsXagmanOwnerAwaitingSupplySweep(string characterNameWorld, XagmanPeerPresence tony)
+    {
+        if (!IsXagmanSupplyCycleActive())
+            return false;
+        if (xagmanPartialOwners.ContainsKey(characterNameWorld))
+            return true;
+        return IsXagmanSupplyOwnerUnresolved(characterNameWorld)
+            && string.Equals(GetXagmanRegionOfChar(characterNameWorld),
+                WorldData.GetRegionOfDataCenter(tony.ServerMatchingActiveDataCenter), StringComparison.OrdinalIgnoreCase);
+    }
+
+    // Outside supply cycling, moving beyond an owner DC proves that the sweep skipped it.
+    // A capacity replacement or later matching collection can revisit an earlier DC in a cycle.
     private bool IsXagmanOwnerCharPassedBySweep(string characterNameWorld)
     {
         var tony = GetXagmanServerMatchingTonyPeer();
-        if (tony == null || tony.ServerMatchingSweepOrdinal < 0)
+        if (tony == null || tony.ServerMatchingSweepOrdinal < 0
+            || IsXagmanOwnerAwaitingSupplySweep(characterNameWorld, tony))
             return false;
         var myDataCenter = GetXagmanDataCenterOfChar(characterNameWorld);
         if (string.IsNullOrWhiteSpace(myDataCenter))
@@ -1014,6 +1094,7 @@ public partial class SlaveWindow
     private void CaptureXagmanRunSnapshot()
     {
         FinalizeXagmanOwnerSkippedRemainder();
+        UpdateXagmanMiniSnapshot(true);
         xagmanLastRunRole = xagmanActiveRole;
         xagmanLastRunCharDurations.Clear();
         foreach (var entry in xagmanCharDurationSeconds)
@@ -1024,6 +1105,19 @@ public partial class SlaveWindow
         xagmanLastRunTonyPlan = xagmanTonyRunPlan.ToList();
         xagmanLastRunOwnerCompleted = GetXagmanLocalOwnerCompletedCharacters();
         xagmanLastRunTonyCompleted = GetXagmanLocalTonyCompletedCharacters();
+        xagmanLastRunOwnerCompletedKeys.Clear();
+        xagmanLastRunOwnerCompletedKeys.UnionWith(xagmanOwnerCompletedKeys);
+        xagmanLastRunPartialOwners.Clear();
+        foreach (var partial in xagmanPartialOwners.Values)
+        {
+            xagmanLastRunPartialOwners[partial.CharacterNameWorld] = new XagmanPartialOwnerState
+            {
+                CharacterNameWorld = partial.CharacterNameWorld,
+                RequestedItems = CloneXagmanTradeRequests(partial.RequestedItems),
+                PendingGiveItems = CloneXagmanTradeRequests(partial.PendingGiveItems),
+                Reason = partial.Reason,
+            };
+        }
         xagmanLastRunFailedCharacters.Clear();
         foreach (var failed in plugin.TaskRunner.FailedCharacters)
         {
@@ -1044,17 +1138,21 @@ public partial class SlaveWindow
         {
             // Filter only the displayed snapshot; live plans, progress, selections and logs remain intact.
             bool NeedsAttention(string character) => xagmanLastRunFailedCharacters.Contains(character)
-                || xagmanLastRunSkippedCharacters.Contains(character);
+                || xagmanLastRunSkippedCharacters.Contains(character)
+                || xagmanLastRunPartialOwners.ContainsKey(character);
             xagmanLastRunOwnerPlan = xagmanLastRunOwnerPlan.Where(NeedsAttention).ToList();
             xagmanLastRunTonyPlan = xagmanLastRunTonyPlan.Where(NeedsAttention).ToList();
             xagmanLastRunOwnerCompleted = 0;
             xagmanLastRunTonyCompleted = 0;
         }
+        xagmanLastRunOwnerPlan = xagmanLastRunOwnerPlan.Concat(xagmanLastRunPartialOwners.Keys)
+            .Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         xagmanHasLastRunSnapshot = (xagmanLastRunOwnerPlan.Count + xagmanLastRunTonyPlan.Count) > 0;
     }
 
     private void ClearXagmanRunSnapshot()
     {
+        ClearXagmanMiniSnapshot();
         xagmanQueueResultsCleaned = false;
         xagmanHasLastRunSnapshot = false;
         xagmanLastRunOwnerPlan = Array.Empty<string>();
@@ -1063,6 +1161,8 @@ public partial class SlaveWindow
         xagmanLastRunTonyCompleted = 0;
         xagmanLastRunFailedCharacters.Clear();
         xagmanLastRunSkippedCharacters.Clear();
+        xagmanLastRunOwnerCompletedKeys.Clear();
+        xagmanLastRunPartialOwners.Clear();
         xagmanLastRunCharDurations.Clear();
     }
 }
