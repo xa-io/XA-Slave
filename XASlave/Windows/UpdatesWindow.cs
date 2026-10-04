@@ -23,6 +23,24 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.50 - 2026-10-04",
+            Lines =
+            [
+                "- Added XA Mods > Player Mods > View Single Item: Default-off previews for gear, hair, facewear, accessories, minions, mounts, static furniture and Framer's Kit artwork through supported right-click menus or item search. Use /xa viewitem to open the search window directly. Examine gear context menus now support the clicked equipment or displayed glamour item.",
+                "- Added View Single Item Controls: Rotate, tilt, roll, pan and zoom; sheathe/unsheathe weapons, play/pause recorded animation, select individual frames and reopen the latest 100 captures.",
+                "- Updated View Single Item: Use the full preview width with proportional item framing, apply camera changes after resizing settles, and reduce repeated native-check allocations.",
+                "- Updated XA Mods > Player Mods > XA Nearby: Added optional Use XA Peep Integration to show current targeters above friends in red, with customizable friend and targeter colors. Restores normal colors and sorting when targeting stops; requires XA Peep enabled and respects its filters.",
+                "- Added /xa db subsupplies <days>: Clear the Dropbox item queue, then queue available supplies for four submarines, rounding up; 30 days requests 1,080 Ceruleum Tanks and 160 Magitek Repair Kits.",
+                "- Updated Dropbox Commands: Use /xa db subgil <gil-value> for subaquatic-loot value trades; previous /xa dbsub will still work but won't be shown in the command list anymore.",
+                "- Fixed Dropbox Queuing: Initialize missing item entries after clearing the queue so new trade items can be added.",
+                "- Updated Debug / Test > XA Abuse > XA Database: Expanded clipboard reports to 25 channels, including configurable aetheryte checks, capture details and failure results.",
+                "- Updated XA Mods > UI Mods > Better Duty Finder: Added a Simple Tweaks conflict check and a button to disable its Improved Duty Finder Settings while leaving other tweaks enabled.",
+                "- Fixed XA Mods > UI Mods > Auto Display IDs: Corrected item-tooltip compatibility with current game interfaces.",
+                "- Fixed XA Mods > UI Mods > Inspect Outfit Try-on: Updated compatibility checks that blocked the feature on current Dalamud.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.49 - 2026-09-30",
             Lines =
             [
@@ -131,7 +149,7 @@ public sealed class UpdatesWindow : Window
             Lines =
             [
                 "Dropbox Queue / Treasure",
-                "- `/xa dbsub <gil>` queues the lowest reachable treasure value at or above the target. Shortages queue all available treasure and report the missing amount; empty inventory does not start a trade.",
+                "- `/xa db subgil <gil>` queues the lowest reachable treasure value at or above the target. Shortages queue all available treasure and report the missing amount; empty inventory does not start a trade.",
                 "- Treasure selection uses local NQ and HQ subaquatic salvage. Results show queue entries, item count, selected value, and any overflow or shortfall.",
                 "- Gil targets accept plain numbers, commas, or underscores. Invalid, zero, and negative targets show usage without changing the queue.",
                 "- Negative `/xa db` quantities queue local stock above the requested reserve. For example, `/xa db 1234:-500` queues stock above 500. NQ and HQ stock are combined, with NQ queued first; a reserve at or above local stock queues nothing. Positive and negative quantities can be mixed.",

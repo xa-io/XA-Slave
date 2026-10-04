@@ -19,6 +19,7 @@ public sealed class NearbyPlayersWindow : Window
     private readonly Dictionary<uint, ISharedImmediateTexture> jobIcons = new();
     private readonly List<int> matches = new();
     private readonly HashSet<ulong> drawn = new();
+    private readonly HashSet<ulong> nearbyTargeters = new();
     private PlayerObservationSnapshot? searched;
     private string query = string.Empty;
     private readonly Dictionary<uint, string> jobs = new(), worlds = new();
@@ -120,9 +121,12 @@ public sealed class NearbyPlayersWindow : Window
         searched = snapshot;
         var local = snapshot.LocalPlayer;
         matches.Clear();
+        nearbyTargeters.Clear();
         for (var i = 0; i < snapshot.Players.Count; i++)
         {
             var p = snapshot.Players[i];
+            if (service.Settings.UseXAPeepIntegration && peep.IsNearbyTargeter(p, local))
+                nearbyTargeters.Add(p.GameObjectId);
             if (string.IsNullOrWhiteSpace(query) || p.Name.Contains(query, StringComparison.OrdinalIgnoreCase)
                 || p.CompanyTag.Contains(query, StringComparison.OrdinalIgnoreCase) || Job(p.JobId).Contains(query, StringComparison.OrdinalIgnoreCase)
                 || World(p.HomeWorldId).Contains(query, StringComparison.OrdinalIgnoreCase)) matches.Add(i);
@@ -147,6 +151,10 @@ public sealed class NearbyPlayersWindow : Window
                 matches.Sort((a, b) =>
                 {
                     var left = snapshot.Players[a]; var right = snapshot.Players[b];
+                    // Targeters precede friends regardless of the selected column or sort direction.
+                    var leftTargeter = nearbyTargeters.Contains(left.GameObjectId);
+                    var rightTargeter = nearbyTargeters.Contains(right.GameObjectId);
+                    if (leftTargeter != rightTargeter) return leftTargeter ? -1 : 1;
                     // Group friends before applying sort direction so descending never sends them to the bottom.
                     if (service.Settings.ShowFriendsOnTop && IsFriend(left) != IsFriend(right))
                         return IsFriend(left) ? -1 : 1;
@@ -172,9 +180,11 @@ public sealed class NearbyPlayersWindow : Window
                         if (ImGui.TableNextColumn())
                         {
                             var friend = IsFriend(player);
-                            if (friend) ImGui.PushStyleColor(ImGuiCol.Text, new Vector4(0.78f, 0.48f, 1f, 1f));
+                            var targeter = nearbyTargeters.Contains(player.GameObjectId);
+                            ImGui.PushStyleColor(ImGuiCol.Text, targeter ? service.Settings.TargetingMeColor
+                                : friend ? service.Settings.FriendColor : Vector4.One);
                             try { ImGui.Selectable(player.Name, false, ImGuiSelectableFlags.SpanAllColumns); }
-                            finally { if (friend) ImGui.PopStyleColor(); }
+                            finally { ImGui.PopStyleColor(); }
                             if (ImGui.IsItemHovered())
                             {
                                 ImGui.SetTooltip(XAPeepData.FormatDisplayName(player.Name, player.HomeWorldId) + "\nRight-click for player actions.");

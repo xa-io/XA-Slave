@@ -3248,7 +3248,8 @@ public partial class SlaveWindow
             "Adds inline duty-finder setting buttons to Contents Finder and Raid Finder.",
             "Shows compact language, loot-rule, join-in-progress, unrestricted, level-sync, minimum-IL, echo, explorer, and limited-leveling-roulette controls over the supported duty finder windows.",
             () => plugin.BetterDutyFinder.StatusText,
-            searchTerms: ["duty finder", "ContentsFinder", "RaidFinder", "unsync", "explorer", "loot", "language"]);
+            searchTerms: ["duty finder", "ContentsFinder", "RaidFinder", "unsync", "explorer", "loot", "language", "Simple Tweaks", "conflict"],
+            drawOptions: SimpleTweaksDutyFinderIntegration.DrawSettings);
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "display-actual-queue-position",
@@ -3599,6 +3600,22 @@ public partial class SlaveWindow
             drawOptions: plugin.InspectOutfitTryOn.DrawOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
+            "view-single-item",
+            "View Single Item",
+            () => configuration.ViewSingleItemEnabled,
+            plugin.ViewSingleItem.SetEnabled,
+            applied => configuration.ViewSingleItemEnabled = applied,
+            "Adds View Single Item to supported player and item menus, with Find item search in the preview window.",
+            "Capture a player outfit or search supported visual items, including untradeable items. Unsupported search results are hidden. Search needs three characters, except exact two-character names. Supported gear, hair, facewear, active fashion accessories, minions and mounts use an isolated preview with rotate, tilt, roll, pan and zoom. Previews start paused. Play Animation briefly records the model and its glow, then loops the captured frames; dragging the frame slider pauses at a frame, numbered from 1. Changing category resets playback; changing angle or size requires recording again. Long or unavailable animation cycles use clearly labeled limited clips. Minions and mounts show supported base models without riders or extra equipment. Indoor and outdoor furnishings show static models and base textures with camera controls and history. Furniture lighting and materials are approximate; dyes, particles, animations and conditional variants are not reproduced. Framer's Kits show static adventurer plate and portrait artwork, including portrait backgrounds, frames and accents. Scroll over artwork to zoom, drag with either mouse button to pan, or use Reset View to fit the image. Selecting a component resets its framing. Unavailable previews report their loading or model limitation. Examine and item menus can close after capture. History keeps the latest 100 captures; searching, animation controls and reopening history do not add entries.",
+            () => plugin.ViewSingleItem.StatusText,
+            searchTerms: ["inspect", "view item", "single item", "weapon", "equipment", "hair", "screenshot", "glamour", "dyes", "history", "facewear", "shield", "shop", "inventory", "chat", "minion", "mount", "framer", "adventurer plate", "find item", "search", "animation", "play", "pause", "timeline", "glow"],
+            drawOptions: () =>
+            {
+                using (ImRaii.Disabled(!configuration.ViewSingleItemEnabled))
+                    if (ImGui.Button("View Item / History##ViewSingleItem")) plugin.ViewSingleItem.ShowWindow();
+            });
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
             "auto-restore-furniture",
             "Auto Restore Furniture",
             () => configuration.AutoRestoreFurnitureEnabled,
@@ -3709,6 +3726,13 @@ public partial class SlaveWindow
                 var settings = configuration.NearbyPlayers;
                 var friendsFirst = settings.ShowFriendsOnTop;
                 if (ImGui.Checkbox("Show friends on top", ref friendsFirst)) plugin.NearbyPlayers.ChangeSettings(s => s.ShowFriendsOnTop = friendsFirst);
+                var peepIntegration = settings.UseXAPeepIntegration;
+                if (ImGui.Checkbox("Use XA Peep Integration", ref peepIntegration)) plugin.NearbyPlayers.ChangeSettings(s => s.UseXAPeepIntegration = peepIntegration);
+                ImGui.TextWrapped("While XA Peep is enabled, players targeting you appear above friends using Peep's tracking filters.");
+                var friendColor = settings.FriendColor;
+                if (ImGui.ColorEdit4("Friend name color##Nearby", ref friendColor)) plugin.NearbyPlayers.ChangeSettings(s => s.FriendColor = friendColor);
+                var targetingMeColor = settings.TargetingMeColor;
+                if (ImGui.ColorEdit4("Targeting me name color##Nearby", ref targetingMeColor)) plugin.NearbyPlayers.ChangeSettings(s => s.TargetingMeColor = targetingMeColor);
                 var dtr = settings.ShowDtr;
                 if (ImGui.Checkbox("Server bar eye and nearby count", ref dtr)) plugin.NearbyPlayers.ChangeSettings(s => s.ShowDtr = dtr);
                 var lines = settings.ShowNearbyLines;

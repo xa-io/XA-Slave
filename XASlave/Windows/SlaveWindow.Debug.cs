@@ -66,6 +66,7 @@ public partial class SlaveWindow
     private Vector4 xaAbuseOverlayFillColor = XaAbuseDefaultOverlayFillColor;
     private DateTime xaAbuseOverlayEnabledAtUtc = DateTime.MinValue;
     private string xaDbIpcTestReport = string.Empty;
+    private int xaDbIpcTestAetheryteId = 8;
     private readonly record struct DalamudTestNotificationDefinition(
         string ButtonLabel,
         string ResultLabel,
@@ -3019,7 +3020,11 @@ public partial class SlaveWindow
     private void DrawXaAbuseXaDatabaseIpcTests()
     {
         ImGui.TextDisabled("Pulls every XA.Database.* IPC channel in one pass and copies the results to the clipboard.");
-        ImGui.TextDisabled("Covers all 21 channels from the XA Database [?] IPC reference tab (2 actions + 19 queries).");
+        ImGui.TextDisabled("Covers all 25 channels from the XA Database [?] IPC reference tab (2 actions + 23 queries).");
+        ImGui.SetNextItemWidth(Scale(160f));
+        if (ImGui.InputInt("Aetheryte ID##xaAbuseDbAetheryteId", ref xaDbIpcTestAetheryteId))
+            xaDbIpcTestAetheryteId = Math.Max(0, xaDbIpcTestAetheryteId);
+        ImGui.TextDisabled("Access checks use this ID and the current character's latest recorded list. ID 0 tests rejection.");
         ImGui.Spacing();
 
         if (ImGui.Button("Run All IPC Tests + Copy Results##xaAbuseDbIpcRun"))
@@ -3027,7 +3032,7 @@ public partial class SlaveWindow
             RunXaDatabaseIpcClipboardTest();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Runs IsReady/GetVersion/GetDbPath, then Refresh + Save (fresh snapshot),\nthen every remaining query including the item-search channels,\nand copies the full result report to the clipboard.");
+            ImGui.SetTooltip("Runs IsReady/GetVersion/GetDbPath, then Refresh + Save (fresh snapshot),\nthen every remaining query including item searches and all four aetheryte channels,\nand copies the result report with full aetheryte JSON to the clipboard.");
 
         if (!string.IsNullOrEmpty(xaDbIpcTestReport))
         {
@@ -3049,6 +3054,7 @@ public partial class SlaveWindow
     private void RunXaDatabaseIpcClipboardTest()
     {
         const string SearchQuery = "potion";
+        var aetheryteId = (uint)Math.Max(0, xaDbIpcTestAetheryteId);
         var ipc = plugin.IpcClient;
         var report = new StringBuilder();
         report.AppendLine("XA Database IPC Test Report");
@@ -3066,7 +3072,7 @@ public partial class SlaveWindow
         var tested = 0;
         var returnedData = 0;
 
-        void Append(string channel, string type, string value, bool hasData)
+        void Append(string channel, string type, string value, bool hasData, bool includeFullValue = false)
         {
             tested++;
             if (hasData)
@@ -3077,10 +3083,11 @@ public partial class SlaveWindow
                 report.AppendLine($"{channel} ({type}):");
                 var lines = value.Split('\n');
                 const int MaxLines = 25;
-                for (var i = 0; i < lines.Length && i < MaxLines; i++)
+                var lineLimit = includeFullValue ? lines.Length : MaxLines;
+                for (var i = 0; i < lines.Length && i < lineLimit; i++)
                     report.AppendLine($"    {lines[i].TrimEnd('\r')}");
-                if (lines.Length > MaxLines)
-                    report.AppendLine($"    ... (+{lines.Length - MaxLines} more lines)");
+                if (lines.Length > lineLimit)
+                    report.AppendLine($"    ... (+{lines.Length - lineLimit} more lines)");
             }
             else
             {
@@ -3151,7 +3158,27 @@ public partial class SlaveWindow
         Append($"XA.Database.SearchCurrentCharacterItemsJson(\"{SearchQuery}\")", "string", currentCharJson, !string.IsNullOrEmpty(currentCharJson));
 
         report.AppendLine(new string('-', 72));
+        var currentContentId = Plugin.ClientState.IsLoggedIn && Plugin.PlayerState.IsLoaded
+            ? Plugin.PlayerState.ContentId : 0UL;
+        report.AppendLine($"Aetheryte test ID: {aetheryteId}; explicit character content ID: {currentContentId} (0 = current alias).");
+        report.AppendLine("Access uses the latest recorded list, independently of the selected XA Database character. Inspect JSON known/capturedUtc/source for certainty and age.");
+        report.AppendLine("A returned false is legitimate for an absent/unknown/hidden destination or owner, ID 0, or a provider-contained failure. FAILED means the subscriber could not obtain a result.");
+
+        var characterAetherytesOk = ipc.TryGetCharacterAetherytesJson(0UL, out var characterAetherytesJson, out var characterAetherytesError);
+        Append("XA.Database.GetCharacterAetherytesJson(0)", "string", characterAetherytesOk ? characterAetherytesJson : $"FAILED: {characterAetherytesError}", characterAetherytesOk, includeFullValue: true);
+
+        var allAetherytesOk = ipc.TryGetAllCharacterAetherytesJson(out var allAetherytesJson, out var allAetherytesError);
+        Append("XA.Database.GetAllCharacterAetherytesJson", "string", allAetherytesOk ? allAetherytesJson : $"FAILED: {allAetherytesError}", allAetherytesOk, includeFullValue: true);
+
+        var hasAetheryteOk = ipc.TryHasAetheryte(aetheryteId, out var hasAetheryte, out var hasAetheryteError);
+        Append($"XA.Database.HasAetheryte({aetheryteId})", "bool", hasAetheryteOk ? hasAetheryte.ToString() : $"FAILED: {hasAetheryteError}", hasAetheryteOk);
+
+        var characterHasAetheryteOk = ipc.TryCharacterHasAetheryte(currentContentId, aetheryteId, out var characterHasAetheryte, out var characterHasAetheryteError);
+        Append($"XA.Database.CharacterHasAetheryte({currentContentId}, {aetheryteId})", "bool", characterHasAetheryteOk ? characterHasAetheryte.ToString() : $"FAILED: {characterHasAetheryteError}", characterHasAetheryteOk);
+
+        report.AppendLine(new string('-', 72));
         report.AppendLine($"Tested {tested} IPC channels, {returnedData} returned data. Empty values can be legitimate (no FC, no plot, no search hits).");
+        report.AppendLine("This report records IPC responses; it does not prove every returned value is current or correct.");
 
         xaDbIpcTestReport = report.ToString();
         ImGui.SetClipboardText(xaDbIpcTestReport);

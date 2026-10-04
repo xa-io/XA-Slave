@@ -204,7 +204,7 @@ public partial class SlaveWindow
             ImGui.TableHeadersRow();
 
             DrawIpcRow("XASlave.IsBusy", "bool", "True while a task, auto-collection, or Moogle Mail operation is running", livePulls);
-            DrawIpcRow("XASlave.ExecuteCommand", "string", "Mirror the direct `/xa` surface and return an `OK:`/`ERROR:` status string. Empty `/xa`, `updates`, `dbsub`, toggles, movement, and restore commands are supported; `/xa ...` input is accepted.", livePulls);
+            DrawIpcRow("XASlave.ExecuteCommand", "string", "Mirror the direct `/xa` surface and return an `OK:`/`ERROR:` status string. Empty `/xa`, `updates`, `db subgil`, toggles, movement, and restore commands are supported; `/xa ...` input is accepted.", livePulls);
             DrawIpcRow("XASlave.RunTask", "Action", "Start a named task (string taskName)", livePulls);
 
         }
@@ -216,7 +216,7 @@ public partial class SlaveWindow
         ImGui.BulletText("XASlave.IsBusy()");
         ImGui.BulletText("XASlave.ExecuteCommand(\"xamods\")");
         ImGui.BulletText("XASlave.ExecuteCommand(\"clearlog\") - archive and clear the active Dalamud log; returns OK: or ERROR:");
-        ImGui.BulletText("XASlave.ExecuteCommand(\"dbsub 5000000\")");
+        ImGui.BulletText("XASlave.ExecuteCommand(\"db subgil 5000000\")");
         ImGui.BulletText("XASlave.ExecuteCommand(\"sprint on\")");
         ImGui.BulletText("XASlave.ExecuteCommand(\"killgame\")");
         ImGui.BulletText("XASlave.ExecuteCommand(\"/xa logout\")");

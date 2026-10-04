@@ -80,6 +80,11 @@ public sealed class XAPeepService : IDisposable
 
     public int ActiveCount => activeTargeters.Count;
 
+    // Use Nearby's current observation, not Peep's polling cache, so target-off clears immediately.
+    internal bool IsNearbyTargeter(PlayerObservation player, PlayerObservation? local)
+        => enabled && clientState.IsLoggedIn && local != null
+            && ShouldTrackPlayer(player, local.GameObjectId);
+
     internal bool HasTargeterVisual(ulong id) => enabled && clientState.IsLoggedIn && activeTargeters.ContainsKey(id)
         && (configuration.XAPeepShowTargeterLine || configuration.XAPeepShowTargeterDot || configuration.XAPeepShowTargetersCard);
 

@@ -1,0 +1,145 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.Text.Json;
+using System.Threading;
+using System.Threading.Tasks;
+using Microsoft.Data.Sqlite;
+
+namespace XASlave.Services;
+
+internal sealed record ViewSingleItemHistoryEntry(long Id, string PlayerName, ushort World,
+    DateTime CapturedUtc, ViewSingleItemCapture? Capture, string Error);
+
+// Serialized background I/O: Draw reads an immutable list and never opens SQLite.
+// Each operation owns its connection; no worker touches game or plugin services.
+internal sealed class ViewSingleItemHistory : IDisposable
+{
+    private readonly string connectionString;
+    private readonly object sync = new();
+    private Task pending = Task.CompletedTask;
+    private int queued;
+    private bool disposed;
+    private ViewSingleItemHistoryEntry[] entries = Array.Empty<ViewSingleItemHistoryEntry>();
+    private string status = "History has not been loaded.";
+
+    internal ViewSingleItemHistory(string path)
+    {
+        connectionString = new SqliteConnectionStringBuilder
+        { DataSource = path, Pooling = false, DefaultTimeout = 2 }.ToString();
+    }
+
+    internal IReadOnlyList<ViewSingleItemHistoryEntry> Entries => Volatile.Read(ref entries);
+    internal string Status => Volatile.Read(ref status);
+    internal void ReportFailure(Exception error) => Volatile.Write(ref status, "History save failed: " + error.Message);
+
+    internal void Load() => Enqueue(null);
+
+    internal void Save(ViewSingleItemCapture capture)
+    {
+        capture.Validate();
+        // Serialize before queuing so no mutable arrays are shared with a worker.
+        Enqueue(JsonSerializer.Serialize(capture));
+    }
+
+    private void Enqueue(string? captureJson)
+    {
+        lock (sync)
+        {
+            if (disposed) return;
+            if (queued >= 8)
+            { Volatile.Write(ref status, "History is busy; this request could not be queued."); return; }
+            queued++;
+            Volatile.Write(ref status, "Updating local history...");
+            pending = pending.ContinueWith(_ =>
+            {
+                try { Process(captureJson); }
+                catch (Exception error)
+                { Volatile.Write(ref status, "History unavailable: " + error.Message); }
+                finally { lock (sync) queued--; }
+            }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        }
+    }
+
+    private void Process(string? captureJson)
+    {
+        using var connection = new SqliteConnection(connectionString);
+        connection.Open();
+        using (var schema = connection.CreateCommand())
+        {
+            schema.CommandText = """
+                CREATE TABLE IF NOT EXISTS view_single_item_history (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    player_name TEXT NOT NULL,
+                    world INTEGER NOT NULL,
+                    captured_utc TEXT NOT NULL,
+                    capture_json TEXT NOT NULL CHECK(length(capture_json) <= 32768)
+                );
+                """;
+            schema.ExecuteNonQuery();
+        }
+        if (captureJson != null)
+        {
+            if (captureJson.Length > 32768) throw new InvalidOperationException("The captured outfit is too large.");
+            var capture = JsonSerializer.Deserialize<ViewSingleItemCapture>(captureJson)
+                ?? throw new InvalidOperationException("The captured outfit is empty.");
+            capture.Validate();
+            using var transaction = connection.BeginTransaction();
+            using var insert = connection.CreateCommand();
+            insert.Transaction = transaction;
+            insert.CommandText = """
+                INSERT INTO view_single_item_history(player_name, world, captured_utc, capture_json)
+                VALUES ($name, $world, $utc, $capture);
+                DELETE FROM view_single_item_history WHERE id NOT IN
+                    (SELECT id FROM view_single_item_history ORDER BY id DESC LIMIT 100);
+                """;
+            insert.Parameters.AddWithValue("$name", capture.PlayerName);
+            insert.Parameters.AddWithValue("$world", (int)capture.World);
+            insert.Parameters.AddWithValue("$utc", capture.CapturedUtc.ToString("O", CultureInfo.InvariantCulture));
+            insert.Parameters.AddWithValue("$capture", captureJson);
+            insert.ExecuteNonQuery();
+            transaction.Commit();
+        }
+        using var read = connection.CreateCommand();
+        read.CommandText = """
+            SELECT id, substr(player_name, 1, 512), world, substr(captured_utc, 1, 64),
+                CASE WHEN length(capture_json) <= 32768 THEN capture_json ELSE '' END
+            FROM view_single_item_history ORDER BY id DESC LIMIT 100;
+            """;
+        using var reader = read.ExecuteReader();
+        var result = new List<ViewSingleItemHistoryEntry>();
+        while (reader.Read())
+        {
+            var name = "Unreadable capture";
+            long world = 0;
+            var time = DateTime.MinValue;
+            ViewSingleItemCapture? capture = null;
+            var error = string.Empty;
+            try
+            {
+                name = reader.GetString(1);
+                world = reader.GetInt64(2);
+                if (!DateTime.TryParse(reader.GetString(3), CultureInfo.InvariantCulture,
+                    DateTimeStyles.RoundtripKind, out time))
+                    throw new InvalidOperationException("The saved capture date is invalid.");
+                capture = JsonSerializer.Deserialize<ViewSingleItemCapture>(reader.GetString(4));
+                if (capture == null) throw new InvalidOperationException("The saved outfit is empty.");
+                capture.Validate();
+                if (capture.PlayerName != name || capture.World != world || capture.CapturedUtc != time)
+                    throw new InvalidOperationException("The saved outfit identity does not match.");
+            }
+            catch (Exception failure) { capture = null; error = failure.Message; }
+            result.Add(new(reader.GetInt64(0), name, world is > 0 and <= ushort.MaxValue ? (ushort)world : (ushort)0,
+                time, capture, error));
+        }
+        Volatile.Write(ref entries, result.ToArray());
+        Volatile.Write(ref status, $"{result.Count}/100 saved captures. Only View Single Item captures are saved.");
+    }
+
+    public void Dispose()
+    {
+        // Already accepted writes drain without blocking the game thread. There
+        // are no native references, plugin callbacks or pooled connections here.
+        lock (sync) disposed = true;
+    }
+}

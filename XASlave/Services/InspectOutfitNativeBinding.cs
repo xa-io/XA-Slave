@@ -13,14 +13,15 @@ namespace XASlave.Services;
 // Validated native capabilities. No hooks or writes to game code.
 internal sealed unsafe class InspectOutfitNativeBinding
 {
+    // Inspect/Tryon layouts and helpers revalidated against both delivered SDKs.
+    internal const string ClientStructs15035Sha256 = "2DC5B513647CC9897041D4BCFEB1E2C15EC087E6E0D04570D72F73B7614C39A5";
+    internal const string ClientStructs15036Sha256 = "4B6F4ACCF4D1038A6E5339A359F536E9ABB9D4E713A8E34D85C80F8CA3D36B56";
     private readonly nint moduleBase;
 
     internal InspectOutfitNativeBinding()
     {
         NearbyZoneNativeBinding.RequireFramework();
-        if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(AgentTryon).Assembly.Location)))
-            != "2DC5B513647CC9897041D4BCFEB1E2C15EC087E6E0D04570D72F73B7614C39A5")
-            throw new InvalidOperationException("Inspection try-on requires revalidated client structures.");
+        RequireSupportedClientStructs(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(AgentTryon).Assembly.Location))));
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
         if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)
@@ -34,6 +35,12 @@ internal sealed unsafe class InspectOutfitNativeBinding
         // live function bodies: Dalamud and other plugins may legitimately hook
         // inspection and TryOn. Source/session/preview checks remain per request.
         Validate();
+    }
+
+    internal static void RequireSupportedClientStructs(string actualSha256)
+    {
+        if (actualSha256 != ClientStructs15035Sha256 && actualSha256 != ClientStructs15036Sha256)
+            throw new InvalidOperationException($"Inspection try-on requires revalidated client structures. Actual SHA256: {actualSha256}; supported SHA256: {ClientStructs15035Sha256}, {ClientStructs15036Sha256}.");
     }
 
     internal void Validate()

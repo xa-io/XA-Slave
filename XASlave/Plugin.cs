@@ -208,6 +208,7 @@ public sealed class Plugin : IDalamudPlugin
     public NearbyPlayersWindow NearbyPlayersWindow { get; init; }
     public XAPeepHistoryWindow XAPeepHistoryWindow { get; init; }
     internal InspectOutfitHistoryWindow InspectOutfitHistoryWindow { get; init; }
+    internal ViewItemWindow ViewItemWindow { get; init; }
     public EurekaLogogramCreatorFavoritesOverlayWindow EurekaLogogramCreatorFavoritesOverlayWindow { get; init; }
     public EurekaLogogramCreatorAutomationOverlayWindow EurekaLogogramCreatorAutomationOverlayWindow { get; init; }
 
@@ -273,6 +274,7 @@ public sealed class Plugin : IDalamudPlugin
     internal AutoSortItemsService AutoSortItems { get; init; }
     internal SlaveNativeUiLibrary NativeUiLibrary { get; init; }
     internal InspectOutfitTryOnService InspectOutfitTryOn { get; init; }
+    internal ViewSingleItemService ViewSingleItem { get; init; }
     internal AutoRestoreFurnitureService AutoRestoreFurniture { get; init; }
     public ItemCommandsService ItemCommands { get; init; }
     public QuickReturnService QuickReturn { get; init; }
@@ -421,6 +423,7 @@ public sealed class Plugin : IDalamudPlugin
         AutoSortItems = new AutoSortItemsService(Configuration, TaskRunner);
         NativeUiLibrary = new SlaveNativeUiLibrary(RetireNativeControls);
         InspectOutfitTryOn = new InspectOutfitTryOnService(NativeUiLibrary, () => { Configuration.InspectOutfitTryOnEnabled = false; Configuration.Save(); }, Configuration, () => InspectOutfitHistoryWindow?.Open());
+        ViewSingleItem = new ViewSingleItemService(ContextMenu, Log, SlaveDatabase.DbPath);
         AutoRestoreFurniture = new AutoRestoreFurnitureService(TaskRunner, MessageLog, () => { Configuration.AutoRestoreFurnitureEnabled = false; Configuration.Save(); });
         ItemCommands = new ItemCommandsService(DataManager, PlayerState);
         QuickReturn = new QuickReturnService(ClientState, GameInterop, Log);
@@ -1028,6 +1031,11 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.InspectOutfitTryOnEnabled = false;
                 Configuration.Save();
             }
+            if (Configuration.ViewSingleItemEnabled && !ViewSingleItem.SetEnabled(true))
+            {
+                Configuration.ViewSingleItemEnabled = false;
+                Configuration.Save();
+            }
             if (Configuration.AutoMergeEnabled && !AutoMerge.SetEnabled(true))
             {
                 Configuration.AutoMergeEnabled = false;
@@ -1245,6 +1253,9 @@ public sealed class Plugin : IDalamudPlugin
         WindowSystem.AddWindow(XAPeepHistoryWindow);
         InspectOutfitHistoryWindow = new InspectOutfitHistoryWindow(InspectOutfitTryOn);
         WindowSystem.AddWindow(InspectOutfitHistoryWindow);
+        ViewItemWindow = new ViewItemWindow(ViewSingleItem);
+        WindowSystem.AddWindow(ViewItemWindow);
+        ViewSingleItem.OpenWindow = () => ViewItemWindow.IsOpen = true;
         EurekaLogogramCreatorFavoritesOverlayWindow = new EurekaLogogramCreatorFavoritesOverlayWindow(this);
         WindowSystem.AddWindow(EurekaLogogramCreatorFavoritesOverlayWindow);
         EurekaLogogramCreatorAutomationOverlayWindow = new EurekaLogogramCreatorAutomationOverlayWindow(this);
@@ -1291,7 +1302,7 @@ public sealed class Plugin : IDalamudPlugin
 
         CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
         {
-            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, outfits, nearby, updates, db, dbsub, npcsell, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands.",
+            HelpMessage = "Open XA Slave. Subcommands include xamods/mods, debug, fe, peep, outfits, viewitem, nearby, updates, db, npcsell, preset save/load/list, XA Mods toggle on/off commands, res, lowres, sprintdelay, and the section restore commands.",
             AllowedInMacros = true,
         });
 
@@ -1792,6 +1803,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoSortItems", AutoSortItems);
         TryDispose("AutoRestoreFurniture", AutoRestoreFurniture);
         TryDispose("InspectOutfitTryOn", InspectOutfitTryOn);
+        TryDispose("ViewSingleItem", ViewSingleItem);
         TryDispose("NativeUiLibrary", NativeUiLibrary);
         TryDispose("MessageLog", MessageLog);
         TryCleanup("WindowSystem.RemoveAllWindows", () => WindowSystem?.RemoveAllWindows());
@@ -2020,11 +2032,8 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("xagman", StringComparison.OrdinalIgnoreCase))
         {
-            if (subcommandArgs.Equals("mini", StringComparison.OrdinalIgnoreCase)
-                || subcommandArgs.Equals("m", StringComparison.OrdinalIgnoreCase))
-                XagmanMiniWindow.Toggle();
-            else
-                PrintCommandResult(false, "Usage: /xa xagman mini (or /xa xagman m)");
+            if (!TryHandleXagmanCommand(subcommandArgs, out var message))
+                PrintCommandResult(false, message);
             return;
         }
 
@@ -2083,6 +2092,12 @@ public sealed class Plugin : IDalamudPlugin
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(TryHandleXAPeepCommand(subcommandArgs, out var message), message);
+            return;
+        }
+
+        if (subcommand.Equals("viewitem", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(TryOpenViewItemCommand(subcommandArgs, out var message), message);
             return;
         }
 
@@ -2265,6 +2280,20 @@ public sealed class Plugin : IDalamudPlugin
         return started;
     }
 
+    private bool TryHandleXagmanCommand(string subcommandArgs, out string message)
+    {
+        if (subcommandArgs.Equals("mini", StringComparison.OrdinalIgnoreCase)
+            || subcommandArgs.Equals("m", StringComparison.OrdinalIgnoreCase))
+        {
+            XagmanMiniWindow.Toggle();
+            message = "Toggled Xagman Mini.";
+            return true;
+        }
+
+        message = "Usage: /xa xagman mini (or /xa xagman m)";
+        return false;
+    }
+
     private unsafe bool TryOpenMoogleMailCommand(string arguments, out string message)
     {
         if (!string.IsNullOrWhiteSpace(arguments))
@@ -2349,6 +2378,9 @@ public sealed class Plugin : IDalamudPlugin
         var subcommand = firstSpaceIndex >= 0 ? trimmed[..firstSpaceIndex].Trim() : trimmed;
         var subcommandArgs = firstSpaceIndex >= 0 ? trimmed[(firstSpaceIndex + 1)..].Trim() : string.Empty;
 
+        if (subcommand.Equals("xagman", StringComparison.OrdinalIgnoreCase))
+            return TryHandleXagmanCommand(subcommandArgs, out message);
+
         if (IsXaModsSubcommand(subcommand))
         {
             SlaveWindow.OpenXAModsTask();
@@ -2381,6 +2413,9 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
             return TryHandleXAPeepCommand(subcommandArgs, out message);
+
+        if (subcommand.Equals("viewitem", StringComparison.OrdinalIgnoreCase))
+            return TryOpenViewItemCommand(subcommandArgs, out message);
 
         if (subcommand.Equals("outfits", StringComparison.OrdinalIgnoreCase))
         {
@@ -4996,6 +5031,19 @@ public sealed class Plugin : IDalamudPlugin
 
     private readonly record struct XAModDisableResult(int DisabledCount, int Failures);
 
+    private bool TryOpenViewItemCommand(string args, out string message)
+    {
+        if (!string.IsNullOrWhiteSpace(args))
+        {
+            message = "Usage: /xa viewitem";
+            return false;
+        }
+        ViewItemWindow.OpenSearch();
+        message = ViewSingleItem.IsEnabled ? "Opened View Single Item search."
+            : "Enable XA Mods > Player Mods > View Single Item to search and preview items.";
+        return true;
+    }
+
     private bool TryHandleNearbyPlayersCommand(string args, out string message)
     {
         var command = args.Trim().ToLowerInvariant();
@@ -5053,6 +5101,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("auto-allow-multiple-game-instances", "Allow Multiple Game Instances", XAModsRestoreScope.Game, () => Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.SetAllowMultipleGameInstancesEnabled, applied => Configuration.AutoAllowMultipleGameInstancesEnabled = applied, () => SystemWindowMods.AllowMultipleGameInstancesStatusText);
         yield return new("auto-cancel-login-cooldown", "Cancel Login Cooldown", XAModsRestoreScope.Game, () => Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.SetCancelLoginCooldownEnabled, applied => Configuration.AutoCancelLoginCooldownEnabled = applied, () => SystemWindowMods.CancelLoginCooldownStatusText);
         yield return new("inspect-outfit-try-on", "Inspect Outfit Try-on", XAModsRestoreScope.Ui, () => Configuration.InspectOutfitTryOnEnabled, InspectOutfitTryOn.SetEnabled, applied => Configuration.InspectOutfitTryOnEnabled = applied, () => InspectOutfitTryOn.StatusText);
+        yield return new("view-single-item", "View Single Item", XAModsRestoreScope.Player, () => Configuration.ViewSingleItemEnabled, ViewSingleItem.SetEnabled, applied => Configuration.ViewSingleItemEnabled = applied, () => ViewSingleItem.StatusText);
         yield return new("auto-display-msq-progress", "Display MSQ Progress", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayMsqProgressEnabled, MsqProgressDisplay.SetEnabled, applied => Configuration.AutoDisplayMsqProgressEnabled = applied, () => MsqProgressDisplay.StatusText);
         yield return new("disable-title-screen-movie", "Disable Title Screen Movie", XAModsRestoreScope.Graphic, () => Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.SetDisableTitleScreenMovieEnabled, applied => Configuration.DisableTitleScreenMovieEnabled = applied, () => SystemWindowMods.DisableTitleScreenMovieStatusText);
         yield return new("auto-display-ids", "Auto Display IDs", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayIdsEnabled, value =>
@@ -5804,5 +5853,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.49";
+    public const string Version = "0.0.0.50";
 }

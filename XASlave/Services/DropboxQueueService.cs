@@ -63,7 +63,7 @@ public sealed class DropboxQueueService
         InventoryType.Currency,
     };
 
-    private const string UsageText = "Usage: /xa db <itemId:qty ...> (negative qty keeps that many) | inv | clear | begin | request <itemId:qty ...> | shards | crystals | clusters | shards+crystals | crystals+clusters | shards+crystals+clusters | subloot";
+    private const string UsageText = "Usage: /xa db <itemId:qty ...> (negative qty keeps that many) | inv | clear | begin | request <itemId:qty ...> | shards | crystals | clusters | shards+crystals | crystals+clusters | shards+crystals+clusters | subloot | subgil <gil-value> | subsupplies <days>";
 
     // /xa db subloot expands to the eight subaquatic loot items (22500-22507), each at 99999.
     private static readonly string SublootArguments =
@@ -96,6 +96,7 @@ public sealed class DropboxQueueService
     public DropboxQueueService(IDalamudPluginInterface pluginInterface, IpcClient ipcClient, IPluginLog log)
         : this(pluginInterface, new DropboxQueueClientAdapter(ipcClient), log)
     {
+        ipcClient.PrepareDropboxQueueEntry = TryPrepareQueueEntry;
     }
 
     internal DropboxQueueService(
@@ -143,6 +144,10 @@ public sealed class DropboxQueueService
                 return TryBuildRequest(BuildCrystalRequestArguments(2, 18), out message);
             case "subloot":
                 return TryAddToQueue(SublootArguments, out message);
+            case "subgil":
+                return TryQueueSublootValue(subcommandArgs, out message);
+            case "subsupplies":
+                return TryQueueSubmarineSupplies(subcommandArgs, out message);
             case "request":
                 return TryBuildRequest(subcommandArgs, out message);
             case "inv":
@@ -154,6 +159,23 @@ public sealed class DropboxQueueService
             default:
                 return TryAddToQueue(trimmed, out message);
         }
+    }
+
+    private bool TryQueueSubmarineSupplies(string arguments, out string message)
+    {
+        if (!SubmarineSupplyCalculator.TryCalculate(arguments, out var tanks, out var repairKits))
+        {
+            message = "Usage: /xa db subsupplies <positive days> (example: /xa db subsupplies 30). "
+                + "Use a decimal point for fractional days; supply totals must fit the Dropbox queue.";
+            return false;
+        }
+
+        var queueArguments = FormattableString.Invariant(
+            $"{SubmarineSupplyCalculator.CeruleumTankItemId}:{tanks} {SubmarineSupplyCalculator.MagitekRepairKitItemId}:{repairKits}");
+        var started = TryAddToQueue(queueArguments, out var queueMessage);
+        message = $"Supplies for {arguments.Trim()} day(s), 4 submarines: requested {tanks:N0} Ceruleum Tanks "
+            + $"and {repairKits:N0} Magitek Repair Kits. {queueMessage}";
+        return started;
     }
 
     public bool TryClearQueue(out string message)
@@ -179,7 +201,7 @@ public sealed class DropboxQueueService
     {
         if (!SublootValueSelector.TryParseTarget(arguments, out var targetValue))
         {
-            message = "Usage: /xa dbsub <positive gil value> (example: /xa dbsub 5000000).";
+            message = "Usage: /xa db subgil <positive gil value> (example: /xa db subgil 5000000).";
             return false;
         }
 
@@ -188,6 +210,9 @@ public sealed class DropboxQueueService
             message = "Dropbox is not available.";
             return false;
         }
+
+        if (!TryClearQueue(out message))
+            return false;
 
         var itemCounts = GetItemCounts();
         var stock = SublootValues
@@ -332,6 +357,10 @@ public sealed class DropboxQueueService
         if (parsed == null)
             return false;
 
+        // Clear once per valid command; individual items remain additive within this batch.
+        if (!TryClearQueue(out message))
+            return false;
+
         var itemCounts = GetItemCounts();
         var queuedEntries = 0;
         var queuedTotal = 0;
@@ -406,6 +435,9 @@ public sealed class DropboxQueueService
             message = "Dropbox is not available.";
             return false;
         }
+
+        if (!TryClearQueue(out message))
+            return false;
 
         var itemCounts = GetMainInventoryItemCounts();
         if (itemCounts.Count == 0)
@@ -675,6 +707,36 @@ public sealed class DropboxQueueService
         }
 
         return itemCounts;
+    }
+
+    private bool TryPrepareQueueEntry(uint itemId, bool isHq)
+    {
+        if (!TryGetItemQuantities(out var itemQuantities))
+            return false;
+
+        try
+        {
+            // Dropbox 1.0.2.15 writes ItemQuantities[key].Value without inserting missing keys.
+            // Its UI normally creates the zero-valued box; commands must do that after clearing.
+            var types = itemQuantities.GetType().GetGenericArguments();
+            if (types.Length != 2)
+                throw new InvalidOperationException("Unexpected Dropbox item queue type.");
+
+            var key = Activator.CreateInstance(types[0], new object[] { itemId, isHq })
+                ?? throw new InvalidOperationException("Could not create a Dropbox item descriptor.");
+            if (itemQuantities.Contains(key))
+                return true;
+
+            var value = Activator.CreateInstance(types[1], new object[] { 0 })
+                ?? throw new InvalidOperationException("Could not create a Dropbox quantity entry.");
+            itemQuantities.Add(key, value);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            log.Warning(ex, "[XASlave] Could not initialize Dropbox queue entry for item {ItemId}, HQ={IsHq}.", itemId, isHq);
+            return false;
+        }
     }
 
     private bool TryGetItemQuantities(out IDictionary itemQuantities)

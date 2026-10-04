@@ -855,6 +855,9 @@ internal static class AutoRetainerUiReflectionService
     internal static object? TryGetAutoRetainerPluginInstance(bool allowAssemblyFallback = true)
         => TryGetPluginInstance(AutoRetainerInternalName, AutoRetainerPluginTypeName, allowAssemblyFallback);
 
+    internal static object? TryGetLoadedPluginInstance(string internalName, string pluginTypeName)
+        => TryGetPluginInstance(internalName, pluginTypeName, allowAssemblyFallback: false);
+
     private static object? TryGetPluginInstance(string internalName, string pluginTypeName, bool allowAssemblyFallback = true)
     {
         try

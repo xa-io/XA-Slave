@@ -6,6 +6,7 @@ using Dalamud.Game.Text.SeStringHandling.Payloads;
 using Dalamud.Hooking;
 using Dalamud.Memory;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.UI;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Component.GUI;
 
@@ -30,7 +31,7 @@ public unsafe sealed class TooltipItemIdService : IDisposable
     private bool subscribed;
     private bool hookInitialized;
 
-    private delegate void* GenerateItemTooltipDelegate(AtkUnitBase* addonItemDetail, NumberArrayData* numberArrayData, StringArrayData* stringArrayData);
+    private delegate void GenerateItemTooltipDelegate(AddonItemDetail* addonItemDetail, NumberArrayData* numberArrayData, StringArrayData* stringArrayData);
 
     public TooltipItemIdService(
         IAddonLifecycle addonLifecycle,
@@ -170,7 +171,7 @@ public unsafe sealed class TooltipItemIdService : IDisposable
         }
     }
 
-    private void* GenerateItemTooltipDetour(AtkUnitBase* addonItemDetail, NumberArrayData* numberArrayData, StringArrayData* stringArrayData)
+    private void GenerateItemTooltipDetour(AddonItemDetail* addonItemDetail, NumberArrayData* numberArrayData, StringArrayData* stringArrayData)
     {
         try
         {
@@ -182,7 +183,7 @@ public unsafe sealed class TooltipItemIdService : IDisposable
             log.Warning(ex, "[XASlave] Show Item ID failed while generating an item tooltip.");
         }
 
-        return generateItemTooltipHook!.OriginalDisposeSafe(addonItemDetail, numberArrayData, stringArrayData);
+        generateItemTooltipHook!.OriginalDisposeSafe(addonItemDetail, numberArrayData, stringArrayData);
     }
 
     private void TryEnableMultilineOnVisibleItemDetail()

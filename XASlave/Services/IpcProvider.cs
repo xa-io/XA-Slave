@@ -13,12 +13,13 @@ namespace XASlave.Services;
 ///   XASlave.IsBusy  (Func→bool) - returns true when any task is running
 ///   XASlave.ExecuteCommand (Func, string→string) - run the same subcommands accepted by /xa and return an OK/ERROR status string
 ///   XASlave.RunTask (Action, string) - start a named task from external plugins
+///   XASlave.Development.ReadDependency.v1 (Func, string to string) - fixed, read-only dependency wrapper observations
 ///
 /// ExecuteCommand examples:
 ///   "" or "/xa"
 ///   "xamods"
 ///   "updates"
-///   "dbsub 5000000"
+///   "db subgil 5000000"
 ///   "sprint on"
 ///   "killgame"
 ///   "res 500x345"
@@ -33,6 +34,8 @@ public sealed class IpcProvider : IDisposable
 
     private readonly Plugin plugin;
     private readonly IPluginLog log;
+    private readonly string developmentLoadId = Guid.NewGuid().ToString("D");
+    private readonly string developmentStartedAtUtc = DateTimeOffset.UtcNow.ToString("O");
 
     private readonly List<(string Channel, IDisposable Registration)> registrations = new();
     private bool isDisposed;
@@ -53,6 +56,7 @@ public sealed class IpcProvider : IDisposable
             Register("XASlave.GetActivityJson", registrationHost.RegisterGetActivityJson(GetActivityJson));
             Register("XASlave.ExecuteCommand", registrationHost.RegisterExecuteCommand(ExecuteCommand));
             Register("XASlave.RunTask", registrationHost.RegisterRunTask(RunTask));
+            Register("XASlave.Development.ReadDependency.v1", registrationHost.RegisterReadDevelopmentDependency(ReadDevelopmentDependency));
         }
         catch
         {
@@ -63,6 +67,10 @@ public sealed class IpcProvider : IDisposable
 
     private bool IsBusy()
         => Plugin.RunOnGameThread(IsBusyOnFrameworkThread).GetAwaiter().GetResult();
+
+    private string ReadDevelopmentDependency(string request)
+        => DevelopmentDependencyReadEndpoint.Read(request, plugin.IpcClient,
+            !isDisposed && Plugin.Framework.IsInFrameworkUpdateThread && !Plugin.Framework.IsFrameworkUnloading);
 
     private bool IsBusyOnFrameworkThread()
     {
@@ -111,6 +119,15 @@ public sealed class IpcProvider : IDisposable
         return JsonSerializer.Serialize(new
         {
             available = true,
+            development = new
+            {
+                schemaVersion = 1,
+                internalName = "XASlave",
+                assemblyMvid = typeof(IpcProvider).Assembly.ManifestModule.ModuleVersionId.ToString("D"),
+                loadId = developmentLoadId,
+                startedAtUtc = developmentStartedAtUtc,
+                ready = !isDisposed,
+            },
             busy = IsBusyOnFrameworkThread(),
             source,
             detail,

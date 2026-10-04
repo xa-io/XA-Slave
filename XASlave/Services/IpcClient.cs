@@ -68,6 +68,10 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<string, string> xaSearchItemsSubscriber;
     private readonly ICallGateSubscriber<string, string> xaGetMatchingCharactersForItemsSubscriber;
     private readonly ICallGateSubscriber<string, string> xaSearchCurrentCharacterItemsJsonSubscriber;
+    private readonly ICallGateSubscriber<ulong, string> xaGetCharacterAetherytesJsonSubscriber;
+    private readonly ICallGateSubscriber<string> xaGetAllCharacterAetherytesJsonSubscriber;
+    private readonly ICallGateSubscriber<uint, bool> xaHasAetheryteSubscriber;
+    private readonly ICallGateSubscriber<ulong, uint, bool> xaCharacterHasAetheryteSubscriber;
 
     // -- vnavmesh (source: vnavmesh/IPCProvider.cs - prefixes "vnavmesh." + name) --
     private readonly ICallGateSubscriber<bool> vnavIsReadySubscriber;
@@ -194,6 +198,10 @@ public sealed class IpcClient
         xaSearchItemsSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.SearchItems");
         xaGetMatchingCharactersForItemsSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.GetMatchingCharactersForItems");
         xaSearchCurrentCharacterItemsJsonSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.SearchCurrentCharacterItemsJson");
+        xaGetCharacterAetherytesJsonSubscriber = pluginInterface.GetIpcSubscriber<ulong, string>("XA.Database.GetCharacterAetherytesJson");
+        xaGetAllCharacterAetherytesJsonSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetAllCharacterAetherytesJson");
+        xaHasAetheryteSubscriber = pluginInterface.GetIpcSubscriber<uint, bool>("XA.Database.HasAetheryte");
+        xaCharacterHasAetheryteSubscriber = pluginInterface.GetIpcSubscriber<ulong, uint, bool>("XA.Database.CharacterHasAetheryte");
 
         // vnavmesh - channel names from RegisterFunc/RegisterAction("X") → "vnavmesh.X"
         vnavIsReadySubscriber = pluginInterface.GetIpcSubscriber<bool>("vnavmesh.Nav.IsReady");
@@ -581,6 +589,73 @@ public sealed class IpcClient
     {
         try { return xaGetLastSnapshotResultJsonSubscriber.InvokeFunc(); }
         catch { return string.Empty; }
+    }
+
+    /// <summary>Reads one character's aetherytes; content ID zero means the currently loaded character.</summary>
+    public bool TryGetCharacterAetherytesJson(ulong contentId, out string json, out string error)
+    {
+        try
+        {
+            json = xaGetCharacterAetherytesJsonSubscriber.InvokeFunc(contentId) ?? string.Empty;
+            error = string.IsNullOrWhiteSpace(json) ? "Provider returned no aetheryte data (unavailable or failed)." : string.Empty;
+            return error.Length == 0;
+        }
+        catch (Exception ex)
+        {
+            json = string.Empty;
+            error = $"{ex.GetType().Name}: {ex.Message}";
+            return false;
+        }
+    }
+
+    public bool TryGetAllCharacterAetherytesJson(out string json, out string error)
+    {
+        try
+        {
+            json = xaGetAllCharacterAetherytesJsonSubscriber.InvokeFunc() ?? string.Empty;
+            error = string.IsNullOrWhiteSpace(json) ? "Provider returned no aetheryte data (unavailable or failed)." : string.Empty;
+            return error.Length == 0;
+        }
+        catch (Exception ex)
+        {
+            json = string.Empty;
+            error = $"{ex.GetType().Name}: {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>Reports invocation success separately from the provider's access value, including its false fallback.</summary>
+    public bool TryHasAetheryte(uint aetheryteId, out bool hasAccess, out string error)
+    {
+        try
+        {
+            hasAccess = xaHasAetheryteSubscriber.InvokeFunc(aetheryteId);
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            hasAccess = false;
+            error = $"{ex.GetType().Name}: {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>Reports invocation success separately from access; content ID zero means the currently loaded character.</summary>
+    public bool TryCharacterHasAetheryte(ulong contentId, uint aetheryteId, out bool hasAccess, out string error)
+    {
+        try
+        {
+            hasAccess = xaCharacterHasAetheryteSubscriber.InvokeFunc(contentId, aetheryteId);
+            error = string.Empty;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            hasAccess = false;
+            error = $"{ex.GetType().Name}: {ex.Message}";
+            return false;
+        }
     }
 
     public string SearchItems(string query)
@@ -1045,10 +1120,23 @@ public sealed class IpcClient
     //  Dropbox
     // ═══════════════════════════════════════════════════
 
+    internal Func<uint, bool, bool>? PrepareDropboxQueueEntry { get; set; }
+
     public bool DropboxSetItemQuantity(uint itemId, bool isHq, int quantity)
     {
-        try { dropboxSetItemQuantitySubscriber.InvokeAction(itemId, isHq, quantity); return true; }
-        catch { return false; }
+        try
+        {
+            if (quantity > 0 && (PrepareDropboxQueueEntry?.Invoke(itemId, isHq) != true))
+                return false;
+
+            dropboxSetItemQuantitySubscriber.InvokeAction(itemId, isHq, quantity);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            Plugin.Log.Warning(ex, "[XASlave] Dropbox.SetItemQuantity failed for item {ItemId}, HQ={IsHq}, quantity={Quantity}.", itemId, isHq, quantity);
+            return false;
+        }
     }
 
     public bool DropboxTryGetItemQuantity(uint itemId, bool isHq, out int quantity)

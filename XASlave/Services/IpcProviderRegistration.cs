@@ -10,6 +10,7 @@ internal interface IIpcProviderRegistrationHost
     IDisposable RegisterGetActivityJson(Func<string> callback);
     IDisposable RegisterExecuteCommand(Func<string, string> callback);
     IDisposable RegisterRunTask(Action<string> callback);
+    IDisposable RegisterReadDevelopmentDependency(Func<string, string> callback);
 }
 
 internal sealed class DalamudIpcProviderRegistrationHost(IDalamudPluginInterface pluginInterface)
@@ -41,6 +42,13 @@ internal sealed class DalamudIpcProviderRegistrationHost(IDalamudPluginInterface
         var provider = pluginInterface.GetIpcProvider<string, object>("XASlave.RunTask");
         provider.RegisterAction(callback);
         return new IpcRegistrationHandle(provider.UnregisterAction);
+    }
+
+    public IDisposable RegisterReadDevelopmentDependency(Func<string, string> callback)
+    {
+        var provider = pluginInterface.GetIpcProvider<string, string>("XASlave.Development.ReadDependency.v1");
+        provider.RegisterFunc(callback);
+        return new IpcRegistrationHandle(provider.UnregisterFunc);
     }
 }
 

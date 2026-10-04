@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Numerics;
 
 namespace XASlave.Data;
 
@@ -10,6 +11,9 @@ public sealed class NearbyPlayersSettings
     public bool WindowLocked { get; set; }
     public bool ShowSearchBar { get; set; } = true;
     public bool ShowFriendsOnTop { get; set; } = true;
+    public bool UseXAPeepIntegration { get; set; }
+    public Vector4 FriendColor { get; set; } = new(0.78f, 0.48f, 1f, 1f);
+    public Vector4 TargetingMeColor { get; set; } = new(1f, 0f, 0f, 1f);
     public bool ShowDtr { get; set; } = true;
     public bool ShowNearbyLines { get; set; }
     public bool ShowTargeterLines { get; set; } = true;

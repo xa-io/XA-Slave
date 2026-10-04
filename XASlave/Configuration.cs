@@ -573,6 +573,7 @@ public class Configuration : IPluginConfiguration
 
     public bool AutoRestoreFurnitureEnabled { get; set; } = false;
     public bool InspectOutfitTryOnEnabled { get; set; } = false;
+    public bool ViewSingleItemEnabled { get; set; } = false;
     public List<InspectOutfitHistoryEntry> InspectOutfitHistory { get; set; } = new();
     public bool QuickReturnEnabled { get; set; } = false;
     public bool UnlockExpertDeliveryEnabled { get; set; } = false;
