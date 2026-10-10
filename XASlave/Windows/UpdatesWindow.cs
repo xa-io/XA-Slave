@@ -23,6 +23,26 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.51 - 2026-10-10",
+            Lines =
+            [
+                "- Added Xagman > Restock: Show stock days using AutoRetainer submarine builds, marked fallback estimates, and an optional Builds column hidden by default.",
+                "- Added Xagman > Restock Sub Farmers: Choose a build and days as Franchise Owner to replace Shared Items with four-submarine tank and repair-material Balance targets.",
+                "- Updated Xagman Restocking: Rotate depleted Tonys and revisit partially supplied owners before leaving each Server Matching server; update all clients together.",
+                "- Added Xagman > Ping Aethertek Server Status: Select available meet worlds across all Server Matching data centers, with marked fallback choices when none qualify.",
+                "- Updated Xagman Progress: Regional waits, account-based estimates, and a stable names-only list of unfinished owners.",
+                "- Fixed Xagman Relogs: Detect travel failures during login and retry owner disconnects before marking failure; successful recovery resumes remaining owners.",
+                "- Fixed Xagman Tony Results: Keep completed capacity/standby handoffs green while preserving outstanding owner work and previous travel failures.",
+                "- Updated Xagman Teleport Helper: Decline aetheryte ticket prompts and keep message logging active during runs without changing saved settings.",
+                "- Added XA Mods > Plugin Mods > Plugin Guard: Block protected disable/toggle commands and other plugins' direct unload requests; allow normal installer actions, updates, and authorized Aethertek IPC/API operations.",
+                "- Added XA Mods > Game Mods > Custom Mouse: Adjustable size, colors, smooth movement, optional trails, and saved appearance presets.",
+                "- Added Custom Mouse Artwork: Per-role .ani/.cur/.png artwork, reusable favorites, and Normal artwork fallback for unassigned roles.",
+                "- Added Debug / Test > XA Abuse > Dalamud > Dalamud Branch: View detected tracks and loaded Dalamud/FFXIVClientStructs details.",
+                "- Updated Debug / Test > XA Abuse > XA Database: Run All IPC Tests and Copy Last Report cover 26 channels, including full Armoire/Glamour Dresser JSON and recorded/unknown status.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.50 - 2026-10-04",
             Lines =
             [

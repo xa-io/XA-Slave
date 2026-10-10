@@ -467,7 +467,8 @@ public partial class SlaveWindow
         foreach (var owner in selectedOwners)
         {
             snapshots.TryGetValue(owner, out var snapshot);
-            var inventoryKnown = snapshot?.IsKnown == true;
+            var reconciledPartial = IsXagmanSupplyCycleActive() ? xagmanPartialOwners.GetValueOrDefault(owner) : null;
+            var inventoryKnown = snapshot?.IsKnown == true || reconciledPartial != null;
             var effectiveItems = ResolveXagmanItemsForOwner(
                     configuredItems,
                     owner,
@@ -505,6 +506,23 @@ public partial class SlaveWindow
                     continue;
                 }
 
+                if (reconciledPartial != null)
+                {
+                    // The live visit's remaining ledger supersedes the pre-trade database
+                    // snapshot, including finite Take/Give obligations and already supplied items.
+                    row.KnownOwnerCount++;
+                    foreach (var request in reconciledPartial.RequestedItems.Where(item =>
+                        item.SelectorKind == XagmanItemSelectorKind.ExactItem
+                        && item.ItemId == itemKey.ItemId && item.IsHq == itemKey.IsHq))
+                    {
+                        if (IsXagmanOpenEndedSupplyRequest(request)) row.AllAvailableRequestCount++;
+                        else row.NeededFromTonyQuantity += Math.Max(0, request.Quantity);
+                    }
+                    foreach (var give in reconciledPartial.PendingGiveItems.Where(item =>
+                        item.ItemId == itemKey.ItemId && item.IsHq == itemKey.IsHq))
+                        row.IncomingToTonyQuantity += Math.Max(0, give.Quantity);
+                    continue;
+                }
                 if (!inventoryKnown || snapshot == null)
                 {
                     row.UnknownOwnerCount++;

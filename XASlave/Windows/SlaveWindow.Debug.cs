@@ -1969,6 +1969,12 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
+        if (ImGui.CollapsingHeader("Dalamud##xaAbuse"))
+        {
+            DrawXaAbuseDalamud();
+            ImGui.Spacing();
+        }
+
         if (ImGui.CollapsingHeader("Dalamud DLL Bypass Checker##xaAbuse"))
         {
             DrawXaAbuseDalamudDllBypassChecker();
@@ -3020,7 +3026,8 @@ public partial class SlaveWindow
     private void DrawXaAbuseXaDatabaseIpcTests()
     {
         ImGui.TextDisabled("Pulls every XA.Database.* IPC channel in one pass and copies the results to the clipboard.");
-        ImGui.TextDisabled("Covers all 25 channels from the XA Database [?] IPC reference tab (2 actions + 23 queries).");
+        ImGui.TextDisabled("Covers all 26 channels from the XA Database [?] IPC reference tab (2 actions + 24 queries).");
+        ImGui.TextDisabled("Includes complete recorded Armoire and Glamour Dresser inventories for the current character.");
         ImGui.SetNextItemWidth(Scale(160f));
         if (ImGui.InputInt("Aetheryte ID##xaAbuseDbAetheryteId", ref xaDbIpcTestAetheryteId))
             xaDbIpcTestAetheryteId = Math.Max(0, xaDbIpcTestAetheryteId);
@@ -3032,7 +3039,7 @@ public partial class SlaveWindow
             RunXaDatabaseIpcClipboardTest();
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Runs IsReady/GetVersion/GetDbPath, then Refresh + Save (fresh snapshot),\nthen every remaining query including item searches and all four aetheryte channels,\nand copies the result report with full aetheryte JSON to the clipboard.");
+            ImGui.SetTooltip("Runs IsReady/GetVersion/GetDbPath, then Refresh + Save (fresh snapshot),\nthen every remaining query including storage inventories and all four aetheryte channels,\nand copies the result report with full storage and aetheryte JSON to the clipboard.");
 
         if (!string.IsNullOrEmpty(xaDbIpcTestReport))
         {
@@ -3156,6 +3163,14 @@ public partial class SlaveWindow
 
         var currentCharJson = ipc.SearchCurrentCharacterItemsJson(SearchQuery);
         Append($"XA.Database.SearchCurrentCharacterItemsJson(\"{SearchQuery}\")", "string", currentCharJson, !string.IsNullOrEmpty(currentCharJson));
+
+        report.AppendLine(new string('-', 72));
+        report.AppendLine("Storage inventories: Armoire (armoire) and Glamour Dresser (glamourDresser), current character, all recorded items.");
+        report.AppendLine("Open each storage once to record its contents. recorded:false means unknown; an empty items list establishes absence only when success, requested and recorded are true.");
+        report.AppendLine("The query reads last-observed data without opening storage. Full JSON is retained, including success:false or unrecorded sections; FAILED means no response was obtained.");
+        const string StorageRequest = """{"version":1,"contentId":0,"sources":["armoire","glamourDresser"]}""";
+        var storageOk = ipc.TrySearchCharacterStorageItemsJson(StorageRequest, out var storageJson, out var storageError);
+        Append($"XA.Database.SearchCharacterStorageItemsJson({StorageRequest})", "string", storageOk ? storageJson : $"FAILED: {storageError}", storageOk, includeFullValue: true);
 
         report.AppendLine(new string('-', 72));
         var currentContentId = Plugin.ClientState.IsLoggedIn && Plugin.PlayerState.IsLoaded

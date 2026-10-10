@@ -2920,6 +2920,18 @@ public partial class SlaveWindow
         {
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
+            "custom-mouse",
+            "Custom Mouse",
+            () => configuration.CustomMouseEnabled,
+            plugin.CustomMouse.SetEnabled,
+            applied => configuration.CustomMouseEnabled = applied,
+            "Resize, recolor or replace the game cursor with local artwork.",
+            "Automatically enables software cursor mode and restores previous settings when disabled. Load a local .ani/.cur normal pointer, optionally animate it, and choose whether cursor trails appear. Move outside plugin windows to preview. Game-art scale is relative to Normal/Large; custom-art scale is relative to its original pixels.",
+            () => plugin.CustomMouse.StatusText,
+            searchTerms: ["cursor", "mouse", "size", "scale", "outline", "color", "custom", "artwork", "animation", "trail", "starcraft", "brood", "ani", "cur"],
+            drawOptions: DrawCustomMouseOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
             "auto-allow-multiple-game-instances",
             "Allow Multiple Game Instances",
             () => configuration.AutoAllowMultipleGameInstancesEnabled,
@@ -3847,6 +3859,17 @@ public partial class SlaveWindow
                 : "This will reject using any aetheryte ticket usage.",
             searchTerms: ["SelectYesNo", "SelectYesno", "aetheryte ticket", "teleport", "ticket", "Yes", "No"],
             drawOptions: DrawTeleportHelperOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.PluginMods,
+            "disable-this",
+            "Plugin Guard",
+            () => configuration.DisableThisEnabled,
+            plugin.PluginGuard.SetEnabled,
+            applied => configuration.DisableThisEnabled = applied,
+            "Guards protected Aethertek, Reborn, and XIV Combo plugins against disable commands and direct unload requests from other plugins.",
+            "Arms after a short delay. Blocks matching disable/toggle commands from every source, including Aethertek plugins and commands you type. Collection commands with protected members are also blocked. Normal installer actions, updates, shutdown, and authorized Aethertek IPC/API operations remain available. Check status to confirm both command and direct unload protection are active. Turn this mod off to allow protected disable/toggle chat commands.",
+            () => plugin.PluginGuard.StatusText,
+            searchTerms: ["Aethertek", "Reborn", "XIVCombo", "XIV Combo", "disable", "unload", "IPC", "plugin", "guard", "command"]);
         AddSavedFeatureEntry(
             ToonModsSection.PluginMods,
             "force-peepingtom",

@@ -249,6 +249,7 @@ public partial class SlaveWindow
         if (xagmanSupplyOwnerCohort.Count == 0) return false;
         var region = GetXagmanRegionOfChar(xagmanActiveCharacter);
         if (string.IsNullOrWhiteSpace(region)) return false;
+        var regionScoped = IsXagmanSupplyRegionScoped(xagmanServerMatchingActive);
         var peers = plugin.XagmanPeers.Peers;
         foreach (var instanceId in xagmanSupplyOwnerCohort)
         {
@@ -263,7 +264,9 @@ public partial class SlaveWindow
                 || peer.SupplyCoordinatorInstanceId != plugin.InstanceId || !xagmanSupplyRunPassIds.Contains(peer.SupplyPassId)
                 || peer.SupplyReceivingPolicyRegions == null || peer.Status == XagmanStatus.Error)
                 return false;
-            hasReceivingPolicies |= peer.SupplyReceivingPolicyRegions.Contains(region, StringComparer.OrdinalIgnoreCase);
+            hasReceivingPolicies |= regionScoped
+                ? peer.SupplyReceivingPolicyRegions.Contains(region, StringComparer.OrdinalIgnoreCase)
+                : peer.SupplyReceivingPolicyRegions.Count > 0;
             hasRemainingWork |= xagmanServerMatchingActive
                 ? peer.SupplyPendingDataCenters.Any(dc => string.Equals(WorldData.GetRegionOfDataCenter(dc), region, StringComparison.OrdinalIgnoreCase))
                     || peer.PartialOwners.Any(state => GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase))
@@ -295,6 +298,7 @@ public partial class SlaveWindow
         int freeSlots, int gil, bool receivingBlocked = false)
     {
         if (owners.Count == 0 || string.IsNullOrWhiteSpace(region)) return null;
+        var regionScoped = IsXagmanSupplyRegionScoped(xagmanServerMatchingActive);
         var useful = false;
         foreach (var peer in owners)
         {
@@ -308,7 +312,7 @@ public partial class SlaveWindow
                 || forecast.SelectedOwnerKeys.Count != forecast.SelectedOwnerCount
                 || forecast.Items.Any(item => item.UnknownOwnerCount > 0 || item.GroupKey == "Unknown"))
                 return null;
-            foreach (var row in forecast.Items.Where(item => item.GroupKey.Equals(region, StringComparison.OrdinalIgnoreCase)))
+            foreach (var row in forecast.Items.Where(item => !regionScoped || item.GroupKey.Equals(region, StringComparison.OrdinalIgnoreCase)))
             {
                 useful |= (row.NeededFromTonyQuantity > 0 || row.AllAvailableRequestCount > 0)
                     && stock.GetValueOrDefault((row.ItemId, row.IsHq)) > 0;
@@ -318,13 +322,13 @@ public partial class SlaveWindow
             // Live reconciled requests outrank a forecast captured before the last trade.
             if (!receivingBlocked)
                 useful |= peer.PartialOwners
-                    .Where(owner => GetXagmanRegionOfChar(owner.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase))
+                    .Where(owner => !regionScoped || GetXagmanRegionOfChar(owner.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase))
                     .SelectMany(owner => owner.PendingGiveItems)
                     .Any(item => item.Quantity > 0 && (item.ItemId == 1 ? gil < XagmanTonySellGilLimit : freeSlots > 0));
             var explicitRequests = peer.PartialOwners
-                .Where(owner => GetXagmanRegionOfChar(owner.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase))
+                .Where(owner => !regionScoped || GetXagmanRegionOfChar(owner.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase))
                 .SelectMany(owner => owner.RequestedItems)
-                .Concat(GetXagmanRegionOfChar(peer.ActiveCharacter).Equals(region, StringComparison.OrdinalIgnoreCase)
+                .Concat(!regionScoped || GetXagmanRegionOfChar(peer.ActiveCharacter).Equals(region, StringComparison.OrdinalIgnoreCase)
                     ? peer.RequestedItems : Enumerable.Empty<XagmanTradeRequestEntry>());
             foreach (var request in explicitRequests)
             {
@@ -530,8 +534,9 @@ public partial class SlaveWindow
         if (IsXagmanCollectionFirstRunActive() || !xagmanSupplyDrainOnly || xagmanSupplyDrainCleanupPending)
             return false;
         var region = GetXagmanRegionOfChar(xagmanActiveCharacter);
+        var regionScoped = IsXagmanSupplyRegionScoped(xagmanServerMatchingActive);
         if (!owners.Any(peer => peer.PartialOwners.Any(state => state.PendingGiveItems.Count > 0
-            && GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase))))
+            && (!regionScoped || GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase)))))
             return false;
         if (!IsXagmanCurrentLocalCharacter(xagmanActiveCharacter)
             || !TryGetXagmanLiveLocalMainInventoryFreeSlots(out var freeSlots)
@@ -600,6 +605,7 @@ public partial class SlaveWindow
         if (IsXagmanCollectionFirstRunActive()) return;
         var demand = CaptureXagmanLegacyDemand(owners);
         var region = GetXagmanRegionOfChar(xagmanActiveCharacter);
+        var regionScoped = IsXagmanSupplyRegionScoped(xagmanServerMatchingActive);
         if (IsXagmanCurrentLocalCharacter(xagmanActiveCharacter)
             && TryGetXagmanLiveLocalMainInventoryFreeSlots(out var freeSlots)
             && TryGetXagmanLiveGil(out var currentGil))
@@ -626,7 +632,7 @@ public partial class SlaveWindow
             if (tony.Equals(xagmanActiveCharacter, StringComparison.OrdinalIgnoreCase)
                 || xagmanTonyRunList.Contains(tony, StringComparer.OrdinalIgnoreCase)
                 || plugin.TaskRunner.FailedCharacters.Contains(tony)
-                || !GetXagmanRegionOfChar(tony).Equals(region, StringComparison.OrdinalIgnoreCase)
+                || (regionScoped && !GetXagmanRegionOfChar(tony).Equals(region, StringComparison.OrdinalIgnoreCase))
                 || !xagmanLegacyTonySupplySnapshots.TryGetValue(tony, out var previous))
                 continue;
             if (GetXagmanForecastTonyUse(owners, previous.Stock, region, previous.FreeSlots, previous.Gil) == false)
@@ -635,7 +641,7 @@ public partial class SlaveWindow
                 continue;
             }
             var newlyUseful = owners.Any(peer => peer.PartialOwners.Any(owner =>
-                GetXagmanRegionOfChar(owner.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase)
+                (!regionScoped || GetXagmanRegionOfChar(owner.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase))
                 && (owner.RequestedItems.Any(item => item.SelectorKind == XagmanItemSelectorKind.ExactItem
                     && previous.Stock.GetValueOrDefault((item.ItemId, item.IsHq)) > 0
                     && demand.GetValueOrDefault(GetXagmanLegacyDemandKey(peer, owner, item, false))

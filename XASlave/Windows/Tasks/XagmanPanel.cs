@@ -19,7 +19,7 @@ namespace XASlave.Windows;
 public partial class SlaveWindow
 {
     // Semantic sort IDs keep each header tied to its data when columns are added.
-    // The v2 table IDs prevent old positional layouts from being applied to the split columns.
+    // The v4 table IDs add the optional Builds column after Restock.
     private enum XagmanRosterColumn : uint
     {
         Character = 1,
@@ -34,6 +34,8 @@ public partial class SlaveWindow
         Retainers = 10,
         Submarines = 11,
         Delete = 12,
+        Restock = 13,
+        Builds = 14,
     }
 
     private enum XagmanTonyMeetCommandPhase
@@ -57,6 +59,8 @@ public partial class SlaveWindow
     private string xagmanItemQueryCache = string.Empty;
     private string xagmanItemImportJson = string.Empty;
     private string xagmanSavedItemListName = string.Empty;
+    private string xagmanRestockBuild = string.Empty;
+    private string xagmanRestockDays = string.Empty;
     private bool xagmanShowLog;
     private bool xagmanShowPeers = true;
     private bool xagmanShowQueue = true;
@@ -76,6 +80,7 @@ public partial class SlaveWindow
     private string xagmanActiveTradePartner = string.Empty;
     private string xagmanActiveTradePartnerInstanceId = string.Empty;
     private bool xagmanRunning;
+    internal bool IsXagmanMessageLoggingRequired => xagmanRunning;
     private bool xagmanTradeSafetySessionActive;
     private bool xagmanExpectedLogout;
     private System.Action<string>? xagmanOwnerRelogLogoutFailure;
@@ -895,7 +900,7 @@ public partial class SlaveWindow
         ImGui.InputTextWithHint("##xagmanTonySearch", "Search Tony name or world...", ref xagmanTonySearchFilter, 128);
         DrawXagmanTonyAutoSelection();
         ImGui.TextDisabled("Right-click the table headers or body to show or hide columns.");
-        using (var imguiScope836 = ImRaii.Table("XagmanTonyTable.ColumnsV2", 12,
+        using (var imguiScope836 = ImRaii.Table("XagmanTonyTable.ColumnsV4", 14,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable |
             ImGuiTableFlags.Hideable | ImGuiTableFlags.ContextMenuInBody,
             ScaledVector(0f, 175f)))
@@ -912,6 +917,8 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Tanks", ImGuiTableColumnFlags.WidthFixed, Scale(55f), (uint)XagmanRosterColumn.Tanks);
             ImGui.TableSetupColumn("Retainers##xagmanTonyRetainers", ImGuiTableColumnFlags.WidthFixed, Scale(72f), (uint)XagmanRosterColumn.Retainers);
             ImGui.TableSetupColumn("Submarines##xagmanTonySubmarines", ImGuiTableColumnFlags.WidthFixed, Scale(84f), (uint)XagmanRosterColumn.Submarines);
+            ImGui.TableSetupColumn("Restock", ImGuiTableColumnFlags.WidthFixed, Scale(65f), (uint)XagmanRosterColumn.Restock);
+            ImGui.TableSetupColumn("Builds", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultHide, Scale(240f), (uint)XagmanRosterColumn.Builds);
             ImGui.TableSetupColumn("Delete##xagmanTonyDelete", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.NoHide | ImGuiTableColumnFlags.NoHeaderLabel, Scale(30f), (uint)XagmanRosterColumn.Delete);
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
@@ -954,6 +961,8 @@ public partial class SlaveWindow
                             XagmanRosterColumn.Tanks => (a.Info?.CeruleumTanks ?? 0).CompareTo(b.Info?.CeruleumTanks ?? 0),
                             XagmanRosterColumn.Retainers => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: false).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: false)),
                             XagmanRosterColumn.Submarines => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: true).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: true)),
+                            XagmanRosterColumn.Builds => string.Compare(GetXagmanBuildsLabel(a.Info), GetXagmanBuildsLabel(b.Info), StringComparison.Ordinal),
+                            XagmanRosterColumn.Restock => (GetXagmanRestockDays(a.Info) ?? int.MaxValue).CompareTo(GetXagmanRestockDays(b.Info) ?? int.MaxValue),
                             _ => a.OrigIdx.CompareTo(b.OrigIdx),
                         };
 
@@ -1009,6 +1018,9 @@ public partial class SlaveWindow
                 DrawXagmanCharacterCountCell(info?.CeruleumTanks ?? 0);
                 DrawXagmanAutoRetainerCountCell(GetXagmanRegisteredAutoRetainerCount(info, submarines: false), "retainer");
                 DrawXagmanAutoRetainerCountCell(GetXagmanRegisteredAutoRetainerCount(info, submarines: true), "submarine");
+                DrawXagmanRestockCell(info);
+                ImGui.TableNextColumn();
+                ImGui.TextDisabled(GetXagmanBuildsLabel(info));
                 ImGui.TableNextColumn();
                 using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
@@ -1101,7 +1113,7 @@ public partial class SlaveWindow
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip("Refresh AutoRetainer data, then replace the current selection with owners under the active Region and Search filters that have registered submarines.");
         ImGui.TextDisabled("Right-click the table headers or body to show or hide columns.");
-        using (var imguiScope1032 = ImRaii.Table("XagmanOwnerTable.ColumnsV2", 12,
+        using (var imguiScope1032 = ImRaii.Table("XagmanOwnerTable.ColumnsV4", 14,
             ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY | ImGuiTableFlags.Sortable | ImGuiTableFlags.Resizable |
             ImGuiTableFlags.Hideable | ImGuiTableFlags.ContextMenuInBody,
             ScaledVector(0f, 175f)))
@@ -1118,6 +1130,8 @@ public partial class SlaveWindow
             ImGui.TableSetupColumn("Tanks", ImGuiTableColumnFlags.WidthFixed, Scale(55f), (uint)XagmanRosterColumn.Tanks);
             ImGui.TableSetupColumn("Retainers##xagmanOwnerRetainers", ImGuiTableColumnFlags.WidthFixed, Scale(72f), (uint)XagmanRosterColumn.Retainers);
             ImGui.TableSetupColumn("Submarines##xagmanOwnerSubmarines", ImGuiTableColumnFlags.WidthFixed, Scale(84f), (uint)XagmanRosterColumn.Submarines);
+            ImGui.TableSetupColumn("Restock", ImGuiTableColumnFlags.WidthFixed, Scale(65f), (uint)XagmanRosterColumn.Restock);
+            ImGui.TableSetupColumn("Builds", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultHide, Scale(240f), (uint)XagmanRosterColumn.Builds);
             ImGui.TableSetupColumn("Delete##xagmanOwnerDelete", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort | ImGuiTableColumnFlags.NoHide | ImGuiTableColumnFlags.NoHeaderLabel, Scale(30f), (uint)XagmanRosterColumn.Delete);
             ImGui.TableSetupScrollFreeze(0, 1);
             ImGui.TableHeadersRow();
@@ -1159,6 +1173,8 @@ public partial class SlaveWindow
                             XagmanRosterColumn.Tanks => (a.Info?.CeruleumTanks ?? 0).CompareTo(b.Info?.CeruleumTanks ?? 0),
                             XagmanRosterColumn.Retainers => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: false).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: false)),
                             XagmanRosterColumn.Submarines => GetXagmanRegisteredAutoRetainerCount(a.Info, submarines: true).CompareTo(GetXagmanRegisteredAutoRetainerCount(b.Info, submarines: true)),
+                            XagmanRosterColumn.Builds => string.Compare(GetXagmanBuildsLabel(a.Info), GetXagmanBuildsLabel(b.Info), StringComparison.Ordinal),
+                            XagmanRosterColumn.Restock => (GetXagmanRestockDays(a.Info) ?? int.MaxValue).CompareTo(GetXagmanRestockDays(b.Info) ?? int.MaxValue),
                             _ => a.OrigIdx.CompareTo(b.OrigIdx),
                         };
 
@@ -1214,6 +1230,9 @@ public partial class SlaveWindow
                 DrawXagmanCharacterCountCell(info?.CeruleumTanks ?? 0);
                 DrawXagmanAutoRetainerCountCell(GetXagmanRegisteredAutoRetainerCount(info, submarines: false), "retainer");
                 DrawXagmanAutoRetainerCountCell(GetXagmanRegisteredAutoRetainerCount(info, submarines: true), "submarine");
+                DrawXagmanRestockCell(info);
+                ImGui.TableNextColumn();
+                ImGui.TextDisabled(GetXagmanBuildsLabel(info));
                 ImGui.TableNextColumn();
                 using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
@@ -1280,6 +1299,42 @@ public partial class SlaveWindow
             return 0;
 
         return Math.Max(0, submarines ? info.SubmarineCount : info.RetainerCount);
+    }
+    private static int? GetXagmanRestockDays(ReloggerCharacterData? info)
+    {
+        if (info == null || info.XaDatabaseSnapshotUpdatedUtc == DateTime.MinValue)
+            return null;
+
+        return SubmarineBuildSupply.CalculateDays(
+            GetXagmanRegisteredAutoRetainerCount(info, submarines: true),
+            info.SubmarineBuilds, info.CeruleumTanks, info.MagitekRepairKits, out _);
+    }
+    private static string GetXagmanBuildsLabel(ReloggerCharacterData? info)
+    {
+        var count = Math.Min(4, GetXagmanRegisteredAutoRetainerCount(info, submarines: true));
+        if (count == 0)
+            return "-";
+        var builds = new List<string>();
+        for (var i = 0; i < count; i++)
+            builds.Add(info?.SubmarineBuilds != null && i < info.SubmarineBuilds.Count
+                ? info.SubmarineBuilds[i] : "????");
+        return string.Join(" / ", builds);
+    }
+    private static void DrawXagmanRestockCell(ReloggerCharacterData? info)
+    {
+        ImGui.TableNextColumn();
+        var days = GetXagmanRestockDays(info);
+        var fallbackCount = 0;
+        if (days.HasValue && info != null)
+            SubmarineBuildSupply.CalculateDays(GetXagmanRegisteredAutoRetainerCount(info, submarines: true),
+                info.SubmarineBuilds, info.CeruleumTanks, info.MagitekRepairKits, out fallbackCount);
+        ImGui.TextDisabled(days.HasValue
+            ? $"{days.Value.ToString("N0", CultureInfo.InvariantCulture)}{(fallbackCount > 0 ? "*" : string.Empty)}" : "-");
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(days.HasValue
+                ? "Estimated whole days until tanks or repair kits run out. Uses saved XA Database stock and Sub Manager's built-in consumption rates for each imported submarine build. User-edited Sub Manager rates are not imported."
+                    + (fallbackCount > 0 ? $"\n* {fallbackCount} missing or unlisted build(s) use 9 tanks and 1.33 kits per day. Import from AutoRetainer to refresh builds." : string.Empty)
+                : "Requires registered AutoRetainer submarines and a saved XA Database inventory snapshot. Use Pull XA Database Info to refresh.");
     }
     private static void DrawXagmanAutoRetainerCountCell(int value, string resourceName)
     {
@@ -2082,6 +2137,72 @@ public partial class SlaveWindow
             InvalidateXagmanTradeCapacityForecast();
     }
 
+    private void DrawXagmanRestockFarmersPopup(List<XagmanItemEntry> items, string id)
+    {
+        ImGui.SameLine();
+        var locked = xagmanRunning || IsXagmanTaskRunnerActive();
+        using (ImRaii.Disabled(locked))
+        {
+            if (ImGui.Button($"Restock Sub Farmers##{id}RestockFarmers"))
+            {
+                xagmanRestockBuild = string.Empty;
+                xagmanRestockDays = string.Empty;
+                ImGui.OpenPopup($"{id}RestockFarmersPopup");
+            }
+        }
+        using var popup = ImRaii.Popup($"{id}RestockFarmersPopup");
+        if (!popup)
+            return;
+        ImGui.TextDisabled("Stock for four submarines of the selected build.");
+        ImGui.TextDisabled("Replaces the Shared Item List with two Balance targets.");
+        if (string.IsNullOrEmpty(xagmanRestockBuild))
+        {
+            foreach (var build in SubmarineBuildSupply.SupportedBuilds)
+            {
+                if (ImGui.Selectable(build, false, ImGuiSelectableFlags.DontClosePopups))
+                    xagmanRestockBuild = build;
+            }
+        }
+        else
+        {
+            ImGui.TextUnformatted($"Build: {xagmanRestockBuild}");
+            if (ImGui.SmallButton($"Change Build##{id}RestockBuild"))
+                xagmanRestockBuild = string.Empty;
+            ImGui.SetNextItemWidth(Scale(180f));
+            var enter = ImGui.InputTextWithHint($"##{id}RestockDays", "Days of stock", ref xagmanRestockDays, 10,
+                ImGuiInputTextFlags.CharsDecimal | ImGuiInputTextFlags.EnterReturnsTrue);
+            xagmanRestockDays = new string(xagmanRestockDays.Where(c => c >= '0' && c <= '9').ToArray());
+            var valid = SubmarineBuildSupply.TryCalculateStock(xagmanRestockBuild, xagmanRestockDays, out var tanks, out var kits);
+            if (valid)
+                ImGui.TextUnformatted($"Ceruleum Tanks: {tanks:N0} | Magitek Repair Materials: {kits:N0}");
+            else
+                ImGui.TextDisabled("Enter a positive whole number of days within the item quantity limit.");
+            using (ImRaii.Disabled(!valid || locked))
+            {
+                var apply = ImGui.Button($"Apply##{id}RestockApply");
+                if ((apply || enter) && valid && !locked)
+                {
+                    items.Clear();
+                    items.Add(new XagmanItemEntry
+                    {
+                        ItemId = SubmarineSupplyCalculator.CeruleumTankItemId,
+                        ItemName = "Ceruleum Tank", Mode = XagmanItemMode.Balance, Quantity = tanks,
+                    });
+                    items.Add(new XagmanItemEntry
+                    {
+                        ItemId = SubmarineSupplyCalculator.MagitekRepairKitItemId,
+                        ItemName = "Magitek Repair Materials", Mode = XagmanItemMode.Balance, Quantity = kits,
+                    });
+                    SaveXagmanSharedItemsState();
+                    ClearXagmanItemSearch();
+                    ImGui.CloseCurrentPopup();
+                }
+            }
+        }
+        if (ImGui.Button($"Cancel##{id}RestockCancel"))
+            ImGui.CloseCurrentPopup();
+    }
+
     private void DrawXagmanItemSection(string title, List<XagmanItemEntry> items, string id, bool searchOnly = false, bool allowGil = true)
     {
         ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), title);
@@ -2216,6 +2337,8 @@ public partial class SlaveWindow
             SaveXagmanSharedItemsState();
             ClearXagmanItemSearch();
         }
+        if (!searchOnly && plugin.Configuration.XagmanRole == XagmanRole.FranchiseOwner)
+            DrawXagmanRestockFarmersPopup(items, id);
         if (!string.IsNullOrEmpty(arImportStatus) && DateTime.UtcNow < arImportStatusExpiry)
         {
             ImGui.SameLine();
@@ -2978,11 +3101,15 @@ public partial class SlaveWindow
 
             if (hasTonyPlan)
             {
+                if (xagmanActiveRole == XagmanRole.Tony && !plugin.Configuration.XagmanOutsideNetworkHelper)
+                    ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), GetXagmanTonyEtaLabel());
                 DrawXagmanProcessingList(
                     "Tony Order",
                     xagmanTonyRunPlan,
                     GetXagmanLocalTonyCompletedCharacters(),
-                    xagmanActiveRole == XagmanRole.Tony ? xagmanActiveCharacter : string.Empty,
+                    xagmanActiveRole == XagmanRole.Tony
+                        && xagmanTonyRunList.Any(key => key.Equals(xagmanActiveCharacter, StringComparison.OrdinalIgnoreCase))
+                        ? xagmanActiveCharacter : string.Empty,
                     runner.FailedCharacters,
                     xagmanSkippedCharacters);
             }
@@ -2992,6 +3119,11 @@ public partial class SlaveWindow
 
             if (hasOwnerPlan)
             {
+                if (TryGetXagmanOwnerRouteWait(out var waitingState, out var waitingEstimate))
+                {
+                    ImGui.TextUnformatted(waitingState);
+                    ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), waitingEstimate);
+                }
                 var etaLabel = GetXagmanOwnerEtaLabel(xagmanOwnerRunPlan, xagmanCharDurationSeconds);
                 if (!string.IsNullOrWhiteSpace(etaLabel))
                     ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), etaLabel);
@@ -3013,18 +3145,18 @@ public partial class SlaveWindow
                     .Where(peer => peer.XagmanEnabled && peer.Role == XagmanRole.FranchiseOwner)
                     .Where(IsXagmanPeerInCurrentRunPhase)
                     .Where(IsXagmanPeerInSupplyCoordinatorScope)
-                    .OrderByDescending(peer => peer.LastSeenUtc)
                     .SelectMany(peer => peer.PartialOwners ?? new List<XagmanPartialOwnerState>())
                     .Where(owner => owner != null && !string.IsNullOrWhiteSpace(owner.CharacterNameWorld))
-                    .GroupBy(owner => owner.CharacterNameWorld, StringComparer.OrdinalIgnoreCase)
-                    .Select(group => group.First())
+                    .Select(owner => owner.CharacterNameWorld)
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .OrderBy(name => name, StringComparer.OrdinalIgnoreCase)
                     .ToList();
                 if (partialOwners.Count > 0)
                 {
                     ImGui.Spacing();
                     ImGui.TextColored(new Vector4(1.0f, 0.65f, 0.2f, 1.0f), $"{partialOwners.Count} owner(s) still have unfinished trade work:");
-                    foreach (var owner in partialOwners)
-                        ImGui.TextWrapped($"{owner.CharacterNameWorld}: {GetXagmanPartialOwnerDetail(owner)}");
+                    foreach (var characterNameWorld in partialOwners)
+                        ImGui.TextUnformatted(characterNameWorld);
                 }
             }
 
@@ -3503,7 +3635,7 @@ public partial class SlaveWindow
                 && franchisePeers.Any(peer => peer.SupplyCycleRevision != XagmanSupplyCycleRevision))
             {
                 await RunXagmanPeerUiActionAsync(() => FailXagmanSupplyCycle(
-                    "Start refused: every owner client must support the current partial supply protocol.")).ConfigureAwait(false);
+                    "Start refused: Your XA Slave plugin versions do not match. Update Tony and every owner client to the same XA Slave build, then restart Xagman.")).ConfigureAwait(false);
                 return;
             }
             var negotiateStartupMode = !collectionFirst
@@ -4323,6 +4455,9 @@ public partial class SlaveWindow
     {
         if (!cfg.XagmanServerMatchingEnabled)
             return;
+
+        if (cfg.XagmanRole == XagmanRole.Tony && !cfg.XagmanOutsideNetworkHelper)
+            DrawXagmanServerStatus();
 
         ImGui.Indent(Scale(8f));
         ImGui.TextDisabled("Server Matching: pick 1 meet world per server. Owners only world-travel inside their own server.");
@@ -5949,15 +6084,27 @@ public partial class SlaveWindow
 
         if (xagmanRunning == value)
         {
+            UpdateXagmanTeleportHelperRequirement();
             plugin.TargetCommandFix.SetRequiredByXagman(value);
             return;
         }
 
         xagmanRunning = value;
+        UpdateXagmanTeleportHelperRequirement();
         InvalidateXagmanTradeCapacityForecast();
         plugin.TargetCommandFix.SetRequiredByXagman(value);
         if (value)
+        {
             plugin.TaskRunner.AddLog("Xagman: Fix /target Command is required while Xagman is running.");
+            plugin.TaskRunner.AddLog("Xagman: Teleport Helper is required while operating; aetheryte ticket prompts select No regardless of saved mod settings.");
+        }
+    }
+
+    private void UpdateXagmanTeleportHelperRequirement()
+    {
+        // Completion can clear xagmanRunning before its final FC-return task finishes.
+        plugin.TeleportHelper.SetRequiredByXagman(!isDisposed && (xagmanRunning
+            || (plugin.TaskRunner.IsRunning && plugin.TaskRunner.CurrentTaskName.Equals("Xagman", StringComparison.OrdinalIgnoreCase))));
     }
 
     private void OnXagmanFranchiseTaskFinished()
@@ -7737,6 +7884,12 @@ public partial class SlaveWindow
                 },
                 IsComplete = () =>
                 {
+                    if (supplyCycle && IsXagmanOwnerSupplyPassClosing(GetXagmanSupplyTonyPeer()))
+                    {
+                        passDeferred = true;
+                        return true;
+                    }
+
                     if (IsXagmanCollectionFirstRunActive() && xagmanTravelRouteFatalError)
                     {
                         charSkipped = true;
@@ -8772,19 +8925,20 @@ public partial class SlaveWindow
         List<TaskStep> steps,
         string charName,
         int attempt,
+        int maxAttempts,
         TaskRunner runner,
         Func<bool> shouldSkip)
     {
         steps.Add(new TaskStep
         {
-            Name = $"Xagman Relog Retry Pre-Flight Begin ({charName}) [attempt {attempt}/{XagmanRelogMaxAttempts}]",
+            Name = $"Xagman Relog Retry Pre-Flight Begin ({charName}) [attempt {attempt}/{maxAttempts}]",
             ShouldSkip = shouldSkip,
             OnEnter = () =>
             {
                 xagmanExpectedLogout = false;
                 runner.AddLog(
-                    $"Xagman: relog attempt {attempt - 1}/{XagmanRelogMaxAttempts} did not reach a safe {charName}; " +
-                    $"running pre-flight before attempt {attempt}/{XagmanRelogMaxAttempts}.");
+                    $"Xagman: relog attempt {attempt - 1}/{maxAttempts} did not reach a safe {charName}; " +
+                    $"running pre-flight before attempt {attempt}/{maxAttempts}.");
             },
             IsComplete = () => true,
             TimeoutSec = 1f,
@@ -8796,18 +8950,18 @@ public partial class SlaveWindow
 
         steps.Add(new TaskStep
         {
-            Name = $"Xagman Relog Retry Pre-Flight Complete ({charName}) [attempt {attempt}/{XagmanRelogMaxAttempts}]",
+            Name = $"Xagman Relog Retry Pre-Flight Complete ({charName}) [attempt {attempt}/{maxAttempts}]",
             ShouldSkip = shouldSkip,
             OnEnter = () => runner.AddLog(
-                $"Xagman: retry pre-flight complete; issuing relog attempt {attempt}/{XagmanRelogMaxAttempts} for {charName}."),
+                $"Xagman: retry pre-flight complete; issuing relog attempt {attempt}/{maxAttempts} for {charName}."),
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
     }
 
-    private long ArmXagmanTravelFailure(string command)
+    private long ArmXagmanTravelFailure(string command, string? expectedCharacter = null)
     {
-        var character = MonthlyReloggerTask.GetCurrentCharacterNameWorld();
+        var character = expectedCharacter ?? MonthlyReloggerTask.GetCurrentCharacterNameWorld();
         EndXagmanTravelFailure(xagmanTravelFailureToken);
         if (string.IsNullOrWhiteSpace(character) || character.EndsWith("@Unknown", StringComparison.OrdinalIgnoreCase))
             return 0;
@@ -8854,6 +9008,9 @@ public partial class SlaveWindow
 
     private void AddXagmanRelogSteps(List<TaskStep> steps, string charName, TaskRunner runner, SysAction onEnter, SysAction onReady, SysAction onTimeout, Func<bool>? externalSkip = null, bool recoverOwnerLogout = false, Action<string>? onDestinationSkip = null)
     {
+        var maxAttempts = recoverOwnerLogout ? 2 : XagmanRelogMaxAttempts;
+        var currentAttempt = 0;
+        var attemptInterrupted = false;
         var relogFailed = false;
         var relogConfirmed = false;
         var skipRelog = false;
@@ -8869,12 +9026,24 @@ public partial class SlaveWindow
         var lastDestinationWaitReason = string.Empty;
         var loginCommandSent = false;
         var relogDatabasePullRequested = false;
-        bool ShouldExternalSkip() => externalSkip?.Invoke() ?? false;
+        long loginTravelFailureToken = 0;
+        void EndLoginTravelObservation()
+        {
+            EndXagmanTravelFailure(loginTravelFailureToken);
+            loginTravelFailureToken = 0;
+        }
+        bool ShouldExternalSkip()
+        {
+            if (externalSkip?.Invoke() != true) return false;
+            EndLoginTravelObservation();
+            return true;
+        }
         void FailLogin(string reason)
         {
             if (relogFailed)
                 return;
             relogFailed = true;
+            EndLoginTravelObservation();
             EndXagmanLobbyOperation();
             var cleanupFailed = loginCommandSent && !plugin.IpcClient.LifestreamAbort();
             loginCommandSent = false;
@@ -8901,7 +9070,42 @@ public partial class SlaveWindow
         }
         bool ObserveLoginReady()
         {
-            if (!string.IsNullOrEmpty(pendingLogoutFailure)) FailLogin(pendingLogoutFailure);
+            // Lifestream can teleport after login while still on the wrong world. Consume
+            // terminal travel errors before readiness checks or the remaining relog retries.
+            if (!relogFailed && xagmanTravelFailureMonitor != null
+                && xagmanTravelFailureMonitor.TryTakeFailure(loginTravelFailureToken, out var failure))
+            {
+                xagmanSkipFcReturnAfterFailureCharacter = failure.ExpectedCharacter;
+                ClearXagmanExpectedTravelLogoutWindow();
+                runner.AddLog($"Xagman: login travel failed for {failure.ExpectedCharacter}; command '{failure.Command}', message: {failure.Message}");
+                FailLogin(failure.Reason);
+            }
+            if (!relogFailed && !string.IsNullOrEmpty(pendingLogoutFailure))
+            {
+                var reason = pendingLogoutFailure;
+                pendingLogoutFailure = string.Empty;
+                EndLoginTravelObservation();
+                EndXagmanLobbyOperation();
+                xagmanExpectedLogout = false;
+                xagmanOwnerRelogLogoutFailure = _ => { };
+                if (loginCommandSent && !plugin.IpcClient.LifestreamAbort())
+                {
+                    FailLogin($"{reason}; Lifestream abort failed; retry blocked.");
+                    runner.RequestHalt("Lifestream disconnect cleanup could not be confirmed; recovery commands were blocked.");
+                    return true;
+                }
+                loginCommandSent = false;
+                readyPasses = 0;
+                if (currentAttempt >= maxAttempts)
+                    FailLogin(reason);
+                else
+                {
+                    attemptInterrupted = true;
+                    runner.AddLog($"Xagman: {charName} disconnected during login attempt {currentAttempt}/{maxAttempts}: {reason}. Not marked failed; running pre-flight before retry.");
+                }
+                return true;
+            }
+            if (attemptInterrupted) return true;
             if (relogFailed) return true;
             var ready = MonthlyReloggerTask.GetCurrentCharacterNameWorld().Equals(charName, StringComparison.OrdinalIgnoreCase)
                 && !string.IsNullOrWhiteSpace(loginWorld)
@@ -8920,6 +9124,7 @@ public partial class SlaveWindow
             runner.AddLog($"Xagman: Lifestream relog CharacterSafeWait {readyPasses}/3 for {charName} on {loginWorld}; Lifestream idle.");
             if (readyPasses < 3) return false;
             relogConfirmed = true;
+            EndLoginTravelObservation();
             EndXagmanLobbyOperation();
             xagmanExpectedLogout = false;
             xagmanOwnerRelogLogoutFailure = null;
@@ -9004,14 +9209,14 @@ public partial class SlaveWindow
             },
             () => relogFailed || skipRelog || !returnToFcBeforeRelog || ShouldExternalSkip(),
             expectCrossDataCenterLogout: true);
-        for (var attempt = 1; attempt <= XagmanRelogMaxAttempts; attempt++)
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
             var capturedAttempt = attempt;
-            Func<bool> skipAttempt = () => relogFailed || relogConfirmed || skipRelog || ShouldExternalSkip();
+            Func<bool> skipAttempt = () => relogFailed || relogConfirmed || ShouldExternalSkip();
 
             steps.Add(new TaskStep
             {
-                Name = $"Xagman Relog Lifestream Idle: {charName} [attempt {capturedAttempt}/{XagmanRelogMaxAttempts}]",
+                Name = $"Xagman Relog Lifestream Idle: {charName} [attempt {capturedAttempt}/{maxAttempts}]",
                 ShouldSkip = skipAttempt,
                 IsComplete = () => plugin.IpcClient.TryGetLifestreamBusy(out var busy) && !busy,
                 TimeoutSec = 60f,
@@ -9020,17 +9225,29 @@ public partial class SlaveWindow
 
             if (capturedAttempt > 1)
             {
+                steps.Add(new TaskStep
+                {
+                    Name = $"Xagman Relog Retry Screen: {charName}",
+                    ShouldSkip = skipAttempt,
+                    IsComplete = () => !AddonHelper.IsAddonVisible("Dialogue")
+                        && (AddonHelper.IsAddonVisible("_TitleLogo") || AddonHelper.IsAddonVisible("_TitleMenu")
+                            || AddonHelper.IsAddonVisible("CharaSelect") || AddonHelper.IsAddonVisible("_CharaSelectListMenu")
+                            || CharacterSafetyHelper.IsCharacterSafeWaitReady()),
+                    TimeoutSec = 30f,
+                    OnTimeout = () => FailLogin("no usable screen before the recovery login attempt"),
+                });
                 AddXagmanRelogRetryPreFlightSteps(
                     steps,
                     charName,
                     capturedAttempt,
+                    maxAttempts,
                     runner,
                     skipAttempt);
             }
 
             steps.Add(new TaskStep
             {
-                Name = $"Xagman Relog Destination: {charName} [attempt {capturedAttempt}/{XagmanRelogMaxAttempts}]",
+                Name = $"Xagman Relog Destination: {charName} [attempt {capturedAttempt}/{maxAttempts}]",
                 ShouldSkip = skipAttempt,
                 IsComplete = () =>
                 {
@@ -9068,12 +9285,14 @@ public partial class SlaveWindow
             });
             steps.Add(new TaskStep
             {
-                Name = $"Xagman Relog: {charName} [attempt {capturedAttempt}/{XagmanRelogMaxAttempts}]",
+                Name = $"Xagman Relog: {charName} [attempt {capturedAttempt}/{maxAttempts}]",
                 ShouldSkip = skipAttempt,
                 OnEnter = () =>
                 {
                     if (!plugin.IpcClient.TryGetLifestreamBusy(out var busy) || busy)
                     { FailLogin("Lifestream became busy or unavailable before login dispatch"); return; }
+                    currentAttempt = capturedAttempt;
+                    attemptInterrupted = false;
                     readyPasses = 0;
                     nextReadyPassUtc = DateTime.UtcNow.AddSeconds(1);
                     pendingLogoutFailure = string.Empty;
@@ -9087,16 +9306,17 @@ public partial class SlaveWindow
                     }
                     // Explicitly pin even a home-world destination: a logged-out character may be visiting elsewhere.
                     var command = $"{charName} {loginWorld}";
-                    runner.AddLog($"Xagman: sending /li {command} (attempt {capturedAttempt}/{XagmanRelogMaxAttempts}); meetup area will be sent separately after three safe passes.");
+                    runner.AddLog($"Xagman: sending /li {command} (attempt {capturedAttempt}/{maxAttempts}); meetup area will be sent separately after three safe passes.");
                     runner.AddLog(returnToFcBeforeRelog && capturedAttempt == 1
-                        ? $"Xagman: relogging to {charName} after returning {loggedInCharacter} to FC (attempt {capturedAttempt}/{XagmanRelogMaxAttempts})."
-                        : $"Xagman: relogging to {charName} (attempt {capturedAttempt}/{XagmanRelogMaxAttempts}).");
+                        ? $"Xagman: relogging to {charName} after returning {loggedInCharacter} to FC (attempt {capturedAttempt}/{maxAttempts})."
+                        : $"Xagman: relogging to {charName} (attempt {capturedAttempt}/{maxAttempts}).");
                     // At the title screen there is no outgoing character logout to consume.
                     xagmanExpectedLogout = !string.IsNullOrWhiteSpace(MonthlyReloggerTask.GetCurrentCharacterNameWorld());
                     loginCommandSent = true;
                     BeginXagmanLobbyOperation(command, charName, $"login {charName}", true, false,
-                        beforeReplay: () => { readyPasses = 0; nextReadyPassUtc = DateTime.UtcNow.AddSeconds(1); pendingLogoutFailure = string.Empty; ArmOwnerRelogFailure(); },
+                        beforeReplay: () => { readyPasses = 0; nextReadyPassUtc = DateTime.UtcNow.AddSeconds(1); pendingLogoutFailure = string.Empty; ArmOwnerRelogFailure(); loginTravelFailureToken = ArmXagmanTravelFailure(command, charName); },
                         completed: () => GetCurrentWorldName().Equals(loginWorld, StringComparison.OrdinalIgnoreCase));
+                    loginTravelFailureToken = ArmXagmanTravelFailure(command, charName);
                     if (!plugin.IpcClient.LifestreamExecuteCommand(command))
                         FailLogin("Lifestream rejected the character/world command IPC call");
                     else if (!relogDatabasePullRequested)
@@ -9109,21 +9329,22 @@ public partial class SlaveWindow
                 TimeoutSec = XagmanRelogTimeoutSeconds,
                 OnTimeout = () =>
                 {
+                    EndLoginTravelObservation();
                     EndXagmanLobbyOperation();
                     xagmanExpectedLogout = false;
-                    xagmanOwnerRelogLogoutFailure = null;
+                    if (recoverOwnerLogout) xagmanOwnerRelogLogoutFailure = _ => { };
                     var current = MonthlyReloggerTask.GetCurrentCharacterNameWorld();
-                    var reason = $"login attempt {capturedAttempt}/{XagmanRelogMaxAttempts} timed out after {XagmanRelogTimeoutSeconds:0}s; "
+                    var reason = $"login attempt {capturedAttempt}/{maxAttempts} timed out after {XagmanRelogTimeoutSeconds:0}s; "
                         + $"current character '{current}', world '{GetCurrentWorldName()}', expected world '{loginWorld}', safe passes {readyPasses}/3; "
                         + $"Lifestream state readable={plugin.IpcClient.TryGetLifestreamBusy(out var busy)}, busy={busy}.";
                     if (loginCommandSent && !plugin.IpcClient.LifestreamAbort())
                     { FailLogin($"{reason} Lifestream abort failed; retries were blocked."); return; }
                     loginCommandSent = false;
                     runner.AddLog($"Xagman: unable to confirm login to {charName}: {reason}");
-                    if (capturedAttempt < XagmanRelogMaxAttempts)
+                    if (capturedAttempt < maxAttempts)
                     {
                         runner.AddLog(
-                            $"Xagman: relog attempt {capturedAttempt}/{XagmanRelogMaxAttempts} timed out before a safe {charName}; " +
+                            $"Xagman: relog attempt {capturedAttempt}/{maxAttempts} timed out before a safe {charName}; " +
                             "the next attempt will run pre-flight first.");
                         return;
                     }
@@ -9132,14 +9353,6 @@ public partial class SlaveWindow
                 },
             });
         }
-        steps.Add(new TaskStep
-        {
-            Name = $"Xagman Already Logged In SafeWait: {charName}",
-            ShouldSkip = () => !skipRelog || relogFailed || ShouldExternalSkip(),
-            IsComplete = ObserveLoginReady,
-            TimeoutSec = 30f,
-            OnTimeout = () => FailLogin("already-logged-in character did not pass three stable character/world/Lifestream-idle checks"),
-        });
         if (recoverOwnerLogout)
         {
             void StopRecovery(string reason)
@@ -9229,6 +9442,9 @@ public partial class SlaveWindow
                 OnEnter = () =>
                 {
                     xagmanOwnerRelogLogoutFailure = null;
+                    // A recovered character failure must not poison the later supply-pass gate.
+                    xagmanStatus = XagmanStatus.Preflight;
+                    xagmanStatusText = $"Recovered after failed login to {charName}; continuing the remaining owners.";
                     runner.AddLog($"Xagman: recovery after {charName} passed; continuing to the next eligible owner.");
                 },
                 TimeoutSec = 1f,
@@ -9239,6 +9455,7 @@ public partial class SlaveWindow
             Name = $"Xagman Relog Logout Window Close: {charName}",
             OnEnter = () =>
             {
+                EndLoginTravelObservation();
                 xagmanExpectedLogout = false;
                 xagmanOwnerRelogLogoutFailure = null;
             },
@@ -10324,6 +10541,7 @@ public partial class SlaveWindow
 
     private void UpdateXagmanFrameworkTick()
     {
+        UpdateXagmanTeleportHelperRequirement();
         UpdateXagmanCustomMovementOwnership();
         UpdateXagmanMiniSnapshot();
         ProcessXagmanRelogDatabasePull();
@@ -10519,7 +10737,14 @@ public partial class SlaveWindow
             EndXagmanTravelFailure(xagmanTravelFailureToken);
             ClearXagmanExpectedTravelLogoutWindow();
             ResetXagmanTonyMeetRetryState();
-            return ReassertXagmanCustomMeetingPoint();
+            if (ReassertXagmanCustomMeetingPoint())
+                return true;
+
+            // A supply barrier can return Blocked while owners are still approaching.
+            // Advertise readiness here so those owners can queue and finish their pass.
+            xagmanStatus = XagmanStatus.AtMeetSpot;
+            xagmanStatusText = $"Tony {xagmanActiveCharacter} is at the meet spot and ready for owners.";
+            return false;
         }
 
         var now = DateTime.UtcNow;
@@ -10653,6 +10878,7 @@ public partial class SlaveWindow
             if (plugin.IpcClient.DropboxIsBusy() || AddonHelper.IsAddonVisible("Trade"))
                 xagmanSupplyInventoryUnreadableSinceUtc = DateTime.MinValue;
             else if (!ObserveXagmanSupplyCohort() || HoldXagmanSupplyDeferral()) return;
+            UpdateXagmanDepletedSupplyPass();
         }
         var queue = GetXagmanQueueForTony(xagmanActiveCharacter);
         if (!xagmanTonyObservedOwnerWork)
@@ -12687,6 +12913,8 @@ public partial class SlaveWindow
             && xagmanStatus != XagmanStatus.Error
             && HasCompleteXagmanActiveMeetDestination();
 
+        xagmanPublishedEta = BuildXagmanEtaReport();
+
         try
         {
             plugin.XagmanPeers.PublishPresence(new XagmanPeerPresence
@@ -12779,6 +13007,7 @@ public partial class SlaveWindow
                 SupplyPassId = role == XagmanRole.Tony ? xagmanSupplyPassId : xagmanOwnerSupplyPassId,
                 SupplyCoordinatorInstanceId = role == XagmanRole.Tony ? plugin.InstanceId : xagmanOwnerSupplyTonyInstance,
                 SupplyPassComplete = role == XagmanRole.FranchiseOwner && xagmanOwnerSupplyPassComplete,
+                SupplyPassClosing = role == XagmanRole.Tony && xagmanSupplyPassClosing,
                 OwnerCompletionRevision = XagmanOwnerCompletionRevision,
                 OwnerCompletionToken = role == XagmanRole.FranchiseOwner ? xagmanOwnerCompletionToken : string.Empty,
                 OwnerCompletionAckReceived = role == XagmanRole.FranchiseOwner && xagmanOwnerCompletionAckReceived,
@@ -12803,6 +13032,7 @@ public partial class SlaveWindow
                 SupplyDeferredOwner = xagmanDeferredOwnerCharacter,
                 SupplyDeferredOwnerInstanceId = xagmanDeferredOwnerInstanceId,
                 SupplyPendingDataCenters = GetXagmanSupplyPendingDataCenters(),
+                Eta = xagmanPublishedEta,
                 GreenValueSnapshot = greenValueSnapshot,
                 TradeCapacityForecast = GetXagmanLocalTradeCapacityForecastForPresence(),
             });
@@ -15564,8 +15794,10 @@ public partial class SlaveWindow
         if (!string.IsNullOrWhiteSpace(fallbackReason))
             plugin.TaskRunner.AddLog(fallbackReason);
 
-        // A receiver at verified item or collection gil capacity has completed its job. An unknown inventory or a generic owner
-        // standby request is not sufficient evidence to turn a real failure green.
+        // This handoff completes Tony's receiving turn, not the owners' outstanding work.
+        // A final capacity read is diagnostic only: an accepted standby handoff can happen
+        // with spare slots, stack/gil limits, or after selling/draining changed the inventory.
+        // Never create a character failure here or erase a previously recorded travel/login failure.
         var completedAtCapacity = IsXagmanCurrentLocalCharacter(xagmanActiveCharacter)
             && ((TryGetXagmanLiveLocalMainInventoryFreeSlots(out var freeSlots) && freeSlots == 0)
                 || (!plugin.Configuration.XagmanOutsideNetworkHelper
@@ -15574,13 +15806,8 @@ public partial class SlaveWindow
         var fallbackContext = completedAtCapacity
             ? $"Xagman: Tony {xagmanActiveCharacter} completed receiving at verified capacity."
             : string.IsNullOrWhiteSpace(activePartner)
-            ? $"Xagman: Tony {xagmanActiveCharacter} hit a full-inventory/standby rotation."
-            : $"Xagman: owner {activePartner} requested Tony rotation after trade failure.";
-        if (!completedAtCapacity)
-        {
-            plugin.TaskRunner.RecordFailedCharacter(xagmanActiveCharacter);
-            xagmanCharacterFailureReasons[xagmanActiveCharacter] = fallbackReason ?? fallbackContext;
-        }
+            ? $"Xagman: Tony {xagmanActiveCharacter} completed its receiving turn at the capacity/standby handoff."
+            : $"Xagman: Tony {xagmanActiveCharacter} completed its receiving turn after owner {activePartner} requested a replacement; remaining owner work is preserved.";
         if (CanRotateXagmanTonyInCurrentScope())
         {
             plugin.TaskRunner.AddLog($"{fallbackContext} Rotating to the next eligible Tony.");
@@ -15589,13 +15816,8 @@ public partial class SlaveWindow
         }
 
         xagmanStatus = XagmanStatus.Error;
-        xagmanStatusText = completedAtCapacity
-            ? $"Tony {xagmanActiveCharacter} completed at receiving capacity, but no eligible replacement Tony remains. Owners still need service and are being recalled home to log out."
-            : $"Tony {xagmanActiveCharacter} is full and no eligible replacement Tony remains. Run failed; owners are being recalled home to log out.";
-        if (completedAtCapacity)
-            MarkXagmanTonyConsumed(xagmanActiveCharacter);
-        else
-            xagmanCharacterFailureReasons[xagmanActiveCharacter] = xagmanStatusText;
+        xagmanStatusText = $"Tony {xagmanActiveCharacter} completed its receiving turn, but no eligible replacement Tony remains. Owners still need service and are being recalled home to log out.";
+        MarkXagmanTonyConsumed(xagmanActiveCharacter);
         plugin.TaskRunner.AddLog($"{fallbackContext} {xagmanStatusText}");
         TrySetXagmanDropboxAutoAcceptOrStop(false, "all Tony inventories exhausted");
         ClearXagmanDropbox();

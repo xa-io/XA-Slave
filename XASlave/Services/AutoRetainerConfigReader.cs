@@ -47,7 +47,10 @@ public sealed class AutoRetainerConfigReader
         string FcName,
         long FcPoints,
         long FCID
-    );
+    )
+    {
+        public List<string> SubmarineBuilds { get; init; } = new();
+    }
 
     public AutoRetainerConfigReader(IDalamudPluginInterface pluginInterface, IPluginLog log)
     {
@@ -274,7 +277,7 @@ public sealed class AutoRetainerConfigReader
             FcName: fcName,
             FcPoints: fcPoints,
             FCID: fcid
-        );
+        ) { SubmarineBuilds = SubmarineBuildSupply.ReadBuilds(entry) };
     }
 
     /// <summary>

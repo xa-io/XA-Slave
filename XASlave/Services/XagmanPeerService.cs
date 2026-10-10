@@ -1242,6 +1242,7 @@ public sealed class XagmanPeerService : IDisposable
             SupplyPassId = record.SupplyPassId ?? string.Empty,
             SupplyCoordinatorInstanceId = record.SupplyCoordinatorInstanceId ?? string.Empty,
             SupplyPassComplete = record.SupplyPassComplete,
+            SupplyPassClosing = record.SupplyPassClosing,
             OwnerCompletionRevision = record.OwnerCompletionRevision,
             OwnerCompletionToken = record.OwnerCompletionToken ?? string.Empty,
             OwnerCompletionAckReceived = record.OwnerCompletionAckReceived,
@@ -1270,6 +1271,27 @@ public sealed class XagmanPeerService : IDisposable
                 : new List<string>(record.SupplyPendingDataCenters),
             GreenValueSnapshot = CloneGreenValueSnapshot(record.GreenValueSnapshot),
             TradeCapacityForecast = CloneTradeCapacityForecast(record.TradeCapacityForecast),
+            Eta = CloneEtaReport(record.Eta),
+        };
+    }
+
+    private static XagmanEtaReport? CloneEtaReport(XagmanEtaReport? report)
+    {
+        if (report == null) return null;
+        return new XagmanEtaReport
+        {
+            Revision = report.Revision, CapturedUtc = report.CapturedUtc,
+            CoordinatorInstanceId = report.CoordinatorInstanceId ?? string.Empty, Phase = report.Phase,
+            Complete = report.Complete && report.Routes != null && report.Routes.Count <= 32
+                && report.Routes.All(route => route != null),
+            UsesDefaultRate = report.UsesDefaultRate, HasUnfinishedWork = report.HasUnfinishedWork,
+            AverageSecondsPerCharacter = report.AverageSecondsPerCharacter, SampleCount = report.SampleCount,
+            RemainingSeconds = report.RemainingSeconds, ActiveDataCenter = report.ActiveDataCenter ?? string.Empty,
+            Routes = report.Routes?.Where(route => route != null).Take(32).Select(route => new XagmanEtaRoute
+            {
+                DataCenter = route.DataCenter ?? string.Empty, RemainingCharacters = route.RemainingCharacters,
+                RemainingSeconds = route.RemainingSeconds,
+            }).ToList() ?? new List<XagmanEtaRoute>(),
         };
     }
 

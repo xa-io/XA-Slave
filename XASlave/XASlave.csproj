@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.0.0.50</Version>
+    <Version>0.0.0.51</Version>
     <LangVersion>preview</LangVersion>
     <PackageProjectUrl>https://aethertek.io/</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
@@ -25,6 +25,8 @@
     <PackageReference Include="SQLitePCLRaw.bundle_e_sqlite3" Version="3.0.3" />
     <PackageReference Include="NAudio.Core" Version="2.2.1" />
     <PackageReference Include="NAudio.Wasapi" Version="2.2.1" />
+    <!-- Managed hook backend is loaded explicitly into a shared noncollectible context. -->
+    <PackageReference Include="MonoMod.RuntimeDetour" Version="25.3.6" ExcludeAssets="compile" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Iced" HintPath="$(DalamudLibPath)Iced.dll" Private="false" />

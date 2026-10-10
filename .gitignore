@@ -59,6 +59,9 @@ Previous Releases/
 *[Ss]igs.cs
 *[Ss]ig.cs
 *[Ss]ignature*.cs
+PluginGuardService.cs
+# Retain the legacy filename exclusion for old local copies.
+DisableThisService.cs
 
 # Python cache
 __pycache__/

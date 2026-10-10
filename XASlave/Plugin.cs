@@ -43,6 +43,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] public static IGameGui GameGui { get; private set; } = null!;
     [PluginService] public static INamePlateGui NamePlateGui { get; private set; } = null!;
     [PluginService] public static ITextureProvider TextureProvider { get; private set; } = null!;
+    [PluginService] public static ITextureReadbackProvider TextureReadbackProvider { get; private set; } = null!;
     [PluginService] public static ISigScanner SigScanner { get; private set; } = null!;
     [PluginService] public static IGameInteropProvider GameInterop { get; private set; } = null!;
     [PluginService] public static IAddonLifecycle AddonLifecycle { get; private set; } = null!;
@@ -249,6 +250,7 @@ public sealed class Plugin : IDalamudPlugin
     public BetterCastBarService BetterCastBar { get; init; }
     public BetterDutyFinderSettingsService BetterDutyFinder { get; init; }
     public CopyItemNameContextMenuService CopyItemNameContextMenu { get; init; }
+    public CustomMouseService CustomMouse { get; init; }
     public SightDistanceService SightDistance { get; init; }
     public PlayerSearchContextMenuService PlayerSearchContextMenu { get; init; }
     public EstateTeleportationContextMenuService EstateTeleportationContextMenu { get; init; }
@@ -288,6 +290,7 @@ public sealed class Plugin : IDalamudPlugin
     internal PlayerTargetingCoordinator PlayerTargeting { get; init; }
     public NearbyPlayersService NearbyPlayers { get; init; }
     public PeepingTomIntegrationService PeepingTomIntegration { get; init; }
+    public PluginGuardService PluginGuard { get; init; }
     public ARealmRecordedIntegrationService ARealmRecordedIntegration { get; init; }
     public TeleportHelperService TeleportHelper { get; init; }
     public ArPostProcessService ArPostProcessor { get; init; }
@@ -359,8 +362,10 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.Save();
 
         IpcClient = new IpcClient(PluginInterface, Log);
-        MessageLog = new MessageLogService(ChatGui, Log, () => Configuration.MessageLogEnabled,
-            type => Configuration.MessageLogDisabledTypes?.Contains((ushort)type) != true);
+        MessageLog = new MessageLogService(ChatGui, Log,
+            () => Configuration.MessageLogEnabled || SlaveWindow?.IsXagmanMessageLoggingRequired == true,
+            type => SlaveWindow?.IsXagmanMessageLoggingRequired == true
+                || Configuration.MessageLogDisabledTypes?.Contains((ushort)type) != true);
         CleanChat = new CleanChatService(ChatGui);
         DropboxQueue = new DropboxQueueService(PluginInterface, IpcClient, Log);
         SlaveDatabase = new SlaveDatabaseService(PluginInterface, Log);
@@ -395,6 +400,11 @@ public sealed class Plugin : IDalamudPlugin
         BetterCastBar = new BetterCastBarService(AddonLifecycle, ObjectTable, DataManager, Log);
         BetterDutyFinder = new BetterDutyFinderSettingsService(AddonLifecycle, SigScanner, GameConfig, Log);
         CopyItemNameContextMenu = new CopyItemNameContextMenuService(ContextMenu, DataManager, Log);
+        CustomMouse = new CustomMouseService(Framework, DataManager, TextureProvider, Log, SigScanner, GameInterop, GameConfig, PluginInterface.UiBuilder, TextureReadbackProvider);
+        Configuration.CustomMouse = (Configuration.CustomMouse ?? new()).Normalized();
+        Configuration.CustomMouseFavorites ??= new();
+        if (Configuration.CustomMouseFavorites.ImportExistingOnce(Configuration.CustomMouse)) Configuration.Save();
+        CustomMouse.ApplyConfiguration(Configuration.CustomMouse);
         SightDistance = new SightDistanceService(Framework, SigScanner, GameInterop, Log);
         PlayerSearchContextMenu = new PlayerSearchContextMenuService(ContextMenu, DataManager, Log);
         EstateTeleportationContextMenu = new EstateTeleportationContextMenuService(ContextMenu, Log);
@@ -437,6 +447,7 @@ public sealed class Plugin : IDalamudPlugin
         XAPeep = new XAPeepService(Framework, ClientState, Condition, ObjectTable, GameGui, Log, SlaveDatabase, Configuration, PlayerObservations, PlayerTargeting);
         NearbyPlayers = new NearbyPlayersService(this, PlayerObservations, PlayerTargeting);
         PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, Log);
+        PluginGuard = new PluginGuardService();
         ARealmRecordedIntegration = new ARealmRecordedIntegrationService(PluginInterface, Framework, ClientState, Condition, DataManager, Log);
         TeleportHelper = new TeleportHelperService(Framework, ClientState, PlayerState, Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
@@ -1031,6 +1042,7 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.InspectOutfitTryOnEnabled = false;
                 Configuration.Save();
             }
+            if (Configuration.CustomMouseEnabled) CustomMouse.SetEnabled(true);
             if (Configuration.ViewSingleItemEnabled && !ViewSingleItem.SetEnabled(true))
             {
                 Configuration.ViewSingleItemEnabled = false;
@@ -1207,6 +1219,11 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.MoveableAfterDeathEnabled = false;
                 Configuration.Save();
             }
+        });
+        QueueDeferredStartupAction("DisableThisEnabled", () =>
+        {
+            if (Configuration.DisableThisEnabled)
+                PluginGuard.SetEnabled(true);
         });
         QueueDeferredStartupAction(() =>
         {
@@ -1686,6 +1703,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private IEnumerable<StartupSurfaceStatus> GetStartupSurfaceStatuses()
     {
+        yield return CreateStartupSurfaceStatus("Plugin Guard", Configuration.DisableThisEnabled, PluginGuard.StatusText);
         yield return CreateStartupSurfaceStatus("Allow Multiple Game Instances", Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.AllowMultipleGameInstancesStatusText);
         yield return CreateStartupSurfaceStatus("Cancel Login Cooldown", Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.CancelLoginCooldownStatusText);
         yield return CreateStartupSurfaceStatus("Auto Skip Cutscenes", Configuration.AutoSkipCutscenesEnabled, AutoSkipCutscenes.StatusText, "AutoSkipCutscenesEnabled");
@@ -1843,6 +1861,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("BetterCastBar", BetterCastBar);
         TryDispose("BetterDutyFinder", BetterDutyFinder);
         TryDispose("CopyItemNameContextMenu", CopyItemNameContextMenu);
+        TryDispose("CustomMouse", CustomMouse);
         TryDispose("SightDistance", SightDistance);
         TryDispose("PlayerSearchContextMenu", PlayerSearchContextMenu);
         TryDispose("EstateTeleportationContextMenu", EstateTeleportationContextMenu);
@@ -1875,6 +1894,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("NearbyPlayers", NearbyPlayers);
         TryDispose("XAPeep", XAPeep);
         TryDispose("PeepingTomIntegration", PeepingTomIntegration);
+        TryDispose("PluginGuard", PluginGuard);
         TryDispose("ARealmRecordedIntegration", ARealmRecordedIntegration);
         TryDispose("TeleportHelper", TeleportHelper);
         TryDispose("ArPostProcessor", ArPostProcessor);
@@ -2923,6 +2943,9 @@ public sealed class Plugin : IDalamudPlugin
     {
         switch (key)
         {
+            case "custom-mouse":
+                snapshot = JsonSerializer.SerializeToElement((Configuration.CustomMouse ?? new()).Normalized(), ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "auto-sort-items":
                 snapshot = JsonSerializer.SerializeToElement(XAModAutoSortItemsSettings.From(AutoSortItems.Settings), ToonModsPresetSerialization.JsonOptions);
                 return true;
@@ -3313,6 +3336,12 @@ public sealed class Plugin : IDalamudPlugin
     {
         if (modSettings == null || modSettings.Count == 0)
             return;
+
+        if (TryDeserializeXAModSettings(modSettings, "custom-mouse", out CustomMouseSettings? mouseSettings) && mouseSettings != null)
+        {
+            Configuration.CustomMouse = mouseSettings.Normalized();
+            CustomMouse.ApplyConfiguration(Configuration.CustomMouse);
+        }
 
         if (TryDeserializeXAModSettings(modSettings, "auto-sort-items", out XAModAutoSortItemsSettings? autoSortItemsSettings) && autoSortItemsSettings != null)
             AutoSortItems.ReplaceSettings(autoSortItemsSettings.ToSettings(), importingPreset: true);
@@ -4729,6 +4758,9 @@ public sealed class Plugin : IDalamudPlugin
     {
         switch (key.ToLowerInvariant())
         {
+            case "custom-mouse":
+                CustomMouse.ApplyConfiguration(Configuration.CustomMouse);
+                break;
             case "auto-sort-items":
                 if (Configuration.AutoSortItemsSettings != AutoSortItems.Settings)
                     AutoSortItems.ReplaceSettings(AutoSortItems.Settings);
@@ -5098,6 +5130,7 @@ public sealed class Plugin : IDalamudPlugin
 
     private IEnumerable<XAModCommandDefinition> GetAllXAModDefinitions()
     {
+        yield return new("custom-mouse", "Custom Mouse", XAModsRestoreScope.Game, () => Configuration.CustomMouseEnabled, CustomMouse.SetEnabled, applied => Configuration.CustomMouseEnabled = applied, () => CustomMouse.StatusText);
         yield return new("auto-allow-multiple-game-instances", "Allow Multiple Game Instances", XAModsRestoreScope.Game, () => Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.SetAllowMultipleGameInstancesEnabled, applied => Configuration.AutoAllowMultipleGameInstancesEnabled = applied, () => SystemWindowMods.AllowMultipleGameInstancesStatusText);
         yield return new("auto-cancel-login-cooldown", "Cancel Login Cooldown", XAModsRestoreScope.Game, () => Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.SetCancelLoginCooldownEnabled, applied => Configuration.AutoCancelLoginCooldownEnabled = applied, () => SystemWindowMods.CancelLoginCooldownStatusText);
         yield return new("inspect-outfit-try-on", "Inspect Outfit Try-on", XAModsRestoreScope.Ui, () => Configuration.InspectOutfitTryOnEnabled, InspectOutfitTryOn.SetEnabled, applied => Configuration.InspectOutfitTryOnEnabled = applied, () => InspectOutfitTryOn.StatusText);
@@ -5236,6 +5269,7 @@ public sealed class Plugin : IDalamudPlugin
                 ? "Enabled - character-list tables and duplicate summaries use deterministic aliases for screenshot-safe local views."
                 : "Disabled");
         yield return new("force-peepingtom", "Force PeepingTom", XAModsRestoreScope.Plugin, () => Configuration.ForcePeepingTomEnabled, PeepingTomIntegration.SetForceEnabled, applied => Configuration.ForcePeepingTomEnabled = applied, () => PeepingTomIntegration.StatusText);
+        yield return new("disable-this", "Plugin Guard", XAModsRestoreScope.Plugin, () => Configuration.DisableThisEnabled, PluginGuard.SetEnabled, applied => Configuration.DisableThisEnabled = applied, () => PluginGuard.StatusText);
         yield return new("arealmrecorded-all-zones", "ARealmRecorded All Zones", XAModsRestoreScope.Plugin, () => Configuration.ARealmRecordedAllZonesEnabled, value =>
         {
             ARealmRecordedIntegration.ApplyConfiguration(
@@ -5853,5 +5887,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.50";
+    public const string Version = "0.0.0.51";
 }

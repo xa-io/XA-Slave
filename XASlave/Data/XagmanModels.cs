@@ -233,6 +233,7 @@ public sealed class XagmanPeerPresence
     public string SupplyPassId { get; set; } = string.Empty;
     public string SupplyCoordinatorInstanceId { get; set; } = string.Empty;
     public bool SupplyPassComplete { get; set; }
+    public bool SupplyPassClosing { get; set; }
     public int OwnerCompletionRevision { get; set; }
     public string OwnerCompletionToken { get; set; } = string.Empty;
     public bool OwnerCompletionAckReceived { get; set; }
@@ -254,6 +255,7 @@ public sealed class XagmanPeerPresence
     public List<string> SupplyPendingDataCenters { get; set; } = new();
     public XagmanGreenValueSnapshot? GreenValueSnapshot { get; set; }
     public XagmanTradeCapacityForecast? TradeCapacityForecast { get; set; }
+    public XagmanEtaReport? Eta { get; set; }
 }
 
 public sealed class XagmanPeerMessage

@@ -27,6 +27,7 @@ public class ReloggerCharacterData
     public string CurrentWorld { get; set; } = "";
     public int RetainerCount { get; set; }
     public int SubmarineCount { get; set; }
+    public List<string> SubmarineBuilds { get; set; } = new();
     public string FcMemberRankName { get; set; } = "";
     public int FcMemberRankSort { get; set; } = int.MaxValue;
     public int FreeCompanyRank { get; set; }
@@ -379,6 +380,9 @@ public class Configuration : IPluginConfiguration
     public bool AutoSkipCutscenesSkipCrystallineConflict { get; set; } = false;
     public bool AutoSkipCutscenesSkipFrontlineRivalWings { get; set; } = false;
     public bool AutoSkipCutscenesSkipInn { get; set; } = false;
+    public bool CustomMouseEnabled { get; set; } = false;
+    public CustomMouseSettings CustomMouse { get; set; } = new();
+    public CustomMouseFavoriteLibrary CustomMouseFavorites { get; set; } = new();
     public bool AutoAllowMultipleGameInstancesEnabled { get; set; } = false;
     public bool AutoCancelLoginCooldownEnabled { get; set; } = false;
     public bool AutoDisplayMsqProgressEnabled { get; set; } = false;
@@ -618,6 +622,7 @@ public class Configuration : IPluginConfiguration
     public bool MoveableAfterDeathEnabled { get; set; } = false;
     public List<ToonModSavedList> ToonModsSavedLists { get; set; } = new();
     public bool ForcePeepingTomEnabled { get; set; } = false;
+    public bool DisableThisEnabled { get; set; } = false;
     public bool ARealmRecordedAllZonesEnabled { get; set; } = false;
     public bool ARealmRecordedAllZonesAllContentTypes { get; set; } = true;
     public List<uint> ARealmRecordedAllZonesSelectedContentTypes { get; set; } = new();

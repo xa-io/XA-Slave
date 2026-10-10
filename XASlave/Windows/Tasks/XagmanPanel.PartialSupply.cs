@@ -10,7 +10,9 @@ namespace XASlave.Windows;
 
 public partial class SlaveWindow
 {
-    private const int XagmanSupplyCycleRevision = 2;
+    private const int XagmanSupplyCycleRevision = 3;
+    private const int XagmanInitialSupplyBindTimeoutSeconds = 600;
+    private const int XagmanSupplyRebindTimeoutSeconds = 120;
     private readonly Dictionary<string, XagmanPartialOwnerState> xagmanPartialOwners = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> xagmanOwnerCollectionCompletedKeys = new(StringComparer.OrdinalIgnoreCase);
     private readonly HashSet<string> xagmanSupplyVisitedOwners = new(StringComparer.OrdinalIgnoreCase);
@@ -49,6 +51,10 @@ public partial class SlaveWindow
 
     private void ResetXagmanSupplyCycle()
     {
+        xagmanSupplyPassClosing = false;
+        xagmanServerSupplyAttempts.Clear();
+        xagmanServerSupplyFinished.Clear();
+        xagmanServerSupplyStock.Clear();
         ResetXagmanOwnerCompletion();
         ResetXagmanSupplyDrain();
         ResetXagmanCapacityRecovery();
@@ -77,6 +83,7 @@ public partial class SlaveWindow
     private void BeginXagmanTonySupplyPass()
     {
         if (!IsXagmanSupplyCycleActive()) return;
+        xagmanSupplyPassClosing = false;
         xagmanSupplyPassId = Guid.NewGuid().ToString("N");
         xagmanSupplyRunPassIds.Add(xagmanSupplyPassId);
         xagmanSupplyInventoryCachedAtUtc = DateTime.MinValue;
@@ -102,6 +109,11 @@ public partial class SlaveWindow
         && !IsXagmanCapacityDrainOwnerFilled(owner)
         && !plugin.TaskRunner.FailedCharacters.Contains(owner) && !xagmanSkippedCharacters.Contains(owner);
 
+    // Fixed-world legacy runs share one meetup across home regions. Travel dispatch still
+    // validates each character's route; server sweeps and phased recovery stay regional.
+    private bool IsXagmanSupplyRegionScoped(bool serverMatching)
+        => serverMatching || IsXagmanCollectionFirstRunActive() || IsXagmanCapacityDrainActive();
+
     private List<string> GetXagmanSupplyPendingDataCenters()
     {
         if (!IsXagmanSupplyCycleActive() || xagmanActiveRole != XagmanRole.FranchiseOwner) return new();
@@ -126,15 +138,27 @@ public partial class SlaveWindow
     private bool TryBindXagmanOwnerSupplyPass()
     {
         if (!IsXagmanSupplyCycleActive()) return true;
-        bool WaitForSupplyPass()
+        bool WaitForSupplyPass(string reason)
         {
-            if (xagmanOwnerSupplyBindSinceUtc == DateTime.MinValue) xagmanOwnerSupplyBindSinceUtc = DateTime.UtcNow;
-            if ((DateTime.UtcNow - xagmanOwnerSupplyBindSinceUtc).TotalSeconds > 120)
-                FailXagmanSupplyCycle("A readable supplying Tony pass was not available within 120 seconds; owner goals remain preserved.");
+            // Initial Start is sent before Tony's FC return, relog and meetup travel.
+            // Allow that handshake to survive delayed/missing readiness advertisements;
+            // an established supply cycle retains the shorter missing-pass bound.
+            var initialBinding = string.IsNullOrWhiteSpace(xagmanOwnerSupplyPassId);
+            var timeoutSeconds = initialBinding ? XagmanInitialSupplyBindTimeoutSeconds : XagmanSupplyRebindTimeoutSeconds;
+            var coordinator = GetXagmanOwnerSupplyCoordinatorInstance();
+            var coordinatorLabel = string.IsNullOrWhiteSpace(coordinator) ? "not selected yet" : coordinator;
+            if (xagmanOwnerSupplyBindSinceUtc == DateTime.MinValue)
+            {
+                xagmanOwnerSupplyBindSinceUtc = DateTime.UtcNow;
+                plugin.TaskRunner.AddLog($"Xagman: waiting up to {timeoutSeconds}s for a readable Tony supply pass (initial binding={initialBinding}, coordinator={coordinatorLabel}): {reason}.");
+            }
+            if ((DateTime.UtcNow - xagmanOwnerSupplyBindSinceUtc).TotalSeconds > timeoutSeconds)
+                FailXagmanSupplyCycle($"A readable supplying Tony pass was not available within {timeoutSeconds} seconds (coordinator={coordinatorLabel}): {reason}; owner goals remain preserved.");
             return false;
         }
         var tony = GetXagmanSupplyTonyPeer();
-        if (tony == null || !IsXagmanPeerFresh(tony)) return WaitForSupplyPass();
+        if (tony == null || !IsXagmanPeerFresh(tony))
+            return WaitForSupplyPass("no fresh enabled Tony in the expected coordinator/run scope");
         if (!string.IsNullOrWhiteSpace(xagmanOwnerSupplyTonyInstance) && tony.InstanceId != xagmanOwnerSupplyTonyInstance)
         {
             FailXagmanSupplyCycle("A different Tony client attempted to take over this supply cycle.");
@@ -142,7 +166,7 @@ public partial class SlaveWindow
         }
         if (tony.SupplyCycleRevision != XagmanSupplyCycleRevision)
         {
-            FailXagmanSupplyCycle("Partial supply cycling requires the same supported supply protocol on Tony and every owner client.");
+            FailXagmanSupplyCycle("Your XA Slave plugin versions do not match. Update Tony and every owner client to the same XA Slave build, then restart Xagman.");
             return false;
         }
         if (string.IsNullOrWhiteSpace(tony.SupplyPassId) || !tony.SupplyInventoryComplete)
@@ -154,13 +178,14 @@ public partial class SlaveWindow
                 xagmanOwnerSupplyBindSinceUtc = DateTime.MinValue;
                 return false;
             }
-            return WaitForSupplyPass();
+            return WaitForSupplyPass($"Tony {tony.ActiveCharacter}, status={tony.Status}, pass available={!string.IsNullOrWhiteSpace(tony.SupplyPassId)}, inventory readable={tony.SupplyInventoryComplete}");
         }
         xagmanOwnerSupplyBindSinceUtc = DateTime.MinValue;
         if (xagmanOwnerSupplyPassId == tony.SupplyPassId) return true;
         xagmanOwnerSupplyPassId = tony.SupplyPassId;
         xagmanOwnerSupplyTonyInstance = tony.InstanceId;
-        xagmanOwnerSupplyRegion = GetXagmanRegionOfChar(tony.ActiveCharacter);
+        xagmanOwnerSupplyRegion = IsXagmanSupplyRegionScoped(tony.ServerMatchingEnabled)
+            ? GetXagmanRegionOfChar(tony.ActiveCharacter) : string.Empty;
         xagmanPreferredTonyCharacter = tony.ActiveCharacter;
         xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyWaiting = xagmanOwnerSupplyAtMenu = false;
         xagmanOwnerSupplyWaitSinceUtc = DateTime.MinValue;
@@ -182,7 +207,9 @@ public partial class SlaveWindow
             if (!TryBindXagmanOwnerSupplyPass()) return true;
             tony = GetXagmanSupplyTonyPeer();
         }
-        if (!GetXagmanRegionOfChar(owner).Equals(xagmanOwnerSupplyRegion, StringComparison.OrdinalIgnoreCase)) return true;
+        if (IsXagmanOwnerSupplyPassClosing(tony) || (tony != null && !IsXagmanOwnerInSupplyServer(owner, tony))) return true;
+        if (tony == null || (IsXagmanSupplyRegionScoped(tony.ServerMatchingEnabled)
+            && !GetXagmanRegionOfChar(owner).Equals(xagmanOwnerSupplyRegion, StringComparison.OrdinalIgnoreCase))) return true;
         if (xagmanPartialOwners.TryGetValue(owner, out var partialState)
             && tony != null && tony.SupplyInventoryComplete
             && (IsXagmanSupplyTonyDraining(tony) || partialState.PendingGiveItems.Count == 0)
@@ -454,9 +481,12 @@ public partial class SlaveWindow
 
     private IEnumerable<string> GetXagmanUsefulUnvisitedOwners(XagmanPeerPresence tony)
     {
+        if (IsXagmanOwnerSupplyPassClosing(tony)) return Enumerable.Empty<string>();
         var stock = CaptureXagmanSupplyStock(tony.SupplyInventory);
         return xagmanOwnerRunPlan.Where(IsXagmanSupplyOwnerUnresolved)
-            .Where(owner => GetXagmanRegionOfChar(owner).Equals(GetXagmanRegionOfChar(tony.ActiveCharacter), StringComparison.OrdinalIgnoreCase))
+            .Where(owner => IsXagmanOwnerInSupplyServer(owner, tony))
+            .Where(owner => !IsXagmanSupplyRegionScoped(tony.ServerMatchingEnabled)
+                || GetXagmanRegionOfChar(owner).Equals(GetXagmanRegionOfChar(tony.ActiveCharacter), StringComparison.OrdinalIgnoreCase))
             .Where(owner =>
             {
                 if (!xagmanPartialOwners.TryGetValue(owner, out var state))
@@ -534,7 +564,9 @@ public partial class SlaveWindow
         if (owner.SupplyCycleRevision != XagmanSupplyCycleRevision || owner.SupplyPassId != xagmanSupplyPassId
             || owner.SupplyCoordinatorInstanceId != plugin.InstanceId)
         {
-            FailXagmanSupplyCycle("Owner cannot acknowledge this Tony supply pass; verify matching plugin source on every client.");
+            FailXagmanSupplyCycle(owner.SupplyCycleRevision != XagmanSupplyCycleRevision
+                ? "Your XA Slave plugin versions do not match. Update Tony and every owner client to the same XA Slave build, then restart Xagman."
+                : "Owner cannot acknowledge this Tony supply pass because its supply session does not match Tony. Restart Xagman on Tony and the affected owner client.");
             return true;
         }
         if (!TryCaptureXagmanSupplyInventory(out var deferredStock))
@@ -603,7 +635,7 @@ public partial class SlaveWindow
             }
             if (peer.SupplyCycleRevision != XagmanSupplyCycleRevision)
             {
-                FailXagmanSupplyCycle("Every participating owner client must support partial supply cycling before Tony can proceed.");
+                FailXagmanSupplyCycle("Your XA Slave plugin versions do not match. Update Tony and every owner client to the same XA Slave build, then restart Xagman.");
                 return false;
             }
             xagmanSupplyOwnerCohort.Add(peer.InstanceId);
@@ -674,8 +706,20 @@ public partial class SlaveWindow
         { xagmanSupplyBarrierSinceUtc = xagmanSupplyRecallSinceUtc = DateTime.MinValue; return true; }
         if (!TryCaptureXagmanSupplyInventory(out var availableStock)) return true;
         var stock = CaptureXagmanSupplyStock(availableStock);
+        if (xagmanSupplyPassClosing && TryGetXagmanLiveLocalMainInventoryFreeSlots(out var closingSlots)
+            && TryGetXagmanLiveGil(out var closingGil)
+            && GetXagmanForecastTonyUse(owners, stock, GetXagmanRegionOfChar(xagmanActiveCharacter), closingSlots, closingGil) == true)
+        {
+            xagmanSupplyPassClosing = false;
+            xagmanSupplyBarrierSinceUtc = DateTime.MinValue;
+            plugin.TaskRunner.AddLog("Xagman: settled stock has useful owner work again; reopening this supply pass before rotation.");
+            PublishXagmanPresence();
+            return true;
+        }
         var recallPending = owners.Any(peer => peer.PartialOwners.Any(state =>
-            GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(GetXagmanRegionOfChar(xagmanActiveCharacter), StringComparison.OrdinalIgnoreCase)
+            (!IsXagmanServerSupplySweep() || GetXagmanDataCenterOfChar(state.CharacterNameWorld).Equals(xagmanSweepDataCenter, StringComparison.OrdinalIgnoreCase))
+            && (!IsXagmanSupplyRegionScoped(xagmanServerMatchingActive)
+                || GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(GetXagmanRegionOfChar(xagmanActiveCharacter), StringComparison.OrdinalIgnoreCase))
             && HasXagmanUsefulSupplyIncrease(state.RequestedItems, stock,
                 xagmanSupplyDeferredStockByOwner.GetValueOrDefault($"{peer.InstanceId}|{state.CharacterNameWorld}"))));
         if (recallPending)
@@ -698,6 +742,7 @@ public partial class SlaveWindow
         if ((DateTime.UtcNow - xagmanSupplyBarrierSinceUtc).TotalSeconds < 2) return true;
         if (TryFinishXagmanCapacityRecoverySupplyPass(owners)) return true;
         if (TryResumeXagmanLegacyTonyReceiving(owners, availableStock)) return true;
+        if (AdvanceXagmanServerSupply(owners, availableStock)) return true;
         RetainXagmanLegacyTonyEligibility(owners, availableStock);
         var pendingDcs = owners.SelectMany(peer => peer.SupplyPendingDataCenters).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var sameScopePending = !xagmanServerMatchingActive

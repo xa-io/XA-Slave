@@ -68,6 +68,7 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<string, string> xaSearchItemsSubscriber;
     private readonly ICallGateSubscriber<string, string> xaGetMatchingCharactersForItemsSubscriber;
     private readonly ICallGateSubscriber<string, string> xaSearchCurrentCharacterItemsJsonSubscriber;
+    private readonly ICallGateSubscriber<string, string> xaSearchCharacterStorageItemsJsonSubscriber;
     private readonly ICallGateSubscriber<ulong, string> xaGetCharacterAetherytesJsonSubscriber;
     private readonly ICallGateSubscriber<string> xaGetAllCharacterAetherytesJsonSubscriber;
     private readonly ICallGateSubscriber<uint, bool> xaHasAetheryteSubscriber;
@@ -198,6 +199,7 @@ public sealed class IpcClient
         xaSearchItemsSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.SearchItems");
         xaGetMatchingCharactersForItemsSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.GetMatchingCharactersForItems");
         xaSearchCurrentCharacterItemsJsonSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.SearchCurrentCharacterItemsJson");
+        xaSearchCharacterStorageItemsJsonSubscriber = pluginInterface.GetIpcSubscriber<string, string>("XA.Database.SearchCharacterStorageItemsJson");
         xaGetCharacterAetherytesJsonSubscriber = pluginInterface.GetIpcSubscriber<ulong, string>("XA.Database.GetCharacterAetherytesJson");
         xaGetAllCharacterAetherytesJsonSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetAllCharacterAetherytesJson");
         xaHasAetheryteSubscriber = pluginInterface.GetIpcSubscriber<uint, bool>("XA.Database.HasAetheryte");
@@ -589,6 +591,23 @@ public sealed class IpcClient
     {
         try { return xaGetLastSnapshotResultJsonSubscriber.InvokeFunc(); }
         catch { return string.Empty; }
+    }
+
+    /// <summary>Preserves the storage response, including unknown sections and provider-declared failures.</summary>
+    public bool TrySearchCharacterStorageItemsJson(string requestJson, out string json, out string error)
+    {
+        try
+        {
+            json = xaSearchCharacterStorageItemsJsonSubscriber.InvokeFunc(requestJson) ?? string.Empty;
+            error = string.IsNullOrWhiteSpace(json) ? "Provider returned no storage data (unavailable or failed)." : string.Empty;
+            return error.Length == 0;
+        }
+        catch (Exception ex)
+        {
+            json = string.Empty;
+            error = $"{ex.GetType().Name}: {ex.Message}";
+            return false;
+        }
     }
 
     /// <summary>Reads one character's aetherytes; content ID zero means the currently loaded character.</summary>

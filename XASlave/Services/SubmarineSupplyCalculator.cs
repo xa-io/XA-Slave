@@ -11,6 +11,17 @@ internal static class SubmarineSupplyCalculator
     private const decimal TanksPerSubmarinePerDay = 9m;
     private const decimal KitsPerSubmarinePerDay = 1.33m;
 
+    internal static int? CalculateRestockDays(int submarines, int tanks, int repairKits)
+    {
+        if (submarines <= 0)
+            return null;
+
+        // XA Sub Manager defaults; the first supply to run out limits whole days.
+        var tankDays = Math.Max(0, tanks) / (submarines * TanksPerSubmarinePerDay);
+        var kitDays = Math.Max(0, repairKits) / (submarines * KitsPerSubmarinePerDay);
+        return (int)decimal.Floor(Math.Min(tankDays, kitDays));
+    }
+
     internal static bool TryCalculate(string arguments, out int tanks, out int repairKits)
     {
         tanks = 0;

@@ -57,6 +57,8 @@ public sealed class IpcProvider : IDisposable
             Register("XASlave.ExecuteCommand", registrationHost.RegisterExecuteCommand(ExecuteCommand));
             Register("XASlave.RunTask", registrationHost.RegisterRunTask(RunTask));
             Register("XASlave.Development.ReadDependency.v1", registrationHost.RegisterReadDevelopmentDependency(ReadDevelopmentDependency));
+            log.Information("[XASlave] Development identity: MVID={Mvid}; LoadId={LoadId}.",
+                typeof(IpcProvider).Assembly.ManifestModule.ModuleVersionId, developmentLoadId);
         }
         catch
         {

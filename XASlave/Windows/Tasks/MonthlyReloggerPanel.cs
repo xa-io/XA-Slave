@@ -860,6 +860,7 @@ public partial class SlaveWindow
         data.CurrentWorld = ar.CurrentWorld;
         data.RetainerCount = ar.RetainerCount;
         data.SubmarineCount = ar.SubmarineCount;
+        data.SubmarineBuilds = new List<string>(ar.SubmarineBuilds);
         data.FoundInAutoRetainer = true;
         cfg.ReloggerCharacterInfo[key] = data;
     }
@@ -1136,6 +1137,7 @@ public partial class SlaveWindow
             {
                 row.Data.CurrentWorld = existing.CurrentWorld;
                 row.Data.SubmarineCount = existing.SubmarineCount;
+                row.Data.SubmarineBuilds = existing.SubmarineBuilds ?? new List<string>();
                 row.Data.FoundInAutoRetainer = existing.FoundInAutoRetainer;
                 if (existing.LastLoggedIn > row.Data.LastLoggedIn)
                     row.Data.LastLoggedIn = existing.LastLoggedIn;

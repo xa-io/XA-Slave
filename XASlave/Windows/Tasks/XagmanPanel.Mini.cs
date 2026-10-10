@@ -24,6 +24,7 @@ public partial class SlaveWindow
     private void ClearXagmanMiniSnapshot()
     {
         xagmanMiniSnapshot = XagmanMiniSnapshot.Empty;
+        xagmanPublishedEta = null;
         xagmanMiniNextUpdate = 0;
     }
 
@@ -75,9 +76,20 @@ public partial class SlaveWindow
         else if (partialCount > 0)
             estimate = "Unavailable while trade work remains unfinished";
 
+        var displayState = xagmanStatus.ToString();
+        if (!onh && xagmanRunning)
+        {
+            if (!owner) estimate = GetXagmanTonyEtaLabel();
+            else if (TryGetXagmanOwnerRouteWait(out var waitingState, out var waitingEstimate))
+            {
+                displayState = waitingState;
+                estimate = waitingEstimate;
+            }
+        }
+
         // Never include free-form task/status text: it can expose character and world names.
         xagmanMiniSnapshot = new XagmanMiniSnapshot(true, xagmanRunning, xagmanActiveRole, onh,
-            xagmanStatus.ToString(), xagmanActiveCharacter, completed, keys.Count,
+            displayState, xagmanActiveCharacter, completed, keys.Count,
             owner && !onh ? "complete" : "processed", failedCount, skippedCount, partialCount, estimate);
     }
 

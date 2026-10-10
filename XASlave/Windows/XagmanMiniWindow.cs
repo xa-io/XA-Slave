@@ -30,7 +30,9 @@ internal sealed class XagmanMiniWindow : Window
         var role = snapshot.Role == XagmanRole.Tony ? "Tony" : "Franchise Owner";
         var mode = snapshot.OutsideNetworkHelper ? "Outside Network Helper" : "Connected";
         ImGui.TextUnformatted($"{role} / {mode}");
+        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + 420f * ImGuiHelpers.GlobalScale);
         ImGui.TextUnformatted(snapshot.Running ? snapshot.State : $"Last run: {snapshot.State}");
+        ImGui.PopTextWrapPos();
         if (!string.IsNullOrWhiteSpace(snapshot.Character))
             ImGui.TextUnformatted(snapshot.Character);
         var fraction = snapshot.Total > 0 ? Math.Clamp((float)snapshot.Processed / snapshot.Total, 0f, 1f) : 0f;
@@ -38,6 +40,8 @@ internal sealed class XagmanMiniWindow : Window
             $"{snapshot.Processed}/{snapshot.Total} local characters {snapshot.ProgressLabel}");
         if (snapshot.Failed + snapshot.Skipped + snapshot.Unfinished > 0)
             ImGui.TextUnformatted($"{snapshot.Failed} failed / {snapshot.Skipped} skipped / {snapshot.Unfinished} unfinished");
+        ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + 420f * ImGuiHelpers.GlobalScale);
         ImGui.TextUnformatted($"Estimate: {snapshot.Estimate}");
+        ImGui.PopTextWrapPos();
     }
 }

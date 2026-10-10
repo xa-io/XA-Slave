@@ -692,6 +692,9 @@ public partial class SlaveWindow
             xagmanInvalidPendingServerPeerSinceUtc = DateTime.MinValue;
         }
 
+        if (IsXagmanServerSupplySweep() && TryAdvanceXagmanSupplyCycle())
+            return XagmanSweepStep.Blocked;
+
         if (!IsXagmanCurrentSweepServerDrained())
         {
             xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;

@@ -15,9 +15,13 @@ public sealed class TeleportHelperService : IDisposable
     private readonly IPluginLog log;
 
     private bool enabled;
+    private bool requiredByXagman;
+    private bool disposed;
     private bool subscribed;
     private bool selectYes;
     private long lastClickAttemptTick;
+    private bool EffectiveEnabled => !disposed && (enabled || requiredByXagman);
+    private bool EffectiveSelectYes => !requiredByXagman && selectYes;
 
     public TeleportHelperService(
         IFramework framework,
@@ -43,19 +47,31 @@ public sealed class TeleportHelperService : IDisposable
 
     public bool SetEnabled(bool value)
     {
+        if (disposed) return false;
         if (value == enabled)
             return enabled;
 
         enabled = value;
         ResetRuntimeState();
-        UpdateSubscription(enabled);
+        UpdateSubscription(EffectiveEnabled);
         UpdateStatusText();
         return enabled;
     }
 
+    public void SetRequiredByXagman(bool value)
+    {
+        if (disposed || requiredByXagman == value) return;
+        requiredByXagman = value;
+        ResetRuntimeState();
+        UpdateSubscription(EffectiveEnabled);
+        UpdateStatusText();
+    }
+
     public void Dispose()
     {
+        disposed = true;
         enabled = false;
+        requiredByXagman = false;
         ResetRuntimeState();
         UpdateSubscription(false);
         UpdateStatusText();
@@ -76,7 +92,7 @@ public sealed class TeleportHelperService : IDisposable
 
     private void OnFrameworkUpdate(IFramework unusedFramework)
     {
-        if (!enabled)
+        if (!EffectiveEnabled)
             return;
 
         if (!clientState.IsLoggedIn || !playerState.IsLoaded)
@@ -104,10 +120,12 @@ public sealed class TeleportHelperService : IDisposable
         lastClickAttemptTick = now;
         try
         {
-            if (!AddonHelper.ClickYesNo(selectYes, closeAfter: true))
+            if (!AddonHelper.ClickYesNo(EffectiveSelectYes, closeAfter: true))
                 return;
 
             LastActionText = $"Last action: selected {GetResponseLabel()} for an aetheryte ticket prompt at {DateTime.Now:HH:mm:ss}.";
+            if (requiredByXagman)
+                log.Information("[XASlave] Xagman Teleport Helper: declined aetheryte ticket usage (No).");
             UpdateStatusText(ticketPromptVisible: true);
         }
         catch (Exception ex)
@@ -174,9 +192,15 @@ public sealed class TeleportHelperService : IDisposable
 
     private void UpdateStatusText(bool selectYesnoReady = false, bool ticketPromptVisible = false)
     {
-        if (!enabled)
+        if (!EffectiveEnabled)
         {
             StatusText = "Disabled";
+            return;
+        }
+
+        if (requiredByXagman)
+        {
+            StatusText = "Required by Xagman - monitoring aetheryte ticket prompts and selecting No; saved mod settings are preserved.";
             return;
         }
 
@@ -194,5 +218,5 @@ public sealed class TeleportHelperService : IDisposable
     }
 
     private string GetResponseLabel()
-        => selectYes ? "Yes" : "No";
+        => EffectiveSelectYes ? "Yes" : "No";
 }
