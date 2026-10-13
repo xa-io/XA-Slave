@@ -503,7 +503,7 @@ public partial class SlaveWindow
             {
                 ImGui.SetTooltip(
                     "Connected Xagman preserves stock for owner supply passes and uses collection/supply cycling when capacity is reached.\n" +
-                    "Vendor selling remains available for Outside Network Helper and ordinary trade-failure recovery.\n" +
+                    "Legacy runs try enabled selling before retiring a full Tony with no useful outgoing supply. Outside Network Helper also supports selling.\n" +
                     "Supported meet locations:\n" +
                     GetXagmanTonySellSupportedLocationTooltipText() + "\n" +
                     "Unsupported locations or 990,000,000+ gil prevent vendor selling; Xagman rotates eligible Tonys or reports remaining capacity needs.");
@@ -3943,35 +3943,33 @@ public partial class SlaveWindow
         plugin.TaskRunner.AddLog($"Xagman: Stopped task and cleared saved results via {source}");
     }
 
-    private void RecallAllXagmanPeersForFailure()
-    {
-        _ = RecallAllXagmanPeersForFailureAsync();
-    }
-
-    private async System.Threading.Tasks.Task RecallAllXagmanPeersForFailureAsync()
+    private async System.Threading.Tasks.Task<bool> RecallAllXagmanPeersForFailureAsync()
     {
         try
         {
             if (!await EnsureXagmanPeerCommandChannelAsync("recall").ConfigureAwait(false))
-                return;
+                return false;
 
             var peers = await WaitForXagmanCommandTargetPeersAsync(1.0).ConfigureAwait(false);
             if (peers.Count == 0)
             {
                 await AddXagmanPeerLogAsync("Xagman: No connected peers to send recall command to").ConfigureAwait(false);
-                return;
+                return true;
             }
 
             await AddXagmanPeerLogAsync($"Xagman: Sending recall command to {peers.Count} connected peers...").ConfigureAwait(false);
-            if (await plugin.XagmanPeers.SendRecallTaskToAllPeersAsync().ConfigureAwait(false))
+            var sent = await plugin.XagmanPeers.SendRecallTaskToAllPeersAsync().ConfigureAwait(false);
+            if (sent)
                 await AddXagmanPeerLogAsync("Xagman: Recall command sent successfully").ConfigureAwait(false);
             else
                 await AddXagmanPeerLogAsync($"Xagman: Failed to send recall command to peers ({plugin.XagmanPeers.LastStatus})").ConfigureAwait(false);
+            return sent;
         }
         catch (Exception ex)
         {
             await AddXagmanPeerLogAsync($"Xagman: Failed to send recall command to peers: {ex.Message}").ConfigureAwait(false);
             Plugin.Log.Error(ex, "[Xagman] RecallAllXagmanPeersForFailure failed");
+            return false;
         }
     }
 
@@ -6850,7 +6848,7 @@ public partial class SlaveWindow
         }
     }
 
-    private void StartXagmanFailureRecallTask(string reason, bool forceLogout = false)
+    private void StartXagmanFailureRecallTask(string reason, bool forceLogout = false, bool tonyCapacityExhausted = false)
     {
         if (plugin.TaskRunner.IsRunning && plugin.TaskRunner.CurrentTaskName.Equals("Xagman", StringComparison.OrdinalIgnoreCase))
             plugin.TaskRunner.Cancel();
@@ -6866,6 +6864,9 @@ public partial class SlaveWindow
         }
 
         var role = xagmanRunning ? xagmanActiveRole : plugin.Configuration.XagmanRole;
+        tonyCapacityExhausted = tonyCapacityExhausted && role == XagmanRole.Tony;
+        forceLogout = forceLogout || (tonyCapacityExhausted && cfg.XagmanAutoReturnToFc);
+        var shutdownContext = tonyCapacityExhausted ? "last Tony capacity cleanup" : "failure recall";
         var localCharacter = string.IsNullOrWhiteSpace(xagmanActiveCharacter)
             ? MonthlyReloggerTask.GetCurrentCharacterNameWorld()
             : xagmanActiveCharacter;
@@ -6890,8 +6891,13 @@ public partial class SlaveWindow
             MarkXagmanTonyConsumed(localCharacter);
 
         var steps = new List<TaskStep>();
-        runner.RecordFailedCharacter(localCharacter);
-        xagmanCharacterFailureReasons[localCharacter] = reason;
+        // A full/gil-capped Tony completed its receiving turn. The overall run still has
+        // unfinished owners, but local shutdown must not turn this capacity result red.
+        if (!tonyCapacityExhausted)
+        {
+            runner.RecordFailedCharacter(localCharacter);
+            xagmanCharacterFailureReasons[localCharacter] = reason;
+        }
         runner.SuppressLogoutCancel = true;
         steps.Add(new TaskStep
         {
@@ -6924,32 +6930,68 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
-        AddXagmanTeleportSteps(
-            steps,
-            "Failure Recall FC",
-            () => "fc",
-            runner,
-            null,
-            true,
-            () =>
-            {
-                xagmanStatus = XagmanStatus.ReturningHome;
-                xagmanStatusText = $"Returning {localCharacter} to FC after Xagman failure.";
-            },
-            () =>
+        if (tonyCapacityExhausted)
+        {
+            System.Threading.Tasks.Task<bool>? peerRecallTask = null;
+            void HaltRecall(string message)
             {
                 xagmanStatus = XagmanStatus.Error;
-                xagmanStatusText = $"Xagman failure recall return finished for {localCharacter}.";
-            },
-            () =>
+                xagmanStatusText = message;
+                PublishXagmanPresence();
+                runner.RequestHalt(message);
+            }
+            steps.Add(new TaskStep
             {
-                xagmanStatus = XagmanStatus.Error;
-                xagmanStatusText = $"Xagman failure recall return did not complete cleanly for {localCharacter}.";
-                runner.AddLog($"Xagman: failure recall could not confirm /li fc return for {localCharacter}.");
-                if (forceLogout)
-                    runner.RequestHalt("Failure recall could not confirm the home return; logout was not started.");
-            },
-            expectCrossDataCenterLogout: true);
+                Name = "Xagman Last Tony Send Owner Recall",
+                OnEnter = () => peerRecallTask = RecallAllXagmanPeersForFailureAsync(),
+                IsComplete = () =>
+                {
+                    if (peerRecallTask == null || !peerRecallTask.IsCompleted) return false;
+                    try
+                    {
+                        // This proves transmission to the hub, not owner completion.
+                        if (peerRecallTask.GetAwaiter().GetResult()) return true;
+                    }
+                    catch (Exception ex)
+                    {
+                        runner.AddLog($"Xagman: owner recall send failed: {ex.Message}");
+                    }
+                    HaltRecall("Last Tony cleanup could not send the owner recall; Tony remains connected and logout was not started.");
+                    return false;
+                },
+                TimeoutSec = 15f,
+                OnTimeout = () => HaltRecall("Last Tony cleanup timed out sending the owner recall; Tony remains connected and logout was not started."),
+            });
+        }
+        if (!tonyCapacityExhausted || cfg.XagmanAutoReturnToFc)
+        {
+            AddXagmanTeleportSteps(
+                steps,
+                "Failure Recall FC",
+                () => "fc",
+                runner,
+                null,
+                true,
+                () =>
+                {
+                    xagmanStatus = XagmanStatus.ReturningHome;
+                    xagmanStatusText = $"Returning {localCharacter} to FC after {shutdownContext}.";
+                },
+                () =>
+                {
+                    xagmanStatus = XagmanStatus.Error;
+                    xagmanStatusText = $"Xagman {shutdownContext} return finished for {localCharacter}.";
+                },
+                () =>
+                {
+                    xagmanStatus = XagmanStatus.Error;
+                    xagmanStatusText = $"Xagman {shutdownContext} return did not complete cleanly for {localCharacter}.";
+                    runner.AddLog($"Xagman: {shutdownContext} could not confirm /li fc return for {localCharacter}.");
+                    if (forceLogout)
+                        runner.RequestHalt("Failure recall could not confirm the home return; logout was not started.");
+                },
+                expectCrossDataCenterLogout: true);
+        }
         AddXagmanTradeSafetyCompletionStep(
             steps,
             runner,
@@ -6957,7 +6999,7 @@ public partial class SlaveWindow
             MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(forceLogout || cfg.XagmanLogoutOnComplete, !forceLogout && cfg.XagmanKillGameOnComplete),
             allowAutoClean: false);
         MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, forceLogout || cfg.XagmanLogoutOnComplete, !forceLogout && cfg.XagmanKillGameOnComplete, !forceLogout && cfg.XagmanEnableArMultiOnComplete);
-        plugin.TaskRunner.Start("Xagman", steps, onFinished: () => FinalizeXagmanLocalShutdown("failure recall"), onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"), preserveRunHistory: true);
+        plugin.TaskRunner.Start("Xagman", steps, onFinished: () => FinalizeXagmanLocalShutdown(shutdownContext), onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"), preserveRunHistory: true);
     }
 
     private void StartXagmanFranchiseCompletionTask(string reason, bool localOwnersFinished = false)
@@ -15505,6 +15547,16 @@ public partial class SlaveWindow
                         return;
                     ClearXagmanDropbox();
                     ClearXagmanFocusTarget();
+                    if (onCompleted == null)
+                    {
+                        // Standby owners must observe the old explicit call disappear before
+                        // accepting another call from this same Tony. Publish that release
+                        // throughout selling, not just in the brief post-sale queue cooldown.
+                        // The captured activePartner still identifies any failure fallback.
+                        xagmanActiveTradePartner = string.Empty;
+                        xagmanActiveTradePartnerInstanceId = string.Empty;
+                        xagmanObservedDropboxBusy = false;
+                    }
                     xagmanStatus = XagmanStatus.Paused;
                     xagmanStatusText = $"Tony {activeTony} is pausing to sell full-inventory items.";
                     runner.AddLog($"Xagman: Tony {activeTony} inventory is full; Sell When Inventory Is Full is routing to randomized coords {FormatXagmanTonySellPosition(randomizedDestinationPosition)} within {XagmanTonySellVendorRandomRadius:0.###}y of {destinationLabel} ({destination.ZoneName}) with vnav stop distance {XagmanTonySellVendorStopDistance:0.###}.");
@@ -15696,6 +15748,15 @@ public partial class SlaveWindow
                     return;
                 }
                 SetXagmanTonySellLocation(destination, randomizedDestinationPosition);
+                // A capacity handoff kept its rotation acknowledgement while selling.
+                // Clear it only after verified recovery, preserving the
+                // owner's finite Give ledger and the consumed standby request key.
+                ResetXagmanTonySupplyDrain();
+                xagmanTonyRotationRequestedByOwnerStandby = false;
+                xagmanObservedDropboxBusy = false;
+                xagmanActiveTradePartner = string.Empty;
+                xagmanActiveTradePartnerInstanceId = string.Empty;
+                xagmanSupplyInventoryCachedAtUtc = DateTime.MinValue;
                 xagmanStatus = XagmanStatus.AtMeetSpot;
                 xagmanStatusText = $"Tony {activeTony} sold full-inventory items and is ready for the next owner.";
                 xagmanLastTonyActionAtUtc = DateTime.UtcNow;
@@ -15816,14 +15877,18 @@ public partial class SlaveWindow
         }
 
         xagmanStatus = XagmanStatus.Error;
-        xagmanStatusText = $"Tony {xagmanActiveCharacter} completed its receiving turn, but no eligible replacement Tony remains. Owners still need service and are being recalled home to log out.";
+        xagmanStatusText = $"Tony {xagmanActiveCharacter} completed its receiving turn, but no eligible replacement Tony remains. Owners still need service and are being recalled home to log out. "
+            + (plugin.Configuration.XagmanAutoReturnToFc
+                ? "Tony will return to FC and log out."
+                : "Tony will run its configured completion actions.");
         MarkXagmanTonyConsumed(xagmanActiveCharacter);
         plugin.TaskRunner.AddLog($"{fallbackContext} {xagmanStatusText}");
-        TrySetXagmanDropboxAutoAcceptOrStop(false, "all Tony inventories exhausted");
+        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, "all Tony inventories exhausted"))
+            return;
         ClearXagmanDropbox();
         ClearXagmanFocusTarget();
         PublishXagmanPresence();
-        RecallAllXagmanPeersForFailure();
+        StartXagmanFailureRecallTask(xagmanStatusText, tonyCapacityExhausted: true);
     }
 
      private bool TryRotateXagmanTonyForPendingOwnerStandbyRequest()

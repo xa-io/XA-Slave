@@ -23,6 +23,17 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.52 - 2026-10-13",
+            Lines =
+            [
+                "- Fixed Xagman > Sell When Inventory Is Full: Full Tonys sell loot in supported areas and resume trades when enabled.",
+                "- Fixed Xagman Completion: When the last Tony reaches capacity, return to FC and log out when enabled; otherwise use normal completion settings.",
+                "- Updated XA Mods > Plugin Mods > Plugin Guard: Choose additional installed plugins to protect and save selections in feature presets.",
+                "- Added Debug / Test > XA Abuse > Notification tests: Inspect and manually open game notifications, with copyable results; available in Debug builds.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.51 - 2026-10-10",
             Lines =
             [

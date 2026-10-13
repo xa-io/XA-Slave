@@ -447,7 +447,8 @@ public sealed class Plugin : IDalamudPlugin
         XAPeep = new XAPeepService(Framework, ClientState, Condition, ObjectTable, GameGui, Log, SlaveDatabase, Configuration, PlayerObservations, PlayerTargeting);
         NearbyPlayers = new NearbyPlayersService(this, PlayerObservations, PlayerTargeting);
         PeepingTomIntegration = new PeepingTomIntegrationService(PluginInterface, Framework, Log);
-        PluginGuard = new PluginGuardService();
+        Configuration.PluginGuardAdditionalPlugins = PluginGuardService.NormalizeAdditionalPlugins(Configuration.PluginGuardAdditionalPlugins);
+        PluginGuard = new PluginGuardService(Configuration.PluginGuardAdditionalPlugins);
         ARealmRecordedIntegration = new ARealmRecordedIntegrationService(PluginInterface, Framework, ClientState, Condition, DataManager, Log);
         TeleportHelper = new TeleportHelperService(Framework, ClientState, PlayerState, Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
@@ -2943,6 +2944,9 @@ public sealed class Plugin : IDalamudPlugin
     {
         switch (key)
         {
+            case "disable-this":
+                snapshot = JsonSerializer.SerializeToElement(Configuration.PluginGuardAdditionalPlugins, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "custom-mouse":
                 snapshot = JsonSerializer.SerializeToElement((Configuration.CustomMouse ?? new()).Normalized(), ToonModsPresetSerialization.JsonOptions);
                 return true;
@@ -3336,6 +3340,12 @@ public sealed class Plugin : IDalamudPlugin
     {
         if (modSettings == null || modSettings.Count == 0)
             return;
+
+        if (TryDeserializeXAModSettings(modSettings, "disable-this", out List<string>? guardPlugins) && guardPlugins != null)
+        {
+            Configuration.PluginGuardAdditionalPlugins = PluginGuardService.NormalizeAdditionalPlugins(guardPlugins);
+            PluginGuard.ApplyConfiguration(Configuration.PluginGuardAdditionalPlugins);
+        }
 
         if (TryDeserializeXAModSettings(modSettings, "custom-mouse", out CustomMouseSettings? mouseSettings) && mouseSettings != null)
         {
@@ -5887,5 +5897,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.51";
+    public const string Version = "0.0.0.52";
 }

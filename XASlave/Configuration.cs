@@ -623,6 +623,7 @@ public class Configuration : IPluginConfiguration
     public List<ToonModSavedList> ToonModsSavedLists { get; set; } = new();
     public bool ForcePeepingTomEnabled { get; set; } = false;
     public bool DisableThisEnabled { get; set; } = false;
+    public List<string> PluginGuardAdditionalPlugins { get; set; } = new();
     public bool ARealmRecordedAllZonesEnabled { get; set; } = false;
     public bool ARealmRecordedAllZonesAllContentTypes { get; set; } = true;
     public List<uint> ARealmRecordedAllZonesSelectedContentTypes { get; set; } = new();

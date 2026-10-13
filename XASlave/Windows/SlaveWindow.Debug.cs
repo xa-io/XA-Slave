@@ -1999,6 +1999,12 @@ public partial class SlaveWindow
             ImGui.Spacing();
         }
 
+        if (ImGui.CollapsingHeader("Notification tests##xaAbuse"))
+        {
+            DrawXaAbuseNotificationTests();
+            ImGui.Spacing();
+        }
+
         if (ImGui.CollapsingHeader("Dalamud Test Notifications##xaAbuse"))
         {
             DrawDalamudTestNotifications();

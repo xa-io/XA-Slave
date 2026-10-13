@@ -400,7 +400,7 @@ public partial class SlaveWindow
         if (xagmanSupplyCapacityRotationPending) xagmanStatus = XagmanStatus.Paused;
         xagmanStatusText = hasUsefulSupply
             ? $"Tony {xagmanActiveCharacter} reached {(fullInventory ? "inventory capacity" : "the selling gil limit")}; closing the receiving trade before distributing remaining useful stock."
-            : $"Tony {xagmanActiveCharacter} reached receiving capacity with no useful future supply {(hasReceivingPolicies ? "in the remaining-owner forecast" : "policies in this region")}; closing the trade before completing this Tony and rotating. Unfinished owners will wait on their current character.";
+            : $"Tony {xagmanActiveCharacter} reached receiving capacity with no useful future supply {(hasReceivingPolicies ? "in the remaining-owner forecast" : "policies in this region")}; closing the trade before checking sell recovery or rotating. Unfinished owners will wait on their current character.";
         plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
         // Keep the active owner lock while the receiver queue and native Trade window settle.
         // The presence flag lets that owner preserve its unfinished Give work immediately.
@@ -494,6 +494,13 @@ public partial class SlaveWindow
             if (xagmanSupplyCapacityRotationPending)
             {
                 xagmanSupplyDrainCleanupPending = false;
+                // The owner has acknowledged standby and the receiver is quiet. Legacy
+                // collection can recover space on this Tony before consuming a replacement.
+                // Keep the capacity latch until verified sell success so a failed seller
+                // falls back once rather than entering the same drain/sell cycle again.
+                if (xagmanSupplyDrainBlockedOnItems && !IsXagmanCollectionFirstRunActive()
+                    && TryStartXagmanTonySellWhenInventoryFull(xagmanActiveTradePartner))
+                    return true;
                 xagmanLegacyTonySupplySnapshots.Remove(xagmanActiveCharacter);
                 // Keep the rotation latch through fallback dispatch to prevent re-entering drain.
                 StartXagmanTonyFullInventoryFallback(xagmanActiveTradePartner);

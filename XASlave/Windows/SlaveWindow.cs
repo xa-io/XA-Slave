@@ -1200,6 +1200,9 @@ public partial class SlaveWindow : Window, IDisposable
 
     private void OnFrameworkUpdate(IFramework framework)
     {
+#if DEBUG
+        UpdateDebugNotificationTests();
+#endif
         var totalStopwatch = plugin.Configuration.VerboseTaskLogging
             ? Stopwatch.StartNew()
             : null;

@@ -3866,10 +3866,11 @@ public partial class SlaveWindow
             () => configuration.DisableThisEnabled,
             plugin.PluginGuard.SetEnabled,
             applied => configuration.DisableThisEnabled = applied,
-            "Guards protected Aethertek, Reborn, and XIV Combo plugins against disable commands and direct unload requests from other plugins.",
+            "Guards built-in plugins and your selected plugins against disable commands and direct unload requests from other plugins.",
             "Arms after a short delay. Blocks matching disable/toggle commands from every source, including Aethertek plugins and commands you type. Collection commands with protected members are also blocked. Normal installer actions, updates, shutdown, and authorized Aethertek IPC/API operations remain available. Check status to confirm both command and direct unload protection are active. Turn this mod off to allow protected disable/toggle chat commands.",
             () => plugin.PluginGuard.StatusText,
-            searchTerms: ["Aethertek", "Reborn", "XIVCombo", "XIV Combo", "disable", "unload", "IPC", "plugin", "guard", "command"]);
+            searchTerms: ["Aethertek", "Reborn", "XIVCombo", "XIV Combo", "disable", "unload", "IPC", "plugin", "guard", "command", "protect", "list"],
+            drawOptions: DrawPluginGuardOptions);
         AddSavedFeatureEntry(
             ToonModsSection.PluginMods,
             "force-peepingtom",
