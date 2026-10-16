@@ -44,7 +44,7 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
     ViewSingleItemCompanion? Mount = null, string? MountHash = null,
     ViewSingleItemCatalogItem? Catalog = null, string? CatalogHash = null)
 {
-    internal const string SupportedLayout = "CharaViewModelData:98:4B6F4ACCF4D1038A6E5339A359F536E9ABB9D4E713A8E34D85C80F8CA3D36B56";
+    internal const string SupportedLayout = "CharaViewModelData:98:A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D";
 
     internal void Validate()
     {

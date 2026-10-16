@@ -33,7 +33,7 @@ namespace XASlave.Services;
 // to our owned scene. Native windows and world characters are never filtered.
 internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
 {
-    private const int MeshGateRva = 0x282850, MeshGateLength = 0xD8C;
+    private const int MeshGateRva = 0x282940, MeshGateLength = 0xD8C;
     private readonly nint moduleBase;
     private readonly Hook<MeshRenderDelegate> meshHook;
     private readonly byte[] installedBody;
@@ -63,7 +63,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     private long viewportChangedAt;
     internal Vector2 ViewportSize => viewport;
 
-    // Exact supported-build ABI proved from the mesh loop at 0x282801..0x282818.
+    // Exact supported-build ABI proved from the mesh loop at 0x2828F1..0x28290A.
     // The caller supplies four arguments and never consumes a return value.
     private delegate void MeshRenderDelegate(ModelRenderer* renderer, ModelRenderer.OnRenderModelParams* parameters,
         ModelResourceHandle* modelResource, uint meshIndex);
@@ -109,7 +109,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     {
         NearbyZoneNativeBinding.RequireFramework();
         var sdk = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(AgentInspect).Assembly.Location)));
-        if (sdk != "4B6F4ACCF4D1038A6E5339A359F536E9ABB9D4E713A8E34D85C80F8CA3D36B56")
+        if (sdk != "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D")
             throw new InvalidOperationException("View Item requires revalidated client structures.");
         ValidateLayouts();
         var module = Plugin.SigScanner.Module;

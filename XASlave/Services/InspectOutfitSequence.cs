@@ -42,6 +42,7 @@ internal sealed class InspectOutfitSequence
     internal int Applied { get; private set; }
     internal int AlreadyPresent { get; private set; }
     internal int Rejected { get; private set; }
+    internal int Replaced { get; private set; }
     internal string Status { get; private set; } = "Waiting for two stable inspection frames.";
 
     internal InspectOutfitSequence(IInspectOutfitAdapter adapter, InspectOutfitHost host, InspectOutfitIdentity identity, long generation, long now)
@@ -102,6 +103,15 @@ internal sealed class InspectOutfitSequence
                 var required = InspectOutfitPlan.RequiredCount(accepted, waiting.Appearance) + 1;
                 if (InspectOutfitPlan.ResolvedCount(preview.Records, waiting.Appearance) < required)
                 { Rejected++; Cancel("The requested appearance was rejected or replaced by the game."); return; }
+                // Reconciliation has already proved any removed records conflict
+                // with this insertion. Continue with the compatible remainder,
+                // while preserving the new appearance's multiplicity check above.
+                for (var index = accepted.Count - 1; index >= 0; index--)
+                {
+                    var appearance = accepted[index].Appearance;
+                    if (InspectOutfitPlan.ResolvedCount(preview.Records, appearance) >= InspectOutfitPlan.RequiredCount(accepted, appearance)) continue;
+                    accepted.RemoveAt(index); Replaced++;
+                }
                 accepted.Add(waiting); Applied++; next++; pending = null; inserted = null; expected = preview;
             }
             else if (expected != null && !expected.SameRecords(preview))
@@ -123,7 +133,7 @@ internal sealed class InspectOutfitSequence
                 if (terminalFrame >= 0 && preview.Frame == terminalFrame + 1)
                 {
                     Completed = true; Terminal = true;
-                    Status = $"Outfit sent to fitting room: {Applied} applied, {AlreadyPresent} already present, {Rejected} rejected.";
+                    Status = $"Outfit processed: {accepted.Count} retained, {Applied} applied, {AlreadyPresent} already present, {Replaced} replaced by the game, {Rejected} rejected.";
                     return;
                 }
                 terminalFrame = preview.Frame; return;

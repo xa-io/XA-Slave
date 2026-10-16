@@ -22,7 +22,7 @@ internal sealed class AutoSortNativeBinding
     {
         NearbyZoneNativeBinding.RequireFramework();
         if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(ItemOrderModuleSorter).Assembly.Location)))
-            != "2DC5B513647CC9897041D4BCFEB1E2C15EC087E6E0D04570D72F73B7614C39A5")
+            != "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D")
             throw new InvalidOperationException("Item sorting requires revalidated client structures.");
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
@@ -40,18 +40,18 @@ internal sealed class AutoSortNativeBinding
         var call = pe.GetSectionData(checked((int)(caller - ModuleBase)) + 18).GetContent(0, 5).ToArray();
         if (call[0] != 0xE8) throw new InvalidOperationException("Item-sort native start caller changed.");
         Start = caller + 23 + BinaryPrimitives.ReadInt32LittleEndian(call.AsSpan(1));
-        if (Start - ModuleBase != 0x7E1700 || !proofs.ContainsKey(Start))
+        if (Start - ModuleBase != 0x7E15A0 || !proofs.ContainsKey(Start))
             throw new InvalidOperationException("Item-sort start target is not the uniquely resolved proven function.");
         var installer = resolved["RuleInstaller"];
         functions.Add(AutoSortFunction.NullSentinel, 0);
-        ResolveRule(pe, installer, AutoSortFunction.IdPrimary, 0x2C, 0x7E2360);
-        ResolveRule(pe, installer, AutoSortFunction.IdSecondary, 0x68, 0x7E24D0);
-        ResolveRule(pe, installer, AutoSortFunction.Category, 0x38, 0x7E23A0);
-        ResolveRule(pe, installer, AutoSortFunction.ItemLevel, 0x5C, 0x7E2480);
-        ResolveRule(pe, installer, AutoSortFunction.Hq, 0x8C, 0x7E2590);
-        ResolveRule(pe, installer, AutoSortFunction.Tab, 0x44, 0x7E2410);
+        ResolveRule(pe, installer, AutoSortFunction.IdPrimary, 0x2C, 0x7E2200);
+        ResolveRule(pe, installer, AutoSortFunction.IdSecondary, 0x68, 0x7E2370);
+        ResolveRule(pe, installer, AutoSortFunction.Category, 0x38, 0x7E2240);
+        ResolveRule(pe, installer, AutoSortFunction.ItemLevel, 0x5C, 0x7E2320);
+        ResolveRule(pe, installer, AutoSortFunction.Hq, 0x8C, 0x7E2430);
+        ResolveRule(pe, installer, AutoSortFunction.Tab, 0x44, 0x7E22B0);
         // Complete inspected key-function region, including every selected leaf body.
-        Pin(pe, 0x7E2340, 0x2B0);
+        Pin(pe, 0x7E21E0, 0x2B0);
         RequireLayout<ItemOrderModule>(nameof(ItemOrderModule.InventorySorter), 0x48, 224);
         RequireLayout<ItemOrderModuleSorter>(nameof(ItemOrderModuleSorter.SortFunctions), 0x40, 104);
         RequireLayout<ItemOrderModuleSorter>(nameof(ItemOrderModuleSorter.SortFunctionIndex), 0x38, 104);

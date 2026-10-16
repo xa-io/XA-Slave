@@ -19,7 +19,7 @@ internal sealed unsafe class InventoryShuttleNativeBinding
     internal InventoryShuttleNativeBinding()
     {
         NearbyZoneNativeBinding.RequireFramework();
-        if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(InventoryItem).Assembly.Location))) != "2DC5B513647CC9897041D4BCFEB1E2C15EC087E6E0D04570D72F73B7614C39A5")
+        if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(InventoryItem).Assembly.Location))) != "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D")
             throw new InvalidOperationException("Inventory shuttle needs revalidated client structures.");
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
@@ -50,15 +50,15 @@ internal sealed unsafe class InventoryShuttleNativeBinding
             }
         }
         finally { CryptographicOperations.ZeroMemory(pattern); CryptographicOperations.ZeroMemory(mask); }
-        if (match != 0x868DB9) throw new InvalidOperationException("Inventory constructor proof changed.");
+        if (match != 0x868BF9) throw new InvalidOperationException("Inventory constructor proof changed.");
         var displacement = pe.GetSectionData(match + 7).GetContent(0, 4).ToArray();
         var tableRva = checked(match + 11 + BinaryPrimitives.ReadInt32LittleEndian(displacement));
-        if (tableRva != 0x2195398) throw new InvalidOperationException("Inventory vtable proof changed.");
+        if (tableRva != 0x2195C18) throw new InvalidOperationException("Inventory vtable proof changed.");
         var entries = pe.GetSectionData(tableRva).GetContent(0, 21 * 8).ToArray();
         var imageBase = pe.PEHeaders.PEHeader.ImageBase;
         var getterRva = checked((int)(BinaryPrimitives.ReadUInt64LittleEndian(entries.AsSpan(20 * 8)) - imageBase));
         var calleeRva = checked((int)(BinaryPrimitives.ReadUInt64LittleEndian(entries.AsSpan(16 * 8)) - imageBase));
-        if (getterRva != 0x897C00 || calleeRva != 0x8977F0) throw new InvalidOperationException("Inventory virtual function proof changed.");
+        if (getterRva != 0x897A40 || calleeRva != 0x897630) throw new InvalidOperationException("Inventory virtual function proof changed.");
         table = module.BaseAddress + tableRva; getter = module.BaseAddress + getterRva; callee = module.BaseAddress + calleeRva;
         getterProof = DecodeExact(Sigs.InventoryShuttleSlot20Sig);
         calleeProof = DecodeExact(Sigs.InventoryShuttleSlot16Sig);

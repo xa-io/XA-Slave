@@ -19,6 +19,7 @@ internal sealed class FurnitureRestoreNativeAdapter : IFurnitureRestoreAdapter
     private FurnitureRestorePlanItem? admittedItem;
     private long admittedOperation;
     private bool acquired, planned, ended, disposed;
+    public string WaitReason { get; private set; } = string.Empty;
 
     internal FurnitureRestoreNativeAdapter(FurnitureRestoreContext context, MessageLogService messages, IToastGui toasts, IDataManager data)
     {
@@ -67,7 +68,7 @@ internal sealed class FurnitureRestoreNativeAdapter : IFurnitureRestoreAdapter
         var observation = observer.Read();
         if (capture == null)
             return new(owner, null, null, observation.Admission, observation.Decision, false, observation.Ambiguous,
-                observation.CorrelatedRejection, operation, context.FrameworkSequence, "Waiting for complete native pages and the housing list refresh.");
+                observation.CorrelatedRejection, operation, context.FrameworkSequence, WaitReason);
         if (observation.Ambiguous)
             return Frame(owner, capture, observation, operation);
         if (!observer.Prepare(item.Source, operation))
@@ -128,16 +129,25 @@ internal sealed class FurnitureRestoreNativeAdapter : IFurnitureRestoreAdapter
 
     private CaptureSet? Capture()
     {
+        WaitReason = string.Empty;
         Require(session);
         var storedSource = mode == FurnitureRestoreMode.StoredToInventory;
         var source = world.Furniture(session, storedSource);
+        if (source == null) return Wait("Waiting for source furniture pages: " + world.SnapshotWaitReason);
         var destination = mode == FurnitureRestoreMode.PlacedToStoreroom ? world.Furniture(session, true) : world.Bags(session);
-        if (source == null || destination == null) return null;
+        if (destination == null) return Wait("Waiting for destination pages: " + world.SnapshotWaitReason);
         var shownStored = session.NativeListMode >= 2;
         var shown = shownStored == storedSource ? source : mode == FurnitureRestoreMode.PlacedToStoreroom && shownStored
             ? destination : world.Furniture(session, shownStored);
-        if (shown == null || world.NativeListCount(session, shown) == null) return null;
+        if (shown == null) return Wait("Waiting for displayed furniture pages: " + world.SnapshotWaitReason);
+        if (world.NativeListCount(session, shown) == null) return Wait("Waiting for the housing list refresh: " + world.SnapshotWaitReason);
         Require(session); return new(source, destination);
+    }
+
+    private CaptureSet? Wait(string reason)
+    {
+        WaitReason = reason;
+        return null;
     }
 
     private void Require(FurnitureRestoreSession owner)

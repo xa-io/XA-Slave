@@ -107,7 +107,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
     private FurnitureRestoreNativeBinding(string fileName, nint moduleBase, int moduleSize, string sdkPath)
     {
         if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(sdkPath)))
-            != "2DC5B513647CC9897041D4BCFEB1E2C15EC087E6E0D04570D72F73B7614C39A5")
+            != "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D")
             throw new InvalidOperationException("Furniture restoration requires revalidated client structures.");
         var bytes = File.ReadAllBytes(fileName);
         if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)
@@ -140,13 +140,13 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         if (!lea.AsSpan(0, 3).SequenceEqual(new byte[] { 0x48, 0x8D, 0x05 }))
             throw new InvalidOperationException("Housing agent constructor layout changed.");
         AgentTable = constructor + 0x32 + BinaryPrimitives.ReadInt32LittleEndian(lea.AsSpan(3));
-        if (AgentTable - ModuleBase != 0x22CE708) throw new InvalidOperationException("Housing agent vtable changed.");
+        if (AgentTable - ModuleBase != 0x22CEC38) throw new InvalidOperationException("Housing agent vtable changed.");
         var updater = ResolveTableEntry(pe, AgentTable, 7);
-        if (updater - ModuleBase != 0x1720A80) throw new InvalidOperationException("Housing agent updater changed.");
+        if (updater - ModuleBase != 0x1720A00) throw new InvalidOperationException("Housing agent updater changed.");
         Pin(pe, checked((int)(updater - ModuleBase)), 0x33);
         RequireBranch(pe, updater + 0x2E, 1, 5, Function("CountProducer"));
-        IndoorListenerTable = FindReceiverTable(pe, Function("IndoorDecision"), 0x21CECA0);
-        OutdoorListenerTable = FindReceiverTable(pe, Function("OutdoorDecision"), 0x21CEC38);
+        IndoorListenerTable = FindReceiverTable(pe, Function("IndoorDecision"), 0x21CF490);
+        OutdoorListenerTable = FindReceiverTable(pe, Function("OutdoorDecision"), 0x21CF428);
 
         RequireOffset<HousingManager>(nameof(HousingManager.CurrentTerritory), 0);
         RequireOffset<HousingManager>(nameof(HousingManager.OutdoorTerritory), 8);

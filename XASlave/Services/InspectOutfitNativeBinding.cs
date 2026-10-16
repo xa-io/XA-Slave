@@ -13,9 +13,8 @@ namespace XASlave.Services;
 // Validated native capabilities. No hooks or writes to game code.
 internal sealed unsafe class InspectOutfitNativeBinding
 {
-    // Inspect/Tryon layouts and helpers revalidated against both delivered SDKs.
-    internal const string ClientStructs15035Sha256 = "2DC5B513647CC9897041D4BCFEB1E2C15EC087E6E0D04570D72F73B7614C39A5";
-    internal const string ClientStructs15036Sha256 = "4B6F4ACCF4D1038A6E5339A359F536E9ABB9D4E713A8E34D85C80F8CA3D36B56";
+    // Inspect/Tryon layouts and helpers revalidated against the delivered 15.0.3.7 SDK.
+    internal const string ClientStructs15037Sha256 = "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D";
     private readonly nint moduleBase;
 
     internal InspectOutfitNativeBinding()
@@ -39,15 +38,15 @@ internal sealed unsafe class InspectOutfitNativeBinding
 
     internal static void RequireSupportedClientStructs(string actualSha256)
     {
-        if (actualSha256 != ClientStructs15035Sha256 && actualSha256 != ClientStructs15036Sha256)
-            throw new InvalidOperationException($"Inspection try-on requires revalidated client structures. Actual SHA256: {actualSha256}; supported SHA256: {ClientStructs15035Sha256}, {ClientStructs15036Sha256}.");
+        if (actualSha256 != ClientStructs15037Sha256)
+            throw new InvalidOperationException($"Inspection try-on requires revalidated client structures. Actual SHA256: {actualSha256}; supported SHA256: {ClientStructs15037Sha256}.");
     }
 
     internal void Validate()
     {
         NearbyZoneNativeBinding.RequireFramework();
-        if ((nint)AgentTryon.MemberFunctionPointers.TryOn != moduleBase + 0xC7C080
-            || (nint)UIState.Instance() != moduleBase + 0x2ACBF20)
+        if ((nint)AgentTryon.MemberFunctionPointers.TryOn != moduleBase + 0xC7BF90
+            || (nint)UIState.Instance() != moduleBase + 0x2ACEF00)
             throw new InvalidOperationException("The typed inspection or try-on binding changed.");
     }
 
@@ -65,7 +64,7 @@ internal sealed unsafe class InspectOutfitNativeBinding
             throw new InvalidOperationException("The fitting room must be closed before clearing its previous outfit.");
         // Supported-build native clear: resets all fourteen TryOnItems. Its
         // inactive path returns without refreshing or reopening the addon.
-        var clear = (delegate* unmanaged<AgentTryon*, void>)(moduleBase + 0xC7BCB0);
+        var clear = (delegate* unmanaged<AgentTryon*, void>)(moduleBase + 0xC7BBC0);
         clear(agent);
         var current = Agent();
         if (current != agent || (requireClosed && current->IsAgentActive()))
@@ -108,7 +107,7 @@ internal sealed unsafe class InspectOutfitNativeBinding
             agent->SaveDeleteOutfit = true;
             // Native glasses-selection callback uses this helper. With Save
             // enabled it replaces only slot 13, preserving ordinary gear.
-            var apply = (delegate* unmanaged<AgentTryon*, ushort, void>)(moduleBase + 0xC7BB20);
+            var apply = (delegate* unmanaged<AgentTryon*, ushort, void>)(moduleBase + 0xC7BA30);
             apply(agent, glassesId);
         }
         finally

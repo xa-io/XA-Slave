@@ -59,10 +59,10 @@ internal sealed unsafe partial class ViewSingleItemScene
         // Native skeleton rendering builds sample jobs from these controls.
         // This read-only timeline supplies the duration of a recorded cycle;
         // neither LocalTime nor independently simulated VFX state is rewritten.
-        AddProof(disk, 0x25D5B0, 0x2CD); // Owned skeleton sample-job preparation
-        AddProof(disk, 0x207950, 0x18); // Advance is distinct from sampling
-        AddProof(disk, 0x1F07D90, 0x17D); // Build both partial-skeleton sample jobs
-        AddProof(disk, 0x1F07850, 0xB1); // Read each control's LocalTime as sample time
+        AddProof(disk, 0x25D6F0, 0x2CD); // Owned skeleton sample-job preparation
+        AddProof(disk, 0x207A90, 0x18); // Advance is distinct from sampling
+        AddProof(disk, 0x1F08FD0, 0x17D); // Build both partial-skeleton sample jobs
+        AddProof(disk, 0x1F08A90, 0xB1); // Read each control's LocalTime as sample time
     }
 
     private void ResetAnimationControls()

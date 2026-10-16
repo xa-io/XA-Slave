@@ -18,6 +18,8 @@ internal static class ViewSingleItemRendererHookState
     private const BindingFlags InstanceFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
     private const string SupportedDalamudSha256 = "C726C1DE70B76A7ACC970F48E29589CD61205F08DAEC9586D112A977583055F5";
     private const string SupportedReloadedSha256 = "B8960D0FD8341524DF2197A457F0152A12DC6203613D27872B204FEF9DCDEFAD";
+    private const string Dalamud15037Sha256 = "715E5F1454F1A6C274E1585A90FF395E01565B72B8D6EF9D380407856B39232F";
+    private const string Reloaded15037Sha256 = "EAEEFDB7D832571723481FA0B822CE1708D90A40D54F1CB0F75A1788DDEC05A7";
     private const string SupportedTitleEditSha256 = "66B2F37E86678CA9619DE9C7747BE6E72D37C1B75F574A2900434A1E81292690";
     private const string SupportedTitleEditModule = "26aa1d69-094c-482b-b372-84d84f9955ef";
 
@@ -27,11 +29,20 @@ internal static class ViewSingleItemRendererHookState
     internal static Lock GetSyncRoot()
     {
         var assembly = typeof(IDalamudHook).Assembly;
-        if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assembly.Location))) != SupportedDalamudSha256
-            || Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(Reloaded.Hooks.ReloadedHooks).Assembly.Location))) != SupportedReloadedSha256)
+        if (!IsSupportedBackendPair(
+                Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assembly.Location))),
+                Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(Reloaded.Hooks.ReloadedHooks).Assembly.Location)))))
             throw new InvalidOperationException("View Item requires a revalidated Dalamud hook backend.");
         return Manager.GetProperty("HookEnableSyncRoot", StaticFlags)?.GetValue(null) as Lock
             ?? throw new InvalidOperationException("The preview hook synchronization changed.");
+    }
+
+    // Each pair has matching emitted hook/loader metadata and backend bodies.
+    // Do not combine independently admitted host and backend artifacts.
+    internal static bool IsSupportedBackendPair(string dalamudSha256, string reloadedSha256)
+    {
+        return (dalamudSha256 == SupportedDalamudSha256 && reloadedSha256 == SupportedReloadedSha256)
+            || (dalamudSha256 == Dalamud15037Sha256 && reloadedSha256 == Reloaded15037Sha256);
     }
 
     // Caller holds the actual Dalamud Lock through comparison, creation and enable.

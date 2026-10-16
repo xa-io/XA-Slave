@@ -27,9 +27,13 @@ internal static class FurnitureRestoreCapacity
     internal static uint[] Pages(bool exterior, bool stored, byte nativeSize)
     {
         _ = Limit(exterior, nativeSize);
-        // The native HousingGoods producer enumerates both exterior page IDs.
-        // Empty excess allocation never authorizes a deposit beyond Limit.
-        if (exterior) return stored ? new uint[] { 27000, 27200 } : new uint[] { 25001, 25200 };
+        // Match native placement coverage: a small estate uses one 40-slot page.
+        // Storage keeps both pages, including holdings above the current estate limit.
+        if (exterior)
+        {
+            if (stored) return new uint[] { 27000, 27200 };
+            return nativeSize == 0 ? new uint[] { 25001 } : new uint[] { 25001, 25200 };
+        }
         var count = stored ? 12 : nativeSize == 0 ? 6 : nativeSize == 1 ? 9 : nativeSize == 2 ? 12 : 3;
         var first = stored ? 27001u : 25003u;
         var pages = new uint[count];

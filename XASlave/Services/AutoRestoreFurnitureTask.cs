@@ -75,6 +75,9 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
         sequence.Tick(Environment.TickCount64);
         if (!running || owned != generation) return true;
         runner.TotalItems = sequence.Results.Count; runner.CompletedItems = sequence.Confirmed;
+        if (Status != sequence.Status)
+            Plugin.Log.Information("[AutoRestoreFurniture] Progress: phase {Phase}, status {Status}, initial items {InitialItems}, confirmed {Confirmed}",
+                sequence.Phase, sequence.Status, sequence.Results.Count, sequence.Confirmed);
         Status = sequence.Status;
         return sequence.Terminal;
     }

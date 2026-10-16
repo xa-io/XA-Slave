@@ -109,132 +109,133 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         using var registration = ViewSingleItemRendererHookState.GetSyncRoot().EnterScope();
         try
         {
-            AddProof(disk, 0x9CDE90, 0x14D); // CharaView constructor
-            AddProof(disk, 0x9DAB80, 0x32); // Destructor does not Release
-            AddProof(disk, 0x9CE0F0, 0xDB);
-            AddProof(disk, 0x9CE080, 0x6A);
-            AddProof(disk, 0x9CE1E0, 0x331);
-            AddProof(disk, 0x9CEB40, 0x2BC); // Initial appearance loads all three weapon values
-            AddProof(disk, 0x9CDC30, 0x253);
-            AddProof(disk, 0x9CF580, 0x119);
-            AddProof(disk, 0x8BFF10, 0x1EC); // Same timeline setter used by CharaView; admits offhand-only clones
-            AddProof(disk, 0x614D40, 0x9); // Owned emote predicate
-            AddProof(disk, 0x614D80, 0x15); // Owned emote mode predicate
-            AddProof(disk, 0x6144B0, 0xA2); // Owned emote cancellation before weapon animation
-            AddProof(disk, 0x8BECD0, 0x3D4); // Timeline action dispatch; linked SEPack branch is excluded
-            AddProof(disk, 0x8D0FA0, 0x635); // ModelChara setup, also used by native ornaments with null appearance arguments
-            AddProof(disk, 0x898910, 0x10); // Setup's gameplay branch excludes owned UI object indices
-            AddProof(disk, 0x89E0C0, 0x1BF); // ObjectIndex stores the manager's index plus 0xC8
-            AddProof(disk, 0x906F60, 0x648); // Native model-ready creates the replacement draw through EnableDraw
-            AddProof(disk, 0x9075B0, 0x79); // Disable only this owned clone's initial human root
-            AddProof(disk, 0x899270, 0x37);
-            AddProof(disk, 0x8992D0, 0x7B);
-            AddProof(disk, 0x899220, 0x3B);
-            AddProof(disk, 0x8D3C00, 0x2D8); // Native standalone Human/DemiHuman/Monster model allocation
-            AddProof(disk, 0x8D4850, 0xC); // Effective model row; secondary override is excluded
-            AddProof(disk, 0x8D4870, 0xB); // Effective skeleton; secondary override is excluded
-            AddProof(disk, 0x9077B0, 0x13); // BattleChara attaches only its own newly created draw
-            AddProof(disk, 0x907BB0, 0x6A); // ModelChara setup's native scale/height virtual
-            AddProof(disk, 0x8D4CB0, 0xBA);
-            AddProof(disk, 0x8D4EB0, 0x62);
-            AddProof(disk, 0x8C9D80, 0x143); // Effects height uses the confirmed clone owner
-            AddProof(disk, 0x8DC1E0, 0xB); // Effects height predicate reads the clone's mode only
-            AddProof(disk, 0x9CF730, 0xB9); // Native model-ready binding after ordinary State3 progression
-            AddProof(disk, 0x9CE520, 0x179); // Base ResetPositions uses camera and GameObject transforms only
-            AddProof(disk, 0x9DC330, 0x3); // Base model-ready callback has no Human-specific work
-            AddProof(disk, 0x9DBF80, 0x3); // Base completed-model callback has no Human-specific work
-            AddProof(disk, 0x9DD010, 0x3); // Base per-frame callback has no Human-specific work
-            AddProof(disk, 0x9CF6A0, 0xF);
-            AddProof(disk, 0x1759110, 0x4B);
+            AddProof(disk, 0x9CDB70, 0x14D); // CharaView constructor
+            AddProof(disk, 0x9DA860, 0x2B); // Destructor does not Release
+            AddProof(disk, 0x9CDDD0, 0xDB);
+            AddProof(disk, 0x9CDD60, 0x6A);
+            AddProof(disk, 0x9CDEC0, 0x331);
+            AddProof(disk, 0x9CE820, 0x2BC); // Initial appearance loads all three weapon values
+            AddProof(disk, 0x9CD910, 0x253);
+            AddProof(disk, 0x9CF260, 0x119);
+            AddProof(disk, 0x8BFBC0, 0x1EC); // Same timeline setter used by CharaView; admits offhand-only clones
+            AddProof(disk, 0x614E30, 0x9); // Owned emote predicate
+            AddProof(disk, 0x614E70, 0x15); // Owned emote mode predicate
+            AddProof(disk, 0x6145A0, 0xA2); // Owned emote cancellation before weapon animation
+            AddProof(disk, 0x8BE980, 0x3D4); // Timeline action dispatch; linked SEPack branch is excluded
+            AddProof(disk, 0x8D0C50, 0x635); // ModelChara setup, also used by native ornaments with null appearance arguments
+            AddProof(disk, 0x8D1288, 0x20); // ModelChara setup switch table
+            AddProof(disk, 0x898750, 0x10); // Setup's gameplay branch excludes owned UI object indices
+            AddProof(disk, 0x89DF00, 0x1BF); // ObjectIndex stores the manager's index plus 0xC8
+            AddProof(disk, 0x906920, 0x648); // Native model-ready creates the replacement draw through EnableDraw
+            AddProof(disk, 0x906F70, 0x79); // Disable only this owned clone's initial human root
+            AddProof(disk, 0x8990B0, 0x37);
+            AddProof(disk, 0x899110, 0x7B);
+            AddProof(disk, 0x899060, 0x3B);
+            AddProof(disk, 0x8D38B0, 0x2D8); // Native standalone Human/DemiHuman/Monster model allocation
+            AddProof(disk, 0x8D4500, 0xC); // Effective model row; secondary override is excluded
+            AddProof(disk, 0x8D4520, 0xB); // Effective skeleton; secondary override is excluded
+            AddProof(disk, 0x907170, 0x13); // BattleChara attaches only its own newly created draw
+            AddProof(disk, 0x907570, 0x6A); // ModelChara setup's native scale/height virtual
+            AddProof(disk, 0x8D4960, 0xBA);
+            AddProof(disk, 0x8D4B60, 0x62);
+            AddProof(disk, 0x8C9A30, 0x143); // Effects height uses the confirmed clone owner
+            AddProof(disk, 0x8DBEC0, 0xB); // Effects height predicate reads the clone's mode only
+            AddProof(disk, 0x9CF410, 0xB9); // Native model-ready binding after ordinary State3 progression
+            AddProof(disk, 0x9CE200, 0x179); // Base ResetPositions uses camera and GameObject transforms only
+            AddProof(disk, 0x9DC010, 0x3); // Base model-ready callback has no Human-specific work
+            AddProof(disk, 0x9DBC60, 0x3); // Base completed-model callback has no Human-specific work
+            AddProof(disk, 0x9DCCF0, 0x3); // Base per-frame callback has no Human-specific work
+            AddProof(disk, 0x9CF380, 0xF);
+            AddProof(disk, 0x1759090, 0x4D);
             AddProof(disk, 0x90D40, 0x20); // UI memory space
             AddProof(disk, 0x8F270, 0x69); // Matching native Free
-            AddProof(disk, 0x41FDC1, 0x4E); // Manual aspect survives camera update
-            AddProof(disk, 0x41FB90, 0x27F); // LookAt camera path uses our rotated up vector
-            AddProof(disk, 0x339130, 0x1F0); // LookAt basis, including camera roll
-            AddProof(disk, 0x3382E0, 0x9E); // Camera up-vector quaternion transform
-            AddProof(disk, 0x343A90, 0x132);
-            AddProof(disk, 0x343BD0, 0x130); // Quaternion multiplication helpers
-            AddProof(disk, 0x446BB0, 0x3AB); // Body visibility, retaining intrinsic IMC attributes
-            AddProof(disk, 0x446F70, 0x14C); // Hands
-            AddProof(disk, 0x4470D0, 0x2EB); // Legs
-            AddProof(disk, 0x4473D0, 0x1DD); // Feet
-            AddProof(disk, 0x4475C0, 0x160); // Earrings
-            AddProof(disk, 0x447730, 0xCC); // Necklace
-            AddProof(disk, 0x447810, 0xA3); // Bracelet
-            AddProof(disk, 0x4478C0, 0x7E); // Right ring
-            AddProof(disk, 0x447950, 0x7E); // Left ring
-            AddProof(disk, 0x4479E0, 0x4B3); // Hair with native race/customize rules
-            AddProof(disk, 0x447E94, 0x18); // Hair visibility jump table
-            AddProof(disk, 0x448FD0, 0x4F); // Race classifier used by accessories and hair
-            AddProof(disk, 0x449020, 0x1C); // Classifier jump table
-            AddProof(disk, 0x274670, 0x43); // Read-only named attribute lookup
-            AddProof(disk, 0x274730, 0x43); // Read-only named shape lookup
-            AddProof(disk, 0x2E6E20, 0x98); // Lookup's resource string-map search
-            AddProof(disk, 0x22D6EF8, 8); // Native neutral equipment parameter default
-            AddProof(disk, 0x260FA0, 0x108); // Orthographic width = height * aspect
-            AddProof(disk, 0x2690E0, 0x1E); // Owned renderer-context constructor
-            AddProof(disk, 0x269270, 0x80); // Renderer-context slot-count release
-            AddProof(disk, 0x3346F0, 0x37); // Context reference release dispatch
-            AddProof(disk, 0x269110, 0x7); // Context cleanup dispatch
-            AddProof(disk, 0x2EE180, 0x4D); // Renderer-context destructor
-            AddProof(disk, 0x41E9B0, 0x33); // Scene camera releases its own RenderCamera
-            AddProof(disk, 0x8D7420, 0x31C); // Character-only native pause, with reason 0x10
+            AddProof(disk, 0x41FDF1, 0x4E); // Manual aspect survives camera update
+            AddProof(disk, 0x41FBC0, 0x27F); // LookAt camera path uses our rotated up vector
+            AddProof(disk, 0x3390F0, 0x1F0); // LookAt basis, including camera roll
+            AddProof(disk, 0x3382A0, 0x9E); // Camera up-vector quaternion transform
+            AddProof(disk, 0x343A50, 0x132);
+            AddProof(disk, 0x343B90, 0x130); // Quaternion multiplication helpers
+            AddProof(disk, 0x446C50, 0x3AB); // Body visibility, retaining intrinsic IMC attributes
+            AddProof(disk, 0x447010, 0x14C); // Hands
+            AddProof(disk, 0x447170, 0x2EB); // Legs
+            AddProof(disk, 0x447470, 0x1DD); // Feet
+            AddProof(disk, 0x447660, 0x160); // Earrings
+            AddProof(disk, 0x4477D0, 0xCC); // Necklace
+            AddProof(disk, 0x4478B0, 0xA3); // Bracelet
+            AddProof(disk, 0x447960, 0x7E); // Right ring
+            AddProof(disk, 0x4479F0, 0x7E); // Left ring
+            AddProof(disk, 0x447A80, 0x4B3); // Hair with native race/customize rules
+            AddProof(disk, 0x447F34, 0x18); // Hair visibility jump table
+            AddProof(disk, 0x449070, 0x4F); // Race classifier used by accessories and hair
+            AddProof(disk, 0x4490C0, 0x1C); // Classifier jump table
+            AddProof(disk, 0x2747A0, 0x43); // Read-only named attribute lookup
+            AddProof(disk, 0x274860, 0x43); // Read-only named shape lookup
+            AddProof(disk, 0x2E6D30, 0x98); // Lookup's resource string-map search
+            AddProof(disk, 0x22D75B8, 8); // Native neutral equipment parameter default
+            AddProof(disk, 0x2610E0, 0x1C2); // Orthographic width = height * aspect
+            AddProof(disk, 0x269220, 0x1E); // Owned renderer-context constructor
+            AddProof(disk, 0x2693B0, 0x80); // Renderer-context slot-count release
+            AddProof(disk, 0x3346B0, 0x37); // Context reference release dispatch
+            AddProof(disk, 0x269250, 0x7); // Context cleanup dispatch
+            AddProof(disk, 0x2EE090, 0x4D); // Renderer-context destructor
+            AddProof(disk, 0x41E9E0, 0x33); // Scene camera releases its own RenderCamera
+            AddProof(disk, 0x8D70D0, 0x31C); // Character-only native pause, with reason 0x10
             AddAnimationSamplingProofs(disk);
-            AddResumeProof(disk, 0x8D7750, 0x345); // Remove only our native pause reason before clone deletion
-            AddResumeProof(disk, 0x4703A0, 0xC); // Resume the clone's external per-index physics
-            AddResumeProof(disk, 0x6071C0, 0x17);
-            AddProof(disk, 0x90A2A0, 0xF); // UI clone setup admits that native pause reason
-            AddProof(disk, 0x607630, 0x32); // Pause owned scheduler slots
-            AddProof(disk, 0x607670, 0x32); // Alternate UI scheduler slots
-            AddProof(disk, 0x18CAF40, 0x60);
-            AddProof(disk, 0x18CAFB0, 0xC8); // Pause the clone's weapon attachments
-            AddProof(disk, 0x6071E0, 0x14);
-            AddProof(disk, 0x1991F80, 0x84);
-            AddResumeProof(disk, 0x8DC120, 0x8); // Clone draw-object virtual getter
-            AddProof(disk, 0x907AD0, 0x81); // Clone loaded-model virtual predicate
-            AddProof(disk, 0x8DC6E0, 0x3); // Clone native pause notification
-            AddResumeProof(disk, 0x8DC690, 0x3); // Clone native resume notification
-            AddVtableProof(disk, 0x21A0788, 0x68); // The base virtual table, including Release/Dtor
-            AddVtableProof(disk, 0x21A4370, 0x2C0); // ClientObjectManager's owned BattleChara
+            AddResumeProof(disk, 0x8D7400, 0x345); // Remove only our native pause reason before clone deletion
+            AddResumeProof(disk, 0x470540, 0xC); // Resume the clone's external per-index physics
+            AddResumeProof(disk, 0x6072B0, 0x17);
+            AddProof(disk, 0x909C60, 0xF); // UI clone setup admits that native pause reason
+            AddProof(disk, 0x607720, 0x32); // Pause owned scheduler slots
+            AddProof(disk, 0x607760, 0x32); // Alternate UI scheduler slots
+            AddProof(disk, 0x18CAF70, 0x60);
+            AddProof(disk, 0x18CAFE0, 0xC8); // Pause the clone's weapon attachments
+            AddProof(disk, 0x6072D0, 0x14);
+            AddProof(disk, 0x19920C0, 0x84);
+            AddResumeProof(disk, 0x8DBE00, 0x8); // Clone draw-object virtual getter
+            AddProof(disk, 0x907490, 0x81); // Clone loaded-model virtual predicate
+            AddProof(disk, 0x8DC0A0, 0x3); // Clone native pause notification
+            AddResumeProof(disk, 0x8DC050, 0x3); // Clone native resume notification
+            AddVtableProof(disk, 0x21A0D38, 0x68); // The base virtual table, including Release/Dtor
+            AddVtableProof(disk, 0x21A4A98, 0x2C0); // ClientObjectManager's owned BattleChara
             resumeProofs.Add(proofs[^1]); // Cleanup also verifies every used virtual seam
-            AddVtableProof(disk, 0x216BB68, 0x48); // Scene.Camera virtual UpdateRender
-            AddVtableProof(disk, 0x214C3A8, 0x30); // Context reference/cleanup/destructor dispatch
+            AddVtableProof(disk, 0x216C3D0, 0x48); // Scene.Camera virtual UpdateRender
+            AddVtableProof(disk, 0x214CDE8, 0x30); // Context reference/cleanup/destructor dispatch
             // These name-pointer tables need the same ASLR normalization as
             // virtual tables. Native selected-slot calculations read them only.
-            AddVtableProof(disk, 0x28A4B40, 0x50); // Body IMC attribute names
-            AddVtableProof(disk, 0x28A4B90, 0x50); // Hands
-            AddVtableProof(disk, 0x28A4BE0, 0x50); // Legs
-            AddVtableProof(disk, 0x28A4C30, 0x50); // Feet
-            initializeHook = AddHook<InitializeDelegate>(disk, 0x9CDFE0, 0x87, InitializeDetour, 10);
-            createHook = AddHook<CreateDelegate>(disk, 0x17589C0, 0x430, CreateDetour);
-            deleteHook = AddHook<DeleteDelegate>(disk, 0x1758DF0, 0x16B, DeleteDetour);
-            contextHook = AddHook<ContextInitializeDelegate>(disk, 0x2691E0, 0x7D, ContextDetour, 10);
-            simpleContextHook = AddHook<ContextInitializeSimpleDelegate>(disk, 0x269120, 0xBA, SimpleContextDetour, 10);
-            cameraHook = AddHook<CameraAssignmentDelegate>(disk, 0x26AA90, 0x62, CameraAssignmentDetour, 10);
-            RequirePointer((nint)CharaView.MemberFunctionPointers.Ctor, 0x9CDE90);
-            RequirePointer((nint)CharaView.MemberFunctionPointers.SetModelData, 0x9CE080);
-            RequirePointer((nint)CharaView.MemberFunctionPointers.Render, 0x9CE1E0);
-            RequirePointer((nint)CharaView.MemberFunctionPointers.GetCharacter, 0x9CF6A0);
-            RequirePointer((nint)CharaView.MemberFunctionPointers.ToggleDrawWeapon, 0x9CF580);
-            RequirePointer((nint)CharaViewModelData.MemberFunctionPointers.CopyFromCharacter, 0x9CDC30);
-            RequirePointer((nint)ClientObjectManager.MemberFunctionPointers.GetObjectByIndex, 0x1759110);
+            AddVtableProof(disk, 0x28A7B40, 0x50); // Body IMC attribute names
+            AddVtableProof(disk, 0x28A7B90, 0x50); // Hands
+            AddVtableProof(disk, 0x28A7BE0, 0x50); // Legs
+            AddVtableProof(disk, 0x28A7C30, 0x50); // Feet
+            initializeHook = AddHook<InitializeDelegate>(disk, 0x9CDCC0, 0x87, InitializeDetour, 10);
+            createHook = AddHook<CreateDelegate>(disk, 0x1758940, 0x430, CreateDetour);
+            deleteHook = AddHook<DeleteDelegate>(disk, 0x1758D70, 0x14C, DeleteDetour);
+            contextHook = AddHook<ContextInitializeDelegate>(disk, 0x269320, 0x7D, ContextDetour, 10);
+            simpleContextHook = AddHook<ContextInitializeSimpleDelegate>(disk, 0x269260, 0xBA, SimpleContextDetour, 10);
+            cameraHook = AddHook<CameraAssignmentDelegate>(disk, 0x26ABC0, 0x62, CameraAssignmentDetour, 10);
+            RequirePointer((nint)CharaView.MemberFunctionPointers.Ctor, 0x9CDB70);
+            RequirePointer((nint)CharaView.MemberFunctionPointers.SetModelData, 0x9CDD60);
+            RequirePointer((nint)CharaView.MemberFunctionPointers.Render, 0x9CDEC0);
+            RequirePointer((nint)CharaView.MemberFunctionPointers.GetCharacter, 0x9CF380);
+            RequirePointer((nint)CharaView.MemberFunctionPointers.ToggleDrawWeapon, 0x9CF260);
+            RequirePointer((nint)CharaViewModelData.MemberFunctionPointers.CopyFromCharacter, 0x9CD910);
+            RequirePointer((nint)ClientObjectManager.MemberFunctionPointers.GetObjectByIndex, 0x1759090);
             RequirePointer((nint)IMemorySpace.MemberFunctionPointers.GetUISpace, 0x90D40);
             RequirePointer((nint)IMemorySpace.MemberFunctionPointers.Free, 0x8F270);
-            pauseCharacter = Marshal.GetDelegateForFunctionPointer<PauseCharacterDelegate>(moduleBase + 0x8D7420);
-            resumeCharacter = Marshal.GetDelegateForFunctionPointer<PauseCharacterDelegate>(moduleBase + 0x8D7750);
-            drawWeapon = Marshal.GetDelegateForFunctionPointer<DrawWeaponDelegate>(moduleBase + 0x8BFF10);
-            setupModel = Marshal.GetDelegateForFunctionPointer<SetupModelDelegate>(moduleBase + 0x8D0FA0);
-            disableDraw = Marshal.GetDelegateForFunctionPointer<CloneDrawDelegate>(moduleBase + 0x9075B0);
-            bodyVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x446BB0);
-            handsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x446F70);
-            legsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x4470D0);
-            feetVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x4473D0);
-            earringsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x4475C0);
-            necklaceVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447730);
-            braceletVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447810);
-            rightRingVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x4478C0);
-            leftRingVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447950);
-            hairVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x4479E0);
+            pauseCharacter = Marshal.GetDelegateForFunctionPointer<PauseCharacterDelegate>(moduleBase + 0x8D70D0);
+            resumeCharacter = Marshal.GetDelegateForFunctionPointer<PauseCharacterDelegate>(moduleBase + 0x8D7400);
+            drawWeapon = Marshal.GetDelegateForFunctionPointer<DrawWeaponDelegate>(moduleBase + 0x8BFBC0);
+            setupModel = Marshal.GetDelegateForFunctionPointer<SetupModelDelegate>(moduleBase + 0x8D0C50);
+            disableDraw = Marshal.GetDelegateForFunctionPointer<CloneDrawDelegate>(moduleBase + 0x906F70);
+            bodyVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x446C50);
+            handsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447010);
+            legsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447170);
+            feetVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447470);
+            earringsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447660);
+            necklaceVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x4477D0);
+            braceletVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x4478B0);
+            rightRingVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447960);
+            leftRingVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x4479F0);
+            hairVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447A80);
             // Assign every delegate's hook field before enabling any detour.
             foreach (var target in hookProofs)
             {
@@ -378,7 +379,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         // TitleEdit's reviewed same-entry Create hook forwards gameplay calls.
         // Reloaded chains it through our Original; every other owner stays rejected.
         byte[]? saved;
-        try { saved = ViewSingleItemRendererHookState.ReadSavedEntry(moduleBase + rva, length, rva == 0x17589C0); }
+        try { saved = ViewSingleItemRendererHookState.ReadSavedEntry(moduleBase + rva, length, rva == 0x1758940); }
         catch (InvalidOperationException error)
         { throw new InvalidOperationException($"Standalone preview hook at RVA 0x{rva:X} is unavailable. " + error.Message, error); }
         var loaded = NearbyZoneNativeBinding.Read(moduleBase + rva, length);
@@ -630,7 +631,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
                 adopted = true;
                 view->Ctor();
                 constructed = true;
-                if (Marshal.ReadIntPtr((nint)view) != moduleBase + 0x21A0788)
+                if (Marshal.ReadIntPtr((nint)view) != moduleBase + 0x21A0D38)
                     throw new InvalidOperationException("The standalone preview virtual table changed.");
                 // Native Initialize deletes an existing slot. Recheck while holding our
                 // lease lock and before the call; foreign requests use the preemption hooks.
@@ -734,11 +735,11 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         // A changed sequence is rejected instead of writing native view state.
         if (view->State != 3 || view->CharacterDataCopied || view->CharacterLoaded)
             throw new InvalidOperationException($"The standalone {StandaloneModelName} initialization sequence changed (state={view->State}, appearancePending={view->CharacterDataCopied}, modelPending={view->CharacterLoaded}).");
-        if (Marshal.ReadIntPtr((nint)view) != moduleBase + 0x21A0788 || view->CameraManager == 0
+        if (Marshal.ReadIntPtr((nint)view) != moduleBase + 0x21A0D38 || view->CameraManager == 0
             || view->Camera == null || Marshal.ReadIntPtr(SceneSlot(slot)) != (nint)view->Camera || ContextCount(slot) != 1)
             throw new InvalidOperationException("The standalone " + StandaloneModelName + " render context could not be confirmed.");
         NearbyZoneNativeBinding.RequireReadable((nint)view->CameraManager, 0x20);
-        if (Marshal.ReadIntPtr((nint)view->CameraManager) != moduleBase + 0x214C3A8)
+        if (Marshal.ReadIntPtr((nint)view->CameraManager) != moduleBase + 0x214CDE8)
             throw new InvalidOperationException("The standalone " + StandaloneModelName + " render context ownership changed.");
         RequireFashionValue("StillOwner", ConfirmStillOwner() ? 1 : 0, 1);
         RequireFashionValue("AnimationPaused", animationPaused ? 1 : 0, 0);
@@ -872,7 +873,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         NearbyZoneNativeBinding.RequireReadable(character, sizeof(NativeCharacter));
         // The pause routine can recurse through these links. This value-only UI
         // clone must have none; never freeze an inspected or gameplay character.
-        if (Marshal.ReadIntPtr(character) != moduleBase + 0x21A4370
+        if (Marshal.ReadIntPtr(character) != moduleBase + 0x21A4A98
             || (Marshal.ReadByte(character + 0x190) & 4) == 0
             || Marshal.ReadIntPtr(character + 0x1B88) != character
             || Marshal.ReadIntPtr(character + 0x1990) != character
@@ -1399,7 +1400,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             preempted = false;
             return;
         }
-        if (Marshal.ReadIntPtr((nint)retired) != moduleBase + 0x21A0788)
+        if (Marshal.ReadIntPtr((nint)retired) != moduleBase + 0x21A0D38)
         {
             // Keep the allocation alive rather than free native resources through an
             // unproved virtual table. No further optional scene can be admitted.
@@ -1410,13 +1411,13 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         if (retired->CameraManager != 0)
         {
             NearbyZoneNativeBinding.RequireReadable((nint)retired->CameraManager, 0x20);
-            if (Marshal.ReadIntPtr((nint)retired->CameraManager) != moduleBase + 0x214C3A8)
+            if (Marshal.ReadIntPtr((nint)retired->CameraManager) != moduleBase + 0x214CDE8)
             { cleanupBlocked = true; throw new InvalidOperationException("The standalone preview context ownership changed."); }
         }
         if (retired->Camera != null)
         {
             NearbyZoneNativeBinding.RequireReadable((nint)retired->Camera, sizeof(SceneCamera));
-            if (Marshal.ReadIntPtr((nint)retired->Camera) != moduleBase + 0x216BB68)
+            if (Marshal.ReadIntPtr((nint)retired->Camera) != moduleBase + 0x216C3D0)
             { cleanupBlocked = true; throw new InvalidOperationException("The standalone preview camera ownership changed."); }
         }
         var manager = Objects();

@@ -16,6 +16,7 @@ internal sealed record FurnitureRestoreFrame(FurnitureRestoreSession Session, Fu
 
 internal interface IFurnitureRestoreAdapter : IDisposable
 {
+    string WaitReason { get; }
     FurnitureRestoreSession Acquire(FurnitureRestoreMode mode, long generation);
     // At most one owned normal storage-loading cycle; never during an outstanding move.
     FurnitureRestorePlan? LoadPlan(FurnitureRestoreSession session, FurnitureRestoreMode mode);
@@ -73,7 +74,13 @@ internal sealed class FurnitureRestoreSequence
             if (Phase == FurnitureRestorePhase.LoadSnapshot)
             {
                 var plan = adapter.LoadPlan(session, mode);
-                if (Terminal || plan == null) return;
+                if (Terminal) return;
+                if (plan == null)
+                {
+                    Status = string.IsNullOrEmpty(adapter.WaitReason)
+                        ? "Waiting for complete furniture and destination pages." : adapter.WaitReason;
+                    return;
+                }
                 items = plan.Items.ToArray(); expectedSource = plan.Source; expectedDestination = plan.Destination;
                 var slots = new HashSet<(uint, ushort)>();
                 foreach (var item in items)
@@ -96,7 +103,11 @@ internal sealed class FurnitureRestoreSequence
             if (frame.FrameworkSequence == lastFrameSequence) return;
             lastFrameSequence = frame.FrameworkSequence;
             if (!frame.Complete || frame.Source == null || frame.Destination == null)
-            { reconciliation?.Gap(frame.FrameworkSequence); Status = "Waiting for a complete source/destination snapshot."; return; }
+            {
+                reconciliation?.Gap(frame.FrameworkSequence);
+                Status = string.IsNullOrEmpty(frame.Detail) ? "Waiting for a complete source/destination snapshot." : frame.Detail;
+                return;
+            }
             var unchanged = frame.Source.SameSlots(expectedSource!) && frame.Destination.AddsExactly(expectedDestination!, null, 0);
             if (Phase == FurnitureRestorePhase.AdmitItem)
             {
@@ -192,7 +203,8 @@ internal sealed class FurnitureRestoreSequence
     internal void Cancel(string reason)
     {
         if (Terminal) return;
-        Plugin.Log.Warning("[AutoRestoreFurniture] Batch stopped: {Reason}", reason);
+        Plugin.Log.Warning("[AutoRestoreFurniture] Batch stopped: {Reason}; mode {Mode}, phase {Phase}, last status {Status}, initial items {InitialItems}, confirmed {Confirmed}, operation {Operation}, submitted current item {Attempted}",
+            reason, mode, Phase, Status, items.Length, confirmed, operation, attempted);
         if (attempted) Record(FurnitureRestoreOutcome.Unconfirmed, reason + " A native request/decision may still be outstanding; no retry or compensation was sent.");
         Finish(reason);
     }

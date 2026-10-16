@@ -17,6 +17,7 @@ internal sealed unsafe class FurnitureRestoreWorld
 {
     private readonly FurnitureRestoreNativeBinding binding;
     private readonly FurnitureRestoreContext context;
+    internal string SnapshotWaitReason { get; private set; } = string.Empty;
     internal FurnitureRestoreWorld(FurnitureRestoreNativeBinding binding, FurnitureRestoreContext context)
     { this.binding = binding; this.context = context; }
 
@@ -73,6 +74,15 @@ internal sealed unsafe class FurnitureRestoreWorld
         Require(session);
         var pages = FurnitureRestoreCapacity.Pages(session.Exterior, stored, session.NativeSize);
         var snapshot = CopyPages(pages, session.Exterior ? 40 : 50);
+        if (snapshot != null && session.Exterior && !stored && session.NativeSize == 0)
+        {
+            // Small estates do not require this overflow page to load. If it is
+            // loaded, reject unexpected contents even when the stored list is shown.
+            var overflow = CopyPages([25200], 40);
+            if (overflow != null && overflow.Occupied.Length != 0)
+                throw new InvalidOperationException("The small estate has unexpected placed furniture on overflow page 25200; refresh the native placed list before retrying.");
+            SnapshotWaitReason = string.Empty;
+        }
         Require(session);
         return snapshot;
     }
@@ -85,8 +95,9 @@ internal sealed unsafe class FurnitureRestoreWorld
         return snapshot;
     }
 
-    private static FurniturePageSnapshot? CopyPages(uint[] pages, int expectedSize)
+    private FurniturePageSnapshot? CopyPages(uint[] pages, int expectedSize)
     {
+        SnapshotWaitReason = string.Empty;
         var manager = InventoryManager.Instance();
         if (manager == null) throw new InvalidOperationException("Inventory manager is unavailable.");
         var occupied = new List<FurnitureRestoreSource>();
@@ -99,7 +110,11 @@ internal sealed unsafe class FurnitureRestoreWorld
             if ((uint)container->Type != page || container->Size != expectedSize || container->Items == null)
                 throw new InvalidOperationException("Required furniture/inventory page layout changed: " + page);
             nominal = checked(nominal + expectedSize);
-            if (!container->IsLoaded) { incomplete = true; continue; }
+            if (!container->IsLoaded)
+            {
+                if (!incomplete) SnapshotWaitReason = "Inventory page " + page + " is not loaded.";
+                incomplete = true; continue;
+            }
             var items = container->Items;
             NearbyZoneNativeBinding.RequireReadable((nint)items, checked(expectedSize * sizeof(InventoryItem)));
             for (var index = 0; index < expectedSize; index++)
@@ -152,6 +167,7 @@ internal sealed unsafe class FurnitureRestoreWorld
 
     internal int? NativeListCount(FurnitureRestoreSession session, FurniturePageSnapshot shown)
     {
+        SnapshotWaitReason = string.Empty;
         Require(session);
         var begin = FurnitureRestoreNativeBinding.ReadPointer(session.Agent + 0xA6E8);
         var end = FurnitureRestoreNativeBinding.ReadPointer(session.Agent + 0xA6F0);
@@ -163,7 +179,11 @@ internal sealed unsafe class FurnitureRestoreWorld
         var count = checked((int)(bytes / 0x88));
         // The verified collector excludes only IsEmpty slots; extra visual rows
         // outside this vector (number-array index475) must not affect occupancy.
-        if (count != shown.Occupied.Length) return null;
+        if (count != shown.Occupied.Length)
+        {
+            SnapshotWaitReason = "The displayed housing list has " + count + " entries; the complete pages contain " + shown.Occupied.Length + " items.";
+            return null;
+        }
         Require(session); return count;
     }
 

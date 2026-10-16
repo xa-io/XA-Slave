@@ -23,6 +23,14 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.53 - 2026-10-16",
+            Lines =
+            [
+                "- Updated Dalamud 15.0.3.7 Compatibility: Updated support for XA Nearby, Auto Sort Items, Better Inventory Mover, Auto Restore Furniture, Inspect Outfit Try-on and View Single Item.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.52 - 2026-10-13",
             Lines =
             [

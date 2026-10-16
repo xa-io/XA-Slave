@@ -15,16 +15,16 @@ namespace XASlave.Services;
 /// <summary>Exact supported executable/layout binding. Diagnostic RVAs are never accepted for another build.</summary>
 internal sealed unsafe class NearbyZoneNativeBinding
 {
-    internal const string SupportedSha256 = "5BBC501DD5C7F22FD61A11D08C25356041D878DB7CD83203ADAE393E4DFACC44";
+    internal const string SupportedSha256 = "B38840761E2677128B6BEC1CEAEE3F2870CD84E1D38AB7958216373058383780";
     internal readonly nint ModuleBase;
     internal readonly int ImageSize;
     private readonly Dictionary<int, byte[]> proofs = new();
     private readonly List<(int Start, int End)> executable = new();
     private readonly UTF8Encoding strictUtf8 = new(false, true);
-    internal nint SearchEnd => ModuleBase + 0x96EB00;
-    internal nint SearchRequest => ModuleBase + 0x96EB70;
-    internal nint ContentEnd => ModuleBase + 0x985190;
-    internal nint ContentStart => ModuleBase + 0x985230;
+    internal nint SearchEnd => ModuleBase + 0x96E4C0;
+    internal nint SearchRequest => ModuleBase + 0x96E530;
+    internal nint ContentEnd => ModuleBase + 0x984BA0;
+    internal nint ContentStart => ModuleBase + 0x984C40;
 
     internal NearbyZoneNativeBinding()
     {
@@ -39,11 +39,11 @@ internal sealed unsafe class NearbyZoneNativeBinding
         foreach (var section in pe.PEHeaders.SectionHeaders)
             if ((section.SectionCharacteristics & SectionCharacteristics.MemExecute) != 0)
                 executable.Add((section.VirtualAddress, checked(section.VirtualAddress + section.VirtualSize)));
-        // Exact extents verified against the supported PE exception table, or the bounded leaf body.
-        AddProof(pe, 0x96EB00, 0x65); AddProof(pe, 0x96EB70, 0x144);
-        AddProof(pe, 0x985190, 0x8B); AddProof(pe, 0x985230, 0x17);
-        AddProof(pe, 0x58F230, 0x8B);
-        AddProof(pe, 0x958600, 11); AddProof(pe, 0x494160, 8);
+        // Exact extents verified against the supported PE exception table (including chained fragments), or the bounded leaf body.
+        AddProof(pe, 0x96E4C0, 0x65); AddProof(pe, 0x96E530, 0x144);
+        AddProof(pe, 0x984BA0, 0x8B); AddProof(pe, 0x984C40, 0x17);
+        AddProof(pe, 0x58F3D0, 0x2F8);
+        AddProof(pe, 0x957FC0, 11); AddProof(pe, 0x494300, 8);
         if (sizeof(InfoProxySearch) != 400 || sizeof(InfoProxyCommonList) != 208 || sizeof(InfoProxyCommonList.CharacterData) != 112
             || Marshal.OffsetOf<InfoProxyCommonList>(nameof(InfoProxyCommonList.DataSize)).ToInt32() != 0xA2
             || Marshal.OffsetOf<InfoProxyCommonList>(nameof(InfoProxyCommonList.CharData)).ToInt32() != 0xB0
@@ -78,8 +78,8 @@ internal sealed unsafe class NearbyZoneNativeBinding
     internal InfoProxyCommonList* CurrentProxy(NearbyZoneMode mode)
     {
         RequireFramework();
-        if ((nint)InfoModule.MemberFunctionPointers.GetInfoProxyById != ModuleBase + 0x958600) throw new InvalidOperationException("Typed proxy lookup changed.");
-        ValidateUnownedTarget(ModuleBase + 0x958600);
+        if ((nint)InfoModule.MemberFunctionPointers.GetInfoProxyById != ModuleBase + 0x957FC0) throw new InvalidOperationException("Typed proxy lookup changed.");
+        ValidateUnownedTarget(ModuleBase + 0x957FC0);
         var pointer = mode == NearbyZoneMode.Search ? (InfoProxyCommonList*)InfoProxySearch.Instance() : (InfoProxyCommonList*)InfoProxyContentMember.Instance();
         ValidateProxy(pointer, mode);
         return pointer;
@@ -88,12 +88,12 @@ internal sealed unsafe class NearbyZoneNativeBinding
     internal void ValidateProxy(InfoProxyCommonList* pointer, NearbyZoneMode mode)
     {
         RequireReadable((nint)pointer, mode == NearbyZoneMode.Search ? 400 : 208);
-        var expected = ModuleBase + (mode == NearbyZoneMode.Search ? 0x219DF58 : 0x219E958);
+        var expected = ModuleBase + (mode == NearbyZoneMode.Search ? 0x219E508 : 0x219EF08);
         if (Marshal.ReadIntPtr((nint)pointer) != expected) throw new InvalidOperationException("Zone proxy has an unexpected vtable.");
         RequireReadable(expected, 88);
         var request = Marshal.ReadIntPtr(expected, 24);
         var end = Marshal.ReadIntPtr(expected, 80);
-        if (request != (mode == NearbyZoneMode.Search ? SearchRequest : ModuleBase + 0x99F130)
+        if (request != (mode == NearbyZoneMode.Search ? SearchRequest : ModuleBase + 0x99EE10)
             || end != (mode == NearbyZoneMode.Search ? SearchEnd : ContentEnd)) throw new InvalidOperationException("Zone proxy virtual methods changed.");
         if (pointer->DataSize != 200 || pointer->EntryCount > 200 || pointer->CharData == null)
             throw new InvalidOperationException($"{mode} cache validation failed: capacity={pointer->DataSize} (expected 200), count={pointer->EntryCount} (maximum 200), buffer={(pointer->CharData == null ? "missing" : "present")}.");
@@ -103,8 +103,8 @@ internal sealed unsafe class NearbyZoneNativeBinding
     internal AgentInterface* Agent(NearbyZoneMode mode)
     {
         RequireFramework();
-        if ((nint)AgentModule.MemberFunctionPointers.GetAgentByInternalId != ModuleBase + 0x494160) throw new InvalidOperationException("Typed agent lookup changed.");
-        ValidateUnownedTarget(ModuleBase + 0x494160);
+        if ((nint)AgentModule.MemberFunctionPointers.GetAgentByInternalId != ModuleBase + 0x494300) throw new InvalidOperationException("Typed agent lookup changed.");
+        ValidateUnownedTarget(ModuleBase + 0x494300);
         var module = AgentModule.Instance();
         if (module == null) throw new InvalidOperationException("Agent module is unavailable.");
         var agent = module->GetAgentByInternalId((AgentId)(mode == NearbyZoneMode.Search ? 63 : 299));
@@ -114,11 +114,11 @@ internal sealed unsafe class NearbyZoneNativeBinding
         if (mode == NearbyZoneMode.ContentMember)
         {
             var receiveEvent = Marshal.ReadIntPtr(table);
-            if (table != ModuleBase + 0x2175448 || receiveEvent != ModuleBase + 0x58F230)
+            if (table != ModuleBase + 0x21755F0 || receiveEvent != ModuleBase + 0x58F3D0)
                 throw new InvalidOperationException(
-                    $"Content-member event binding changed: agent=299, vtable offset=0x{(long)(table - ModuleBase):X} (expected 0x2175448), "
-                    + $"event offset=0x{(long)(receiveEvent - ModuleBase):X} (expected 0x58F230). Content refresh was not sent.");
-            ValidateUnownedTarget(ModuleBase + 0x58F230);
+                    $"Content-member event binding changed: agent=299, vtable offset=0x{(long)(table - ModuleBase):X} (expected 0x21755F0), "
+                    + $"event offset=0x{(long)(receiveEvent - ModuleBase):X} (expected 0x58F3D0). Content refresh was not sent.");
+            ValidateUnownedTarget(ModuleBase + 0x58F3D0);
         }
         return agent;
     }
