@@ -22,7 +22,7 @@ internal sealed class AutoSortNativeBinding
     {
         NearbyZoneNativeBinding.RequireFramework();
         if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(ItemOrderModuleSorter).Assembly.Location)))
-            != "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D")
+            is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2"))
             throw new InvalidOperationException("Item sorting requires revalidated client structures.");
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);

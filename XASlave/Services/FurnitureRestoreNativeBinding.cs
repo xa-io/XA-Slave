@@ -107,7 +107,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
     private FurnitureRestoreNativeBinding(string fileName, nint moduleBase, int moduleSize, string sdkPath)
     {
         if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(sdkPath)))
-            != "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D")
+            is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2"))
             throw new InvalidOperationException("Furniture restoration requires revalidated client structures.");
         var bytes = File.ReadAllBytes(fileName);
         if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)

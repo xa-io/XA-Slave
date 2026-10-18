@@ -109,7 +109,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     {
         NearbyZoneNativeBinding.RequireFramework();
         var sdk = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(AgentInspect).Assembly.Location)));
-        if (sdk != "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D")
+        if (sdk is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2"))
             throw new InvalidOperationException("View Item requires revalidated client structures.");
         ValidateLayouts();
         var module = Plugin.SigScanner.Module;

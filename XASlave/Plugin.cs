@@ -214,6 +214,7 @@ public sealed class Plugin : IDalamudPlugin
     public EurekaLogogramCreatorAutomationOverlayWindow EurekaLogogramCreatorAutomationOverlayWindow { get; init; }
 
     // Services
+    internal PluginBuilderService PluginBuilder { get; init; }
     public IpcClient IpcClient { get; init; }
     internal MessageLogService MessageLog { get; init; }
     internal CleanChatService CleanChat { get; init; }
@@ -1257,8 +1258,10 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.Save();
             }
         });
+        PluginBuilder = new PluginBuilderService(this);
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
+        SlaveWindow.InitializePluginBuilder(PluginBuilder);
         XagmanMiniWindow = new XagmanMiniWindow(SlaveWindow.GetXagmanMiniSnapshot);
         WindowSystem.AddWindow(XagmanMiniWindow);
 
@@ -1816,6 +1819,7 @@ public sealed class Plugin : IDalamudPlugin
         TryCleanup("ClientState.Login -= OnLogin", () => ClientState.Login -= OnLogin);
         TryCleanup("ClientState.Logout -= OnLogout", () => ClientState.Logout -= OnLogout);
         TryCleanup($"CommandManager.RemoveHandler({CommandName})", () => CommandManager.RemoveHandler(CommandName));
+        TryDispose("PluginBuilder", PluginBuilder);
         TryDispose("IpcProvider", IpcProvider);
         TryDispose("DalamudLogCleaner", DalamudLogCleaner);
         TryDispose("CleanChat", CleanChat);
@@ -2050,6 +2054,16 @@ public sealed class Plugin : IDalamudPlugin
         var firstSpaceIndex = trimmed.IndexOf(' ');
         var subcommand = firstSpaceIndex >= 0 ? trimmed[..firstSpaceIndex].Trim() : trimmed;
         var subcommandArgs = firstSpaceIndex >= 0 ? trimmed[(firstSpaceIndex + 1)..].Trim() : string.Empty;
+
+        if (subcommand.Equals("win", StringComparison.OrdinalIgnoreCase))
+        {
+            ScheduleOnGameThread(() =>
+            {
+                if (isDisposed) return;
+                PrintCommandResult(SlaveWindow.TryTogglePluginBuilderWindow(subcommandArgs, out var message), message);
+            });
+            return;
+        }
 
         if (subcommand.Equals("xagman", StringComparison.OrdinalIgnoreCase))
         {
@@ -5897,5 +5911,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.53";
+    public const string Version = "0.0.0.54";
 }

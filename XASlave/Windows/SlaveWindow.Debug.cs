@@ -1790,6 +1790,10 @@ public partial class SlaveWindow
         if (imguiScope1827)
         {
 
+#if DEBUG
+        DrawPluginInspector();
+#endif
+
         if (ImGui.CollapsingHeader("PlayerNames##xaAbuse"))
         {
             ImGui.TextDisabled("Testing-build nameplate override + optional floating overlay.");

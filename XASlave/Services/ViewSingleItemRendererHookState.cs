@@ -2,7 +2,6 @@ using System;
 using System.Collections;
 using System.IO;
 using System.Reflection;
-using System.Runtime.Loader;
 using System.Security.Cryptography;
 using System.Threading;
 using Dalamud.Hooking;
@@ -20,8 +19,8 @@ internal static class ViewSingleItemRendererHookState
     private const string SupportedReloadedSha256 = "B8960D0FD8341524DF2197A457F0152A12DC6203613D27872B204FEF9DCDEFAD";
     private const string Dalamud15037Sha256 = "715E5F1454F1A6C274E1585A90FF395E01565B72B8D6EF9D380407856B39232F";
     private const string Reloaded15037Sha256 = "EAEEFDB7D832571723481FA0B822CE1708D90A40D54F1CB0F75A1788DDEC05A7";
-    private const string SupportedTitleEditSha256 = "66B2F37E86678CA9619DE9C7747BE6E72D37C1B75F574A2900434A1E81292690";
-    private const string SupportedTitleEditModule = "26aa1d69-094c-482b-b372-84d84f9955ef";
+    private const string Dalamud15038Sha256 = "AD4C2B94679DDE94DFB4F9390C506D2CF293AD1626B52A8FE9FF5CB642CCF759";
+    private const string Reloaded15038Sha256 = "D9CD3C718302AF9BAC00F7AC846EE732575186FC8456AC111FE679EA0059F6AC";
 
     private static Type Manager => typeof(IDalamudHook).Assembly.GetType("Dalamud.Hooking.Internal.HookManager")
         ?? throw new InvalidOperationException("The preview hook registry is unavailable.");
@@ -42,7 +41,8 @@ internal static class ViewSingleItemRendererHookState
     internal static bool IsSupportedBackendPair(string dalamudSha256, string reloadedSha256)
     {
         return (dalamudSha256 == SupportedDalamudSha256 && reloadedSha256 == SupportedReloadedSha256)
-            || (dalamudSha256 == Dalamud15037Sha256 && reloadedSha256 == Reloaded15037Sha256);
+            || (dalamudSha256 == Dalamud15037Sha256 && reloadedSha256 == Reloaded15037Sha256)
+            || (dalamudSha256 == Dalamud15038Sha256 && reloadedSha256 == Reloaded15038Sha256);
     }
 
     // Caller holds the actual Dalamud Lock through comparison, creation and enable.
@@ -92,7 +92,7 @@ internal static class ViewSingleItemRendererHookState
         if (hook.BackendName != "Reloaded" || backend.Assembly != typeof(IDalamudHook).Assembly
             || !backend.IsGenericType || backend.GetGenericTypeDefinition().FullName != "Dalamud.Hooking.Internal.ReloadedHook`1"
             || backend.GetGenericArguments()[0] != callback.GetType()
-            || assembly.GetName().Name != "TitleEdit" || assembly.ManifestModule.ModuleVersionId.ToString() != SupportedTitleEditModule
+            || assembly.GetName().Name != "TitleEdit"
             || method.Module != assembly.ManifestModule || method.IsStatic
             || target.Assembly != assembly || method.DeclaringType != target
             || target.FullName != "TitleEdit.PluginServices.Lobby.LobbyService" || method.Name != "CreateBattleCharacterDetour"
@@ -101,20 +101,59 @@ internal static class ViewSingleItemRendererHookState
             || parameters[1].ParameterType != typeof(uint) || parameters[2].ParameterType != typeof(byte)
             || (target.GetField("creatingCharSelectGameObjects", InstanceFlags)?.GetValue(callback.Target) is not false))
             return false;
-        var path = assembly.Location;
-        if (string.IsNullOrEmpty(path))
+        return IsForwardingTitleEditCreate(method, target, callback, hook);
+    }
+
+    // Inspect the loaded callback, not a plugin version, file hash or installation path.
+    // Only its non-lobby path is admitted: Original(thisPtr, index, assignCompanion),
+    // then return the result. Unknown code shapes fail closed without executing them.
+    private static bool IsForwardingTitleEditCreate(MethodInfo method, Type target, Delegate callback, IDalamudHook hook)
+    {
+        try
         {
-            // Dalamud loads plugins from streams, leaving Assembly.Location empty.
-            // Use only this assembly's owning, reviewed loader; never search for a DLL.
-            var context = AssemblyLoadContext.GetLoadContext(assembly);
-            var loaderType = typeof(IDalamudHook).Assembly.GetType("Dalamud.Plugin.Internal.Loader.ManagedLoadContext");
-            if (context == null || loaderType == null || context.GetType() != loaderType
-                || (loaderType.GetField("mainAssemblyPath", InstanceFlags)?.GetValue(context) is not string sourcePath))
-                return false;
-            path = sourcePath;
+            var body = method.GetMethodBody();
+            var il = body?.GetILAsByteArray();
+            if (body == null || il == null || body.ExceptionHandlingClauses.Count != 0
+                || body.LocalVariables.Count == 0 || body.LocalVariables[0].LocalType != typeof(uint)
+                || !MatchesTitleEditForwarding(il)) return false;
+            var hookField = target.GetField("createBattleCharacterHook", InstanceFlags);
+            var flagField = target.GetField("creatingCharSelectGameObjects", InstanceFlags);
+            var hookType = typeof(Hook<>).MakeGenericType(callback.GetType());
+            if (hookField == null || flagField == null || hookField.IsStatic || flagField.IsStatic
+                || hookField.DeclaringType != target || flagField.DeclaringType != target
+                || hookField.FieldType != hookType || flagField.FieldType != typeof(bool)
+                || !ReferenceEquals(hookField.GetValue(callback.Target), hook)) return false;
+            var module = method.Module;
+            var original = hookType.GetProperty("Original")?.GetMethod;
+            var invoke = callback.GetType().GetMethod("Invoke");
+            if (original == null || invoke == null) return false;
+            return module.ResolveField(BitConverter.ToInt32(il, 2)) == hookField
+                && module.ResolveField(BitConverter.ToInt32(il, 15)) == flagField
+                && module.ResolveField(BitConverter.ToInt32(il, 33)) == flagField
+                && module.ResolveMethod(BitConverter.ToInt32(il, 7)) == original
+                && module.ResolveMethod(BitConverter.ToInt32(il, 26)) == invoke;
         }
-        if (string.IsNullOrWhiteSpace(path) || !Path.IsPathFullyQualified(path)) return false;
-        return Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path))) == SupportedTitleEditSha256;
+        catch (Exception)
+        {
+            // Missing/unsupported managed metadata cannot establish safe forwarding.
+            return false;
+        }
+    }
+
+    internal static bool MatchesTitleEditForwarding(byte[] il)
+    {
+        // Tokens vary between builds and are resolved to actual members above.
+        // The first branch selects arg3 when the lobby flag is false; the second
+        // flag test skips all lobby-only work and returns exactly Original's result.
+        if (il.Length < 44 || il[0] != 0x02 || il[1] != 0x7B || il[6] != 0x6F
+            || il[11] != 0x03 || il[12] != 0x04 || il[13] != 0x02 || il[14] != 0x7B
+            || il[19] != 0x2D || il[20] != 3 || il[21] != 0x05
+            || il[22] != 0x2B || il[23] != 1 || il[24] != 0x17 || il[25] != 0x6F
+            || il[30] != 0x0A || il[31] != 0x02 || il[32] != 0x7B || il[37] != 0x39)
+            return false;
+        var skip = BitConverter.ToInt32(il, 38);
+        return skip >= 0 && skip == il.Length - 44
+            && il[il.Length - 2] == 0x06 && il[il.Length - 1] == 0x2A;
     }
 
     internal static bool MatchesSupportedCode(byte[] original, byte[] loaded, byte[]? savedEntry, int entryLength = 7)

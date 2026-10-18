@@ -15,6 +15,7 @@ internal sealed unsafe class InspectOutfitNativeBinding
 {
     // Inspect/Tryon layouts and helpers revalidated against the delivered 15.0.3.7 SDK.
     internal const string ClientStructs15037Sha256 = "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D";
+    internal const string ClientStructs15038Sha256 = "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2";
     private readonly nint moduleBase;
 
     internal InspectOutfitNativeBinding()
@@ -38,8 +39,8 @@ internal sealed unsafe class InspectOutfitNativeBinding
 
     internal static void RequireSupportedClientStructs(string actualSha256)
     {
-        if (actualSha256 != ClientStructs15037Sha256)
-            throw new InvalidOperationException($"Inspection try-on requires revalidated client structures. Actual SHA256: {actualSha256}; supported SHA256: {ClientStructs15037Sha256}.");
+        if (actualSha256 != ClientStructs15037Sha256 && actualSha256 != ClientStructs15038Sha256)
+            throw new InvalidOperationException($"Inspection try-on requires revalidated client structures. Actual SHA256: {actualSha256}; supported SHA256: {ClientStructs15037Sha256} or {ClientStructs15038Sha256}.");
     }
 
     internal void Validate()

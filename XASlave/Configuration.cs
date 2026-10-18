@@ -137,6 +137,9 @@ public class Configuration : IPluginConfiguration
     public int Version { get; set; } = 0;
     public bool OpenPluginOnLoad { get; set; } = false;
 
+    // Custom layouts and source descriptions only; live plugin values are never persisted.
+    public List<PluginBuilderWindowDefinition> PluginBuilderWindows { get; set; } = new();
+
     // Force the game window to a custom resolution when the plugin loads.
     // Reuses the XA Mods custom-resolution machinery (SystemWindowModsService).
     public bool CustomResolutionOnLoadEnabled { get; set; } = false;

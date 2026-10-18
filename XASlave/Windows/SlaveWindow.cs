@@ -77,6 +77,7 @@ public partial class SlaveWindow : Window, IDisposable
         IpcCallsAvailable,
         CommandsReference,
         SplashScreen,
+        PluginBuilder,
     }
 
     private enum MenuSection
@@ -124,6 +125,7 @@ public partial class SlaveWindow : Window, IDisposable
         (SlaveTask.XAMods, "XA Mods"),
         (SlaveTask.WindowRenamer, "Window Renamer"),
         (SlaveTask.PluginOperations, "Plugin Operations"),
+        (SlaveTask.PluginBuilder, "Plugin Builder"),
     };
 
     private static readonly (SlaveTask Task, string Label)[] ReferenceItems =
@@ -949,11 +951,13 @@ public partial class SlaveWindow : Window, IDisposable
         isDisposed = true;
 
         DetachDuringDispose("Worker cancellation", workerCts.Cancel);
+        DetachDuringDispose("Plugin Builder windows", DisposePluginBuilder);
 
         DetachDuringDispose("Framework.Update", () => Plugin.Framework.Update -= OnFrameworkUpdate);
         DetachDuringDispose("ClientState.Login", () => Plugin.ClientState.Login -= OnExportDataLogin);
         DetachDuringDispose("ClientState.Logout", () => Plugin.ClientState.Logout -= OnExportDataLogoutHandler);
 #if DEBUG
+        DetachDuringDispose("Plugin Inspector", DisposePluginInspector);
         DetachDuringDispose("NamePlateGui.OnDataUpdate", () => Plugin.NamePlateGui.OnDataUpdate -= OnXaAbuseNamePlateUpdate);
         DetachDuringDispose("UiBuilder.Draw", () => Plugin.PluginInterface.UiBuilder.Draw -= DrawXaAbuseOverlay);
         DetachDuringDispose("AR RetainerListTaskButtonsDraw", () => plugin.IpcClient.AutoRetainerUnsubscribeRetainerListTaskButtonsDraw(OnDebugAutoRetainerDepositGilListTaskButtonsDraw));
@@ -1200,6 +1204,8 @@ public partial class SlaveWindow : Window, IDisposable
 
     private void OnFrameworkUpdate(IFramework framework)
     {
+        if (isDisposed) return;
+        UpdatePluginBuilderWindows();
 #if DEBUG
         UpdateDebugNotificationTests();
 #endif
@@ -1483,6 +1489,9 @@ public partial class SlaveWindow : Window, IDisposable
                                 break;
                             case SlaveTask.PluginOperations:
                                 DrawPluginOperationsTask();
+                                break;
+                            case SlaveTask.PluginBuilder:
+                                DrawPluginBuilderPanel();
                                 break;
                             case SlaveTask.XAMods:
                                 DrawXAModsTask();

@@ -23,6 +23,17 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.54 - 2026-10-18",
+            Lines =
+            [
+                "- Updated Dalamud 15.0.3.8 Compatibility: Updated support for Auto Sort Items, Better Inventory Mover, Auto Restore Furniture, Inspect Outfit Try-on and View Single Item.",
+                "- Fixed View Single Item: Restored compatibility with updated TitleEdit builds without requiring an exact plugin version.",
+                "- Added Utility > Plugin Builder: Combine information and action buttons from multiple plugins in saved custom windows. Arrange controls beside each other, organize left-side pages, choose timestamps and toggle windows with /xa win <name>. Prefer IPC, with commands and selected reflection sources also available.",
+                "- Added Debug / Test > XA Abuse > Plugin Inspector: Browse registered IPC channels and export IPC, commands and member metadata to JSON, with ownership and discovery limits shown; available in Debug builds.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.53 - 2026-10-16",
             Lines =
             [

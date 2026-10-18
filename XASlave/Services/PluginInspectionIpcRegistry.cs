@@ -1,0 +1,380 @@
+using System;
+using System.Collections;
+using System.Collections.Generic;
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Linq;
+using System.Reflection;
+using System.Threading;
+using Dalamud.Plugin;
+
+namespace XASlave.Services;
+
+internal sealed record PluginInspectionIpcParameter(string Name, string Type, string Direction, bool Optional);
+
+internal sealed record PluginInspectionIpcHandler(
+    string Method, string MethodAssembly, string MethodModuleVersionId,
+    string TargetType, string TargetAssembly, string TargetModuleVersionId,
+    bool AttributedToSelectedPlugin, string Attribution);
+
+internal sealed record PluginInspectionIpcDelegate(
+    string DelegateType, string InvokeSignature, string ReturnType, bool SignatureComplete,
+    IReadOnlyList<PluginInspectionIpcParameter> Parameters,
+    IReadOnlyList<PluginInspectionIpcHandler> Handlers, bool AttributedToSelectedPlugin);
+
+internal sealed record PluginInspectionIpcChannel(
+    string Name, bool NameComplete, bool HasFunction, bool HasAction, int SubscriptionCount,
+    bool AttributedToSelectedPlugin, bool SelectedPluginSubscribes,
+    PluginInspectionIpcDelegate? Function, PluginInspectionIpcDelegate? Action,
+    IReadOnlyList<PluginInspectionIpcDelegate> Subscriptions)
+{
+    public string RegistrationState => HasFunction || HasAction ? "provider registered"
+        : SubscriptionCount > 0 ? "message subscribers only; publisher unknown" : "empty channel; no provider observed";
+}
+
+internal sealed record PluginInspectionIpcSnapshot(
+    string Status, string HostAssemblyVersion, DateTime CapturedUtc, bool Incomplete,
+    IReadOnlyList<PluginInspectionIpcChannel> Channels, IReadOnlyList<string> Limitations);
+
+/// <summary>Reads only the host registry and delegate metadata; never calls an IPC endpoint or peer member.</summary>
+internal static class PluginInspectionIpcRegistry
+{
+    private const int MaxChannels = 4096;
+    private const int MaxHandlers = 10000;
+    private const int MaxSubscriptions = 64;
+    private const int MaxInvocationList = 16;
+    private const int MaxParameters = 64;
+    private const int MaxTypeDepth = 12;
+    private const int MaxTextLength = 2048;
+    private const int MaxCapturedTextCharacters = 2_000_000;
+    private static readonly TimeSpan CaptureBudget = TimeSpan.FromSeconds(5);
+    private const BindingFlags PublicInstance = BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly;
+
+    // Grounded against installed Dalamud 15.0.3.8, read-only decompilation of:
+    // Service<T>.GetNullable, CallGate.Gates, CallGateChannel.Action/Func/Subscriptions.
+    // Source counterparts: Dalamud/Service/Service{T}.cs and Dalamud/Plugin/Ipc/Internal/.
+    // Gates and Subscriptions produce immutable BCL snapshots; their host caches may be populated.
+    // Reflection execution is restricted to these five accessors. No GetIpcSubscriber/provider factory is used.
+    internal static PluginInspectionIpcSnapshot Capture(Assembly selectedAssembly,
+        IDalamudPluginInterface initializedPluginInterface, CancellationToken token)
+    {
+        ArgumentNullException.ThrowIfNull(selectedAssembly);
+        ArgumentNullException.ThrowIfNull(initializedPluginInterface);
+        var state = new CaptureState(token);
+        var capturedUtc = DateTime.UtcNow;
+        var host = typeof(IDalamudPluginInterface).Assembly;
+        var hostVersion = host.GetName().Version?.ToString() ?? string.Empty;
+        var channels = new List<PluginInspectionIpcChannel>();
+        var status = "available";
+        try
+        {
+            token.ThrowIfCancellationRequested();
+            var contract = ResolveContract(host, initializedPluginInterface);
+            if (!state.Continue()) return Result("partial");
+            // The actual initialized host interface establishes that service initialization has completed.
+            // GetNullable(None) returns immediately for an unavailable/faulted service; never use Get/GetAsync.
+            var registry = contract.GetNullable.Invoke(null, new[] { contract.NoPropagation });
+            if (registry == null) return Result("unavailable: host registry is not ready", incomplete: true);
+            if (registry.GetType() != contract.RegistryType) throw new NotSupportedException();
+            if (!state.Continue()) return Result("partial");
+            var snapshot = contract.Gates.GetValue(registry);
+            if (snapshot?.GetType() != contract.DictionaryType || snapshot is not IDictionary gates)
+                throw new NotSupportedException();
+            if (gates.Count > MaxChannels) state.Incomplete("Registry channel list limited to 4096 entries.");
+            var visitedChannels = 0;
+            foreach (DictionaryEntry entry in gates)
+            {
+                if (visitedChannels >= MaxChannels || !state.Continue()) break;
+                visitedChannels++;
+                if (entry.Key is not string name || entry.Value?.GetType() != contract.ChannelType)
+                    throw new NotSupportedException();
+                try { channels.Add(CaptureChannel(name, entry.Value, contract, selectedAssembly, state)); }
+                catch (OperationCanceledException) { throw; }
+                catch (Exception exception) { state.Failure("Channel metadata", exception); }
+            }
+        }
+        catch (OperationCanceledException) { throw; }
+        catch (NotSupportedException)
+        {
+            status = "unsupported host registry layout";
+            state.Incomplete("The loaded host does not match the allowlisted IPC registry contract; no fallback factories or plugin object traversal were attempted.");
+        }
+        catch (Exception exception)
+        {
+            status = "registry capture unavailable or partial";
+            state.Failure("Host IPC registry", exception);
+        }
+        token.ThrowIfCancellationRequested();
+        return Result(status);
+
+        PluginInspectionIpcSnapshot Result(string resultStatus, bool incomplete = false)
+        {
+            token.ThrowIfCancellationRequested();
+            if (resultStatus == "available" && (incomplete || state.IsIncomplete)) resultStatus = "partial";
+            return new(resultStatus, hostVersion, capturedUtc, incomplete || state.IsIncomplete,
+                Array.AsReadOnly(channels.ToArray()), Array.AsReadOnly(state.Limitations.ToArray()));
+        }
+    }
+
+    private static HostContract ResolveContract(Assembly host, IDalamudPluginInterface initializedPluginInterface)
+    {
+        var interfaceType = RequiredType(host, "Dalamud.Plugin.DalamudPluginInterface");
+        if (initializedPluginInterface.GetType() != interfaceType) throw new NotSupportedException();
+        var registry = RequiredType(host, "Dalamud.Plugin.Ipc.Internal.CallGate");
+        var channel = RequiredType(host, "Dalamud.Plugin.Ipc.Internal.CallGateChannel");
+        var propagation = RequiredType(host, "Dalamud.ExceptionPropagationMode");
+        if (!propagation.IsEnum || Enum.GetUnderlyingType(propagation) != typeof(int)
+            || Enum.GetNames(propagation).Length != 3
+            || !Enum.TryParse(propagation, "None", false, out var none) || Convert.ToInt32(none) != 2)
+            throw new NotSupportedException();
+        var service = RequiredType(host, "Dalamud.Service`1").MakeGenericType(registry);
+        var get = service.GetMethod("GetNullable", BindingFlags.Public | BindingFlags.Static | BindingFlags.DeclaredOnly,
+            binder: null, types: new[] { propagation }, modifiers: null);
+        if (get == null || get.ReturnType != registry || get.IsGenericMethod || get.DeclaringType != service)
+            throw new NotSupportedException();
+        return new(registry, channel, typeof(ImmutableDictionary<,>).MakeGenericType(typeof(string), channel), get, none!,
+            RequiredGetter(registry, "Gates", typeof(IReadOnlyDictionary<,>).MakeGenericType(typeof(string), channel)),
+            RequiredGetter(channel, "Action", typeof(Delegate)), RequiredGetter(channel, "Func", typeof(Delegate)),
+            RequiredGetter(channel, "Subscriptions", typeof(IReadOnlyList<Delegate>)));
+    }
+
+    // Runtime consumers may inspect the current provider but must execute only through official subscribers.
+    internal static Delegate? FindProvider(string name, bool action, Assembly selectedAssembly, IDalamudPluginInterface pluginInterface)
+    {
+        var contract = ResolveContract(typeof(IDalamudPluginInterface).Assembly, pluginInterface);
+        var registry = contract.GetNullable.Invoke(null, new[] { contract.NoPropagation });
+        if (registry?.GetType() != contract.RegistryType) return null;
+        var snapshot = contract.Gates.GetValue(registry);
+        if (snapshot?.GetType() != contract.DictionaryType || snapshot is not IDictionary gates) return null;
+        var channel = gates[name];
+        if (channel?.GetType() != contract.ChannelType) return null;
+        var value = (action ? contract.Action : contract.Func).GetValue(channel) as Delegate;
+        if (value == null) return null;
+        var handlers = value.GetInvocationList();
+        if (handlers.Length != 1) return null;
+        var handler = handlers[0];
+        return handler.Method.Module.Assembly == selectedAssembly || handler.Target?.GetType().Assembly == selectedAssembly
+            ? value : null;
+    }
+
+    private static Type RequiredType(Assembly host, string name)
+    {
+        var type = host.GetType(name, throwOnError: false);
+        if (type == null || type.Assembly != host) throw new NotSupportedException();
+        return type;
+    }
+
+    private static PropertyInfo RequiredGetter(Type owner, string name, Type expectedType)
+    {
+        var property = owner.GetProperty(name, PublicInstance);
+        if (property == null || property.PropertyType != expectedType || property.GetIndexParameters().Length != 0
+            || property.GetMethod is not { IsPublic: true, IsStatic: false, IsVirtual: false } getter
+            || getter.DeclaringType != owner || getter.DeclaringType.Assembly != typeof(IDalamudPluginInterface).Assembly)
+            throw new NotSupportedException();
+        return property;
+    }
+
+    private static PluginInspectionIpcChannel CaptureChannel(string name, object channel, HostContract contract,
+        Assembly selectedAssembly, CaptureState state)
+    {
+        var nameRevision = state.IncompleteRevision;
+        var channelName = state.Text(name);
+        var nameComplete = state.IncompleteRevision == nameRevision && string.Equals(channelName, name, StringComparison.Ordinal);
+        // These are host-owned auto-properties, not plugin properties. Read each delegate once.
+        var action = contract.Action.GetValue(channel) as Delegate;
+        var function = contract.Func.GetValue(channel) as Delegate;
+        if (contract.Subscriptions.GetValue(channel) is not ImmutableList<Delegate> subscriptions)
+            throw new NotSupportedException();
+        var actionInfo = action == null ? null : CaptureDelegate(action, selectedAssembly, state);
+        var functionInfo = function == null ? null : CaptureDelegate(function, selectedAssembly, state);
+        var subscribers = new List<PluginInspectionIpcDelegate>();
+        if (subscriptions.Count > MaxSubscriptions) state.Incomplete("Subscriptions per channel limited to 64 entries.");
+        for (var index = 0; index < subscriptions.Count && index < MaxSubscriptions && state.Continue(); index++)
+            subscribers.Add(CaptureDelegate(subscriptions[index], selectedAssembly, state));
+        return new(channelName, nameComplete, function != null, action != null, subscriptions.Count,
+            actionInfo?.AttributedToSelectedPlugin == true || functionInfo?.AttributedToSelectedPlugin == true,
+            subscribers.Any(value => value.AttributedToSelectedPlugin), functionInfo, actionInfo,
+            Array.AsReadOnly(subscribers.ToArray()));
+    }
+
+    private static PluginInspectionIpcDelegate CaptureDelegate(Delegate value, Assembly selectedAssembly, CaptureState state)
+    {
+        var signatureRevision = state.IncompleteRevision;
+        var delegateType = value.GetType();
+        // Invoke describes the actual delegate call shape; Method may differ for closed/bound delegates.
+        var invoke = delegateType.GetMethod("Invoke", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
+        if (invoke == null) throw new NotSupportedException();
+        var supported = !delegateType.ContainsGenericParameters && !invoke.ContainsGenericParameters;
+        if (!supported) state.Incomplete("Open generic IPC delegate signatures require a separately reviewed contract.");
+        var delegateTypeName = TypeName(delegateType, state);
+        var parameters = new List<PluginInspectionIpcParameter>();
+        var parameterMetadata = invoke.GetParameters();
+        if (parameterMetadata.Length > MaxParameters) state.Incomplete("IPC parameter lists limited to 64 entries.");
+        foreach (var parameter in parameterMetadata.Take(MaxParameters))
+        {
+            if (!state.Continue()) break;
+            supported &= SignatureTypeSupported(parameter.ParameterType, state);
+            var direction = parameter.IsOut ? "out" : parameter.ParameterType.IsByRef ? parameter.IsIn ? "in" : "ref" : "value";
+            parameters.Add(new(state.Text(parameter.Name), TypeName(parameter.ParameterType, state), direction, parameter.IsOptional));
+        }
+        supported &= SignatureTypeSupported(invoke.ReturnType, state);
+        var returnType = TypeName(invoke.ReturnType, state);
+        var signature = state.Text(returnType + " (" + string.Join(", ", parameters.Select(parameter =>
+            (parameter.Direction == "value" ? string.Empty : parameter.Direction + " ") + parameter.Type + " " + parameter.Name)) + ")");
+        var signatureComplete = state.Continue() && supported && parameters.Count == parameterMetadata.Length
+            && state.IncompleteRevision == signatureRevision;
+        var handlers = new List<PluginInspectionIpcHandler>();
+        var invocationList = value.GetInvocationList();
+        if (invocationList.Length > MaxInvocationList) state.Incomplete("Multicast invocation metadata limited to 16 handlers per delegate.");
+        foreach (var handler in invocationList.Take(MaxInvocationList))
+        {
+            if (!state.ReserveHandler()) break;
+            var method = handler.Method;
+            var methodAssembly = method.Module.Assembly;
+            var targetType = handler.Target?.GetType();
+            var targetAssembly = targetType?.Assembly;
+            var methodMatches = methodAssembly == selectedAssembly;
+            var targetMatches = targetAssembly == selectedAssembly;
+            handlers.Add(new(state.Text((method.DeclaringType?.FullName ?? "<dynamic>") + "." + method.Name),
+                state.Text(methodAssembly.FullName), state.Text(method.Module.ModuleVersionId.ToString("D")),
+                targetType == null ? string.Empty : TypeName(targetType, state), state.Text(targetAssembly?.FullName),
+                state.Text(targetAssembly?.ManifestModule.ModuleVersionId.ToString("D")), methodMatches || targetMatches,
+                methodMatches ? "handler method belongs to selected assembly instance"
+                    : targetMatches ? "delegate target type belongs to selected assembly instance"
+                    : "other or unknown owner; shared wrapper targets are not traversed"));
+        }
+        return new(delegateTypeName, signature, returnType, signatureComplete, Array.AsReadOnly(parameters.ToArray()),
+            Array.AsReadOnly(handlers.ToArray()), handlers.Any(handler => handler.AttributedToSelectedPlugin));
+    }
+
+    private static bool SignatureTypeSupported(Type type, CaptureState state, int depth = 0)
+    {
+        if (!state.Continue()) return false;
+        if (depth >= MaxTypeDepth)
+        {
+            state.Incomplete("IPC signature type validation exceeded the 12-level nesting bound.");
+            return false;
+        }
+        if (type.IsByRef || type.IsPointer || type.IsFunctionPointer || type.IsByRefLike || type.ContainsGenericParameters)
+        {
+            state.Incomplete("By-reference, pointer, function-pointer, ref-like or open generic IPC signature types require a separately reviewed contract; SignatureComplete is false.");
+            return false;
+        }
+        if (type.HasElementType)
+        {
+            var element = type.GetElementType();
+            if (element != null) return SignatureTypeSupported(element, state, depth + 1);
+            state.Incomplete("IPC signature element type metadata was unavailable.");
+            return false;
+        }
+        if (!type.IsGenericType) return true;
+        var arguments = type.GetGenericArguments();
+        if (arguments.Length > MaxParameters)
+        {
+            state.Incomplete("IPC signature generic argument validation exceeded the 64-entry bound.");
+            return false;
+        }
+        var supported = true;
+        foreach (var argument in arguments)
+            supported &= SignatureTypeSupported(argument, state, depth + 1);
+        return supported;
+    }
+
+    private static string TypeName(Type type, CaptureState state, int depth = 0)
+    {
+        if (!state.Continue()) return "<capture limit>";
+        if (depth >= MaxTypeDepth) { state.Incomplete("IPC type nesting limited to 12 levels."); return "<type nesting limit>"; }
+        if (type.HasElementType)
+        {
+            var element = type.GetElementType();
+            var suffix = type.IsArray ? "[" + new string(',', type.GetArrayRank() - 1) + "]" : type.IsByRef ? "&" : "*";
+            return state.Text((element == null ? "?" : TypeName(element, state, depth + 1)) + suffix);
+        }
+        if (!type.IsGenericType) return state.Text(type.FullName ?? type.Name);
+        var arguments = type.GetGenericArguments();
+        if (arguments.Length > MaxParameters) state.Incomplete("IPC generic argument lists limited to 64 entries.");
+        return state.Text((type.GetGenericTypeDefinition().FullName ?? type.Name) + "<"
+            + string.Join(", ", arguments.Take(MaxParameters).Select(argument => TypeName(argument, state, depth + 1))) + ">");
+    }
+
+    private sealed record HostContract(Type RegistryType, Type ChannelType, Type DictionaryType,
+        MethodInfo GetNullable, object NoPropagation, PropertyInfo Gates, PropertyInfo Action,
+        PropertyInfo Func, PropertyInfo Subscriptions);
+
+    private sealed class CaptureState
+    {
+        private readonly CancellationToken token;
+        private readonly Stopwatch clock = Stopwatch.StartNew();
+        private int textCharacters;
+        private int handlers;
+        internal bool IsIncomplete { get; private set; }
+        internal long IncompleteRevision { get; private set; }
+        internal List<string> Limitations { get; } = new()
+        {
+            "Host-wide runtime IPC registry snapshot, including unrelated channels; selected-plugin ownership is separate evidence, not inferred from channel prefixes.",
+            "Function/action registration means a provider delegate was observed, not that calling it is safe, documented, ready, or free of side effects. No endpoint was invoked, subscribed, registered, created, or removed.",
+            "Message subscriptions identify listeners, not the publisher. Empty channels can be created by consumers or remain after unload; they are not available calls.",
+            "Attribution compares exact handler/target assembly instances. Shared-library wrappers may hide the provider; plugin target objects and closure fields are never traversed.",
+            "Callable signatures come from delegate Invoke metadata. Handler method names are attribution evidence; parameter semantics, threading, lifecycle preconditions and supported contract versions require review.",
+            "Action/message delegates return void and do not reveal the dummy return-type generic argument used by the provider/subscriber call-gate contract. That generic argument cannot be inferred solely from this delegate signature.",
+            "NameComplete and SignatureComplete describe bounded metadata capture and supported type shapes only; true does not establish a safe callable contract or complete handler ownership evidence.",
+            "Gates/Subscriptions are host-owned immutable snapshots, but channel delegates may change during capture. This is not an atomic view and must be refreshed after plugin load/unload or before designing an adapter.",
+            "Five-second time/cancellation limits are cooperative. Individual host snapshot getters and reflection calls cannot be interrupted; host locks or large snapshots may exceed the budget.",
+            "Private host layout is supported only when it matches the verified contract. Registry metadata cannot discover endpoints a plugin has not registered or non-Dalamud transports.",
+        };
+
+        internal CaptureState(CancellationToken token) => this.token = token;
+
+        internal bool Continue()
+        {
+            token.ThrowIfCancellationRequested();
+            if (textCharacters >= MaxCapturedTextCharacters || handlers >= MaxHandlers)
+            {
+                Incomplete("IPC cumulative text or handler bound prevents further metadata capture.");
+                return false;
+            }
+            if (clock.Elapsed < CaptureBudget) return true;
+            Incomplete("Cooperative five-second IPC registry deadline reached.");
+            return false;
+        }
+
+        internal bool ReserveHandler()
+        {
+            if (!Continue()) return false;
+            handlers++;
+            if (handlers == MaxHandlers) Incomplete("IPC handler metadata limited to 10000 entries.");
+            return true;
+        }
+
+        internal string Text(string? text)
+        {
+            if (text == null) return string.Empty;
+            var remaining = MaxCapturedTextCharacters - textCharacters;
+            if (remaining <= 0)
+            {
+                if (text.Length > 0) Incomplete("IPC text omitted after the cumulative text bound.");
+                return string.Empty;
+            }
+            var maximum = Math.Min(MaxTextLength, remaining);
+            var length = Math.Min(maximum, text.Length);
+            if (length < text.Length)
+            {
+                Incomplete("IPC text exceeded the 2048-character value or two-million-character total bound; affected names/signatures are not exact callable identifiers.");
+                if (length > 0 && char.IsHighSurrogate(text[length - 1])) length--;
+            }
+            textCharacters += length;
+            if (length == remaining) Incomplete("IPC cumulative text bound reached.");
+            return text[..length];
+        }
+
+        internal void Failure(string scope, Exception exception)
+            => Incomplete(scope + " unavailable (" + Text(exception.GetType().FullName) + ").");
+
+        internal void Incomplete(string message)
+        {
+            IsIncomplete = true;
+            IncompleteRevision++;
+            if (Limitations.Count < 64 && !Limitations.Contains(message, StringComparer.Ordinal)) Limitations.Add(message);
+        }
+    }
+}
