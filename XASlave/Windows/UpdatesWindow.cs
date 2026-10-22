@@ -23,6 +23,17 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.55 - 2026-10-21",
+            Lines =
+            [
+                "- Updated Dalamud 15.0.3.9 Compatibility: Updated October 16 game support for XA Nearby, Auto Sort Items, Better Inventory Mover, Auto Restore Furniture, Inspect Outfit Try-on and View Single Item. Recapture saved item previews from older game builds.",
+                "- Added Xagman > Submarine Build Rates: Save custom builds and daily tank/material rates, with reset and removal controls while Xagman is stopped.",
+                "- Updated Xagman Restocking: Estimates and Restock Sub Farmers use saved rates; reapply the preset to update existing Shared Item List quantities.",
+                "- Updated Submarine Defaults: Use rank-90 OJ upkeep rates from Mammet's Fleet with 24- or 36-hour resend intervals.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.54 - 2026-10-18",
             Lines =
             [

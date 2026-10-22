@@ -261,6 +261,8 @@ public class Configuration : IPluginConfiguration
     public List<XagmanTonyCharacterEntry> XagmanTonyCharacters { get; set; } = new();
     public List<string> XagmanFranchiseCharacters { get; set; } = new();
     public List<XagmanItemEntry> XagmanItems { get; set; } = new();
+    // User additions and overrides; omitted builds retain the built-in upkeep defaults.
+    public Dictionary<string, SubmarineConsumptionRate> SubmarineBuildConsumptionRates { get; set; } = new(StringComparer.Ordinal);
     public List<XagmanNamedItemList> XagmanSavedItemLists { get; set; } = new();
     public List<XagmanItemEntry> XagmanTonyItems { get; set; } = new();
     public List<XagmanItemEntry> XagmanFranchiseItems { get; set; } = new();

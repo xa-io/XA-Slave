@@ -337,6 +337,7 @@ public partial class SlaveWindow
     private void DrawXagmanTask()
     {
         var cfg = plugin.Configuration;
+        xagmanSubmarineRates = SubmarineBuildSupply.GetEffectiveRates(cfg.SubmarineBuildConsumptionRates);
         var runner = plugin.TaskRunner;
         if (!xagmanPendingHubEndpointInitialized)
         {
@@ -735,6 +736,7 @@ public partial class SlaveWindow
             DrawXagmanOwnerForecasts(cfg);
         }
         DrawXagmanGreenValueForecasts(cfg);
+        DrawXagmanSubmarineRates(cfg);
         if (onh)
         {
             ImGui.Spacing();
@@ -1300,14 +1302,14 @@ public partial class SlaveWindow
 
         return Math.Max(0, submarines ? info.SubmarineCount : info.RetainerCount);
     }
-    private static int? GetXagmanRestockDays(ReloggerCharacterData? info)
+    private int? GetXagmanRestockDays(ReloggerCharacterData? info)
     {
         if (info == null || info.XaDatabaseSnapshotUpdatedUtc == DateTime.MinValue)
             return null;
 
         return SubmarineBuildSupply.CalculateDays(
             GetXagmanRegisteredAutoRetainerCount(info, submarines: true),
-            info.SubmarineBuilds, info.CeruleumTanks, info.MagitekRepairKits, out _);
+            info.SubmarineBuilds, info.CeruleumTanks, info.MagitekRepairKits, xagmanSubmarineRates, out _);
     }
     private static string GetXagmanBuildsLabel(ReloggerCharacterData? info)
     {
@@ -1320,19 +1322,19 @@ public partial class SlaveWindow
                 ? info.SubmarineBuilds[i] : "????");
         return string.Join(" / ", builds);
     }
-    private static void DrawXagmanRestockCell(ReloggerCharacterData? info)
+    private void DrawXagmanRestockCell(ReloggerCharacterData? info)
     {
         ImGui.TableNextColumn();
         var days = GetXagmanRestockDays(info);
         var fallbackCount = 0;
         if (days.HasValue && info != null)
             SubmarineBuildSupply.CalculateDays(GetXagmanRegisteredAutoRetainerCount(info, submarines: true),
-                info.SubmarineBuilds, info.CeruleumTanks, info.MagitekRepairKits, out fallbackCount);
+                info.SubmarineBuilds, info.CeruleumTanks, info.MagitekRepairKits, xagmanSubmarineRates, out fallbackCount);
         ImGui.TextDisabled(days.HasValue
             ? $"{days.Value.ToString("N0", CultureInfo.InvariantCulture)}{(fallbackCount > 0 ? "*" : string.Empty)}" : "-");
         if (ImGui.IsItemHovered())
             ImGui.SetTooltip(days.HasValue
-                ? "Estimated whole days until tanks or repair kits run out. Uses saved XA Database stock and Sub Manager's built-in consumption rates for each imported submarine build. User-edited Sub Manager rates are not imported."
+                ? "Estimated whole days until tanks or repair kits run out. Uses saved XA Database stock and your Submarine Build Rates for each imported build, with rank-90 OJ defaults where no override is saved. Sub Manager settings are not imported."
                     + (fallbackCount > 0 ? $"\n* {fallbackCount} missing or unlisted build(s) use 9 tanks and 1.33 kits per day. Import from AutoRetainer to refresh builds." : string.Empty)
                 : "Requires registered AutoRetainer submarines and a saved XA Database inventory snapshot. Use Pull XA Database Info to refresh.");
     }
@@ -2157,7 +2159,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled("Replaces the Shared Item List with two Balance targets.");
         if (string.IsNullOrEmpty(xagmanRestockBuild))
         {
-            foreach (var build in SubmarineBuildSupply.SupportedBuilds)
+            foreach (var build in xagmanSubmarineRates.Keys.OrderBy(build => build, StringComparer.Ordinal))
             {
                 if (ImGui.Selectable(build, false, ImGuiSelectableFlags.DontClosePopups))
                     xagmanRestockBuild = build;
@@ -2172,7 +2174,7 @@ public partial class SlaveWindow
             var enter = ImGui.InputTextWithHint($"##{id}RestockDays", "Days of stock", ref xagmanRestockDays, 10,
                 ImGuiInputTextFlags.CharsDecimal | ImGuiInputTextFlags.EnterReturnsTrue);
             xagmanRestockDays = new string(xagmanRestockDays.Where(c => c >= '0' && c <= '9').ToArray());
-            var valid = SubmarineBuildSupply.TryCalculateStock(xagmanRestockBuild, xagmanRestockDays, out var tanks, out var kits);
+            var valid = SubmarineBuildSupply.TryCalculateStock(xagmanRestockBuild, xagmanRestockDays, xagmanSubmarineRates, out var tanks, out var kits);
             if (valid)
                 ImGui.TextUnformatted($"Ceruleum Tanks: {tanks:N0} | Magitek Repair Materials: {kits:N0}");
             else

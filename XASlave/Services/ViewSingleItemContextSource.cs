@@ -12,7 +12,7 @@ namespace XASlave.Services;
 // Native reads remain behind ViewSingleItemPreview's exact game/SDK gate.
 internal static unsafe class ViewSingleItemContextSource
 {
-    private const int ItemContextVtableRva = 0x21C5110;
+    private const int ItemContextVtableRva = 0x21C5F40;
     // Exact-build native Inspect ReceiveEvent toggles this byte and selects GlamourItems.
     private const int InspectViewingGlamoursOffset = 0x582;
 

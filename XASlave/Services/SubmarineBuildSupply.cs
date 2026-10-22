@@ -1,41 +1,99 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
+using System.Linq;
 using System.Text.Json;
 
 namespace XASlave.Services;
 
+[Serializable]
+public sealed class SubmarineConsumptionRate
+{
+    public decimal TanksPerDay { get; set; }
+    public decimal KitsPerDay { get; set; }
+}
+
 internal static class SubmarineBuildSupply
 {
-    // XA Sub Manager src/core/Config.cpp defaults (2026-10-09).
-    private static readonly Dictionary<string, (decimal Tanks, decimal Kits)> Rates = new(StringComparer.Ordinal)
+    // Mammet's Fleet upkeep, confirmed 2026-10-21: rank 90, route O -> J, per submarine/day.
+    // Default resend interval: 24h if the voyage fits, otherwise 36h; repair all parts when the first breaks.
+    // Rates use the displayed two-decimal values: https://mammets-fleet.web.app/tools/upkeep
+    private static readonly Dictionary<string, (decimal Tanks, decimal Kits)> DefaultRates = new(StringComparer.Ordinal)
     {
-        ["WSUC"] = (9.0m, 1.33m),
+        ["WSUC"] = (9.0m, 1.67m),
         ["SSUC"] = (9.0m, 1.33m),
         ["W+S+U+C+"] = (9.0m, 3.43m),
         ["S+S+S+C+"] = (9.0m, 3.43m),
-        ["YUUW"] = (7.5m, 1.40m),
-        ["Y+U+U+W+"] = (10.0m, 3.07m),
-        ["WCSU"] = (10.0m, 1.67m),
-        ["WUSS"] = (10.0m, 1.67m),
-        ["W+U+S+S+"] = (10.0m, 3.20m),
-        ["YSYC"] = (10.0m, 2.50m),
-        ["Y+S+Y+C+"] = (10.0m, 3.20m),
-        ["S+S+U+C"] = (14.0m, 3.67m),
-        ["S+S+U+C+"] = (14.0m, 4.00m),
-        ["WCYC"] = (10.5m, 2.00m),
-        ["WUWC"] = (10.5m, 2.00m),
-        ["W+U+W+C+"] = (10.5m, 3.00m),
-        ["YSCU"] = (9.0m, 1.67m),
-        ["SCUS"] = (9.0m, 1.67m),
-        ["S+C+U+S+"] = (13.5m, 4.00m),
+        ["YUUW"] = (6.0m, 1.14m),
+        ["Y+U+U+W+"] = (6.0m, 2.29m),
+        ["WCSU"] = (6.0m, 1.11m),
+        ["WUSS"] = (6.0m, 0.78m),
+        ["W+U+S+S+"] = (6.0m, 2.29m),
+        ["YSYC"] = (6.0m, 1.67m),
+        ["Y+S+Y+C+"] = (6.0m, 2.29m),
+        ["S+S+U+C"] = (9.0m, 3.14m),
+        ["S+S+U+C+"] = (9.0m, 3.43m),
+        ["WCYC"] = (6.0m, 1.52m),
+        ["WUWC"] = (6.0m, 1.14m),
+        ["W+U+W+C+"] = (6.0m, 2.29m),
+        ["YSCU"] = (6.0m, 1.33m),
+        ["SCUS"] = (6.0m, 0.89m),
+        ["S+C+U+S+"] = (6.0m, 2.29m),
     };
 
-    internal static IEnumerable<string> SupportedBuilds => Rates.Keys;
+    internal static bool IsDefaultBuild(string build) => DefaultRates.ContainsKey(build);
 
-    internal static bool TryCalculateStock(string build, string daysText, out int tanks, out int kits)
+    internal static bool TryNormalizeBuild(string? value, out string build)
+    {
+        build = (value ?? string.Empty).Trim().ToUpperInvariant();
+        if (build.Length == 6 && build.EndsWith("++", StringComparison.Ordinal))
+            build = string.Concat(build[..4].Select(part => $"{part}+"));
+
+        var parts = 0;
+        for (var i = 0; i < build.Length; i++)
+        {
+            if (build[i] is not ('S' or 'U' or 'W' or 'C' or 'Y'))
+                return false;
+            parts++;
+            if (i + 1 < build.Length && build[i + 1] == '+')
+                i++;
+        }
+        return parts == 4;
+    }
+
+    internal static bool IsValidRate(decimal tanks, decimal kits)
+        => tanks > 0m && kits > 0m && tanks <= int.MaxValue && kits <= int.MaxValue;
+
+    internal static bool TryParseRate(string text, out decimal value)
+        => decimal.TryParse(text, NumberStyles.AllowDecimalPoint | NumberStyles.AllowLeadingWhite | NumberStyles.AllowTrailingWhite,
+            CultureInfo.InvariantCulture, out value) && value > 0m && value <= int.MaxValue;
+
+    internal static IReadOnlyDictionary<string, (decimal Tanks, decimal Kits)> GetEffectiveRates(
+        IReadOnlyDictionary<string, SubmarineConsumptionRate>? overrides)
+    {
+        var rates = new Dictionary<string, (decimal Tanks, decimal Kits)>(DefaultRates, StringComparer.Ordinal);
+        if (overrides == null)
+            return rates;
+
+        foreach (var (key, value) in overrides.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+        {
+            if (!TryNormalizeBuild(key, out var build) || value == null || !IsValidRate(value.TanksPerDay, value.KitsPerDay))
+                continue;
+            // An exact canonical key takes precedence over aliases in manually edited JSON.
+            if (key != build && overrides.TryGetValue(build, out var canonical) && canonical != null
+                && IsValidRate(canonical.TanksPerDay, canonical.KitsPerDay))
+                continue;
+            rates[build] = (value.TanksPerDay, value.KitsPerDay);
+        }
+        return rates;
+    }
+
+    internal static bool TryCalculateStock(string build, string daysText,
+        IReadOnlyDictionary<string, (decimal Tanks, decimal Kits)> rates, out int tanks, out int kits)
     {
         tanks = kits = 0;
-        if (!Rates.TryGetValue(build, out var rate)
+        if (!TryNormalizeBuild(build, out var normalizedBuild) || !rates.TryGetValue(normalizedBuild, out var rate)
+            || !IsValidRate(rate.Tanks, rate.Kits)
             || !int.TryParse(daysText, System.Globalization.NumberStyles.None,
                 System.Globalization.CultureInfo.InvariantCulture, out var days) || days <= 0)
             return false;
@@ -112,7 +170,8 @@ internal static class SubmarineBuildSupply
         _ => "?",
     };
 
-    internal static int? CalculateDays(int submarines, IReadOnlyList<string>? builds, int tanks, int kits, out int fallbackCount)
+    internal static int? CalculateDays(int submarines, IReadOnlyList<string>? builds, int tanks, int kits,
+        IReadOnlyDictionary<string, (decimal Tanks, decimal Kits)> rates, out int fallbackCount)
     {
         fallbackCount = 0;
         if (submarines <= 0)
@@ -121,7 +180,8 @@ internal static class SubmarineBuildSupply
         for (var i = 0; i < Math.Min(submarines, 4); i++)
         {
             var build = builds != null && i < builds.Count ? builds[i] : null;
-            if (build == null || !Rates.TryGetValue(build, out var rate))
+            if (!TryNormalizeBuild(build, out var normalizedBuild) || !rates.TryGetValue(normalizedBuild, out var rate)
+                || !IsValidRate(rate.Tanks, rate.Kits))
             {
                 rate = (9m, 1.33m);
                 fallbackCount++;
@@ -129,6 +189,13 @@ internal static class SubmarineBuildSupply
             tanksPerDay += rate.Tanks;
             kitsPerDay += rate.Kits;
         }
-        return (int)decimal.Floor(Math.Min(Math.Max(0, tanks) / tanksPerDay, Math.Max(0, kits) / kitsPerDay));
+        return (int)decimal.Floor(Math.Min(DaysForStock(tanks, tanksPerDay), DaysForStock(kits, kitsPerDay)));
+    }
+
+    private static decimal DaysForStock(int stock, decimal dailyRate)
+    {
+        var available = (decimal)Math.Max(0, stock);
+        // Bound before dividing so tiny valid custom rates cannot overflow decimal or Int32.
+        return available >= dailyRate * int.MaxValue ? int.MaxValue : available / dailyRate;
     }
 }

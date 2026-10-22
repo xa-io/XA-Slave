@@ -21,6 +21,8 @@ internal static class ViewSingleItemRendererHookState
     private const string Reloaded15037Sha256 = "EAEEFDB7D832571723481FA0B822CE1708D90A40D54F1CB0F75A1788DDEC05A7";
     private const string Dalamud15038Sha256 = "AD4C2B94679DDE94DFB4F9390C506D2CF293AD1626B52A8FE9FF5CB642CCF759";
     private const string Reloaded15038Sha256 = "D9CD3C718302AF9BAC00F7AC846EE732575186FC8456AC111FE679EA0059F6AC";
+    private const string Dalamud15039Sha256 = "F0550B8942E2EF142C6537A1F3D29DD73E70F51E0719AF27483D9294985E8A55";
+    private const string Reloaded15039Sha256 = "A867659817E745BD38BA28C7E0F649BDFCCC5D4B4B01A45E375E27B6382E41FE";
 
     private static Type Manager => typeof(IDalamudHook).Assembly.GetType("Dalamud.Hooking.Internal.HookManager")
         ?? throw new InvalidOperationException("The preview hook registry is unavailable.");
@@ -42,7 +44,8 @@ internal static class ViewSingleItemRendererHookState
     {
         return (dalamudSha256 == SupportedDalamudSha256 && reloadedSha256 == SupportedReloadedSha256)
             || (dalamudSha256 == Dalamud15037Sha256 && reloadedSha256 == Reloaded15037Sha256)
-            || (dalamudSha256 == Dalamud15038Sha256 && reloadedSha256 == Reloaded15038Sha256);
+            || (dalamudSha256 == Dalamud15038Sha256 && reloadedSha256 == Reloaded15038Sha256)
+            || (dalamudSha256 == Dalamud15039Sha256 && reloadedSha256 == Reloaded15039Sha256);
     }
 
     // Caller holds the actual Dalamud Lock through comparison, creation and enable.
