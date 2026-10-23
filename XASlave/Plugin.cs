@@ -2465,6 +2465,8 @@ public sealed class Plugin : IDalamudPlugin
         return AutoSortItems.IsRunning;
     }
 
+    internal IpcUiSnapshot ReadDevelopmentUiState() => SlaveWindow.ReadDevelopmentUiState();
+
     public bool TryExecuteXaCommandFromIpc(string rawCommand, out string message) => TryExecuteXaCommandFromIpcLocalizedCore(out _, rawCommand, out message);
     internal bool TryExecuteXaCommandFromIpcMessage(string rawCommand, out global::XASlave.Localization.UiMessage message)
     {
@@ -2487,6 +2489,9 @@ public sealed class Plugin : IDalamudPlugin
         var firstSpaceIndex = trimmed.IndexOf(' ');
         var subcommand = firstSpaceIndex >= 0 ? trimmed[..firstSpaceIndex].Trim() : trimmed;
         var subcommandArgs = firstSpaceIndex >= 0 ? trimmed[(firstSpaceIndex + 1)..].Trim() : string.Empty;
+
+        if (subcommand.Equals("win", StringComparison.OrdinalIgnoreCase))
+            return SlaveWindow.TryTogglePluginBuilderWindow(subcommandArgs, out message);
 
         if (subcommand.Equals("xagman", StringComparison.OrdinalIgnoreCase))
             return TryHandleXagmanCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
@@ -6326,5 +6331,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.56";
+    public const string Version = "0.0.0.57";
 }

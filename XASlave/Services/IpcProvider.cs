@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Text.Json;
 using Dalamud.Plugin;
 using Dalamud.Plugin.Services;
 
@@ -118,63 +117,27 @@ public sealed class IpcProvider : IDisposable
             source = "Expert Delivery";
             detail = plugin.AutoUnlockExpertDelivery.StatusText;
         }
-        return JsonSerializer.Serialize(new
-        {
-            available = true,
-            development = new
-            {
-                schemaVersion = 1,
-                internalName = "XASlave",
-                assemblyMvid = typeof(IpcProvider).Assembly.ManifestModule.ModuleVersionId.ToString("D"),
-                loadId = developmentLoadId,
-                startedAtUtc = developmentStartedAtUtc,
-                ready = !isDisposed,
-            },
-            busy = IsBusyOnFrameworkThread(),
-            source,
-            detail,
-            task = new
-            {
-                running = plugin.TaskRunner.IsRunning,
-                name = plugin.TaskRunner.CurrentTaskName,
-                status = plugin.TaskRunner.StatusText,
-                currentStep = plugin.TaskRunner.CurrentStep,
-                totalSteps = plugin.TaskRunner.TotalSteps,
-                completedItems = plugin.TaskRunner.CompletedItems,
-                totalItems = plugin.TaskRunner.TotalItems,
-                currentItem = plugin.TaskRunner.CurrentItemLabel,
-            },
-            arPostProcess = new
-            {
-                running = plugin.ArPostProcessor.IsRunning,
-                status = plugin.ArPostProcessor.StatusText,
-                lastAction = string.Empty,
-            },
-            autoCollector = new
-            {
-                running = plugin.AutoCollector.IsRunning,
-                status = plugin.AutoCollector.StatusText,
-                lastAction = string.Empty,
-            },
-            moogleMail = new
-            {
-                running = plugin.AutoOpenMoogleMail.IsProcessing,
-                status = plugin.AutoOpenMoogleMail.StatusText,
-                lastAction = plugin.AutoOpenMoogleMail.LastActionText,
-            },
-            expertDelivery = new
-            {
-                running = plugin.AutoUnlockExpertDelivery?.IsProcessing == true,
-                runId = plugin.AutoUnlockExpertDelivery?.RunId ?? 0,
-                status = plugin.AutoUnlockExpertDelivery?.StatusText ?? "Unavailable",
-                delivered = plugin.AutoUnlockExpertDelivery?.DeliveredCount ?? 0,
-                summary = plugin.AutoUnlockExpertDelivery?.ListSummary ?? string.Empty,
-                outcome = plugin.AutoUnlockExpertDelivery?.LastResult is { } deliveryResult && deliveryResult.RunId == plugin.AutoUnlockExpertDelivery.RunId && !plugin.AutoUnlockExpertDelivery.IsProcessing
-                    ? deliveryResult.Outcome.ToString() : null,
-                result = plugin.AutoUnlockExpertDelivery?.LastResult,
-            },
-            error = string.Empty,
-        });
+        var delivery = plugin.AutoUnlockExpertDelivery;
+        var lastResult = delivery?.LastResult;
+        return new IpcActivitySnapshot(
+            new(typeof(IpcProvider).Assembly.ManifestModule.ModuleVersionId.ToString("D"),
+                developmentLoadId, developmentStartedAtUtc, !isDisposed),
+            IsBusyOnFrameworkThread(), source, detail,
+            new(plugin.TaskRunner.IsRunning, plugin.TaskRunner.CurrentTaskName, plugin.TaskRunner.StatusText,
+                plugin.TaskRunner.CurrentStep, plugin.TaskRunner.TotalSteps, plugin.TaskRunner.CompletedItems,
+                plugin.TaskRunner.TotalItems, plugin.TaskRunner.CurrentItemLabel),
+            new(plugin.ArPostProcessor.IsRunning, plugin.ArPostProcessor.StatusText, string.Empty),
+            new(plugin.AutoCollector.IsRunning, plugin.AutoCollector.StatusText, string.Empty),
+            new(plugin.AutoOpenMoogleMail.IsProcessing, plugin.AutoOpenMoogleMail.StatusText,
+                plugin.AutoOpenMoogleMail.LastActionText),
+            new(delivery?.IsProcessing == true, delivery?.RunId ?? 0, delivery?.StatusText ?? "Unavailable",
+                delivery?.DeliveredCount ?? 0, delivery?.ListSummary ?? string.Empty,
+                lastResult is not null && lastResult.RunId == delivery!.RunId && !delivery.IsProcessing
+                    ? lastResult.Outcome.ToString() : null,
+                lastResult is null ? null : new(lastResult.RunId, (int)lastResult.Outcome, lastResult.Delivered,
+                    lastResult.Protected, lastResult.CapBlocked, lastResult.ElapsedMilliseconds, lastResult.Message)),
+            plugin.ReadDevelopmentUiState())
+            .ToJson();
     }
 
     private void RunTask(string taskName)

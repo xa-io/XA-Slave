@@ -23,6 +23,19 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.57 - 2026-10-23",
+            Lines =
+            [
+                "- Fixed Monthly Relogger: Skip characters missing from AutoRetainer's data without relog attempts or retries, then continue to the next character.",
+                "- Fixed Developer Integration: Activity and dependency reports remain readable in protected builds, preserving task progress and unavailable-provider results.",
+                "- Updated XA Database Integration: Support current all-character aetheryte summaries for developer testing.",
+                "- Fixed Plugin Builder Commands: Toggle saved windows through IPC with /xa win <name>, matching chat command behavior.",
+                "- Fixed Commands and XA Mods: Explicitly opening either panel expands and focuses a collapsed main window; later manual collapse remains available.",
+                "- Added Developer Panel Observations: Report completed panel draws separately from selection so command checks can distinguish opening from drawing.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.56 - 2026-10-23",
             Lines =
             [

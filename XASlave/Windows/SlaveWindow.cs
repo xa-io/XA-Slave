@@ -176,6 +176,7 @@ public partial class SlaveWindow : Window, IDisposable
 
     public override void PreDraw()
     {
+        ApplyCommandPanelReveal();
         UpdateSizeConstraints(UiScale);
         WindowName = plugin.Configuration.ShowVersionInUpdatesTitle
             ? $"XA Slave v{PluginVersion}###SlaveWindow"
@@ -894,7 +895,41 @@ public partial class SlaveWindow : Window, IDisposable
     public void OpenXAModsTask()
     {
         IsOpen = true;
+        revealCommandPanel = true;
+        BringToFront();
         SelectBuiltInTask(SlaveTask.XAMods);
+    }
+
+    private bool revealCommandPanel;
+    private void ApplyCommandPanelReveal()
+    {
+        if (!revealCommandPanel) return;
+        ImGui.SetNextWindowCollapsed(false, ImGuiCond.Always);
+        revealCommandPanel = false;
+    }
+
+    // Fixed, non-private panel names only. A completed Draw is separate from a
+    // selected/open flag; consumers must require a newer revision after dispatch.
+    private IpcUiSnapshot developmentUiRender = new(false, "none", "none", 0);
+    private string DevelopmentPanelName() => selectedExternalTask != null ? "other" : selectedTask switch
+    {
+        SlaveTask.XAMods => "mods",
+        SlaveTask.CommandsReference => "commands",
+        null => "landing",
+        _ => "other",
+    };
+
+    internal IpcUiSnapshot ReadDevelopmentUiState()
+    {
+        var rendered = System.Threading.Volatile.Read(ref developmentUiRender);
+        return new(IsOpen, DevelopmentPanelName(), rendered.RenderedPanel, rendered.RenderRevision);
+    }
+
+    private void RecordDevelopmentPanelDraw(string renderedPanel)
+    {
+        var previous = System.Threading.Volatile.Read(ref developmentUiRender);
+        System.Threading.Volatile.Write(ref developmentUiRender,
+            new IpcUiSnapshot(IsOpen, DevelopmentPanelName(), renderedPanel, checked(previous.RenderRevision + 1)));
     }
 
     public void OpenEurekaInstanceHunterTask()
@@ -906,6 +941,8 @@ public partial class SlaveWindow : Window, IDisposable
     public void OpenCommandsReferenceTask()
     {
         IsOpen = true;
+        revealCommandPanel = true;
+        BringToFront();
         SelectBuiltInTask(SlaveTask.CommandsReference);
     }
 
@@ -1457,6 +1494,7 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     try
                     {
+                        var renderedPanel = DevelopmentPanelName();
                         switch (selectedTask)
                         {
                             case null:
@@ -1536,6 +1574,7 @@ public partial class SlaveWindow : Window, IDisposable
                                 DrawCommandsReference();
                                 break;
                         }
+                        RecordDevelopmentPanelDraw(renderedPanel);
                     }
                     catch (Exception ex)
                     {

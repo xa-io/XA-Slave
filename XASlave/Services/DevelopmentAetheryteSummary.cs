@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace XASlave.Services;
 
@@ -24,7 +25,7 @@ internal static class DevelopmentAetheryteSummary
             RequireUniqueProperties(root);
             var contract = root.GetProperty("ipcContractVersion").GetInt32();
             var version = root.GetProperty("aetheryteListVersion").GetInt32();
-            if (contract != 7 || version != 1) return "dependency_invalid_evidence";
+            if (contract is not (7 or 8) || version != 1) return "dependency_invalid_evidence";
             var characters = root.GetProperty("characters");
             if (characters.ValueKind != JsonValueKind.Array) return "dependency_invalid_evidence";
             if (characters.GetArrayLength() > 4096) return "response_oversize";
@@ -46,16 +47,25 @@ internal static class DevelopmentAetheryteSummary
                 destinations = checked(destinations + characterDestinations.GetArrayLength());
             }
             var bytes = StrictUtf8.GetBytes(source);
-            summary = JsonSerializer.Serialize(new
+            summary = new JsonObject
             {
-                schema = 1, representation = "aggregate-summary", sourceQuery = "xa.aetherytes.all",
-                sourceSha256 = Convert.ToHexStringLower(SHA256.HashData(bytes)), sourceUtf8Bytes = bytes.Length,
-                ipcContractVersion = contract, aetheryteListVersion = version,
-                characterCount = owners.Count, knownCharacterCount = known, unknownCharacterCount = owners.Count - known,
-                aetheryteIdCount = ids, destinationCount = destinations,
-                scannedAllReturnedCharacters = true, recordsRetained = false, providerPopulationVerified = false,
-                validation = "aggregate-fields-only",
-            });
+                ["schema"] = 1,
+                ["representation"] = "aggregate-summary",
+                ["sourceQuery"] = "xa.aetherytes.all",
+                ["sourceSha256"] = Convert.ToHexStringLower(SHA256.HashData(bytes)),
+                ["sourceUtf8Bytes"] = bytes.Length,
+                ["ipcContractVersion"] = contract,
+                ["aetheryteListVersion"] = version,
+                ["characterCount"] = owners.Count,
+                ["knownCharacterCount"] = known,
+                ["unknownCharacterCount"] = owners.Count - known,
+                ["aetheryteIdCount"] = ids,
+                ["destinationCount"] = destinations,
+                ["scannedAllReturnedCharacters"] = true,
+                ["recordsRetained"] = false,
+                ["providerPopulationVerified"] = false,
+                ["validation"] = "aggregate-fields-only",
+            }.ToJsonString();
             return "observed";
         }
         catch

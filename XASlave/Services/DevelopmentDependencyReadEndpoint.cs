@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace XASlave.Services;
 
@@ -142,5 +143,18 @@ internal static class DevelopmentDependencyReadEndpoint
     }
 
     private static string Response(string query, string code, object? value)
-        => JsonSerializer.Serialize(new { schema = 1, query, success = code == "observed", code, value });
+        => new JsonObject
+        {
+            ["schema"] = 1,
+            ["query"] = query,
+            ["success"] = code == "observed",
+            ["code"] = code,
+            ["value"] = value switch
+            {
+                bool flag => JsonValue.Create(flag),
+                string text => JsonValue.Create(text),
+                null => null,
+                _ => throw new InvalidOperationException("Unsupported dependency wire value."),
+            },
+        }.ToJsonString();
 }

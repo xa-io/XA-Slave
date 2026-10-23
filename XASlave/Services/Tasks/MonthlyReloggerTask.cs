@@ -116,8 +116,9 @@ public sealed class MonthlyReloggerTask
             // re-run the pre-flight checklist to recover a safe state before moving on.
             steps.AddRange(BuildRelogTimeoutRecoverySteps(charName, runner, relogState));
 
-            steps.AddRange(BuildDutyGuardSteps(charName, runner, relogState));
-            steps.AddRange(BuildHomeworldCheckSteps(charName, runner, relogState));
+            foreach (var guard in BuildDutyGuardSteps(charName, runner, relogState)
+                         .Concat(BuildHomeworldCheckSteps(charName, runner, relogState)))
+                steps.Add(WithSkip(guard, () => relogState.ShouldHalt));
 
             // Per-character actions - built inline so ordering is correct
             // Each action step is gated by relog success
@@ -230,6 +231,7 @@ public sealed class MonthlyReloggerTask
     ///
     /// Flow:
     ///   1. Check if already logged in → skip relog if yes
+    ///      Otherwise skip characters marked missing by the last AutoRetainer import/refresh.
     ///   2. Send /ays relog, wait via SafeWait (relog takes 1-2 minutes)
     ///   3. After SafeWait, verify GetCurrentCharacterNameWorld() == target
     ///   4. If wrong character, retry up to 3 total attempts
@@ -266,7 +268,11 @@ public sealed class MonthlyReloggerTask
                     }
 
                     if (capturedAttempt == 1 && IsCharacterMissingFromAutoRetainer(charName))
-                        runner.AddLog($"Note: {charName} is not in AutoRetainer's data (not found in AR) - /ays relog may fail to find it.");
+                    {
+                        RecordRelogFailure(runner, relogState, charName,
+                            $"Skipping {charName}: not found in AutoRetainer's data. No relog attempts or retries will be made.");
+                        return;
+                    }
 
                     runner.SuppressLogoutCancel = true;
                     var actionLabel = capturedAttempt == 1 ? "Relogging" : "Retrying relog";
@@ -440,7 +446,7 @@ public sealed class MonthlyReloggerTask
 
     /// <summary>
     /// True if the last AutoRetainer import/refresh found no data for this character.
-    /// Such characters cannot be relogged with /ays relog and are expected to fail.
+    /// Such characters are skipped before /ays relog unless already logged in.
     /// </summary>
     private bool IsCharacterMissingFromAutoRetainer(string charName)
     {
