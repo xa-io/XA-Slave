@@ -174,14 +174,14 @@ public partial class SlaveWindow
         {
             onhRemoteTransferStop = false;
             onhTransferFailed = true;
-            CleanupXagmanDropboxTradeAttempt("ONH partner requested an item-transfer pause");
-            if (!TryRequireXagmanReceiverAutoAccept("ONH receive pause/failure signal")) return;
+            CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S68D386B1258AD49E"));
+            if (!TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("SDDFB5DEBCC9EB1E1"))) return;
         }
         if (onhTellOutbox.Count > 0 && (DateTime.UtcNow - onhLastTellSent).TotalSeconds >= 1)
         {
             onhLastTellSent = DateTime.UtcNow;
             if (!SendXagmanOnhTell(onhTellOutbox.Dequeue()))
-            { FailXagmanOnhRun("could not acknowledge protocol tell"); return; }
+            { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S663273F993F1ED0B")); return; }
         }
         if (onhTradeBefore == null) return;
         if (OnhTradeOpen)
@@ -372,7 +372,7 @@ public partial class SlaveWindow
         if (tony.Length == 0)
         {
             xagmanStatus = XagmanStatus.Standby;
-            xagmanStatusText = "Waiting for an eligible Tony.";
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("SFBE80885519A4264"));
             MaybeLogOnhWait("no eligible Tony nearby; waiting for rotation or arrival.");
             return;
         }
@@ -382,14 +382,14 @@ public partial class SlaveWindow
             xagmanOnhEngagedPartner = xagmanActiveTradePartner = tony;
         }
         if (!IsCurrentTargetWithinStopDistanceAndStopped(tony, XagmanOnhTradeStopDistance)) return;
-        BeginXagmanOnhFoAwaitStart("queued for an invitation");
+        BeginXagmanOnhFoAwaitStart(global::XASlave.Localization.UiMessage.Key("SF78476E73B354613"));
     }
 
-    private void BeginXagmanOnhFoAwaitStart(string reason)
+    private void BeginXagmanOnhFoAwaitStart(global::XASlave.Localization.UiMessage reason)
     {
-        if (!TryRequireXagmanReceiverAutoAccept("ONH owner awaiting invitation")) return;
+        if (!TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("SB899E6BCA20868ED"))) return;
         xagmanStatus = XagmanStatus.Queued;
-        xagmanStatusText = $"{reason} from {xagmanOnhEngagedPartner}.";
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SED7CBBA203C6B932", reason, xagmanOnhEngagedPartner));
         SetXagmanOnhPhase(XagmanOnhPhase.FoAwaitStartGil);
     }
 
@@ -415,7 +415,7 @@ public partial class SlaveWindow
     {
         onhGiveBlocked = XagmanOnhGiveRemaining().Count > 0;
         if (!onhGiveBlocked) onhCollectionDone = true;
-        if (!TryRequireXagmanReceiverAutoAccept("ONH collection complete/pause")) return;
+        if (!TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("S8AE8498B0D5B49A9"))) return;
         xagmanOnhFoSettleSinceUtc = DateTime.UtcNow;
         SetXagmanOnhPhase(XagmanOnhPhase.FoSettle);
     }
@@ -427,13 +427,13 @@ public partial class SlaveWindow
         {
             if (!IsXagmanOnhPartnerPresent(xagmanOnhEngagedPartner)) { ReleaseXagmanOnhOwnerPartner(true); return; }
             if ((DateTime.UtcNow - xagmanOnhFoSettleSinceUtc).TotalSeconds > 120)
-                FailXagmanOnhRun("collection remains incomplete without a verified Tony rotation signal");
+                FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SA748FEC12F29D282"));
             else MaybeLogOnhWait("collection paused; waiting for Tony's 2-gil rotation signal.");
             return;
         }
         if ((DateTime.UtcNow - xagmanOnhFoSettleSinceUtc).TotalSeconds < 3 || OnhTradeOpen) return;
         var rows = XagmanOnhReceiveRemaining();
-        if (rows.Count > OnhMaxRequestItems) { FailXagmanOnhRun("too many ONH resupply request rows"); return; }
+        if (rows.Count > OnhMaxRequestItems) { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S9917761E4E406EB7")); return; }
         var steps = new List<TaskStep>();
         onhSupplyAnnounced.Clear();
         for (var i = 0; i < Math.Max(1, rows.Count); i++)
@@ -442,14 +442,14 @@ public partial class SlaveWindow
             var row = rows.Count == 0 ? (Id: 0u, Quantity: 0) : rows[i];
             AppendXagmanOnhTell(steps, $"/xa db {row.Id}:{row.Quantity} ONH:{onhSession}:{index}:{rows.Count}");
         }
-        steps.AddRange(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, "request supply", 1));
+        steps.AddRange(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, global::XASlave.Localization.UiMessage.Key("SC640B70A9E161E38"), 1));
         if (TryStartXagmanOnhSubTask(steps)) SetXagmanOnhPhase(XagmanOnhPhase.FoSendDoneGil);
     }
 
     private void DriveXagmanOnhFoAfterDoneGil()
     {
-        if (xagmanOnhGilSendAborted) { FailXagmanOnhRun("supply confirmation gil was not delivered"); return; }
-        if (!TryRequireXagmanReceiverAutoAccept("ONH owner receiving supplies")) return;
+        if (xagmanOnhGilSendAborted) { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SFB9F8F69E27E772D")); return; }
+        if (!TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("S09DAE4D64B1A7CF7"))) return;
         onhPhaseSince = onhLastActivity = DateTime.UtcNow;
         SetXagmanOnhPhase(XagmanOnhPhase.FoReceiving);
     }
@@ -457,7 +457,7 @@ public partial class SlaveWindow
     private void ReleaseXagmanOnhOwnerPartner(bool retire)
     {
         if (retire) onhRetiredTonys.Add(xagmanOnhEngagedPartner);
-        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, "ONH owner standby")) return;
+        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("S98C1BB0E85998E9F"))) return;
         plugin.TaskRunner.AddLog($"Xagman ONH: {(retire ? "retired" : "released")} Tony {xagmanOnhEngagedPartner}; preserving outstanding inventory goals.");
         xagmanOnhEngagedPartner = xagmanActiveTradePartner = string.Empty;
         onhGiveBlocked = false;
@@ -491,14 +491,14 @@ public partial class SlaveWindow
             return;
         }
         if ((DateTime.UtcNow - onhPhaseSince).TotalSeconds < 2) return;
-        if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(candidate, "invitation", 1)))
+        if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(candidate, global::XASlave.Localization.UiMessage.Key("SA3013C082C75EDC9"), 1)))
             SetXagmanOnhPhase(XagmanOnhPhase.TonySendStartGil);
     }
 
     private void DriveXagmanOnhTonyAfterStartGil()
     {
         if (xagmanOnhGilSendAborted) { FinishXagmanOnhTonyEngagement(false); return; }
-        if (!TryRequireXagmanReceiverAutoAccept("ONH Tony receiving collection")) return;
+        if (!TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("SAEB459D349FF1B72"))) return;
         onhLastActivity = DateTime.UtcNow;
         SetXagmanOnhPhase(XagmanOnhPhase.TonyReceiving);
         plugin.TaskRunner.AddLog($"Xagman ONH: invitation delivered to {xagmanOnhEngagedPartner}; receiving collection.");
@@ -513,7 +513,7 @@ public partial class SlaveWindow
             {
                 onhReceivedSignals.Dequeue();
                 var rows = onhRequestParts.OrderBy(x => x.Key).Select(x => x.Value).ToList();
-                if (rows.Select(x => x.Id).Distinct().Count() != rows.Count) { FailXagmanOnhRun("duplicate item in supply request"); return; }
+                if (rows.Select(x => x.Id).Distinct().Count() != rows.Count) { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S743BC65723D58AE5")); return; }
                 if (TryStartXagmanOnhSubTask(BuildXagmanOnhTransfer(rows, true))) SetXagmanOnhPhase(XagmanOnhPhase.TonySupplying);
                 return;
             }
@@ -534,7 +534,7 @@ public partial class SlaveWindow
         var name = xagmanOnhEngagedPartner;
         if (completed) xagmanOnhCompletedPartners.Add(name);
         onhWaitingOwners.RemoveAll(x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
-        CleanupXagmanDropboxTradeAttempt("ONH Tony releasing queue slot");
+        CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("SC4697A92FC94FC0D"));
         xagmanOnhEngagedPartner = xagmanActiveTradePartner = string.Empty;
         ResetXagmanOnhExchange();
         xagmanOnhSearchSinceUtc = DateTime.UtcNow;
@@ -550,8 +550,8 @@ public partial class SlaveWindow
 
     private void StartXagmanOnhTonyRotationSignal()
     {
-        CleanupXagmanDropboxTradeAttempt("ONH Tony full or depleted");
-        if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, "pause and rotate Tony", 2)))
+        CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S51F35A8468A36665"));
+        if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, global::XASlave.Localization.UiMessage.Key("S2FEED9732E92C0C1"), 2)))
             SetXagmanOnhPhase(XagmanOnhPhase.TonySendRotate);
     }
 
@@ -563,9 +563,9 @@ public partial class SlaveWindow
             else AdvanceXagmanOnhCharacter(false, rotateForFull: true);
             return;
         }
-        CleanupXagmanDropboxTradeAttempt("ONH full inventory before selling");
+        CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S92BDF2B8B06C0DCC"));
         if (!xagmanRunning) return;
-        if (plugin.IpcClient.DropboxIsBusy()) { FailXagmanOnhRun("Dropbox did not stop before selling"); return; }
+        if (plugin.IpcClient.DropboxIsBusy()) { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SEF4021FA692408FE")); return; }
         onhSellHasOwner = hasOwner;
         onhSaleCompleted = onhSaleSucceeded = onhSaleReturnFailed = false;
         if (!hasOwner)
@@ -579,10 +579,10 @@ public partial class SlaveWindow
         AppendXagmanOnhTell(steps, $"/xa onh {onhSession} selling {seq}");
         steps.Add(new TaskStep
         {
-            Name = "Xagman ONH wait for owner selling pause",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SFC2033409E9B060D"),
             IsComplete = () => onhAcknowledgedSequence == seq,
             TimeoutSec = 15,
-            OnTimeout = () => FailXagmanOnhRun("owner did not acknowledge selling pause; update both ONH clients"),
+            OnTimeout = () => FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S990A243C38B842D2")),
         });
         if (TryStartXagmanOnhSubTask(steps)) SetXagmanOnhPhase(XagmanOnhPhase.TonyPauseForSale);
     }
@@ -596,7 +596,7 @@ public partial class SlaveWindow
         if (!TryStartXagmanTonySellWhenInventoryFull(xagmanOnhEngagedPartner, (succeeded, uncertain) =>
             {
                 if (!xagmanRunning || xagmanOnhPhase != XagmanOnhPhase.TonySelling) return;
-                if (uncertain) { FailXagmanOnhRun("seller/shop cleanup could not be confirmed"); return; }
+                if (uncertain) { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SE6C93B1BF70DBC6D")); return; }
                 onhSaleSucceeded = succeeded;
                 onhSaleCompleted = true;
                 xagmanStatus = XagmanStatus.Traveling;
@@ -613,7 +613,7 @@ public partial class SlaveWindow
         var steps = new List<TaskStep>();
         steps.Add(new TaskStep
         {
-            Name = "Xagman ONH close seller before returning",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S4766BBF3442D4076"),
             IsComplete = () =>
             {
                 if (AddonHelper.IsAddonVisible("Shop"))
@@ -621,10 +621,10 @@ public partial class SlaveWindow
                 return CharacterSafetyHelper.IsCharacterSafeWaitReady();
             },
             TimeoutSec = 15,
-            OnTimeout = () => FailXagmanOnhRun("shop/character readiness could not be confirmed after selling"),
+            OnTimeout = () => FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S48DB4408676787D5")),
         });
-        AddXagmanTeleportSteps(steps, "ONH Return From Selling", GetXagmanActiveMeetAetheryte, plugin.TaskRunner, null, true,
-            () => { xagmanStatus = XagmanStatus.Traveling; xagmanStatusText = "Tony returning to the meetup after selling."; },
+        AddXagmanTeleportSteps(steps, global::XASlave.Localization.UiMessage.Key("S6604736E1D66E93A"), GetXagmanActiveMeetAetheryte, plugin.TaskRunner, null, true,
+            () => { xagmanStatus = XagmanStatus.Traveling; xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("SC4490041E92783F2")); },
             () =>
             {
                 if (!IsXagmanAtMeetDestination(GetXagmanActiveMeetWorld(), GetXagmanActiveMeetAetheryte())) onhSaleReturnFailed = true;
@@ -640,19 +640,19 @@ public partial class SlaveWindow
         {
             case XagmanOnhPhase.FoAwaitSale:
                 xagmanStatus = XagmanStatus.Paused;
-                xagmanStatusText = $"Waiting for {xagmanOnhEngagedPartner} to sell and return.";
+                xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SAD03D2DA370A07B0", xagmanOnhEngagedPartner));
                 if (onhReceivedSignals.TryPeek(out var saleSignal))
                 {
                     onhPartnerSelling = false;
                     if (saleSignal == 2) { onhReceivedSignals.Dequeue(); ReleaseXagmanOnhOwnerPartner(true); return true; }
                     onhGiveBlocked = false;
                     xagmanStatus = XagmanStatus.Trading;
-                    xagmanStatusText = $"Resuming collection with {xagmanOnhEngagedPartner}.";
+                    xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S16B3E80875EB0181", xagmanOnhEngagedPartner));
                     SetXagmanOnhPhase(XagmanOnhPhase.FoAwaitStartGil);
                     DriveXagmanOnhFoAwaitStartGil();
                 }
                 else if ((DateTime.UtcNow - onhPartnerSellSince).TotalSeconds > 2400)
-                    FailXagmanOnhRun("Tony selling/resume timed out without a verified signal");
+                    FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S4FDDDF89575C5614"));
                 else MaybeLogOnhWait($"waiting for {xagmanOnhEngagedPartner} to sell and return; collection progress retained.");
                 return true;
             case XagmanOnhPhase.TonyPauseForSale:
@@ -662,14 +662,14 @@ public partial class SlaveWindow
             case XagmanOnhPhase.TonySelling:
                 if (!onhSaleCompleted)
                 {
-                    if (plugin.TaskRunner.StatusText is "Cancelled" or "Halted") FailXagmanOnhRun("selling was interrupted");
+                    if (plugin.TaskRunner.StatusText is "Cancelled" or "Halted") FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S85CFDE754AC94C85"));
                     return true;
                 }
                 ReturnXagmanOnhFromSale();
                 return true;
             case XagmanOnhPhase.TonyReturnFromSale:
                 if (!TryConsumeXagmanOnhSubTaskCompletion()) return true;
-                if (onhSaleReturnFailed) { FailXagmanOnhRun("could not return to meetup after selling"); return true; }
+                if (onhSaleReturnFailed) { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SF01C0DB40735EFBD")); return true; }
                 if (!onhSaleSucceeded)
                 {
                     if (onhSellHasOwner && IsXagmanOnhPartnerPresent(xagmanOnhEngagedPartner)) StartXagmanOnhTonyRotationSignal();
@@ -681,7 +681,7 @@ public partial class SlaveWindow
                 onhRequestParts.Clear();
                 onhRequestCount = -1;
                 onhReceivedSignals.Clear();
-                if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, "resume after selling", 1)))
+                if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, global::XASlave.Localization.UiMessage.Key("SA790D1AC3D7AFEC6"), 1)))
                     SetXagmanOnhPhase(XagmanOnhPhase.TonySendStartGil);
                 return true;
             case XagmanOnhPhase.FoReceiving:
@@ -691,21 +691,21 @@ public partial class SlaveWindow
                     var satisfied = onhGoals.All(g => (!g.TakeAll || onhSupplyAnnounced.ContainsKey(g.WireId))
                         && OnhOwnerHeld(g.WireId) >= g.ReceiveTarget);
                     if (satisfied) AdvanceXagmanOnhCharacter(false);
-                    else FailXagmanOnhRun("Tony sent completion but requested inventory totals are not satisfied");
+                    else FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S91C2BD61954E3FD1"));
                     return true;
                 }
                 if (XagmanOnhOwnerCapacityFailure())
                 {
-                    CleanupXagmanDropboxTradeAttempt("ONH owner cannot receive more");
-                    if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, "owner full/failed", 2)))
+                    CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("SF87E3F1CB0689F10"));
+                    if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, global::XASlave.Localization.UiMessage.Key("S4498B971C279B0E7"), 2)))
                         SetXagmanOnhPhase(XagmanOnhPhase.FoSendFailed);
                 }
                 else if ((DateTime.UtcNow - onhLastActivity).TotalSeconds > 180)
-                    FailXagmanOnhRun("resupply timed out without a verified final signal");
+                    FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SE1E5E0649AE02395"));
                 return true;
             case XagmanOnhPhase.FoSendFailed:
                 if (!TryConsumeXagmanOnhSubTaskCompletion()) return true;
-                if (xagmanOnhGilSendAborted) FailXagmanOnhRun("owner-full signal was not delivered");
+                if (xagmanOnhGilSendAborted) FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S694AD62038A6A27A"));
                 else AdvanceXagmanOnhCharacter(true);
                 return true;
             case XagmanOnhPhase.TonySupplying:
@@ -716,29 +716,29 @@ public partial class SlaveWindow
                 {
                     if (!IsXagmanOnhPartnerPresent(xagmanOnhEngagedPartner))
                     { FinishXagmanOnhTonyEngagement(false); return true; }
-                    if (!TryRequireXagmanReceiverAutoAccept("ONH Tony awaiting owner-full signal")) return true;
+                    if (!TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("S074D3795AF9A26FC"))) return true;
                     if ((DateTime.UtcNow - onhLastActivity).TotalSeconds > 30)
-                        FailXagmanOnhRun("supply trade failed without an owner-full signal");
+                        FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SE63EBAD5E06A7CB0"));
                     else xagmanOnhSubTaskCompleted = true;
                     return true;
                 }
                 if (onhTransferPartial) { StartXagmanOnhTonyRotationSignal(); return true; }
-                if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, "supply complete", 1)))
+                if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, global::XASlave.Localization.UiMessage.Key("SA03DD2065F2985B0"), 1)))
                     SetXagmanOnhPhase(XagmanOnhPhase.TonySendFinish);
                 return true;
             case XagmanOnhPhase.TonySendFinish:
                 if (!TryConsumeXagmanOnhSubTaskCompletion()) return true;
-                if (xagmanOnhGilSendAborted) FailXagmanOnhRun("final acknowledgement was not delivered");
+                if (xagmanOnhGilSendAborted) FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S5EA4394FF3E98275"));
                 else FinishXagmanOnhTonyEngagement();
                 return true;
             case XagmanOnhPhase.TonySendRotate:
                 if (!TryConsumeXagmanOnhSubTaskCompletion()) return true;
-                if (xagmanOnhGilSendAborted) FailXagmanOnhRun("Tony rotation signal was not delivered");
+                if (xagmanOnhGilSendAborted) FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S3B3120E7984606E7"));
                 else AdvanceXagmanOnhCharacter(false, rotateForFull: true);
                 return true;
             case XagmanOnhPhase.ReturningHome:
                 if (!TryConsumeXagmanOnhSubTaskCompletion()) return true;
-                if (onhReturnFailed) FailXagmanOnhRun("FC return failed; next character was not started");
+                if (onhReturnFailed) FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SF99490EDDEE7F06D"));
                 else FinishXagmanOnhCharacter(onhReturningFailed, onhReturningIncomplete, onhReturningRotation);
                 return true;
             default: return false;
@@ -749,12 +749,12 @@ public partial class SlaveWindow
     {
         steps.Add(new TaskStep
         {
-            Name = "Xagman ONH protocol tell",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S13E3A5D142ADFD9C"),
             ShouldSkip = () => onhPartnerSelling,
-            OnEnter = () => { if (!SendXagmanOnhTell(text)) FailXagmanOnhRun("could not send protocol tell"); },
+            OnEnter = () => { if (!SendXagmanOnhTell(text)) FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SFDA9E7A2FF7636E4")); },
             IsComplete = () => true, TimeoutSec = 1,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("Xagman ONH tell delivery wait", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("SD6265CA12DBACA5A"), 1.0f));
     }
 
     private bool XagmanOnhOwnerCapacityFailure()
@@ -785,22 +785,22 @@ public partial class SlaveWindow
             planned.Add((row.Id, amount));
             targets[row.Id] = OnhHeld(row.Id) - amount;
         }
-        steps.Add(MonthlyReloggerTask.MakeDelay("Xagman ONH receiver preparation", 2f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S1BF168ACED3A423A"), 2f));
         steps.Add(new TaskStep
         {
-            Name = "Xagman ONH prepare item trade",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S9D2C2F40FA4BC84E"),
             OnEnter = () =>
             {
                 OpenXagmanDropboxWindow();
                 OpenXagmanDropboxTradeTab();
-                if (!TryClearXagmanDropbox(out _) || !TrySetXagmanDropboxAutoAcceptOrStop(false, "ONH item sender")
+                if (!TryClearXagmanDropbox(out _) || !TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("S4E84B6471C8CD19D"))
                     || !FocusXagmanCurrentTarget(xagmanOnhEngagedPartner)) onhTransferFailed = true;
             }, IsComplete = () => true, TimeoutSec = 2,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("Xagman ONH prime item wait", 1f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S9DDE364F2BE9A65F"), 1f));
         steps.Add(new TaskStep
         {
-            Name = "Xagman ONH queue exact items",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S896438A1D17D63B3"),
             OnEnter = () =>
             {
                 if (onhTransferFailed) return;
@@ -827,37 +827,37 @@ public partial class SlaveWindow
         });
         steps.Add(new TaskStep
         {
-            Name = "Xagman ONH verify item transfer",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S11DD8C95E768089F"),
             IsComplete = () =>
             {
                 if (onhTransferFailed || queuedRows == 0) return true;
                 if (!IsXagmanOnhPartnerPresent(xagmanOnhEngagedPartner))
-                { onhTransferFailed = true; CleanupXagmanDropboxTradeAttempt("ONH partner disappeared"); return true; }
+                { onhTransferFailed = true; CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S89E0F08137FA8605")); return true; }
                 var failure = GetXagmanTradeFailureKind(out _);
                 if ((DateTime.UtcNow - onhPhaseSince).TotalSeconds > 2 && failure != XagmanTradeFailureKind.None)
-                { onhTransferFailed = true; CleanupXagmanDropboxTradeAttempt("ONH item transfer error"); return true; }
+                { onhTransferFailed = true; CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S3B1C5D0D954822B5")); return true; }
                 if (plugin.IpcClient.DropboxIsBusy() || OnhTradeOpen || onhTradeBefore != null) return false;
                 if (targets.All(x => OnhHeld(x.Key) <= x.Value)) return true;
                 if ((DateTime.UtcNow - onhPhaseSince).TotalSeconds < 10) return false;
                 onhTransferFailed = true;
                 return true;
             }, TimeoutSec = 600,
-            OnTimeout = () => { onhTransferFailed = true; CleanupXagmanDropboxTradeAttempt("ONH item transfer timeout"); },
+            OnTimeout = () => { onhTransferFailed = true; CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S89826927007964E4")); },
         });
         steps.Add(new TaskStep
         {
-            Name = "Xagman ONH finish item transfer",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SB7A2305A9354AC9E"),
             OnEnter = () =>
             {
                 ClearXagmanDropbox();
-                TryRequireXagmanReceiverAutoAccept("ONH item transfer signal receiver");
+                TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("SD1DBFC3ACE79748B"));
                 onhLastActivity = DateTime.UtcNow;
             }, IsComplete = () => true, TimeoutSec = 2,
         });
         return steps;
     }
 
-    private List<TaskStep> BuildXagmanOnhSendGilSteps(string targetKey, string contextLabel, int amount = 1)
+    private List<TaskStep> BuildXagmanOnhSendGilSteps(string targetKey, global::XASlave.Localization.UiMessage contextLabel, int amount = 1)
     {
         xagmanOnhGilSendAborted = false;
         var steps = new List<TaskStep>();
@@ -865,33 +865,33 @@ public partial class SlaveWindow
         AppendXagmanOnhTell(steps, $"/xa onh {onhSession} signal {seq} {amount}");
         steps.Add(new TaskStep
         {
-            Name = "Xagman ONH wait for signal tell acknowledgement",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SFFB247E0AB2906DD"),
             IsComplete = () => onhAcknowledgedSequence == seq,
             TimeoutSec = 15, OnTimeout = () => xagmanOnhGilSendAborted = true,
         });
         steps.Add(new TaskStep
         {
-            Name = $"Xagman ONH signal approach: {contextLabel}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SCA00E6D061DCEBE7", contextLabel),
             ShouldSkip = () => xagmanOnhGilSendAborted,
             IsComplete = () => IsCurrentTargetWithinStopDistanceAndStopped(targetKey, XagmanOnhTradeStopDistance),
             TimeoutSec = 15, OnTimeout = () => xagmanOnhGilSendAborted = true,
         });
         steps.Add(new TaskStep
         {
-            Name = $"Xagman ONH prepare {amount}-gil signal",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S5C7D543804EE4C30", amount),
             ShouldSkip = () => xagmanOnhGilSendAborted,
             OnEnter = () =>
             {
                 OpenXagmanDropboxWindow();
                 OpenXagmanDropboxTradeTab();
-                if (!TryClearXagmanDropbox(out _) || !TrySetXagmanDropboxAutoAcceptOrStop(false, "ONH signal sender")
+                if (!TryClearXagmanDropbox(out _) || !TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("SEE3984428C9C76EC"))
                     || !FocusXagmanCurrentTarget(targetKey)) xagmanOnhGilSendAborted = true;
             }, IsComplete = () => true, TimeoutSec = 2,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("Xagman ONH signal prime wait", 1f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S8CF90E20F5BB2374"), 1f));
         steps.Add(new TaskStep
         {
-            Name = $"Xagman ONH send {amount} gil: {contextLabel}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S6ED935E234DF4B92", amount, contextLabel),
             ShouldSkip = () => xagmanOnhGilSendAborted,
             OnEnter = () =>
             {
@@ -906,20 +906,20 @@ public partial class SlaveWindow
         });
         steps.Add(new TaskStep
         {
-            Name = $"Xagman ONH verify {amount}-gil delivery",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S1DD5E8F196C819B5", amount),
             ShouldSkip = () => xagmanOnhGilSendAborted,
             IsComplete = () => onhOutgoingSignalConfirmed && !OnhTradeOpen && !plugin.IpcClient.DropboxIsBusy(),
             TimeoutSec = 60,
-            OnTimeout = () => { xagmanOnhGilSendAborted = true; CleanupXagmanDropboxTradeAttempt("ONH unconfirmed signal"); },
+            OnTimeout = () => { xagmanOnhGilSendAborted = true; CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S06C891AAF3DF4024")); },
         });
         steps.Add(new TaskStep
         {
-            Name = "Xagman ONH signal cleanup",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SE57203BA47146381"),
             OnEnter = () =>
             {
                 onhOutgoingSignalAmount = 0;
                 ClearXagmanDropbox();
-                TryRequireXagmanReceiverAutoAccept("ONH awaiting partner response");
+                TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("S77F870DBB2ACA6FE"));
                 plugin.TaskRunner.AddLog($"Xagman ONH: {contextLabel}: {amount}-gil delivery {(xagmanOnhGilSendAborted ? "FAILED" : "verified")}.");
             }, IsComplete = () => true, TimeoutSec = 2,
         });
@@ -932,12 +932,12 @@ public partial class SlaveWindow
         onhReturningIncomplete = incomplete;
         onhReturningRotation = rotate;
         onhReturnFailed = false;
-        CleanupXagmanDropboxTradeAttempt("ONH return home");
+        CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S0628F92194C44786"));
         if (plugin.IpcClient.DropboxIsBusy())
-        { FailXagmanOnhRun("Dropbox did not stop before FC return"); return; }
+        { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S246F51001770EE35")); return; }
         var steps = new List<TaskStep>();
-        AddXagmanTeleportSteps(steps, "ONH Return FC", () => "fc", plugin.TaskRunner, null, true,
-            () => { xagmanStatus = XagmanStatus.ReturningHome; xagmanStatusText = $"Returning {xagmanActiveCharacter} to FC."; },
+        AddXagmanTeleportSteps(steps, global::XASlave.Localization.UiMessage.Key("S64EE74CBF4FDAAF0"), () => "fc", plugin.TaskRunner, null, true,
+            () => { xagmanStatus = XagmanStatus.ReturningHome; xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SA9F0BA7C25CD7E82", xagmanActiveCharacter)); },
             () => RememberXagmanRecentFcReturn(xagmanActiveCharacter), () => onhReturnFailed = true, expectCrossDataCenterLogout: true);
         if (TryStartXagmanOnhSubTask(steps)) SetXagmanOnhPhase(XagmanOnhPhase.ReturningHome);
     }

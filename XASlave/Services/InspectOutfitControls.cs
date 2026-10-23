@@ -11,7 +11,7 @@ internal readonly record struct InspectOutfitGeometry(float X, float Y, float Wi
     {
         if (!float.IsFinite(x) || !float.IsFinite(y) || !float.IsFinite(width) || !float.IsFinite(hostWidth) || !float.IsFinite(hostHeight)
             || x < 0 || y < 0 || width <= 0 || hostWidth <= 0 || hostHeight <= 0 || x + width > hostWidth || y + 52 > hostHeight)
-            throw new InvalidOperationException("CharacterInspect has no compatible space for its try-on button.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S7C28C1DECD033188"), originalMessage => new InvalidOperationException(originalMessage));
         return new(x, y + 28, width);
     }
 }
@@ -67,7 +67,7 @@ internal sealed unsafe class InspectOutfitControls : IDisposable
     private void Require(bool visible)
     {
         if (!hostAlive() || Resolve(Host.Generation, visible) != Host)
-            throw new InvalidOperationException("The inspection window generation changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S3DD66E20372352D3"), originalMessage => new InvalidOperationException(originalMessage));
     }
 
     private InspectOutfitGeometry Geometry()
@@ -83,7 +83,7 @@ internal sealed unsafe class InspectOutfitControls : IDisposable
         Require(false);
         if (Resolve(Host.Generation) == null) { button.IsVisible = false; return; }
         if (((AtkResNode*)Host.Anchor)->Height != 24)
-            throw new InvalidOperationException("The inspection anchor was resized by another owner.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S20DA0FC0B83AE6B4"), originalMessage => new InvalidOperationException(originalMessage));
         var geometry = Geometry();
         button.Position = new Vector2(geometry.X, geometry.Y); button.Size = new Vector2(geometry.Width, 24);
         button.String = busy ? "Stop" : "Try On All";

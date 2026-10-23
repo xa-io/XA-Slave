@@ -431,7 +431,7 @@ public partial class SlaveWindow
         {
             Plugin.Log.Warning(ex, "[Xagman] Trade-capacity forecast refresh failed");
             if (xagmanTonyAutoPending || xagmanTonyAutoTracking)
-                StopXagmanTonyAutoSelection("Auto: forecast refresh failed. Existing selection kept; refresh and try again.");
+                StopXagmanTonyAutoSelection(global::XASlave.Localization.UiMessage.Key("SFDAAB458DA9F7897"));
             xagmanLocalTradeCapacityForecast = null;
             xagmanTradeCapacityView = null;
             xagmanOwnerForecastView = null;
@@ -1783,48 +1783,47 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Franchise Owner Forecasts");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SA0853EBE0D12C002"));
         ImGui.SameLine();
-        if (ImGui.SmallButton("Refresh##xagmanOwnerForecastRefresh"))
+        if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S0E91610117029A62") + "##xagmanOwnerForecastRefresh")))
             RefreshXagmanTradeCapacityInventorySnapshots();
         ImGui.SameLine();
-        ImGui.TextDisabled("Cached setup planning; live trade limits remain authoritative.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SD158ED75B40CD3A1"));
 
         if (xagmanRunning && xagmanActiveRole == XagmanRole.FranchiseOwner)
         {
-            ImGui.TextDisabled("The setup forecasts are hidden during an active owner run; use the processing list and task log for live progress.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S0898A4310D449238"));
             return;
         }
 
         var view = xagmanOwnerForecastView;
         if (view == null)
         {
-            ImGui.TextDisabled("Waiting for the cached Franchise Owner inventory forecasts...");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S7EDB4D21D08E78F7"));
             return;
         }
 
         ImGui.TextDisabled(
-            $"{view.SelectedOwnerCount} selected owner(s), inventory: {view.KnownOwnerCount} known, {view.UnknownOwnerCount} unknown | " +
-            $"refreshed {view.GeneratedAtUtc.ToLocalTime():HH:mm:ss}");
+            global::XASlave.Localization.UiLocale.FormatKey("SFECDE1B42B14934F", view.SelectedOwnerCount, view.KnownOwnerCount, view.UnknownOwnerCount, view.GeneratedAtUtc.ToLocalTime()));
         if (view.SelectedOwnerCount <= 0)
         {
-            ImGui.TextDisabled("Select at least one Franchise Owner to calculate Give, Balance, or Take planning totals.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S84AC4E95251FEED7"));
             return;
         }
         if (view.InvalidPlanningItemCount > 0)
-            DrawXagmanTradeCapacityWarning($"{view.InvalidPlanningItemCount} planning item row(s) are invalid or untradable and are excluded; affected results cannot be marked complete.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S06931CDF7D2D06EB", view.InvalidPlanningItemCount));
         if (view.DuplicateItemKeyCount > 0)
-            DrawXagmanTradeCapacityWarning($"{view.DuplicateItemKeyCount} duplicate item/HQ/applicability key(s) are configured. Resolve the exact duplicates before relying on the totals.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("SA0A336ED02A119F8", view.DuplicateItemKeyCount));
         if (view.IsTruncated)
-            DrawXagmanTradeCapacityWarning("The owner or published-item safety limit was exceeded; results cannot be marked complete.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.Get("SFBB7F313AECD9E87"));
         if (view.UnknownOwnerCount > 0)
-            DrawXagmanTradeCapacityWarning($"{view.UnknownOwnerCount} selected owner inventory snapshot(s) are unknown or stale. Ranges and Take readiness remain conservative; Pull XA Database Info, then Refresh.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S9F78808BF74E1253", view.UnknownOwnerCount));
         if (view.UnknownConditionalPolicyOwnerCount > 0)
-            DrawXagmanTradeCapacityWarning($"{view.UnknownConditionalPolicyOwnerCount} selected owner(s) have unknown AutoRetainer registration; conditional item groups were excluded instead of applying their All fallback. Restore AutoRetainer data, then rerun Select Matching Items or start again.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("SBA36FF2C7C1A966F", view.UnknownConditionalPolicyOwnerCount));
         if (view.AllAvailableGiveItemCount > 0)
-            DrawXagmanTradeCapacityWarning($"{view.AllAvailableGiveItemCount} effective Give-0 all-available policy row(s) have no finite pooled target and remain indeterminate.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S01FF0BCF0B7C41FA", view.AllAvailableGiveItemCount));
         if (view.AllAvailableTakeItemCount > 0)
-            DrawXagmanTradeCapacityWarning($"{view.AllAvailableTakeItemCount} effective Take-0 all-available policy row(s) are indeterminate, excluded from finite slot totals, and prevent a complete Take result.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S197F510CCB6F6AC7", view.AllAvailableTakeItemCount));
 
         if (view.GiveItems.Count > 0)
             DrawXagmanOwnerGiveForecast(view);
@@ -1833,14 +1832,14 @@ public partial class SlaveWindow
         if (view.TakeItems.Count > 0 || view.AllAvailableTakeItemCount > 0)
             DrawXagmanOwnerTakeForecast(view);
         if (view.GiveItems.Count == 0 && view.BalanceItems.Count == 0 && view.TakeItems.Count == 0)
-            ImGui.TextDisabled("No valid tradable finite Give, positive Balance, or finite Take rows are available; all-available modes stay indeterminate.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SD3D5DEA433622BDA"));
     }
 
     private void DrawXagmanOwnerGiveForecast(XagmanOwnerForecastView view)
     {
         ImGui.Spacing();
-        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), "Give Batch Forecast");
-        ImGui.TextDisabled("Give N is one total planning target across the selected owners; runtime Give still offers up to N from each owner.");
+        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S332048F1B8B03694"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S316D8FB05DDA6B00"));
         var confirmedShortage = view.GiveItems.Sum(item => item.ConfirmedShortageQuantity);
         var maximumShortage = view.GiveItems.Sum(item => item.MaximumShortageQuantity);
         var configurationUncertainty = view.InvalidPlanningItemCount > 0
@@ -1850,7 +1849,7 @@ public partial class SlaveWindow
         if (confirmedShortage > 0 && confirmedShortage == maximumShortage && !configurationUncertainty)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                $"Still needed across the Give batch target: {confirmedShortage:N0} unit(s).");
+                global::XASlave.Localization.UiLocale.FormatKey("SF17837E6627D5D41", confirmedShortage));
         }
         else if (maximumShortage > 0 || configurationUncertainty)
         {
@@ -1858,12 +1857,12 @@ public partial class SlaveWindow
                 ? maximumShortage.ToString("N0", CultureInfo.InvariantCulture)
                 : $"{confirmedShortage:N0}-{maximumShortage:N0}";
             ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                $"Still needed across the Give batch target: {range} unit(s); incomplete inputs prevent a final result.");
+                global::XASlave.Localization.UiLocale.FormatKey("S5B301275272F64BF", range));
         }
         else
         {
             ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f),
-                "Known selected-owner supply covers every Give batch target.");
+                global::XASlave.Localization.UiLocale.Get("S7CF6DA9BD2340104"));
         }
 
         using (var table = ImRaii.Table("XagmanOwnerGiveForecastItems", 5,
@@ -1871,12 +1870,12 @@ public partial class SlaveWindow
         {
         if (!table)
             return;
-        ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Target (Batch)", ImGuiTableColumnFlags.WidthFixed, Scale(105f));
-        ImGui.TableSetupColumn("Owners", ImGuiTableColumnFlags.WidthFixed, Scale(65f));
-        ImGui.TableSetupColumn("Known to Give", ImGuiTableColumnFlags.WidthFixed, Scale(105f));
-        ImGui.TableSetupColumn("Still Needed", ImGuiTableColumnFlags.WidthFixed, Scale(105f));
-        ImGui.TableHeadersRow();
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S652BCC3A47842889"), ImGuiTableColumnFlags.WidthStretch);
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SEF9CCA63A56C9B1A"), ImGuiTableColumnFlags.WidthFixed, Scale(105f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S58F5DF9B241AE8A8"), ImGuiTableColumnFlags.WidthFixed, Scale(65f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S18ABE5EB32BD27A5"), ImGuiTableColumnFlags.WidthFixed, Scale(105f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SE74E6C89734DBA9C"), ImGuiTableColumnFlags.WidthFixed, Scale(105f));
+        global::XASlave.Localization.UiNative.TableHeadersRow();
         foreach (var item in view.GiveItems)
         {
             ImGui.TableNextRow();
@@ -1890,21 +1889,21 @@ public partial class SlaveWindow
             ImGui.TableNextColumn();
             ImGui.TextDisabled(item.SelectedOwnerCount.ToString("N0", CultureInfo.InvariantCulture));
             if (item.UnknownOwnerCount > 0 && ImGui.IsItemHovered())
-                ImGui.SetTooltip($"{item.KnownOwnerCount:N0} known / {item.UnknownOwnerCount:N0} unknown owner inventories.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.FormatKey("S5540861DB1C7BEA7", item.KnownOwnerCount, item.UnknownOwnerCount));
             ImGui.TableNextColumn();
             ImGui.TextDisabled(item.KnownToGiveQuantity.ToString("N0", CultureInfo.InvariantCulture));
             ImGui.TableNextColumn();
             DrawXagmanOwnerForecastRange(item.ConfirmedShortageQuantity, item.MaximumShortageQuantity);
         }
         }
-        ImGui.TextDisabled("Known to Give sums min(owner inventory, Give N). Still Needed is max(0, batch target - known total); unknown owners can reduce, never increase, that shortage.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S2721972A5D38B357"));
     }
 
     private void DrawXagmanOwnerBalanceForecast(XagmanOwnerForecastView view)
     {
         ImGui.Spacing();
-        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), "Balance Forecast");
-        ImGui.TextDisabled("Balance N is a per-owner ending target; each owner's deficit is calculated independently.");
+        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S1E781F8248D91BFD"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SAF462EC80A13C784"));
         var confirmedNeeded = view.BalanceItems.Sum(item => item.ConfirmedNeededQuantity);
         var maximumNeeded = view.BalanceItems.Sum(item => item.MaximumNeededQuantity);
         var configurationUncertainty = view.InvalidPlanningItemCount > 0
@@ -1914,17 +1913,17 @@ public partial class SlaveWindow
         if (confirmedNeeded > 0 && confirmedNeeded == maximumNeeded && !configurationUncertainty)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                $"Tony must supply {confirmedNeeded:N0} unit(s) to fill the known Balance deficits.");
+                global::XASlave.Localization.UiLocale.FormatKey("SC782EB69615759C6", confirmedNeeded));
         }
         else if (maximumNeeded > confirmedNeeded || configurationUncertainty)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                $"Tony supply needed: {confirmedNeeded:N0}-{maximumNeeded:N0} unit(s); unknown or invalid inputs prevent a final total.");
+                global::XASlave.Localization.UiLocale.FormatKey("S7AAE002814A9B137", confirmedNeeded, maximumNeeded));
         }
         else
         {
             ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f),
-                "Every known owner already meets each positive Balance target.");
+                global::XASlave.Localization.UiLocale.Get("S4BA6A641BCF3BB64"));
         }
 
         using (var table = ImRaii.Table("XagmanOwnerBalanceForecastItems", 7,
@@ -1932,14 +1931,14 @@ public partial class SlaveWindow
         {
         if (!table)
             return;
-        ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Target Each", ImGuiTableColumnFlags.WidthFixed, Scale(85f));
-        ImGui.TableSetupColumn("Owners", ImGuiTableColumnFlags.WidthFixed, Scale(65f));
-        ImGui.TableSetupColumn("Total Target", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
-        ImGui.TableSetupColumn("Known Filled", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
-        ImGui.TableSetupColumn("Owners Short", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
-        ImGui.TableSetupColumn("Needed From Tony", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
-        ImGui.TableHeadersRow();
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S652BCC3A47842889"), ImGuiTableColumnFlags.WidthStretch);
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SB21A27F01CC6C1F1"), ImGuiTableColumnFlags.WidthFixed, Scale(85f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S58F5DF9B241AE8A8"), ImGuiTableColumnFlags.WidthFixed, Scale(65f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S936AC261EEE0C74B"), ImGuiTableColumnFlags.WidthFixed, Scale(95f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S236017BC551BBD2C"), ImGuiTableColumnFlags.WidthFixed, Scale(95f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S8C6A1DE9BBE4190A"), ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SC067A0C833BD7716"), ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+        global::XASlave.Localization.UiNative.TableHeadersRow();
         foreach (var item in view.BalanceItems)
         {
             ImGui.TableNextRow();
@@ -1953,7 +1952,7 @@ public partial class SlaveWindow
             ImGui.TableNextColumn();
             ImGui.TextDisabled(item.SelectedOwnerCount.ToString("N0", CultureInfo.InvariantCulture));
             if (item.UnknownOwnerCount > 0 && ImGui.IsItemHovered())
-                ImGui.SetTooltip($"{item.KnownOwnerCount:N0} known / {item.UnknownOwnerCount:N0} unknown owner inventories.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.FormatKey("S5540861DB1C7BEA7", item.KnownOwnerCount, item.UnknownOwnerCount));
             ImGui.TableNextColumn();
             ImGui.TextDisabled(item.TotalTargetQuantity.ToString("N0", CultureInfo.InvariantCulture));
             ImGui.TableNextColumn();
@@ -1967,59 +1966,58 @@ public partial class SlaveWindow
             DrawXagmanOwnerForecastRange(item.ConfirmedNeededQuantity, item.MaximumNeededQuantity);
         }
         }
-        ImGui.TextDisabled("Known Filled credits min(owner inventory, Balance N) per owner. Surplus on one owner never cancels another owner's deficit. Balance 0 has no deficit row.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S8E78C9DE82C647B7"));
     }
 
     private void DrawXagmanOwnerTakeForecast(XagmanOwnerForecastView view)
     {
         ImGui.Spacing();
-        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), "Take Receive-Capacity Forecast");
+        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S7858C7ABCF1E4D6F"));
         if (view.TakeItems.Count == 0)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                "No finite Take amount is available for a bag-capacity estimate; Take 0 remains indeterminate.");
+                global::XASlave.Localization.UiLocale.Get("S4569A3FC6262EF0B"));
             return;
         }
         ImGui.TextDisabled(
-            $"Selected {view.SelectedOwnerCount:N0} | known bag-ready {view.KnownTakeBagReadyOwnerCount:N0} | " +
-            $"known needing slots {view.KnownTakeNeedingSlotsOwnerCount:N0} | unknown {view.UnknownOwnerCount:N0}");
+            global::XASlave.Localization.UiLocale.FormatKey("S0C6BE12E86D57ED4", view.SelectedOwnerCount, view.KnownTakeBagReadyOwnerCount, view.KnownTakeNeedingSlotsOwnerCount, view.UnknownOwnerCount));
         var takeUncertainty = view.UnknownOwnerCount > 0
             || view.InvalidPlanningItemCount > 0
             || view.DuplicateItemKeyCount > 0
             || view.UnknownConditionalPolicyOwnerCount > 0
             || view.IsTruncated
             || view.AllAvailableTakeItemCount > 0;
-        var slotSummary = $"Known slots: {view.KnownTakeRequiredSlots:N0} required / {view.KnownTakeFreeSlots:N0} free / {view.KnownTakeShortSlots:N0} short.";
+        var slotSummary = (global::XASlave.Localization.UiMessage.Format("S226E6B2227A20E4A", view.KnownTakeRequiredSlots, view.KnownTakeFreeSlots, view.KnownTakeShortSlots)).Display;
         if (view.KnownTakeShortSlots > 0)
             ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), slotSummary);
         else if (takeUncertainty)
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"{slotSummary} Incomplete inputs prevent a complete result.");
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("SC989466F02AF12D9", slotSummary));
         else
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"{slotSummary} Every known owner has enough main-bag capacity.");
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S2D869A52750141C1", slotSummary));
 
         if (view.KnownTakeCrystalCapacityShortQuantity > 0)
         {
             ImGui.TextColored(
                 new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                $"Crystal pouch capacity is {view.KnownTakeCrystalCapacityShortQuantity:N0} unit(s) short across the known finite Take rows.");
+                global::XASlave.Localization.UiLocale.FormatKey("S483CADCE96EFDD7B", view.KnownTakeCrystalCapacityShortQuantity));
         }
 
         if (view.HasFiniteTakeGil)
-            DrawXagmanTradeCapacityWarning("Gil uses zero bag slots. Its quantity is advisory only; Tony's live gil minimum and the live trade cap remain authoritative.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.Get("S24C28ECF97696E99"));
 
         using (var table = ImRaii.Table("XagmanOwnerTakeForecastItems", 7,
                    ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
         {
         if (!table)
             return;
-        ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Each", ImGuiTableColumnFlags.WidthFixed, Scale(75f));
-        ImGui.TableSetupColumn("Owners", ImGuiTableColumnFlags.WidthFixed, Scale(65f));
-        ImGui.TableSetupColumn("Stack", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
-        ImGui.TableSetupColumn("Known Partial Fit", ImGuiTableColumnFlags.WidthFixed, Scale(115f));
-        ImGui.TableSetupColumn("Known New Slots", ImGuiTableColumnFlags.WidthFixed, Scale(105f));
-        ImGui.TableSetupColumn("Crystal Short", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
-        ImGui.TableHeadersRow();
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S652BCC3A47842889"), ImGuiTableColumnFlags.WidthStretch);
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SA9531F64027967A0"), ImGuiTableColumnFlags.WidthFixed, Scale(75f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S58F5DF9B241AE8A8"), ImGuiTableColumnFlags.WidthFixed, Scale(65f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SE551641242CE7246"), ImGuiTableColumnFlags.WidthFixed, Scale(55f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S25ACF838E92D7A54"), ImGuiTableColumnFlags.WidthFixed, Scale(115f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S75BE51916BF0368B"), ImGuiTableColumnFlags.WidthFixed, Scale(105f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SECE1E65C4DC4CB84"), ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+        global::XASlave.Localization.UiNative.TableHeadersRow();
         foreach (var item in view.TakeItems)
         {
             ImGui.TableNextRow();
@@ -2033,20 +2031,18 @@ public partial class SlaveWindow
             ImGui.TableNextColumn();
             ImGui.TextDisabled(item.SelectedOwnerCount.ToString("N0", CultureInfo.InvariantCulture));
             if (item.UnknownOwnerCount > 0 && ImGui.IsItemHovered())
-                ImGui.SetTooltip($"{item.KnownOwnerCount:N0} known / {item.UnknownOwnerCount:N0} unknown owner inventories.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.FormatKey("S5540861DB1C7BEA7", item.KnownOwnerCount, item.UnknownOwnerCount));
             ImGui.TableNextColumn();
-            ImGui.TextDisabled(item.IsGil ? "cash" : item.StackSize.ToString("N0", CultureInfo.InvariantCulture));
+            ImGui.TextDisabled(((item.IsGil ? global::XASlave.Localization.UiMessage.Key("SAB0FCEC08E18A7BC") : global::XASlave.Localization.UiMessage.Raw(item.StackSize.ToString("N0", CultureInfo.InvariantCulture)))).Display);
             ImGui.TableNextColumn();
-            ImGui.TextDisabled(item.IsGil ? "-" : item.KnownPartialFitQuantity.ToString("N0", CultureInfo.InvariantCulture));
+            ImGui.TextDisabled(((item.IsGil ? global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9") : global::XASlave.Localization.UiMessage.Raw(item.KnownPartialFitQuantity.ToString("N0", CultureInfo.InvariantCulture)))).Display);
             ImGui.TableNextColumn();
             ImGui.TextDisabled(item.KnownNewSlotsRequired.ToString("N0", CultureInfo.InvariantCulture));
             ImGui.TableNextColumn();
-            ImGui.TextDisabled(item.UsesCrystalPouch
-                ? item.KnownCrystalCapacityShortQuantity.ToString("N0", CultureInfo.InvariantCulture)
-                : "-");
+            ImGui.TextDisabled(((item.UsesCrystalPouch ? global::XASlave.Localization.UiMessage.Raw(item.KnownCrystalCapacityShortQuantity.ToString("N0", CultureInfo.InvariantCulture)) : global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9"))).Display);
         }
         }
-        ImGui.TextDisabled("Starting capacity covers one configured Take batch per owner. Non-crystal partial stacks are credited before shared Inventory 1-4 slots; elemental crystal rows use only their dedicated 9,999-unit pouch headroom and never consume bag slots. Later live supply passes remain authoritative. Take 0 is excluded.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S43E2E5A137134975"));
     }
 
     private static string GetXagmanOwnerForecastItemLabel(
@@ -2054,19 +2050,19 @@ public partial class SlaveWindow
         bool isHq,
         string policyLabel)
     {
-        var itemLabel = isHq ? $"{itemName} HQ" : itemName;
-        return string.IsNullOrWhiteSpace(policyLabel)
+        var itemLabel = isHq ? global::XASlave.Localization.UiMessage.Format("S5864848AE53E7CAF", itemName) : global::XASlave.Localization.UiMessage.Raw(itemName);
+        return (string.IsNullOrWhiteSpace(policyLabel)
             ? itemLabel
-            : $"{itemLabel} — {policyLabel}";
+            : global::XASlave.Localization.UiMessage.Format("SFA4816846A52134E", itemLabel, global::XASlave.Localization.UiMessage.Authored(policyLabel))).Display;
     }
 
     private static void DrawXagmanOwnerForecastRange(long confirmed, long maximum)
     {
         if (confirmed != maximum)
         {
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"{confirmed:N0}-{maximum:N0}");
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S1101B7E441F216AE", confirmed, maximum));
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Confirmed amount through the conservative maximum allowed by unknown inventories.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S90AB1CBE5DFDF1BB"));
         }
         else if (confirmed > 0)
         {
@@ -2074,7 +2070,7 @@ public partial class SlaveWindow
         }
         else
         {
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "0");
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), (global::XASlave.Localization.UiMessage.Key("S5FECEB66FFC86F38")).Display);
         }
     }
 
@@ -2090,47 +2086,45 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
         ImGui.Separator();
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Trade Capacity Forecast");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SCB92B0E791095341"));
         ImGui.SameLine();
-        if (ImGui.SmallButton("Refresh##xagmanTradeCapacityRefresh"))
+        if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S0E91610117029A62") + "##xagmanTradeCapacityRefresh")))
             RefreshXagmanTradeCapacityInventorySnapshots();
         ImGui.SameLine();
-        ImGui.TextDisabled("Connected estimate; live trade checks remain authoritative.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S677B7E62445F8B82"));
 
         var view = xagmanTradeCapacityView;
         if (view == null)
         {
-            ImGui.TextDisabled("Waiting for fresh Franchise Owner selection forecasts...");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SB1D238D525213987"));
             return;
         }
 
         ImGui.TextDisabled(
-            $"{view.ConnectedOwnerPeerCount} FO client(s), {view.SelectedOwnerCount} selected owner(s), " +
-            $"{view.SelectedTonyCount} selected Tony(s) | refreshed {view.GeneratedAtUtc.ToLocalTime():HH:mm:ss}");
+            global::XASlave.Localization.UiLocale.FormatKey("SC705F6BB882BACFC", view.ConnectedOwnerPeerCount, view.SelectedOwnerCount, view.SelectedTonyCount, view.GeneratedAtUtc.ToLocalTime()));
         if (view.ShowCollectionFirstProjection)
         {
             ImGui.TextWrapped(
-                "Collection-first projection: Stock After Collect = selected Tony stock now + all forecast Give/Balance surplus. " +
-                "The run freezes this baseline before collection so received items are not counted twice.");
+                global::XASlave.Localization.UiLocale.Get("S922A3D4FF39929D5"));
         }
         if (view.MissingForecastPeerCount > 0)
-            DrawXagmanTradeCapacityWarning($"{view.MissingForecastPeerCount} connected FO client(s) have not published a forecast yet (old or not-yet-refreshed plugin state).");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("SC979A9FBA3650478", view.MissingForecastPeerCount));
         if (view.StaleForecastPeerCount > 0 || view.StalePresencePeerCount > 0)
-            DrawXagmanTradeCapacityWarning($"Stale inputs excluded: {view.StaleForecastPeerCount} forecast(s), {view.StalePresencePeerCount} peer presence record(s).");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("SFECF12B530E9962D", view.StaleForecastPeerCount, view.StalePresencePeerCount));
         if (view.TruncatedForecastPeerCount > 0)
-            DrawXagmanTradeCapacityWarning($"{view.TruncatedForecastPeerCount} FO forecast payload(s) exceeded the safety limit; displayed requirements are incomplete.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S5A069C1992C995A3", view.TruncatedForecastPeerCount));
         if (view.UnknownOwnerCount > 0)
-            DrawXagmanTradeCapacityWarning($"{view.UnknownOwnerCount} selected owner inventory snapshot(s) or conditional-policy registration(s) are unknown; shown requirements are a known lower bound. Refresh XA Database inventory and AutoRetainer registration on each FO client; failed sources remain unknown.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S1A9DDCED07561FD7", view.UnknownOwnerCount));
         if (view.DuplicateOwnerKeys.Count > 0)
         {
             var preview = string.Join(", ", view.DuplicateOwnerKeys.Take(3));
-            var remainder = view.DuplicateOwnerKeys.Count > 3 ? $" +{view.DuplicateOwnerKeys.Count - 3} more" : string.Empty;
-            DrawXagmanTradeCapacityWarning($"Duplicate owner selections across FO clients may be counted twice: {preview}{remainder}.");
+            var remainder = ((view.DuplicateOwnerKeys.Count > 3 ? global::XASlave.Localization.UiMessage.Format("S13248AD5985692FB", view.DuplicateOwnerKeys.Count - 3) : global::XASlave.Localization.UiMessage.Raw(string.Empty))).Display;
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("SE4B422867A2A10CB", preview, remainder));
         }
 
         if (view.Groups.Count == 0)
         {
-            ImGui.TextDisabled("Connected forecasts contain no selected-owner item requirements yet.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SB8A41E471433BA21"));
             return;
         }
 
@@ -2144,17 +2138,16 @@ public partial class SlaveWindow
                 || view.TruncatedForecastPeerCount > 0
                 || view.Groups.Any(group => group.UnknownOwnerCount > 0 || group.UnknownTonyCount > 0);
             ImGui.Spacing();
-            ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), "All Selected Regions");
-            ImGui.TextDisabled("Informational total; each region's capacity stays in that physical region.");
+            ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SB3EE879E3793392E"));
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S1C6B93FD8DE84CEE"));
             DrawXagmanCollectionCapacitySummary(view.OverallCollectionCapacity, overallInputUncertainty);
         }
         else if (view.ServerMatching && view.OverallCollectionItemTypeCount > 1)
         {
             ImGui.Spacing();
-            ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), "All Selected Regions");
+            ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SB3EE879E3793392E"));
             ImGui.TextWrapped(
-                $"{view.OverallCollectionItemTypeCount:N0} incoming item types use shared regional slots. " +
-                "An overall item-unit capacity is not summed because unlike items and physical regions cannot share one pooled stack allocation.");
+                global::XASlave.Localization.UiLocale.FormatKey("S8FF0C504CC86132E", view.OverallCollectionItemTypeCount));
         }
 
         foreach (var group in view.Groups)
@@ -2164,12 +2157,10 @@ public partial class SlaveWindow
     private void DrawXagmanTradeCapacityGroup(XagmanTradeCapacityView view, XagmanTradeCapacityViewGroup group)
     {
         ImGui.Spacing();
-        var groupLabel = view.ServerMatching
-            ? $"Server Matching: {group.GroupKey}"
-            : $"Fixed World: {(string.IsNullOrWhiteSpace(plugin.Configuration.XagmanTargetWorld) ? "combined" : plugin.Configuration.XagmanTargetWorld)}";
+        var groupLabel = ((view.ServerMatching ? global::XASlave.Localization.UiMessage.Format("S84BDF8ACBFC44E37", group.GroupKey) : global::XASlave.Localization.UiMessage.Format("S16B9E43E0B7409C6", ((string.IsNullOrWhiteSpace(plugin.Configuration.XagmanTargetWorld) ? global::XASlave.Localization.UiMessage.Key("S8A92BCDD6DBDAA6E") : global::XASlave.Localization.UiMessage.Value(plugin.Configuration.XagmanTargetWorld)))))).Display;
         ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), groupLabel);
         ImGui.SameLine();
-        ImGui.TextDisabled($"({group.SelectedOwnerCount} owner(s), {group.SelectedTonyCount} Tony(s))");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("SAD73BC22B38902E7", group.SelectedOwnerCount, group.SelectedTonyCount));
 
         var duplicateUncertainty = view.DuplicateOwnerKeys.Count > 0;
         var inputUncertainty = duplicateUncertainty
@@ -2184,12 +2175,12 @@ public partial class SlaveWindow
         if (collectionShortage > 0 && !inputUncertainty)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                $"Collection: {group.RequiredCollectionSlots:N0} slot(s) needed / {group.KnownFreeSlots:N0} known free - select at least {collectionShortage:N0} more free slot(s).");
+                global::XASlave.Localization.UiLocale.FormatKey("S13BDAC4CEFE01EAA", group.RequiredCollectionSlots, group.KnownFreeSlots, collectionShortage));
         }
         else if (collectionShortage > 0)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                $"Collection: known aggregate is {collectionShortage:N0} slot(s) short, but unknown or duplicate inputs make the final result indeterminate.");
+                global::XASlave.Localization.UiLocale.FormatKey("S6A9983DC933E21A2", collectionShortage));
         }
         else
         {
@@ -2197,9 +2188,7 @@ public partial class SlaveWindow
                 ? new Vector4(1.0f, 0.8f, 0.3f, 1.0f)
                 : new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
             ImGui.TextColored(color,
-                inputUncertainty
-                    ? $"Collection: {group.RequiredCollectionSlots:N0} known slot(s) needed / {group.KnownFreeSlots:N0} known free - unknown or duplicate inputs may change the result."
-                    : $"Collection: {group.RequiredCollectionSlots:N0} slot(s) needed / {group.KnownFreeSlots:N0} known free - selected Tony capacity is sufficient.");
+                ((inputUncertainty ? global::XASlave.Localization.UiMessage.Format("S2C180ADA3E50F569", group.RequiredCollectionSlots, group.KnownFreeSlots) : global::XASlave.Localization.UiMessage.Format("S2D35DC239DF91FAA", group.RequiredCollectionSlots, group.KnownFreeSlots))).Display);
         }
 
         if (group.CollectionCapacity != null)
@@ -2208,10 +2197,9 @@ public partial class SlaveWindow
         }
         else if (group.CollectionItemTypeCount > 1)
         {
-            ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), "Selected-Tony Collection Capacity");
+            ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S1570095C82F7BF28"));
             ImGui.TextWrapped(
-                $"{group.KnownFreeSlots:N0} known empty stack slots are shared across " +
-                $"{group.CollectionItemTypeCount:N0} incoming item types. Exact item-unit capacity and Can Collect are not summed because each item needs its own stack allocation.");
+                global::XASlave.Localization.UiLocale.FormatKey("S896D2E7B20A361E5", group.KnownFreeSlots, group.CollectionItemTypeCount));
         }
         if (!view.ServerMatching && group.FixedWorldRegionCapacities.Count > 0)
             DrawXagmanFixedWorldRegionCapacities(group, inputUncertainty);
@@ -2219,12 +2207,12 @@ public partial class SlaveWindow
         if (group.SupplyShortageItemCount > 0 && !inputUncertainty)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                $"Supply now: {group.SupplyShortageUnits:N0} unit(s) short across {group.SupplyShortageItemCount} item type(s).");
+                global::XASlave.Localization.UiLocale.FormatKey("SDCC4C2EA74EE77A7", group.SupplyShortageUnits, group.SupplyShortageItemCount));
         }
         else if (group.SupplyShortageItemCount > 0)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                $"Supply now: known aggregate is {group.SupplyShortageUnits:N0} unit(s) short across {group.SupplyShortageItemCount} item type(s), but unknown or duplicate inputs make the final result indeterminate.");
+                global::XASlave.Localization.UiLocale.FormatKey("S8AC322450890D2AD", group.SupplyShortageUnits, group.SupplyShortageItemCount));
         }
         else
         {
@@ -2232,9 +2220,7 @@ public partial class SlaveWindow
                 ? new Vector4(1.0f, 0.8f, 0.3f, 1.0f)
                 : new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
             ImGui.TextColored(color,
-                inputUncertainty
-                    ? "Supply now: known selected-Tony stock covers the fixed known requirements, but unknown or duplicate inputs may change the result."
-                    : "Supply now: selected Tony stock covers every fixed known requirement.");
+                ((inputUncertainty ? global::XASlave.Localization.UiMessage.Key("S4DBB42F4B1CD4B91") : global::XASlave.Localization.UiMessage.Key("SEE110F033051754C"))).Display);
         }
         if (view.ShowCollectionFirstProjection)
         {
@@ -2244,12 +2230,12 @@ public partial class SlaveWindow
             if (group.SupplyAfterCollectionShortageItemCount > 0 && !projectionUncertain)
             {
                 ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                    $"Supply after collection: {group.SupplyAfterCollectionShortageUnits:N0} unit(s) still short across {group.SupplyAfterCollectionShortageItemCount} item type(s).");
+                    global::XASlave.Localization.UiLocale.FormatKey("SFCAF2E2402C42704", group.SupplyAfterCollectionShortageUnits, group.SupplyAfterCollectionShortageItemCount));
             }
             else if (group.SupplyAfterCollectionShortageItemCount > 0)
             {
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                    $"Supply after collection: projected known aggregate remains {group.SupplyAfterCollectionShortageUnits:N0} unit(s) short, but collection capacity or unknown inputs make the final result conditional.");
+                    global::XASlave.Localization.UiLocale.FormatKey("S8723DC57C5269BAD", group.SupplyAfterCollectionShortageUnits));
             }
             else
             {
@@ -2258,15 +2244,13 @@ public partial class SlaveWindow
                     : new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
                 ImGui.TextColored(
                     projectionColor,
-                    projectionUncertain
-                        ? "Supply after collection: projected known stock covers fixed known demand only if every forecast collection fits and all unknown inputs resolve as expected."
-                        : "Supply after collection: projected Tony stock covers every fixed known restock requirement.");
+                    ((projectionUncertain ? global::XASlave.Localization.UiMessage.Key("SBF97441AE9D166D3") : global::XASlave.Localization.UiMessage.Key("S1EE66778C481C48D"))).Display);
             }
         }
         if (group.AllAvailableRequestCount > 0)
-            DrawXagmanTradeCapacityWarning($"{group.AllAvailableRequestCount} Take-0 all-available request(s) are indeterminate and are not included in fixed supply units.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S238C8B2584889BE0", group.AllAvailableRequestCount));
         if (group.UnknownTonyCount > 0)
-            DrawXagmanTradeCapacityWarning($"{group.UnknownTonyCount} selected Tony inventory snapshot(s) are unknown; only known Tony stock and free slots are counted. Pull XA Database Info on this client, then Refresh; IPC plus read-only fallback failures remain unknown.");
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("SD698B45E68975C3B", group.UnknownTonyCount));
 
         if (group.Items.Count == 0)
             return;
@@ -2276,52 +2260,50 @@ public partial class SlaveWindow
         {
         if (!itemsTable)
             return;
-        ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Stack", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
-        ImGui.TableSetupColumn("Collect", ImGuiTableColumnFlags.WidthFixed, Scale(75f));
-        ImGui.TableSetupColumn("Slots", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
-        ImGui.TableSetupColumn("Need from Tony Pool", ImGuiTableColumnFlags.WidthFixed, Scale(125f));
-        ImGui.TableSetupColumn("Stock Now", ImGuiTableColumnFlags.WidthFixed, Scale(85f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S652BCC3A47842889"), ImGuiTableColumnFlags.WidthStretch);
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SE551641242CE7246"), ImGuiTableColumnFlags.WidthFixed, Scale(55f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S08A0C33F913A1237"), ImGuiTableColumnFlags.WidthFixed, Scale(75f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S4FD72C06BCFF7971"), ImGuiTableColumnFlags.WidthFixed, Scale(55f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SF921375CB5109B5A"), ImGuiTableColumnFlags.WidthFixed, Scale(125f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SFACD9B5DD3E38232"), ImGuiTableColumnFlags.WidthFixed, Scale(85f));
         if (view.ShowCollectionFirstProjection)
-            ImGui.TableSetupColumn("Stock After Collect", ImGuiTableColumnFlags.WidthFixed, Scale(115f));
-        ImGui.TableSetupColumn("Short Now", ImGuiTableColumnFlags.WidthFixed, Scale(75f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SAC4914A9B95DB718"), ImGuiTableColumnFlags.WidthFixed, Scale(115f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S29347CA8AF9483F3"), ImGuiTableColumnFlags.WidthFixed, Scale(75f));
         if (view.ShowCollectionFirstProjection)
-            ImGui.TableSetupColumn("Short After", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
-        ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SE3C0B1E74C4CE850"), ImGuiTableColumnFlags.WidthFixed, Scale(80f));
+        global::XASlave.Localization.UiNative.TableHeadersRow();
         foreach (var item in group.Items)
         {
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
-            ImGui.TextUnformatted(item.IsHq ? $"{item.ItemName} HQ" : item.ItemName);
+            ImGui.TextUnformatted(((item.IsHq ? global::XASlave.Localization.UiMessage.Format("S5864848AE53E7CAF", item.ItemName) : global::XASlave.Localization.UiMessage.Raw(item.ItemName))).Display);
             ImGui.TableNextColumn();
-            ImGui.TextDisabled(item.StackSize > 0 ? item.StackSize.ToString("N0", CultureInfo.InvariantCulture) : "-");
+            ImGui.TextDisabled(((item.StackSize > 0 ? global::XASlave.Localization.UiMessage.Raw(item.StackSize.ToString("N0", CultureInfo.InvariantCulture)) : global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9"))).Display);
             ImGui.TableNextColumn();
-            ImGui.TextDisabled(item.IncomingToTonyQuantity > 0 ? item.IncomingToTonyQuantity.ToString("N0", CultureInfo.InvariantCulture) : "-");
+            ImGui.TextDisabled(((item.IncomingToTonyQuantity > 0 ? global::XASlave.Localization.UiMessage.Raw(item.IncomingToTonyQuantity.ToString("N0", CultureInfo.InvariantCulture)) : global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9"))).Display);
             ImGui.TableNextColumn();
-            ImGui.TextDisabled(item.RequiredCollectionSlots > 0 ? item.RequiredCollectionSlots.ToString("N0", CultureInfo.InvariantCulture) : "-");
+            ImGui.TextDisabled(((item.RequiredCollectionSlots > 0 ? global::XASlave.Localization.UiMessage.Raw(item.RequiredCollectionSlots.ToString("N0", CultureInfo.InvariantCulture)) : global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9"))).Display);
             ImGui.TableNextColumn();
             var supplyLabel = item.NeededFromTonyQuantity > 0
                 ? item.NeededFromTonyQuantity.ToString("N0", CultureInfo.InvariantCulture)
                 : "-";
             if (item.AllAvailableRequestCount > 0)
-                supplyLabel += $" + All x{item.AllAvailableRequestCount}";
+                supplyLabel += (global::XASlave.Localization.UiMessage.Format("S93EA9B958D254A7B", item.AllAvailableRequestCount)).Display;
             ImGui.TextDisabled(supplyLabel);
             ImGui.TableNextColumn();
-            ImGui.TextDisabled(item.TonyStockQuantity > 0 ? item.TonyStockQuantity.ToString("N0", CultureInfo.InvariantCulture) : "-");
+            ImGui.TextDisabled(((item.TonyStockQuantity > 0 ? global::XASlave.Localization.UiMessage.Raw(item.TonyStockQuantity.ToString("N0", CultureInfo.InvariantCulture)) : global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9"))).Display);
             if (view.ShowCollectionFirstProjection)
             {
                 ImGui.TableNextColumn();
-                ImGui.TextDisabled(item.ProjectedTonyStockAfterCollection > 0
-                    ? item.ProjectedTonyStockAfterCollection.ToString("N0", CultureInfo.InvariantCulture)
-                    : "-");
+                ImGui.TextDisabled(((item.ProjectedTonyStockAfterCollection > 0 ? global::XASlave.Localization.UiMessage.Raw(item.ProjectedTonyStockAfterCollection.ToString("N0", CultureInfo.InvariantCulture)) : global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9"))).Display);
             }
             ImGui.TableNextColumn();
             if (item.SupplyShortageQuantity > 0 && !inputUncertainty)
                 ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), item.SupplyShortageQuantity.ToString("N0", CultureInfo.InvariantCulture));
             else if (item.SupplyShortageQuantity > 0 || item.UnknownOwnerCount > 0 || item.AllAvailableRequestCount > 0 || duplicateUncertainty)
-                ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), "?");
+                ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), (global::XASlave.Localization.UiMessage.Key("S8A8DE823D5ED3E12")).Display);
             else
-                ImGui.TextDisabled("-");
+                ImGui.TextDisabled((global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9")).Display);
             if (view.ShowCollectionFirstProjection)
             {
                 ImGui.TableNextColumn();
@@ -2338,34 +2320,33 @@ public partial class SlaveWindow
                     || item.UnknownOwnerCount > 0
                     || projectionUncertain)
                 {
-                    ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), "?");
+                    ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), (global::XASlave.Localization.UiMessage.Key("S8A8DE823D5ED3E12")).Display);
                 }
                 else
                 {
-                    ImGui.TextDisabled("-");
+                    ImGui.TextDisabled((global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9")).Display);
                 }
             }
         }
         }
         ImGui.TextDisabled(
-            "Collection slots credit matching partial stacks first. Stock After Collect assumes every projected Give/Balance surplus is received; " +
-            "if collection slots are short, the after-collection supply result is conditional.");
+            global::XASlave.Localization.UiLocale.Get("S7F623B83411D3652"));
 
         if (group.TonySupplyAvailability.Count == 0)
             return;
         ImGui.Spacing();
-        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), "Per-Tony Supply Availability");
+        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SD81F1DCD0E6A83D2"));
         var availabilityTableId = $"XagmanTonySupplyAvailability##{group.GroupKey}";
         using (var availabilityTable = ImRaii.Table(availabilityTableId, 4,
                    ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
         {
         if (!availabilityTable)
             return;
-        ImGui.TableSetupColumn("Tony", ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
-        ImGui.TableSetupColumn("Pooled Need", ImGuiTableColumnFlags.WidthFixed, Scale(105f));
-        ImGui.TableSetupColumn("This Tony Available", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
-        ImGui.TableHeadersRow();
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SC5A8D95238CD3EE8"), ImGuiTableColumnFlags.WidthStretch);
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S652BCC3A47842889"), ImGuiTableColumnFlags.WidthStretch);
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SCD41DE668E2F141E"), ImGuiTableColumnFlags.WidthFixed, Scale(105f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S97F0220721840ABC"), ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+        global::XASlave.Localization.UiNative.TableHeadersRow();
         var anonymizeTonyCharacters = IsCharacterListAnonymizationEnabled();
         foreach (var availability in group.TonySupplyAvailability)
         {
@@ -2373,14 +2354,14 @@ public partial class SlaveWindow
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(GetDisplayCharacterKey(availability.TonyCharacter, anonymizeTonyCharacters));
             ImGui.TableNextColumn();
-            ImGui.TextUnformatted(availability.IsHq ? $"{availability.ItemName} HQ" : availability.ItemName);
+            ImGui.TextUnformatted(((availability.IsHq ? global::XASlave.Localization.UiMessage.Format("S5864848AE53E7CAF", availability.ItemName) : global::XASlave.Localization.UiMessage.Raw(availability.ItemName))).Display);
             ImGui.TableNextColumn();
             var pooledNeed = availability.PooledNeededQuantity > 0
                 ? availability.PooledNeededQuantity.ToString("N0", CultureInfo.InvariantCulture)
                 : string.Empty;
             if (availability.AllAvailableRequestCount > 0)
             {
-                var allAvailableLabel = $"All x{availability.AllAvailableRequestCount:N0}";
+                var allAvailableLabel = (global::XASlave.Localization.UiMessage.Format("S0558FC196C3BB350", availability.AllAvailableRequestCount)).Display;
                 pooledNeed = string.IsNullOrEmpty(pooledNeed)
                     ? allAvailableLabel
                     : $"{pooledNeed} + {allAvailableLabel}";
@@ -2390,10 +2371,10 @@ public partial class SlaveWindow
             if (availability.IsTonyInventoryKnown)
                 ImGui.TextDisabled(availability.TonyAvailableQuantity.ToString("N0", CultureInfo.InvariantCulture));
             else
-                ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), "?");
+                ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), (global::XASlave.Localization.UiMessage.Key("S8A8DE823D5ED3E12")).Display);
         }
         }
-        ImGui.TextDisabled("Availability only; no stock is reserved or split here. Runtime Tony order/rotation and live trade checks decide which Tony supplies each unit. Gil availability is the amount above Tony Gil Minimum.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SFC2AE8EDE11F1D3B"));
     }
 
     private static void DrawXagmanFixedWorldRegionCapacities(
@@ -2401,51 +2382,47 @@ public partial class SlaveWindow
         bool inputUncertainty)
     {
         ImGui.Spacing();
-        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), "Selected-Tony Capacity by Region");
+        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SA395C39D3C23BB5A"));
 
         var fullyDemandedKnownPool = !inputUncertainty
             && group.CollectionCapacity != null
             && group.CollectionCapacity.IncomingQuantity >= group.CollectionCapacity.TotalItemCapacityQuantity;
         foreach (var region in group.FixedWorldRegionCapacities)
         {
-            var knownLabel = region.UnknownTonyCount > 0
-                ? $"{region.SelectedTonyCount:N0} selected / {region.KnownTonyCount:N0} known / {region.UnknownTonyCount:N0} unknown Tony(s)"
-                : $"{region.SelectedTonyCount:N0} selected / {region.KnownTonyCount:N0} known Tony(s)";
+            var knownLabel = ((region.UnknownTonyCount > 0 ? global::XASlave.Localization.UiMessage.Format("S8FD29C1604BB8FDD", region.SelectedTonyCount, region.KnownTonyCount, region.UnknownTonyCount) : global::XASlave.Localization.UiMessage.Format("SE82B5442BF9EE51E", region.SelectedTonyCount, region.KnownTonyCount))).Display;
             if (region.StackSize <= 0)
             {
                 ImGui.TextWrapped(
-                    $"{region.RegionKey}: {knownLabel}; {region.KnownEmptyStackSlots:N0} known shared empty stack slot(s).");
+                    global::XASlave.Localization.UiLocale.FormatKey("SE1B7BAC768171164", region.RegionKey, knownLabel, region.KnownEmptyStackSlots));
                 continue;
             }
 
             var capacityText =
-                $"{region.RegionKey}: {knownLabel}; {region.KnownEmptyStackSlots:N0} known empty stack slot(s) x " +
-                $"{region.StackSize:N0} = {region.EmptyStackCapacityQuantity:N0} unit(s)";
+                (global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("S0C12E054C356F98B", region.RegionKey, knownLabel, region.KnownEmptyStackSlots), global::XASlave.Localization.UiMessage.Format("S39C4A182FB2A48A8", region.StackSize, region.EmptyStackCapacityQuantity))).Display;
             if (region.PartialStackHeadroom > 0)
             {
                 capacityText +=
-                    $"; + {region.PartialStackHeadroom:N0} matching partial-stack room " +
-                    $"= {region.TotalItemCapacityQuantity:N0} total unit(s)";
+                    (global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("S880F3A8DABCDEF30", region.PartialStackHeadroom), global::XASlave.Localization.UiMessage.Format("SE649FAFB251B6AD0", region.TotalItemCapacityQuantity))).Display;
             }
             if (fullyDemandedKnownPool)
-                capacityText += $". Can Collect: {region.TotalItemCapacityQuantity:N0} unit(s)";
+                capacityText += (global::XASlave.Localization.UiMessage.Format("SA04277B06A4D113C", region.TotalItemCapacityQuantity)).Display;
             ImGui.TextWrapped(capacityText + ".");
         }
 
         if (fullyDemandedKnownPool)
         {
             DrawWrappedDisabledText(
-                "The combined incoming workload fully demands every known regional capacity above; the combined Can Collect result remains authoritative.");
+                global::XASlave.Localization.UiLocale.Get("SEF66DFDAE686FAAF"));
         }
         else if (group.CollectionCapacity != null)
         {
             DrawWrappedDisabledText(
-                "Fixed-world incoming is one shared workload; region rows show capacity only and do not assign the same Can Collect quantity more than once.");
+                global::XASlave.Localization.UiLocale.Get("SC6F78EBC94444EDC"));
         }
         else if (group.CollectionItemTypeCount > 1)
         {
             DrawWrappedDisabledText(
-                "Regional empty slots are shared across incoming item types, so item-unit capacity and Can Collect are not summed per region.");
+                global::XASlave.Localization.UiLocale.Get("SA5AE29979452E861"));
         }
     }
 
@@ -2453,35 +2430,30 @@ public partial class SlaveWindow
         XagmanCollectionCapacityView capacity,
         bool inputUncertainty)
     {
-        var itemLabel = capacity.IsHq ? $"{capacity.ItemName} HQ" : capacity.ItemName;
-        var capacityLabel = inputUncertainty
-            ? "Known selected-Tony capacity"
-            : "Selected-Tony capacity";
-        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), $"{itemLabel} Collection Capacity");
+        var itemLabel = ((capacity.IsHq ? global::XASlave.Localization.UiMessage.Format("S5864848AE53E7CAF", capacity.ItemName) : global::XASlave.Localization.UiMessage.Raw(capacity.ItemName))).Display;
+        var capacityLabel = ((inputUncertainty ? global::XASlave.Localization.UiMessage.Key("S20A0295B00C5F526") : global::XASlave.Localization.UiMessage.Key("SE6BE05D10C4E0C9F"))).Display;
+        ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S78502CBEFA9D3541", itemLabel));
         var capacityText =
-            $"{capacityLabel}: {capacity.KnownEmptyStackSlots:N0} empty stack slot(s) × {capacity.StackSize:N0} " +
-            $"= {capacity.EmptyStackCapacityQuantity:N0} unit(s)";
+            (global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("S0D3DFAA025F9E845", capacityLabel, capacity.KnownEmptyStackSlots, capacity.StackSize), global::XASlave.Localization.UiMessage.Format("S0569C411F5D87BFD", capacity.EmptyStackCapacityQuantity))).Display;
         if (capacity.PartialStackHeadroom > 0)
         {
             capacityText +=
-                $"; + {capacity.PartialStackHeadroom:N0} matching partial-stack room " +
-                $"= {capacity.TotalItemCapacityQuantity:N0} total unit(s).";
+                (global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("S880F3A8DABCDEF30", capacity.PartialStackHeadroom), global::XASlave.Localization.UiMessage.Format("S9CBC4D8B229BB62E", capacity.TotalItemCapacityQuantity))).Display;
         }
         else
         {
-            capacityText += ".";
+            capacityText += (global::XASlave.Localization.UiMessage.Key("SCDB4EE2AEA69CC6A")).Display;
         }
         ImGui.TextWrapped(capacityText);
 
-        var collectLabel = inputUncertainty ? "Can Collect now (known inputs)" : "Can Collect now";
+        var collectLabel = ((inputUncertainty ? global::XASlave.Localization.UiMessage.Key("S275C7194912C93A6") : global::XASlave.Localization.UiMessage.Key("S4EA67B2DC3A0BEC0"))).Display;
         var collectColor = capacity.RemainingQuantity > 0
             ? new Vector4(1.0f, 0.8f, 0.3f, 1.0f)
             : new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
         using (ImRaii.PushColor(ImGuiCol.Text, collectColor))
         {
             ImGui.TextWrapped(
-                $"{collectLabel}: {capacity.CollectableQuantity:N0} of {capacity.IncomingQuantity:N0} unit(s), " +
-                $"using up to {capacity.NewStackSlotsUsed:N0} new stack slot(s); {capacity.RemainingQuantity:N0} remain.");
+                global::XASlave.Localization.UiLocale.FormatKey("S5DAB970D0F72A01C", collectLabel, capacity.CollectableQuantity, capacity.IncomingQuantity, capacity.NewStackSlotsUsed, capacity.RemainingQuantity));
         }
     }
 

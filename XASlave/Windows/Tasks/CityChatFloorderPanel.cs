@@ -17,6 +17,7 @@ public partial class SlaveWindow
     private string floorderAddAnnouncementInput = string.Empty;
     private readonly Random floorderRng = new();
     private string floorderError = string.Empty;
+    private global::XASlave.Localization.UiMessage? floorderErrorUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
     private DateTime floorderErrorExpiry = DateTime.MinValue;
     private readonly HashSet<string> floorderExpandedSections = new();
 
@@ -46,18 +47,18 @@ public partial class SlaveWindow
         var yellow = new Vector4(1.0f, 0.8f, 0.3f, 1.0f);
 
         // -- Title --
-        ImGui.TextColored(cyan, "City Chat Flooder");
-        ImGui.TextDisabled("Travel through worlds and cities, sending announcements in chat.");
-        ImGui.TextDisabled("Worlds are processed in order: Region > Data Center > World.");
+        ImGui.TextColored(cyan, global::XASlave.Localization.UiLocale.Get("S5C5514B66531FC2E"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SD2D3BC7D75A885AF"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SB364344A34063978"));
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
         // -- Plugin Status --
         var lsOk = plugin.IpcClient.IsLifestreamAvailable();
-        ImGui.Text("Required: ");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("S4588EB2A8F8AB239"));
         ImGui.SameLine();
-        ImGui.TextColored(lsOk ? green : red, lsOk ? "[Lifestream]" : "[Lifestream \u2717]");
+        ImGui.TextColored(lsOk ? green : red, lsOk ? global::XASlave.Localization.UiLocale.Get("S3D7411ED3FFD4E68") : global::XASlave.Localization.UiLocale.Get("S3C1330608BBB5379"));
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -66,12 +67,12 @@ public partial class SlaveWindow
         if (runner.IsRunning && runner.CurrentTaskName == "City Chat Flooder")
         {
             var progress = runner.TotalItems > 0 ? (float)runner.CompletedItems / runner.TotalItems : 0f;
-            ImGui.TextColored(yellow, $"Running: {runner.StatusText}");
+            ImGui.TextColored(yellow, global::XASlave.Localization.UiLocale.FormatKey("S8EB69248AA11B2FD", runner.LocalizedStatusText));
             ImGui.ProgressBar(progress, new Vector2(-1, 0), $"{runner.CompletedItems}/{runner.TotalItems}");
             if (!string.IsNullOrEmpty(runner.CurrentItemLabel))
-                ImGui.TextDisabled(runner.CurrentItemLabel);
+                ImGui.TextDisabled(runner.CurrentItemLabelDisplay);
             ImGui.Spacing();
-            if (ImGui.Button("Cancel"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S19766ED6CCB2F4A3")))
                 runner.Cancel();
         }
         else
@@ -79,7 +80,7 @@ public partial class SlaveWindow
             // Error message (always visible when set)
             if (!string.IsNullOrEmpty(floorderError) && DateTime.UtcNow < floorderErrorExpiry)
             {
-                ImGui.TextColored(red, floorderError);
+                ImGui.TextColored(red, global::XASlave.Localization.UiMessage.Resolve(ref floorderErrorUiMessage, floorderError));
                 ImGui.Spacing();
             }
 
@@ -90,24 +91,24 @@ public partial class SlaveWindow
 
             DrawPriorityTaskActionButton(
                 SlaveTask.CityChatFlooder,
-                "Start Flooding",
+                global::XASlave.Localization.UiLocale.Native("S53ABFA1371C8230F"),
                 canStart,
                 StartCityChatFlooder,
                 !lsOk
-                    ? "Lifestream is required."
+                    ? global::XASlave.Localization.UiLocale.Get("SD208BB89DADAB760")
                     : worldCount == 0
-                        ? "Select at least one world."
+                        ? global::XASlave.Localization.UiLocale.Get("S0111262CE593953D")
                         : cityCount == 0
-                            ? "Select at least one city."
+                            ? global::XASlave.Localization.UiLocale.Get("SA051DBCBB85B0450")
                             : cfg.FloorderAnnouncements.Count == 0
-                                ? "Add at least one announcement."
+                                ? global::XASlave.Localization.UiLocale.Get("S800E18D91BF7FE06")
                                 : !Plugin.PlayerState.IsLoaded
-                                    ? "Player must be loaded to start City Chat Flooder."
-                                    : "Another XA Slave task is already running.");
+                                    ? global::XASlave.Localization.UiLocale.Get("S2CB54493D411918F")
+                                    : global::XASlave.Localization.UiLocale.Get("SAB859E621D62EDD7"));
 
             ImGui.SameLine();
             var looping = cfg.FloorderEnableLooping;
-            if (ImGui.Checkbox("Enable Looping", ref looping))
+            if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S0E7DB37CCB0C5899"), ref looping))
             {
                 cfg.FloorderEnableLooping = looping;
                 cfg.Save();
@@ -117,7 +118,7 @@ public partial class SlaveWindow
                 ImGui.SameLine();
                 ImGui.SetNextItemWidth(Scale(80f));
                 var loopDelay = cfg.FloorderLoopDelayMinutes;
-                if (ImGui.InputFloat("min##loop", ref loopDelay, 1f, 5f, "%.0f"))
+                if (global::XASlave.Localization.UiNative.InputFloat((global::XASlave.Localization.UiLocale.Native("S1F6FA6F69D185E60") + "##loop"), ref loopDelay, 1f, 5f, "%.0f"))
                 {
                     if (loopDelay < 1f) loopDelay = 1f;
                     if (loopDelay > 60f) loopDelay = 60f;
@@ -126,7 +127,7 @@ public partial class SlaveWindow
                 }
             }
 
-            ImGui.TextDisabled($"{worldCount} world(s) x {cityCount} city/cities x {cfg.FloorderAnnouncements.Count} announcement(s)");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S66B42F7075B44F96", worldCount, cityCount, cfg.FloorderAnnouncements.Count));
         }
 
         ImGui.Spacing();
@@ -134,22 +135,22 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Chat Channel + Timing --
-        ImGui.TextColored(cyan, "Chat Channel");
+        ImGui.TextColored(cyan, global::XASlave.Localization.UiLocale.Get("S14DB43FDA20F537A"));
         ImGui.Spacing();
         var channelIdx = Array.IndexOf(FloorderChannelOptions, cfg.FloorderChatChannel);
         if (channelIdx < 0) channelIdx = 0;
         ImGui.SetNextItemWidth(Scale(120f));
-        if (ImGui.Combo("##FloorderChannel", ref channelIdx, FloorderChannelOptions, FloorderChannelOptions.Length))
+        if (global::XASlave.Localization.UiNative.Combo("##FloorderChannel", ref channelIdx, FloorderChannelOptions, FloorderChannelOptions.Length))
         {
             cfg.FloorderChatChannel = FloorderChannelOptions[channelIdx];
             cfg.Save();
         }
         ImGui.SameLine();
-        ImGui.TextDisabled("Channel used for announcements");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SE5F10C5FF5BC2B1B"));
 
         var waitCity = cfg.FloorderWaitBetweenCities;
         ImGui.SetNextItemWidth(Scale(80f));
-        if (ImGui.InputFloat("Wait between cities (sec)##fl", ref waitCity, 0.5f, 1.0f, "%.1f"))
+        if (global::XASlave.Localization.UiNative.InputFloat((global::XASlave.Localization.UiLocale.Native("SE1AA81C2FF748EA4") + "##fl"), ref waitCity, 0.5f, 1.0f, "%.1f"))
         {
             if (waitCity < 1f) waitCity = 1f;
             if (waitCity > 30f) waitCity = 30f;
@@ -159,7 +160,7 @@ public partial class SlaveWindow
 
         var waitAnn = cfg.FloorderWaitAfterAnnounce;
         ImGui.SetNextItemWidth(Scale(80f));
-        if (ImGui.InputFloat("Wait after announce (sec)##fl", ref waitAnn, 0.5f, 1.0f, "%.1f"))
+        if (global::XASlave.Localization.UiNative.InputFloat((global::XASlave.Localization.UiLocale.Native("SCCEE93CF2BA74041") + "##fl"), ref waitAnn, 0.5f, 1.0f, "%.1f"))
         {
             if (waitAnn < 0.5f) waitAnn = 0.5f;
             if (waitAnn > 10f) waitAnn = 10f;
@@ -172,16 +173,16 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- World Selection Grid --
-        ImGui.TextColored(cyan, $"Worlds ({cfg.FloorderSelectedWorlds.Count} selected)");
+        ImGui.TextColored(cyan, global::XASlave.Localization.UiLocale.FormatKey("S7A529A5146067A08", cfg.FloorderSelectedWorlds.Count));
         ImGui.SameLine();
-        if (ImGui.SmallButton("Select All##flworlds"))
+        if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("SD1EC69E64B9609D0") + "##flworlds")))
         {
             foreach (var w in WorldData.Worlds) cfg.FloorderSelectedWorlds.Add(w.Name);
             cfg.FloorderSelectedWorlds = cfg.FloorderSelectedWorlds.Distinct().ToList();
             cfg.SaveDeferred();
         }
         ImGui.SameLine();
-        if (ImGui.SmallButton("Clear All##flworlds"))
+        if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("SDDCEB7ADFDB8816E") + "##flworlds")))
         {
             cfg.FloorderSelectedWorlds.Clear();
             cfg.SaveDeferred();
@@ -206,7 +207,7 @@ public partial class SlaveWindow
 
             if (regionOpen)
             {
-                if (ImGui.SmallButton($"All##fl{region}"))
+                if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("SA52ACE420F2175D0") + $"##fl{region}")))
                 {
                     foreach (var w in regionWorlds)
                         if (!cfg.FloorderSelectedWorlds.Contains(w.Name))
@@ -214,7 +215,7 @@ public partial class SlaveWindow
                     cfg.SaveDeferred();
                 }
                 ImGui.SameLine();
-                if (ImGui.SmallButton($"None##fl{region}"))
+                if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("SDC937B59892604F5") + $"##fl{region}")))
                 {
                     foreach (var w in regionWorlds)
                         cfg.FloorderSelectedWorlds.Remove(w.Name);
@@ -256,9 +257,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- City Selection --
-        ImGui.TextColored(cyan, $"Cities ({cfg.FloorderSelectedCities.Count} selected)");
+        ImGui.TextColored(cyan, global::XASlave.Localization.UiLocale.FormatKey("S3C48535FAF948451", cfg.FloorderSelectedCities.Count));
         ImGui.SameLine();
-        if (ImGui.SmallButton("Select All##flcities"))
+        if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("SD1EC69E64B9609D0") + "##flcities")))
         {
             foreach (var c in FloorderDefaultCities)
                 if (!cfg.FloorderSelectedCities.Contains(c))
@@ -266,7 +267,7 @@ public partial class SlaveWindow
             cfg.SaveDeferred();
         }
         ImGui.SameLine();
-        if (ImGui.SmallButton("Clear All##flcities"))
+        if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("SDDCEB7ADFDB8816E") + "##flcities")))
         {
             cfg.FloorderSelectedCities.Clear();
             cfg.SaveDeferred();
@@ -280,7 +281,7 @@ public partial class SlaveWindow
             else floorderExpandedSections.Remove("cities_closed");
         }
         ImGui.SameLine();
-        ImGui.Text("Main Cities");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("SEE636AD3127B77BC"));
 
         if (citiesOpen)
         {
@@ -325,7 +326,7 @@ public partial class SlaveWindow
                 else floorderExpandedSections.Remove("custom_cities_closed");
             }
             ImGui.SameLine();
-            ImGui.Text("Custom Cities");
+            ImGui.Text(global::XASlave.Localization.UiLocale.Get("SA878F9E6FCEAB32F"));
 
             if (customOpen)
             {
@@ -344,7 +345,7 @@ public partial class SlaveWindow
                     ImGui.SameLine();
                     using (ImRaii.PushColor(ImGuiCol.Text, red))
                     {
-                        if (ImGui.SmallButton($"X##flrmcust_{i}"))
+                        if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S4B68AB3847FEDA7D") + $"##flrmcust_{i}")))
                         {
                             cfg.FloorderSelectedCities.Remove(city);
                             cfg.FloorderCustomCities.RemoveAt(i);
@@ -357,9 +358,9 @@ public partial class SlaveWindow
         }
 
         ImGui.SetNextItemWidth(Scale(200f));
-        var cityEnter = ImGui.InputTextWithHint("##FlAddCity", "Add custom city...", ref floorderAddCityInput, 64, ImGuiInputTextFlags.EnterReturnsTrue);
+        var cityEnter = ImGui.InputTextWithHint("##FlAddCity", global::XASlave.Localization.UiLocale.Get("S94F73DAAF712B62B"), ref floorderAddCityInput, 64, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
-        if ((ImGui.Button("Add City##fl") || cityEnter) && !string.IsNullOrWhiteSpace(floorderAddCityInput))
+        if ((global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S68C65A76FE30B427") + "##fl")) || cityEnter) && !string.IsNullOrWhiteSpace(floorderAddCityInput))
         {
             var trimmed = floorderAddCityInput.Trim();
             if (!cfg.FloorderCustomCities.Contains(trimmed) && !FloorderDefaultCities.Contains(trimmed))
@@ -375,9 +376,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Announcements --
-        ImGui.TextColored(cyan, $"Announcements ({cfg.FloorderAnnouncements.Count})");
-        ImGui.TextDisabled("One random announcement is picked per city visit.");
-        ImGui.TextDisabled($"Maximum {FloorderMaxMessageLength} characters per message.");
+        ImGui.TextColored(cyan, global::XASlave.Localization.UiLocale.FormatKey("SD64C18A82BBE386E", cfg.FloorderAnnouncements.Count));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S51CBF91B7D716A1C"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S9AC5E23492986568", FloorderMaxMessageLength));
         ImGui.Spacing();
         for (int i = 0; i < cfg.FloorderAnnouncements.Count; i++)
         {
@@ -386,11 +387,11 @@ public partial class SlaveWindow
             var color = msg.Length > FloorderMaxMessageLength ? red : new Vector4(1f, 1f, 1f, 1f);
             ImGui.TextColored(color, $"  {i + 1}. {display}");
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip($"{msg}\n\n({msg.Length}/{FloorderMaxMessageLength} chars)");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.FormatKey("S0C478AD14BC6F06B", msg, msg.Length, FloorderMaxMessageLength));
             ImGui.SameLine();
             using (ImRaii.PushColor(ImGuiCol.Text, red))
             {
-                if (ImGui.SmallButton($"X##flrma{i}"))
+                if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S4B68AB3847FEDA7D") + $"##flrma{i}")))
                 {
                     cfg.FloorderAnnouncements.RemoveAt(i);
                     cfg.Save();
@@ -400,12 +401,12 @@ public partial class SlaveWindow
         }
 
         ImGui.SetNextItemWidth(-100);
-        var annEnter = ImGui.InputTextWithHint("##FlAddAnn", "New announcement message...", ref floorderAddAnnouncementInput, 512, ImGuiInputTextFlags.EnterReturnsTrue);
+        var annEnter = ImGui.InputTextWithHint("##FlAddAnn", global::XASlave.Localization.UiLocale.Get("S0126E59E833F941D"), ref floorderAddAnnouncementInput, 512, ImGuiInputTextFlags.EnterReturnsTrue);
         var charCount = floorderAddAnnouncementInput.Length;
         var charColor = charCount > FloorderMaxMessageLength ? red : charCount > FloorderMaxMessageLength * 0.8f ? yellow : new Vector4(0.6f, 0.6f, 0.6f, 1.0f);
-        ImGui.TextColored(charColor, $"{charCount}/{FloorderMaxMessageLength} characters");
+        ImGui.TextColored(charColor, global::XASlave.Localization.UiLocale.FormatKey("SCBF3C0DF1E8BD4F8", charCount, FloorderMaxMessageLength));
         ImGui.SameLine();
-        if ((ImGui.Button("Add##flann") || annEnter) && !string.IsNullOrWhiteSpace(floorderAddAnnouncementInput))
+        if ((global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S9FD728C66C9A256B") + "##flann")) || annEnter) && !string.IsNullOrWhiteSpace(floorderAddAnnouncementInput))
         {
             var trimmed = floorderAddAnnouncementInput.Trim();
             if (trimmed.Length <= FloorderMaxMessageLength)
@@ -421,7 +422,7 @@ public partial class SlaveWindow
         {
             using (ImRaii.PushColor(ImGuiCol.Text, red))
             {
-                if (ImGui.SmallButton("Clear All Messages##flclearann"))
+                if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S1CC6022C287C63D7") + "##flclearann")))
                 {
                     cfg.FloorderAnnouncements.Clear();
                     cfg.Save();
@@ -468,10 +469,11 @@ public partial class SlaveWindow
                 }
                 if (unreachable.Count > 0)
                 {
-                    var msg = $"Cannot travel to {unreachable.Count} world(s) from {myRegion}: {string.Join(", ", unreachable.Take(5))}";
-                    if (unreachable.Count > 5) msg += $" (+{unreachable.Count - 5} more)";
-                    msg += ". Clear unreachable worlds and try again.";
-                    floorderError = msg;
+                    global::XASlave.Localization.UiMessage? msgUiPresentation = null;
+                    var msg = global::XASlave.Localization.UiMessage.Store(ref msgUiPresentation, global::XASlave.Localization.UiMessage.Format("SD2DD3525D804AE9A", unreachable.Count, myRegion, string.Join(", ", unreachable.Take(5))));
+                    if (unreachable.Count > 5) msg = global::XASlave.Localization.UiMessage.Store(ref msgUiPresentation, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref msgUiPresentation, msg), global::XASlave.Localization.UiMessage.Format("S4F4D2932620104F6", unreachable.Count - 5)));
+                    msg = global::XASlave.Localization.UiMessage.Store(ref msgUiPresentation, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref msgUiPresentation, msg), global::XASlave.Localization.UiMessage.Key("SA135DA1123F77342")));
+                    floorderError = global::XASlave.Localization.UiMessage.Store(ref floorderErrorUiMessage, global::XASlave.Localization.UiMessage.Capture(ref msgUiPresentation, msg));
                     floorderErrorExpiry = DateTime.UtcNow.AddSeconds(30);
                     runner.AddLog(msg);
                     Plugin.Log.Warning($"[XASlave] City Chat Flooder: {msg}");
@@ -484,7 +486,7 @@ public partial class SlaveWindow
 
         var steps = new List<TaskStep>();
         // -- Pre-flight: CharacterSafeWait --
-        foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass("Pre-flight SafeWait", 30f))
+        foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Key("S80D1F3CAE51EBF31"), 30f))
             steps.Add(sw);
 
         var visitIndex = 0;
@@ -496,10 +498,10 @@ public partial class SlaveWindow
             var worldSkipped = new bool[] { false };
             steps.Add(new TaskStep
             {
-                Name = $"Travel to {capturedWorld}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SAF39EBC16CD3813A", capturedWorld),
                 OnEnter = () =>
                 {
-                    runner.CurrentItemLabel = $"World: {capturedWorld}";
+                    runner.CurrentItemLabelMessage = global::XASlave.Localization.UiMessage.Format("S42E89DF618B3750F", capturedWorld);
                     try
                     {
                         var local = Plugin.ObjectTable.LocalPlayer;
@@ -520,11 +522,11 @@ public partial class SlaveWindow
                 TimeoutSec = 3f,
             });
 
-            steps.Add(MonthlyReloggerTask.MakeDelay($"LS Init ({capturedWorld})", 2.0f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SB3674300DBD8460D", capturedWorld), 2.0f));
 
             steps.Add(new TaskStep
             {
-                Name = $"Wait LS ({capturedWorld})",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SD95670CDDBEDB70A", capturedWorld),
                 IsComplete = () =>
                 {
                     if (worldSkipped[0]) return true;
@@ -534,7 +536,7 @@ public partial class SlaveWindow
                 TimeoutSec = 120f,
             });
 
-            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"SafeWait ({capturedWorld})", 30f))
+            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Format("SFA31CB70A88EB43A", capturedWorld), 30f))
                 steps.Add(sw);
 
             foreach (var city in cityList)
@@ -546,7 +548,7 @@ public partial class SlaveWindow
                 var citySkipped = new bool[] { false };
                 steps.Add(new TaskStep
                 {
-                    Name = $"Travel to {capturedCity} on {capturedWorld}",
+                    NameMessage = global::XASlave.Localization.UiMessage.Format("SCC596C340C7CB058", capturedCity, capturedWorld),
                     OnEnter = () =>
                     {
                         runner.CurrentItemLabel = $"{capturedWorld} > {capturedCity}";
@@ -574,11 +576,11 @@ public partial class SlaveWindow
                     TimeoutSec = 3f,
                 });
 
-                steps.Add(MonthlyReloggerTask.MakeDelay($"LS Init ({capturedCity})", 2.0f));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SB3674300DBD8460D", capturedCity), 2.0f));
 
                 steps.Add(new TaskStep
                 {
-                    Name = $"Wait LS ({capturedCity})",
+                    NameMessage = global::XASlave.Localization.UiMessage.Format("SD95670CDDBEDB70A", capturedCity),
                     IsComplete = () =>
                     {
                         if (citySkipped[0]) return true;
@@ -588,14 +590,14 @@ public partial class SlaveWindow
                     TimeoutSec = 120f,
                 });
 
-                foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"SafeWait ({capturedCity})", 30f))
+                foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Format("SFA31CB70A88EB43A", capturedCity), 30f))
                     steps.Add(sw);
 
-                steps.Add(MonthlyReloggerTask.MakeDelay($"City settle ({capturedCity})", cfg.FloorderWaitBetweenCities));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S1B4E6B2C881F9833", capturedCity), cfg.FloorderWaitBetweenCities));
 
                 steps.Add(new TaskStep
                 {
-                    Name = $"Announce in {capturedCity}",
+                    NameMessage = global::XASlave.Localization.UiMessage.Format("S6FAE5AEBB16DE272", capturedCity),
                     OnEnter = () =>
                     {
                         var announcements = cfg.FloorderAnnouncements;
@@ -608,11 +610,11 @@ public partial class SlaveWindow
                     TimeoutSec = 3f,
                 });
 
-                steps.Add(MonthlyReloggerTask.MakeDelay($"Post-announce ({capturedCity})", cfg.FloorderWaitAfterAnnounce));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S2E931F567D165739", capturedCity), cfg.FloorderWaitAfterAnnounce));
 
                 steps.Add(new TaskStep
                 {
-                    Name = $"Complete: {capturedWorld}/{capturedCity}",
+                    NameMessage = global::XASlave.Localization.UiMessage.Format("S609E533F9CC93FC6", capturedWorld, capturedCity),
                     OnEnter = () =>
                     {
                         runner.CompletedItems = capturedIdx + 1;
@@ -628,15 +630,15 @@ public partial class SlaveWindow
         {
             steps.Add(new TaskStep
             {
-                Name = "Loop: Waiting for next cycle",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S712566DCDD8182F0"),
                 OnEnter = () => runner.AddLog($"==== Cycle complete. Waiting {cfg.FloorderLoopDelayMinutes:F0} min before next loop... ===="),
                 IsComplete = () => true,
                 TimeoutSec = 1f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay("Loop Delay", cfg.FloorderLoopDelayMinutes * 60f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("SF682F58F565C8420"), cfg.FloorderLoopDelayMinutes * 60f));
             steps.Add(new TaskStep
             {
-                Name = "Loop: Restart",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SA25ECB66C3F66798"),
                 OnEnter = () =>
                 {
                     runner.AddLog("==== Restarting flooding cycle... ====");
@@ -650,14 +652,14 @@ public partial class SlaveWindow
         {
             steps.Add(new TaskStep
             {
-                Name = "Flooding Complete",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SDB62D47B5AC8EB14"),
                 OnEnter = () => runner.AddLog($"==== Completed! {totalCityVisits} city visits across {orderedWorlds.Count} worlds ===="),
                 IsComplete = () => true,
                 TimeoutSec = 1f,
             });
         }
 
-        if (!plugin.TaskRunner.Start("City Chat Flooder", steps, onLog: (msg) =>
+        if (!plugin.TaskRunner.Start(global::XASlave.Localization.UiMessage.Key("S5C5514B66531FC2E"), steps, onLog: (msg) =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
         }, totalItems: totalCityVisits))

@@ -20,13 +20,14 @@ public partial class SlaveWindow
     private int debugInputMaxCharacters1 = 20;
     private int debugInputMaxCharacters2 = 5;
     private bool debugInputUseSecondField = true;
-    private string debugInputWindowResult = "Open a naming window, then inspect its input fields.";
+    private string debugInputWindowResult = global::XASlave.Localization.UiMessage.Key("SFBF2F08BB6193F5C").Original;
+    private global::XASlave.Localization.UiMessage? debugInputWindowResultMessage = global::XASlave.Localization.UiMessage.Key("SFBF2F08BB6193F5C");
 
     private void DrawXaAbuseInputWindows()
     {
         ImGui.SetNextItemWidth(Scale(220f));
-        ImGui.InputText("Addon##xaInputWindows", ref debugInputAddonName, 96);
-        if (ImGui.Button("Free Company preset##xaInputWindows"))
+        global::XASlave.Localization.UiNative.InputText((global::XASlave.Localization.UiLocale.Native("S25BD3377DF88F39F") + "##xaInputWindows"), ref debugInputAddonName, 96);
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SB21DCE4D15B6648A") + "##xaInputWindows")))
         {
             // User's 2026-09-20 InputString capture: name = node 17, tag = node 19.
             debugInputAddonName = "InputString";
@@ -38,19 +39,19 @@ public partial class SlaveWindow
             debugInputMaxCharacters2 = 5;
         }
         ImGui.SameLine();
-        if (ImGui.Button("Inspect fields##xaInputWindows"))
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S749BB6B5A233C7B4") + "##xaInputWindows")))
             InspectDebugInputWindow();
 
-        ImGui.Checkbox("Use second field##xaInputWindows", ref debugInputUseSecondField);
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S6B83C375D594DE15") + "##xaInputWindows"), ref debugInputUseSecondField);
         DrawDebugInputField(1, ref debugInputNode1, ref debugInputText1,
             ref debugInputLimit1, ref debugInputMaxCharacters1);
         if (debugInputUseSecondField)
             DrawDebugInputField(2, ref debugInputNode2, ref debugInputText2,
                 ref debugInputLimit2, ref debugInputMaxCharacters2);
 
-        ImGui.TextWrapped("Inject replaces the field text. Empty text clears it. The game's input limits apply.");
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S69095BC8FBFC988C"));
         DrawDebugFreeCompanyInputButtons();
-        ImGui.TextWrapped(debugInputWindowResult);
+        ImGui.TextWrapped(global::XASlave.Localization.UiMessage.Resolve(ref debugInputWindowResultMessage, debugInputWindowResult));
     }
 
     private const string DebugFreeCompanyInputPrompt = "Enter free company name and tag.";
@@ -60,27 +61,27 @@ public partial class SlaveWindow
         var canOk = TryGetDebugFreeCompanyInputButton(true, out _, out _, out var okReason);
         var canCancel = TryGetDebugFreeCompanyInputButton(false, out _, out _, out var cancelReason);
         ImGui.BeginDisabled(!canOk);
-        if (ImGui.Button("Test OK##xaInputWindowsFc"))
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S0E764B1738ED46CB") + "##xaInputWindowsFc")))
             ClickDebugFreeCompanyInputButton(true);
         ImGui.EndDisabled();
         ImGui.SameLine();
         ImGui.BeginDisabled(!canCancel);
-        if (ImGui.Button("Test Cancel##xaInputWindowsFc"))
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SE12A42DFC91E7223") + "##xaInputWindowsFc")))
             ClickDebugFreeCompanyInputButton(false);
         ImGui.EndDisabled();
-        ImGui.TextWrapped("FC tests: OK submits the current name/tag; Cancel closes the dialog.");
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SCE0A340DB37BD608"));
         if (!canOk)
-            ImGui.TextWrapped($"OK: {okReason}");
-        if (!canCancel && cancelReason != okReason)
-            ImGui.TextWrapped($"Cancel: {cancelReason}");
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("SEC552145B73D9D29", okReason.Display));
+        if (!canCancel && cancelReason.Original != okReason.Original)
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("S1FDA212C73740869", cancelReason.Display));
     }
 
     private unsafe bool TryGetDebugFreeCompanyInputButton(bool accept, out AtkUnitBase* addon,
-        out AtkResNode* node, out string reason)
+        out AtkResNode* node, out global::XASlave.Localization.UiMessage reason)
     {
         addon = null;
         node = null;
-        reason = "Requires InputString with the exact FC name/tag prompt.";
+        reason = global::XASlave.Localization.UiMessage.Key("S25FF6ED807AC9DB7");
         try
         {
             if (!string.Equals(debugInputAddonName.Trim(), "InputString", StringComparison.Ordinal))
@@ -98,7 +99,7 @@ public partial class SlaveWindow
                 return false;
 
             var label = accept ? "OK" : "Cancel";
-            reason = $"{label} button is missing, hidden, or does not match the expected node/event.";
+            reason = global::XASlave.Localization.UiMessage.Format("S315A421B718352CC", label);
             node = addon->GetNodeById(accept ? 21u : 22u);
             if (node == null || (int)node->Type < 1000 || !IsDebugInputNodeVisible(node))
                 return false;
@@ -118,16 +119,16 @@ public partial class SlaveWindow
 
             if (!button->IsEnabled)
             {
-                reason = $"The game's {label} button is disabled.";
+                reason = global::XASlave.Localization.UiMessage.Format("SFF6E14EEA54A99BA", label);
                 return false;
             }
 
-            reason = string.Empty;
+            reason = global::XASlave.Localization.UiMessage.Raw(string.Empty);
             return true;
         }
         catch (Exception ex)
         {
-            reason = $"FC dialog check failed ({ex.GetType().Name}).";
+            reason = global::XASlave.Localization.UiMessage.Format("SFE45136F6955C110", ex.GetType().Name);
             return false;
         }
     }
@@ -137,24 +138,22 @@ public partial class SlaveWindow
         // Revalidate the exact dialog at click time, independently of the draw-time enabled state.
         if (!TryGetDebugFreeCompanyInputButton(accept, out var addon, out var node, out var reason))
         {
-            SetDebugInputWindowResult($"Input Windows: {reason}");
+            SetDebugInputWindowResult(global::XASlave.Localization.UiMessage.Format("S8D13FB548842D371", reason));
             return;
         }
 
         var label = accept ? "OK" : "Cancel";
         var dispatched = AddonHelper.ClickResNode(addon, node);
         // Dispatch may close/destroy the addon: never dereference either pointer afterwards.
-        SetDebugInputWindowResult(dispatched
-            ? $"Input Windows: FC {label} click dispatched; check the game result."
-            : $"Input Windows: FC {label} click could not be dispatched.");
+        SetDebugInputWindowResult((dispatched ? global::XASlave.Localization.UiMessage.Format("S5C042CB8592BCFBB", label) : global::XASlave.Localization.UiMessage.Format("S7C370CE72F9FE0D6", label)));
     }
 
     private unsafe void DrawDebugInputField(int field, ref int nodeId, ref string text,
         ref bool limitEnabled, ref int maxCharacters)
     {
         ImGui.SetNextItemWidth(Scale(100f));
-        ImGui.InputInt($"Field {field} node ID##xaInputWindows{field}", ref nodeId, 0, 0);
-        ImGui.Checkbox($"Max Characters##xaInputLimit{field}", ref limitEnabled);
+        global::XASlave.Localization.UiNative.InputInt((string.Format(global::XASlave.Localization.UiLocale.Native("S1F2EF503B2C84D40"), field) + $"##xaInputWindows{field}"), ref nodeId, 0, 0, display: global::XASlave.Localization.UiLocale.FormatKey("S1F2EF503B2C84D40", field));
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SFC589D6A97A319A0") + $"##xaInputLimit{field}"), ref limitEnabled);
         ImGui.SameLine();
         ImGui.SetNextItemWidth(Scale(100f));
         ImGui.BeginDisabled(!limitEnabled);
@@ -168,7 +167,7 @@ public partial class SlaveWindow
         if (starts.Length > limit)
             text = text[..starts[limit]];
 
-        ImGui.TextUnformatted($"Text {field}");
+        ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.FormatKey("S51D7C08DD27F93E8", field));
         ImGui.SameLine();
         ImGui.SetNextItemWidth(Scale(300f));
         ImGui.InputText($"##xaInputWindows{field}", ref text, 16384,
@@ -187,17 +186,17 @@ public partial class SlaveWindow
             });
         ImGui.SameLine();
         var count = new StringInfo(text).LengthInTextElements;
-        ImGui.TextUnformatted(limitEnabled ? $"{count}/{maxCharacters}" : $"{count} chars");
+        ImGui.TextUnformatted(limitEnabled ? $"{count}/{maxCharacters}" : global::XASlave.Localization.UiLocale.FormatKey("SCEFE0CEA2B839FE0", count));
         ImGui.SameLine();
-        if (ImGui.Button($"Inject {field}##xaInputWindows{field}"))
+        if (global::XASlave.Localization.UiNative.Button((string.Format(global::XASlave.Localization.UiLocale.Native("S43DC3C2C45865C76"), field) + $"##xaInputWindows{field}"), display: global::XASlave.Localization.UiLocale.FormatKey("S43DC3C2C45865C76", field)))
             InjectDebugInputWindow(nodeId, text);
         if (field == 1)
-            ImGui.TextDisabled("Spaces count. Lowering a limit trims excess text. Editor cap: 1024 characters.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S615375270AB8A4FB"));
     }
 
-    private void SetDebugInputWindowResult(string result)
+    private void SetDebugInputWindowResult(global::XASlave.Localization.UiMessage result)
     {
-        debugInputWindowResult = result;
+        debugInputWindowResult = global::XASlave.Localization.UiMessage.Store(ref debugInputWindowResultMessage, result);
         SetDebugResult(result);
     }
 
@@ -207,7 +206,7 @@ public partial class SlaveWindow
         var addon = string.IsNullOrEmpty(name) ? null : AddonHelper.GetAddon(name);
         if (addon == null || !addon->IsVisible || !addon->IsReady)
         {
-            SetDebugInputWindowResult("Input Windows: addon is missing, hidden, or not ready.");
+            SetDebugInputWindowResult(global::XASlave.Localization.UiMessage.Key("SDD3DBD2C3E68F14B"));
             return null;
         }
 
@@ -251,7 +250,7 @@ public partial class SlaveWindow
             var count = addon->UldManager.NodeListCount;
             if (nodes == null || count > 4096)
             {
-                SetDebugInputWindowResult("Input Windows: node list is unavailable or outside the inspection limit.");
+                SetDebugInputWindowResult(global::XASlave.Localization.UiMessage.Key("S32D0AC4A8D6874A4"));
                 return;
             }
 
@@ -270,14 +269,11 @@ public partial class SlaveWindow
                 debugInputUseSecondField = false;
             }
 
-            SetDebugInputWindowResult(ids.Count == 0
-                ? "Input Windows: no visible top-level text inputs found."
-                : $"Input Windows: visible text input node IDs: {string.Join(", ", ids)}."
-                    + (ids.Count == 1 ? " Field 1 selected." : " Set the field node IDs above."));
+            SetDebugInputWindowResult((ids.Count == 0 ? global::XASlave.Localization.UiMessage.Key("SA8FDD5B136D4D954") : global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("SF88A4381E354EDA5", string.Join(", ", ids)), ((ids.Count == 1 ? global::XASlave.Localization.UiMessage.Key("S9121F347CD0F869C") : global::XASlave.Localization.UiMessage.Key("S73084073622A771F"))))));
         }
         catch (Exception ex)
         {
-            SetDebugInputWindowResult($"Input Windows: inspection failed ({ex.GetType().Name}).");
+            SetDebugInputWindowResult(global::XASlave.Localization.UiMessage.Format("S551A94CE383BC5D9", ex.GetType().Name));
         }
     }
 
@@ -285,7 +281,7 @@ public partial class SlaveWindow
     {
         if (nodeId <= 0 || text.Contains('\0'))
         {
-            SetDebugInputWindowResult("Input Windows: use a positive node ID and text without embedded NUL characters.");
+            SetDebugInputWindowResult(global::XASlave.Localization.UiMessage.Key("S51C20AC9F94171B0"));
             return;
         }
 
@@ -299,16 +295,16 @@ public partial class SlaveWindow
             var input = GetDebugTextInput(addon->GetNodeById((uint)nodeId));
             if (input == null)
             {
-                SetDebugInputWindowResult($"Input Windows: node {nodeId} is not a visible text input.");
+                SetDebugInputWindowResult(global::XASlave.Localization.UiMessage.Format("SACF08E5D67F68475", nodeId));
                 return;
             }
 
             input->SetText(text);
-            SetDebugInputWindowResult($"Input Windows: SetText called for node {nodeId}; check the game field before confirming.");
+            SetDebugInputWindowResult(global::XASlave.Localization.UiMessage.Format("S63211E0DE0DF9C4C", nodeId));
         }
         catch (Exception ex)
         {
-            SetDebugInputWindowResult($"Input Windows: injection failed ({ex.GetType().Name}).");
+            SetDebugInputWindowResult(global::XASlave.Localization.UiMessage.Format("S1FFB1DB7EF054469", ex.GetType().Name));
         }
     }
 }

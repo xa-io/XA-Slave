@@ -90,7 +90,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     private int currentInstanceResolveAttempt;
     private long currentInstanceResolveNextTick;
     private EurekaZone currentInstanceResolveZone;
-    private Action<bool, EurekaZone, int, string>? currentInstanceResolveCallback;
+    private Action<bool, EurekaZone, int, global::XASlave.Localization.UiMessage>? currentInstanceResolveCallback;
 
     private bool enabled;
     private bool subscribed;
@@ -105,6 +105,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     private long leaveDutyRequestedAtTick;
     private bool leaveDutyConfirmationSent;
     private string pendingLeaveReason = string.Empty;
+    private global::XASlave.Localization.UiMessage? pendingLeaveReasonMessage;
     private string legacyDtrText = string.Empty;
     private bool legacyDtrShown, fieldOperationsOwnsDtr, fieldOperationsDtrShown, fieldEntryEvaluationPending;
     private string fieldOperationsDtrText = string.Empty, fieldOperationsDtrTooltip = string.Empty;
@@ -157,7 +158,10 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         UpdateStatusText();
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public static EurekaZone NormalizeZone(int value)
     {
@@ -492,7 +496,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         if (!IsZoneEnabled(currentZone))
         {
             fieldEntryEvaluationPending = false;
-            ScheduleLeaveFromCurrentZone(currentZone, $"Current Eureka {zoneLabel} is not enabled.");
+            ScheduleLeaveFromCurrentZone(currentZone, global::XASlave.Localization.UiMessage.Format("S1245D310FDE4E43E", zoneLabel));
             UpdateStatusText();
             return;
         }
@@ -512,10 +516,10 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         if (baselineInstanceId <= 0)
         {
             SaveZoneBaseline(currentZone, currentInstanceId);
-            pendingLeaveReason = $"Captured Eureka {zoneLabel} baseline {currentInstanceId}{BuildResolutionSourceSuffix(resolution)}.";
-            Plugin.ChatGui.Print($"[XASlave] {zoneLabel} baseline instance set to {currentInstanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}{GetFieldOperationsAnnouncementSuffix()}");
+            pendingLeaveReason = global::XASlave.Localization.UiMessage.Store(ref pendingLeaveReasonMessage, global::XASlave.Localization.UiMessage.Format("S2559F9569A216901", zoneLabel, currentInstanceId, BuildResolutionSourceSuffix(resolution)));
+            Plugin.ChatGui.Print(global::XASlave.Localization.UiMessage.Format("SB60C325D3FE8C81C", zoneLabel, currentInstanceId, resolution.Source, BuildResolutionDetailsSuffix(resolution), GetFieldOperationsAnnouncementSuffix()).Original);
             ConfirmFieldOperationsAnnouncement();
-            ScheduleLeaveFromCurrentZone(currentZone, pendingLeaveReason);
+            ScheduleLeaveFromCurrentZone(currentZone, global::XASlave.Localization.UiMessage.Capture(ref pendingLeaveReasonMessage, pendingLeaveReason));
             UpdateStatusText();
             return;
         }
@@ -534,7 +538,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
 
         ScheduleLeaveFromCurrentZone(
             currentZone,
-            $"Eureka {zoneLabel} instance {currentInstanceId}{BuildResolutionSourceSuffix(resolution)} matched the stored baseline.");
+            global::XASlave.Localization.UiMessage.Format("SA5ED421246C5CC36", zoneLabel, currentInstanceId, BuildResolutionSourceSuffix(resolution)));
         UpdateStatusText();
     }
 
@@ -933,10 +937,10 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         readySinceTick = 0;
     }
 
-    private void ScheduleLeaveFromCurrentZone(EurekaZone currentZone, string reason)
+    private void ScheduleLeaveFromCurrentZone(EurekaZone currentZone, global::XASlave.Localization.UiMessage reason)
     {
         zoneEvaluationPending = false;
-        pendingLeaveReason = reason;
+        pendingLeaveReason = global::XASlave.Localization.UiMessage.Store(ref pendingLeaveReasonMessage, reason);
         leaveDutyRequestedAtTick = 0;
         leaveDutyConfirmationSent = false;
         lastInteractionTick = 0;
@@ -1041,7 +1045,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         leaveDutyReadyAtTick = 0;
         leaveDutyRequestedAtTick = 0;
         leaveDutyConfirmationSent = false;
-        pendingLeaveReason = string.Empty;
+        pendingLeaveReason = global::XASlave.Localization.UiMessage.Store(ref pendingLeaveReasonMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         lastObservedInstanceId = 0;
         lastNewInstanceId = 0;
         lastObservedInstanceSource = "None";
@@ -1337,7 +1341,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
@@ -1345,7 +1349,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         {
             if (state == EurekaHopState.Completed)
             {
-                StatusText = $"Enabled - found new Eureka {GetZoneLabel(lastObservedZone)} instance {lastNewInstanceId}{FormatSourceLabel(lastObservedInstanceSource)} and updated the baseline. Press Start to scan again.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("SE95DF9C5258623AA", GetZoneLabel(lastObservedZone), lastNewInstanceId, FormatSourceLabel(lastObservedInstanceSource)));
                 return;
             }
 
@@ -1354,27 +1358,27 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
                 var zoneLabel = GetZoneLabel(currentZone);
                 if (displayRefreshPending)
                 {
-                    StatusText = $"Enabled - waiting to read the live Eureka {zoneLabel} instance. Press Start to begin farming.";
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S7558364DE2E1C0AB", zoneLabel));
                     return;
                 }
 
                 if (lastObservedZone == currentZone && lastObservedInstanceId != 0)
                 {
-                    StatusText = $"Enabled - showing Eureka {zoneLabel} instance {lastObservedInstanceId}{FormatSourceLabel(lastObservedInstanceSource)}. Press Start to begin farming.";
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S6DACA69F5D73A14E", zoneLabel, lastObservedInstanceId, FormatSourceLabel(lastObservedInstanceSource)));
                     return;
                 }
 
-                StatusText = $"Enabled - Eureka {zoneLabel} instance is currently unavailable. Press Start to begin farming.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("SA2393EB2A4B3E383", zoneLabel));
                 return;
             }
 
-            StatusText = "Enabled - shows the live Eureka instance while you are in Anemos, Pagos, Pyros, or Hydatos. Press Start to begin farming.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S9BB86EE74AF0D25E"));
             return;
         }
 
         if (!HasEnabledZones())
         {
-            StatusText = "Enabled - select at least one Eureka zone row to scan.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SB9C13755791E3B09"));
             return;
         }
 
@@ -1382,111 +1386,108 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         switch (state)
         {
             case EurekaHopState.Idle:
-                StatusText = $"Enabled - waiting in Kugane or a selected Eureka zone. Next target: {currentTargetLabel}.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S3B0DA9B7F566F928", currentTargetLabel));
                 return;
             case EurekaHopState.WaitingForLeaveDutyDelay:
             {
                 var remainingMs = Math.Max(0, leaveDutyReadyAtTick - Environment.TickCount64);
                 var remainingSeconds = Math.Max(1, (int)Math.Ceiling(remainingMs / 1000d));
-                StatusText = string.IsNullOrWhiteSpace(pendingLeaveReason)
-                    ? $"Enabled - waiting {remainingSeconds} more sec before leaving Eureka for {currentTargetLabel}."
-                    : $"Enabled - {pendingLeaveReason} Leaving in {remainingSeconds} sec for {currentTargetLabel}.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (string.IsNullOrWhiteSpace(pendingLeaveReason) ? global::XASlave.Localization.UiMessage.Format("S37A4220EBFEF8E63", remainingSeconds, currentTargetLabel) : global::XASlave.Localization.UiMessage.Format("S7CD583B5EBC4DA5C", global::XASlave.Localization.UiMessage.Capture(ref pendingLeaveReasonMessage, pendingLeaveReason), remainingSeconds, currentTargetLabel)));
                 return;
             }
             case EurekaHopState.LeavingDuty:
                 if (!condition[ConditionFlag.BoundByDuty])
                 {
-                    StatusText = "Enabled - waiting to finish leaving the current Eureka duty.";
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S4D485F31FBC2DDDB"));
                     return;
                 }
 
                 if (!CanLeaveDutyNow(completingLeave: AddonHelper.IsAddonVisible("ContentsFinderMenu") || leaveDutyRequestedAtTick != 0))
                 {
-                    StatusText = string.IsNullOrWhiteSpace(pendingLeaveReason)
-                        ? "Enabled - waiting for blockers to clear before leaving the current Eureka duty."
-                        : $"Enabled - {pendingLeaveReason} Waiting for blockers to clear before leaving.";
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (string.IsNullOrWhiteSpace(pendingLeaveReason) ? global::XASlave.Localization.UiMessage.Key("S911A792184CB6EA0") : global::XASlave.Localization.UiMessage.Format("SD7C65BBDFB183E09", global::XASlave.Localization.UiMessage.Capture(ref pendingLeaveReasonMessage, pendingLeaveReason))));
                     return;
                 }
 
                 if (leaveDutyConfirmationSent)
                 {
-                    StatusText = "Enabled - waiting for the game to finish leaving Eureka.";
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S55CB84085E1F3431"));
                     return;
                 }
 
                 if (AddonHelper.IsAddonVisible("SelectYesno"))
                 {
-                    StatusText = leaveDutyRequestedAtTick == 0 || !AddonHelper.IsLeaveDutyConfirmationPrompt()
-                        ? "Enabled - waiting for the current confirmation to close before leaving Eureka."
-                        : "Enabled - waiting to confirm Leave Duty.";
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (leaveDutyRequestedAtTick == 0 || !AddonHelper.IsLeaveDutyConfirmationPrompt() ? global::XASlave.Localization.UiMessage.Key("SB0C2B88328B7E939") : global::XASlave.Localization.UiMessage.Key("S25F494C88E4A0ED2")));
                     return;
                 }
 
                 if (leaveDutyRequestedAtTick != 0)
                 {
-                    StatusText = "Enabled - waiting for the Leave Duty confirmation.";
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SE0EDAF866ADAF94A"));
                     return;
                 }
 
                 if (AddonHelper.IsAddonVisible("ContentsFinderMenu"))
                 {
-                    StatusText = AddonHelper.IsAddonReady("ContentsFinderMenu")
-                        ? "Enabled - pressing Leave Duty in the duty menu."
-                        : "Enabled - waiting for the duty menu to open.";
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (AddonHelper.IsAddonReady("ContentsFinderMenu") ? global::XASlave.Localization.UiMessage.Key("S70574D196FDF6010") : global::XASlave.Localization.UiMessage.Key("S132289B2E049AD76")));
                     return;
                 }
 
-                StatusText = "Enabled - opening the duty menu to leave Eureka.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S79CE5F330723039E"));
                 return;
             case EurekaHopState.WaitingForCharacterSafe:
-                StatusText = "Enabled - waiting for CharacterSafeWait in Kugane before targeting Rodney.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S6D15BBA072B0BCC4"));
                 return;
             case EurekaHopState.TargetingRodney:
-                StatusText = $"Enabled - targeting Rodney in Kugane for Eureka {currentTargetLabel}.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("SB75CB1FD4649EC9F", currentTargetLabel));
                 return;
             case EurekaHopState.InteractingWithRodney:
-                StatusText = $"Enabled - interacting with Rodney for Eureka {currentTargetLabel}.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S1E85DC0403A6C8CA", currentTargetLabel));
                 return;
             case EurekaHopState.SelectingZone:
-                StatusText = $"Enabled - selecting Eureka {currentTargetLabel} from Rodney's menu.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S97F9238723E30648", currentTargetLabel));
                 return;
             case EurekaHopState.ConfirmingEntry:
                 if (AddonHelper.IsAddonVisible(AddonHelper.ContentsFinderConfirmAddonName))
                 {
-                    StatusText = AddonHelper.IsAddonReady(AddonHelper.ContentsFinderConfirmAddonName)
-                        ? $"Enabled - pressing Commence for Eureka {currentTargetLabel}."
-                        : $"Enabled - waiting for the Eureka {currentTargetLabel} duty-ready prompt.";
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (AddonHelper.IsAddonReady(AddonHelper.ContentsFinderConfirmAddonName) ? global::XASlave.Localization.UiMessage.Format("SC40DE76B7B91548D", currentTargetLabel) : global::XASlave.Localization.UiMessage.Format("S1FF9556B2976FFFD", currentTargetLabel)));
                     return;
                 }
 
-                StatusText = $"Enabled - confirming entry into Eureka {currentTargetLabel}.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S9D00C113B162097E", currentTargetLabel));
                 return;
             case EurekaHopState.WaitingForZoneLoad:
-                StatusText = $"Enabled - waiting to zone into Eureka {currentTargetLabel}.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("SD6D4B8DEC5F18B72", currentTargetLabel));
                 return;
             case EurekaHopState.WaitingForZoneReadiness:
-                StatusText = $"Enabled - waiting for CharacterSafeWait after entering Eureka {GetZoneLabel(lastObservedZone)} before reading the instance ID.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("SFE08FBB39BDA34C4", GetZoneLabel(lastObservedZone)));
                 return;
             default:
-                StatusText = "Enabled";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S92C1CDFDF4CB9CF6"));
                 return;
         }
     }
 
     public bool TryUseCurrentInstance(out EurekaZone zone, out int instanceId, out string message)
     {
+        var success = TryUseCurrentInstanceMessage(out zone, out instanceId, out var presentation);
+        message = presentation.Original;
+        return success;
+    }
+
+    internal bool TryUseCurrentInstanceMessage(out EurekaZone zone, out int instanceId, out global::XASlave.Localization.UiMessage message)
+    {
         zone = DefaultZone;
         instanceId = 0;
 
         if (!TryResolveCurrentEurekaZone(out zone))
         {
-            message = "Current zone is not Anemos, Pagos, Pyros, or Hydatos.";
+            message = global::XASlave.Localization.UiMessage.Key("SBE3E244FF4D8545C");
             return false;
         }
 
         if (condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
         {
-            message = "Cannot read instance ID while loading. Wait a moment and try again.";
+            message = global::XASlave.Localization.UiMessage.Key("S9E86765AFDE0025B");
             return false;
         }
 
@@ -1495,32 +1496,39 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
 
         if (resolution.InstanceId == 0)
         {
-            message = $"Could not read the current {GetZoneLabel(zone)} instance ID. Last candidate snapshot: {resolution.Diagnostics}";
+            message = global::XASlave.Localization.UiMessage.Format("SA30DFE51801C1437" , GetZoneLabel(zone), resolution.Diagnostics);
             return false;
         }
 
         instanceId = NormalizeInstanceId((int)resolution.InstanceId);
-        message = $"Captured {GetZoneLabel(zone)} instance {instanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}.";
+        message = global::XASlave.Localization.UiMessage.Format("S6123DFAD93B194A5" , GetZoneLabel(zone), instanceId, resolution.Source, BuildResolutionDetailsSuffix(resolution));
         return true;
     }
 
     public bool RequestUseCurrentInstance(Action<bool, EurekaZone, int, string> onResolved, out string message)
     {
+        var success = RequestUseCurrentInstanceMessage(onResolved == null ? null! : (completedSuccessfully, zone, instanceId, result) => onResolved(completedSuccessfully, zone, instanceId, result.Original), out var presentation);
+        message = presentation.Original;
+        return success;
+    }
+
+    internal bool RequestUseCurrentInstanceMessage(Action<bool, EurekaZone, int, global::XASlave.Localization.UiMessage> onResolved, out global::XASlave.Localization.UiMessage message)
+    {
         if (currentInstanceResolvePending)
         {
-            message = "An instance ID read is already pending.";
+            message = global::XASlave.Localization.UiMessage.Key("SB31C7A71B2573B7E");
             return false;
         }
 
         if (!TryResolveCurrentEurekaZone(out currentInstanceResolveZone))
         {
-            message = "Current zone is not Anemos, Pagos, Pyros, or Hydatos.";
+            message = global::XASlave.Localization.UiMessage.Key("SBE3E244FF4D8545C");
             return false;
         }
 
         if (condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
         {
-            message = "Cannot read instance ID while loading. Wait a moment and try again.";
+            message = global::XASlave.Localization.UiMessage.Key("S9E86765AFDE0025B");
             return false;
         }
 
@@ -1529,7 +1537,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         currentInstanceResolveNextTick = 0;
         currentInstanceResolveCallback = onResolved;
         framework.Update += OnCurrentInstanceResolvePoll;
-        message = $"Reading the current {GetZoneLabel(currentInstanceResolveZone)} instance ID across framework ticks...";
+        message = global::XASlave.Localization.UiMessage.Format("SAF7AA3F8A330118C" , GetZoneLabel(currentInstanceResolveZone));
         return true;
     }
 
@@ -1548,7 +1556,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         currentInstanceResolveNextTick = now + CurrentInstanceResolveIntervalMilliseconds;
         if (condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
         {
-            CompleteCurrentInstanceResolve(false, 0, "Cannot read instance ID while loading. Wait for zone load to complete.");
+            CompleteCurrentInstanceResolve(false, 0, global::XASlave.Localization.UiMessage.Key("S330A2B03739154DE"));
             return;
         }
 
@@ -1561,7 +1569,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
             CompleteCurrentInstanceResolve(
                 true,
                 instanceId,
-                $"Captured {GetZoneLabel(currentInstanceResolveZone)} instance {instanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}.");
+                global::XASlave.Localization.UiMessage.Format("S6123DFAD93B194A5" , GetZoneLabel(currentInstanceResolveZone), instanceId, resolution.Source, BuildResolutionDetailsSuffix(resolution)));
             return;
         }
 
@@ -1570,11 +1578,14 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
             CompleteCurrentInstanceResolve(
                 false,
                 0,
-                $"Could not read the current {GetZoneLabel(currentInstanceResolveZone)} instance ID. Last candidate snapshot: {resolution.Diagnostics}");
+                global::XASlave.Localization.UiMessage.Format("SA30DFE51801C1437" , GetZoneLabel(currentInstanceResolveZone), resolution.Diagnostics));
         }
     }
 
     private void CompleteCurrentInstanceResolve(bool success, int instanceId, string message)
+        => CompleteCurrentInstanceResolve(success, instanceId, global::XASlave.Localization.UiMessage.Raw(message));
+
+    private void CompleteCurrentInstanceResolve(bool success, int instanceId, global::XASlave.Localization.UiMessage message)
     {
         framework.Update -= OnCurrentInstanceResolvePoll;
         currentInstanceResolvePending = false;
@@ -1755,15 +1766,11 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
         lastResolutionDiagnostics = resolution.Diagnostics;
     }
 
-    private static string FormatSourceLabel(string source)
-        => string.IsNullOrWhiteSpace(source) || string.Equals(source, "None", StringComparison.Ordinal)
-            ? string.Empty
-            : $" via {source}";
+    private static global::XASlave.Localization.UiMessage FormatSourceLabel(string source)
+        => (string.IsNullOrWhiteSpace(source) || string.Equals(source, "None", StringComparison.Ordinal) ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Format("SB7968BA79AD59496", source));
 
-    private static string BuildResolutionSourceSuffix(EurekaInstanceResolution resolution)
-        => string.IsNullOrWhiteSpace(resolution.Source) || string.Equals(resolution.Source, "None", StringComparison.Ordinal)
-            ? string.Empty
-            : $" via {resolution.Source}";
+    private static global::XASlave.Localization.UiMessage BuildResolutionSourceSuffix(EurekaInstanceResolution resolution)
+        => (string.IsNullOrWhiteSpace(resolution.Source) || string.Equals(resolution.Source, "None", StringComparison.Ordinal) ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Format("SB7968BA79AD59496", resolution.Source));
 
     private static string BuildResolutionDetailsSuffix(EurekaInstanceResolution resolution)
     {
@@ -1781,7 +1788,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     private void AnnounceNewInstance(EurekaZone zone, EurekaInstanceResolution resolution)
     {
         var zoneLabel = GetZoneLabel(zone);
-        Plugin.ChatGui.Print($"[XASlave] {zoneLabel} Instance: {resolution.InstanceId} via {resolution.Source}{BuildResolutionDetailsSuffix(resolution)}. Baseline updated.{GetFieldOperationsAnnouncementSuffix()}");
+        Plugin.ChatGui.Print(global::XASlave.Localization.UiMessage.Format("S330E517344D2E3A3", zoneLabel, resolution.InstanceId, resolution.Source, BuildResolutionDetailsSuffix(resolution), GetFieldOperationsAnnouncementSuffix()).Original);
         ConfirmFieldOperationsAnnouncement();
         if (configuration.EurekaInstanceIdPlaySound)
             XAPeepSoundPlayer.TryPlayAlert(configuration.EurekaInstanceIdSoundEffectId, configuration.EurekaInstanceIdSoundVolume, log);
@@ -1838,7 +1845,7 @@ public sealed unsafe class EurekaInstanceIdService : IDisposable
     public string FieldOperationsLegacyTooltip()
     {
         if (!TryResolveEurekaZoneByTerritoryType(clientState.TerritoryType, out var zone) || zone != lastObservedZone) return string.Empty;
-        return $"Ordinary Eureka instance: {lastObservedInstanceId} ({lastObservedInstanceSource})";
+        return global::XASlave.Localization.UiMessage.Format("S66B7298293809647", lastObservedInstanceId, lastObservedInstanceSource).Original;
     }
 
     private string GetFieldOperationsAnnouncementSuffix()

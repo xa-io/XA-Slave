@@ -20,8 +20,14 @@ public unsafe sealed class AutoDutyCommenceService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
 
     public bool SetEnabled(bool value)
     {
@@ -32,13 +38,13 @@ public unsafe sealed class AutoDutyCommenceService : IDisposable
         {
             enabled = false;
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         Subscribe();
         enabled = true;
-        StatusText = "Enabled - Duty Commence is clicked automatically when the confirmation prompt is ready.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SF35868DF2FDC9DEA"));
         return true;
     }
 
@@ -95,7 +101,7 @@ public unsafe sealed class AutoDutyCommenceService : IDisposable
             lastAddonAddress = addonAddress;
             lastAttemptUtc = now;
             addon->AtkUnitBase.FireCallbackInt(8);
-            LastActionText = $"Last action: clicked Duty Commence at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S419FF2B2D75C0B7A", DateTime.Now));
         }
         catch (Exception ex)
         {

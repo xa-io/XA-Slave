@@ -13,7 +13,9 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
     private FurnitureRestoreSequence? sequence;
     private long generation;
     private bool disposed, running, terminating, ownsRunner;
-    internal string Status { get; private set; } = "Choose a furniture batch mode from the current HousingGoods session.";
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("S9204566911DD7ECF");
+    internal string Status { get; private set; } = global::XASlave.Localization.UiLocale.Native("S9204566911DD7ECF");
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(statusMessage, Status);
     internal bool IsRunning => running;
     internal IReadOnlyList<FurnitureRestoreItemResult> Results => sequence?.Results ?? Array.Empty<FurnitureRestoreItemResult>();
 
@@ -25,7 +27,7 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
         Plugin.Log.Information("[AutoRestoreFurniture] Start requested: {Mode}", mode);
         if (disposed || running || terminating || runner.IsRunning)
         {
-            Status = "Another task is running or furniture restoration is unavailable.";
+            Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S7A51CB5AEA3CD411"));
             Plugin.Log.Warning("[AutoRestoreFurniture] Start rejected: {Status}", Status);
             return false;
         }
@@ -41,16 +43,16 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
             adapter = created;
             sequence = new(adapter, mode, owned, Environment.TickCount64);
             ownsRunner = true;
-            var accepted = runner.Start("Auto Restore Furniture", [new TaskStep
+            var accepted = runner.Start(global::XASlave.Localization.UiMessage.Key("S62F6C455F98922D0"), [new TaskStep
             {
-                Name = "Restore the fixed initial furniture set",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SB5B724D0C38B0930"),
                 IsComplete = () => Tick(owned), TimeoutSec = 1801, MaxRetries = 0,
-                OnTimeout = () => Stop("Furniture batch timeout."),
+                OnTimeout = () => Stop(global::XASlave.Localization.UiMessage.Key("S0289334B2CEC26B8")),
             }], suppressCompletionReport: true, totalItems: 0, suppressLogoutCancel: false,
                 onTerminal: () => Cleanup(owned), haltOnStepError: true);
             if (!accepted)
             {
-                Cleanup(owned); Status = "The shared task runner rejected furniture restoration.";
+                Cleanup(owned); Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S21436434C4877F7F"));
                 Plugin.Log.Warning("[AutoRestoreFurniture] Start rejected: {Status}", Status);
                 return false;
             }
@@ -63,7 +65,7 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
             if (owned == generation)
             {
                 Cleanup(owned);
-                Status = error.Message;
+                Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.FromException(error));
             }
             return false;
         }
@@ -78,11 +80,13 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
         if (Status != sequence.Status)
             Plugin.Log.Information("[AutoRestoreFurniture] Progress: phase {Phase}, status {Status}, initial items {InitialItems}, confirmed {Confirmed}",
                 sequence.Phase, sequence.Status, sequence.Results.Count, sequence.Confirmed);
-        Status = sequence.Status;
+        Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, sequence.StatusMessage);
         return sequence.Terminal;
     }
 
-    internal void Stop(string reason = "Furniture restoration stopped by the operator.")
+    internal void Stop() => Stop(global::XASlave.Localization.UiMessage.Key("S22808EAC3BCF65C6"));
+    internal void Stop(string reason) => Stop(global::XASlave.Localization.UiMessage.Raw(reason));
+    internal void Stop(global::XASlave.Localization.UiMessage reason)
     {
         if (!running) return;
         terminating = true;
@@ -91,7 +95,7 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
         ownsRunner = false;
         try
         {
-            sequence?.Cancel(reason); Status = sequence?.Status ?? reason;
+            sequence?.Cancel(reason); Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, sequence?.StatusMessage ?? reason);
             if (cancelRunner) runner.Cancel();
         }
         finally { ReleaseAdapter(); terminating = false; }
@@ -104,8 +108,8 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
         generation++; running = false; ownsRunner = false;
         try
         {
-            sequence?.Cancel("Furniture task ended; no additional native requests will be made.");
-            Status = sequence?.Status ?? "Furniture task ended.";
+            sequence?.Cancel(global::XASlave.Localization.UiMessage.Key("SEE3064093A1B7550"));
+            Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, sequence?.StatusMessage ?? global::XASlave.Localization.UiMessage.Key("SEF5140206674324B"));
         }
         finally { ReleaseAdapter(); terminating = false; }
     }
@@ -117,7 +121,7 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
         try { retiring?.Dispose(); }
         catch (Exception error)
         {
-            Status += " XA observer disposal reported a failure.";
+            Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("SE9EE3F9E8133EEB0" , StatusMessage));
             Plugin.Log.Error(error, "[AutoRestoreFurniture] Adapter disposal failed.");
         }
     }
@@ -125,7 +129,7 @@ internal sealed class AutoRestoreFurnitureTask : IDisposable
     public void Dispose()
     {
         if (disposed) return;
-        disposed = true; Stop("Furniture restoration disposed."); generation++;
+        disposed = true; Stop(global::XASlave.Localization.UiMessage.Key("S70E883B773879A48")); generation++;
         ReleaseAdapter();
     }
 }

@@ -38,7 +38,7 @@ public partial class SlaveWindow
     {
         public HashSet<int> SelectedIndices { get; } = new();
         public Dictionary<string, int> SelectedByGroup { get; } = new(StringComparer.OrdinalIgnoreCase);
-        public List<string> Shortfalls { get; } = new();
+        public List<global::XASlave.Localization.UiMessage> Shortfalls { get; } = new();
         public bool Success => Shortfalls.Count == 0;
     }
 
@@ -100,7 +100,7 @@ public partial class SlaveWindow
 
             if (!IsXagmanTonyAutoGroupKnown(groupKey))
             {
-                result.Shortfalls.Add("An owner region is unknown; its Tony requirement cannot be selected.");
+                result.Shortfalls.Add(global::XASlave.Localization.UiMessage.Key("S5769D385BD82B269"));
                 continue;
             }
 
@@ -138,29 +138,29 @@ public partial class SlaveWindow
             result.SelectedIndices.UnionWith(selected.Select(candidate => candidate.Index));
             result.SelectedByGroup[groupKey] = selected.Count;
             if (deficits.MissingCoordinator)
-                result.Shortfalls.Add($"{groupKey}: an eligible Tony with at least 5,000 gil is needed.");
+                result.Shortfalls.Add(global::XASlave.Localization.UiMessage.Format("S2C57DD3C4E703E22", groupKey));
             if (deficits.BagSlots > 0)
-                result.Shortfalls.Add($"{groupKey}: more eligible Tonys are needed for {deficits.BagSlots:N0} additional free inventory slot(s).");
+                result.Shortfalls.Add(global::XASlave.Localization.UiMessage.Format("SBB2936679B9BBA58", groupKey, deficits.BagSlots));
             foreach (var item in items)
             {
                 var key = new XagmanForecastItemKey(item.ItemId, item.IsHq);
-                var name = string.IsNullOrWhiteSpace(item.ItemName) ? $"Item {item.ItemId}" : item.ItemName;
-                var label = item.IsHq ? $"{name} (HQ)" : name;
+                var name = (string.IsNullOrWhiteSpace(item.ItemName) ? global::XASlave.Localization.UiMessage.Format("SFAD8B09F2BDD2797", item.ItemId) : global::XASlave.Localization.UiMessage.Raw(item.ItemName));
+                var label = (item.IsHq ? global::XASlave.Localization.UiMessage.Format("SE6E7D5ED3AAA1051", name) : name);
                 if (deficits.ReceivingUnits.TryGetValue(key, out var receiving) && receiving > 0)
                 {
-                    var capacity = item.ItemId == 1 ? "gil receiving capacity" : $"{label} crystal pouch capacity";
-                    result.Shortfalls.Add($"{groupKey}: more eligible Tonys are needed for {receiving:N0} additional units of {capacity}.");
+                    var capacity = (item.ItemId == 1 ? global::XASlave.Localization.UiMessage.Key("S3EC562161B572519") : global::XASlave.Localization.UiMessage.Format("S919B0B57B95CB089", label));
+                    result.Shortfalls.Add(global::XASlave.Localization.UiMessage.Format("S5A8CAB597EF1F61E", groupKey, receiving, capacity));
                 }
                 if (deficits.SupplyUnits.TryGetValue(key, out var supply) && supply > 0)
                 {
-                    var projection = creditIncomingSupply ? " after collection" : string.Empty;
-                    result.Shortfalls.Add($"{groupKey}: eligible Tony stock is short {supply:N0} {label}{projection}; add Tonys holding the missing supply.");
+                    var projection = (creditIncomingSupply ? global::XASlave.Localization.UiMessage.Key("S47BFBFDB54F740ED") : global::XASlave.Localization.UiMessage.Raw(string.Empty));
+                    result.Shortfalls.Add(global::XASlave.Localization.UiMessage.Format("S67F55761B9C9EEF9", groupKey, supply, label, projection));
                 }
             }
         }
 
         if (result.SelectedByGroup.Count == 0 && result.Shortfalls.Count == 0)
-            result.Shortfalls.Add("No selected Franchise Owner requirements are available for Tony Auto selection.");
+            result.Shortfalls.Add(global::XASlave.Localization.UiMessage.Key("SE09E3115CEC9A160"));
         return result;
     }
 

@@ -12,6 +12,7 @@ internal sealed unsafe class NearbyZoneCache : IDisposable
     private NearbyZoneNativeBinding? binding;
     private NearbyZoneObserverOwner? observer;
     private string? bindingError;
+    private global::XASlave.Localization.UiMessage? bindingErrorMessage;
     private bool observersReady, eligible, pending, armed;
     private long epoch, deadline, attemptEpoch;
     private long sourceGeneration = -1;
@@ -25,7 +26,10 @@ internal sealed unsafe class NearbyZoneCache : IDisposable
     private ushort place;
     internal long Generation { get; private set; } = -1;
     internal NearbyZoneObservation? Observation { get; private set; }
-    internal string Status { get; private set; } = "Zone results unavailable";
+    internal string Status { get; private set; } = global::XASlave.Localization.UiMessage.Key("S9D3AB32D7F0AE2DF").Original;
+    private global::XASlave.Localization.UiMessage? uiStatus = global::XASlave.Localization.UiMessage.Key("S9D3AB32D7F0AE2DF");
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatus, Status);
+    internal string LocalizedStatus => global::XASlave.Localization.UiMessage.Resolve(ref uiStatus, Status);
     internal NearbyZoneNativeBinding? Binding => binding;
 
     internal void Update(long generation, uint currentTerritory, bool canSearch, bool contentMode, uint searchPlace, bool screenReady, long tick)
@@ -38,42 +42,42 @@ internal sealed unsafe class NearbyZoneCache : IDisposable
         if (eligible && !canSearch) Invalidate();
         eligible = canSearch;
         place = searchPlace <= ushort.MaxValue ? (ushort)searchPlace : (ushort)0;
-        if (!eligible) { observer?.Disable(); Observation = null; pending = false; Status = "Zone search is not available in this area"; return; }
-        if (pending && tick >= deadline) { pending = false; Status = "Refresh timed out; native cache may be stale"; }
-        if (!screenReady) { Status = "Waiting for the game screen"; return; }
+        if (!eligible) { observer?.Disable(); Observation = null; pending = false; Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S0809AB8F94DDCDB6")); return; }
+        if (pending && tick >= deadline) { pending = false; Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("SB7B3FA06F6125BD9")); }
+        if (!screenReady) { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S8E3FC22FE62AA086")); return; }
         if (binding == null && bindingError == null)
         {
             try { binding = new(); }
-            catch (Exception error) { bindingError = error.Message; }
+            catch (Exception error) { bindingError = global::XASlave.Localization.UiMessage.Store(ref bindingErrorMessage, global::XASlave.Localization.UiMessage.FromException(error)); }
         }
-        if (bindingError != null) { Status = "Zone results unavailable: " + bindingError; return; }
+        if (bindingError != null) { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S3DA9EDDC61708133"), global::XASlave.Localization.UiMessage.Capture(ref bindingErrorMessage, bindingError))); return; }
         try { (observer ??= new NearbyZoneObserverOwner(binding!, this)).Enable(); }
         catch (Exception error)
         {
-            var reason = error.Message;
+            var reason = global::XASlave.Localization.UiMessage.FromException(error);
             try { observer?.Disable(); }
-            catch (Exception cleanupError) { reason += " Cleanup also failed: " + cleanupError.Message; }
+            catch (Exception cleanupError) { reason = global::XASlave.Localization.UiMessage.Concat(reason, global::XASlave.Localization.UiMessage.Key("S94D5A3593864B008"), global::XASlave.Localization.UiMessage.FromException(cleanupError)); }
             ReportUnavailable(reason);
             return;
         }
-        if (!observersReady) { Status = "Zone results unavailable"; return; }
+        if (!observersReady) { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S9D3AB32D7F0AE2DF")); return; }
         if (pending || tick < nextAttempt[(int)mode]) return;
         try
         {
             var proxy = binding!.CurrentProxy(mode);
-            if (binding.Agent(mode)->IsAgentActive()) { Status = "Automatic refresh paused while the search window is active"; return; }
+            if (binding.Agent(mode)->IsAgentActive()) { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S9DDFDBAFAE429CA0")); return; }
             if (lastProxy[(int)mode] != (nint)proxy) { lastProxy[(int)mode] = (nint)proxy; nextAttempt[(int)mode] = 0; }
             nextAttempt[(int)mode] = tick + 60 * Stopwatch.Frequency;
             deadline = tick + 15 * Stopwatch.Frequency;
             pending = armed = true;
             attemptProxy = (nint)proxy;
             attemptIdKnown = false;
-            Status = "Refresh attempted; waiting for a native cache observation";
+            Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S23E1E92BB67C315D"));
             try { NearbyZoneRequestAdapter.Request(binding, mode, Generation, () => Generation, place); }
             finally { armed = false; }
-            if (attemptEpoch != epoch) { pending = false; Status = "Refresh ownership changed; native cache may be stale"; }
+            if (attemptEpoch != epoch) { pending = false; Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S5152075EB4A18BBB")); }
         }
-        catch (Exception error) { armed = pending = false; Status = "Zone refresh unavailable: " + error.Message; }
+        catch (Exception error) { armed = pending = false; Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SC2D048B0F73DA3AF"), global::XASlave.Localization.UiMessage.FromException(error))); }
     }
 
     // Called only after an owner has validated and activated every required native observer.
@@ -94,7 +98,7 @@ internal sealed unsafe class NearbyZoneCache : IDisposable
         armed = false;
         epoch++;
         if (owned) attemptEpoch = epoch;
-        else if (pending) { pending = false; Status = "Another native request started; cache freshness is uncertain"; }
+        else if (pending) { pending = false; Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S56656BD35AE88FA9")); }
         return new(Generation, epoch, requestMode, proxy, owned);
     }
 
@@ -119,9 +123,7 @@ internal sealed unsafe class NearbyZoneCache : IDisposable
             && (mode == NearbyZoneMode.Search || (attemptIdKnown && ((InfoProxyCommonList*)callbackProxy)->CurrentRequestId == attemptId));
         if (matchedAttempt) pending = false;
         // Even a matching byte can wrap, and Search has no unique direct-request ID. Never claim freshness or transport success.
-        Status = (mode == NearbyZoneMode.Search ? "Search results" : "Content-member cache") + " observed at " + copy.ObservedUtc.ToString("HH:mm:ss 'UTC'")
-            + (copy.PossiblyCapped ? "; possibly capped at 200" : string.Empty)
-            + (matchedAttempt ? "; request attribution is not guaranteed" : "; unsolicited or late cache observation");
+        Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(((mode == NearbyZoneMode.Search ? global::XASlave.Localization.UiMessage.Key("SE978B00DE465A271") : global::XASlave.Localization.UiMessage.Key("S2B692F5EBEC2AE57"))), global::XASlave.Localization.UiMessage.Key("S1D1AEEEE9DAF660D")), global::XASlave.Localization.UiMessage.Raw(copy.ObservedUtc.ToString("HH:mm:ss 'UTC'"))), ((copy.PossiblyCapped ? global::XASlave.Localization.UiMessage.Key("SD99325749EEC6E69") : global::XASlave.Localization.UiMessage.Raw(string.Empty)))), ((matchedAttempt ? global::XASlave.Localization.UiMessage.Key("S3E21FDB965115CE3") : global::XASlave.Localization.UiMessage.Key("SD7E803CB7EAC4E90")))));
     }
 
     internal void Invalidate()
@@ -131,13 +133,15 @@ internal sealed unsafe class NearbyZoneCache : IDisposable
         Observation = null;
         pending = armed = eligible = false;
         attemptIdKnown = false;
-        Status = "Zone results unavailable";
+        Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S9D3AB32D7F0AE2DF"));
     }
 
-    internal void ReportUnavailable(string reason)
+    internal void ReportUnavailable(string reason) => ReportUnavailable(global::XASlave.Localization.UiMessage.Raw(reason));
+
+    internal void ReportUnavailable(global::XASlave.Localization.UiMessage reason)
     {
         pending = armed = false;
-        Status = "Zone results unavailable: " + reason;
+        Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S3DA9EDDC61708133"), reason));
     }
 
     internal void Suspend()

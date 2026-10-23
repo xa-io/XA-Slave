@@ -15,7 +15,7 @@ internal sealed partial class ViewItemWindow : Window
     private bool showHistory;
 
     internal ViewItemWindow(ViewSingleItemService service)
-        : base("View Item###XAViewSingleItem", ImGuiWindowFlags.None)
+        : base(global::XASlave.Localization.UiLocale.Get("SEF7E5322A926044B") + "###XAViewSingleItem", ImGuiWindowFlags.None)
     {
         this.service = service;
         Size = ImGuiHelpers.ScaledVector2(960, 760);
@@ -33,6 +33,7 @@ internal sealed partial class ViewItemWindow : Window
 
     public override void PreDraw()
     {
+        WindowName = global::XASlave.Localization.UiLocale.Get("SEF7E5322A926044B") + "###XAViewSingleItem";
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = ImGuiHelpers.ScaledVector2(600, 500),
@@ -50,20 +51,20 @@ internal sealed partial class ViewItemWindow : Window
     {
         if (!service.IsEnabled)
         {
-            ImGui.TextWrapped("Enable XA Mods > Player Mods > View Single Item to use Find item search or right-click a player or supported item.");
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SBB0DF7AF96BC40EC"));
             return;
         }
-        if (ImGui.Button("Use current inspection")) service.OpenCurrentInspection();
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SAFA6A38A0534E12E"))) service.OpenCurrentInspection();
         ImGui.SameLine();
-        if (ImGui.Button("Stop")) service.Stop();
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SCAE7D57BC067A514"))) service.Stop();
         ImGui.SameLine();
-        if (ImGui.Button("History")) showHistory = !showHistory;
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S0E76960093379060"))) showHistory = !showHistory;
         ImGui.SameLine();
-        if (ImGui.Button("Find item")) showCatalogSearch = !showCatalogSearch;
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S15CB4F141211A50F"))) showCatalogSearch = !showCatalogSearch;
         if (showCatalogSearch) DrawCatalogSearch();
         if (showHistory) DrawHistory();
         if (!string.IsNullOrEmpty(service.PlayerName)) ImGui.TextUnformatted(service.PlayerName);
-        ImGui.TextWrapped(service.StatusText);
+        ImGui.TextWrapped(service.LocalizedStatusText);
         if (service.Choices.Count == 0) return;
 
         DrawItemButtons();
@@ -86,31 +87,31 @@ internal sealed partial class ViewItemWindow : Window
         if (preview != null) DrawAnimationControls(preview);
         if (preview != null && service.SelectedKey is 0 or 1)
         {
-            if (ImGui.RadioButton("Sheathe Weapon", !preview.WeaponDrawn)) preview.SetWeaponDrawn(false);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Shows the weapon's sheathed appearance, then freezes the pose.");
+            if (global::XASlave.Localization.UiNative.RadioButton(global::XASlave.Localization.UiLocale.Native("SA8C767779B6DE601"), !preview.WeaponDrawn)) preview.SetWeaponDrawn(false);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SB945D411AA9BE1B4"));
             ImGui.SameLine();
-            if (ImGui.RadioButton("Unsheathe Weapon", preview.WeaponDrawn)) preview.SetWeaponDrawn(true);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Shows the weapon's drawn appearance and supported glow effects, then freezes the pose.");
+            if (global::XASlave.Localization.UiNative.RadioButton(global::XASlave.Localization.UiLocale.Native("S028F8B9BD94F5F80"), preview.WeaponDrawn)) preview.SetWeaponDrawn(true);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S80D53AFFF9CE844F"));
         }
-        if (ImGui.Button("Rotate Left")) preview?.Camera(-0.15f, 0, 0, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S1E8977C24EE39B44"))) preview?.Camera(-0.15f, 0, 0, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Rotate Right")) preview?.Camera(0.15f, 0, 0, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SD2F1321248875601"))) preview?.Camera(0.15f, 0, 0, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Above")) preview?.Camera(0, -0.15f, 0, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S80792346CA2D714D"))) preview?.Camera(0, -0.15f, 0, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Below")) preview?.Camera(0, 0.15f, 0, 0, 0);
-        if (ImGui.Button("Roll Counterclockwise")) preview?.Camera(0, 0, 0, 0, 0, -0.15f);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Turn the view counterclockwise. Shift + left-drag left or right also rolls the view.");
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SA53DFFFFB7E57BB6"))) preview?.Camera(0, 0.15f, 0, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SC90B88F3B2622C2E"))) preview?.Camera(0, 0, 0, 0, 0, -0.15f);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S47CBE59ACC20EF01"));
         ImGui.SameLine();
-        if (ImGui.Button("Roll Clockwise")) preview?.Camera(0, 0, 0, 0, 0, 0.15f);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Turn the view clockwise, including sideways or upside down. Shift + left-drag also rolls the view.");
-        if (ImGui.Button("Zoom Out")) preview?.Camera(0, 0, 1, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S1B353379EAB6ED41"))) preview?.Camera(0, 0, 0, 0, 0, 0.15f);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SCA08E0F5181F7D6E"));
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S24649EE0C7A92FD8"))) preview?.Camera(0, 0, 1, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Zoom In")) preview?.Camera(0, 0, -1, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S5A982CF9DC11B4EC"))) preview?.Camera(0, 0, -1, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Reset View")) preview?.ResetCamera();
-        ImGui.TextDisabled("Drag: rotate / tilt | Shift + drag: roll | Right-drag: pan | Wheel: zoom");
-        ImGui.TextDisabled("Drag the title bar to move this window.");
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S7F19F60F9123C6BD"))) preview?.ResetCamera();
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S9CCF0E8137768B84"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S6B0ADEA6943EAAC4"));
 
         if (preview == null) return;
         var available = ImGui.GetContentRegionAvail();
@@ -171,33 +172,33 @@ internal sealed partial class ViewItemWindow : Window
                     if (active) ImGui.PushStyleColor(ImGuiCol.Button, ImGui.GetStyle().Colors[(int)ImGuiCol.ButtonActive]);
                     try
                     {
-                        if (ImGui.Button(ChoiceButtonLabel(choice.Key) + $"##ViewItemChoice{choice.Key}", new Vector2(-1, 0)))
+                        if (global::XASlave.Localization.UiNative.Button(ChoiceButtonLabel(choice.Key) + $"##ViewItemChoice{choice.Key}", new Vector2(-1, 0)))
                             service.Select(choice.Key);
                     }
                     finally { if (active) ImGui.PopStyleColor(); }
                     if (ImGui.IsItemHovered())
                         ImGui.SetTooltip(string.IsNullOrEmpty(choice.UnavailableReason)
-                            ? choice.Label : choice.Label + "\n" + choice.UnavailableReason);
+                            ? choice.LocalizedLabel : choice.LocalizedLabel + "\n" + choice.LocalizedUnavailableReason);
                 }
             }
             finally { ImGui.EndTable(); }
         }
         foreach (var choice in service.Choices)
-            if (choice.Key == service.SelectedKey) { ImGui.TextWrapped(choice.Label); break; }
+            if (choice.Key == service.SelectedKey) { ImGui.TextWrapped(choice.LocalizedLabel); break; }
     }
 
     private static string ChoiceButtonLabel(int key) => key switch
     {
-        0 => "Weapon", 1 => "Off Hand", 2 => "Head", 3 => "Body", 4 => "Hands",
-        6 => "Legs", 7 => "Feet", 8 => "Earrings", 9 => "Necklace", 10 => "Bracelets",
-        11 => "Right Ring", 12 => "Left Ring", 100 => "Hair", 101 => "Facewear",
-        102 => "Fashion Accessory", 103 => "Minion", 104 => "Mount", 105 => "Framer's Kit", 106 => "Furniture", _ => "Item",
+        0 => global::XASlave.Localization.UiLocale.Native("S1710782C5D15B913"), 1 => global::XASlave.Localization.UiLocale.Native("SBFD173C2F222B066"), 2 => global::XASlave.Localization.UiLocale.Native("S9BB0AACC6D51F140"), 3 => global::XASlave.Localization.UiLocale.Native("S6CCAA6415B5EE449"), 4 => global::XASlave.Localization.UiLocale.Native("S6B7204778686145F"),
+        6 => global::XASlave.Localization.UiLocale.Native("S38557594D0FCE7FE"), 7 => global::XASlave.Localization.UiLocale.Native("SC59E96ABC48597B1"), 8 => global::XASlave.Localization.UiLocale.Native("SA532E980AE2F48EB"), 9 => global::XASlave.Localization.UiLocale.Native("S6A88445BBF65F756"), 10 => global::XASlave.Localization.UiLocale.Native("SA9A8BED2FC5B6067"),
+        11 => global::XASlave.Localization.UiLocale.Native("SDBC12EA1A8F44940"), 12 => global::XASlave.Localization.UiLocale.Native("S3A3780EAF4A4B1FA"), 100 => global::XASlave.Localization.UiLocale.Native("SABABED4823AB79D2"), 101 => global::XASlave.Localization.UiLocale.Native("SAF854AC129CA6190"),
+        102 => global::XASlave.Localization.UiLocale.Native("SE896611DD4474B59"), 103 => global::XASlave.Localization.UiLocale.Native("S2904BFF43BC4B7FE"), 104 => global::XASlave.Localization.UiLocale.Native("SD5605821C44BA5CB"), 105 => global::XASlave.Localization.UiLocale.Native("S2C5C087FBC66991D"), 106 => global::XASlave.Localization.UiLocale.Native("SC50440E0E41148B9"), _ => global::XASlave.Localization.UiLocale.Native("S652BCC3A47842889"),
     };
 
     private void DrawHistory()
     {
-        ImGui.TextWrapped(service.HistoryStatus);
-        if (ImGui.Button("Refresh history")) service.RefreshHistory();
+        ImGui.TextWrapped(service.LocalizedHistoryStatus);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S70F3D21749CCB8DA"))) service.RefreshHistory();
         if (ImGui.BeginChild("##ViewItemHistory", new Vector2(0, 150 * ImGuiHelpers.GlobalScale), true))
         {
             foreach (var entry in service.History)
@@ -206,8 +207,11 @@ internal sealed partial class ViewItemWindow : Window
                 var label = entry.World == 0 ? $"{stamp}  {entry.PlayerName}  (Item)"
                     : $"{stamp}  {entry.PlayerName}  (World {entry.World})";
                 if (entry.Capture == null) label += " - unavailable";
-                if (ImGui.Selectable(label + $"##Capture{entry.Id}")) service.OpenHistory(entry.Id);
-                if (entry.Capture == null && ImGui.IsItemHovered()) ImGui.SetTooltip(entry.Error);
+                var display = entry.World == 0 ? global::XASlave.Localization.UiLocale.FormatKey("SDF55C71EBF46A8B1", stamp, entry.LocalizedPlayerName)
+                    : global::XASlave.Localization.UiLocale.FormatKey("SA29B42C3DECD5FF9", stamp, entry.LocalizedPlayerName, entry.World);
+                if (entry.Capture == null) display += global::XASlave.Localization.UiLocale.Get("SF908C382BE86A0B8");
+                if (global::XASlave.Localization.UiNative.Selectable(label + $"##Capture{entry.Id}", display: display)) service.OpenHistory(entry.Id);
+                if (entry.Capture == null && ImGui.IsItemHovered()) ImGui.SetTooltip(entry.LocalizedError);
             }
         }
         ImGui.EndChild();

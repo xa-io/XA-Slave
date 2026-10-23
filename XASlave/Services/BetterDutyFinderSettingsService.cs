@@ -47,8 +47,14 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
     public bool IsReady => EnsureInitializer();
 
     public bool SetEnabled(bool value)
@@ -61,7 +67,7 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
             enabled = false;
             Unsubscribe();
             ClearTrackedAddons();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -71,7 +77,7 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
         enabled = true;
         Subscribe();
         RefreshTrackedAddons();
-        StatusText = "Enabled - ContentsFinder and RaidFinder expose lifecycle-tracked duty-finder setting buttons inline.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SFAEC50FA0A375324"));
         return true;
     }
 
@@ -152,29 +158,29 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
 
         if (ImGui.Begin($"##BetterDutyFinderSettings_{overlayId}", flags))
         {
-            DrawLanguageButton("JP", DutyFinderSetting.Ja);
+            DrawLanguageButton(global::XASlave.Localization.UiLocale.Get("S569EC6135D377E8A"), DutyFinderSetting.Ja);
             ImGui.SameLine();
-            DrawLanguageButton("EN", DutyFinderSetting.En);
+            DrawLanguageButton(global::XASlave.Localization.UiLocale.Get("S69374B09B1681162"), DutyFinderSetting.En);
             ImGui.SameLine();
-            DrawLanguageButton("DE", DutyFinderSetting.De);
+            DrawLanguageButton(global::XASlave.Localization.UiLocale.Get("S6814EF46F686990C"), DutyFinderSetting.De);
             ImGui.SameLine();
-            DrawLanguageButton("FR", DutyFinderSetting.Fr);
+            DrawLanguageButton(global::XASlave.Localization.UiLocale.Get("S501C26B2571A1F7F"), DutyFinderSetting.Fr);
             ImGui.SameLine();
             DrawCyclingButton(GetLootRuleLabel(), DutyFinderSetting.LootRule);
             ImGui.SameLine();
-            DrawToggleButton("InProg", DutyFinderSetting.JoinPartyInProgress);
+            DrawToggleButton(global::XASlave.Localization.UiLocale.Get("S4CD7FAE0FB61C6AF"), DutyFinderSetting.JoinPartyInProgress);
             ImGui.SameLine();
-            DrawToggleButton("LLR", DutyFinderSetting.LimitedLevelingRoulette);
+            DrawToggleButton(global::XASlave.Localization.UiLocale.Get("SD85C1EEBDFCD502E"), DutyFinderSetting.LimitedLevelingRoulette);
 
-            DrawToggleButton("Unsync", DutyFinderSetting.UnrestrictedParty);
+            DrawToggleButton(global::XASlave.Localization.UiLocale.Get("S51AF34F346CFEED7"), DutyFinderSetting.UnrestrictedParty);
             ImGui.SameLine();
-            DrawToggleButton("Sync", DutyFinderSetting.LevelSync, disabled: GetCurrentSettingValue(DutyFinderSetting.UnrestrictedParty) == 0);
+            DrawToggleButton(global::XASlave.Localization.UiLocale.Get("S8D261A372FDE1461"), DutyFinderSetting.LevelSync, disabled: GetCurrentSettingValue(DutyFinderSetting.UnrestrictedParty) == 0);
             ImGui.SameLine();
-            DrawToggleButton("MinIL", DutyFinderSetting.MinimumIl);
+            DrawToggleButton(global::XASlave.Localization.UiLocale.Get("S31C9C046B930BB92"), DutyFinderSetting.MinimumIl);
             ImGui.SameLine();
-            DrawToggleButton("NoEcho", DutyFinderSetting.SilenceEcho);
+            DrawToggleButton(global::XASlave.Localization.UiLocale.Get("S383B861273FB466E"), DutyFinderSetting.SilenceEcho);
             ImGui.SameLine();
-            DrawToggleButton("Explore", DutyFinderSetting.ExplorerMode);
+            DrawToggleButton(global::XASlave.Localization.UiLocale.Get("S3B73900B8D29F963"), DutyFinderSetting.ExplorerMode);
         }
 
         ImGui.End();
@@ -287,7 +293,7 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
         var uiModule = UIModule.Instance();
         if (uiModule == null)
         {
-            StatusText = "Unavailable - UIModule was not available.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S6E6D244E3E69B0A3"));
             return false;
         }
 
@@ -299,15 +305,15 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
             fixed (byte* arrayPtr = array)
                 setContentsFinderSettingsInit!(arrayPtr, uiModule);
 
-            LastActionText = $"Last action: {action} at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S0B42A0AB4428C05D", action, DateTime.Now));
             if (enabled)
-                StatusText = "Enabled - ContentsFinder and RaidFinder expose lifecycle-tracked duty-finder setting buttons inline.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SFAEC50FA0A375324"));
             return true;
         }
         catch (Exception ex)
         {
             log.Warning(ex, "[XASlave] Better Duty Finder failed while applying duty-finder settings.");
-            StatusText = "Unavailable - failed while applying the duty-finder setting update.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S599E5DF09F984EC0"));
             return false;
         }
     }
@@ -496,7 +502,7 @@ public unsafe sealed class BetterDutyFinderSettingsService : IDisposable
         catch (Exception ex)
         {
             log.Warning(ex, "[XASlave] Better Duty Finder failed while resolving the duty-finder settings initializer.");
-            StatusText = "Unavailable - failed to resolve the duty-finder settings initializer.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S183B674DAD1206C4"));
             return false;
         }
     }

@@ -37,34 +37,34 @@ public partial class SlaveWindow
     // Weather ID → group mapping
     private static readonly (int Id, string Label)[] AutoGlamWeatherDefinitions =
     {
-        (1, "Clear Skies"),
-        (2, "Fair Skies"),
-        (3, "Clouds"),
-        (4, "Fog"),
-        (5, "Wind"),
-        (6, "Gales"),
-        (7, "Rain"),
-        (8, "Showers"),
-        (9, "Thunder"),
-        (10, "Thunderstorms"),
-        (11, "Dust Storms"),
-        (14, "Heat Waves"),
-        (15, "Snow"),
-        (16, "Blizzards"),
-        (17, "Gloom"),
-        (49, "Umbral Wind"),
-        (50, "Umbral Static"),
-        (148, "Moon Dust"),
-        (149, "Astro Storm"),
+        (1, global::XASlave.Localization.UiLocale.Native("S222496583519AFFA")),
+        (2, global::XASlave.Localization.UiLocale.Native("SC49A9BED0A9742CA")),
+        (3, global::XASlave.Localization.UiLocale.Native("SE45347B019F0AC8F")),
+        (4, global::XASlave.Localization.UiLocale.Native("S14394E978D84AA11")),
+        (5, global::XASlave.Localization.UiLocale.Native("SD151346FE7EEA3C6")),
+        (6, global::XASlave.Localization.UiLocale.Native("SFC8107BE0E54D71E")),
+        (7, global::XASlave.Localization.UiLocale.Native("SA6D20AA6A4C73F0D")),
+        (8, global::XASlave.Localization.UiLocale.Native("SB77EAA0A3FB6FC8B")),
+        (9, global::XASlave.Localization.UiLocale.Native("S519BCE7BC2DAB47F")),
+        (10, global::XASlave.Localization.UiLocale.Native("SB8A0A4F4CE2F0E24")),
+        (11, global::XASlave.Localization.UiLocale.Native("SE70BCFE2C7679E72")),
+        (14, global::XASlave.Localization.UiLocale.Native("S793C380E1B82BAAD")),
+        (15, global::XASlave.Localization.UiLocale.Native("S4F946DA92E825D36")),
+        (16, global::XASlave.Localization.UiLocale.Native("S09BED18D7CF1561D")),
+        (17, global::XASlave.Localization.UiLocale.Native("S70C970F3EBDA5752")),
+        (49, global::XASlave.Localization.UiLocale.Native("SC19822C0D0940A38")),
+        (50, global::XASlave.Localization.UiLocale.Native("SF2ED0DC83A888D03")),
+        (148, global::XASlave.Localization.UiLocale.Native("SAD779FEA57A6367E")),
+        (149, global::XASlave.Localization.UiLocale.Native("SEC102433F3D2329A")),
     };
 
     private static readonly Dictionary<int, string> WeatherNames = new()
     {
-        { 1, "Clear Skies" }, { 2, "Fair Skies" }, { 3, "Clouds" }, { 4, "Fog" },
-        { 5, "Wind" }, { 6, "Gales" }, { 7, "Rain" }, { 8, "Showers" },
-        { 9, "Thunder" }, { 10, "Thunderstorms" }, { 11, "Dust Storms" },
-        { 14, "Heat Waves" }, { 15, "Snow" }, { 16, "Blizzards" }, { 17, "Gloom" },
-        { 49, "Umbral Wind" }, { 50, "Umbral Static" }, { 148, "Moon Dust" }, { 149, "Astromagnetic Storm" },
+        { 1, global::XASlave.Localization.UiLocale.Native("S222496583519AFFA") }, { 2, global::XASlave.Localization.UiLocale.Native("SC49A9BED0A9742CA") }, { 3, global::XASlave.Localization.UiLocale.Native("SE45347B019F0AC8F") }, { 4, global::XASlave.Localization.UiLocale.Native("S14394E978D84AA11") },
+        { 5, global::XASlave.Localization.UiLocale.Native("SD151346FE7EEA3C6") }, { 6, global::XASlave.Localization.UiLocale.Native("SFC8107BE0E54D71E") }, { 7, global::XASlave.Localization.UiLocale.Native("SA6D20AA6A4C73F0D") }, { 8, global::XASlave.Localization.UiLocale.Native("SB77EAA0A3FB6FC8B") },
+        { 9, global::XASlave.Localization.UiLocale.Native("S519BCE7BC2DAB47F") }, { 10, global::XASlave.Localization.UiLocale.Native("SB8A0A4F4CE2F0E24") }, { 11, global::XASlave.Localization.UiLocale.Native("SE70BCFE2C7679E72") },
+        { 14, global::XASlave.Localization.UiLocale.Native("S793C380E1B82BAAD") }, { 15, global::XASlave.Localization.UiLocale.Native("S4F946DA92E825D36") }, { 16, global::XASlave.Localization.UiLocale.Native("S09BED18D7CF1561D") }, { 17, global::XASlave.Localization.UiLocale.Native("S70C970F3EBDA5752") },
+        { 49, global::XASlave.Localization.UiLocale.Native("SC19822C0D0940A38") }, { 50, global::XASlave.Localization.UiLocale.Native("SF2ED0DC83A888D03") }, { 148, global::XASlave.Localization.UiLocale.Native("SAD779FEA57A6367E") }, { 149, global::XASlave.Localization.UiLocale.Native("S633C77C8B4FBB56C") },
     };
 
     private void DrawAutoGlamWeatherTask()
@@ -72,8 +72,8 @@ public partial class SlaveWindow
         var cfg = plugin.Configuration;
         InitializeAutoGlamInputs(cfg);
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Auto-Glam Against Weather");
-        ImGui.TextDisabled("Automatically changes glamour plate based on current weather conditions.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S37B6959332453356"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S6D72DE5FECAEAE07"));
         ImGui.Spacing();
 
         // Start/Stop button moved to top
@@ -83,16 +83,10 @@ public partial class SlaveWindow
         var canStart = Plugin.PlayerState.IsLoaded
             && classJobOptions.Count > 0
             && string.IsNullOrEmpty(firstMissingWeatherLabel);
-        var startDisabledReason = !Plugin.PlayerState.IsLoaded
-            ? "Player must be loaded to start Auto-Glam Weather."
-            : classJobOptions.Count == 0
-                ? "Enter at least one valid class/job number."
-                : !string.IsNullOrEmpty(firstMissingWeatherLabel)
-                    ? $"Enter at least one valid plate number between 1 and 20 for {firstMissingWeatherLabel}."
-                    : string.Empty;
+        var startDisabledReason = (!Plugin.PlayerState.IsLoaded ? global::XASlave.Localization.UiMessage.Key("SA8771D7334A50BB8") : (classJobOptions.Count == 0 ? global::XASlave.Localization.UiMessage.Key("S8F4C610A87315C34") : (!string.IsNullOrEmpty(firstMissingWeatherLabel) ? global::XASlave.Localization.UiMessage.Format("S827CE1A5D5BF266C", firstMissingWeatherLabel) : global::XASlave.Localization.UiMessage.Raw(string.Empty)))).Display;
         var started = DrawPriorityTaskActionButton(
             SlaveTask.AutoGlamWeather,
-            "Start Monitoring##glamStart",
+            (global::XASlave.Localization.UiLocale.Native("SA2F859806EB26F9B") + "##glamStart"),
             canStart,
             StartAutoGlamWeatherTask,
             startDisabledReason);
@@ -102,7 +96,7 @@ public partial class SlaveWindow
         if (glamWeatherRunning)
         {
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Monitoring active...");
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("SFDFDEEB2BB2037D9"));
         }
 
         DrawAutoGlamForecast();
@@ -112,13 +106,13 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // Configuration
-        ImGui.Text("Glamour Plate Configuration:");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("SC3903B46A7F97137"));
         ImGui.Spacing();
 
         var glamConfigChanged = false;
 
         ImGui.SetNextItemWidth(Scale(AutoGlamClassJobInputWidth));
-        if (ImGui.InputText("Class/Job(s) to Assign##glamClass", ref glamClassJobInput, 128))
+        if (global::XASlave.Localization.UiNative.InputText((global::XASlave.Localization.UiLocale.Native("S907687DD0DA62777") + "##glamClass"), ref glamClassJobInput, 128))
         {
             glamClassJobInput = SanitizeAutoGlamInput(glamClassJobInput, 1, MaxAutoGlamClassJob, true);
             var committedClassJobs = CommitAutoGlamInput(glamClassJobInput, 1, MaxAutoGlamClassJob);
@@ -132,16 +126,16 @@ public partial class SlaveWindow
         if (ImGui.IsItemDeactivatedAfterEdit())
             glamClassJobInput = CommitAutoGlamInput(glamClassJobInput, 1, MaxAutoGlamClassJob);
         ImGui.SameLine();
-        ImGui.TextDisabled("(Comma-separated numbers, no spaces)");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SBDB7C906F56B7B37"));
 
-        ImGui.TextDisabled("Each weather box accepts comma-separated glamour plate values from 1-20.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SC4836B6CBDECFB78"));
         if (DrawAutoGlamWeatherPlateGrid(cfg))
             glamConfigChanged = true;
 
         ImGui.Spacing();
         ImGui.SetNextItemWidth(Scale(80f));
         var interval = cfg.AutoGlamWeatherCheckIntervalSeconds;
-        if (ImGui.InputFloat("Check Interval (sec)##glamInterval", ref interval, 0.5f, 1.0f, "%.1f"))
+        if (global::XASlave.Localization.UiNative.InputFloat((global::XASlave.Localization.UiLocale.Native("S450DA347330F7030") + "##glamInterval"), ref interval, 0.5f, 1.0f, "%.1f"))
         {
             if (interval < 1.0f) interval = 1.0f;
             if (interval > 60.0f) interval = 60.0f;
@@ -156,7 +150,7 @@ public partial class SlaveWindow
         if (glamWeatherRunning || glamLastWeatherId >= 0)
         {
             ImGui.Spacing();
-            ImGui.TextDisabled($"Last weather: {GetLastAutoGlamWeatherLabel()}");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S9DEC2C6BFA215CB8", GetLastAutoGlamWeatherLabel()));
         }
 
         DrawTaskLog("glamWeather", ref glamWeatherShowLog, plugin.TaskRunner);
@@ -254,7 +248,7 @@ public partial class SlaveWindow
         var changed = false;
         var startY = MathF.Ceiling(ImGui.GetCursorPosY());
         ImGui.SetCursorPosY(startY);
-        ImGui.TextUnformatted(label);
+        ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.T(label));
         ImGui.SetNextItemWidth(Scale(AutoGlamWeatherPlateInputWidth));
         if (ImGui.InputText($"##glamWeather{weatherId}", ref input, 128))
         {
@@ -282,10 +276,10 @@ public partial class SlaveWindow
         }
 
         if (ImGui.IsItemHovered() && WeatherNames.TryGetValue(weatherId, out var weatherName))
-            ImGui.SetTooltip($"{weatherName} plate options (1-20, comma-separated).");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.FormatKey("SF4C07F43201C5FD3", global::XASlave.Localization.UiLocale.T(weatherName)));
 
         var style = ImGui.GetStyle();
-        var entryHeight = MathF.Ceiling(ImGui.CalcTextSize("Ag").Y + style.ItemSpacing.Y + ImGui.GetFrameHeight() + style.ItemSpacing.Y);
+        var entryHeight = MathF.Ceiling(ImGui.CalcTextSize(global::XASlave.Localization.UiLocale.Get("S468415F0E1128F85")).Y + style.ItemSpacing.Y + ImGui.GetFrameHeight() + style.ItemSpacing.Y);
         var nextY = MathF.Ceiling(startY + entryHeight);
         if (ImGui.GetCursorPosY() < nextY)
             ImGui.SetCursorPosY(nextY);
@@ -315,11 +309,11 @@ public partial class SlaveWindow
     private string GetLastAutoGlamWeatherLabel()
     {
         if (glamLastWeatherId < 0)
-            return "(none yet)";
+            return global::XASlave.Localization.UiLocale.Get("S6A02603D4436F06F");
 
         return WeatherNames.TryGetValue(glamLastWeatherId, out var weatherName)
-            ? weatherName
-            : $"Unknown({glamLastWeatherId})";
+            ? global::XASlave.Localization.UiLocale.T(weatherName)
+            : global::XASlave.Localization.UiLocale.FormatKey("SAACBAF3CF3EF2D77", glamLastWeatherId);
     }
 
     private static string SanitizeAutoGlamInput(string input, int minValue, int? maxValue, bool preserveTrailingComma)

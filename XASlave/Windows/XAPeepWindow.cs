@@ -28,7 +28,7 @@ public sealed class XAPeepWindow : Window
     private ulong cachedFocusTargetId = ulong.MaxValue;
 
     public XAPeepWindow(Plugin plugin)
-        : base("XA Peep###XAPeepWindow", ImGuiWindowFlags.None)
+        : base(global::XASlave.Localization.UiLocale.Get("S1079C85AFAB8AEDC") + "###XAPeepWindow", ImGuiWindowFlags.None)
     {
         this.plugin = plugin;
         Size = ScaledVector(290f, 220f);
@@ -47,6 +47,7 @@ public sealed class XAPeepWindow : Window
 
     public override void PreDraw()
     {
+        WindowName = global::XASlave.Localization.UiLocale.Get("S1079C85AFAB8AEDC") + "###XAPeepWindow";
         UpdateSizeConstraints(UiScale);
         Flags = plugin.Configuration.XAPeepWindowLocked
             ? ImGuiWindowFlags.NoResize
@@ -82,23 +83,23 @@ public sealed class XAPeepWindow : Window
         var service = plugin.XAPeep;
 
         ImGui.AlignTextToFramePadding();
-        ImGui.TextUnformatted("Targeting you");
+        ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.Get("S156DA9BBB0935135"));
         ImGui.SameLine();
-        DrawHelpMarker("Hover live rows to preview the focus target.\nLeft-click prints the player name. Right-click targets them.\nCtrl+Left Click examines. Ctrl+Right Click opens the adventurer plate.");
+        DrawHelpMarker(global::XASlave.Localization.UiLocale.Get("S9A26EAF1FAF5D21B"));
         ImGui.SameLine();
-        if (ImGui.SmallButton("History"))
+        if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S0E76960093379060")))
             plugin.OpenXAPeepHistoryUi();
         ImGui.SameLine();
         var clearHistoryModifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
         using (ImRaii.Disabled(!clearHistoryModifierHeld))
         {
-            if (ImGui.SmallButton("Clear"))
+            if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S83B12C2216EFB4FD")))
                 service.ClearHistory();
         }
         if (!clearHistoryModifierHeld)
         {
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Press and hold CTRL + SHIFT to allow clearing.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SB5788021233F3E54"));
         }
 
         ImGui.Spacing();
@@ -107,7 +108,7 @@ public sealed class XAPeepWindow : Window
         if (!plugin.Configuration.XAPeepEnabled && trackedPlayers.Count == 0)
         {
             ReleaseFocusPreviewIfNeeded(false);
-            ImGui.TextDisabled("Tracking is off.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S5016FDB99C318780"));
             return;
         }
 
@@ -121,7 +122,7 @@ public sealed class XAPeepWindow : Window
 
         if (trackedPlayers.Count == 0)
         {
-            ImGui.TextDisabled("Nobody is targeting you.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SD9F1FDEEE8E9B50F"));
         }
         else
         {

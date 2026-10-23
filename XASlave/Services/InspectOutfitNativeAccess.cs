@@ -33,10 +33,10 @@ internal sealed unsafe class InspectOutfitNativeAccess
     {
         var epoch = session();
         if (!Plugin.ClientState.IsLoggedIn || !Plugin.PlayerState.IsLoaded)
-            throw new InvalidOperationException("The fitting-room login session ended.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2662030FF63757FD"), originalMessageText => new InvalidOperationException(originalMessageText));
         var agent = binding.Agent();
         var records = agent->TryOnItems;
-        if (records.Length != 14) throw new InvalidOperationException("The fitting-room record layout changed.");
+        if (records.Length != 14) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S8212654873F6E194"), originalMessageText => new InvalidOperationException(originalMessageText));
         var raw = MemoryMarshal.AsBytes(records).ToArray();
         var descriptions = new InspectPreviewRecord[14];
         for (var index = 0; index < descriptions.Length; index++)
@@ -63,7 +63,7 @@ internal sealed unsafe class InspectOutfitNativeAccess
         var live = binding.Agent();
         if (epoch != session() || !Plugin.ClientState.IsLoggedIn || !Plugin.PlayerState.IsLoaded || agent != live
             || !raw.AsSpan().SequenceEqual(MemoryMarshal.AsBytes(agent->TryOnItems)))
-            throw new InvalidOperationException("The fitting-room snapshot changed during capture.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE486D69BE0283B2E"), originalMessageText => new InvalidOperationException(originalMessageText));
         return result;
     }
 
@@ -72,15 +72,15 @@ internal sealed unsafe class InspectOutfitNativeAccess
     {
         var current = world.Capture(source.Host, source.Identity);
         if (!requestAlive(generation) || current == null || !source.SameSource(current))
-            throw new InvalidOperationException("The inspected outfit request changed before submission.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S30DDDDCF9DF17D14"), originalMessageText => new InvalidOperationException(originalMessageText));
         var fresh = Capture();
         if (!before.SameAdmission(fresh) || fresh.Preview.Changed || fresh.Preview.Transitioning
             || InspectOutfitPlan.HasPending(fresh.Preview.Records) || !InspectOutfitPlan.HasCapacity(fresh.Preview.Records))
-            throw new InvalidOperationException("The fitting room changed before submission.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC501D0569838D9C2"), originalMessageText => new InvalidOperationException(originalMessageText));
         var agent = binding.Agent();
         var epoch = session();
         if (!requestAlive(generation) || (nint)agent != fresh.Preview.Agent || epoch != fresh.Preview.Session)
-            throw new InvalidOperationException("The fitting-room request ended before submission.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD5746911949FE07E"), originalMessageText => new InvalidOperationException(originalMessageText));
         var original = agent->SaveDeleteOutfit;
         bool accepted;
         try
@@ -100,7 +100,7 @@ internal sealed unsafe class InspectOutfitNativeAccess
             }
         }
         if (!requestAlive(generation) || epoch != session())
-            throw new InvalidOperationException("The outfit request ended during submission.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9F2566181A4ABD08"), originalMessageText => new InvalidOperationException(originalMessageText));
         return (accepted, Capture());
     }
 }

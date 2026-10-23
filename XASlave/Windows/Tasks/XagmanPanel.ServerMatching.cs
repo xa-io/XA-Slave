@@ -201,13 +201,22 @@ public partial class SlaveWindow
         IReadOnlyList<XagmanTonyCharacterEntry> selectedTonys,
         out string reason)
     {
+        var result = TryValidateXagmanServerMatchingTravelPlanMessage(selectedTonys, out var presentation);
+        reason = presentation.Original;
+        return result;
+    }
+
+    private bool TryValidateXagmanServerMatchingTravelPlanMessage(
+        IReadOnlyList<XagmanTonyCharacterEntry> selectedTonys,
+        out global::XASlave.Localization.UiMessage reason)
+    {
         foreach (var tony in selectedTonys)
         {
             var homeWorld = GetWorldFromKey(tony.CharacterNameWorld);
             if (WorldData.GetByName(homeWorld) != null)
                 continue;
 
-            reason = $"selected Tony {tony.CharacterNameWorld} has an unknown home world '{homeWorld}'";
+            reason = global::XASlave.Localization.UiMessage.Format("S9665CAB6F437582E", tony.CharacterNameWorld, homeWorld);
             return false;
         }
 
@@ -216,7 +225,7 @@ public partial class SlaveWindow
             : plugin.Configuration.XagmanServerMeetWorlds;
         if (configuredMeetWorlds.Count == 0)
         {
-            reason = "no Server Matching meet worlds were captured for this run";
+            reason = global::XASlave.Localization.UiMessage.Key("SCBCB9A365D0AC6DE");
             return false;
         }
 
@@ -228,25 +237,25 @@ public partial class SlaveWindow
             var configuredRegion = WorldData.GetRegionOfDataCenter(configured.Key);
             if (string.IsNullOrWhiteSpace(configuredRegion))
             {
-                reason = $"configured server '{configured.Key}' is not in the XA world map";
+                reason = global::XASlave.Localization.UiMessage.Format("S49DB8AFE58529671", configured.Key);
                 return false;
             }
 
             var meetWorld = WorldData.GetByName(configured.Value.Trim());
             if (meetWorld == null)
             {
-                reason = $"meet world '{configured.Value}' for server {configured.Key} is unknown";
+                reason = global::XASlave.Localization.UiMessage.Format("SA4B1C9F68078356F", configured.Value, configured.Key);
                 return false;
             }
             if (!meetWorld.DataCenter.Equals(configured.Key, StringComparison.OrdinalIgnoreCase))
             {
                 reason =
-                    $"meet world {meetWorld.Name} belongs to {meetWorld.DataCenter}, not configured server {configured.Key}";
+                    global::XASlave.Localization.UiMessage.Format("SD1561434AF45F0AA", meetWorld.Name, meetWorld.DataCenter, configured.Key);
                 return false;
             }
         }
 
-        reason = string.Empty;
+        reason = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         return true;
     }
 
@@ -256,9 +265,20 @@ public partial class SlaveWindow
         string dataCenter,
         out string reason)
     {
+        var result = TryValidateXagmanServerMatchingTonyRouteMessage(tonyCharacter, region, dataCenter, out var presentation);
+        reason = presentation.Original;
+        return result;
+    }
+
+    private bool TryValidateXagmanServerMatchingTonyRouteMessage(
+        string tonyCharacter,
+        string region,
+        string dataCenter,
+        out global::XASlave.Localization.UiMessage reason)
+    {
         if (string.IsNullOrWhiteSpace(region) || string.IsNullOrWhiteSpace(dataCenter))
         {
-            reason = "the active sweep region or server is blank";
+            reason = global::XASlave.Localization.UiMessage.Key("SD0CF45F039BCA889");
             return false;
         }
 
@@ -266,7 +286,7 @@ public partial class SlaveWindow
         if (string.IsNullOrWhiteSpace(serverRegion)
             || !serverRegion.Equals(region, StringComparison.OrdinalIgnoreCase))
         {
-            reason = $"server {dataCenter} does not belong to active region {region}";
+            reason = global::XASlave.Localization.UiMessage.Format("SF6427257860D52CA", dataCenter, region);
             return false;
         }
 
@@ -276,18 +296,18 @@ public partial class SlaveWindow
             : WorldData.GetByName(meetWorld.Trim());
         if (meetWorldInfo == null)
         {
-            reason = $"server {dataCenter} has no known configured meet world";
+            reason = global::XASlave.Localization.UiMessage.Format("S12D8D3612BCC30CC", dataCenter);
             return false;
         }
         if (!meetWorldInfo.DataCenter.Equals(dataCenter, StringComparison.OrdinalIgnoreCase))
         {
             reason =
-                $"configured meet world {meetWorldInfo.Name} belongs to {meetWorldInfo.DataCenter}, not {dataCenter}";
+                global::XASlave.Localization.UiMessage.Format("SB1B95BBE72624C7A", meetWorldInfo.Name, meetWorldInfo.DataCenter, dataCenter);
             return false;
         }
         if (string.IsNullOrWhiteSpace(GetXagmanSharedMeetLocation()))
         {
-            reason = "the shared meet aetheryte is blank";
+            reason = global::XASlave.Localization.UiMessage.Key("S7E690D483193A352");
             return false;
         }
 
@@ -296,13 +316,13 @@ public partial class SlaveWindow
             || !tonyRegion.Equals(region, StringComparison.OrdinalIgnoreCase))
         {
             reason =
-                $"Tony {tonyCharacter} belongs to {(string.IsNullOrWhiteSpace(tonyRegion) ? "an unknown region" : tonyRegion)}, not active region {region}";
+                global::XASlave.Localization.UiMessage.Format("S9B564AD61CC61261", tonyCharacter, ((string.IsNullOrWhiteSpace(tonyRegion) ? global::XASlave.Localization.UiMessage.Key("SBC09BE322309C64B") : global::XASlave.Localization.UiMessage.Value(tonyRegion))), region);
             return false;
         }
-        if (!TryValidateXagmanMeetTravel(tonyCharacter, meetWorldInfo.Name, out reason))
+        if (!TryValidateXagmanMeetTravelMessage(tonyCharacter, meetWorldInfo.Name, out reason))
             return false;
 
-        reason = string.Empty;
+        reason = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         return true;
     }
 
@@ -471,13 +491,13 @@ public partial class SlaveWindow
         if (string.IsNullOrWhiteSpace(tonyKey))
         {
             ReportXagmanTravelRouteError(
-                $"Server Matching cannot commit {region}/{server}: no same-region Tony remains.");
+                global::XASlave.Localization.UiMessage.Format("S4AB68E6F82F4D079", region, server));
             return false;
         }
-        if (!TryValidateXagmanServerMatchingTonyRoute(tonyKey, region, server, out var routeFailure))
+        if (!TryValidateXagmanServerMatchingTonyRouteMessage(tonyKey, region, server, out var routeFailure))
         {
             ReportXagmanTravelRouteError(
-                $"Server Matching cannot commit {region}/{server} with {tonyKey}: {routeFailure}");
+                global::XASlave.Localization.UiMessage.Format("S5907F2A151CB6D83", region, server, tonyKey, routeFailure));
             return false;
         }
 
@@ -495,7 +515,7 @@ public partial class SlaveWindow
         xagmanActiveTradePartnerInstanceId = string.Empty;
         xagmanObservedDropboxBusy = false;
         ResetXagmanTonySellLocation();
-        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, $"Tony sweep commit to {region}/{server}"))
+        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Format("S3D573C55813F4DE9", region, server)))
             return false;
         xagmanPreferredTonyCharacter = tonyKey;
         StartXagmanTonyStartup(entry, true);
@@ -550,11 +570,7 @@ public partial class SlaveWindow
         var needed = GetXagmanFoNeededServers();
         var invalidPendingPeers = GetXagmanInvalidPendingServerPeers();
         xagmanStatus = XagmanStatus.Paused;
-        xagmanStatusText = needed.Count == 0 && invalidPendingPeers.Count == 0
-            ? "Server Matching: waiting to see which servers Franchise Owners need..."
-            : invalidPendingPeers.Count > 0
-                ? "Server Matching: waiting for Franchise Owners to publish known configured home servers..."
-            : "Server Matching: Franchise Owners are on regions with no selected Tony; waiting...";
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, (needed.Count == 0 && invalidPendingPeers.Count == 0 ? global::XASlave.Localization.UiMessage.Key("SBA182C05573D0771") : (invalidPendingPeers.Count > 0 ? global::XASlave.Localization.UiMessage.Key("S4502DFAD5F6EAE6E") : global::XASlave.Localization.UiMessage.Key("SBD906C505D7C27B1"))));
 
         // If owners are present but none are on a region we have a Tony for, give up after a grace
         // period so the run does not hang. Owners on unservable regions are skipped on completion.
@@ -565,12 +581,9 @@ public partial class SlaveWindow
             xagmanSweepAwaitingStart = false;
             if (invalidPendingPeers.Count > 0 || IsXagmanCollectionFirstCollectionPhase() || IsXagmanSupplyCycleActive())
             {
-                var invalidDetail = invalidPendingPeers.Count == 0
-                    ? string.Empty
-                    : $" Invalid pending FO servers: {DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers)}.";
+                var invalidDetail = (invalidPendingPeers.Count == 0 ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Format("SC1A2B760872353B2", DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers)));
                 ReportXagmanTravelRouteError(
-                    "Server Matching cannot continue because waiting FO clients have unknown or unconfigured home servers, or their regions have no selected Tony."
-                    + invalidDetail);
+                    global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S1A7059D304C1CD45"), invalidDetail));
                 return;
             }
             plugin.TaskRunner.AddLog("Xagman: no selected Tony covers the regions where Franchise Owners are waiting; completing (those owners will be marked skipped).");
@@ -634,7 +647,7 @@ public partial class SlaveWindow
 
         xagmanStatus = XagmanStatus.Paused;
         xagmanStatusText =
-            $"Collection sweep paused for {unavailable.Count} unavailable expected FO client(s); no server or region advance is allowed.";
+            global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SC7249269B0A60A6A", unavailable.Count));
         if ((DateTime.UtcNow - xagmanMissingCohortPeerSinceUtc).TotalSeconds
             < XagmanMissingCohortPeerFailSeconds)
         {
@@ -643,7 +656,7 @@ public partial class SlaveWindow
 
         xagmanStatus = XagmanStatus.Error;
         xagmanStatusText =
-            $"Collection sweep stopped because {unavailable.Count} expected FO client(s) stayed unavailable.";
+            global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S54209C2EB263DE44", unavailable.Count));
         plugin.TaskRunner.AddLog(
             $"Xagman: collection-first run {xagmanRunId} failed closed before Server Matching advance after waiting {XagmanMissingCohortPeerFailSeconds:0} seconds for: {string.Join(", ", unavailable)}. Restock was not started.");
         PublishXagmanPresence();
@@ -676,7 +689,7 @@ public partial class SlaveWindow
                 xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;
                 xagmanStatus = XagmanStatus.Paused;
                 xagmanStatusText =
-                    "Server Matching is holding for Franchise Owners to publish known configured home servers.";
+                    global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("S0C0EFC0574201EE1"));
                 if ((DateTime.UtcNow - xagmanInvalidPendingServerPeerSinceUtc).TotalSeconds
                     < XagmanSweepDiscoveryGiveUpSeconds)
                 {
@@ -684,8 +697,7 @@ public partial class SlaveWindow
                 }
 
                 ReportXagmanTravelRouteError(
-                    "Server Matching cannot advance while expected FO clients have blank, unknown, or unconfigured pending servers: "
-                    + DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers));
+                    global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SFBC7FC21D5678A62"), global::XASlave.Localization.UiMessage.Value(DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers))));
                 return XagmanSweepStep.Error;
             }
 
@@ -719,14 +731,14 @@ public partial class SlaveWindow
         if (nextInRegion != null)
         {
             var drainedServer = xagmanSweepDataCenter;
-            if (!TryValidateXagmanServerMatchingTonyRoute(
+            if (!TryValidateXagmanServerMatchingTonyRouteMessage(
                     xagmanActiveCharacter,
                     xagmanSweepRegion,
                     nextInRegion,
                     out var routeFailure))
             {
                 ReportXagmanTravelRouteError(
-                    $"Server Matching cannot advance {xagmanActiveCharacter} from {drainedServer} to {nextInRegion}: {routeFailure}");
+                    global::XASlave.Localization.UiMessage.Format("S5100A026D82BF5D6", xagmanActiveCharacter, drainedServer, nextInRegion, routeFailure));
                 return XagmanSweepStep.Error;
             }
 
@@ -783,7 +795,7 @@ public partial class SlaveWindow
             if (IsXagmanCollectionFirstCollectionPhase())
             {
                 ReportXagmanTravelRouteError(
-                    $"Collection pass cannot leave region {xagmanSweepRegion} after its last usable Tony was exhausted; all required collection work must finish before restock.");
+                    global::XASlave.Localization.UiMessage.Format("S302CE6115B3CA256", xagmanSweepRegion));
                 return true;
             }
             return TryAdvanceXagmanSweepToNextNeededRegion("ran out of Tony capacity; remaining owners on it will be skipped");
@@ -851,13 +863,12 @@ public partial class SlaveWindow
                 xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;
                 xagmanStatus = XagmanStatus.Paused;
                 xagmanStatusText =
-                    "Server Matching is holding for Franchise Owners to publish known configured home servers.";
+                    global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("S0C0EFC0574201EE1"));
                 return true;
             }
 
             ReportXagmanTravelRouteError(
-                "Server Matching cannot advance while expected FO clients have blank, unknown, or unconfigured pending servers: "
-                + DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers));
+                global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SFBC7FC21D5678A62"), global::XASlave.Localization.UiMessage.Value(DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers))));
             return true;
         }
 
@@ -893,29 +904,36 @@ public partial class SlaveWindow
 
     private bool IsXagmanServerMatchingTonyMeetReady(XagmanPeerPresence tony, out string reason)
     {
+        var result = IsXagmanServerMatchingTonyMeetReadyMessage(tony, out var presentation);
+        reason = presentation.Original;
+        return result;
+    }
+
+    private bool IsXagmanServerMatchingTonyMeetReadyMessage(XagmanPeerPresence tony, out global::XASlave.Localization.UiMessage reason)
+    {
         if (tony.Status == XagmanStatus.Error)
         {
-            reason = "Tony reported a travel or coordination error";
+            reason = global::XASlave.Localization.UiMessage.Key("SFF14A93837E058D7");
             return false;
         }
 
         if (tony.ServerMatchingSweepOrdinal < 0
             || string.IsNullOrWhiteSpace(tony.ServerMatchingActiveDataCenter))
         {
-            reason = "waiting for the Tony sweep to start";
+            reason = global::XASlave.Localization.UiMessage.Key("SFA1D8EBD2AF18886");
             return false;
         }
 
         if (!HasCompleteXagmanMeetDestination(tony.MeetWorld, tony.MeetAetheryte))
         {
-            reason = "waiting for Tony to publish a complete meet world and aetheryte";
+            reason = global::XASlave.Localization.UiMessage.Key("S9ADF55333D1FD353");
             return false;
         }
 
         var activeRegion = WorldData.GetRegionOfDataCenter(tony.ServerMatchingActiveDataCenter);
         if (string.IsNullOrWhiteSpace(activeRegion))
         {
-            reason = $"Tony published unknown active server {tony.ServerMatchingActiveDataCenter}";
+            reason = global::XASlave.Localization.UiMessage.Format("S4409CF8A13ECE7CD", tony.ServerMatchingActiveDataCenter);
             return false;
         }
 
@@ -923,7 +941,7 @@ public partial class SlaveWindow
         if (tony.ServerMatchingSweepOrdinal != expectedOrdinal)
         {
             reason =
-                $"Tony's sweep ordinal {tony.ServerMatchingSweepOrdinal} does not match active server {tony.ServerMatchingActiveDataCenter} ({expectedOrdinal})";
+                global::XASlave.Localization.UiMessage.Format("S63B656ABE6EA70D5", tony.ServerMatchingSweepOrdinal, tony.ServerMatchingActiveDataCenter, expectedOrdinal);
             return false;
         }
 
@@ -932,7 +950,7 @@ public partial class SlaveWindow
             || !tonyHomeRegion.Equals(activeRegion, StringComparison.OrdinalIgnoreCase))
         {
             reason =
-                $"Tony {tony.ActiveCharacter} is not a home-region match for active region {activeRegion}";
+                global::XASlave.Localization.UiMessage.Format("SC5554BDD043B7F0C", tony.ActiveCharacter, activeRegion);
             return false;
         }
 
@@ -940,37 +958,44 @@ public partial class SlaveWindow
         if (string.IsNullOrWhiteSpace(advertisedDataCenter)
             || !advertisedDataCenter.Equals(tony.ServerMatchingActiveDataCenter, StringComparison.OrdinalIgnoreCase))
         {
-            reason = $"waiting for a meet world on Tony's active server {tony.ServerMatchingActiveDataCenter}";
+            reason = global::XASlave.Localization.UiMessage.Format("S4122173C39FD6E22", tony.ServerMatchingActiveDataCenter);
             return false;
         }
 
-        if (!TryValidateXagmanMeetTravel(tony.ActiveCharacter, tony.MeetWorld, out reason))
+        if (!TryValidateXagmanMeetTravelMessage(tony.ActiveCharacter, tony.MeetWorld, out reason))
             return false;
 
-        reason = string.Empty;
+        reason = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         return true;
     }
 
     private XagmanOwnerServerGate EvaluateXagmanOwnerServerGate(string characterNameWorld, out string meetWorld, out string meetAetheryte, out string reason)
     {
+        var result = EvaluateXagmanOwnerServerGateMessage(characterNameWorld, out meetWorld, out meetAetheryte, out var presentation);
+        reason = presentation.Original;
+        return result;
+    }
+
+    private XagmanOwnerServerGate EvaluateXagmanOwnerServerGateMessage(string characterNameWorld, out string meetWorld, out string meetAetheryte, out global::XASlave.Localization.UiMessage reason)
+    {
         meetWorld = string.Empty;
         meetAetheryte = string.Empty;
-        reason = string.Empty;
+        reason = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
         var tony = GetXagmanServerMatchingTonyPeer();
         if (tony == null)
         {
-            reason = "waiting for a Server Matching Tony";
+            reason = global::XASlave.Localization.UiMessage.Key("SE2B67F7838ECE136");
             return XagmanOwnerServerGate.Wait;
         }
 
-        if (!IsXagmanServerMatchingTonyMeetReady(tony, out reason))
+        if (!IsXagmanServerMatchingTonyMeetReadyMessage(tony, out reason))
             return XagmanOwnerServerGate.Wait;
 
         var myDataCenter = GetXagmanDataCenterOfChar(characterNameWorld);
         if (string.IsNullOrWhiteSpace(myDataCenter))
         {
-            reason = "home server is unknown, so Server Matching cannot route this owner safely";
+            reason = global::XASlave.Localization.UiMessage.Key("SDFAEDAF163732F99");
             return IsXagmanCollectionFirstRunActive() || IsXagmanSupplyCycleActive()
                 ? XagmanOwnerServerGate.RouteError
                 : XagmanOwnerServerGate.Skip;
@@ -980,24 +1005,24 @@ public partial class SlaveWindow
         {
             meetWorld = tony.MeetWorld;
             meetAetheryte = tony.MeetAetheryte;
-            reason = $"Tony is processing {myDataCenter}";
+            reason = global::XASlave.Localization.UiMessage.Format("S3373DD0E6CDFD0AC", myDataCenter);
             return XagmanOwnerServerGate.Proceed;
         }
 
         var myOrdinal = WorldData.GetSweepOrdinal(myDataCenter);
         if (tony.ServerMatchingSweepOrdinal < myOrdinal)
         {
-            reason = $"waiting for server {myDataCenter} (Tony on {tony.ServerMatchingActiveDataCenter})";
+            reason = global::XASlave.Localization.UiMessage.Format("S50FEA64E4C3AE132", myDataCenter, tony.ServerMatchingActiveDataCenter);
             return XagmanOwnerServerGate.Wait;
         }
 
         if (IsXagmanOwnerAwaitingSupplySweep(characterNameWorld, tony))
         {
-            reason = $"waiting for the supply sweep to revisit outstanding owner work on {myDataCenter}";
+            reason = global::XASlave.Localization.UiMessage.Format("S6CDA1BBA10A72DED", myDataCenter);
             return XagmanOwnerServerGate.Wait;
         }
 
-        reason = $"server {myDataCenter} already processed (Tony on {tony.ServerMatchingActiveDataCenter})";
+        reason = global::XASlave.Localization.UiMessage.Format("SCB5759711C9D4286", myDataCenter, tony.ServerMatchingActiveDataCenter);
         return XagmanOwnerServerGate.Skip;
     }
 
@@ -1063,31 +1088,35 @@ public partial class SlaveWindow
         xagmanCharDurationSeconds.Clear();
     }
 
-    private static string FormatXagmanDuration(double seconds)
+    private static string FormatXagmanDuration(double seconds) => FormatXagmanDurationMessage(seconds).Display;
+
+    private static global::XASlave.Localization.UiMessage FormatXagmanDurationMessage(double seconds)
     {
         var total = (int)Math.Round(Math.Max(0, seconds));
         if (total < 60)
-            return $"{total}s";
+            return global::XASlave.Localization.UiMessage.Format("SC4C041F888329C4F", total);
         var minutes = total / 60;
         var secs = total % 60;
         if (minutes < 60)
-            return $"{minutes}m {secs:00}s";
+            return global::XASlave.Localization.UiMessage.Format("SD8E33CB74C7EE10B", minutes, secs);
         var hours = minutes / 60;
         minutes %= 60;
-        return $"{hours}h {minutes:00}m";
+        return global::XASlave.Localization.UiMessage.Format("S85AE847670C7E847", hours, minutes);
     }
 
     // Rolling completion estimate from the average processed-character time times the remaining count.
-    private string GetXagmanOwnerEtaLabel(IReadOnlyList<string> runPlan, IReadOnlyDictionary<string, double> durations)
+    private string GetXagmanOwnerEtaLabel(IReadOnlyList<string> runPlan, IReadOnlyDictionary<string, double> durations) => GetXagmanOwnerEtaLabelMessage(runPlan, durations).Display;
+
+    private global::XASlave.Localization.UiMessage GetXagmanOwnerEtaLabelMessage(IReadOnlyList<string> runPlan, IReadOnlyDictionary<string, double> durations)
     {
         if (runPlan == null || runPlan.Count == 0 || durations == null || durations.Count == 0)
-            return string.Empty;
+            return global::XASlave.Localization.UiMessage.Raw(string.Empty);
         var avg = durations.Values.Average();
         var processed = durations.Count;
         var remaining = Math.Max(0, runPlan.Count - processed);
         if (remaining == 0)
-            return $"Avg {FormatXagmanDuration(avg)}/char.";
-        return $"Avg {FormatXagmanDuration(avg)}/char, {remaining} remaining, ETA ~{FormatXagmanDuration(avg * remaining)}.";
+            return global::XASlave.Localization.UiMessage.Format("S701D777BF761312B", FormatXagmanDurationMessage(avg));
+        return global::XASlave.Localization.UiMessage.Format("SF8DE09C2B6F95A9B", FormatXagmanDurationMessage(avg), remaining, FormatXagmanDurationMessage(avg * remaining));
     }
 
     // ---- Post-completion snapshot ----
@@ -1118,7 +1147,7 @@ public partial class SlaveWindow
                 CharacterNameWorld = partial.CharacterNameWorld,
                 RequestedItems = CloneXagmanTradeRequests(partial.RequestedItems),
                 PendingGiveItems = CloneXagmanTradeRequests(partial.PendingGiveItems),
-                Reason = partial.Reason,
+                ReasonMessage = partial.ReasonMessage,
             };
         }
         xagmanLastRunFailedCharacters.Clear();

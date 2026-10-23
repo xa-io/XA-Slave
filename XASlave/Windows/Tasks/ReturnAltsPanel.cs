@@ -42,19 +42,19 @@ public partial class SlaveWindow
         var cfg = plugin.Configuration;
         var runner = plugin.TaskRunner;
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Return Alts To Homeworlds");
-        ImGui.TextDisabled("Relog through selected characters and return any that are world-visiting back to their homeworld.");
-        ImGui.TextDisabled("Useful after DC travel sessions to ensure all characters are on their homeworld for data collection.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S99446740287A7C89"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S75CE0E3D97FCF0E5"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SE7150C565DA54E91"));
         ImGui.Spacing();
 
         // -- Data source buttons --
-        ImGui.TextDisabled("Press buttons in order: Import from AutoRetainer \u2192 Refresh AR Data \u2192 Pull XA Database Info \u2192 Refresh List.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S36E98D468AE144B3"));
         ImGui.Spacing();
 
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
         using (ImRaii.Disabled(!arConfigExists))
         {
-            if (ImGui.Button("Import from AutoRetainer##ra"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S74BC538828226264") + "##ra")))
             { ImportFromAutoRetainer(cfg.ReturnAltsHonorArExclusions); RefreshReturnAltsList(); }
         }
 
@@ -65,26 +65,26 @@ public partial class SlaveWindow
         PruneAutoRetainerExcludedSelections(returnAltsCharList.Select(row => row.CharName).ToList(),
             returnAltsSelectedIndices, cfg.ReturnAltsHonorArExclusions);
 
-        if (ImGui.Button("Refresh AR Data##ra"))
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S2D11B96CDCB0C642") + "##ra")))
         { RefreshArCharacterCache(cfg.ReturnAltsHonorArExclusions); RefreshReturnAltsList(); }
 
         ImGui.SameLine();
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
         using (ImRaii.Disabled(!xaDbAvailable))
         {
-            if (ImGui.Button("Pull XA Database Info##ra"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S658431DD798692FF") + "##ra")))
             { PullXaDatabaseInfo(RefreshReturnAltsList); }
         }
 
         ImGui.SameLine();
-        if (ImGui.Button("Refresh List##ra"))
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S429ADCE82E86413F") + "##ra")))
             RefreshReturnAltsList();
 
         // Import status message
         if (!string.IsNullOrEmpty(arImportStatus) && DateTime.UtcNow < arImportStatusExpiry)
         {
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), arImportStatus);
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiMessage.Resolve(ref arImportStatusUiMessage, arImportStatus));
         }
 
         ImGui.Spacing();
@@ -101,15 +101,15 @@ public partial class SlaveWindow
         if (runner.IsRunning && runner.CurrentTaskName == "Return Alts To Homeworlds")
         {
             var progress = runner.TotalItems > 0 ? (float)runner.CompletedItems / runner.TotalItems : 0f;
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"Running: {runner.StatusText}");
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S8EB69248AA11B2FD", runner.LocalizedStatusText));
             ImGui.ProgressBar(progress, new Vector2(-1, 0), $"{runner.CompletedItems}/{runner.TotalItems}");
             if (!string.IsNullOrEmpty(runner.CurrentItemLabel))
-                ImGui.TextDisabled(runner.CurrentItemLabel);
+                ImGui.TextDisabled(runner.CurrentItemLabelDisplay);
 
             DrawProcessingList(runner);
 
             ImGui.Spacing();
-            if (ImGui.Button("Cancel##ra"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S19766ED6CCB2F4A3") + "##ra")))
                 runner.Cancel();
         }
         else
@@ -127,25 +127,25 @@ public partial class SlaveWindow
 
             var started = DrawPriorityTaskActionButton(
                 SlaveTask.ReturnAltsToHomeworlds,
-                $"Start ({selectedChars.Count} chars)##ra",
+                (string.Format(global::XASlave.Localization.UiLocale.Native("SC0F20E306C7E38D9"), selectedChars.Count) + $"##ra"),
                 canStart,
-                () => StartTaskWithConfig("Return Alts To Homeworlds", selectedChars, returnAltsCharList, returnAltsSelectedIndices,
+                () => StartTaskWithConfig(global::XASlave.Localization.UiMessage.Key("S99446740287A7C89"), selectedChars, returnAltsCharList, returnAltsSelectedIndices,
                     raDoTextAdvance, raDoRemoveSprout, raDoOpenInventory, raDoOpenArmoury,
                     raDoOpenSaddlebags, raDoOpenJournal, raDoReturnToHome, raDoCollectPersonalPlotInfo,
                     raDoReturnToFc, raDoParseForXaDatabase, raDoLogoutOnComplete, raDoKillGameOnComplete, raDoEnableArMulti),
-                "Select at least one character and ensure required plugins are loaded.");
+                global::XASlave.Localization.UiLocale.Get("S9C7F83339653A405"), displayButtonLabel: global::XASlave.Localization.UiLocale.FormatKey("SC0F20E306C7E38D9", selectedChars.Count));
             if (started)
                 AutoOpenTaskLogIfVerbose(ref returnAltsShowLog);
 
             ImGui.SameLine();
-            if (ImGui.Button("Check All##ra"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S8D36DE8ED9DBBB1B") + "##ra")))
             {
                 for (int i = 0; i < returnAltsCharList.Count; i++)
                     if (IsAutoRetainerCharacterAllowed(returnAltsCharList[i].CharName, cfg.ReturnAltsHonorArExclusions))
                         returnAltsSelectedIndices.Add(i);
             }
             ImGui.SameLine();
-            if (ImGui.Button("Clear All##ra"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SDDCEB7ADFDB8816E") + "##ra")))
                 returnAltsSelectedIndices.Clear();
         }
 
@@ -157,7 +157,7 @@ public partial class SlaveWindow
         var returnAltsVisibleIndices = Enumerable.Range(0, returnAltsCharList.Count)
             .Where(i => IsAutoRetainerCharacterAllowed(returnAltsCharList[i].CharName, cfg.ReturnAltsHonorArExclusions))
             .ToList();
-        DrawCharacterListHeader("Characters Not On Homeworld", $"({returnAltsVisibleIndices.Count} shown)", "returnAltsAnonymize");
+        DrawCharacterListHeader(global::XASlave.Localization.UiLocale.Get("SA3DE23C8527D41C0"), global::XASlave.Localization.UiLocale.FormatKey("S9C7EACDA63DAB78B", returnAltsVisibleIndices.Count), "returnAltsAnonymize");
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
@@ -166,13 +166,13 @@ public partial class SlaveWindow
             ScaledVector(0f, 250f)))
         if (imguiScope148)
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(25f));
-            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Homeworld", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
-            ImGui.TableSetupColumn("Current World", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            global::XASlave.Localization.UiNative.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            global::XASlave.Localization.UiNative.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(25f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S1405A63E8A78B85C"), ImGuiTableColumnFlags.WidthStretch);
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S5733E35FD7609001"), ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S804810D864C2645C"), ImGuiTableColumnFlags.WidthFixed, Scale(90f));
             ImGui.TableSetupScrollFreeze(0, 1);
-            ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableHeadersRow();
 
             // Sort
             var sortedRa = returnAltsVisibleIndices;
@@ -239,23 +239,23 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Actions Per Character --
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Actions Per Character");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SD077709C2945CC78"));
         ImGui.Spacing();
-        ImGui.TextDisabled("Check if on homeworld \u2192 return via Lifestream if not (always-on)");
-        ImGui.Checkbox("Enable TextAdvance (/at y)##ra", ref raDoTextAdvance);
-        ImGui.Checkbox("Remove Sprout (/nastatus off)##ra", ref raDoRemoveSprout);
-        ImGui.Checkbox("Open Inventory##ra", ref raDoOpenInventory);
-        ImGui.Checkbox("Open Armoury Chest##ra", ref raDoOpenArmoury);
-        ImGui.Checkbox("Open Saddlebags##ra", ref raDoOpenSaddlebags);
-        ImGui.Checkbox("Open Journal##ra", ref raDoOpenJournal);
-        ImGui.Checkbox("Teleport Home (Lifestream)##ra", ref raDoReturnToHome);
-        ImGui.Checkbox("Collect Personal Plot Info##ra", ref raDoCollectPersonalPlotInfo);
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S457274504CDF43AA"));
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S799FDA81A78E3803") + "##ra"), ref raDoTextAdvance);
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S4714B2D36A35833C") + "##ra"), ref raDoRemoveSprout);
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S166DBD737506990A") + "##ra"), ref raDoOpenInventory);
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S53649CACF2611F56") + "##ra"), ref raDoOpenArmoury);
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S04135E2D90F4F408") + "##ra"), ref raDoOpenSaddlebags);
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SF7B51D61398CF038") + "##ra"), ref raDoOpenJournal);
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S621D93AD01358374") + "##ra"), ref raDoReturnToHome);
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SFF3C7116AEE8239B") + "##ra"), ref raDoCollectPersonalPlotInfo);
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Opens /housing, checks Apartment, Private Estate, and Shared Estate signboards when available,\nand triggers XA Database saves after each housing pass.");
-        ImGui.Checkbox("Teleport FC (Lifestream)##ra", ref raDoReturnToFc);
-        ImGui.Checkbox("Parse for XA Database (FC window + save)##ra", ref raDoParseForXaDatabase);
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SF5DB3C15B4DCD96C"));
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S45CB3AAD43EE350D") + "##ra"), ref raDoReturnToFc);
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SD46EE40E0A0D26E7") + "##ra"), ref raDoParseForXaDatabase);
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Opens FC window, navigates Members/Info/Housing tabs to collect\nall FC data, then saves to XA Database.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SAB2CB5AF83659715"));
         DrawSharedCompletionAndLogFooter("ra", "ralog", ref raDoLogoutOnComplete, ref raDoKillGameOnComplete, ref raDoEnableArMulti, ref returnAltsShowLog, runner);
     }
 

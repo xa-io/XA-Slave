@@ -94,7 +94,12 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     }
     private readonly record struct ImageIdentity(nint Texture, nint View, Vector2 Actual, Vector2 Allocated);
 
-    internal string StatusText { get; private set; } = "Choose an inspected item.";
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("SE3872DCC0D95A9AE");
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(statusMessage, StatusText);
+    internal string LocalizedStatusText => StatusMessage.Display;
+    internal string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("SE3872DCC0D95A9AE");
+    private global::XASlave.Localization.UiMessage? unavailableMessage;
+    internal global::XASlave.Localization.UiMessage UnavailableMessage => global::XASlave.Localization.UiMessage.Capture(unavailableMessage, UnavailableReason);
     internal string UnavailableReason { get; private set; } = string.Empty;
     internal string ReadinessDiagnostic { get; private set; } = string.Empty;
     internal Vector2 ImageUvMax { get; private set; } = Vector2.One;
@@ -110,25 +115,23 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         NearbyZoneNativeBinding.RequireFramework();
         var sdk = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(AgentInspect).Assembly.Location)));
         if (sdk is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2" or "F5A2C68CCECD3E199BDA572050E98902B2E7594066C95DC7826C2D4297CD0564"))
-            throw new InvalidOperationException("View Item requires revalidated client structures.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S3AC296CB69ECFF46"), originalMessageText => new InvalidOperationException(originalMessageText));
         ValidateLayouts();
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
         if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)
-            throw new InvalidOperationException("View Item requires a revalidated game build.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF0B352CBCC662406"), originalMessageText => new InvalidOperationException(originalMessageText));
         using var stream = new MemoryStream(bytes, false);
         using var pe = new PEReader(stream);
         if (pe.PEHeaders.PEHeader?.SizeOfImage != module.ModuleMemorySize)
-            throw new InvalidOperationException("The preview executable image changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S94B5DBAC63D01E98"), originalMessageText => new InvalidOperationException(originalMessageText));
         moduleBase = module.BaseAddress;
         var original = pe.GetSectionData(MeshGateRva).GetContent(0, MeshGateLength).ToArray();
         using var hookRegistration = ViewSingleItemRendererHookState.GetSyncRoot().EnterScope();
         var savedEntry = ViewSingleItemRendererHookState.ReadSavedEntry(moduleBase + MeshGateRva, MeshGateLength);
         var loaded = NearbyZoneNativeBinding.Read(moduleBase + MeshGateRva, MeshGateLength);
         if (!ViewSingleItemRendererHookState.MatchesSupportedCode(original, loaded, savedEntry))
-            throw new InvalidOperationException("The loaded preview renderer differs from the supported game code. "
-                + ViewSingleItemRendererDiagnostics.DescribeBytes(MeshGateRva, original, loaded) + " "
-                + ViewSingleItemRendererDiagnostics.DescribeOwners(moduleBase + MeshGateRva, MeshGateLength));
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S18116930FDB1719F" , ViewSingleItemRendererDiagnostics.DescribeBytes(MeshGateRva, original, loaded), ViewSingleItemRendererDiagnostics.DescribeOwners(moduleBase + MeshGateRva, MeshGateLength)), originalMessageText => new InvalidOperationException(originalMessageText));
         meshHook = Plugin.GameInterop.HookFromAddress<MeshRenderDelegate>(moduleBase + MeshGateRva, RenderMesh);
         try
         {
@@ -145,7 +148,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
             || sizeof(DrawDataContainer) != 0x268 || sizeof(DrawObjectData) != 0x70
             || sizeof(SceneObject) != 0x80
             || sizeof(SceneCamera) != 0x100 || sizeof(RenderCamera) != 0x290)
-            throw new InvalidOperationException("The preview renderer layout changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SABACD1547BA6E00C"), originalMessageText => new InvalidOperationException(originalMessageText));
         RequireOffset<AgentInspect>(nameof(AgentInspect.CharaView), 0x628);
         RequireOffset<CharaView>(nameof(CharaView.State), 0x8);
         RequireOffset<CharaView>(nameof(CharaView.ClientObjectId), 0xC);
@@ -181,7 +184,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         var offset = type.GetField(field, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             ?.GetCustomAttribute<FieldOffsetAttribute>();
         if (type.StructLayoutAttribute?.Value != LayoutKind.Explicit || offset == null || offset.Value != expected)
-            throw new InvalidOperationException("The preview field layout changed: " + type.Name + "." + field);
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S2BAD4969167D3CDF" , type.Name, field), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     internal void Validate()
@@ -192,7 +195,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         if (!meshHook.IsEnabled || !ViewSingleItemScene.MatchesNativeBytes(moduleBase + MeshGateRva, installedBody))
         {
             Clear();
-            throw new InvalidOperationException("The preview mesh renderer changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF8EBB11384EF76AB"), originalMessageText => new InvalidOperationException(originalMessageText));
         }
         scene.Validate();
     }
@@ -202,13 +205,13 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         UnavailableReason = ReadinessDiagnostic = string.Empty;
         var host = InspectOutfitControls.Resolve(snapshot.Host.Generation);
         if (host != snapshot.Host || !Plugin.ClientState.IsLoggedIn || !Plugin.PlayerState.IsLoaded)
-            return Unavailable("The inspection window or login session changed.", "stage=preview-session");
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("S79436927C71DF4C0"), "stage=preview-session");
         var state = UIState.Instance();
         NearbyZoneNativeBinding.RequireReadable((nint)state, sizeof(UIState));
         var inspect = &state->Inspect;
         if (inspect->IsInspectRequested || new InspectOutfitIdentity(inspect->EntityId, inspect->WorldId,
                 inspect->NameString, inspect->Type) != snapshot.Identity)
-            return Unavailable("The game is fetching or changing the inspected player.", "stage=preview-identity");
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("SAF11D9909F7DA243"), "stage=preview-identity");
         var agent = AgentInspect.Instance();
         NearbyZoneNativeBinding.RequireReadable((nint)agent, sizeof(AgentInspect));
         var active = agent->IsAgentActive();
@@ -224,29 +227,29 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         var objectId = agent->CharaView.ClientObjectId;
         var diagnostic = $"stage=preview-character; active={active}; buddy={buddy}; addon={addonId}; expectedAddon={snapshot.Host.Id}; agentMatch={agentMatches}; appearancePending={appearancePending}; modelPending={modelPending}; state={viewState}; index={objectIndex}; id={objectId}";
         if (!active || buddy || addonId != snapshot.Host.Id || !agentMatches)
-            return Unavailable("The player preview does not belong to this Examine window.", diagnostic);
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("S3D03980BD4AA21F9"), diagnostic);
         if (appearancePending || modelPending)
-            return Unavailable("The inspected appearance or character model is still updating.", diagnostic);
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("S0D425D87C38E70DC"), diagnostic);
         if (viewState != 6)
-            return Unavailable("The inspected character preview is not ready.", diagnostic);
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("SAE638AD04887D0A3"), diagnostic);
         if (!IsInspectPreviewOwner(objectIndex, objectId))
-            return Unavailable("The inspected preview has an unsupported owner.", diagnostic);
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("SF9F27A661DF12FB3"), diagnostic);
         var character = agent->CharaView.GetCharacter();
         if (character == null)
-            return Unavailable("The inspected preview character is not available yet.", diagnostic);
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("S384C6C7F597DD05A"), diagnostic);
         NearbyZoneNativeBinding.RequireReadable((nint)character, sizeof(NativeCharacter));
         // The client-object manager must independently identify the preview clone.
         var manager = ClientObjectManager.Instance();
         NearbyZoneNativeBinding.RequireReadable((nint)manager, sizeof(ClientObjectManager));
         if (manager->GetObjectByIndex(checked((ushort)agent->CharaView.ClientObjectId)) != character)
-            return Unavailable("The inspected preview owner could not be confirmed.", diagnostic + "; managerMatch=false");
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("SFD9DC018092A27ED"), diagnostic + "; managerMatch=false");
         var draw = (CharacterBase*)character->DrawObject;
         if (draw == null)
-            return Unavailable("The inspected character model is still loading.", diagnostic + "; drawObject=false");
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("SCBAE78F8BA1F8BAF"), diagnostic + "; drawObject=false");
         NearbyZoneNativeBinding.RequireReadable((nint)draw, sizeof(CharacterBase));
         var modelType = draw->GetModelType();
         if (modelType != CharacterBase.ModelType.Human)
-            return Unavailable("The inspected preview has an unsupported character model.", diagnostic + "; modelType=" + modelType);
+            return Unavailable(global::XASlave.Localization.UiMessage.Key("S70A64EDF9CEF3C28"), diagnostic + "; modelType=" + modelType);
         return character;
     }
 
@@ -254,9 +257,9 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     private static bool IsInspectPreviewOwner(uint objectIndex, uint objectId)
         => objectIndex == 1 && objectId == objectIndex + 0xF0;
 
-    private NativeCharacter* Unavailable(string reason, string diagnostic)
+    private NativeCharacter* Unavailable(global::XASlave.Localization.UiMessage reason, string diagnostic)
     {
-        UnavailableReason = reason; ReadinessDiagnostic = diagnostic;
+        UnavailableReason = global::XASlave.Localization.UiMessage.Store(ref unavailableMessage, reason); ReadinessDiagnostic = diagnostic;
         return null;
     }
 
@@ -271,24 +274,23 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         {
             if (!equipped.TryGetValue(slot, out var item))
             {
-                result.Add(new(slot, SlotLabel(slot) + ": not equipped", 0, "No item was equipped in this captured slot."));
+                result.Add(ViewSingleItemChoice.Create(slot, global::XASlave.Localization.UiMessage.Format("S665654451B8998BC" , SlotLabel(slot)), 0, global::XASlave.Localization.UiMessage.Key("S50C21EA3F6F55ED3")));
                 continue;
             }
             var row = Plugin.DataManager.GetExcelSheet<Item>().GetRowOrDefault(item.Appearance.Item);
-            var name = row?.Name.ToString() ?? $"Item {item.Appearance.Item}";
-            result.Add(new(item.Slot, $"{SlotLabel(item.Slot)}: {name}", item.Appearance.Item));
+            var name = row is { } itemRow ? global::XASlave.Localization.UiMessage.Raw(itemRow.Name.ToString()) : global::XASlave.Localization.UiMessage.Format("SFAD8B09F2BDD2797" , item.Appearance.Item);
+            result.Add(ViewSingleItemChoice.Create(item.Slot, global::XASlave.Localization.UiMessage.Format("SFB62FE2AE6B2AE6C" , SlotLabel(item.Slot), name), item.Appearance.Item));
         }
-        result.Add(new(100, "Hair (currently displayed hairstyle)", 0));
+        result.Add(ViewSingleItemChoice.Create(100, global::XASlave.Localization.UiMessage.Key("SD640CF0CFA2C6004"), 0));
         scene.Capture(character);
         var appearance = scene.ExportAppearance();
         var glasses = BitConverter.ToUInt16(appearance, 0x1A);
         var glasses2 = BitConverter.ToUInt16(appearance, 0x1C);
-        result.Add(new(101, glasses != 0 || glasses2 != 0 ? $"Facewear: {glasses}/{glasses2}" : "Facewear: not equipped", 0,
-            glasses == 0 && glasses2 == 0 ? "No facewear was present in this captured appearance." : ""));
-        ornament = ViewSingleItemService.CaptureOrnament(snapshot.Identity, out var ornamentUnavailable);
+        result.Add(ViewSingleItemChoice.Create(101, (glasses != 0 || glasses2 != 0 ? global::XASlave.Localization.UiMessage.Format("S984BE847B1B87AED" , glasses, glasses2) : global::XASlave.Localization.UiMessage.Key("SE9CC45CDF977F88A")), 0, (glasses == 0 && glasses2 == 0 ? global::XASlave.Localization.UiMessage.Key("SA749BAC66915EA70") : global::XASlave.Localization.UiMessage.Raw(string.Empty))));
+        ornament = ViewSingleItemService.CaptureOrnamentMessage(snapshot.Identity, out var ornamentUnavailable);
         result.Add(OrnamentChoice(ornament, ornamentUnavailable));
-        minion = ViewSingleItemCompanions.Capture(snapshot.Identity, false, out var minionUnavailable);
-        mount = ViewSingleItemCompanions.Capture(snapshot.Identity, true, out var mountUnavailable);
+        minion = ViewSingleItemCompanions.CaptureMessage(snapshot.Identity, false, out var minionUnavailable);
+        mount = ViewSingleItemCompanions.CaptureMessage(snapshot.Identity, true, out var mountUnavailable);
         result.Add(ViewSingleItemCompanions.Choice(103, minion, minionUnavailable));
         result.Add(ViewSingleItemCompanions.Choice(104, mount, mountUnavailable));
         capturedUtc = DateTime.UtcNow;
@@ -299,7 +301,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     internal ViewSingleItemCapture ExportCapture()
     {
         Validate();
-        if (source == null) throw new InvalidOperationException("No outfit has been captured.");
+        if (source == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1BE83053D7E1622E"), originalMessageText => new InvalidOperationException(originalMessageText));
         var appearance = scene.ExportAppearance();
         var schema = catalog != null || choices.Any(choice => choice.Key == 103) ? 3 : 2;
         return new(schema, NearbyZoneNativeBinding.SupportedSha256, ViewSingleItemCapture.SupportedLayout,
@@ -327,44 +329,79 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         minion = capture.Minion; mount = capture.Mount; catalog = capture.Catalog;
         source = snapshot; capturedUtc = capture.CapturedUtc;
         var restored = (ViewSingleItemChoice[])capture.Choices.Clone();
+        if (catalog == null)
+            for (var index = 0; index < restored.Length; index++)
+                restored[index] = RestoreChoicePresentation(restored[index], capture.Appearance);
         var accessoryIndex = Array.FindIndex(restored, choice => choice.Key == 102);
         if (accessoryIndex >= 0 && capture.Schema == 1)
         {
-            restored[accessoryIndex] = new(102, "Fashion accessory: not captured", 0,
-                "This older capture has no fashion accessory data. Capture the player again while they are nearby and using the accessory.");
+            restored[accessoryIndex] = ViewSingleItemChoice.Create(102, global::XASlave.Localization.UiMessage.Key("S2D47ACAF6F69836B"), 0, global::XASlave.Localization.UiMessage.Key("SFCD5E98F304A74C4"));
         }
-        else if (accessoryIndex >= 0) restored[accessoryIndex] = OrnamentChoice(ornament, restored[accessoryIndex].UnavailableReason);
+        else if (accessoryIndex >= 0) restored[accessoryIndex] = OrnamentChoice(ornament, restored[accessoryIndex].UnavailablePresentation);
         // Re-check saved row/model relationships before exposing native models.
         for (var index = 0; index < restored.Length; index++)
         {
             var key = restored[index].Key;
             if (key is not (103 or 104)) continue;
             var value = key == 103 ? minion : mount;
-            var updated = ViewSingleItemCompanions.Choice(key, value, restored[index].UnavailableReason);
+            var updated = ViewSingleItemCompanions.Choice(key, value, restored[index].UnavailablePresentation);
             restored[index] = catalog == null ? updated : updated with { ItemId = catalog.ItemId };
         }
         if (catalog != null)
         {
-            if (!ViewSingleItemShopSource.TryDescribe(catalog.ItemId, out var current, out var reason)
+            if (!ViewSingleItemShopSource.TryDescribeMessage(catalog.ItemId, out var current, out var reason)
                 || current.Key != catalog.Key || current.FramerKitId != catalog.FramerKitId
                 || (catalog.Key is 103 or 104 && !Equals(current.Companion, catalog.Key == 103 ? minion : mount)))
-                throw new InvalidDataException("This saved shop item is no longer supported. " + reason);
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SB779B7865E5CBE42" , reason), originalMessageText => new InvalidDataException(originalMessageText));
             if (!capture.Appearance.AsSpan().SequenceEqual(ViewSingleItemShopSource.CreateAppearance(current, capture.Appearance)))
-                throw new InvalidDataException("The saved shop appearance does not match its single item.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SB52DAA82CCFCF2DC"), originalMessageText => new InvalidDataException(originalMessageText));
         }
         choices = Array.AsReadOnly(restored);
         return choices;
     }
 
-    private static ViewSingleItemChoice OrnamentChoice(ViewSingleItemOrnament? value, string unavailable)
+    // Saved choices retain their original text and game names. Recover only the
+    // authored wrapper whose slot/schema identifies its origin; unknown text stays raw.
+    private static ViewSingleItemChoice RestoreChoicePresentation(ViewSingleItemChoice choice, byte[] appearance)
     {
-        if (value == null) return new(102, "Fashion accessory: not captured", 0,
-            string.IsNullOrEmpty(unavailable) ? "No fashion accessory data was captured for this player." : unavailable);
-        if (value.Id == 0) return new(102, "Fashion accessory: not in use", 0,
-            "The player was not using a fashion accessory when captured. Capture them again while the accessory is visible.");
+        global::XASlave.Localization.UiMessage? label = null, unavailable = null;
+        if (Array.Exists(InspectOutfitPlan.Slots, slot => slot == choice.Key))
+        {
+            var slot = SlotLabel(choice.Key);
+            if (choice.ItemId == 0)
+            {
+                label = global::XASlave.Localization.UiMessage.Format("S665654451B8998BC" , slot);
+                unavailable = global::XASlave.Localization.UiMessage.Key("S50C21EA3F6F55ED3");
+            }
+            else
+            {
+                var prefix = slot.Original + ": ";
+                if (choice.Label.StartsWith(prefix, StringComparison.Ordinal))
+                    label = global::XASlave.Localization.UiMessage.Format("SFB62FE2AE6B2AE6C" , slot, choice.Label[prefix.Length..]);
+            }
+        }
+        else if (choice.Key == 100) label = global::XASlave.Localization.UiMessage.Key("SD640CF0CFA2C6004");
+        else if (choice.Key == 101)
+        {
+            var glasses = BitConverter.ToUInt16(appearance, 0x1A);
+            var glasses2 = BitConverter.ToUInt16(appearance, 0x1C);
+            label = glasses != 0 || glasses2 != 0 ? global::XASlave.Localization.UiMessage.Format("S984BE847B1B87AED" , glasses, glasses2) : global::XASlave.Localization.UiMessage.Key("SE9CC45CDF977F88A");
+            if (glasses == 0 && glasses2 == 0) unavailable = global::XASlave.Localization.UiMessage.Key("SA749BAC66915EA70");
+        }
+        return choice with
+        {
+            LabelMessage = label != null && label.Original == choice.Label ? label : choice.LabelMessage,
+            UnavailableMessage = unavailable != null && unavailable.Original == choice.UnavailableReason ? unavailable : choice.UnavailableMessage,
+        };
+    }
+
+    private static ViewSingleItemChoice OrnamentChoice(ViewSingleItemOrnament? value, global::XASlave.Localization.UiMessage unavailable)
+    {
+        if (value == null) return ViewSingleItemChoice.Create(102, global::XASlave.Localization.UiMessage.Key("S2D47ACAF6F69836B"), 0, (string.IsNullOrEmpty(unavailable.Original) ? global::XASlave.Localization.UiMessage.Key("S94A2CE8862AD3D29") : unavailable));
+        if (value.Id == 0) return ViewSingleItemChoice.Create(102, global::XASlave.Localization.UiMessage.Key("S65C578A428F5C224"), 0, global::XASlave.Localization.UiMessage.Key("S80C3514512962647"));
         var row = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Ornament>().GetRowOrDefault(value.Id);
         var name = row?.Singular.ToString();
-        return new(102, "Fashion accessory: " + (string.IsNullOrWhiteSpace(name) ? $"Accessory {value.Id}" : name), 0);
+        return ViewSingleItemChoice.Create(102, global::XASlave.Localization.UiMessage.Format("S38BB8BEC43FFED77" , ((string.IsNullOrWhiteSpace(name) ? global::XASlave.Localization.UiMessage.Format("S20BEBB1632B1D76A" , value.Id) : global::XASlave.Localization.UiMessage.Raw(name)))), 0);
     }
 
     internal bool Select(int key, InspectOutfitSnapshot snapshot)
@@ -385,20 +422,20 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
             DescribeSelection(), revision, frame);
         if (key == 105)
         {
-            StatusText = "Adventurer plate and portrait decorations";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S8DD186B55BC92CC9"));
             return true;
         }
         if (key == 106)
         {
             if (catalog == null || !ViewSingleItemFurnitureAssets.TryDescribe(catalog.ItemId, out var furnishing))
-                throw new InvalidDataException("This furnishing is no longer available in the current game data.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0F4EF07904685BB6"), originalMessageText => new InvalidDataException(originalMessageText));
             Furniture.Load(furnishing);
-            StatusText = Furniture.Status;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, Furniture.StatusMessage);
             return true;
         }
         Refresh(snapshot);
-        StatusText = choices.First(value => value.Key == key).UnavailableReason;
-        if (string.IsNullOrEmpty(StatusText)) StatusText = "Loading the selected item in the standalone preview...";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, choices.First(value => value.Key == key).UnavailablePresentation);
+        if (string.IsNullOrEmpty(StatusText)) StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SA333D4BDF30300CD"));
         return true;
     }
 
@@ -410,7 +447,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         scene.SetWeaponDrawn(drawn);
         DrainSceneImageRetirement();
         lastDiagnostic = string.Empty; lastDiagnosticAt = lastFilterDiagnosticAt = 0;
-        StatusText = drawn ? "Preparing the unsheathed weapon..." : "Preparing the sheathed weapon...";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (drawn ? global::XASlave.Localization.UiMessage.Key("S1AE44151FC56CA2D") : global::XASlave.Localization.UiMessage.Key("S74D9A29A000D1FB5")));
         Plugin.Log.Information("[View Item] Weapon state: {Selection}; drawn={Drawn}; revision={Revision}.",
             DescribeSelection(), drawn, revision);
     }
@@ -422,7 +459,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         if (selection == 106)
         {
             Furniture.Tick();
-            StatusText = Furniture.Status;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, Furniture.StatusMessage);
             return;
         }
         scene.Tick(frameworkFrame);
@@ -441,10 +478,10 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
             { Volatile.Write(ref filter, null); return false; }
             var unavailable = choices.FirstOrDefault(value => value.Key == selection)?.UnavailableReason;
             if (!string.IsNullOrEmpty(unavailable))
-            { Volatile.Write(ref filter, null); StatusText = unavailable; return false; }
+            { Volatile.Write(ref filter, null); StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, choices.First(value => value.Key == selection).UnavailablePresentation); return false; }
             var character = scene.GetCharacter();
             if (character == null)
-            { Volatile.Write(ref filter, null); StatusText = scene.StatusText; return false; }
+            { Volatile.Write(ref filter, null); StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, scene.StatusTextMessage); return false; }
             var models = new List<ModelIdentity>();
             var owners = new List<nint>();
             var descendants = new HashSet<nint>();
@@ -494,7 +531,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     private static void CaptureChildren(SceneObject* parent, int choice, List<nint> owners, List<ModelIdentity> models,
         HashSet<nint> descendants, int depth = 0)
     {
-        if (depth > 8 || owners.Count > 64) throw new InvalidOperationException("The preview attachment tree is too large.");
+        if (depth > 8 || owners.Count > 64) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S4DC83950EB0C04DF"), originalMessageText => new InvalidOperationException(originalMessageText));
         NearbyZoneNativeBinding.RequireReadable((nint)parent, sizeof(SceneObject));
         var first = parent->ChildObject;
         var child = first;
@@ -502,14 +539,14 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         while (child != null)
         {
             if (visited.Count >= 64 || !visited.Add((nint)child))
-                throw new InvalidOperationException("The preview attachment tree contains an unexpected cycle.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S25B3AE5D69D3AEB9"), originalMessageText => new InvalidOperationException(originalMessageText));
             NearbyZoneNativeBinding.RequireReadable((nint)child, sizeof(SceneObject));
             if (child->ParentObject != parent)
-                throw new InvalidOperationException("The preview attachment owner changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SEB1C97BCB7CFF165"), originalMessageText => new InvalidOperationException(originalMessageText));
             if (!owners.Contains((nint)child))
             {
                 if (descendants.Count >= 128 || !descendants.Add((nint)child))
-                    throw new InvalidOperationException("The preview attachment tree exceeds its capture bounds.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SB0796512CF9EDBCD"), originalMessageText => new InvalidOperationException(originalMessageText));
                 if (child->GetObjectType() == FFXIVClientStructs.FFXIV.Client.Graphics.Scene.ObjectType.CharacterBase)
                 {
                     owners.Add((nint)child);
@@ -539,7 +576,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     {
         NearbyZoneNativeBinding.RequireReadable((nint)draw, sizeof(CharacterBase));
         if (draw->SlotCount < 0 || draw->SlotCount > 32)
-            throw new InvalidOperationException("The inspected model collection is unavailable.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S40051C450F7CBA56"), originalMessageText => new InvalidOperationException(originalMessageText));
         if (draw->SlotCount == 0 || draw->Models == null) return;
         NearbyZoneNativeBinding.RequireReadable((nint)draw->Models, checked(draw->SlotCount * sizeof(nint)));
         for (var index = 0; index < draw->SlotCount; index++)
@@ -550,9 +587,9 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
             if (model->ModelResourceHandle == null || model->RenderModelCallback == null) continue;
             NearbyZoneNativeBinding.RequireReadable((nint)model->RenderModelCallback, sizeof(ModelRenderer.Callback));
             if ((nint)model->RenderModelCallback->ThisArg != (nint)draw || model->SlotIndex != (uint)index)
-                throw new InvalidOperationException("The inspected model owner changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9F517FB0BB6AD20D"), originalMessageText => new InvalidOperationException(originalMessageText));
             if (model->MaterialCount < 0 || model->MaterialCount > 128 || model->Materials == null)
-                throw new InvalidOperationException("The inspected material collection changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SDE176A44868F47AB"), originalMessageText => new InvalidOperationException(originalMessageText));
             var materials = new MaterialIdentity[model->MaterialCount];
             if (materials.Length != 0) NearbyZoneNativeBinding.RequireReadable((nint)model->Materials,
                 checked(materials.Length * sizeof(nint)));
@@ -580,13 +617,13 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     private static string ReadShaderName(MaterialResourceHandle* material)
     {
         if (material->Strings == null || material->ShpkNameOffset >= material->TotalDataSize)
-            throw new InvalidOperationException("The preview shader name is unavailable.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9C8A6B1495FCD95D"), originalMessageText => new InvalidOperationException(originalMessageText));
         var pointer = material->Strings + material->ShpkNameOffset;
         var length = Math.Min(128, material->TotalDataSize - material->ShpkNameOffset);
         NearbyZoneNativeBinding.RequireReadable((nint)pointer, length);
         var data = new ReadOnlySpan<byte>(pointer, length);
         var end = data.IndexOf((byte)0);
-        if (end < 0) throw new InvalidOperationException("The preview shader name is unterminated.");
+        if (end < 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC866032C1E367A1F"), originalMessageText => new InvalidOperationException(originalMessageText));
         return Encoding.UTF8.GetString(data[..end]);
     }
 
@@ -760,17 +797,17 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         return ImageBlocker.None;
     }
 
-    private static string DescribeBlocker(ImageBlocker blocker) => blocker switch
+    private static global::XASlave.Localization.UiMessage DescribeBlocker(ImageBlocker blocker) => blocker switch
     {
-        ImageBlocker.NoFilter => "Waiting for the standalone scene and item models...",
-        ImageBlocker.Expired => "The preview render confirmation expired; refreshing item isolation...",
-        ImageBlocker.Invalidated => "The preview render or texture changed; reconfirming item isolation. See xllog for details.",
-        ImageBlocker.MissingModels => "The selected item's model is not loaded in this captured preview.",
-        ImageBlocker.NoSceneSubmission => "The standalone scene has not submitted a confirmed mesh yet.",
-        ImageBlocker.NoSelectedSubmission => "The selected item has not submitted a confirmed mesh. See xllog for render diagnostics.",
-        ImageBlocker.SkinFiltered => "The selected item's submitted materials were excluded by the skin filter. See xllog for details.",
-        ImageBlocker.FrameSettling => "Waiting for the isolated preview frames to settle...",
-        _ => "Standalone preview - Examine can be closed.",
+        ImageBlocker.NoFilter => global::XASlave.Localization.UiMessage.Key("S66E9A08B573C19E4"),
+        ImageBlocker.Expired => global::XASlave.Localization.UiMessage.Key("SF9CF73BB484F4724"),
+        ImageBlocker.Invalidated => global::XASlave.Localization.UiMessage.Key("S7A503CF883DEFA50"),
+        ImageBlocker.MissingModels => global::XASlave.Localization.UiMessage.Key("S8C0770C056A42157"),
+        ImageBlocker.NoSceneSubmission => global::XASlave.Localization.UiMessage.Key("S99869E9A4132161D"),
+        ImageBlocker.NoSelectedSubmission => global::XASlave.Localization.UiMessage.Key("SB5DD881BC65AF571"),
+        ImageBlocker.SkinFiltered => global::XASlave.Localization.UiMessage.Key("S2C484313D4D042F3"),
+        ImageBlocker.FrameSettling => global::XASlave.Localization.UiMessage.Key("S0106FDC9C4372ABF"),
+        _ => global::XASlave.Localization.UiMessage.Key("S1AC772397839B282"),
     };
 
     private string DescribeSelection()
@@ -880,13 +917,13 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
             if (disposed || source == null) return false;
             Validate();
             var unavailable = choices.FirstOrDefault(value => value.Key == selection)?.UnavailableReason;
-            if (!string.IsNullOrEmpty(unavailable)) { StatusText = unavailable; return false; }
-            if (scene.GetCharacter() == null) { StatusText = scene.StatusText; return false; }
+            if (!string.IsNullOrEmpty(unavailable)) { StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, choices.First(value => value.Key == selection).UnavailablePresentation); return false; }
+            if (scene.GetCharacter() == null) { StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, scene.StatusTextMessage); return false; }
             var current = Volatile.Read(ref filter);
             var blocker = GetImageBlocker(current);
             if (blocker != ImageBlocker.None || current == null)
             {
-                StatusText = DescribeBlocker(blocker);
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, DescribeBlocker(blocker));
                 return false;
             }
             var manager = RenderTargetManager.Instance();
@@ -901,7 +938,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
             {
                 textureDiagnostic += "; rejected=" + textureProblem;
                 RememberTextureDiagnostic();
-                StatusText = "The standalone preview texture is not ready."; return false;
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S9018C0FA7D78E95F")); return false;
             }
             var textureId = (nint)texture->D3D11ShaderResourceView;
             size = new Vector2(texture->ActualWidth, texture->ActualHeight);
@@ -916,7 +953,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
                 InvalidateFilter(current);
                 revisionStarted = Environment.TickCount64;
                 size = default;
-                StatusText = "Waiting for the current preview texture to confirm item isolation...";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S82F5549A41369806"));
                 return false;
             }
             if (!IsCurrentFilter(current))
@@ -925,7 +962,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
             textureDiagnostic += "; state=retained";
             ImageUvMax = new Vector2((float)texture->ActualWidth / texture->AllocatedWidth,
                 (float)texture->ActualHeight / texture->AllocatedHeight);
-            StatusText = "Standalone preview - Examine can be closed.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S1AC772397839B282"));
             return true;
         }
     }
@@ -1076,9 +1113,9 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         8 => 11, 9 => 12, 10 => 100, 16 => 101, _ => -1,
     };
 
-    private static string SlotLabel(int slot) => slot switch
+    private static global::XASlave.Localization.UiMessage SlotLabel(int slot) => slot switch
     {
-        0 => "Weapon", 1 => "Shield / off hand", 2 => "Helm", 3 => "Armor", 4 => "Hands", 6 => "Pants",
-        7 => "Shoes", 8 => "Earrings", 9 => "Necklace", 10 => "Bracelets", 11 => "Right ring", 12 => "Left ring", _ => "Item",
+        0 => global::XASlave.Localization.UiMessage.Key("S1710782C5D15B913"), 1 => global::XASlave.Localization.UiMessage.Key("SB68A5DF103BDB195"), 2 => global::XASlave.Localization.UiMessage.Key("S7E94675FF2DEA116"), 3 => global::XASlave.Localization.UiMessage.Key("SA592855D0508D161"), 4 => global::XASlave.Localization.UiMessage.Key("S6B7204778686145F"), 6 => global::XASlave.Localization.UiMessage.Key("SE4633585E7BBA115"),
+        7 => global::XASlave.Localization.UiMessage.Key("SB5EFA9EC3F5F8D45"), 8 => global::XASlave.Localization.UiMessage.Key("SA532E980AE2F48EB"), 9 => global::XASlave.Localization.UiMessage.Key("S6A88445BBF65F756"), 10 => global::XASlave.Localization.UiMessage.Key("SA9A8BED2FC5B6067"), 11 => global::XASlave.Localization.UiMessage.Key("S44D9F0B94BCAB574"), 12 => global::XASlave.Localization.UiMessage.Key("S2B4543478B84CB8E"), _ => global::XASlave.Localization.UiMessage.Key("S652BCC3A47842889"),
     };
 }

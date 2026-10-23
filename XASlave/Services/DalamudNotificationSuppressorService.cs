@@ -27,29 +27,28 @@ public sealed class DalamudNotificationSuppressorOptions
         || HideSuccessInfo
         || HideWarningsErrors;
 
-    public string BuildCategorySummary()
+    internal global::XASlave.Localization.UiMessage BuildCategoryMessage()
     {
         if (HideAll)
-            return "all notifications";
+            return global::XASlave.Localization.UiMessage.Key("SD05CF237CA9328CD");
 
-        var categories = new List<string>();
+        var categories = new List<global::XASlave.Localization.UiMessage>();
         if (HideDalamudUpdates)
-            categories.Add("updates");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S35759B3CA7DA9A51"));
         if (HidePluginLifecycle)
-            categories.Add("plugin lifecycle");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S6D6A7F2F4674C728"));
         if (HidePluginErrors)
-            categories.Add("plugin errors");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S06601217D4EFCB21"));
         if (HideModManagerAlerts)
-            categories.Add("mod manager alerts");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S1140BB1666F1B485"));
         if (HideSuccessInfo)
-            categories.Add("success/info");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S65CBE7A0F131E9E6"));
         if (HideWarningsErrors)
-            categories.Add("warnings/errors");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("SCBD7FD8CD5FC3969"));
 
-        return categories.Count == 0
-            ? "no categories selected"
-            : string.Join(", ", categories);
+        return (categories.Count == 0 ? global::XASlave.Localization.UiMessage.Key("S51EFA1957ADA9FEB") : global::XASlave.Localization.UiMessage.Join(", ", categories));
     }
+    public string BuildCategorySummary() => BuildCategoryMessage().Original;
 }
 
 public sealed class DalamudNotificationSuppressorService : IDisposable
@@ -171,8 +170,14 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No notifications hidden yet.";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03268E4B8CEC8B34");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03268E4B8CEC8B34");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
     public int SuppressedCount => suppressedCount;
 
     public void ApplyConfiguration(DalamudNotificationSuppressorOptions options)
@@ -193,7 +198,7 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
         {
             enabled = false;
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -242,12 +247,12 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
                 return;
 
             suppressedCount += hiddenCount;
-            LastActionText = $"Last action: hid {hiddenCount} Dalamud notification(s) at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S6C2B30775DAFD95B", hiddenCount, DateTime.Now));
             UpdateStatusText();
         }
         catch (Exception ex)
         {
-            StatusText = "Enabled - suppression failed; check /xllog.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S247F2CA9D93CB4E7"));
             log.Warning(ex, "[XASlave] Dalamud Notifications Suck failed while hiding notifications.");
         }
     }
@@ -423,12 +428,12 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
             var managerType = dalamudAssembly.GetType("Dalamud.Interface.ImGuiNotification.Internal.NotificationManager", throwOnError: false);
             var serviceGenericType = dalamudAssembly.GetType("Dalamud.Service`1", throwOnError: false);
             if (managerType == null || serviceGenericType == null)
-                return ReflectionUnavailable("Dalamud NotificationManager service type could not be resolved.", null);
+                return ReflectionUnavailable(global::XASlave.Localization.UiMessage.Key("SB1B1B3C948A9435E"), null);
 
             var manager = GetDalamudServiceInstance(serviceGenericType.MakeGenericType(managerType));
             if (manager == null)
             {
-                StatusText = "Enabled - waiting for Dalamud NotificationManager.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S82394BDD1ADBEEB0"));
                 return false;
             }
 
@@ -437,7 +442,7 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
             var activeType = activeField?.FieldType.GetGenericArguments().FirstOrDefault()
                              ?? pendingField?.FieldType.GetGenericArguments().FirstOrDefault();
             if (activeField == null || pendingField == null || activeType == null)
-                return ReflectionUnavailable("Dalamud notification storage fields could not be resolved.", null);
+                return ReflectionUnavailable(global::XASlave.Localization.UiMessage.Key("S4DB1FD517BBAE4C9"), null);
 
             notificationManager = manager;
             activeNotificationsField = activeField;
@@ -457,14 +462,14 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
             pendingAddMethod = pendingInstance?.GetType().GetMethod("Add", InstanceFlags);
 
             if (dismissNowMethod == null || contentProperty == null || pendingTryTakeMethod == null || pendingAddMethod == null)
-                return ReflectionUnavailable("Dalamud notification accessors could not be resolved.", null);
+                return ReflectionUnavailable(global::XASlave.Localization.UiMessage.Key("S82FBBA0C0DCA9C38"), null);
 
             UpdateStatusText();
             return true;
         }
         catch (Exception ex)
         {
-            return ReflectionUnavailable("Dalamud notification reflection failed.", ex);
+            return ReflectionUnavailable(global::XASlave.Localization.UiMessage.Key("SE6D0A9913D0B4ACC"), ex);
         }
     }
 
@@ -485,10 +490,10 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
         return get?.Invoke(null, null);
     }
 
-    private bool ReflectionUnavailable(string message, Exception? exception)
+    private bool ReflectionUnavailable(global::XASlave.Localization.UiMessage message, Exception? exception)
     {
-        StatusText = "Enabled - Dalamud notification internals are unavailable.";
-        LastActionText = message;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S3D51B7CF5FD3617D"));
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, message);
         if (!hasLoggedReflectionFailure)
         {
             hasLoggedReflectionFailure = true;
@@ -505,17 +510,17 @@ public sealed class DalamudNotificationSuppressorService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (!options.HasAnyCategory)
         {
-            StatusText = "Enabled - no notification categories selected.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S842774E567AFBE1B"));
             return;
         }
 
-        StatusText = $"Enabled - hiding {options.BuildCategorySummary()}. Hidden so far: {suppressedCount}.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S7747A67DCB263A78", options.BuildCategoryMessage(), suppressedCount));
     }
 
     private sealed record NotificationSnapshot(

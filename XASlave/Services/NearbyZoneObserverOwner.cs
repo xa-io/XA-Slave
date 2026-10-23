@@ -24,9 +24,10 @@ internal sealed unsafe class NearbyZoneObserverOwner : IDisposable
     private volatile bool enabled;
     private bool initialized, failed, disposed;
     private string? callbackFailure;
+    private global::XASlave.Localization.UiMessage? callbackFailureMessage;
     private Exception? setupFailure;
-    private string setupStage = "starting observer setup";
-    private static readonly string[] TargetNames = ["search completion", "search request", "content-member completion", "content-member request"];
+    private global::XASlave.Localization.UiMessage setupStage = global::XASlave.Localization.UiMessage.Key("S68269058F0889D83");
+    private static readonly global::XASlave.Localization.UiMessage[] TargetNames = [global::XASlave.Localization.UiMessage.Key("S7C2C28FFBD9DDCCC"), global::XASlave.Localization.UiMessage.Key("S08B79BBB8EFD3A64"), global::XASlave.Localization.UiMessage.Key("SDBF8024C3A3098DD"), global::XASlave.Localization.UiMessage.Key("S20FE3F55EF01986D")];
 
     internal NearbyZoneObserverOwner(NearbyZoneNativeBinding binding, NearbyZoneCache cache)
     {
@@ -38,20 +39,20 @@ internal sealed unsafe class NearbyZoneObserverOwner : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         NearbyZoneNativeBinding.RequireFramework();
-        if (failed) throw new InvalidOperationException(setupFailure?.Message ?? "Zone observer setup failed.", setupFailure);
-        if (callbackFailure is { } failure) { Disable(); throw new InvalidOperationException(failure); }
+        if (failed) throw global::XASlave.Localization.UiMessage.CreateException((setupFailure is { } priorSetup ? global::XASlave.Localization.UiMessage.FromException(priorSetup) : global::XASlave.Localization.UiMessage.Key("S9BAD5A4961CF1397")), originalMessageText => new InvalidOperationException(originalMessageText, setupFailure));
+        if (callbackFailure is { } failure) { Disable(); throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Capture(callbackFailureMessage, failure), originalMessageText => new InvalidOperationException(originalMessageText)); }
         if (enabled) { Validate(); return; }
         try
         {
-            setupStage = "resolving Dalamud hook synchronization";
+            setupStage = global::XASlave.Localization.UiMessage.Key("S16A463EDD8C2EDFC");
             hookLock ??= ResolveHookLock();
             using (hookLock.EnterScope())
             {
                 if (!initialized)
                 {
-                    setupStage = "validating search proxy";
+                    setupStage = global::XASlave.Localization.UiMessage.Key("S6DA6F178954C8A7A");
                     binding.CurrentProxy(NearbyZoneMode.Search);
-                    setupStage = "validating content-member proxy";
+                    setupStage = global::XASlave.Localization.UiMessage.Key("S15F0BA01BF51C993");
                     binding.CurrentProxy(NearbyZoneMode.ContentMember);
                     // Hook installation depends on proxy/code identity, not either refresh agent.
                     // The cache and request adapter validate the selected agent immediately before use.
@@ -59,12 +60,12 @@ internal sealed unsafe class NearbyZoneObserverOwner : IDisposable
                     var proofs = new byte[4][];
                     for (var i = 0; i < 4; i++)
                     {
-                        setupStage = "validating " + TargetNames[i] + " code";
+                        setupStage = global::XASlave.Localization.UiMessage.Format("S4E91DCB371368163" , TargetNames[i]);
                         proofs[i] = binding.ValidateUnownedTarget(targets[i]);
                     }
                     for (var i = 0; i < 4; i++)
                     {
-                        setupStage = "creating " + TargetNames[i] + " observer";
+                        setupStage = global::XASlave.Localization.UiMessage.Format("SA71A12E47F45E030" , TargetNames[i]);
                         var index = i;
                         gates[i] = new((NativeCall)(proxy => Dispatch(index, proxy)));
                         hooks[i] = ReloadedHooks.Instance.CreateHook<NativeCall>((void*)gates[i]!.Entry, (long)targets[i]);
@@ -75,7 +76,7 @@ internal sealed unsafe class NearbyZoneObserverOwner : IDisposable
                     // Native guards stay inactive until every hook and Original is ready.
                     for (var i = 0; i < 4; i++)
                     {
-                        setupStage = "activating " + TargetNames[i] + " observer";
+                        setupStage = global::XASlave.Localization.UiMessage.Format("S52E3E751AD9E7835" , TargetNames[i]);
                         hooks[i]!.Activate();
                         prefixes[i] = NearbyZoneNativeBinding.Read(targets[i], Math.Min(32, proofs[i].Length));
                     }
@@ -83,12 +84,12 @@ internal sealed unsafe class NearbyZoneObserverOwner : IDisposable
                 }
                 else
                 {
-                    setupStage = "validating existing observers";
+                    setupStage = global::XASlave.Localization.UiMessage.Key("S72868346359615F2");
                     Validate();
-                    setupStage = "re-enabling existing observers";
+                    setupStage = global::XASlave.Localization.UiMessage.Key("S757042786E250865");
                     foreach (var hook in hooks) hook!.Enable();
                 }
-                setupStage = "activating callback gates";
+                setupStage = global::XASlave.Localization.UiMessage.Key("S417783DEEE7BE53C");
                 foreach (var gate in gates) gate!.Activate();
                 enabled = true;
                 cache.SetObserversReady(true);
@@ -97,7 +98,7 @@ internal sealed unsafe class NearbyZoneObserverOwner : IDisposable
         catch (Exception error)
         {
             failed = true;
-            setupFailure = new InvalidOperationException($"Zone observer setup failed while {setupStage}: {error.Message}", error);
+            setupFailure = global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SE240C28A3A2018AB" , setupStage, global::XASlave.Localization.UiMessage.FromException(error)), originalMessageText => new InvalidOperationException(originalMessageText, error));
             // Preserve the first failure across future polls and cleanup; do not flood the log at 1 Hz.
             Plugin.Log.Error(setupFailure, "[XASlave] XA Nearby zone observer setup failed.");
             try { Disable(); }
@@ -135,11 +136,11 @@ internal sealed unsafe class NearbyZoneObserverOwner : IDisposable
 
     private void RecordFailure(Exception error)
     {
-        callbackFailure ??= error.Message;
+        callbackFailure ??= global::XASlave.Localization.UiMessage.Store(ref callbackFailureMessage, global::XASlave.Localization.UiMessage.FromException(error));
         foreach (var gate in gates) gate?.Deactivate();
         enabled = false;
         cache.SetObserversReady(false);
-        cache.ReportUnavailable(error.Message);
+        cache.ReportUnavailable(global::XASlave.Localization.UiMessage.FromException(error));
     }
 
     private void Validate()
@@ -159,14 +160,14 @@ internal sealed unsafe class NearbyZoneObserverOwner : IDisposable
                     try { if (hook?.IsHookActivated == true) hook.Disable(); }
                     catch (Exception error) { failure ??= error; }
         }
-        if (failure != null) cache.ReportUnavailable("Zone observer cleanup: " + failure.Message);
+        if (failure != null) cache.ReportUnavailable(global::XASlave.Localization.UiMessage.Format("SD0FB2B099C83FA19" , global::XASlave.Localization.UiMessage.FromException(failure)));
     }
 
     private static Lock ResolveHookLock()
     {
         var manager = typeof(IFramework).Assembly.GetType("Dalamud.Hooking.Internal.HookManager", throwOnError: true)!;
         return manager.GetProperty("HookEnableSyncRoot", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(null) as Lock
-            ?? throw new NotSupportedException("The installed hook synchronization contract is unavailable.");
+            ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S865C2E7363396B55"), originalMessageText => new NotSupportedException(originalMessageText));
     }
 
     public void Dispose()

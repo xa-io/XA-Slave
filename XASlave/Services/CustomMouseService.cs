@@ -1,4 +1,5 @@
 using System;
+using UiMessage = XASlave.Localization.UiMessage;
 using System.Collections.Generic;
 using System.IO;
 using System.Numerics;
@@ -89,8 +90,14 @@ public sealed class CustomMouseService : IDisposable
     [ThreadStatic] private static CustomMouseService? drawingService;
     [ThreadStatic] private static int drawingPreset;
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string ArtworkStatusText { get; private set; } = "Game artwork";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string ArtworkStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S5744D0597F0C3DDA");
+    private global::XASlave.Localization.UiMessage? uiArtworkStatusText = global::XASlave.Localization.UiMessage.Key("S5744D0597F0C3DDA");
+    internal string LocalizedArtworkStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiArtworkStatusText, ArtworkStatusText);
+    internal global::XASlave.Localization.UiMessage ArtworkStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiArtworkStatusText, ArtworkStatusText);
 
     public CustomMouseService(IFramework framework, IDataManager data, ITextureProvider textures, IPluginLog log,
         ISigScanner scanner, IGameInteropProvider interop, IGameConfig gameConfig, IUiBuilder uiBuilder, ITextureReadbackProvider readback)
@@ -155,7 +162,7 @@ public sealed class CustomMouseService : IDisposable
                 RestoreSoftwareSetting();
                 RestoreTrailSetting();
                 ClearAtlases();
-                SetStatus("Disabled");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
                 return false;
             }
             if (enabled) return true;
@@ -166,7 +173,7 @@ public sealed class CustomMouseService : IDisposable
                 nativeDrawObserved = false;
                 nextDiagnosticAt = 0;
                 enabled = true;
-                SetStatus("Waiting for the game's software cursor renderer.");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S7E4727E634180657"));
                 log.Information("[Custom Mouse] Enabled native cursor renderer; scale={Scale:F2}x, base={Base}, outline={Outline}, software setting owned={Owned}.", settings.Scale, settings.BaseColor, settings.OutlineColor, ownsSoftwareSetting);
                 return true;
             }
@@ -176,7 +183,7 @@ public sealed class CustomMouseService : IDisposable
                 DisableHooks();
                 RestoreSoftwareSetting();
                 RestoreTrailSetting();
-                SetStatus("Unavailable - cursor renderer could not be initialized.");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S69CB46434A483EC0"));
                 log.Warning(ex, "[Custom Mouse] Could not initialize the native cursor renderer.");
                 return false;
             }
@@ -238,7 +245,7 @@ public sealed class CustomMouseService : IDisposable
     private void EnableSoftwareSetting()
     {
         if (!gameConfig.TryGet(SystemConfigOption.SystemMouseOperationSoftOn, out uint before))
-            throw new InvalidOperationException("The game's software cursor setting is unavailable.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC0381DD0943D6D66"), originalMessage => new InvalidOperationException(originalMessage));
         if (before != 0) return;
         originalSoftwareSetting = before;
         // Own the write before performing it so partial failure can still be rolled back.
@@ -287,7 +294,7 @@ public sealed class CustomMouseService : IDisposable
     private void ApplyTrailSetting()
     {
         if (!gameConfig.TryGet(SystemConfigOption.SystemMouseOperationTrajectory, out uint before))
-            throw new InvalidOperationException("The game's cursor trail setting is unavailable.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC7B26E55D1FA58C3"), originalMessage => new InvalidOperationException(originalMessage));
         if (!trailSettingCaptured)
         {
             originalTrailSetting = before;
@@ -337,7 +344,7 @@ public sealed class CustomMouseService : IDisposable
                 RestoreSoftwareSetting();
                 RestoreTrailSetting();
                 ClearAtlases();
-                SetStatus("Unavailable - native cursor customization failed; original cursor restored.");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S0990B1101D90CA2F"));
                 return;
             }
             try
@@ -345,15 +352,15 @@ public sealed class CustomMouseService : IDisposable
                 if (rendererModePending) ApplyRendererMode();
                 if (settings.AllowWindowsMouse)
                 {
-                    ArtworkStatusText = "Windows cursor selected; custom artwork and colors are inactive.";
-                    SetStatus("Active - using your Windows pointer.");
+                    ArtworkStatusText = global::XASlave.Localization.UiMessage.Store(ref uiArtworkStatusText, global::XASlave.Localization.UiMessage.Key("SC3D99EDE79D66BF2"));
+                    SetStatus(global::XASlave.Localization.UiMessage.Key("S7D9324FA8CBF1442"));
                     return;
                 }
                 if (trailPreferencePending) ApplyTrailSetting();
                 UpdateArtwork();
                 var cursor = GameCursor.Instance();
-                if (cursor == null) { SetStatus("Waiting for the game's cursor."); return; }
-                if (!cursor->UseSoftwareCursor) { SetStatus("Software cursor is off; toggle Custom Mouse off/on to enable it."); return; }
+                if (cursor == null) { SetStatus(global::XASlave.Localization.UiMessage.Key("SD362A29105877EA7")); return; }
+                if (!cursor->UseSoftwareCursor) { SetStatus(global::XASlave.Localization.UiMessage.Key("S8BF1024A8330AB79")); return; }
                 var resource = cursor->SoftwareCursorTexture;
                 if (resource != null && resource->Texture != null)
                 {
@@ -417,26 +424,19 @@ public sealed class CustomMouseService : IDisposable
                 {
                     nextDiagnosticAt = now + 1000;
                     if (IsUiMouseOwned)
-                        SetStatus("Ready - Dalamud controls the pointer over plugin windows.");
+                        SetStatus(global::XASlave.Localization.UiMessage.Key("SC0F8BFCD937FF87D"));
                     else if (customHardwareActive)
-                        SetStatus("Active - smooth cursor movement follows Windows.");
+                        SetStatus(global::XASlave.Localization.UiMessage.Key("SBD8FBCD42A726BF3"));
                     else if (nativeDrawObserved && settings.CursorTrails)
-                        SetStatus("Active - cursor trails use game-frame software rendering.");
+                        SetStatus(global::XASlave.Localization.UiMessage.Key("SBCDE22C9FA6BF256"));
                     else if (nativeDrawObserved && currentAtlas?.HardwareFailure != null)
-                        SetStatus("Active - software cursor retained; native hardware preparation unavailable.");
+                        SetStatus(global::XASlave.Localization.UiMessage.Key("S9F69128F3C145A85"));
                     else if (nativeDrawObserved)
-                        SetStatus(settings.UseCustomArtwork
-                            ? GetArtworkResource(cursor->ActiveCursorType)?.Current?.Ready == true ? "Active - custom cursor roles; other game cursors preserved."
-                                : GetArtworkResource(cursor->ActiveCursorType)?.Failed == true ? "Active - game cursor retained; this role artwork is unavailable."
-                                : "Active - game cursor retained while custom artwork loads."
-                            : NeedsRecolor ? currentAtlas?.Ready == true ? "Active - native cursor size and colors applied."
-                                : currentAtlas?.Failed == true ? "Active - size applied; cursor colors unavailable (toggle off/on to retry)."
-                                : "Active - size applied; preparing cursor colors."
-                            : "Active - native cursor size applied with original colors.");
+                        SetStatus((settings.UseCustomArtwork ? (GetArtworkResource(cursor->ActiveCursorType)?.Current?.Ready == true ? global::XASlave.Localization.UiMessage.Key("S6D1A1A1E863EC093") : (GetArtworkResource(cursor->ActiveCursorType)?.Failed == true ? global::XASlave.Localization.UiMessage.Key("S46557BB798AC6EA8") : global::XASlave.Localization.UiMessage.Key("S8C51C15FE1833399"))) : (NeedsRecolor ? (currentAtlas?.Ready == true ? global::XASlave.Localization.UiMessage.Key("SC12EB29D41C23E9B") : (currentAtlas?.Failed == true ? global::XASlave.Localization.UiMessage.Key("SA4F462BD971F259E") : global::XASlave.Localization.UiMessage.Key("SB0C41F2726FB4E74"))) : global::XASlave.Localization.UiMessage.Key("S84A88542B1E54949"))));
                     else if (!cursor->IsCursorVisible || cursor->IsCursorOutsideViewPort)
-                        SetStatus("Ready - move the mouse over the game to show its cursor.");
+                        SetStatus(global::XASlave.Localization.UiMessage.Key("S6CA8CADB9799A7CB"));
                     else
-                        SetStatus("Waiting for a visible native software cursor draw.");
+                        SetStatus(global::XASlave.Localization.UiMessage.Key("S53448704C3F0F323"));
                     nativeDrawObserved = false;
                 }
             }
@@ -450,22 +450,24 @@ public sealed class CustomMouseService : IDisposable
 
     private bool NeedsRecolor => settings.BaseColor != Vector4.One || settings.OutlineColor != new Vector4(0, 0, 0, 1);
 
-    internal string GetArtworkStatus(CustomMouseArtworkRole role)
+    internal global::XASlave.Localization.UiMessage GetArtworkStatusMessage(CustomMouseArtworkRole role)
     {
         lock (sync)
         {
-            if ((uint)role >= roleArtworks.Length) return "Unknown cursor role.";
-            if (settings.AllowWindowsMouse) return "Windows cursor selected; custom artwork is inactive.";
-            if (!settings.UseCustomArtwork) return "Game artwork";
+            if ((uint)role >= roleArtworks.Length) return global::XASlave.Localization.UiMessage.Key("SF1A9423632901C3E");
+            if (settings.AllowWindowsMouse) return global::XASlave.Localization.UiMessage.Key("S07255DE5B16A5BAF");
+            if (!settings.UseCustomArtwork) return global::XASlave.Localization.UiMessage.Key("S5744D0597F0C3DDA");
             if (string.IsNullOrWhiteSpace(settings.ResolveArtworkPath(role)))
-                return "Choose a local .ani, .cur or .png file. This role retains the game cursor.";
-            if (artworkPathsPending) return "Artwork selection will load when enabled.";
+                return global::XASlave.Localization.UiMessage.Key("S597E4CF4AAF804A3");
+            if (artworkPathsPending) return global::XASlave.Localization.UiMessage.Key("S6FEAD7D2E7219B3B");
             var resource = roleArtworks[(int)role];
-            var status = resource?.Status ?? "Custom artwork will load when enabled.";
-            return role != CustomMouseArtworkRole.Normal && string.IsNullOrWhiteSpace(settings.GetArtworkPath(role))
-                ? "Using normal pointer artwork. " + status : status;
+            var status = resource?.StatusMessage ?? global::XASlave.Localization.UiMessage.Key("SA58AC1BD56949C40");
+            return (role != CustomMouseArtworkRole.Normal && string.IsNullOrWhiteSpace(settings.GetArtworkPath(role)) ? global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SFF5D5079552EC57B"), status) : status);
         }
     }
+
+    internal string GetArtworkStatus(CustomMouseArtworkRole role) => GetArtworkStatusMessage(role).Original;
+    internal string GetLocalizedArtworkStatus(CustomMouseArtworkRole role) => GetArtworkStatusMessage(role).Display;
 
     internal static string[] GetDistinctArtworkPaths(CustomMouseSettings appearance)
     {
@@ -510,7 +512,7 @@ public sealed class CustomMouseService : IDisposable
     {
         if (!settings.UseCustomArtwork)
         {
-            ArtworkStatusText = "Game artwork";
+            ArtworkStatusText = global::XASlave.Localization.UiMessage.Store(ref uiArtworkStatusText, global::XASlave.Localization.UiMessage.Key("S5744D0597F0C3DDA"));
             return;
         }
         if (artworkPathsPending) ReconcileArtworkPaths();
@@ -531,15 +533,13 @@ public sealed class CustomMouseService : IDisposable
                     resource.Current = loaded;
                     resource.AnimationStartedAt = now;
                     resource.FrameIndex = 0;
-                    resource.Status = $"Loaded {loaded.Model.Frames.Count} frame(s), {loaded.Model.Steps.Count} playback step(s)."
-                        + (loaded.PreservesPngColors ? " PNG frames retain their original colors." : string.Empty)
-                        + (loaded.HardwareFailure != null ? " Smooth movement unavailable: " + loaded.HardwareFailure : string.Empty);
+                    resource.Status = global::XASlave.Localization.UiMessage.Store(ref resource.StatusToken, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("S5124647E7C719E69", loaded.Model.Frames.Count, loaded.Model.Steps.Count), ((loaded.PreservesPngColors ? global::XASlave.Localization.UiMessage.Key("S3CA27D935F281007") : global::XASlave.Localization.UiMessage.Raw(string.Empty)))), ((loaded.HardwareFailure != null ? global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S2CB6371AFA119D18"), loaded.HardwareFailure) : global::XASlave.Localization.UiMessage.Raw(string.Empty)))));
                     log.Information("[Custom Mouse] {ArtworkStatus}", resource.Status);
                 }
                 catch (Exception ex)
                 {
                     resource.Failed = true;
-                    resource.Status = "Could not load this artwork: " + ex.Message;
+                    resource.Status = global::XASlave.Localization.UiMessage.Store(ref resource.StatusToken, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S64BD7E00F25D8407"), global::XASlave.Localization.UiMessage.FromException(ex)));
                     log.Warning(ex, "[Custom Mouse] Cursor role artwork unavailable; its game cursor is retained.");
                 }
             }
@@ -558,9 +558,7 @@ public sealed class CustomMouseService : IDisposable
             if (resource.Current?.Ready == true) ready++;
             if (resource.Failed) failed++;
         }
-        ArtworkStatusText = artworkResources.Count == 0 ? "Choose cursor artwork for one or more roles."
-            : $"{ready}/{artworkResources.Count} distinct cursor file(s) ready."
-                + (failed == 0 ? string.Empty : $" {failed} unavailable; affected roles retain the game cursor.");
+        ArtworkStatusText = global::XASlave.Localization.UiMessage.Store(ref uiArtworkStatusText, (artworkResources.Count == 0 ? global::XASlave.Localization.UiMessage.Key("SFC0A987D0DC61A95") : global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("S2755687CE981093C", ready, artworkResources.Count), ((failed == 0 ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Format("S05FB2FB4DB3BA62D", failed))))));
     }
 
     private ArtworkResource? GetArtworkResource(uint cursorType)
@@ -577,7 +575,7 @@ public sealed class CustomMouseService : IDisposable
         var hardware = new List<CustomMouseHardwareCursor>(model.Frames.Count);
         var recolor = appearance.BaseColor != Vector4.One || appearance.OutlineColor != new Vector4(0, 0, 0, 1);
         var preservesPngColors = false;
-        string? hardwareFailure = null;
+        UiMessage? hardwareFailure = null;
         var prepareHardware = true;
         if (prepareHardware)
         {
@@ -588,7 +586,7 @@ public sealed class CustomMouseService : IDisposable
             if (scaledPixels > 16 * 1024 * 1024)
             {
                 prepareHardware = false;
-                hardwareFailure = "scaled animation exceeds the 64 MiB cursor pixel budget; software rendering retained.";
+                hardwareFailure = global::XASlave.Localization.UiMessage.Key("S6EAD7F59AD24449B");
             }
         }
         try
@@ -607,13 +605,13 @@ public sealed class CustomMouseService : IDisposable
                 }
                 else
                 {
-                    wrap = await textures.CreateFromImageAsync(frame.EncodedPng ?? throw new InvalidDataException("Cursor frame has no image."),
+                    wrap = await textures.CreateFromImageAsync(frame.EncodedPng ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S433DB91C9A6BA7BD"), originalMessage => new InvalidDataException(originalMessage)),
                         debugName: "XA Custom Mouse PNG artwork", cancellationToken: token).ConfigureAwait(false);
                     preservesPngColors = true;
                 }
                 wraps.Add(wrap);
                 if (wrap.Width != frame.Width || wrap.Height != frame.Height)
-                    throw new InvalidDataException("Decoded cursor dimensions do not match its frame metadata.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9552D2204ADAAB11"), originalMessage => new InvalidDataException(originalMessage));
                 if (prepareHardware)
                 {
                     try
@@ -624,10 +622,10 @@ public sealed class CustomMouseService : IDisposable
                                 leaveWrapOpen: true, cancellationToken: token).ConfigureAwait(false);
                             if (decoded.Specification.Width != frame.Width || decoded.Specification.Height != frame.Height
                                 || decoded.Specification.DxgiFormat != 87)
-                                throw new InvalidDataException("PNG readback dimensions or color format did not match.");
+                                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1892BFECBD18F32B"), originalMessage => new InvalidDataException(originalMessage));
                             var sourcePitch = decoded.Specification.Pitch;
                             if (sourcePitch < pitch || (long)(frame.Height - 1) * sourcePitch + pitch > decoded.RawData.Length)
-                                throw new InvalidDataException("PNG readback rows are incomplete.");
+                                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S5E9951142C5A9037"), originalMessage => new InvalidDataException(originalMessage));
                             pixels = new byte[checked(pitch * frame.Height)];
                             for (var row = 0; row < frame.Height; row++)
                                 decoded.RawData.AsSpan(row * sourcePitch, pitch).CopyTo(pixels.AsSpan(row * pitch, pitch));
@@ -641,7 +639,7 @@ public sealed class CustomMouseService : IDisposable
                     catch (Exception ex)
                     {
                         prepareHardware = false;
-                        hardwareFailure = ex.Message;
+                        hardwareFailure = global::XASlave.Localization.UiMessage.FromException(ex);
                         foreach (var handle in hardware) handle.Dispose();
                         hardware.Clear();
                         log.Warning(ex, "[Custom Mouse] Private hardware cursor could not be prepared; software artwork retained.");
@@ -662,19 +660,19 @@ public sealed class CustomMouseService : IDisposable
     private static byte[] ReadArtworkFile(string path, CancellationToken token)
     {
         if (path.Length > 1024 || !Path.IsPathFullyQualified(path))
-            throw new InvalidDataException("Select a fully qualified local cursor file path.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S10A9D0A1ACEA09F9"), originalMessage => new InvalidDataException(originalMessage));
         var fullPath = Path.GetFullPath(path);
         var root = Path.GetPathRoot(fullPath);
         if (root == null || root.Length != 3 || !char.IsAsciiLetter(root[0]) || root[1] != ':'
             || new DriveInfo(root).DriveType == DriveType.Network)
-            throw new InvalidDataException("Cursor files must be on a local drive; network paths are not supported.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S8F2A8FF7E57A98F7"), originalMessage => new InvalidDataException(originalMessage));
         var extension = Path.GetExtension(fullPath);
         if (!extension.Equals(".ani", StringComparison.OrdinalIgnoreCase) && !extension.Equals(".cur", StringComparison.OrdinalIgnoreCase)
             && !extension.Equals(".png", StringComparison.OrdinalIgnoreCase))
-            throw new InvalidDataException("Select an .ani, .cur or .png cursor file.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF8DE68F492092400"), originalMessage => new InvalidDataException(originalMessage));
         using var source = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read, 8192, FileOptions.SequentialScan);
         if (source.Length > MaximumArtworkFileBytes)
-            throw new InvalidDataException("Cursor file exceeds the 16 MiB limit.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SEBCCAEE1E1D816F3"), originalMessage => new InvalidDataException(originalMessage));
         using var output = new MemoryStream((int)source.Length);
         var buffer = new byte[8192];
         while (true)
@@ -683,7 +681,7 @@ public sealed class CustomMouseService : IDisposable
             var read = source.Read(buffer, 0, buffer.Length);
             if (read == 0) break;
             if (output.Length + read > MaximumArtworkFileBytes)
-                throw new InvalidDataException("Cursor file exceeds the 16 MiB limit.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SEBCCAEE1E1D816F3"), originalMessage => new InvalidDataException(originalMessage));
             output.Write(buffer, 0, read);
         }
         return output.ToArray();
@@ -695,21 +693,21 @@ public sealed class CustomMouseService : IDisposable
         var decoded = await Task.Run(() =>
         {
             token.ThrowIfCancellationRequested();
-            var file = data.GetFile<TexFile>(path) ?? throw new InvalidOperationException("Cursor texture was not found.");
+            var file = data.GetFile<TexFile>(path) ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC6A74E6F127FA8CE"), originalMessage => new InvalidOperationException(originalMessage));
             var width = (int)file.Header.Width;
             var height = (int)file.Header.Height;
             if (width < 1 || height < 1 || width > 2048 || height > 2048)
-                throw new InvalidOperationException("Cursor atlas exceeds the supported dimensions.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S26700914D41C612B"), originalMessage => new InvalidOperationException(originalMessage));
             if (width != expectedWidth || height != expectedHeight)
-                throw new InvalidOperationException("Decoded cursor atlas dimensions differ from the active game resource.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S3378EE955D1FA4CD"), originalMessage => new InvalidOperationException(originalMessage));
             var pixels = file.TextureBuffer.Filter(mip: 0, z: 0, format: TexFile.TextureFormat.B8G8R8A8).RawData;
-            if (pixels.Length != checked(width * height * 4)) throw new InvalidOperationException("Invalid cursor pixels.");
+            if (pixels.Length != checked(width * height * 4)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2CEE0B15A02379F5"), originalMessage => new InvalidOperationException(originalMessage));
             var recolor = appearance.BaseColor != Vector4.One || appearance.OutlineColor != new Vector4(0, 0, 0, 1);
             return (width, height, pixels: recolor ? appearance.Recolor(pixels) : pixels);
         }, token).ConfigureAwait(false);
         IDalamudTextureWrap? wrap = null;
         var hardware = new List<CustomMouseHardwareCursor>(CustomMouseNativeArtwork.CursorTypeCount);
-        string? hardwareFailure = null;
+        UiMessage? hardwareFailure = null;
         try
         {
             wrap = await textures.CreateFromRawAsync(RawImageSpecification.Bgra32(decoded.width, decoded.height),
@@ -730,7 +728,7 @@ public sealed class CustomMouseService : IDisposable
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                hardwareFailure = ex.Message;
+                hardwareFailure = global::XASlave.Localization.UiMessage.FromException(ex);
                 foreach (var handle in hardware) handle.Dispose();
                 hardware.Clear();
                 log.Warning(ex, "[Custom Mouse] Native hardware cursor preparation failed; software cursor retained.");
@@ -1017,11 +1015,11 @@ public sealed class CustomMouseService : IDisposable
         log.Warning(ex, "[Custom Mouse] Native cursor override failed; original draw retained.");
     }
 
-    private void SetStatus(string value)
+    private void SetStatus(global::XASlave.Localization.UiMessage value)
     {
-        if (StatusText == value) return;
-        StatusText = value;
-        log.Information("[Custom Mouse] {Status}", value);
+        if (StatusText == value.Original) return;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, value);
+        log.Information("[Custom Mouse] {Status}", value.Original);
     }
 
     private void DisableHooks()
@@ -1049,7 +1047,7 @@ public sealed class CustomMouseService : IDisposable
         Array.Clear(roleArtworks);
         artworkReloadPaths.Clear();
         artworkPathsPending = true;
-        ArtworkStatusText = settings.UseCustomArtwork ? "Custom artwork will load when enabled." : "Game artwork";
+        ArtworkStatusText = global::XASlave.Localization.UiMessage.Store(ref uiArtworkStatusText, (settings.UseCustomArtwork ? global::XASlave.Localization.UiMessage.Key("SA58AC1BD56949C40") : global::XASlave.Localization.UiMessage.Key("S5744D0597F0C3DDA")));
         _ = CustomMouseHardwareCursor.TryDrainRetiredOnGameThread(out _);
     }
 
@@ -1086,7 +1084,7 @@ public sealed class CustomMouseService : IDisposable
         [FieldOffset(0x10)] public ulong Flags;
     }
 
-    private sealed record NativeAtlas(IDalamudTextureWrap Wrap, CustomMouseHardwareCursor[] HardwareCursors, string? HardwareFailure);
+    private sealed record NativeAtlas(IDalamudTextureWrap Wrap, CustomMouseHardwareCursor[] HardwareCursors, UiMessage? HardwareFailure);
 
     private sealed unsafe class Atlas(Task<NativeAtlas> pending, int preset, CancellationTokenSource cancellation) : IDisposable
     {
@@ -1095,7 +1093,7 @@ public sealed class CustomMouseService : IDisposable
         internal readonly int Preset = preset;
         private bool disposed;
         internal CustomMouseHardwareCursor[] HardwareCursors = [];
-        internal string? HardwareFailure;
+        internal UiMessage? HardwareFailure;
         internal IDalamudTextureWrap? Wrap;
         internal bool Failed;
         internal KernelTexture* Texture;
@@ -1104,7 +1102,7 @@ public sealed class CustomMouseService : IDisposable
         internal void Convert(ITextureProvider provider)
         {
             Texture = (KernelTexture*)provider.ConvertToKernelTexture(Wrap!, true);
-            if (Texture == null) throw new InvalidOperationException("Native texture conversion failed.");
+            if (Texture == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC0D37FE5E83D0893"), originalMessage => new InvalidOperationException(originalMessage));
         }
 
         public void Dispose()
@@ -1138,7 +1136,9 @@ public sealed class CustomMouseService : IDisposable
         internal bool Failed;
         internal int FrameIndex;
         internal long AnimationStartedAt;
-        internal string Status = "Loading cursor artwork...";
+        internal string Status = global::XASlave.Localization.UiLocale.Native("S86FAA7DB9C401EA0");
+        internal global::XASlave.Localization.UiMessage? StatusToken = global::XASlave.Localization.UiMessage.Key("S86FAA7DB9C401EA0");
+        internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(ref StatusToken, Status);
 
         public void Dispose()
         {
@@ -1164,13 +1164,13 @@ public sealed class CustomMouseService : IDisposable
         internal readonly nint[] NativeTextures;
         internal readonly bool PreservesPngColors;
         internal readonly CustomMouseHardwareCursor[] HardwareCursors;
-        internal readonly string? HardwareFailure;
+        internal readonly UiMessage? HardwareFailure;
         internal bool Ready { get; private set; }
         private readonly IDalamudTextureWrap[] wraps;
         private bool disposed;
 
         internal Artwork(CustomMouseArtwork model, IDalamudTextureWrap[] wraps, bool preservesPngColors,
-            CustomMouseHardwareCursor[] hardwareCursors, string? hardwareFailure)
+            CustomMouseHardwareCursor[] hardwareCursors, UiMessage? hardwareFailure)
         {
             Model = model;
             this.wraps = wraps;
@@ -1185,7 +1185,7 @@ public sealed class CustomMouseService : IDisposable
             for (var i = 0; i < wraps.Length; i++)
             {
                 NativeTextures[i] = provider.ConvertToKernelTexture(wraps[i], true);
-                if (NativeTextures[i] == 0) throw new InvalidOperationException("Custom cursor native texture conversion failed.");
+                if (NativeTextures[i] == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD543E11B3A356B1B"), originalMessage => new InvalidOperationException(originalMessage));
             }
             Ready = true;
         }

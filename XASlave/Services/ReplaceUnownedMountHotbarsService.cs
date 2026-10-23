@@ -29,7 +29,10 @@ public unsafe sealed class ReplaceUnownedMountHotbarsService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -37,7 +40,7 @@ public unsafe sealed class ReplaceUnownedMountHotbarsService : IDisposable
         {
             enabled = false;
             DisableHooks();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -49,7 +52,7 @@ public unsafe sealed class ReplaceUnownedMountHotbarsService : IDisposable
         EnsureInitialized();
         if (appearanceHook == null || executeHook == null)
         {
-            StatusText = "Unavailable - required hotbar hooks are missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S180B8DF2F7302141"));
             return false;
         }
 
@@ -63,14 +66,14 @@ public unsafe sealed class ReplaceUnownedMountHotbarsService : IDisposable
                 appearanceHook.Enable();
 
             enabled = true;
-            StatusText = "Enabled - unowned Mount hotbar slots display and execute Mount Roulette; saved hotbars are unchanged.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SF1D9B42F87C9094B"));
             return true;
         }
         catch (Exception ex)
         {
             enabled = false;
             DisableHooks();
-            StatusText = "Unavailable - failed to enable the required hotbar hooks.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SC0F14B1EAC544EE9"));
             log.Warning(ex, "[XASlave] Replace Unowned Mount Hotbars failed to enable its hooks.");
             return false;
         }
@@ -82,7 +85,7 @@ public unsafe sealed class ReplaceUnownedMountHotbarsService : IDisposable
         DisableHooks();
         DisposeHook(ref appearanceHook);
         DisposeHook(ref executeHook);
-        StatusText = "Disabled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
     }
 
     private void EnsureInitialized()

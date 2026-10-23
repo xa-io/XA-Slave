@@ -42,11 +42,13 @@ internal sealed class AutoRetainerInventoryOperation
 
     internal int TimeoutSeconds => kind == Kind.Discard ? 300 : 900;
     internal bool MayStillBeRunning { get; private set; }
-    internal string Status { get; private set; } = "Not started";
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("SBA35F0C47D862763");
+    internal string Status { get; private set; } = global::XASlave.Localization.UiLocale.Native("SBA35F0C47D862763");
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(statusMessage, Status);
 
     internal State Start()
     {
-        if (started) return Fail("The inventory pass was already started; it will not be dispatched twice.");
+        if (started) return Fail(global::XASlave.Localization.UiMessage.Key("S72926ABC181248E4"));
         started = true;
         startedAt = Environment.TickCount64;
         try
@@ -54,23 +56,23 @@ internal sealed class AutoRetainerInventoryOperation
             RequireFrameworkThread();
             if (!Plugin.ClientState.IsLoggedIn || !Plugin.PlayerState.IsLoaded || IsLoading()
                 || Plugin.PlayerState.ContentId == 0 || !isExpectedCharacter())
-                return Fail("The expected character is not ready for inventory operations.");
+                return Fail(global::XASlave.Localization.UiMessage.Key("SEBA42A0C409030F4"));
             contentId = Plugin.PlayerState.ContentId;
             provider = ResolveLoadedProvider();
             var providerType = provider.GetType();
             taskManagerField = providerType.GetField("TaskManager", InstanceBindings)
-                ?? throw new InvalidOperationException("AutoRetainer TaskManager contract is unavailable.");
+                ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S56883EFD71A5329A"), originalMessageText => new InvalidOperationException(originalMessageText));
             taskManager = taskManagerField.GetValue(provider)
-                ?? throw new InvalidOperationException("AutoRetainer TaskManager is unavailable.");
+                ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE310299F651182D7"), originalMessageText => new InvalidOperationException(originalMessageText));
             queueBusyProperty = taskManager.GetType().GetProperty("IsBusy", InstanceBindings);
             if (queueBusyProperty?.PropertyType != typeof(bool) || queueBusyProperty.GetMethod == null
                 || queueBusyProperty.GetIndexParameters().Length != 0)
-                throw new InvalidOperationException("AutoRetainer queue status contract is unsupported.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9A4F30B4AFFD12FA"), originalMessageText => new InvalidOperationException(originalMessageText));
             var assembly = providerType.Assembly;
             deliveryOperationField = assembly.GetType("AutoRetainer.Modules.GcHandin.AutoGCHandin")?
                 .GetField("Operation", StaticBindings);
             if (deliveryOperationField?.FieldType != typeof(bool))
-                throw new InvalidOperationException("AutoRetainer delivery status contract is unsupported.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S34A9F5C34BBC6135"), originalMessageText => new InvalidOperationException(originalMessageText));
 
             var taskTypeName = kind == Kind.Discard
                 ? "AutoRetainer.Scheduler.Tasks.TaskRecursiveItemDiscard"
@@ -80,9 +82,9 @@ internal sealed class AutoRetainerInventoryOperation
             var method = assembly.GetType(taskTypeName)?.GetMethod(methodName, StaticBindings, null, parameterTypes, null);
             if (method == null || method.ContainsGenericParameters
                 || method.ReturnType != (kind == Kind.Discard ? typeof(void) : typeof(bool)))
-                throw new InvalidOperationException("AutoRetainer inventory enqueue contract is unsupported.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S5FAF1F07E1B224A7"), originalMessageText => new InvalidOperationException(originalMessageText));
 
-            if (ReadBusy()) return Fail("AutoRetainer or Lifestream is already busy; inventory work was not queued.");
+            if (ReadBusy()) return Fail(global::XASlave.Localization.UiMessage.Key("S2E18C0ABBF462EB6"));
             ValidateSession();
             // A provider can enqueue work and then throw. Retain this uncertainty until
             // idle has been positively observed, including when reflection invocation fails.
@@ -91,7 +93,7 @@ internal sealed class AutoRetainerInventoryOperation
             if (kind == Kind.ExpertDelivery && accepted is not true)
             {
                 MayStillBeRunning = false;
-                return Fail("AutoRetainer rejected Expert Delivery; check this character's GC and delivery settings.");
+                return Fail(global::XASlave.Localization.UiMessage.Key("S224B6E0CF0130256"));
             }
             if (kind == Kind.Discard)
             {
@@ -100,24 +102,24 @@ internal sealed class AutoRetainerInventoryOperation
                 noDiscardWorkQueued = !ReadQueueBusy();
                 if (noDiscardWorkQueued) MayStillBeRunning = false;
             }
-            Status = noDiscardWorkQueued ? "AutoRetainer queued no discard work; waiting for provider idle." : "AutoRetainer accepted the inventory pass.";
+            Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (noDiscardWorkQueued ? global::XASlave.Localization.UiMessage.Key("S8BF20163B1C330DB") : global::XASlave.Localization.UiMessage.Key("S7D3C0F2AA696405E")));
             return state;
         }
         catch (Exception ex)
         {
-            return Fail($"AutoRetainer inventory start failed: {FailureMessage(ex)}");
+            return Fail(global::XASlave.Localization.UiMessage.Format("SABE5FCE7BE0EAD27" , FailureMessage(ex)));
         }
     }
 
     internal State Poll()
     {
         if (state != State.Running) return state;
-        if (!started) return Fail("The inventory pass has not been started.");
+        if (!started) return Fail(global::XASlave.Localization.UiMessage.Key("SF01F6BB82D6B214F"));
         try
         {
             ValidateSession();
             if (Environment.TickCount64 - startedAt >= TimeoutSeconds * 1000L)
-                return Fail($"AutoRetainer inventory pass exceeded its {TimeoutSeconds}-second limit.");
+                return Fail(global::XASlave.Localization.UiMessage.Format("S8AE94E7BB4E81DF9" , TimeoutSeconds));
             // AR 4.6.2.11 queues GCContinuation synchronously and sets Operation before
             // the initiating queue task returns. Closing, purchases and redelivery are
             // queued synchronously as Operation ends. Check every ownership indicator;
@@ -132,14 +134,12 @@ internal sealed class AutoRetainerInventoryOperation
             if (Environment.TickCount64 - idleSince.Value < IdleSettleMilliseconds)
                 return State.Running;
             MayStillBeRunning = false;
-            Status = noDiscardWorkQueued
-                ? "Discard pass finished: AutoRetainer queued no work and is idle."
-                : "Inventory pass finished: AutoRetainer and Lifestream are idle; provider caps and protection settings still apply.";
+            Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (noDiscardWorkQueued ? global::XASlave.Localization.UiMessage.Key("SCB1E1D82A8531A16") : global::XASlave.Localization.UiMessage.Key("SEB0EFD77C6624EBD")));
             return state = State.Finished;
         }
         catch (Exception ex)
         {
-            return Fail($"AutoRetainer inventory monitoring failed: {FailureMessage(ex)}");
+            return Fail(global::XASlave.Localization.UiMessage.Format("S79ABA54A7A1FBFC3" , FailureMessage(ex)));
         }
     }
 
@@ -147,43 +147,43 @@ internal sealed class AutoRetainerInventoryOperation
     {
         RequireFrameworkThread();
         if (!Plugin.ClientState.IsLoggedIn || contentId == 0 || Plugin.PlayerState.ContentId != contentId)
-            throw new InvalidOperationException("The character logged out or the player session changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S41B5C4FCC4013D32"), originalMessageText => new InvalidOperationException(originalMessageText));
         // Provider travel can temporarily remove the local actor. Keep observing the
         // same logged-in content ID during that load, and never complete while loading.
         if (!IsLoading() && (!Plugin.PlayerState.IsLoaded || !isExpectedCharacter()))
-            throw new InvalidOperationException("The expected character is no longer loaded.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD5BD2CAA4C0BAD34"), originalMessageText => new InvalidOperationException(originalMessageText));
         if (!ReferenceEquals(ResolveLoadedProvider(), provider)
             || !ReferenceEquals(taskManagerField?.GetValue(provider), taskManager))
-            throw new InvalidOperationException("The AutoRetainer instance or task manager changed during the pass.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S5E7E1DA8FEB9E741"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     private bool ReadBusy()
     {
         if (!ipcClient.TryGetAutoRetainerBusy(out var providerBusy)
             || !ipcClient.TryGetLifestreamBusy(out var travelBusy))
-            throw new InvalidOperationException("AutoRetainer or Lifestream busy status is unavailable.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SB84A4D33B108B254"), originalMessageText => new InvalidOperationException(originalMessageText));
         var queueBusy = ReadQueueBusy();
         if (deliveryOperationField?.GetValue(null) is not bool deliveryBusy)
-            throw new InvalidOperationException("AutoRetainer delivery status is unavailable.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S817DA0C8B71FE1B2"), originalMessageText => new InvalidOperationException(originalMessageText));
         return providerBusy || travelBusy || queueBusy || deliveryBusy;
     }
 
     private bool ReadQueueBusy()
     {
         if (queueBusyProperty?.GetValue(taskManager) is not bool busy)
-            throw new InvalidOperationException("AutoRetainer queue status is unavailable.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6BA5A3CC277B40A7"), originalMessageText => new InvalidOperationException(originalMessageText));
         return busy;
     }
 
     private static object ResolveLoadedProvider()
     {
         if (!Plugin.PluginInterface.InstalledPlugins.Any(x => x.InternalName == "AutoRetainer" && x.IsLoaded))
-            throw new InvalidOperationException("AutoRetainer is not loaded.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SB291C74355DC1094"), originalMessageText => new InvalidOperationException(originalMessageText));
         var instance = AutoRetainerUiReflectionService.TryGetAutoRetainerPluginInstance(allowAssemblyFallback: false);
         if (instance == null || instance.GetType().FullName != "AutoRetainer.AutoRetainer"
             || instance.GetType().Assembly.GetName().Name != "AutoRetainer"
             || !ReferenceEquals(instance.GetType().GetField("P", StaticBindings)?.GetValue(null), instance))
-            throw new InvalidOperationException("The live AutoRetainer instance could not be verified.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S061603E1AC1769BD"), originalMessageText => new InvalidOperationException(originalMessageText));
         return instance;
     }
 
@@ -193,15 +193,15 @@ internal sealed class AutoRetainerInventoryOperation
     private static void RequireFrameworkThread()
     {
         if (!Plugin.Framework.IsInFrameworkUpdateThread)
-            throw new InvalidOperationException("Inventory operations require the framework update thread.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S3D27D9EF9AF13D87"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
-    private State Fail(string message)
+    private State Fail(global::XASlave.Localization.UiMessage message)
     {
-        Status = message;
+        Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, message);
         return state = State.Failed;
     }
 
-    private static string FailureMessage(Exception ex)
-        => (ex is TargetInvocationException invocation ? invocation.InnerException ?? ex : ex).Message;
+    private static global::XASlave.Localization.UiMessage FailureMessage(Exception ex)
+        => global::XASlave.Localization.UiMessage.FromException(ex is TargetInvocationException invocation ? invocation.InnerException ?? ex : ex);
 }

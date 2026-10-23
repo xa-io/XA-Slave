@@ -117,7 +117,10 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
         bool IsVisible,
         string Detail);
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -127,7 +130,7 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
             dialogueMonitorUntilUtc = DateTime.MinValue;
             lastDialogueSeenUtc = DateTime.MinValue;
             UpdateSubscription();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -135,7 +138,7 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
         {
             enabled = true;
             UpdateSubscription();
-            StatusText = "Enabled - waits for Dialogue/SelectOk, then monitors lobby/networking errors and NoKill for 10 seconds.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S1EA7842F3982B6F9"));
             return true;
         }
         catch (Exception ex)
@@ -143,7 +146,7 @@ public sealed class LobbyErrorAutoCloseService : IDisposable
             enabled = false;
             temporaryMonitorUntilUtc = DateTime.MinValue;
             UpdateSubscription();
-            StatusText = "Unavailable - failed to arm the lobby Dialogue monitor.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD9B15BFB3D337D7E"));
             log.Warning(ex, "[XASlave] Failed to enable Auto Close Lobby Errors.");
             return false;
         }

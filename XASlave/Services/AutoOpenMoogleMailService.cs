@@ -49,14 +49,20 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
     public int KnownLetterCount => knownLetterCount < 0 ? 0 : knownLetterCount;
     public int KnownNewLetterCount => knownNewLetterCount < 0 ? 0 : knownNewLetterCount;
     public int KnownAttachmentCount => knownAttachmentCount < 0 ? 0 : knownAttachmentCount;
-    public string PendingOperationText => pendingOperation == null
-        ? "Idle"
-        : $"{pendingOperation.Label} ({pendingOperation.ProcessedCount}/{pendingOperation.TargetIndices.Count})";
+    internal global::XASlave.Localization.UiMessage PendingOperationTextMessage => pendingOperation == null ? global::XASlave.Localization.UiMessage.Key("SAB0171CA0494D441") : global::XASlave.Localization.UiMessage.Format("S8B4157F20FD802BB", global::XASlave.Localization.UiMessage.Authored(pendingOperation.Label), pendingOperation.ProcessedCount, pendingOperation.TargetIndices.Count);
+    public string PendingOperationText => PendingOperationTextMessage.Original;
+    internal string LocalizedPendingOperationText => PendingOperationTextMessage.Display;
     public int CompletedOperationCount { get; private set; }
     public int LastProcessedLetterCount { get; private set; }
     public bool CanQueueManualOperation => enabled && pendingOperation == null;
@@ -73,14 +79,14 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
             enabled = false;
             pendingOperation = null;
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         enabled = true;
         RefreshKnownCounts();
         Subscribe();
-        StatusText = BuildStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
         return true;
     }
 
@@ -94,7 +100,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
     public bool TryOpenLetterList()
     {
         if (!enabled)
-            return RejectDisabledManualAction("the Letter List was not opened");
+            return RejectDisabledManualAction(global::XASlave.Localization.UiMessage.Key("S868C9E54743A15D4"));
 
         return TryOpenLetterListCore();
     }
@@ -110,32 +116,32 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         {
             if (AddonHelper.IsAddonVisible("LetterList"))
             {
-                LastActionText = $"Last action: Letter List was already open at {DateTime.Now:HH:mm:ss}.";
+                LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S865A73E3885629D0", DateTime.Now));
                 return true;
             }
 
             var agentModule = AgentModule.Instance();
             if (agentModule == null)
             {
-                LastActionText = $"Last action: failed to resolve AgentModule for Letter List at {DateTime.Now:HH:mm:ss}.";
+                LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SA7245103392100DF", DateTime.Now));
                 return false;
             }
 
             var agent = agentModule->GetAgentByInternalId(LetterListAgentId);
             if (agent == null)
             {
-                LastActionText = $"Last action: failed to resolve the Letter List agent at {DateTime.Now:HH:mm:ss}.";
+                LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S40C61DF46B841FD9", DateTime.Now));
                 return false;
             }
 
             agent->Show();
-            LastActionText = $"Last action: requested the Letter List window at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S93039AFE7A1BB94F", DateTime.Now));
             return true;
         }
         catch (Exception ex)
         {
             log.Warning(ex, "[XASlave] Auto Open Moogle Mail failed while trying to open Letter List.");
-            LastActionText = $"Last action: opening Letter List threw an exception at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S95515292EE829B7A", DateTime.Now));
             return false;
         }
     }
@@ -143,14 +149,14 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
     public bool QueueDeleteAllLetters()
     {
         return RunBatchDeleteOperation(
-            "Deleting all opened letters",
+            global::XASlave.Localization.UiLocale.Native("SB9300B3F10B553E5"),
             letter => letter.Timestamp != 0 && !HasAttachments(letter));
     }
 
     public bool QueueDeleteNonPlayerLetters()
     {
         return RunBatchDeleteOperation(
-            "Deleting opened NPC letters",
+            global::XASlave.Localization.UiLocale.Native("SC56925D351163189"),
             letter => letter.Timestamp != 0 && letter.SenderContentId < NonPlayerSenderThreshold && !HasAttachments(letter));
     }
 
@@ -158,7 +164,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
     {
         return QueueLetterOperation(
             PendingOperationKind.ClaimAttachments,
-            "Claiming all letter attachments",
+            global::XASlave.Localization.UiLocale.Native("S768EF0FD634990FB"),
             HasAttachments,
             sortDescending: false,
             deleteAllWhenFinished: deleteAllWhenFinished);
@@ -167,17 +173,17 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
     public bool QueueRequestDelivery()
     {
         if (!enabled)
-            return RejectDisabledManualAction("the delivery request was not queued");
+            return RejectDisabledManualAction(global::XASlave.Localization.UiMessage.Key("S84E18D53C48AB11E"));
 
         if (pendingOperation != null)
         {
-            LastActionText = $"Last action: another mail operation is already running ({pendingOperation.Label}) at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S398BACA841BEE876", global::XASlave.Localization.UiMessage.Authored(pendingOperation.Label), DateTime.Now));
             return false;
         }
 
-        pendingOperation = new PendingOperation(PendingOperationKind.RequestDelivery, "Requesting delivery", []);
+        pendingOperation = new PendingOperation(PendingOperationKind.RequestDelivery, global::XASlave.Localization.UiLocale.Native("S708C4E4FF9E6B46C"), []);
         LastProcessedLetterCount = 0;
-        LastActionText = $"Last action: queued a moogle delivery request at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S56535DE92D29B132", DateTime.Now));
         return true;
     }
 
@@ -185,7 +191,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
     {
         if (pendingOperation == null)
         {
-            LastActionText = $"Last action: no Moogle Mail operation was running at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S85A2E768EEE1F4EE", DateTime.Now));
             return false;
         }
 
@@ -196,7 +202,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
             AddonHelper.ClickYesNo(false, closeAfter: true);
 
         CloseLetterViewer();
-        LastActionText = $"Last action: stopped {label.ToLowerInvariant()} at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S76F3FB3419BDC65B", global::XASlave.Localization.UiMessage.Authored(label.ToLowerInvariant()), DateTime.Now));
         return true;
     }
 
@@ -227,7 +233,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         if (operationActive)
         {
             var stopWidth = (OverlayButtonWidth * OverlayButtonsPerRow) + (ImGui.GetStyle().ItemSpacing.X * (OverlayButtonsPerRow - 1));
-            if (DrawOverlayButton("Stop", "Stop", stopWidth))
+            if (DrawOverlayButton(global::XASlave.Localization.UiLocale.Get("SCAE7D57BC067A514"), "Stop", stopWidth))
             {
                 StopPendingOperation();
                 ImGui.End();
@@ -239,15 +245,15 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         if (disableActions)
             ImGui.BeginDisabled();
 
-        if (DrawOverlayButton("Take all", "TakeAll"))
+        if (DrawOverlayButton(global::XASlave.Localization.UiLocale.Get("S680FF55706A1AB03"), "TakeAll"))
             QueueClaimAttachments(Plugin.Instance?.Configuration.AutoOpenMoogleMailDeleteAllWhenFinished ?? false);
 
         ImGui.SameLine();
-        if (DrawOverlayButton("Delete all", "DeleteAll"))
+        if (DrawOverlayButton(global::XASlave.Localization.UiLocale.Get("S978111835DFADD7A"), "DeleteAll"))
             QueueDeleteAllLetters();
 
         ImGui.SameLine();
-        if (DrawOverlayButton("Delete NPC", "DeleteNpc"))
+        if (DrawOverlayButton(global::XASlave.Localization.UiLocale.Get("S7164BC1579A8D874"), "DeleteNpc"))
             QueueDeleteNonPlayerLetters();
 
         if (disableActions)
@@ -287,16 +293,16 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         return clicked;
     }
 
-    private bool RejectDisabledManualAction(string skippedAction)
+    private bool RejectDisabledManualAction(global::XASlave.Localization.UiMessage skippedAction)
     {
-        StatusText = "Unavailable - enable Auto Open Moogle Mail before using it.";
-        LastActionText = $"Last action: Auto Open Moogle Mail is disabled, so {skippedAction} at {DateTime.Now:HH:mm:ss}.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SF2800DC42005260E"));
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S50903BAEE59D4C45", skippedAction, DateTime.Now));
         return false;
     }
 
-    private string BuildStatusText()
+    private global::XASlave.Localization.UiMessage BuildStatusText()
     {
-        return "Enabled.";
+        return global::XASlave.Localization.UiMessage.Key("SB389D56C1FCEDB91");
     }
 
     private bool TryGetLetterListOverlayAnchor(out Vector2 position)
@@ -363,7 +369,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         catch (Exception ex)
         {
             log.Warning(ex, "[XASlave] Auto Open Moogle Mail failed while processing the framework update.");
-            AbortPendingOperation("processing threw an exception");
+            AbortPendingOperation(global::XASlave.Localization.UiMessage.Key("SE1AABDF928459893"));
         }
     }
 
@@ -389,13 +395,13 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
 
         if (!SendLetterListEvent(9, 0))
         {
-            RetryOrAbort("failed to request delivery through AgentId.Letter");
+            RetryOrAbort(global::XASlave.Localization.UiMessage.Key("S4966D27A2B2749B9"));
             return;
         }
 
         CompletedOperationCount++;
         LastProcessedLetterCount = 0;
-        LastActionText = $"Last action: requested delivery mail at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S623F94CB07B3CBA5", DateTime.Now));
         pendingOperation = null;
     }
 
@@ -429,52 +435,52 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
                 pendingOperation.ConfirmedCurrentPrompt = false;
                 if (!SendLetterListEvent(0, 0, targetIndex, 0, 1))
                 {
-                    RetryOrAbort($"failed to select letter index {targetIndex} for attachment claim");
+                    RetryOrAbort(global::XASlave.Localization.UiMessage.Format("S5D7AE361B26E0B94", targetIndex));
                     return;
                 }
 
                 pendingOperation.Stage = PendingOperationStage.OpeningLetter;
                 pendingOperation.ExecuteAtUtc = DateTime.UtcNow.AddMilliseconds(OpenLetterDelayMs);
                 pendingOperation.FailureCount = 0;
-                LastActionText = $"Last action: selected letter index {targetIndex} to claim attachments at {DateTime.Now:HH:mm:ss}.";
+                LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S4436CA83167F8468", targetIndex, DateTime.Now));
                 return;
             }
             case PendingOperationStage.OpeningLetter:
             {
                 if (!SendOpenLetterEvent())
                 {
-                    RetryOrAbort($"failed to open letter index {pendingOperation.CurrentTargetIndex} for attachment claim");
+                    RetryOrAbort(global::XASlave.Localization.UiMessage.Format("S1B196C9BA736B2FD", pendingOperation.CurrentTargetIndex));
                     return;
                 }
 
                 pendingOperation.Stage = PendingOperationStage.WaitingForViewer;
                 pendingOperation.ExecuteAtUtc = DateTime.UtcNow.AddMilliseconds(LetterViewerDelayMs);
                 pendingOperation.FailureCount = 0;
-                LastActionText = $"Last action: opened letter index {pendingOperation.CurrentTargetIndex} to claim attachments at {DateTime.Now:HH:mm:ss}.";
+                LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SE695D06217504F3D", pendingOperation.CurrentTargetIndex, DateTime.Now));
                 return;
             }
             case PendingOperationStage.WaitingForViewer:
             {
-                if (WaitForSelectYesnoToClear("letter open confirmation"))
+                if (WaitForSelectYesnoToClear(global::XASlave.Localization.UiMessage.Key("S05560C637E0B1488")))
                     return;
 
                 if (AddonHelper.IsAddonVisible("LetterEditor"))
                 {
                     AddonHelper.CloseAddon("LetterEditor");
-                    AbortPendingOperation("opened LetterEditor instead of LetterViewer");
+                    AbortPendingOperation(global::XASlave.Localization.UiMessage.Key("S7361B0118D6B7E1F"));
                     return;
                 }
 
                 var viewer = AddonHelper.GetAddon("LetterViewer");
                 if (viewer == null || !viewer->IsVisible || !viewer->IsReady)
                 {
-                    RetryOrAbort("LetterViewer did not become ready");
+                    RetryOrAbort(global::XASlave.Localization.UiMessage.Key("S2AB2198451F44F59"));
                     return;
                 }
 
                 if (!SendLetterViewEvent(0, 1))
                 {
-                    RetryOrAbort("failed to submit the LetterView attachment claim event");
+                    RetryOrAbort(global::XASlave.Localization.UiMessage.Key("S6550BB868B6609D0"));
                     return;
                 }
 
@@ -483,7 +489,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
                 pendingOperation.Stage = PendingOperationStage.WaitingForAttachmentTransfer;
                 pendingOperation.ExecuteAtUtc = DateTime.UtcNow.AddMilliseconds(AttachmentTransferDelayMs);
                 pendingOperation.FailureCount = 0;
-                LastActionText = $"Last action: claimed attachments from letter index {pendingOperation.CurrentTargetIndex} at {DateTime.Now:HH:mm:ss}.";
+                LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S9C7EEE196536A77D", pendingOperation.CurrentTargetIndex, DateTime.Now));
                 return;
             }
             case PendingOperationStage.WaitingForAttachmentTransfer:
@@ -494,7 +500,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
                     {
                         if (!AddonHelper.ClickYesNo(true, closeAfter: false))
                         {
-                            RetryOrAbort("failed to confirm the attachment claim confirmation");
+                            RetryOrAbort(global::XASlave.Localization.UiMessage.Key("SD74FFE8609488ABC"));
                             return;
                         }
 
@@ -527,7 +533,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
                 var viewer = AddonHelper.GetAddon("LetterViewer");
                 if (viewer != null && viewer->IsVisible)
                 {
-                    RetryOrAbort("LetterViewer did not close after attachment claim");
+                    RetryOrAbort(global::XASlave.Localization.UiMessage.Key("SCAFEA3D4CC52B2DD"));
                     return;
                 }
 
@@ -549,7 +555,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         }
     }
 
-    private bool WaitForSelectYesnoToClear(string promptDescription)
+    private bool WaitForSelectYesnoToClear(global::XASlave.Localization.UiMessage promptDescription)
     {
         if (pendingOperation == null || !AddonHelper.IsAddonVisible("SelectYesno"))
             return false;
@@ -558,7 +564,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         {
             if (!AddonHelper.ClickYesNo(true, closeAfter: false))
             {
-                RetryOrAbort($"failed to confirm the {promptDescription}");
+                RetryOrAbort(global::XASlave.Localization.UiMessage.Format("SBF2F2E301678DC64", promptDescription));
                 return true;
             }
 
@@ -660,7 +666,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
             return false;
         }
 
-        RetryOrAbort("failed to open Letter List");
+        RetryOrAbort(global::XASlave.Localization.UiMessage.Key("S2A05D59024B21C99"));
         return false;
     }
 
@@ -672,17 +678,17 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         bool deleteAllWhenFinished = false)
     {
         if (!enabled)
-            return RejectDisabledManualAction($"'{label}' was not queued");
+            return RejectDisabledManualAction(global::XASlave.Localization.UiMessage.Format("S436C930DCD82AA15", global::XASlave.Localization.UiMessage.Authored(label)));
 
         if (pendingOperation != null)
         {
-            LastActionText = $"Last action: another mail operation is already running ({pendingOperation.Label}) at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S398BACA841BEE876", global::XASlave.Localization.UiMessage.Authored(pendingOperation.Label), DateTime.Now));
             return false;
         }
 
         if (!TryFindTargetIndices(predicate, out var indices))
         {
-            LastActionText = $"Last action: no letters matched '{label}' at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S2A172FAA485C348E", global::XASlave.Localization.UiMessage.Authored(label), DateTime.Now));
             return false;
         }
 
@@ -695,18 +701,18 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
             DeleteAllWhenFinished = deleteAllWhenFinished,
         };
         LastProcessedLetterCount = 0;
-        LastActionText = $"Last action: queued '{label}' for {orderedIndices.Count} letters at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S744B9A098DA40D9F", global::XASlave.Localization.UiMessage.Authored(label), orderedIndices.Count, DateTime.Now));
         return true;
     }
 
     private bool RunBatchDeleteOperation(string label, Predicate<InfoProxyLetter.Letter> predicate)
     {
         if (!enabled)
-            return RejectDisabledManualAction($"'{label}' was not queued");
+            return RejectDisabledManualAction(global::XASlave.Localization.UiMessage.Format("S436C930DCD82AA15", global::XASlave.Localization.UiMessage.Authored(label)));
 
         if (pendingOperation != null)
         {
-            LastActionText = $"Last action: another mail operation is already running ({pendingOperation.Label}) at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S398BACA841BEE876", global::XASlave.Localization.UiMessage.Authored(pendingOperation.Label), DateTime.Now));
             return false;
         }
 
@@ -715,7 +721,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
 
         if (!TryFindTargetIndices(predicate, out var indices))
         {
-            LastActionText = $"Last action: no letters matched '{label}' at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S2A172FAA485C348E", global::XASlave.Localization.UiMessage.Authored(label), DateTime.Now));
             return false;
         }
 
@@ -724,7 +730,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         {
             if (!SendLetterListEvent(0, 0, index, 0, 1) || !SendLetterListEvent(4, 0))
             {
-                LastActionText = $"Last action: '{label}' stopped after {processed} letters because letter index {index} could not be deleted at {DateTime.Now:HH:mm:ss}.";
+                LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S6EFF6AFBFF81C339", global::XASlave.Localization.UiMessage.Authored(label), processed, index, DateTime.Now));
                 return false;
             }
 
@@ -733,7 +739,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
 
         CompletedOperationCount++;
         LastProcessedLetterCount = processed;
-        LastActionText = $"Last action: completed {label.ToLowerInvariant()} for {processed} letters at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S4A02E2F66E0ABA35", global::XASlave.Localization.UiMessage.Authored(label.ToLowerInvariant()), processed, DateTime.Now));
         return true;
     }
 
@@ -775,7 +781,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         return letter.Timestamp != 0 && predicate(letter);
     }
 
-    private void RetryOrAbort(string failureReason)
+    private void RetryOrAbort(global::XASlave.Localization.UiMessage failureReason)
     {
         if (pendingOperation == null)
             return;
@@ -790,11 +796,11 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
         pendingOperation.ExecuteAtUtc = DateTime.UtcNow.AddMilliseconds(RetryDelayMs);
     }
 
-    private void AbortPendingOperation(string failureReason)
+    private void AbortPendingOperation(global::XASlave.Localization.UiMessage failureReason)
     {
-        var label = pendingOperation?.Label ?? "mail operation";
+        var label = pendingOperation?.Label ?? global::XASlave.Localization.UiLocale.Native("S595C22BBA252CC7A");
         pendingOperation = null;
-        LastActionText = $"Last action: {label} aborted because it {failureReason} at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S8CD99EEA0306673E", global::XASlave.Localization.UiMessage.Authored(label), failureReason, DateTime.Now));
     }
 
     private void CompletePendingOperation()
@@ -804,7 +810,7 @@ public unsafe sealed class AutoOpenMoogleMailService : IDisposable
 
         CompletedOperationCount++;
         LastProcessedLetterCount = pendingOperation.ProcessedCount;
-        LastActionText = $"Last action: completed {pendingOperation.Label.ToLowerInvariant()} for {pendingOperation.ProcessedCount} letters at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S4A02E2F66E0ABA35", global::XASlave.Localization.UiMessage.Authored(pendingOperation.Label.ToLowerInvariant()), pendingOperation.ProcessedCount, DateTime.Now));
         var deleteAllWhenFinished = pendingOperation.Kind == PendingOperationKind.ClaimAttachments && pendingOperation.DeleteAllWhenFinished;
         pendingOperation = null;
 

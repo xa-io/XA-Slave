@@ -32,7 +32,10 @@ public unsafe sealed class MsqProgressDisplayService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -43,19 +46,19 @@ public unsafe sealed class MsqProgressDisplayService : IDisposable
         {
             enabled = false;
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         if (!EnsureQuestCache())
         {
-            StatusText = "Unavailable - quest sheet cache could not be prepared.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S1DFDDE6C19495180"));
             return false;
         }
 
         Subscribe();
         enabled = true;
-        StatusText = "Enabled - Scenario Tree shows remaining all-MSQ count and completion percentage.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S4555DBE1934615B4"));
         TryRefreshScenarioTree();
         return true;
     }

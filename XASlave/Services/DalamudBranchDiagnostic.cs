@@ -25,13 +25,31 @@ internal sealed record DalamudBranchSnapshot(
     string ClientStructsGitHash,
     string Detail)
 {
+
+    internal global::XASlave.Localization.UiMessage BranchMessage => AutoRetainerUiMessagePresentation.Get(Branch);
+    internal global::XASlave.Localization.UiMessage DalamudVersionMessage => AutoRetainerUiMessagePresentation.Get(DalamudVersion);
+    internal global::XASlave.Localization.UiMessage ClientStructsVersionMessage => AutoRetainerUiMessagePresentation.Get(ClientStructsVersion);
+    internal global::XASlave.Localization.UiMessage ClientStructsGitHashMessage => AutoRetainerUiMessagePresentation.Get(ClientStructsGitHash);
+    internal global::XASlave.Localization.UiMessage DetailMessage => AutoRetainerUiMessagePresentation.Get(Detail);
+    internal global::XASlave.Localization.UiMessage KindMessage => Kind switch
+    {
+        DalamudBranchKind.Unknown => global::XASlave.Localization.UiMessage.Key("SB764CDC0EAB71374"),
+        DalamudBranchKind.Release => global::XASlave.Localization.UiMessage.Key("SE020E3C67BD0C312"),
+        DalamudBranchKind.Staging => global::XASlave.Localization.UiMessage.Key("SA8E7AC92A1164AD8"),
+        DalamudBranchKind.ApiPreview => global::XASlave.Localization.UiMessage.Key("S69B080253A5A4067"),
+        DalamudBranchKind.Development => global::XASlave.Localization.UiMessage.Key("S21B6A798321A49F7"),
+        DalamudBranchKind.Other => global::XASlave.Localization.UiMessage.Key("SF97E9DA0E3B879F0"),
+        _ => global::XASlave.Localization.UiMessage.Value(Kind),
+    };
+
     internal bool IsRelease => Kind == DalamudBranchKind.Release;
 
-    internal string PolicyMessage => IsRelease
-        ? "Dalamud Release confirmed"
+    internal string PolicyMessage => PolicyMessagePresentation.Original;
+    internal global::XASlave.Localization.UiMessage PolicyMessagePresentation => IsRelease
+        ? global::XASlave.Localization.UiMessage.Key("S15C9573729DB7C13")
         : Kind == DalamudBranchKind.Unknown
-            ? "Cannot confirm Dalamud Release"
-            : "You are not on Dalamud Release";
+            ? global::XASlave.Localization.UiMessage.Key("SF413BBBED8F3E49F")
+            : global::XASlave.Localization.UiMessage.Key("S5DE23484A989E5D3");
 
     internal string ToReport() =>
         $"Dalamud Branch: {Branch}\n" +
@@ -56,32 +74,31 @@ internal static class DalamudBranchDiagnostic
     {
         var capturedUtc = DateTime.UtcNow;
         string? rawBranch = null;
-        var version = "Unavailable";
-        var clientStructsGitHash = "Unavailable";
+        var version = AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SCA184496974204A0"));
+        var clientStructsGitHash = AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SCA184496974204A0"));
         var kind = DalamudBranchKind.Unknown;
-        var detail = "Branch reported by the running Dalamud session. Release status does not verify private DLL dependency compatibility.";
+        var detail = AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SCA1E952AADAD33FC"));
 
         try
         {
             var info = pluginInterface.GetDalamudVersion();
             rawBranch = info.BetaTrack;
             kind = Classify(rawBranch);
-            version = info.Version.ToString();
-            clientStructsGitHash = string.IsNullOrWhiteSpace(info.GitHashClientStructs)
-                ? "Unavailable" : info.GitHashClientStructs;
+            version = AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Raw(info.Version.ToString()));
+            clientStructsGitHash = AutoRetainerUiMessagePresentation.Store((string.IsNullOrWhiteSpace(info.GitHashClientStructs) ? global::XASlave.Localization.UiMessage.Key("SCA184496974204A0") : global::XASlave.Localization.UiMessage.Raw(info.GitHashClientStructs)));
             if (kind == DalamudBranchKind.Unknown)
-                detail = "The running session did not report a branch. A custom launch or unavailable metadata cannot be treated as release.";
+                detail = AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S97EE7DAED18034CC"));
         }
         catch (Exception error)
         {
             // A failed capture must never keep an earlier successful release verdict.
             kind = DalamudBranchKind.Unknown;
-            detail = $"Branch detection failed: {error.GetType().Name}: {error.Message}";
+            detail = AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Format("S58602E3150030A09", error.GetType().Name, global::XASlave.Localization.UiMessage.FromException(error)));
         }
 
         var clientStructsVersion = ReadLoadedClientStructs();
         return new DalamudBranchSnapshot(capturedUtc, rawBranch,
-            string.IsNullOrWhiteSpace(rawBranch) ? "Unknown" : rawBranch.Trim().ToLowerInvariant(),
+            AutoRetainerUiMessagePresentation.Store((string.IsNullOrWhiteSpace(rawBranch) ? global::XASlave.Localization.UiMessage.Key("SB764CDC0EAB71374") : global::XASlave.Localization.UiMessage.Raw(rawBranch.Trim().ToLowerInvariant()))),
             kind, version, clientStructsVersion, clientStructsGitHash, detail);
     }
 
@@ -106,15 +123,15 @@ internal static class DalamudBranchDiagnostic
             var identities = AppDomain.CurrentDomain.GetAssemblies()
                 .Where(assembly => !assembly.IsDynamic
                     && string.Equals(assembly.GetName().Name, "FFXIVClientStructs", StringComparison.Ordinal))
-                .Select(assembly => $"{assembly.GetName().Version} (context: {AssemblyLoadContext.GetLoadContext(assembly)?.Name ?? "<unnamed>"})")
-                .OrderBy(identity => identity, StringComparer.Ordinal)
+                .Select(assembly => global::XASlave.Localization.UiMessage.Format("S7462756AF770C086", assembly.GetName().Version, (AssemblyLoadContext.GetLoadContext(assembly)?.Name is { } contextName ? global::XASlave.Localization.UiMessage.Raw(contextName) : global::XASlave.Localization.UiMessage.Key("SB42151CA1488F5E8"))))
+                .OrderBy(identity => identity.Original, StringComparer.Ordinal)
                 .ToArray();
-            return identities.Length == 0 ? "Not loaded" : string.Join("; ", identities);
+            return AutoRetainerUiMessagePresentation.Store(identities.Length == 0 ? global::XASlave.Localization.UiMessage.Key("S9B41BA20B8A3C870") : global::XASlave.Localization.UiMessage.Join("; ", identities));
         }
         catch (Exception error)
         {
             // Optional dependency reporting does not change the independently captured branch.
-            return $"Unavailable ({error.GetType().Name}: {error.Message})";
+            return AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Format("S07E75F84B9846061", error.GetType().Name, global::XASlave.Localization.UiMessage.FromException(error)));
         }
     }
 }

@@ -15,7 +15,24 @@ public readonly record struct XagmanSnapshotSaveVerification(
     XagmanSnapshotSaveState State,
     string Detail,
     DateTime SavedAtUtc,
-    DateTime RefreshedAtUtc);
+    DateTime RefreshedAtUtc)
+{
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<string, global::XASlave.Localization.UiMessage> Presentations = new();
+
+    internal XagmanSnapshotSaveVerification(XagmanSnapshotSaveState state, global::XASlave.Localization.UiMessage detail, DateTime savedAtUtc, DateTime refreshedAtUtc)
+        : this(state, Retain(detail), savedAtUtc, refreshedAtUtc) { }
+
+    internal global::XASlave.Localization.UiMessage DetailMessage => Detail != null && Presentations.TryGetValue(Detail, out var message)
+        ? message : global::XASlave.Localization.UiMessage.Raw(Detail ?? string.Empty);
+
+    private static string Retain(global::XASlave.Localization.UiMessage message)
+    {
+        var original = new string(message.Original.AsSpan());
+        if (original.Length > 0)
+            Presentations.AddOrUpdate(original, message);
+        return original;
+    }
+}
 
 public static class XagmanSnapshotSaveVerifier
 {
@@ -27,7 +44,7 @@ public static class XagmanSnapshotSaveVerifier
         DateTime requestedAtUtc)
     {
         if (string.IsNullOrWhiteSpace(resultJson))
-            return Waiting("XA Database has not returned a snapshot result yet.");
+            return Waiting(global::XASlave.Localization.UiMessage.Key("S37F92BB21DFA9176"));
 
         try
         {
@@ -37,18 +54,16 @@ public static class XagmanSnapshotSaveVerifier
                 || !TryReadBoolean(root, "Success", out var success)
                 || !TryReadBoolean(root, "Pending", out var pending))
             {
-                return Failed("XA Database returned an invalid snapshot result.");
+                return Failed(global::XASlave.Localization.UiMessage.Key("S707065AD3029875C"));
             }
 
             if (pending)
-                return Waiting("XA Database is refreshing and saving the post-trade snapshot.");
+                return Waiting(global::XASlave.Localization.UiMessage.Key("S09B01093B7059693"));
 
             var summary = TryReadString(root, "Summary");
             if (!success)
             {
-                return Failed(string.IsNullOrWhiteSpace(summary)
-                    ? "XA Database skipped or failed the post-trade snapshot save."
-                    : summary);
+                return Failed((string.IsNullOrWhiteSpace(summary) ? global::XASlave.Localization.UiMessage.Key("S2261B438DCF2C951") : global::XASlave.Localization.UiMessage.Raw(summary)));
             }
 
             if (!root.TryGetProperty("PayloadVersion", out var versionElement)
@@ -56,7 +71,7 @@ public static class XagmanSnapshotSaveVerifier
                 || !versionElement.TryGetInt32(out var payloadVersion)
                 || payloadVersion < MinimumPayloadVersion)
             {
-                return Failed($"XA Database snapshot result v{MinimumPayloadVersion}+ is required. Update XA Database before continuing Xagman.");
+                return Failed(global::XASlave.Localization.UiMessage.Format("S144500AA7330040A", MinimumPayloadVersion));
             }
 
             if (!root.TryGetProperty("ContentId", out var contentIdElement)
@@ -64,11 +79,11 @@ public static class XagmanSnapshotSaveVerifier
                 || !contentIdElement.TryGetUInt64(out var savedContentId)
                 || savedContentId != expectedContentId)
             {
-                return Failed("XA Database saved a different character than the owner currently being processed.");
+                return Failed(global::XASlave.Localization.UiMessage.Key("S1F5246BE5B6B2AFB"));
             }
 
             if (!TryReadUtc(root, "SavedAtUtc", out var savedAtUtc))
-                return Failed("XA Database did not return a valid snapshot save timestamp.");
+                return Failed(global::XASlave.Localization.UiMessage.Key("SD90020739896B633"));
 
             var normalizedRequestUtc = requestedAtUtc.Kind == DateTimeKind.Utc
                 ? requestedAtUtc
@@ -78,24 +93,24 @@ public static class XagmanSnapshotSaveVerifier
             // not rejected after its sub-second precision is intentionally removed.
             normalizedRequestUtc = normalizedRequestUtc.AddTicks(-(normalizedRequestUtc.Ticks % TimeSpan.TicksPerSecond));
             if (savedAtUtc < normalizedRequestUtc)
-                return Waiting("XA Database is still reporting the snapshot from before this request.");
+                return Waiting(global::XASlave.Localization.UiMessage.Key("S37036BCE680CEF34"));
 
             if (!TryReadUtc(root, "RefreshedAtUtc", out var refreshedAtUtc))
-                return Failed("XA Database did not prove that live inventory was refreshed before the snapshot save.");
+                return Failed(global::XASlave.Localization.UiMessage.Key("S3B84D79CE2292464"));
             if (refreshedAtUtc < normalizedRequestUtc)
-                return Failed("XA Database saved cached data without a post-request live inventory refresh.");
+                return Failed(global::XASlave.Localization.UiMessage.Key("S47DCC23C323683CB"));
             if (refreshedAtUtc > savedAtUtc)
-                return Failed("XA Database returned inconsistent refresh and save timestamps.");
+                return Failed(global::XASlave.Localization.UiMessage.Key("S16D06F34976DBE18"));
 
             return new XagmanSnapshotSaveVerification(
                 XagmanSnapshotSaveState.Succeeded,
-                string.IsNullOrWhiteSpace(summary) ? "Post-trade snapshot saved." : summary,
+                (string.IsNullOrWhiteSpace(summary) ? global::XASlave.Localization.UiMessage.Key("S709A940FDFC38567") : global::XASlave.Localization.UiMessage.Raw(summary)),
                 savedAtUtc,
                 refreshedAtUtc);
         }
         catch (JsonException ex)
         {
-            return Failed($"XA Database returned an unreadable snapshot result: {ex.Message}");
+            return Failed(global::XASlave.Localization.UiMessage.Format("SC6AEEA3B222A8326", global::XASlave.Localization.UiMessage.FromException(ex)));
         }
     }
 
@@ -129,9 +144,9 @@ public static class XagmanSnapshotSaveVerifier
                 out value);
     }
 
-    private static XagmanSnapshotSaveVerification Waiting(string detail)
+    private static XagmanSnapshotSaveVerification Waiting(global::XASlave.Localization.UiMessage detail)
         => new(XagmanSnapshotSaveState.Waiting, detail, DateTime.MinValue, DateTime.MinValue);
 
-    private static XagmanSnapshotSaveVerification Failed(string detail)
+    private static XagmanSnapshotSaveVerification Failed(global::XASlave.Localization.UiMessage detail)
         => new(XagmanSnapshotSaveState.Failed, detail, DateTime.MinValue, DateTime.MinValue);
 }

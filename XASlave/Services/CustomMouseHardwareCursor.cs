@@ -125,14 +125,14 @@ internal sealed class CustomMouseHardwareCursor : IDisposable
     {
         ArgumentNullException.ThrowIfNull(bgra);
         if (width is < 1 or > MaximumSourceDimension || height is < 1 or > MaximumSourceDimension)
-            throw new ArgumentOutOfRangeException(nameof(width), "Cursor source dimensions must be between 1 and 256 pixels.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SAFD04445F94BF42F"), originalMessage => new ArgumentOutOfRangeException(nameof(width), originalMessage));
         if (hotspotX < 0 || hotspotX >= width || hotspotY < 0 || hotspotY >= height)
-            throw new ArgumentOutOfRangeException(nameof(hotspotX), "Cursor hotspot must be inside its image.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SDEC8066B43AEFE06"), originalMessage => new ArgumentOutOfRangeException(nameof(hotspotX), originalMessage));
         if (!float.IsFinite(ratio) || ratio is < 0.1f or > 5f)
-            throw new ArgumentOutOfRangeException(nameof(ratio), "Cursor scale must be between 0.1x and 5x.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S73EAB4A970092CE6"), originalMessage => new ArgumentOutOfRangeException(nameof(ratio), originalMessage));
         if (pitch < checked(width * 4) || pitch > MaximumSourceDimension * 4 + 4096
             || bgra.Length != checked(pitch * height))
-            throw new ArgumentException("Cursor pixels must contain exactly the bounded positive-pitch BGRA image.", nameof(bgra));
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S668655DC4628490E"), originalMessage => new ArgumentException(originalMessage, nameof(bgra)));
         var scaledWidth = Math.Clamp((int)MathF.Round(width * ratio), 1, MaximumOutputDimension);
         var scaledHeight = Math.Clamp((int)MathF.Round(height * ratio), 1, MaximumOutputDimension);
         var scaledHotspotX = Math.Clamp((int)MathF.Round(hotspotX * ratio), 0, scaledWidth - 1);
@@ -228,7 +228,7 @@ internal sealed class CustomMouseHardwareCursor : IDisposable
         lock (RetirementSync)
         {
             if (reservedHandles >= MaximumHandles || reservedBytes + bytes > MaximumReservedBytes)
-                throw new InvalidOperationException("Custom hardware cursors exceed the 128-handle or 64 MiB budget.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1CEF1A00F77A2024"), originalMessage => new InvalidOperationException(originalMessage));
             reservedHandles++;
             reservedBytes += bytes;
         }
@@ -239,7 +239,11 @@ internal sealed class CustomMouseHardwareCursor : IDisposable
         lock (RetirementSync) { reservedHandles--; reservedBytes -= bytes; }
     }
 
-    private static Win32Exception NativeFailure(string operation) => new(Marshal.GetLastWin32Error(), operation + " failed.");
+    private static Win32Exception NativeFailure(string operation)
+    {
+        var errorCode = Marshal.GetLastWin32Error();
+        return global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Raw(operation), global::XASlave.Localization.UiMessage.Key("S6F6C0EDE58468D53")), originalMessage => new Win32Exception(errorCode, originalMessage));
+    }
 
     internal readonly record struct ScaledPixels(int Width, int Height, int HotspotX, int HotspotY, byte[] Bgra);
     private readonly record struct RetiredCursor(nint Handle, int Bytes);

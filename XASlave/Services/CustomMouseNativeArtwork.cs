@@ -20,13 +20,13 @@ internal static class CustomMouseNativeArtwork
         if (preset is < 0 or > 2) throw new ArgumentOutOfRangeException(nameof(preset));
         if (atlasWidth is < 1 or > 2048 || atlasHeight is < 1 or > 2048
             || atlasBgra.Length != checked(atlasWidth * atlasHeight * 4))
-            throw new InvalidDataException("Native cursor atlas dimensions or pixels are invalid.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S261914D636D704A9"), originalMessage => new InvalidDataException(originalMessage));
         var cellSize = 64 + 32 * preset;
         var extent = cellSize - 1; // Native quad width and UV extent both exclude the final padding texel.
         var left = cell % 4 * cellSize;
         var top = cell / 4 * cellSize;
         if (left + extent > atlasWidth || top + extent > atlasHeight)
-            throw new InvalidDataException("Native cursor cell does not fit the loaded atlas preset.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S89F3F69425610DC1"), originalMessage => new InvalidDataException(originalMessage));
         var pixels = new byte[checked(extent * extent * 4)];
         for (var row = 0; row < extent; row++)
             atlasBgra.AsSpan(((top + row) * atlasWidth + left) * 4, extent * 4)

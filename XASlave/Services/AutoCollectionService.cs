@@ -38,6 +38,9 @@ public sealed class AutoCollectionService : IDisposable
 
     public bool IsRunning => running;
     public string StatusText { get; private set; } = string.Empty;
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
     public IReadOnlyList<string> LogMessages => logMessages;
 
     public AutoCollectionService(Plugin plugin, ICondition condition, IFramework framework, IObjectTable objectTable, IPluginLog log)
@@ -101,28 +104,28 @@ public sealed class AutoCollectionService : IDisposable
         {
             steps.Add(new TaskStep
             {
-                Name = "Open Armoury Chest",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S53649CACF2611F56"),
                 OnEnter = () => ChatHelper.SendMessage("/armourychest"),
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(new TaskStep { Name = "Armoury Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SDAC2DC1DADA20909"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         // -- Saddlebag collection --
         if (doSaddlebag)
         {
-            steps.Add(new TaskStep { Name = "Open Saddlebag", OnEnter = () => OpenAgentWindow(AgentId.InventoryBuddy, "InventoryBuddy"), IsComplete = () => IsAddonReady("InventoryBuddy"), TimeoutSec = 3f });
-            steps.Add(new TaskStep { Name = "Read Saddlebag", IsComplete = () => !IsAddonReady("InventoryBuddy") || DelayComplete(1.0f), TimeoutSec = 2f });
-            steps.Add(new TaskStep { Name = "Close Saddlebag", OnEnter = () => CloseAddon("InventoryBuddy"), IsComplete = () => !IsAddonReady("InventoryBuddy"), TimeoutSec = 3f });
-            steps.Add(new TaskStep { Name = "Saddlebag Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SA2B7258D99B30DD3"), OnEnter = () => OpenAgentWindow(AgentId.InventoryBuddy, "InventoryBuddy"), IsComplete = () => IsAddonReady("InventoryBuddy"), TimeoutSec = 3f });
+            steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S9A0143089ADB4DE4"), IsComplete = () => !IsAddonReady("InventoryBuddy") || DelayComplete(1.0f), TimeoutSec = 2f });
+            steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S8A2B93B57C5613AE"), OnEnter = () => CloseAddon("InventoryBuddy"), IsComplete = () => !IsAddonReady("InventoryBuddy"), TimeoutSec = 3f });
+            steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S9C0C4DF158C10E1B"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         if (doJournal)
         {
             steps.Add(new TaskStep
             {
-                Name = "Open Journal",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SF7B51D61398CF038"),
                 OnEnter = () =>
                 {
                     AddLog("Opening Journal...");
@@ -131,10 +134,10 @@ public sealed class AutoCollectionService : IDisposable
                 IsComplete = () => IsAddonReady("Journal") || DelayComplete(2.0f),
                 TimeoutSec = 3f,
             });
-            steps.Add(new TaskStep { Name = "Journal Read Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S85732DC4FA199321"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
             steps.Add(new TaskStep
             {
-                Name = "Journal Save",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SE8299921A6AE18A8"),
                 ShouldSkip = () => onSave == null || !IsAddonReady("Journal"),
                 OnEnter = () =>
                 {
@@ -146,7 +149,7 @@ public sealed class AutoCollectionService : IDisposable
             });
             steps.Add(new TaskStep
             {
-                Name = "Journal Save Delay",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S1972610E01FD0B9A"),
                 ShouldSkip = () => onSave == null || !IsAddonReady("Journal"),
                 IsComplete = () => DelayComplete(0.5f),
                 TimeoutSec = 1f,
@@ -174,29 +177,29 @@ public sealed class AutoCollectionService : IDisposable
             }
             else
             {
-                steps.Add(new TaskStep { Name = "Open FC Window", OnEnter = () => OpenAgentWindow(AgentId.FreeCompany, "FreeCompany"), IsComplete = () => IsAddonReady("FreeCompany"), TimeoutSec = 5f });
-                steps.Add(new TaskStep { Name = "FC Load Delay", IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SB062952FD2A35F98"), OnEnter = () => OpenAgentWindow(AgentId.FreeCompany, "FreeCompany"), IsComplete = () => IsAddonReady("FreeCompany"), TimeoutSec = 5f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S320C84AE04E84E12"), IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
 
-                steps.Add(new TaskStep { Name = "Click Members Tab", OnEnter = () => { FireAddonCallback("FreeCompany", 1); ClickAddonNode("FreeCompany", 8); }, IsComplete = () => IsAddonReady("FreeCompanyMember") || DelayComplete(3.0f), TimeoutSec = 5f });
-                steps.Add(new TaskStep { Name = "Members Load Delay", IsComplete = () => DelayComplete(1.5f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S39F62D53ACFC42ED"), OnEnter = () => { FireAddonCallback("FreeCompany", 1); ClickAddonNode("FreeCompany", 8); }, IsComplete = () => IsAddonReady("FreeCompanyMember") || DelayComplete(3.0f), TimeoutSec = 5f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S53027077A76AC9C6"), IsComplete = () => DelayComplete(1.5f), TimeoutSec = 2f });
 
                 // IPC save after members tab - XA Database addon watcher will also trigger on close
-                steps.Add(new TaskStep { Name = "Save Members", OnEnter = () => onSave?.Invoke(), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S8DC43600493B2598"), OnEnter = () => onSave?.Invoke(), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
 
-                steps.Add(new TaskStep { Name = "Click Info Tab", OnEnter = () => { FireAddonCallback("FreeCompany", 3); ClickAddonNode("FreeCompany", 4); }, IsComplete = () => IsAddonReady("FreeCompanyStatus") || DelayComplete(3.0f), TimeoutSec = 5f });
-                steps.Add(new TaskStep { Name = "Status Load Delay", IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SAB2254CE34BA1273"), OnEnter = () => { FireAddonCallback("FreeCompany", 3); ClickAddonNode("FreeCompany", 4); }, IsComplete = () => IsAddonReady("FreeCompanyStatus") || DelayComplete(3.0f), TimeoutSec = 5f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SC66AD98A27551C47"), IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
 
-                steps.Add(new TaskStep { Name = "Click Housing Search", OnEnter = () => { if (IsAddonReady("FreeCompanyStatus")) ClickAddonNode("FreeCompanyStatus", 12); }, IsComplete = () => IsAddonReady("HousingSignBoard") || DelayComplete(3.0f), TimeoutSec = 5f });
-                steps.Add(new TaskStep { Name = "Housing Load Delay", IsComplete = () => DelayComplete(1.5f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SD1BE8023417A5B04"), OnEnter = () => { if (IsAddonReady("FreeCompanyStatus")) ClickAddonNode("FreeCompanyStatus", 12); }, IsComplete = () => IsAddonReady("HousingSignBoard") || DelayComplete(3.0f), TimeoutSec = 5f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S7B2949CEFDFA6F0F"), IsComplete = () => DelayComplete(1.5f), TimeoutSec = 2f });
 
-                steps.Add(new TaskStep { Name = "Close Sub-Addons", OnEnter = () => { CloseAddon("HousingSignBoard"); CloseAddon("FreeCompanyStatus"); CloseAddon("FreeCompanyMember"); }, IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
-                steps.Add(new TaskStep { Name = "Close FC Window", OnEnter = () => CloseAddon("FreeCompany"), IsComplete = () => !IsAddonReady("FreeCompany"), TimeoutSec = 5f });
-                steps.Add(new TaskStep { Name = "FC Cooldown", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SE732D3BBB184FB6C"), OnEnter = () => { CloseAddon("HousingSignBoard"); CloseAddon("FreeCompanyStatus"); CloseAddon("FreeCompanyMember"); }, IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SDA29C79AF68E9D0E"), OnEnter = () => CloseAddon("FreeCompany"), IsComplete = () => !IsAddonReady("FreeCompany"), TimeoutSec = 5f });
+                steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S7B6B3BD41DA48C19"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
             }
         }
 
         // Final IPC save step
-        steps.Add(new TaskStep { Name = "Final Save", OnEnter = () => onSave?.Invoke(), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
+        steps.Add(new TaskStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S8F768F66B7F3A1B2"), OnEnter = () => onSave?.Invoke(), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 2f });
 
         if (steps.Count == 0)
         {
@@ -209,7 +212,7 @@ public sealed class AutoCollectionService : IDisposable
         stepStart = DateTime.UtcNow;
         stepActionDone = false;
         running = true;
-        StatusText = steps[0].Name;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, steps[0].NameMessage);
         framework.Update += OnTick;
         AddLog($"Collection queued with {steps.Count} steps.");
         log.Information($"[XASlave] AutoCollection started with {steps.Count} steps.");
@@ -221,7 +224,7 @@ public sealed class AutoCollectionService : IDisposable
         running = false;
         framework.Update -= OnTick;
         stepIndex = -1;
-        StatusText = "Cancelled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD353A99EB4556847"));
         var completion = onCompletion;
         onSave = null;
         onCompletion = null;
@@ -253,7 +256,7 @@ public sealed class AutoCollectionService : IDisposable
 
             stepStart = DateTime.UtcNow;
             stepActionDone = false;
-            StatusText = steps[stepIndex].Name;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, steps[stepIndex].NameMessage);
         }
 
         if (!running || stepIndex < 0 || stepIndex >= steps.Count)
@@ -330,7 +333,7 @@ public sealed class AutoCollectionService : IDisposable
         if (stepIndex >= steps.Count) { Finish(); return; }
         stepStart = DateTime.UtcNow;
         stepActionDone = false;
-        StatusText = steps[stepIndex].Name;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, steps[stepIndex].NameMessage);
     }
 
     private void Finish()
@@ -338,7 +341,7 @@ public sealed class AutoCollectionService : IDisposable
         running = false;
         framework.Update -= OnTick;
         stepIndex = -1;
-        StatusText = "Complete";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S143B270A32602D41"));
         var completion = onCompletion;
         onSave = null;
         onCompletion = null;

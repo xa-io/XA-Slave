@@ -65,15 +65,25 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
     public long CurrentPing { get; private set; } = -1;
     public float AveragePing { get; private set; }
     public float MinimumPing { get; private set; }
     public float MaximumPing { get; private set; }
     public float LossRate { get; private set; }
     public string ServerEndpoint { get; private set; } = "Unavailable";
+    internal global::XASlave.Localization.UiMessage ServerEndpointMessage => ServerEndpoint == "Unavailable" ? global::XASlave.Localization.UiMessage.Key("SCA184496974204A0") : global::XASlave.Localization.UiMessage.Raw(ServerEndpoint);
+    internal string LocalizedServerEndpoint => ServerEndpointMessage.Display;
     public string ObservedEndpoint { get; private set; } = "Unavailable";
+    internal global::XASlave.Localization.UiMessage ObservedEndpointMessage => ObservedEndpoint == "Unavailable" ? global::XASlave.Localization.UiMessage.Key("SCA184496974204A0") : global::XASlave.Localization.UiMessage.Raw(ObservedEndpoint);
+    internal string LocalizedObservedEndpoint => ObservedEndpointMessage.Display;
 
     public static string NormalizeFormat(string value)
     {
@@ -85,7 +95,7 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
         this.format = NormalizeFormat(format);
 
         if (enabled)
-            StatusText = BuildStatusText();
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
     }
 
     public bool SetEnabled(bool value)
@@ -99,7 +109,7 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
             StopMonitoring();
             Unsubscribe();
             HideDtrEntry();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -109,11 +119,11 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
         {
             enabled = false;
             Unsubscribe();
-            StatusText = "Unavailable - previous network monitor did not stop safely.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S765DEAFA693BB145"));
             return false;
         }
         PublishPlaceholderDtr("Resolving game endpoint.");
-        StatusText = BuildStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
         return true;
     }
 
@@ -138,9 +148,9 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
         }
     }
 
-    private string BuildStatusText()
+    private global::XASlave.Localization.UiMessage BuildStatusText()
     {
-        return $"Enabled - pinging the detected game endpoint once per second. Current: {(CurrentPing < 0 ? "--" : CurrentPing)} ms.";
+        return global::XASlave.Localization.UiMessage.Format("S4AFE8C90084AAD48", (CurrentPing < 0 ? "--" : CurrentPing));
     }
 
     private void Subscribe()
@@ -259,7 +269,7 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
         MinimumPing = 0;
         MaximumPing = 0;
         LossRate = 0;
-        StatusText = BuildStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
 
         Plugin.ScheduleOnGameThread(() =>
         {
@@ -309,7 +319,7 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
             ServerEndpoint = serverEndpointSnapshot;
             ObservedEndpoint = observedEndpointSnapshot;
             UpdateStats(historySnapshot, filledCountSnapshot);
-            StatusText = BuildStatusText();
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
             SetDtrState(FormatLatencyText(currentPingSnapshot), tooltip, true);
         });
     }
@@ -343,16 +353,14 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
             lastDtrText = text;
             lastDtrTooltip = tooltip;
             lastDtrShown = true;
-            LastActionText = entry.UserHidden
-                ? "DTR entry is hidden in /xlsettings."
-                : "DTR entry visible.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, (entry.UserHidden ? global::XASlave.Localization.UiMessage.Key("S59ACFE0CEDF8602C") : global::XASlave.Localization.UiMessage.Key("S6D8B71471C2171A1")));
         }
         catch (Exception ex)
         {
             dtrEntry = null;
             nextDtrAcquireUtc = DateTime.UtcNow.AddSeconds(5);
             lastDtrShown = false;
-            LastActionText = "DTR entry update failed; retrying.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Key("S2C332085BF2672BF"));
             if (!hasLoggedDtrAcquireFailure)
             {
                 log.Warning(ex, "[XASlave] Display Network Latency could not update its DTR entry; the service will retry without stopping the plugin.");
@@ -374,13 +382,13 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
             TryRemoveLegacyDtrEntry();
             dtrEntry = dtrBar.Get(DtrTitle, Dalamud.Game.Text.SeStringHandling.SeString.Empty);
             hasLoggedDtrAcquireFailure = false;
-            LastActionText = "DTR entry acquired.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Key("S45C07ED449FA9675"));
             return dtrEntry;
         }
         catch (ArgumentException ex)
         {
             nextDtrAcquireUtc = DateTime.UtcNow.AddSeconds(1);
-            LastActionText = "DTR entry is already registered; retrying.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Key("S948E726A8387E847"));
             if (!hasLoggedDtrAcquireFailure)
             {
                 log.Warning(ex, "[XASlave] Display Network Latency could not acquire its DTR entry; retrying after requesting stale entry removal.");
@@ -401,7 +409,7 @@ public sealed class AutoDisplayNetworkLatencyService : IDisposable
         catch (Exception ex)
         {
             nextDtrAcquireUtc = DateTime.UtcNow.AddSeconds(5);
-            LastActionText = "DTR entry is unavailable; retrying.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Key("S66290D256E03D5CD"));
             if (!hasLoggedDtrAcquireFailure)
             {
                 log.Warning(ex, "[XASlave] Display Network Latency could not acquire its DTR entry; the service will keep running without crashing plugin startup.");

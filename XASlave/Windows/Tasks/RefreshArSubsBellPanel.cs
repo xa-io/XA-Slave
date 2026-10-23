@@ -100,38 +100,36 @@ public partial class SlaveWindow
         }
         EnsureRefreshSubsActionOptionsInitialized();
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Refresh Sub/Bell/Chest");
-        ImGui.TextDisabled("Rotate characters, teleport to FC house, interact with sub console & summoning bell.\n\nTHIS REQUIRES LIFESTREAM TO HAVE PATH TO THE DOOR\nAND TO ENTER THE HOUSE, IF NOT IT WILL FAIL!");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S85CC8B46B386EB84"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S4398B2CD0B387C5C"));
         ImGui.Spacing();
 
         // -- Import / Refresh buttons --
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
         using (ImRaii.Disabled(!arConfigExists))
         {
-            if (ImGui.Button("Import from AutoRetainer##refreshSubsImportAR"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S74BC538828226264") + "##refreshSubsImportAR")))
             {
                 try
                 {
                     var (added, total) = ImportCharactersFromArToList(chars, cfg.RefreshSubsHonorArExclusions);
                     cfg.Save();
-                    arImportStatus = added > 0
-                        ? $"Imported {added} new ({total} total)"
-                        : $"All {total} already in list";
+                    arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, (added > 0 ? global::XASlave.Localization.UiMessage.Format("SAFF25205F56B2E82", added, total) : global::XASlave.Localization.UiMessage.Format("SECB3F6AE67AFB0B6", total)));
                     if (cfg.RefreshSubsHonorArExclusions)
-                        arImportStatus += plugin.ArConfigReader.ExclusionStatusSuffix;
+                        arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref arImportStatusUiMessage, arImportStatus), plugin.ArConfigReader.ExclusionStatusMessage));
                     arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 }
                 catch (Exception ex)
                 {
-                    arImportStatus = $"Import failed: {ex.Message}";
+                    arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Format("S002C95411A310E05", ex.Message));
                     arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 }
             }
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(arConfigExists
-                ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
-                : "AutoRetainer config not found.\nExpected: " + plugin.ArConfigReader.GetAutoRetainerConfigPath());
+                ? global::XASlave.Localization.UiLocale.FormatKey("S4F45236F63C59987", plugin.ArConfigReader.GetAutoRetainerConfigPath())
+                : global::XASlave.Localization.UiLocale.FormatKey("S7F848B59CF50E7D8", plugin.ArConfigReader.GetAutoRetainerConfigPath()));
 
         DrawHonorAutoRetainerExclusions("refreshSubs", cfg.RefreshSubsHonorArExclusions,
             value => cfg.RefreshSubsHonorArExclusions = value,
@@ -142,18 +140,18 @@ public partial class SlaveWindow
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
         using (ImRaii.Disabled(!xaDbAvailable))
         {
-            if (ImGui.Button("Pull XA Database Info##refreshSubsPullXA"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S658431DD798692FF") + "##refreshSubsPullXA")))
                 PullXaDatabaseInfo();
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(xaDbAvailable
-                ? "Read XA Database to update retainer/submarine counts for all characters."
-                : "XA Database plugin not available.");
+                ? global::XASlave.Localization.UiLocale.Get("S527758F195A7F287")
+                : global::XASlave.Localization.UiLocale.Get("S2A0686AE2571326E"));
 
         if (!string.IsNullOrEmpty(arImportStatus) && DateTime.UtcNow < arImportStatusExpiry)
         {
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), arImportStatus);
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiMessage.Resolve(ref arImportStatusUiMessage, arImportStatus));
         }
 
         ImGui.Spacing();
@@ -170,9 +168,9 @@ public partial class SlaveWindow
         using (ImRaii.Group())
         {
             ImGui.AlignTextToFramePadding();
-            ImGui.TextUnformatted("Enter Workshop and tap the Voyage Console and Summoning bell to refresh AutoRetainer.");
-            ImGui.TextUnformatted("While inside the workshop, XA Slave also checks Company Chest gil for XA Database before resuming AR.");
-            ImGui.TextUnformatted("If not selected it will only collect the summoning bell inside the plot.");
+            ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.Get("SD32A6F9854E816A5"));
+            ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.Get("S2A4ACEDC283E5710"));
+            ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.Get("S9800D2F9E726C212"));
             ImGui.Spacing();
         }
         if (ImGui.IsItemClicked())
@@ -183,7 +181,7 @@ public partial class SlaveWindow
 
         ImGui.SetNextItemWidth(Scale(80f));
         var wait = refreshSubsExtraWait;
-        if (ImGui.InputFloat("Extra Wait (sec)##refreshSubsWait", ref wait, 0.5f, 1.0f, "%.1f"))
+        if (global::XASlave.Localization.UiNative.InputFloat((global::XASlave.Localization.UiLocale.Native("S2AD98BDBAE0CB01A") + "##refreshSubsWait"), ref wait, 0.5f, 1.0f, "%.1f"))
         {
             if (wait < 0f) wait = 0f;
             if (wait > 30f) wait = 30f;
@@ -202,13 +200,13 @@ public partial class SlaveWindow
         if (isRunning)
         {
             var progress = plugin.TaskRunner.TotalItems > 0 ? (float)plugin.TaskRunner.CompletedItems / plugin.TaskRunner.TotalItems : 0f;
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"Running: {plugin.TaskRunner.StatusText}");
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S8EB69248AA11B2FD", plugin.TaskRunner.LocalizedStatusText));
             ImGui.ProgressBar(progress, new Vector2(-1, 0), $"{plugin.TaskRunner.CompletedItems}/{plugin.TaskRunner.TotalItems}");
             if (!string.IsNullOrEmpty(plugin.TaskRunner.CurrentItemLabel))
-                ImGui.TextDisabled(plugin.TaskRunner.CurrentItemLabel);
+                ImGui.TextDisabled(plugin.TaskRunner.CurrentItemLabelDisplay);
             DrawProcessingList(plugin.TaskRunner);
             ImGui.Spacing();
-            if (ImGui.Button("Cancel##refreshSubsCancel"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S19766ED6CCB2F4A3") + "##refreshSubsCancel")))
             {
                 ReleaseRefreshSubsArSuppression();
                 plugin.TaskRunner.Cancel();
@@ -224,22 +222,22 @@ public partial class SlaveWindow
                 && (!refreshSubsDoCollectPersonalPlotInfo || plugin.IpcClient.IsXaDatabaseAvailable());
             var started = DrawPriorityTaskActionButton(
                 SlaveTask.RefreshArSubsBell,
-                $"Start ({selectedChars.Count} chars)##refreshSubsStart",
+                (string.Format(global::XASlave.Localization.UiLocale.Native("SC0F20E306C7E38D9"), selectedChars.Count) + $"##refreshSubsStart"),
                 canStart,
                 StartRefreshArSubsBell,
                 !plugin.IpcClient.IsAutoRetainerAvailable()
                     || !plugin.IpcClient.IsLifestreamAvailable()
                     || (refreshSubsDoCollectPersonalPlotInfo && !plugin.IpcClient.IsXaDatabaseAvailable())
-                    ? "Missing required plugins. Check the plugin status above."
-                    : "Select at least one character to start.");
+                    ? global::XASlave.Localization.UiLocale.Get("S0A4C6C0B785E7FB1")
+                    : global::XASlave.Localization.UiLocale.Get("S630BBC121AA0D071"), displayButtonLabel: global::XASlave.Localization.UiLocale.FormatKey("SC0F20E306C7E38D9", selectedChars.Count));
             if (started)
                 AutoOpenTaskLogIfVerbose(ref refreshSubsShowLog);
 
             ImGui.SameLine();
-            if (ImGui.Button("Check All##refreshSubsAll"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S8D36DE8ED9DBBB1B") + "##refreshSubsAll")))
                 SelectVisibleRefreshSubsCharacters();
             ImGui.SameLine();
-            if (ImGui.Button("Clear All##refreshSubsNone"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SDDCEB7ADFDB8816E") + "##refreshSubsNone")))
                 refreshSubsSelectedIndices.Clear();
         }
 
@@ -248,12 +246,12 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Character List --
-        DrawCharacterListHeader("Character List", $"({chars.Count} total)", "refreshSubsAnonymize");
+        DrawCharacterListHeader(global::XASlave.Localization.UiLocale.Get("S9127EB7A3D10F5D6"), global::XASlave.Localization.UiLocale.FormatKey("S261FA25B9E69A2B0", chars.Count), "refreshSubsAnonymize");
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
         var refreshSubsRegionFilter = cfg.RefreshSubsRegionFilter;
-        if (DrawRegionFilterCombo("Region##refreshSubsRegion", ref refreshSubsRegionFilter))
+        if (DrawRegionFilterCombo((global::XASlave.Localization.UiLocale.Native("SD3A008EF1335692D") + "##refreshSubsRegion"), ref refreshSubsRegionFilter))
         {
             cfg.RefreshSubsRegionFilter = refreshSubsRegionFilter;
             cfg.Save();
@@ -262,7 +260,7 @@ public partial class SlaveWindow
         ImGui.SameLine();
         // Search filter
         ImGui.SetNextItemWidth(Scale(200f));
-        ImGui.InputTextWithHint("##refreshSubsSearch", "Search name or world...", ref refreshSubsSearchFilter, 128);
+        ImGui.InputTextWithHint("##refreshSubsSearch", global::XASlave.Localization.UiLocale.Get("SF62AB4CE4380C1B9"), ref refreshSubsSearchFilter, 128);
         ImGui.Spacing();
 
         // Character table - columns: checkbox, #, character, world, retainers, submarines, remove
@@ -273,15 +271,15 @@ public partial class SlaveWindow
             ScaledVector(0f, 250f)))
         if (imguiScope262)
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
-            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
-            ImGui.TableSetupColumn("Retainers", ImGuiTableColumnFlags.WidthFixed, Scale(65f));
-            ImGui.TableSetupColumn("Submarines", ImGuiTableColumnFlags.WidthFixed, Scale(75f));
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
+            global::XASlave.Localization.UiNative.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            global::XASlave.Localization.UiNative.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S1405A63E8A78B85C"), ImGuiTableColumnFlags.WidthStretch);
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S78AE647DC5544D22"), ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S3F91391122918036"), ImGuiTableColumnFlags.WidthFixed, Scale(65f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S358FD9EED262500E"), ImGuiTableColumnFlags.WidthFixed, Scale(75f));
+            global::XASlave.Localization.UiNative.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
             ImGui.TableSetupScrollFreeze(0, 1);
-            ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableHeadersRow();
 
             // Build filtered list
             var filtered = new List<(int OrigIdx, string CharName, string World, ReloggerCharacterData? Info)>();
@@ -378,7 +376,7 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
-                    if (ImGui.SmallButton($"X##rsRm{i}"))
+                    if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S4B68AB3847FEDA7D") + $"##rsRm{i}")))
                     {
                         chars.RemoveAt(i);
                         refreshSubsSelectedIndices.Remove(i);
@@ -400,9 +398,9 @@ public partial class SlaveWindow
 
         // Add character input
         ImGui.SetNextItemWidth(Scale(250f));
-        var enterPressed = ImGui.InputTextWithHint("##refreshSubsAdd", "Name Surname@World", ref refreshSubsNewChar, 128, ImGuiInputTextFlags.EnterReturnsTrue);
+        var enterPressed = ImGui.InputTextWithHint("##refreshSubsAdd", global::XASlave.Localization.UiLocale.Get("SF32C73F5DCC35D82"), ref refreshSubsNewChar, 128, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
-        if ((ImGui.Button("Add##refreshSubsAddBtn") || enterPressed) && !string.IsNullOrWhiteSpace(refreshSubsNewChar))
+        if ((global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S9FD728C66C9A256B") + "##refreshSubsAddBtn")) || enterPressed) && !string.IsNullOrWhiteSpace(refreshSubsNewChar))
         {
             var trimmed = refreshSubsNewChar.Trim();
             if (!chars.Contains(trimmed))
@@ -413,24 +411,24 @@ public partial class SlaveWindow
             refreshSubsNewChar = "";
         }
         ImGui.SameLine();
-        ImGui.TextDisabled("Format: FirstName LastName@World");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S1B7CB3CFDA6217B9"));
 
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Actions Per Character");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SD077709C2945CC78"));
         ImGui.Spacing();
         var refreshOptionsChanged = false;
-        refreshOptionsChanged |= ImGui.Checkbox("Open Armoury Chest##refreshSubsArmoury", ref refreshSubsDoOpenArmoury);
-        refreshOptionsChanged |= ImGui.Checkbox("Open Saddlebags##refreshSubsSaddlebags", ref refreshSubsDoOpenSaddlebags);
-        refreshOptionsChanged |= ImGui.Checkbox("Open Journal##refreshSubsJournal", ref refreshSubsDoOpenJournal);
-        refreshOptionsChanged |= ImGui.Checkbox("Teleport Home (Lifestream)##refreshSubsHome", ref refreshSubsDoReturnToHome);
-        refreshOptionsChanged |= ImGui.Checkbox("Collect Personal Plot Info##refreshSubsPlot", ref refreshSubsDoCollectPersonalPlotInfo);
+        refreshOptionsChanged |= global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S53649CACF2611F56") + "##refreshSubsArmoury"), ref refreshSubsDoOpenArmoury);
+        refreshOptionsChanged |= global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S04135E2D90F4F408") + "##refreshSubsSaddlebags"), ref refreshSubsDoOpenSaddlebags);
+        refreshOptionsChanged |= global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SF7B51D61398CF038") + "##refreshSubsJournal"), ref refreshSubsDoOpenJournal);
+        refreshOptionsChanged |= global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S621D93AD01358374") + "##refreshSubsHome"), ref refreshSubsDoReturnToHome);
+        refreshOptionsChanged |= global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SFF3C7116AEE8239B") + "##refreshSubsPlot"), ref refreshSubsDoCollectPersonalPlotInfo);
         if (refreshOptionsChanged)
             SaveRefreshSubsOptions();
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Opens /housing, checks Apartment, Private Estate, and Shared Estate signboards when available,\nand triggers XA Database saves after each housing pass.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SF5DB3C15B4DCD96C"));
 
         var completionBefore = (refreshSubsDoLogoutOnComplete, refreshSubsDoKillGameOnComplete, refreshSubsDoEnableArMulti);
         DrawSharedCompletionAndLogFooter("refreshSubs", "refreshSubs", ref refreshSubsDoLogoutOnComplete, ref refreshSubsDoKillGameOnComplete, ref refreshSubsDoEnableArMulti, ref refreshSubsShowLog, plugin.TaskRunner);
@@ -496,7 +494,7 @@ public partial class SlaveWindow
 
         var steps = BuildRefreshSubsBellSteps(selected, plugin.TaskRunner);
 
-        if (!plugin.TaskRunner.Start("Refresh Sub/Bell/Chest", steps, onFinished: () =>
+        if (!plugin.TaskRunner.Start(global::XASlave.Localization.UiMessage.Key("S85CC8B46B386EB84"), steps, onFinished: () =>
         {
             ReleaseRefreshSubsArSuppression();
         }, onLog: (msg) =>
@@ -517,7 +515,7 @@ public partial class SlaveWindow
         // Disable AR Multi Mode
         steps.Add(new TaskStep
         {
-            Name = "Disable AR Multi Mode",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S22C41FFCBA42741B"),
             OnEnter = () =>
             {
                 runner.AddLog("Disabling AutoRetainer Multi Mode...");
@@ -526,7 +524,7 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 3f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("AR Disable Cooldown", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("SC4B6369ECA28F664"), 1.0f));
 
         for (int i = 0; i < characters.Count; i++)
         {
@@ -537,7 +535,7 @@ public partial class SlaveWindow
             // Label
             steps.Add(new TaskStep
             {
-                Name = $"[{charIndex}/{charTotal}] {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S5FB6F2415218C668", charIndex, charTotal, charName),
                 OnEnter = () =>
                 {
                     runner.CurrentItemLabel = $"[{charIndex}/{charTotal}] {charName}";
@@ -551,7 +549,7 @@ public partial class SlaveWindow
             var relogState = new RefreshSubsRelogState();
             steps.Add(new TaskStep
             {
-                Name = $"Relog: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SB8BF19049E887413", charName),
                 OnEnter = () =>
                 {
                     var current = MonthlyReloggerTask.GetCurrentCharacterNameWorld();
@@ -567,12 +565,12 @@ public partial class SlaveWindow
                 IsComplete = () => true,
                 TimeoutSec = 3f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Relog Init: {charName}", 2.0f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S27A359F38EA15525", charName), 2.0f));
 
             // Wait for relog
             steps.Add(new TaskStep
             {
-                Name = $"Wait Relog: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S4B35E54CFF820E18", charName),
                 IsComplete = () =>
                 {
                     if (relogState.Ready) return true;
@@ -603,18 +601,18 @@ public partial class SlaveWindow
             var downstreamStart = steps.Count;
 
             // SafeWait 3-pass
-            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"SafeWait ({charName})"))
+            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Format("SFA31CB70A88EB43A", charName)))
             {
                 steps.Add(sw);
             }
 
             // Extra wait
             if (refreshSubsExtraWait > 0)
-                steps.Add(MonthlyReloggerTask.MakeDelay($"Extra Wait: {charName}", refreshSubsExtraWait));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S9B1F3A1AEEAB099C", charName), refreshSubsExtraWait));
 
             AddRefreshSubsSelectedActionSteps(steps, runner, charName);
             AddRefreshSubsTeleportSteps(steps, runner, charName, "FC", "fc", 8f);
-            steps.Add(MonthlyReloggerTask.MakeDelay($"TP FC Final Settle: {charName}", 1.0f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SE27712F35A85C724", charName), 1.0f));
 
             // Enter workshop if configured
             if (refreshSubsGoWorkshop)
@@ -622,7 +620,7 @@ public partial class SlaveWindow
                 // Target and enter Additional Chambers
                 steps.Add(new TaskStep
                 {
-                    Name = $"Enter Workshop: {charName}",
+                    NameMessage = global::XASlave.Localization.UiMessage.Format("SA029DF8EAB10D42F", charName),
                     OnEnter = () =>
                     {
                         runner.AddLog("Entering Additional Chambers (workshop)...");
@@ -631,11 +629,11 @@ public partial class SlaveWindow
                     IsComplete = () => true,
                     TimeoutSec = 2f,
                 });
-                steps.Add(MonthlyReloggerTask.MakeDelay($"Workshop Target: {charName}", 0.5f));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S56625C53EEDA2ECD", charName), 0.5f));
 
                 steps.Add(new TaskStep
                 {
-                    Name = $"Workshop Lockon: {charName}",
+                    NameMessage = global::XASlave.Localization.UiMessage.Format("SDBC8EFAE9E7D120C", charName),
                     OnEnter = () =>
                     {
                         ChatHelper.SendMessage("/lockon on");
@@ -644,11 +642,11 @@ public partial class SlaveWindow
                     IsComplete = () => true,
                     TimeoutSec = 2f,
                 });
-                steps.Add(MonthlyReloggerTask.MakeDelay($"Workshop Walk: {charName}", 3.0f));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SA75BDE33BDB47DCD", charName), 3.0f));
 
                 steps.Add(new TaskStep
                 {
-                    Name = $"Workshop Interact: {charName}",
+                    NameMessage = global::XASlave.Localization.UiMessage.Format("S4E533EC5CE78DB50", charName),
                     OnEnter = () =>
                     {
                         ChatHelper.SendMessage("/automove off");
@@ -657,11 +655,11 @@ public partial class SlaveWindow
                     IsComplete = () => true,
                     TimeoutSec = 2f,
                 });
-                steps.Add(MonthlyReloggerTask.MakeDelay($"Workshop Wait: {charName}", 1.0f));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SED1F20FE005958E3", charName), 1.0f));
 
                 steps.Add(new TaskStep
                 {
-                    Name = $"Workshop Menu: {charName}",
+                    NameMessage = global::XASlave.Localization.UiMessage.Format("SCA89D606E8E98EC5", charName),
                     OnEnter = () =>
                     {
                         if (!AddonHelper.IsAddonReady("SelectString"))
@@ -676,14 +674,14 @@ public partial class SlaveWindow
                     IsComplete = () => true,
                     TimeoutSec = 2f,
                 });
-                steps.Add(MonthlyReloggerTask.MakeDelay($"Workshop Menu Wait: {charName}", 1.0f));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SFEE26FC99D0C965D", charName), 1.0f));
 
                 // SafeWait after zone
-                foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"Workshop SafeWait ({charName})"))
+                foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Format("SB0DDAC94B3144DF4", charName)))
                 {
                     steps.Add(sw);
                 }
-                steps.Add(MonthlyReloggerTask.MakeDelay($"Workshop Settle: {charName}", 1.0f));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SCD99159A4AA6CAC5", charName), 1.0f));
             }
 
             if (refreshSubsGoWorkshop)
@@ -702,7 +700,7 @@ public partial class SlaveWindow
             }
 
             // SafeWait before next
-            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"Final SafeWait ({charName})"))
+            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Format("S8D6C1BCD252A00BA", charName)))
             {
                 steps.Add(sw);
             }
@@ -718,7 +716,7 @@ public partial class SlaveWindow
             var capturedName = charName;
             steps.Add(new TaskStep
             {
-                Name = $"Complete: {capturedName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SB5063DC812CCDD2B", capturedName),
                 OnEnter = () =>
                 {
                     runner.CompletedItems = capturedIndex;
@@ -739,7 +737,7 @@ public partial class SlaveWindow
         // Summary
         steps.Add(new TaskStep
         {
-            Name = "Refresh Sub/Bell/Chest Summary",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SB74F3562768E1910"),
             OnEnter = () =>
             {
                 if (!MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(refreshSubsDoLogoutOnComplete, refreshSubsDoKillGameOnComplete))
@@ -757,7 +755,7 @@ public partial class SlaveWindow
 
         MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, refreshSubsDoLogoutOnComplete, refreshSubsDoKillGameOnComplete, refreshSubsDoEnableArMulti);
 
-        steps.Add(MonthlyReloggerTask.MakeDelay("Final Cooldown", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("SB4678F98BF3E7AA8"), 1.0f));
 
         return steps;
     }
@@ -766,7 +764,7 @@ public partial class SlaveWindow
     {
         steps.Add(new TaskStep
         {
-            Name = $"Suppress AR ({sequenceLabel}): {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S3C909C2DB19DF6B8", sequenceLabel, charName),
             OnEnter = () =>
             {
                 var alreadySuppressed = false;
@@ -787,7 +785,7 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 2f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Suppress AR Wait: {charName}", 0.5f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SE33D11F396469358", charName), 0.5f));
     }
 
     private void AddRefreshSubsSelectedActionSteps(List<TaskStep> steps, TaskRunner runner, string charName)
@@ -796,7 +794,7 @@ public partial class SlaveWindow
         {
             steps.Add(new TaskStep
             {
-                Name = $"Open Armoury Chest: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S71231B7F19BDE9AE", charName),
                 OnEnter = () =>
                 {
                     runner.AddLog("Opening Armoury Chest...");
@@ -805,14 +803,14 @@ public partial class SlaveWindow
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Armoury Delay: {charName}", 0.5f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SF9960A327CD719B6", charName), 0.5f));
         }
 
         if (refreshSubsDoOpenSaddlebags)
         {
             steps.Add(new TaskStep
             {
-                Name = $"Open Saddlebags: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SAD6733BD059FC5AC", charName),
                 OnEnter = () =>
                 {
                     runner.AddLog("Opening Saddlebags...");
@@ -821,22 +819,22 @@ public partial class SlaveWindow
                 IsComplete = () => AddonHelper.IsAddonVisible("InventoryBuddy"),
                 TimeoutSec = 3f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Saddlebag Read Delay: {charName}", 1.0f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SDC9237CAB0509B21", charName), 1.0f));
             steps.Add(new TaskStep
             {
-                Name = $"Close Saddlebags: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S7612FEBE5DF538F5", charName),
                 OnEnter = () => AddonHelper.CloseAddon("InventoryBuddy"),
                 IsComplete = () => !AddonHelper.IsAddonVisible("InventoryBuddy"),
                 TimeoutSec = 3f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Saddlebag Close Delay: {charName}", 0.5f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SD70C1D57F3E8A2F3", charName), 0.5f));
         }
 
         if (refreshSubsDoOpenJournal)
         {
             steps.Add(new TaskStep
             {
-                Name = $"Open Journal: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SE3B98044DD638E06", charName),
                 OnEnter = () =>
                 {
                     runner.AddLog("Opening Journal...");
@@ -845,12 +843,12 @@ public partial class SlaveWindow
                 IsComplete = () => AddonHelper.IsAddonVisible("Journal"),
                 TimeoutSec = 3f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Journal Read Delay: {charName}", 0.5f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SAB83714CDBAC5C52", charName), 0.5f));
             if (plugin.IpcClient.IsXaDatabaseAvailable())
             {
                 steps.Add(new TaskStep
                 {
-                    Name = $"Journal Save: {charName}",
+                    NameMessage = global::XASlave.Localization.UiMessage.Format("S1BDA4991F1C6723A", charName),
                     ShouldSkip = () => !AddonHelper.IsAddonVisible("Journal"),
                     OnEnter = () =>
                     {
@@ -863,7 +861,7 @@ public partial class SlaveWindow
                     IsComplete = () => true,
                     TimeoutSec = 3f,
                 });
-                steps.Add(MonthlyReloggerTask.MakeDelay($"Journal Save Delay: {charName}", 0.5f, () => !AddonHelper.IsAddonVisible("Journal")));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SCD2E90E245B4863E", charName), 0.5f, () => !AddonHelper.IsAddonVisible("Journal")));
             }
         }
 
@@ -879,7 +877,7 @@ public partial class SlaveWindow
     {
         steps.Add(new TaskStep
         {
-            Name = $"Teleport {label}: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SB0C94D048DE7AB2A", label, charName),
             OnEnter = () =>
             {
                 runner.AddLog($"Teleporting to {label} (/li {command})...");
@@ -888,11 +886,11 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 2f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Teleport {label} Init: {charName}", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S7311FE0B9AC55A3A", label, charName), 1.0f));
 
         steps.Add(new TaskStep
         {
-            Name = $"Teleport {label} Wait Start: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SC2AEB1C364FADCE2", label, charName),
             IsComplete = () =>
             {
                 try { return Plugin.Instance!.IpcClient.LifestreamIsBusy(); }
@@ -903,7 +901,7 @@ public partial class SlaveWindow
 
         steps.Add(new TaskStep
         {
-            Name = $"Teleport {label} Wait Complete: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S0736ED50BA73BFEF", label, charName),
             IsComplete = () =>
             {
                 try { return !Plugin.Instance!.IpcClient.LifestreamIsBusy(); }
@@ -916,7 +914,7 @@ public partial class SlaveWindow
         DateTime lastCheck = DateTime.MinValue;
         steps.Add(new TaskStep
         {
-            Name = $"Teleport {label} Confirm: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S9F8F68DB32FFE98C", label, charName),
             OnEnter = () =>
             {
                 confirmCount = 0;
@@ -947,10 +945,10 @@ public partial class SlaveWindow
             TimeoutSec = 15f,
         });
 
-        foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"Teleport {label} SafeWait ({charName})"))
+        foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Format("S66E20AD11B3CB01D", label, charName)))
             steps.Add(sw);
 
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Teleport {label} Settle: {charName}", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S8307AABB4D836DA7", label, charName), 1.0f));
     }
 
     private static void AddRefreshSubsAddonExitSequenceSteps(List<TaskStep> steps, TaskRunner runner, string charName, string label, string addonName, Func<bool>? shouldSkip = null)
@@ -968,7 +966,7 @@ public partial class SlaveWindow
 
         steps.Add(new TaskStep
         {
-            Name = $"{label}: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SFB62FE2AE6B2AE6C", label, charName),
             ShouldSkip = shouldSkip,
             OnEnter = () =>
             {
@@ -1015,7 +1013,7 @@ public partial class SlaveWindow
 
             steps.Add(new TaskStep
             {
-                Name = $"{label} [pass {capturedPass}/3]: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S7C50286C95DC8AB3", label, capturedPass, charName),
                 ShouldSkip = shouldSkip,
                 OnEnter = () =>
                 {
@@ -1049,7 +1047,7 @@ public partial class SlaveWindow
             });
 
             if (capturedPass < 3)
-                steps.Add(MonthlyReloggerTask.MakeDelay($"{label} [wait 1s]: {charName}", 1.0f));
+                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S32A44A6DA5D18FA7", label, charName), 1.0f));
         }
     }
 
@@ -1059,7 +1057,7 @@ public partial class SlaveWindow
 
         steps.Add(new TaskStep
         {
-            Name = $"Target Sub Console: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S1BC2D2D4CBE7759D", charName),
             OnEnter = () =>
             {
                 runner.AddLog("Targeting Voyage Control Panel...");
@@ -1068,11 +1066,11 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 2f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Target: {charName}", 0.5f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S20FB99DCAB571EDB", charName), 0.5f));
 
         steps.Add(new TaskStep
         {
-            Name = $"Walk to Sub Console: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SC898FDC4DA9206B3", charName),
             OnEnter = () =>
             {
                 ChatHelper.SendMessage("/lockon on");
@@ -1081,11 +1079,11 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Walk: {charName}", 1.5f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SCD95B10651E06BE0", charName), 1.5f));
 
         steps.Add(new TaskStep
         {
-            Name = $"Interact Sub Console: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SBDF73576DE1E2828", charName),
             OnEnter = () =>
             {
                 ChatHelper.SendMessage("/automove off");
@@ -1094,11 +1092,11 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 2f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Interact: {charName}", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S3E848BFAB5936F24", charName), 1.0f));
 
         steps.Add(new TaskStep
         {
-            Name = $"Sub Reports: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SEED8BD8210AD10FE", charName),
             OnEnter = () =>
             {
                 voyageLogSelected = AddonHelper.SelectFirstAddonListText(
@@ -1115,7 +1113,7 @@ public partial class SlaveWindow
             MaxRetries = 1,
             OnTimeout = () => runner.AddLog("Could not resolve 'View previous voyage log' in the Voyage Control Panel; no numeric fallback was used."),
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Sub Reports Wait: {charName}", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S7760953BFBDCAE4F", charName), 1.0f));
 
         AddRefreshSubsAddonExitSequenceSteps(steps, runner, charName, "Sub Console Recovery", "SelectString");
     }
@@ -1124,7 +1122,7 @@ public partial class SlaveWindow
     {
         steps.Add(new TaskStep
         {
-            Name = $"Target Bell: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SD5108833D1C5B222", charName),
             OnEnter = () =>
             {
                 runner.AddLog("Targeting Summoning Bell...");
@@ -1133,11 +1131,11 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 2f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Target: {charName}", 0.5f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S59BF5F30FD647B96", charName), 0.5f));
 
         steps.Add(new TaskStep
         {
-            Name = $"Walk to Bell: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S4D85060965AE916F", charName),
             OnEnter = () =>
             {
                 ChatHelper.SendMessage("/lockon on");
@@ -1146,11 +1144,11 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Walk: {charName}", 3.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S0734A70A4D78AE76", charName), 3.0f));
 
         steps.Add(new TaskStep
         {
-            Name = $"Interact Bell: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S07871353BFF510F3", charName),
             OnEnter = () =>
             {
                 ChatHelper.SendMessage("/automove off");
@@ -1159,7 +1157,7 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 2f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Bell Interact: {charName}", 2.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S8B374EDDC947F736", charName), 2.0f));
 
         AddRefreshSubsAddonExitSequenceSteps(steps, runner, charName, "Retainer List Recovery", "RetainerList");
     }
@@ -1177,7 +1175,7 @@ public partial class SlaveWindow
 
         steps.Add(new TaskStep
         {
-            Name = $"FC Chest Check: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S2FB2F946D04C7284", charName),
             OnEnter = () =>
             {
                 var plugin = Plugin.Instance!;
@@ -1208,7 +1206,7 @@ public partial class SlaveWindow
 
         steps.Add(new TaskStep
         {
-            Name = $"Target FC Chest: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S27674B92CCEB4A8A", charName),
             ShouldSkip = () => skipFcChest,
             OnEnter = () =>
             {
@@ -1218,11 +1216,11 @@ public partial class SlaveWindow
             IsComplete = () => AddonHelper.CurrentTargetMatches("Company Chest"),
             TimeoutSec = 3f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"FC Chest Target Delay: {charName}", 0.5f, () => skipFcChest));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SCD9DC7C9DE85F388", charName), 0.5f, () => skipFcChest));
 
         steps.Add(new TaskStep
         {
-            Name = $"Path to FC Chest: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SF318271AE72842F8", charName),
             ShouldSkip = () => skipFcChest,
             OnEnter = () =>
             {
@@ -1241,7 +1239,7 @@ public partial class SlaveWindow
 
         steps.Add(new TaskStep
         {
-            Name = $"Interact FC Chest: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SFE5A75FAE3FF34C6", charName),
             ShouldSkip = () => skipFcChest,
             OnEnter = () =>
             {
@@ -1325,11 +1323,11 @@ public partial class SlaveWindow
                 skipFcChest = true;
             },
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"FC Chest Load Delay: {charName}", 0.5f, () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest")));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S4941D6F40191541A", charName), 0.5f, () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest")));
 
         steps.Add(new TaskStep
         {
-            Name = $"FC Chest Save: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SA5714A8AADF0A795", charName),
             ShouldSkip = () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest"),
             OnEnter = () =>
             {
@@ -1342,11 +1340,11 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 3f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"FC Chest Save Delay: {charName}", 0.5f, () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest")));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SB2C97B2449185F3E", charName), 0.5f, () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest")));
 
         steps.Add(new TaskStep
         {
-            Name = $"FC Chest Close: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S2856F1B1C292A641", charName),
             ShouldSkip = () => skipFcChest || !AddonHelper.IsAddonVisible("FreeCompanyChest"),
             OnEnter = () => runner.AddLog("Closing FC chest window..."),
             IsComplete = () => true,
@@ -1365,7 +1363,7 @@ public partial class SlaveWindow
     {
         steps.Add(new TaskStep
         {
-            Name = $"Resume AR ({sequenceLabel}): {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S2BEEE73ADB42C3F3", sequenceLabel, charName),
             OnEnter = () =>
             {
                 if (!refreshSubsArSuppressedByTask)
@@ -1381,7 +1379,7 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 2f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay($"Resume AR Wait: {charName}", 0.5f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S4BCBB507CD7B86B7", charName), 0.5f));
     }
 
     private void UncheckRefreshSubsCharacter(string characterName, TaskRunner runner)

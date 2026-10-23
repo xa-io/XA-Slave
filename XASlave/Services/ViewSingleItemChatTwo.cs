@@ -98,7 +98,7 @@ internal sealed class ViewSingleItemChatTwo : IDisposable
         {
             var itemId = ViewSingleItemShopSource.NormalizeItemId(item.ItemId);
             if (itemId == 0 || !ViewSingleItemShopSource.TryDescribe(itemId, out _, out _)) return;
-            if (ImGui.MenuItem("View Single Item")) onItem(itemId);
+            if (global::XASlave.Localization.UiNative.MenuItem(global::XASlave.Localization.UiLocale.Native("S26AFC61257A5D865"))) onItem(itemId);
         }
         catch (Exception error)
         {

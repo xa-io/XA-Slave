@@ -7,9 +7,11 @@ namespace XASlave.Services;
 internal sealed unsafe partial class ViewSingleItemPreview
 {
     private readonly ViewSingleItemAnimationClip animationClip = new();
+    private global::XASlave.Localization.UiMessage? animationClipKindMessage;
     private string animationClipKind = "";
     private long animationRenderRevision = -1;
     private long animationControlRevision = -1;
+    private global::XASlave.Localization.UiMessage? animationRecordingNoticeMessage;
     private string animationRecordingNotice = "";
 
     internal ViewSingleItemAnimationState Animation
@@ -17,13 +19,7 @@ internal sealed unsafe partial class ViewSingleItemPreview
         get
         {
             var live = scene.Animation;
-            return new(live.Ready, animationClip.IsRecording || animationClip.Playing,
-                animationClip.Position, animationClip.Complete ? animationClip.Duration : 0,
-                animationClip.Revision, animationClip.IsRecording ? "Recording " + animationClipKind + ". " + animationClip.Status
-                    : !string.IsNullOrEmpty(animationClip.Status) ? animationClip.Status
-                    : !string.IsNullOrEmpty(animationRecordingNotice) ? animationRecordingNotice
-                    : !live.Ready ? live.Status : "Play to record a loop with its glow.",
-                animationClip.Complete ? animationClip.FrameCount : 0, animationClip.FrameIndex);
+            return ViewSingleItemAnimationState.Create(live.Ready, animationClip.IsRecording || animationClip.Playing, animationClip.Position, animationClip.Complete ? animationClip.Duration : 0, animationClip.Revision, (animationClip.IsRecording ? global::XASlave.Localization.UiMessage.Format("S9ACAF433203D5340" , global::XASlave.Localization.UiMessage.Capture(animationClipKindMessage, animationClipKind), animationClip.StatusMessage) : (!string.IsNullOrEmpty(animationClip.Status) ? animationClip.StatusMessage : (!string.IsNullOrEmpty(animationRecordingNotice) ? global::XASlave.Localization.UiMessage.Capture(animationRecordingNoticeMessage, animationRecordingNotice) : (!live.Ready ? live.StatusPresentation : global::XASlave.Localization.UiMessage.Key("S1B5755C340A4BB94"))))), animationClip.Complete ? animationClip.FrameCount : 0, animationClip.FrameIndex);
         }
     }
 
@@ -52,10 +48,10 @@ internal sealed unsafe partial class ViewSingleItemPreview
             {
                 // Capture actual rendered frames: LocalTime alone cannot rewind
                 // particle randomness, material clocks or scheduler effects.
-                animationClipKind = live.Duration > 0 ? "one animation cycle" : "a five-second effect clip";
+                animationClipKind = global::XASlave.Localization.UiMessage.Store(ref animationClipKindMessage, (live.Duration > 0 ? global::XASlave.Localization.UiMessage.Key("S2FB7F070FCF653E2") : global::XASlave.Localization.UiMessage.Key("SBB97F64CCE50C5C1")));
                 animationRenderRevision = -1;
                 animationControlRevision = live.Revision;
-                animationRecordingNotice = "";
+                animationRecordingNotice = global::XASlave.Localization.UiMessage.Store(ref animationRecordingNoticeMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
                 animationClip.Start(live.Duration > 0 ? live.Duration : 5);
                 scene.SetAnimationPlaying(true);
             }
@@ -81,7 +77,7 @@ internal sealed unsafe partial class ViewSingleItemPreview
         animationClip.Reset();
         animationRenderRevision = -1;
         animationControlRevision = -1;
-        animationRecordingNotice = "";
+        animationRecordingNotice = global::XASlave.Localization.UiMessage.Store(ref animationRecordingNoticeMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         scene.SetAnimationPlaying(false);
     }
 
@@ -98,7 +94,7 @@ internal sealed unsafe partial class ViewSingleItemPreview
     {
         if (animationControlRevision < 0 || animationControlRevision == scene.Animation.Revision) return;
         ResetRecordedAnimation();
-        animationRecordingNotice = "The animation changed. Play to record its new cycle.";
+        animationRecordingNotice = global::XASlave.Localization.UiMessage.Store(ref animationRecordingNoticeMessage, global::XASlave.Localization.UiMessage.Key("S17B03676265E9821"));
     }
 
     internal Vector2 DisplayPixelSize { get; private set; }

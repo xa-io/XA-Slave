@@ -25,7 +25,7 @@ public sealed class NearbyPlayersWindow : Window
     private readonly Dictionary<uint, string> jobs = new(), worlds = new();
     private int nearbyFrame = -1;
 
-    public NearbyPlayersWindow(NearbyPlayersService service, XAPeepService peep) : base("XA Nearby###XANearbyMini")
+    public NearbyPlayersWindow(NearbyPlayersService service, XAPeepService peep) : base(global::XASlave.Localization.UiLocale.Get("S8B51AF9B04952D38") + "###XANearbyMini")
     {
         this.service = service;
         this.peep = peep;
@@ -49,7 +49,7 @@ public sealed class NearbyPlayersWindow : Window
 
     public override void PreDraw()
     {
-        WindowName = $"XA Nearby: {service.Snapshot.Players.Count}###XANearbyMini";
+        WindowName = global::XASlave.Localization.UiLocale.FormatKey("S6DB12F98F33D70B2", service.Snapshot.Players.Count) + "###XANearbyMini";
         UpdateSizeConstraints();
         Flags = service.Settings.WindowLocked ? ImGuiWindowFlags.NoResize : ImGuiWindowFlags.None;
         lockButton.Icon = service.Settings.WindowLocked ? FontAwesomeIcon.Lock : FontAwesomeIcon.LockOpen;
@@ -83,7 +83,7 @@ public sealed class NearbyPlayersWindow : Window
         ImGui.PushStyleVar(ImGuiStyleVar.CellPadding, new Vector2(4, 2));
         try
         {
-            if (!service.Enabled) { ImGui.TextWrapped("Enable XA Nearby in XA Mods."); return; }
+            if (!service.Enabled) { ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S58BA320E86E00D2D")); return; }
             DrawNearby();
         }
         finally { ImGui.PopStyleVar(2); }
@@ -113,7 +113,7 @@ public sealed class NearbyPlayersWindow : Window
         if (service.Settings.ShowSearchBar)
         {
             ImGui.SetNextItemWidth(-1);
-            ImGui.InputTextWithHint("##Search", "Search name, class, FC or world...", ref query, 128);
+            ImGui.InputTextWithHint("##Search", global::XASlave.Localization.UiLocale.Get("S449396CF8AFE1A40"), ref query, 128);
         }
         else query = string.Empty; // Hiding search must never leave an invisible filter active.
         var cameraHeading = GetCameraHeading();
@@ -138,13 +138,13 @@ public sealed class NearbyPlayersWindow : Window
             try
             {
                 ImGui.TableSetupScrollFreeze(0, 1);
-                ImGui.TableSetupColumn("Name", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.NoHide);
-                ImGui.TableSetupColumn("Distance", ImGuiTableColumnFlags.WidthFixed, 78 * ImGuiHelpers.GlobalScale);
-                ImGui.TableSetupColumn("Class", ImGuiTableColumnFlags.DefaultHide | ImGuiTableColumnFlags.WidthFixed, 44 * ImGuiHelpers.GlobalScale);
-                ImGui.TableSetupColumn("FC", ImGuiTableColumnFlags.DefaultHide | ImGuiTableColumnFlags.WidthFixed, 55 * ImGuiHelpers.GlobalScale);
-                ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.DefaultHide | ImGuiTableColumnFlags.WidthFixed, 90 * ImGuiHelpers.GlobalScale);
-                ImGui.TableHeadersRow();
-                if (ImGui.IsItemHovered()) ImGui.SetTooltip("Right-click table headings to choose columns.");
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SDCD1D5223F73B3A9"), ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.NoHide);
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SB7BDF7A2D6E73E58"), ImGuiTableColumnFlags.WidthFixed, 78 * ImGuiHelpers.GlobalScale);
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S4F3A9BD003974A5E"), ImGuiTableColumnFlags.DefaultHide | ImGuiTableColumnFlags.WidthFixed, 44 * ImGuiHelpers.GlobalScale);
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SB4777CCC172FB07E"), ImGuiTableColumnFlags.DefaultHide | ImGuiTableColumnFlags.WidthFixed, 55 * ImGuiHelpers.GlobalScale);
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S78AE647DC5544D22"), ImGuiTableColumnFlags.DefaultHide | ImGuiTableColumnFlags.WidthFixed, 90 * ImGuiHelpers.GlobalScale);
+                global::XASlave.Localization.UiNative.TableHeadersRow();
+                if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S89F87BAA1D272788"));
                 var specs = ImGui.TableGetSortSpecs();
                 var column = specs.SpecsCount > 0 ? specs.Specs.ColumnIndex : 0;
                 var descending = specs.SpecsCount > 0 && specs.Specs.SortDirection == ImGuiSortDirection.Descending;
@@ -187,7 +187,7 @@ public sealed class NearbyPlayersWindow : Window
                             finally { ImGui.PopStyleColor(); }
                             if (ImGui.IsItemHovered())
                             {
-                                ImGui.SetTooltip(XAPeepData.FormatDisplayName(player.Name, player.HomeWorldId) + "\nRight-click for player actions.");
+                                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.FormatKey("SE696E5DB0AF3C7E3", XAPeepData.FormatDisplayName(player.Name, player.HomeWorldId)));
                             }
                             if (ImGui.BeginPopupContextItem("PlayerActions"))
                             {
@@ -195,14 +195,14 @@ public sealed class NearbyPlayersWindow : Window
                                 {
                                     ImGui.TextUnformatted(XAPeepData.FormatDisplayName(player.Name, player.HomeWorldId));
                                     ImGui.Separator();
-                                    if (ImGui.MenuItem("Locate on map")) service.Locate(player);
-                                    if (ImGui.MenuItem("Target")) service.PlayerAction(player, NearbyPlayerAction.Target);
-                                    if (ImGui.MenuItem("Examine")) service.PlayerAction(player, NearbyPlayerAction.Examine);
-                                    if (ImGui.MenuItem("View adventurer plate")) service.PlayerAction(player, NearbyPlayerAction.AdventurerPlate);
-                                    if (ImGui.MenuItem("Focus target")) service.PlayerAction(player, NearbyPlayerAction.FocusTarget);
-                                    if (ImGui.MenuItem("Send tell")) service.PlayerAction(player, NearbyPlayerAction.Tell);
-                                    if (ImGui.MenuItem("Invite to party")) service.PlayerAction(player, NearbyPlayerAction.Invite);
-                                    if (ImGui.MenuItem("Copy name")) ImGui.SetClipboardText(XAPeepData.FormatDisplayName(player.Name, player.HomeWorldId));
+                                    if (global::XASlave.Localization.UiNative.MenuItem(global::XASlave.Localization.UiLocale.Native("S5434358103491B1E"))) service.Locate(player);
+                                    if (global::XASlave.Localization.UiNative.MenuItem(global::XASlave.Localization.UiLocale.Native("S978354DB0C00FC78"))) service.PlayerAction(player, NearbyPlayerAction.Target);
+                                    if (global::XASlave.Localization.UiNative.MenuItem(global::XASlave.Localization.UiLocale.Native("S8898B9F2350B2BF3"))) service.PlayerAction(player, NearbyPlayerAction.Examine);
+                                    if (global::XASlave.Localization.UiNative.MenuItem(global::XASlave.Localization.UiLocale.Native("S9B9E05144E933D69"))) service.PlayerAction(player, NearbyPlayerAction.AdventurerPlate);
+                                    if (global::XASlave.Localization.UiNative.MenuItem(global::XASlave.Localization.UiLocale.Native("SB7538A8B7CF68241"))) service.PlayerAction(player, NearbyPlayerAction.FocusTarget);
+                                    if (global::XASlave.Localization.UiNative.MenuItem(global::XASlave.Localization.UiLocale.Native("S3868BA42376CE7DB"))) service.PlayerAction(player, NearbyPlayerAction.Tell);
+                                    if (global::XASlave.Localization.UiNative.MenuItem(global::XASlave.Localization.UiLocale.Native("S5A4C33CB8156EDBF"))) service.PlayerAction(player, NearbyPlayerAction.Invite);
+                                    if (global::XASlave.Localization.UiNative.MenuItem(global::XASlave.Localization.UiLocale.Native("SA037E5315EC804AA"))) ImGui.SetClipboardText(XAPeepData.FormatDisplayName(player.Name, player.HomeWorldId));
                                 }
                                 finally { ImGui.EndPopup(); }
                             }
@@ -211,7 +211,7 @@ public sealed class NearbyPlayersWindow : Window
                         {
                             DrawDirection(player, local, cameraHeading);
                             ImGui.SameLine(0, 3);
-                            ImGui.TextUnformatted(local == null ? "-" : $"{Distance(player, local):0} y");
+                            ImGui.TextUnformatted(local == null ? "-" : global::XASlave.Localization.UiLocale.FormatKey("S022360940B8A0886", Distance(player, local)));
                         }
                         if (ImGui.TableNextColumn()) ImGui.TextUnformatted(Job(player.JobId));
                         if (ImGui.TableNextColumn()) ImGui.TextUnformatted(player.CompanyTag);
@@ -247,7 +247,7 @@ public sealed class NearbyPlayersWindow : Window
         ImGui.GetWindowDrawList().AddTriangleFilled(center + forward * size * 0.45f,
             center - forward * size * 0.3f + side * size * 0.25f,
             center - forward * size * 0.3f - side * size * 0.25f, ImGui.GetColorU32(ImGuiCol.Text));
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Direction relative to the camera");
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S9A10ECADEDB2B132"));
     }
 
     private ISharedImmediateTexture? JobIcon(uint job)

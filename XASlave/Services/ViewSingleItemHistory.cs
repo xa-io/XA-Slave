@@ -9,7 +9,36 @@ using Microsoft.Data.Sqlite;
 namespace XASlave.Services;
 
 internal sealed record ViewSingleItemHistoryEntry(long Id, string PlayerName, ushort World,
-    DateTime CapturedUtc, ViewSingleItemCapture? Capture, string Error);
+    DateTime CapturedUtc, ViewSingleItemCapture? Capture, string Error)
+{
+    private sealed record Presentation(global::XASlave.Localization.UiMessage? ErrorMessage, global::XASlave.Localization.UiMessage? NameMessage);
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ViewSingleItemHistoryEntry, Presentation> Presentations = new();
+    private static readonly Presentation EmptyPresentation = new(null, null);
+    private Presentation Messages => Presentations.TryGetValue(this, out var value) ? value : EmptyPresentation;
+    internal global::XASlave.Localization.UiMessage? ErrorMessage
+    {
+        get => Messages.ErrorMessage;
+        init => Presentations.AddOrUpdate(this, Messages with { ErrorMessage = value });
+    }
+    internal global::XASlave.Localization.UiMessage? NameMessage
+    {
+        get => Messages.NameMessage;
+        init => Presentations.AddOrUpdate(this, Messages with { NameMessage = value });
+    }
+    private ViewSingleItemHistoryEntry(ViewSingleItemHistoryEntry original)
+    {
+        Id = original.Id;
+        PlayerName = original.PlayerName;
+        World = original.World;
+        CapturedUtc = original.CapturedUtc;
+        Capture = original.Capture;
+        Error = original.Error;
+        if (Presentations.TryGetValue(original, out var presentation)) Presentations.Add(this, presentation);
+    }
+    internal global::XASlave.Localization.UiMessage ErrorPresentation => global::XASlave.Localization.UiMessage.Capture(ErrorMessage, Error);
+    internal string LocalizedError => ErrorPresentation.Display;
+    internal string LocalizedPlayerName => global::XASlave.Localization.UiMessage.Resolve(NameMessage, PlayerName);
+}
 
 // Serialized background I/O: Draw reads an immutable list and never opens SQLite.
 // Each operation owns its connection; no worker touches game or plugin services.
@@ -21,7 +50,7 @@ internal sealed class ViewSingleItemHistory : IDisposable
     private int queued;
     private bool disposed;
     private ViewSingleItemHistoryEntry[] entries = Array.Empty<ViewSingleItemHistoryEntry>();
-    private string status = "History has not been loaded.";
+    private string status = global::XASlave.Localization.UiLocale.Native("SF295265E61972A9B");
 
     internal ViewSingleItemHistory(string path)
     {
@@ -30,8 +59,11 @@ internal sealed class ViewSingleItemHistory : IDisposable
     }
 
     internal IReadOnlyList<ViewSingleItemHistoryEntry> Entries => Volatile.Read(ref entries);
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("SF295265E61972A9B");
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(statusMessage, status);
+    internal string LocalizedStatus => StatusMessage.Display;
     internal string Status => Volatile.Read(ref status);
-    internal void ReportFailure(Exception error) => Volatile.Write(ref status, "History save failed: " + error.Message);
+    internal void ReportFailure(Exception error) => Volatile.Write(ref status, global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("SD38FE60DECA3EA65" , global::XASlave.Localization.UiMessage.FromException(error))));
 
     internal void Load() => Enqueue(null);
 
@@ -48,14 +80,14 @@ internal sealed class ViewSingleItemHistory : IDisposable
         {
             if (disposed) return;
             if (queued >= 8)
-            { Volatile.Write(ref status, "History is busy; this request could not be queued."); return; }
+            { Volatile.Write(ref status, global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SDB204E0437A2E0C0"))); return; }
             queued++;
-            Volatile.Write(ref status, "Updating local history...");
+            Volatile.Write(ref status, global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S4FBA1D4B747601FE")));
             pending = pending.ContinueWith(_ =>
             {
                 try { Process(captureJson); }
                 catch (Exception error)
-                { Volatile.Write(ref status, "History unavailable: " + error.Message); }
+                { Volatile.Write(ref status, global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S62F2F0E1363D374F" , global::XASlave.Localization.UiMessage.FromException(error)))); }
                 finally { lock (sync) queued--; }
             }, CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
         }
@@ -80,9 +112,9 @@ internal sealed class ViewSingleItemHistory : IDisposable
         }
         if (captureJson != null)
         {
-            if (captureJson.Length > 32768) throw new InvalidOperationException("The captured outfit is too large.");
+            if (captureJson.Length > 32768) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S44DA0EBAB854E7BF"), originalMessageText => new InvalidOperationException(originalMessageText));
             var capture = JsonSerializer.Deserialize<ViewSingleItemCapture>(captureJson)
-                ?? throw new InvalidOperationException("The captured outfit is empty.");
+                ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S8EFF2C9324FAAA68"), originalMessageText => new InvalidOperationException(originalMessageText));
             capture.Validate();
             using var transaction = connection.BeginTransaction();
             using var insert = connection.CreateCommand();
@@ -110,7 +142,9 @@ internal sealed class ViewSingleItemHistory : IDisposable
         var result = new List<ViewSingleItemHistoryEntry>();
         while (reader.Read())
         {
-            var name = "Unreadable capture";
+            var nameMessage = global::XASlave.Localization.UiMessage.Key("SB28344DBEC2C16EA");
+            var name = nameMessage.Original;
+            global::XASlave.Localization.UiMessage? errorMessage = null;
             long world = 0;
             var time = DateTime.MinValue;
             ViewSingleItemCapture? capture = null;
@@ -121,19 +155,19 @@ internal sealed class ViewSingleItemHistory : IDisposable
                 world = reader.GetInt64(2);
                 if (!DateTime.TryParse(reader.GetString(3), CultureInfo.InvariantCulture,
                     DateTimeStyles.RoundtripKind, out time))
-                    throw new InvalidOperationException("The saved capture date is invalid.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S5C6368600BBD6B44"), originalMessageText => new InvalidOperationException(originalMessageText));
                 capture = JsonSerializer.Deserialize<ViewSingleItemCapture>(reader.GetString(4));
-                if (capture == null) throw new InvalidOperationException("The saved outfit is empty.");
+                if (capture == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S7DA95E7C8795AA23"), originalMessageText => new InvalidOperationException(originalMessageText));
                 capture.Validate();
                 if (capture.PlayerName != name || capture.World != world || capture.CapturedUtc != time)
-                    throw new InvalidOperationException("The saved outfit identity does not match.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2DA3D5CF04599CFA"), originalMessageText => new InvalidOperationException(originalMessageText));
             }
-            catch (Exception failure) { capture = null; error = failure.Message; }
+            catch (Exception failure) { capture = null; error = global::XASlave.Localization.UiMessage.Store(ref errorMessage, global::XASlave.Localization.UiMessage.FromException(failure)); }
             result.Add(new(reader.GetInt64(0), name, world is > 0 and <= ushort.MaxValue ? (ushort)world : (ushort)0,
-                time, capture, error));
+                time, capture, error) { ErrorMessage = errorMessage, NameMessage = nameMessage });
         }
         Volatile.Write(ref entries, result.ToArray());
-        Volatile.Write(ref status, $"{result.Count}/100 saved captures. Only View Single Item captures are saved.");
+        Volatile.Write(ref status, global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S43FDEAD2CAAF33E3" , result.Count)));
     }
 
     public void Dispose()

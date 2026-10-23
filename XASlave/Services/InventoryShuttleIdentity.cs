@@ -11,7 +11,7 @@ internal readonly record struct InventoryShuttleItemState(uint FullId, uint Base
 {
     internal static unsafe InventoryShuttleItemState Read(InventoryItem* slot)
     {
-        if (slot == null || slot->IsSymbolic) throw new InvalidOperationException("Symbolic or unavailable inventory slots are not supported.");
+        if (slot == null || slot->IsSymbolic) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S689F20BF12F4C2E9"), originalMessage => new InvalidOperationException(originalMessage));
         ulong materia = 0, grades = 0;
         for (var index = 0; index < 5; index++)
         {

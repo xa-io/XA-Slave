@@ -14,6 +14,7 @@ public partial class SlaveWindow
     private AutoRetainerExclusionSnapshot? arTaskExclusionSnapshot;
     private bool arTaskExclusionsInitialized;
     private string arTaskExclusionError = string.Empty;
+    private global::XASlave.Localization.UiMessage? arTaskExclusionErrorUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
     private bool CanChangeAutoRetainerExclusions()
         => !plugin.TaskRunner.IsRunning && !xagmanRunning && !xagmanTradeSafetySessionActive;
@@ -34,7 +35,7 @@ public partial class SlaveWindow
         try
         {
             arTaskExclusionSnapshot = plugin.ArConfigReader.ReadExclusionSnapshot();
-            arTaskExclusionError = string.Empty;
+            arTaskExclusionError = global::XASlave.Localization.UiMessage.Store(ref arTaskExclusionErrorUiMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
             if (pruneSelections)
                 PruneAllAutoRetainerExcludedSelections();
             return true;
@@ -43,7 +44,7 @@ public partial class SlaveWindow
         {
             // Preserve saved rows and selections, but do not allow an unchecked roster to run.
             arTaskExclusionSnapshot = null;
-            arTaskExclusionError = $"Exclusions unavailable: {ex.Message}";
+            arTaskExclusionError = global::XASlave.Localization.UiMessage.Store(ref arTaskExclusionErrorUiMessage, global::XASlave.Localization.UiMessage.Format("SBB2D86A75E1F07AD", global::XASlave.Localization.UiMessage.FromException(ex)));
             PruneAllAutoRetainerExcludedSelections();
             return false;
         }
@@ -52,7 +53,7 @@ public partial class SlaveWindow
     private List<AutoRetainerConfigReader.ArCharacterInfo> ReadAutoRetainerCharactersForTask(bool honorExclusions)
     {
         if (honorExclusions && !CanChangeAutoRetainerExclusions())
-            throw new InvalidOperationException("Stop active automation before refreshing honored AutoRetainer exclusions.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0F59484A76C0487B"), original => new InvalidOperationException(original));
         try
         {
             // Keep all imported rows so switching Honor Exclusions off restores them without another import.
@@ -61,8 +62,8 @@ public partial class SlaveWindow
             {
                 arTaskExclusionsInitialized = true;
                 arTaskExclusionSnapshot = plugin.ArConfigReader.LastExclusionSnapshot
-                    ?? throw new InvalidDataException("AutoRetainer exclusions could not be read; existing roster data was preserved.");
-                arTaskExclusionError = string.Empty;
+                    ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S5E0D70BB12102D87"), original => new InvalidDataException(original));
+                arTaskExclusionError = global::XASlave.Localization.UiMessage.Store(ref arTaskExclusionErrorUiMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
                 PruneAllAutoRetainerExcludedSelections();
             }
             return characters;
@@ -71,7 +72,7 @@ public partial class SlaveWindow
         {
             arTaskExclusionsInitialized = true;
             arTaskExclusionSnapshot = null;
-            arTaskExclusionError = $"Exclusions unavailable: {ex.Message}";
+            arTaskExclusionError = global::XASlave.Localization.UiMessage.Store(ref arTaskExclusionErrorUiMessage, global::XASlave.Localization.UiMessage.Format("SBB2D86A75E1F07AD", global::XASlave.Localization.UiMessage.FromException(ex)));
             PruneAllAutoRetainerExcludedSelections();
             throw;
         }
@@ -85,7 +86,7 @@ public partial class SlaveWindow
         ImGui.SameLine();
         using (ImRaii.Disabled(!CanChangeAutoRetainerExclusions()))
         {
-            if (ImGui.Checkbox($"Honor Exclusions##{id}", ref honorExclusions))
+            if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S9CF500B411EB366C") + $"##{id}"), ref honorExclusions))
             {
                 setValue(honorExclusions);
                 if (honorExclusions)
@@ -96,18 +97,18 @@ public partial class SlaveWindow
             }
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip("Saved separately for this task. Hide and uncheck AutoRetainer's globally excluded characters, including already imported rows. Turn off to show them again without selecting them. Saved rows are retained. Stop active automation before changing this option.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S3A8AF9CC1690654E"));
 
         if (honorExclusions && !string.IsNullOrEmpty(arTaskExclusionError))
         {
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(1f, 0.45f, 0.35f, 1f), "Exclusions unavailable");
+            ImGui.TextColored(new Vector4(1f, 0.45f, 0.35f, 1f), global::XASlave.Localization.UiLocale.Get("S3C7A854F8BAC7B5D"));
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip(arTaskExclusionError + "\nThis task's characters cannot be selected until Retry succeeds or Honor Exclusions is turned off.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.FormatKey("S6146A7ADFE5103AB", global::XASlave.Localization.UiMessage.Resolve(ref arTaskExclusionErrorUiMessage, arTaskExclusionError)));
             ImGui.SameLine();
             using (ImRaii.Disabled(!CanChangeAutoRetainerExclusions()))
             {
-                if (ImGui.SmallButton($"Retry##arExclusions{id}"))
+                if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S942087CC2D41E013") + $"##arExclusions{id}")))
                 {
                     RefreshAutoRetainerExclusions();
                     pruneSelection();
@@ -144,7 +145,7 @@ public partial class SlaveWindow
         if (cfg.XagmanHonorArExclusions)
         {
             ResetXagmanMatchingCharacterSelection();
-            StopXagmanTonyAutoSelection("Auto: exclusions refreshed. Run Auto again to check eligible characters.");
+            StopXagmanTonyAutoSelection(global::XASlave.Localization.UiMessage.Key("S51F9A4C091CC0626"));
             InvalidateXagmanTradeCapacityForecast();
         }
     }

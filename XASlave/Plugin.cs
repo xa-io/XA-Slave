@@ -18,6 +18,7 @@ using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using XASlave.Data;
+using XASlave.Localization;
 using XASlave.Services;
 using XASlave.Windows;
 
@@ -162,7 +163,11 @@ public sealed class Plugin : IDalamudPlugin
         Func<bool> GetCurrent,
         Func<bool, bool> Apply,
         Action<bool> Store,
-        Func<string> GetStatusText);
+        Func<global::XASlave.Localization.UiMessage> GetStatusMessage)
+    {
+        internal string GetStatusText() => GetStatusMessage().Original;
+        internal global::XASlave.Localization.UiMessage DisplayNameMessage => global::XASlave.Localization.UiMessage.Authored(DisplayName);
+    }
 
     private readonly record struct XAModToggleCommandDefinition(
         string Subcommand,
@@ -301,6 +306,7 @@ public sealed class Plugin : IDalamudPlugin
     private UiFlags appliedSpecialRenderUiFlags;
     private bool hasAppliedSpecialRenderUiFlags;
     private bool isDisposed;
+    private UiLocaleFonts? uiLocaleFonts;
     private bool xaModMutationPending;
     private readonly Queue<DeferredStartupAction> deferredStartupActions = new();
     private readonly Queue<PostLoadXAModActivation> postLoadXAModActivations = new();
@@ -329,6 +335,8 @@ public sealed class Plugin : IDalamudPlugin
         try
         {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        UiLocale.Initialize(Configuration);
+        uiLocaleFonts = new UiLocaleFonts(PluginInterface.UiBuilder);
         var livePullsWereEnabled = Configuration.IpcLivePullsEnabled;
         Configuration.IpcLivePullsEnabled = false;
         var protectedRiskyToonModsReset = Configuration.UnlockExpertDeliveryEnabled || Configuration.MoveableAfterDeathEnabled;
@@ -1327,15 +1335,11 @@ public sealed class Plugin : IDalamudPlugin
             AllowedInMacros = true,
         });
 
+        PluginInterface.UiBuilder.Draw += PrepareLocalizedUi;
         PluginInterface.UiBuilder.Draw += UpdateEurekaLogogramCreatorOverlayWindows;
         PluginInterface.UiBuilder.Draw += NearbyPlayersWindow.PrepareDraw;
         PluginInterface.UiBuilder.Draw += DrawWindowSystemOnGameThread;
-        PluginInterface.UiBuilder.Draw += BetterCompanyChest.DrawOverlay;
-        PluginInterface.UiBuilder.Draw += AutoOpenMoogleMail.DrawOverlay;
-        PluginInterface.UiBuilder.Draw += BetterCastBar.DrawOverlay;
-        PluginInterface.UiBuilder.Draw += BetterDutyFinder.DrawOverlay;
-        PluginInterface.UiBuilder.Draw += XAPeep.DrawOverlay;
-        PluginInterface.UiBuilder.Draw += NearbyPlayersWindow.DrawOverlay;
+        PluginInterface.UiBuilder.Draw += DrawLocalizedOverlays;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleMainUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
@@ -1370,7 +1374,38 @@ public sealed class Plugin : IDalamudPlugin
 
     private void DrawWindowSystemOnGameThread()
     {
-        RunOnGameThread(() => { WindowSystem.Draw(); AutoRestoreFurniture.DrawResults(); }).GetAwaiter().GetResult();
+        RunOnGameThread(() =>
+        {
+            if (uiLocaleFonts is not { IsReady: true })
+            {
+                // Loading or an unavailable language must not open a window when XA Slave is closed.
+                if (WindowSystem.Windows.Any(window => window.IsOpen))
+                    uiLocaleFonts?.DrawStatus(Configuration);
+                return;
+            }
+            using var font = uiLocaleFonts.Push();
+            WindowSystem.Draw();
+            AutoRestoreFurniture.DrawResults();
+        }).GetAwaiter().GetResult();
+    }
+
+    private void PrepareLocalizedUi() => uiLocaleFonts?.BeginFrame();
+
+    private void DrawLocalizedOverlays()
+    {
+        if (uiLocaleFonts is not { IsReady: true })
+        {
+            // Cast state is also refreshed by this callback; do not suppress it while fonts load.
+            BetterCastBar.DrawOverlay();
+            return;
+        }
+        using var font = uiLocaleFonts.Push();
+        BetterCompanyChest.DrawOverlay();
+        AutoOpenMoogleMail.DrawOverlay();
+        BetterCastBar.DrawOverlay();
+        BetterDutyFinder.DrawOverlay();
+        XAPeep.DrawOverlay();
+        NearbyPlayersWindow.DrawOverlay();
     }
 
     private void QueueDeferredStartupAction(string name, Action action, [CallerLineNumber] int lineNumber = 0)
@@ -1804,16 +1839,12 @@ public sealed class Plugin : IDalamudPlugin
 
         // Detach public-facing callbacks first so a reload cannot re-enter partially disposed UI or services.
         TryCleanup("AutoRetainerUiReflectionService.Dispose", AutoRetainerUiReflectionService.Dispose);
+        TryCleanup("UiBuilder.Draw -= PrepareLocalizedUi", () => PluginInterface.UiBuilder.Draw -= PrepareLocalizedUi);
         TryCleanup("UiBuilder.Draw -= UpdateEurekaLogogramCreatorOverlayWindows", () => PluginInterface.UiBuilder.Draw -= UpdateEurekaLogogramCreatorOverlayWindows);
         TryCleanup("UiBuilder.Draw -= DrawWindowSystemOnGameThread", () => PluginInterface.UiBuilder.Draw -= DrawWindowSystemOnGameThread);
-        TryCleanup("UiBuilder.Draw -= BetterCompanyChest.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterCompanyChest.DrawOverlay);
-        TryCleanup("UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= AutoOpenMoogleMail.DrawOverlay);
-        TryCleanup("UiBuilder.Draw -= BetterCastBar.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterCastBar.DrawOverlay);
-        TryCleanup("UiBuilder.Draw -= BetterDutyFinder.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= BetterDutyFinder.DrawOverlay);
+        TryCleanup("UiBuilder.Draw -= DrawLocalizedOverlays", () => PluginInterface.UiBuilder.Draw -= DrawLocalizedOverlays);
         TryCleanup("UiBuilder.Draw -= NearbyPlayersWindow.PrepareDraw", () => PluginInterface.UiBuilder.Draw -= NearbyPlayersWindow.PrepareDraw);
-        TryCleanup("UiBuilder.Draw -= NearbyPlayersWindow.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= NearbyPlayersWindow.DrawOverlay);
         TryCleanup("Clear shared Peep visual", () => XAPeep.SharedTargeterVisual = null);
-        TryCleanup("UiBuilder.Draw -= XAPeep.DrawOverlay", () => PluginInterface.UiBuilder.Draw -= XAPeep.DrawOverlay);
         TryCleanup("UiBuilder.OpenConfigUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenConfigUi -= ToggleMainUi);
         TryCleanup("UiBuilder.OpenMainUi -= ToggleMainUi", () => PluginInterface.UiBuilder.OpenMainUi -= ToggleMainUi);
         TryCleanup("ClientState.Login -= OnLogin", () => ClientState.Login -= OnLogin);
@@ -1830,6 +1861,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("NativeUiLibrary", NativeUiLibrary);
         TryDispose("MessageLog", MessageLog);
         TryCleanup("WindowSystem.RemoveAllWindows", () => WindowSystem?.RemoveAllWindows());
+        TryDispose("UI language fonts", uiLocaleFonts);
         TryCleanup("RestoreSpecialRenderModes", () =>
         {
             if (hasAppliedSpecialRenderUiFlags)
@@ -2299,47 +2331,72 @@ public sealed class Plugin : IDalamudPlugin
         ChatGui.PrintError("[XASlave] That is not a command, please read `/xa commands`.");
     }
 
-    private bool TryStartFieldEntryCommand(string arguments, out string message)
+    private bool TryStartFieldEntryCommand(string arguments, out string message) => TryStartFieldEntryCommandLocalizedCore(out _, arguments, out message);
+    private bool TryStartFieldEntryCommandMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryStartFieldEntryCommandLocalizedCore(out var presentation, arguments, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryStartFieldEntryCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    {
+        replyPresentation = null;
         var value = arguments.Trim();
         if (string.IsNullOrWhiteSpace(value))
         {
-            message = FieldEntryCommand.BuildUsageText();
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, FieldEntryCommand.BuildUsageMessage());
             return false;
         }
 
         var started = FieldEntryCommand.TryStart(value);
-        message = !started && FieldEntryCommand.StatusText.StartsWith("Unavailable", StringComparison.OrdinalIgnoreCase)
-            ? FieldEntryCommand.StatusText
-            : FieldEntryCommand.LastActionText;
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (!started && FieldEntryCommand.StatusText.StartsWith("Unavailable", StringComparison.OrdinalIgnoreCase) ? FieldEntryCommand.StatusTextMessage : FieldEntryCommand.LastActionTextMessage));
         return started;
     }
 
-    private bool TryHandleXagmanCommand(string subcommandArgs, out string message)
+    private bool TryHandleXagmanCommand(string subcommandArgs, out string message) => TryHandleXagmanCommandLocalizedCore(out _, subcommandArgs, out message);
+    private bool TryHandleXagmanCommandMessage(string subcommandArgs, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryHandleXagmanCommandLocalizedCore(out var presentation, subcommandArgs, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryHandleXagmanCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string subcommandArgs, out string message)
+    {
+        replyPresentation = null;
         if (subcommandArgs.Equals("mini", StringComparison.OrdinalIgnoreCase)
             || subcommandArgs.Equals("m", StringComparison.OrdinalIgnoreCase))
         {
             XagmanMiniWindow.Toggle();
-            message = "Toggled Xagman Mini.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SE36CBCCE01F937EE"));
             return true;
         }
 
-        message = "Usage: /xa xagman mini (or /xa xagman m)";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S8A272E27F304D904"));
         return false;
     }
 
-    private unsafe bool TryOpenMoogleMailCommand(string arguments, out string message)
+    private unsafe bool TryOpenMoogleMailCommand(string arguments, out string message) => TryOpenMoogleMailCommandLocalizedCore(out _, arguments, out message);
+    private bool TryOpenMoogleMailCommandMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryOpenMoogleMailCommandLocalizedCore(out var presentation, arguments, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private unsafe bool TryOpenMoogleMailCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    {
+        replyPresentation = null;
         if (!string.IsNullOrWhiteSpace(arguments))
         {
-            message = "Usage: /xa mail.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S3612262D79494194"));
             return false;
         }
 
         if (!ClientState.IsLoggedIn)
         {
-            message = "Log in before opening Moogle Mail.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S8CEE3AFBE4BC9781"));
             return false;
         }
 
@@ -2347,65 +2404,83 @@ public sealed class Plugin : IDalamudPlugin
         {
             if (AddonHelper.IsAddonVisible("LetterList"))
             {
-                message = "Moogle Mail is already open.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S41989561C0A3530B"));
                 return true;
             }
 
             var agentModule = FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentModule.Instance();
             if (agentModule == null)
             {
-                message = "Moogle Mail is unavailable: AgentModule could not be resolved.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S34785B73CA84F251"));
                 return false;
             }
 
             var agent = agentModule->GetAgentByInternalId(FFXIVClientStructs.FFXIV.Client.UI.Agent.AgentId.Letter);
             if (agent == null)
             {
-                message = "Moogle Mail is unavailable: the Letter List agent could not be resolved.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S36C690EB6CCB8A7B"));
                 return false;
             }
 
             agent->Show();
-            message = "Requested the Moogle Mail window.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S2ABBF4DF230AB475"));
             return true;
         }
         catch (Exception ex)
         {
             Log.Warning(ex, "[XASlave] Failed to open Moogle Mail from /xa mail.");
-            message = "Moogle Mail could not be opened; see the plugin log.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S3BE9FC51F1E0B044"));
             return false;
         }
     }
 
-    private bool TryRequestItemSort(string arguments, out string message)
+    private bool TryRequestItemSort(string arguments, out string message) => TryRequestItemSortLocalizedCore(out _, arguments, out message);
+    private bool TryRequestItemSortMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryRequestItemSortLocalizedCore(out var presentation, arguments, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryRequestItemSortLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    {
+        replyPresentation = null;
         if (!string.IsNullOrWhiteSpace(arguments))
         {
-            message = "Usage: /xa sort.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S94DB6BCDE110338A"));
             return false;
         }
         if (!Configuration.AutoSortItemsEnabled)
         {
-            message = "Enable Auto Sort Items in XA Mods before using /xa sort.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SB9609328D8CA3209"));
             return false;
         }
         if (AutoSortItems.IsRunning)
         {
-            message = "Auto Sort Items already has a pending or running request.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S7536DFE013F18A70"));
             return false;
         }
         AutoSortItems.SortNow();
-        message = AutoSortItems.StatusText;
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, AutoSortItems.StatusTextMessage);
         return AutoSortItems.IsRunning;
     }
 
-    public bool TryExecuteXaCommandFromIpc(string rawCommand, out string message)
+    public bool TryExecuteXaCommandFromIpc(string rawCommand, out string message) => TryExecuteXaCommandFromIpcLocalizedCore(out _, rawCommand, out message);
+    internal bool TryExecuteXaCommandFromIpcMessage(string rawCommand, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryExecuteXaCommandFromIpcLocalizedCore(out var presentation, rawCommand, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryExecuteXaCommandFromIpcLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string rawCommand, out string message)
+    {
+        replyPresentation = null;
         var trimmed = NormalizeXaCommandInput(rawCommand);
         if (string.IsNullOrEmpty(trimmed))
         {
             SlaveWindow.Toggle();
-            message = "Toggled XA Slave.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S5575B10FD067C9E2"));
             return true;
         }
 
@@ -2414,22 +2489,22 @@ public sealed class Plugin : IDalamudPlugin
         var subcommandArgs = firstSpaceIndex >= 0 ? trimmed[(firstSpaceIndex + 1)..].Trim() : string.Empty;
 
         if (subcommand.Equals("xagman", StringComparison.OrdinalIgnoreCase))
-            return TryHandleXagmanCommand(subcommandArgs, out message);
+            return TryHandleXagmanCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (IsXaModsSubcommand(subcommand))
         {
             SlaveWindow.OpenXAModsTask();
-            message = "Opened XA Mods.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S8ECF4D07DCEFE01A"));
             return true;
         }
 
         if (IsFieldEntrySubcommand(subcommand))
-            return TryStartFieldEntryCommand(subcommandArgs, out message);
+            return TryStartFieldEntryCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("commands", StringComparison.OrdinalIgnoreCase))
         {
             SlaveWindow.OpenCommandsReferenceTask();
-            message = "Opened Commands reference.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SAFF0F4955451BD0E"));
             return true;
         }
 
@@ -2439,28 +2514,28 @@ public sealed class Plugin : IDalamudPlugin
         if (subcommand.Equals("updates", StringComparison.OrdinalIgnoreCase))
         {
             UpdatesWindow.Toggle();
-            message = "Toggled XA Slave version history.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S9872248B40B3D0BA"));
             return true;
         }
 
         if (subcommand.Equals("nearby", StringComparison.OrdinalIgnoreCase))
-            return TryHandleNearbyPlayersCommand(subcommandArgs, out message);
+            return TryHandleNearbyPlayersCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("peep", StringComparison.OrdinalIgnoreCase))
-            return TryHandleXAPeepCommand(subcommandArgs, out message);
+            return TryHandleXAPeepCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("viewitem", StringComparison.OrdinalIgnoreCase))
-            return TryOpenViewItemCommand(subcommandArgs, out message);
+            return TryOpenViewItemCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("outfits", StringComparison.OrdinalIgnoreCase))
         {
             InspectOutfitHistoryWindow.Open(subcommandArgs);
-            message = "Opened outfit history.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S250F473EE9E41CDA"));
             return true;
         }
 
         if (subcommand.Equals("mail", StringComparison.OrdinalIgnoreCase))
-            return TryOpenMoogleMailCommand(subcommandArgs, out message);
+            return TryOpenMoogleMailCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("db", StringComparison.OrdinalIgnoreCase))
             return DropboxQueue.TryExecute(subcommandArgs, out message);
@@ -2472,46 +2547,46 @@ public sealed class Plugin : IDalamudPlugin
             return SlaveWindow.TryExecuteNpcSellCommand(subcommandArgs, out message);
 
         if (subcommand.Equals("sort", StringComparison.OrdinalIgnoreCase))
-            return TryRequestItemSort(subcommandArgs, out message);
+            return TryRequestItemSortLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("sit", StringComparison.OrdinalIgnoreCase))
         {
             var success = DozeSitAnywhere.RequestSit();
-            message = success ? "Triggered Sit Anywhere." : DozeSitAnywhere.StatusText;
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (success ? global::XASlave.Localization.UiMessage.Key("SF9024A5925AA7BB0") : DozeSitAnywhere.StatusTextMessage));
             return success;
         }
 
         if (subcommand.Equals("doze", StringComparison.OrdinalIgnoreCase))
         {
             var success = DozeSitAnywhere.RequestDoze();
-            message = success ? "Triggered Doze Anywhere." : DozeSitAnywhere.StatusText;
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (success ? global::XASlave.Localization.UiMessage.Key("S016DB5FE1D2E5EEC") : DozeSitAnywhere.StatusTextMessage));
             return success;
         }
 
         if (subcommand.Equals("logout", StringComparison.OrdinalIgnoreCase))
         {
-            var success = TryRequestLogoutAction(out message);
+            var success = TryRequestLogoutActionLocalizedCore(out replyPresentation, out message);
             if (success)
-                message = "Triggered XA hard logout.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SD5CF617D7DE48773"));
             return success;
         }
 
         if (subcommand.Equals("killgame", StringComparison.OrdinalIgnoreCase))
         {
-            var success = TryRequestKillGameAction(out message);
+            var success = TryRequestKillGameActionLocalizedCore(out replyPresentation, out message);
             if (success)
-                message = "Triggered XA kill-game flow.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SA9CACA0353FA2468"));
             return success;
         }
 
         if (subcommand.Equals("preset", StringComparison.OrdinalIgnoreCase))
-            return TryHandlePresetCommandFromIpc(subcommandArgs, out message);
+            return TryHandlePresetCommandFromIpcLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("lowres", StringComparison.OrdinalIgnoreCase))
-            return TryApplyLowResolutionCommand(subcommandArgs, out message);
+            return TryApplyLowResolutionCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("res", StringComparison.OrdinalIgnoreCase))
-            return TryHandleResolutionCommand(subcommandArgs, out message);
+            return TryHandleResolutionCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("clearlog", StringComparison.OrdinalIgnoreCase))
             return DalamudLogCleaner.TryClean(subcommandArgs, out message);
@@ -2520,31 +2595,31 @@ public sealed class Plugin : IDalamudPlugin
             return ItemCommands.TryExecuteEquipCommand(subcommandArgs, out message);
 
         if (subcommand.Equals("sprintdelay", StringComparison.OrdinalIgnoreCase))
-            return TryApplySprintDelayCommand(subcommandArgs, out message);
+            return TryApplySprintDelayCommandLocalizedCore(out replyPresentation, subcommandArgs, out message);
 
         if (subcommand.Equals("allrestore", StringComparison.OrdinalIgnoreCase))
-            return RestoreAllXAMods(out message);
+            return RestoreAllXAModsLocalizedCore(out replyPresentation, out message);
 
         if (subcommand.Equals("resrestore", StringComparison.OrdinalIgnoreCase))
-            return RestoreXAModsSection(XAModsRestoreScope.Graphic, out message);
+            return RestoreXAModsSectionLocalizedCore(out replyPresentation, XAModsRestoreScope.Graphic, out message);
 
         if (subcommand.Equals("gamerestore", StringComparison.OrdinalIgnoreCase))
-            return RestoreXAModsSection(XAModsRestoreScope.Game, out message);
+            return RestoreXAModsSectionLocalizedCore(out replyPresentation, XAModsRestoreScope.Game, out message);
 
         if (subcommand.Equals("uirestore", StringComparison.OrdinalIgnoreCase))
-            return RestoreXAModsSection(XAModsRestoreScope.Ui, out message);
+            return RestoreXAModsSectionLocalizedCore(out replyPresentation, XAModsRestoreScope.Ui, out message);
 
         if (subcommand.Equals("playerrestore", StringComparison.OrdinalIgnoreCase))
-            return RestoreXAModsSection(XAModsRestoreScope.Player, out message);
+            return RestoreXAModsSectionLocalizedCore(out replyPresentation, XAModsRestoreScope.Player, out message);
 
         if (subcommand.Equals("pluginrestore", StringComparison.OrdinalIgnoreCase))
-            return RestoreXAModsSection(XAModsRestoreScope.Plugin, out message);
+            return RestoreXAModsSectionLocalizedCore(out replyPresentation, XAModsRestoreScope.Plugin, out message);
 
         if (subcommand.Equals("eurekarestore", StringComparison.OrdinalIgnoreCase))
-            return RestoreXAModsSection(XAModsRestoreScope.Eureka, out message);
+            return RestoreXAModsSectionLocalizedCore(out replyPresentation, XAModsRestoreScope.Eureka, out message);
 
         if (subcommand.Equals("imlegit", StringComparison.OrdinalIgnoreCase))
-            return RestoreXAModsSection(XAModsRestoreScope.Illegal, out message);
+            return RestoreXAModsSectionLocalizedCore(out replyPresentation, XAModsRestoreScope.Illegal, out message);
 
         if (SlaveWindow.TryExecuteXaMovementCommand(subcommand, subcommandArgs, out message, out var movementHandled))
             return true;
@@ -2557,20 +2632,20 @@ public sealed class Plugin : IDalamudPlugin
             if (string.IsNullOrWhiteSpace(subcommandArgs))
             {
                 var currentState = commandDefinition.Definition.GetCurrent() ? "On" : "Off";
-                message = $"{commandDefinition.Definition.DisplayName}: {currentState}. {commandDefinition.Definition.GetStatusText()} Usage: {commandDefinition.Usage}";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("SBC103D5B6D16EF2E", commandDefinition.Definition.DisplayNameMessage, global::XASlave.Localization.UiMessage.Authored(currentState), commandDefinition.Definition.GetStatusMessage(), commandDefinition.Usage));
                 return true;
             }
 
-            if (!TryParseToggleCommandState(subcommandArgs, out var enabled, out var toggleMessage))
+            if (!TryParseToggleCommandStateMessage(subcommandArgs, out var enabled, out var toggleMessage))
             {
-                message = $"{toggleMessage} Usage: {commandDefinition.Usage}";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S3F89ADB690212EC4", toggleMessage, commandDefinition.Usage));
                 return false;
             }
 
-            return SetXAModEnabled(commandDefinition.Definition, enabled, out message);
+            return SetXAModEnabledLocalizedCore(out replyPresentation, commandDefinition.Definition, enabled, out message);
         }
 
-        message = "That is not a command, please read `/xa commands`.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S8CE5A27047F8FF4F"));
         return false;
     }
 
@@ -2594,39 +2669,48 @@ public sealed class Plugin : IDalamudPlugin
         return ResolutionCommandParser.TryParseDimensions(value, out width, out height);
     }
 
-    private bool TryApplyLowResolutionCommand(string value, out string message)
+    private bool TryApplyLowResolutionCommand(string value, out string message) => TryApplyLowResolutionCommandLocalizedCore(out _, value, out message);
+    private bool TryApplyLowResolutionCommandMessage(string value, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryApplyLowResolutionCommandLocalizedCore(out var presentation, value, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryApplyLowResolutionCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string value, out string message)
+    {
+        replyPresentation = null;
         if (IsExplicitLowResolutionOff(value))
         {
             SystemWindowMods.SetLowResolutionEnabled(false);
             Configuration.LowResolutionEnabled = false;
             Configuration.Save();
-            message = "Low Resolution disabled.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S65EF8EE6B3CB8476"));
             return true;
         }
 
         if (IsExplicitLowResolutionOn(value))
         {
             Configuration.LowResolutionScale = SystemWindowModsService.ClampLowResolutionScale(Configuration.LowResolutionScale);
-            return SetXAModEnabled(GetXAModDefinition("low-resolution"), true, out message);
+            return SetXAModEnabledLocalizedCore(out replyPresentation, GetXAModDefinition("low-resolution"), true, out message);
         }
 
-        if (!TryParseLowResolutionCommand(value, out var scale, out message))
+        if (!TryParseLowResolutionCommandLocalizedCore(out replyPresentation, value, out var scale, out message))
             return false;
 
         Configuration.LowResolutionScale = scale;
         if (!Configuration.LowResolutionEnabled)
         {
-            if (!SetXAModEnabled(GetXAModDefinition("low-resolution"), true, out message))
+            if (!SetXAModEnabledLocalizedCore(out replyPresentation, GetXAModDefinition("low-resolution"), true, out message))
                 return false;
 
-            message = $"Low Resolution enabled and scale set to {scale:0.00}.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("SC42DF93BE6880226", scale));
             return true;
         }
 
         SystemWindowMods.ApplyLowResolutionConfiguration(scale);
         Configuration.Save();
-        message = $"Low Resolution scale set to {scale:0.00}.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S549CFC51E0E84DB3", scale));
         return true;
     }
 
@@ -2647,67 +2731,94 @@ public sealed class Plugin : IDalamudPlugin
             || value.Equals("0", StringComparison.OrdinalIgnoreCase);
     }
 
-    private static bool TryParseLowResolutionCommand(string value, out float scale, out string message)
+    private static bool TryParseLowResolutionCommand(string value, out float scale, out string message) => TryParseLowResolutionCommandLocalizedCore(out _, value, out scale, out message);
+    private static bool TryParseLowResolutionCommandMessage(string value, out float scale, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryParseLowResolutionCommandLocalizedCore(out var presentation, value, out scale, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private static bool TryParseLowResolutionCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string value, out float scale, out string message)
+    {
+        replyPresentation = null;
         scale = 0f;
         if (string.IsNullOrWhiteSpace(value))
         {
-            message = "Usage: /xa lowres on, /xa lowres <scale>, or /xa lowres off.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S23B492DD8A2F96B2"));
             return false;
         }
 
         if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out scale))
         {
-            message = "Usage: /xa lowres on, /xa lowres <scale>, or /xa lowres off.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S23B492DD8A2F96B2"));
             return false;
         }
 
         if (scale < 0.01f || scale > 1.00f)
         {
-            message = "Low Resolution scale must be between 0.01 and 1.00.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S856AE3E8C2ECF318"));
             return false;
         }
 
         scale = SystemWindowModsService.ClampLowResolutionScale(scale);
-        message = string.Empty;
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         return true;
     }
 
-    private bool TryHandlePresetCommand(string value, out string message)
+    private bool TryHandlePresetCommand(string value, out string message) => TryHandlePresetCommandLocalizedCore(out _, value, out message);
+    private bool TryHandlePresetCommandMessage(string value, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryHandlePresetCommandLocalizedCore(out var presentation, value, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryHandlePresetCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string value, out string message)
+    {
+        replyPresentation = null;
         var firstSpaceIndex = value.IndexOf(' ');
         var action = firstSpaceIndex >= 0 ? value[..firstSpaceIndex].Trim() : value.Trim();
         var actionArgs = firstSpaceIndex >= 0 ? value[(firstSpaceIndex + 1)..].Trim() : string.Empty;
 
         if (string.IsNullOrWhiteSpace(action))
         {
-            message = "Usage: /xa preset save <name>, /xa preset load <name>, or /xa preset list.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SCDD1E8CCA74D97F7"));
             return false;
         }
 
         if (action.Equals("save", StringComparison.OrdinalIgnoreCase))
-            return SaveCurrentXAModsPreset(actionArgs, out message);
+            return SaveCurrentXAModsPresetLocalizedCore(out replyPresentation, actionArgs, out message);
 
         if (action.Equals("load", StringComparison.OrdinalIgnoreCase))
-            return LoadSavedXAModsPreset(actionArgs, out message);
+            return LoadSavedXAModsPresetLocalizedCore(out replyPresentation, actionArgs, out message);
 
         if (action.Equals("list", StringComparison.OrdinalIgnoreCase))
         {
             PrintSavedXAModsPresetList();
-            message = string.Empty;
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Raw(string.Empty));
             return true;
         }
 
-        message = "Usage: /xa preset save <name>, /xa preset load <name>, or /xa preset list.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SCDD1E8CCA74D97F7"));
         return false;
     }
 
-    private bool SaveCurrentXAModsPreset(string name, out string message)
+    private bool SaveCurrentXAModsPreset(string name, out string message) => SaveCurrentXAModsPresetLocalizedCore(out _, name, out message);
+    private bool SaveCurrentXAModsPresetMessage(string name, out global::XASlave.Localization.UiMessage message)
     {
+        var success = SaveCurrentXAModsPresetLocalizedCore(out var presentation, name, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool SaveCurrentXAModsPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string name, out string message)
+    {
+        replyPresentation = null;
         var trimmedName = name.Trim();
         if (string.IsNullOrWhiteSpace(trimmedName))
         {
-            message = "Usage: /xa preset save <name>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S5DA5ACD955171770"));
             return false;
         }
 
@@ -2731,27 +2842,36 @@ public sealed class Plugin : IDalamudPlugin
         }
 
         Configuration.Save();
-        message = $"Saved XA Mods preset '{trimmedName}' with {modKeys.Count} enabled mod(s).";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S64ECFECCEDE1F3A8", trimmedName, modKeys.Count));
         return true;
     }
 
-    private bool LoadSavedXAModsPreset(string name, out string message)
+    private bool LoadSavedXAModsPreset(string name, out string message) => LoadSavedXAModsPresetLocalizedCore(out _, name, out message);
+    private bool LoadSavedXAModsPresetMessage(string name, out global::XASlave.Localization.UiMessage message)
     {
+        var success = LoadSavedXAModsPresetLocalizedCore(out var presentation, name, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool LoadSavedXAModsPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string name, out string message)
+    {
+        replyPresentation = null;
         var trimmedName = name.Trim();
         if (string.IsNullOrWhiteSpace(trimmedName))
         {
-            message = "Usage: /xa preset load <name>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SD91CF4FD2048ABA8"));
             return false;
         }
 
         var savedList = Configuration.ToonModsSavedLists.FirstOrDefault(entry => entry.Name.Equals(trimmedName, StringComparison.OrdinalIgnoreCase));
         if (savedList == null)
         {
-            message = $"No XA Mods preset named '{trimmedName}' was found.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S8B56FFC950262528", trimmedName));
             return false;
         }
 
-        return ApplyXAModsPreset(savedList.Name, savedList.ModKeys, savedList.ModSettings, out message);
+        return ApplyXAModsPresetLocalizedCore(out replyPresentation, savedList.Name, savedList.ModKeys, savedList.ModSettings, out message);
     }
 
     private void PrintSavedXAModsPresetList()
@@ -2772,35 +2892,46 @@ public sealed class Plugin : IDalamudPlugin
             ChatGui.Print($"[XASlave] - {savedName}");
     }
 
-    private bool TryHandlePresetCommandFromIpc(string value, out string message)
+    private bool TryHandlePresetCommandFromIpc(string value, out string message) => TryHandlePresetCommandFromIpcLocalizedCore(out _, value, out message);
+    private bool TryHandlePresetCommandFromIpcMessage(string value, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryHandlePresetCommandFromIpcLocalizedCore(out var presentation, value, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryHandlePresetCommandFromIpcLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string value, out string message)
+    {
+        replyPresentation = null;
         var firstSpaceIndex = value.IndexOf(' ');
         var action = firstSpaceIndex >= 0 ? value[..firstSpaceIndex].Trim() : value.Trim();
         var actionArgs = firstSpaceIndex >= 0 ? value[(firstSpaceIndex + 1)..].Trim() : string.Empty;
 
         if (string.IsNullOrWhiteSpace(action))
         {
-            message = "Usage: preset save <name>, preset load <name>, or preset list.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SA95891ADFF28BC13"));
             return false;
         }
 
         if (action.Equals("save", StringComparison.OrdinalIgnoreCase))
-            return SaveCurrentXAModsPreset(actionArgs, out message);
+            return SaveCurrentXAModsPresetLocalizedCore(out replyPresentation, actionArgs, out message);
 
         if (action.Equals("load", StringComparison.OrdinalIgnoreCase))
-            return LoadSavedXAModsPreset(actionArgs, out message);
+            return LoadSavedXAModsPresetLocalizedCore(out replyPresentation, actionArgs, out message);
 
         if (action.Equals("list", StringComparison.OrdinalIgnoreCase))
         {
-            message = BuildSavedXAModsPresetListSummary();
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, BuildSavedXAModsPresetListSummaryMessage());
             return true;
         }
 
-        message = "Usage: preset save <name>, preset load <name>, or preset list.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SA95891ADFF28BC13"));
         return false;
     }
 
-    private string BuildSavedXAModsPresetListSummary()
+    private string BuildSavedXAModsPresetListSummary() => BuildSavedXAModsPresetListSummaryMessage().Original;
+
+    private global::XASlave.Localization.UiMessage BuildSavedXAModsPresetListSummaryMessage()
     {
         var savedNames = Configuration.ToonModsSavedLists
             .OrderBy(entry => entry.Name, StringComparer.OrdinalIgnoreCase)
@@ -2808,9 +2939,9 @@ public sealed class Plugin : IDalamudPlugin
             .ToList();
 
         if (savedNames.Count == 0)
-            return "No XA Mods presets are currently saved.";
+            return global::XASlave.Localization.UiMessage.Key("S963FBA90990DAB98");
 
-        return $"Saved XA Mods presets ({savedNames.Count}): {string.Join(", ", savedNames)}";
+        return global::XASlave.Localization.UiMessage.Format("S61C0B3F136E01489" , savedNames.Count, string.Join(", ", savedNames));
     }
 
     private List<string> GetCurrentXAModKeys()
@@ -2845,25 +2976,98 @@ public sealed class Plugin : IDalamudPlugin
         IEnumerable<string> modKeys,
         IReadOnlyDictionary<string, JsonElement>? modSettings,
         Action<bool, string>? onCompleted,
+        out string message) => ApplySavedXAModsPresetLocalizedCore(out _, title, modKeys, modSettings, onCompleted == null ? null : (success, result) => onCompleted(success, result.Original), out message);
+    internal bool ApplySavedXAModsPresetMessage(
+        string title,
+        IEnumerable<string> modKeys,
+        IReadOnlyDictionary<string, JsonElement>? modSettings,
+        Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
+        out global::XASlave.Localization.UiMessage message)
+    {
+        var success = ApplySavedXAModsPresetLocalizedCore(out var presentation, title, modKeys, modSettings, onCompleted, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool ApplySavedXAModsPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation,
+        string title,
+        IEnumerable<string> modKeys,
+        IReadOnlyDictionary<string, JsonElement>? modSettings,
+        Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
         out string message)
-        => QueueXAModsPreset(title, modKeys, modSettings, onCompleted, out message);
+    {
+        replyPresentation = null;
+        return QueueXAModsPresetLocalizedCore(out replyPresentation, title, modKeys, modSettings, onCompleted, out message);
+    }
 
-    internal bool ApplySavedXAModsPreset(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
-        => QueueXAModsPreset(title, modKeys, modSettings, null, out message);
+    internal bool ApplySavedXAModsPreset(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message) => ApplySavedXAModsPresetLocalizedCore(out _, title, modKeys, modSettings, out message);
+    internal bool ApplySavedXAModsPresetMessage(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out global::XASlave.Localization.UiMessage message)
+    {
+        var success = ApplySavedXAModsPresetLocalizedCore(out var presentation, title, modKeys, modSettings, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
 
-    private bool ApplyXAModsPreset(string title, IEnumerable<string> modKeys, out string message)
-        => QueueXAModsPreset(title, modKeys, null, null, out message);
+    private bool ApplySavedXAModsPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
+    {
+        replyPresentation = null;
+        return QueueXAModsPresetLocalizedCore(out replyPresentation, title, modKeys, modSettings, null, out message);
+    }
 
-    private bool ApplyXAModsPreset(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
-        => QueueXAModsPreset(title, modKeys, modSettings, null, out message);
+    private bool ApplyXAModsPreset(string title, IEnumerable<string> modKeys, out string message) => ApplyXAModsPresetLocalizedCore(out _, title, modKeys, out message);
+    private bool ApplyXAModsPresetMessage(string title, IEnumerable<string> modKeys, out global::XASlave.Localization.UiMessage message)
+    {
+        var success = ApplyXAModsPresetLocalizedCore(out var presentation, title, modKeys, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool ApplyXAModsPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string title, IEnumerable<string> modKeys, out string message)
+    {
+        replyPresentation = null;
+        return QueueXAModsPresetLocalizedCore(out replyPresentation, title, modKeys, null, null, out message);
+    }
+
+    private bool ApplyXAModsPreset(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message) => ApplyXAModsPresetLocalizedCore(out _, title, modKeys, modSettings, out message);
+    private bool ApplyXAModsPresetMessage(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out global::XASlave.Localization.UiMessage message)
+    {
+        var success = ApplyXAModsPresetLocalizedCore(out var presentation, title, modKeys, modSettings, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool ApplyXAModsPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
+    {
+        replyPresentation = null;
+        return QueueXAModsPresetLocalizedCore(out replyPresentation, title, modKeys, modSettings, null, out message);
+    }
 
     private bool QueueXAModsPreset(
         string title,
         IEnumerable<string> modKeys,
         IReadOnlyDictionary<string, JsonElement>? modSettings,
         Action<bool, string>? onCompleted,
+        out string message) => QueueXAModsPresetLocalizedCore(out _, title, modKeys, modSettings, onCompleted == null ? null : (success, result) => onCompleted(success, result.Original), out message);
+    private bool QueueXAModsPresetMessage(
+        string title,
+        IEnumerable<string> modKeys,
+        IReadOnlyDictionary<string, JsonElement>? modSettings,
+        Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
+        out global::XASlave.Localization.UiMessage message)
+    {
+        var success = QueueXAModsPresetLocalizedCore(out var presentation, title, modKeys, modSettings, onCompleted, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool QueueXAModsPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation,
+        string title,
+        IEnumerable<string> modKeys,
+        IReadOnlyDictionary<string, JsonElement>? modSettings,
+        Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
         out string message)
     {
+        replyPresentation = null;
         var capturedKeys = modKeys
             .Where(key => !string.IsNullOrWhiteSpace(key))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -2872,19 +3076,28 @@ public sealed class Plugin : IDalamudPlugin
             ? null
             : new Dictionary<string, JsonElement>(modSettings, StringComparer.OrdinalIgnoreCase);
 
-        return QueueXAModMutation(
-            $"load preset '{title}'",
+        return QueueXAModMutationLocalizedCore(out replyPresentation,
+            global::XASlave.Localization.UiMessage.Format("S39BF8BB45CAE28FE" , title),
             () =>
             {
-                var success = ApplyXAModsPresetNow(title, capturedKeys, capturedSettings, out var resultMessage);
+                var success = ApplyXAModsPresetNowMessage(title, capturedKeys, capturedSettings, out var resultMessage);
                 return (success, resultMessage);
             },
             onCompleted,
             out message);
     }
 
-    private bool ApplyXAModsPresetNow(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
+    private bool ApplyXAModsPresetNow(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message) => ApplyXAModsPresetNowLocalizedCore(out _, title, modKeys, modSettings, out message);
+    private bool ApplyXAModsPresetNowMessage(string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out global::XASlave.Localization.UiMessage message)
     {
+        var success = ApplyXAModsPresetNowLocalizedCore(out var presentation, title, modKeys, modSettings, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool ApplyXAModsPresetNowLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string title, IEnumerable<string> modKeys, IReadOnlyDictionary<string, JsonElement>? modSettings, out string message)
+    {
+        replyPresentation = null;
         var requestedKeys = modKeys
             .Where(key => !string.IsNullOrWhiteSpace(key))
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -2895,16 +3108,14 @@ public sealed class Plugin : IDalamudPlugin
 
         if (requestedKeys.Count == 0)
         {
-            message = disableResult.Failures == 0
-                ? $"Loaded XA Mods preset '{title}' with all mods disabled."
-                : $"Loaded XA Mods preset '{title}', but {disableResult.Failures} mod teardown(s) failed; see the log.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (disableResult.Failures == 0 ? global::XASlave.Localization.UiMessage.Format("SB5A7801AB73DEE5E", title) : global::XASlave.Localization.UiMessage.Format("S4F60226029B84760", title, disableResult.Failures)));
             return disableResult.Failures == 0;
         }
 
         var appliedCount = 0;
         var unavailableCount = 0;
         var unknownCount = 0;
-        var unavailableMods = new List<string>();
+        var unavailableMods = new List<global::XASlave.Localization.UiMessage>();
         var unknownMods = new List<string>();
 
         foreach (var key in requestedKeys)
@@ -2919,7 +3130,7 @@ public sealed class Plugin : IDalamudPlugin
             if (definition.Scope == XAModsRestoreScope.Illegal)
             {
                 unavailableCount++;
-                unavailableMods.Add($"{definition.DisplayName} ({key}: cannot be enabled by a preset)");
+                unavailableMods.Add(global::XASlave.Localization.UiMessage.Format("S939C8924A7CE5A41" , global::XASlave.Localization.UiMessage.Authored(definition.DisplayName), key));
                 continue;
             }
 
@@ -2932,25 +3143,23 @@ public sealed class Plugin : IDalamudPlugin
                 else
                 {
                     unavailableCount++;
-                    unavailableMods.Add($"{definition.DisplayName} ({key})");
+                    unavailableMods.Add(global::XASlave.Localization.UiMessage.Format("SFA1E7180CF6C8EA6" , global::XASlave.Localization.UiMessage.Authored(definition.DisplayName), key));
                 }
             }
             catch (Exception ex)
             {
                 unavailableCount++;
-                unavailableMods.Add($"{definition.DisplayName} ({key}: {ex.Message})");
+                unavailableMods.Add(global::XASlave.Localization.UiMessage.Format("SBF526118FA3C3104" , global::XASlave.Localization.UiMessage.Authored(definition.DisplayName), key, global::XASlave.Localization.UiMessage.FromException(ex)));
                 Log.Error(ex, $"[XASlave] Enabling XA Mod '{definition.Key}' from preset '{title}' failed.");
             }
         }
 
         ApplyImportedXAModSettings(modSettings);
-        message = unknownCount > 0 || unavailableCount > 0 || disableResult.Failures > 0
-            ? $"Loaded XA Mods preset '{title}' ({appliedCount} applied, {unavailableCount} unavailable, {unknownCount} unknown, {disableResult.Failures} teardown failures)."
-            : $"Loaded XA Mods preset '{title}' ({appliedCount} mod(s)).";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (unknownCount > 0 || unavailableCount > 0 || disableResult.Failures > 0 ? global::XASlave.Localization.UiMessage.Format("SD8E51356FC238C76", title, appliedCount, unavailableCount, unknownCount, disableResult.Failures) : global::XASlave.Localization.UiMessage.Format("S40B5CB0368A659BA", title, appliedCount)));
         if (unavailableMods.Count > 0)
-            message += $" Unavailable: {string.Join("; ", unavailableMods)}.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref replyPresentation, message), global::XASlave.Localization.UiMessage.Format("SDBDAAFC8074CB0B4", global::XASlave.Localization.UiMessage.Join("; ", unavailableMods))));
         if (unknownMods.Count > 0)
-            message += $" Unknown mod keys: {string.Join(", ", unknownMods)}.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref replyPresentation, message), global::XASlave.Localization.UiMessage.Format("S29B24B3BEFB7591E", string.Join(", ", unknownMods))));
         return unknownCount == 0 && unavailableCount == 0 && disableResult.Failures == 0;
     }
 
@@ -3590,7 +3799,7 @@ public sealed class Plugin : IDalamudPlugin
                     friendNearSettings.Patterns ?? [], friendNearSettings.CooldownSeconds, explicitApply: true);
                 PublishNearbyPlayerRules(validated, friendNearSettings.CooldownSeconds, save: false);
             }
-            catch (ArgumentException error) { NotifyWhenFriendIsNear.ReportConfigurationError(error.Message); }
+            catch (ArgumentException error) { NotifyWhenFriendIsNear.ReportConfigurationError(global::XASlave.Localization.UiMessage.FromException(error)); }
         }
 
         if (TryDeserializeXAModSettings(modSettings, "alert-when-typing-in-combat", out XAModAlertWhenTypingInCombatSettings? typingCombatSettings)
@@ -3998,11 +4207,20 @@ public sealed class Plugin : IDalamudPlugin
             ClampUnitFloat(value.Z),
             ClampUnitFloat(value.W));
 
-    private bool TryHandleResolutionCommand(string value, out string message)
+    private bool TryHandleResolutionCommand(string value, out string message) => TryHandleResolutionCommandLocalizedCore(out _, value, out message);
+    private bool TryHandleResolutionCommandMessage(string value, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryHandleResolutionCommandLocalizedCore(out var presentation, value, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryHandleResolutionCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string value, out string message)
+    {
+        replyPresentation = null;
         if (string.IsNullOrWhiteSpace(value))
         {
-            message = "Usage: /xa res <width>x<height>, /xa res <width> <height>, /xa res reset, /xa res add <width>x<height>, or /xa res remove <width>x<height>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S9F095B85694E2F44"));
             return false;
         }
 
@@ -4010,25 +4228,34 @@ public sealed class Plugin : IDalamudPlugin
             return SystemWindowMods.TryResetCustomResolution(out message);
 
         if (value.StartsWith("add ", StringComparison.OrdinalIgnoreCase))
-            return TryAddCustomResolutionPreset(value[4..].Trim(), out message);
+            return TryAddCustomResolutionPresetLocalizedCore(out replyPresentation, value[4..].Trim(), out message);
 
         if (value.StartsWith("remove ", StringComparison.OrdinalIgnoreCase))
-            return TryRemoveCustomResolutionPreset(value[7..].Trim(), out message);
+            return TryRemoveCustomResolutionPresetLocalizedCore(out replyPresentation, value[7..].Trim(), out message);
 
         if (!TryParseResolutionCommand(value, out var width, out var height))
         {
-            message = "Usage: /xa res <width>x<height>, /xa res <width> <height>, /xa res reset, /xa res add <width>x<height>, or /xa res remove <width>x<height>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S9F095B85694E2F44"));
             return false;
         }
 
         return SystemWindowMods.TryApplyCustomResolution(width, height, out message);
     }
 
-    private bool TryAddCustomResolutionPreset(string value, out string message)
+    private bool TryAddCustomResolutionPreset(string value, out string message) => TryAddCustomResolutionPresetLocalizedCore(out _, value, out message);
+    private bool TryAddCustomResolutionPresetMessage(string value, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryAddCustomResolutionPresetLocalizedCore(out var presentation, value, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryAddCustomResolutionPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string value, out string message)
+    {
+        replyPresentation = null;
         if (!TryParseResolutionCommand(value, out var width, out var height))
         {
-            message = "Usage: /xa res add <width>x<height>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S841D80543F5FE6DB"));
             return false;
         }
 
@@ -4037,7 +4264,7 @@ public sealed class Plugin : IDalamudPlugin
 
         if (Configuration.CustomResolutionPresets.Any(entry => entry.Width == normalizedWidth && entry.Height == normalizedHeight))
         {
-            message = $"Custom resolution button {normalizedWidth}x{normalizedHeight} already exists.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("SED813A5BE9E1A309", normalizedWidth, normalizedHeight));
             return false;
         }
 
@@ -4047,15 +4274,24 @@ public sealed class Plugin : IDalamudPlugin
             Height = normalizedHeight,
         });
         Configuration.Save();
-        message = $"Added custom resolution button {normalizedWidth}x{normalizedHeight}.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S3D1520C7C14799B8", normalizedWidth, normalizedHeight));
         return true;
     }
 
-    private bool TryRemoveCustomResolutionPreset(string value, out string message)
+    private bool TryRemoveCustomResolutionPreset(string value, out string message) => TryRemoveCustomResolutionPresetLocalizedCore(out _, value, out message);
+    private bool TryRemoveCustomResolutionPresetMessage(string value, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryRemoveCustomResolutionPresetLocalizedCore(out var presentation, value, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryRemoveCustomResolutionPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string value, out string message)
+    {
+        replyPresentation = null;
         if (!TryParseResolutionCommand(value, out var width, out var height))
         {
-            message = "Usage: /xa res remove <width>x<height>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S35AFE33027A3ED8A"));
             return false;
         }
 
@@ -4065,33 +4301,42 @@ public sealed class Plugin : IDalamudPlugin
         var removedCount = Configuration.CustomResolutionPresets.RemoveAll(entry => entry.Width == normalizedWidth && entry.Height == normalizedHeight);
         if (removedCount == 0)
         {
-            message = $"No custom resolution button {normalizedWidth}x{normalizedHeight} was found.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S03A57BF569F76198", normalizedWidth, normalizedHeight));
             return false;
         }
 
         Configuration.Save();
-        message = $"Removed custom resolution button {normalizedWidth}x{normalizedHeight}.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("SB2A70ECD6F1F947C", normalizedWidth, normalizedHeight));
         return true;
     }
 
-    private bool TryApplySprintDelayCommand(string value, out string message)
+    private bool TryApplySprintDelayCommand(string value, out string message) => TryApplySprintDelayCommandLocalizedCore(out _, value, out message);
+    private bool TryApplySprintDelayCommandMessage(string value, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryApplySprintDelayCommandLocalizedCore(out var presentation, value, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryApplySprintDelayCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string value, out string message)
+    {
+        replyPresentation = null;
         if (string.IsNullOrWhiteSpace(value))
         {
-            message = "Usage: /xa sprintdelay <seconds>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SC26E57B3B7E2C51F"));
             return false;
         }
 
         if (!float.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var delaySeconds))
         {
-            message = "Usage: /xa sprintdelay <seconds>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SC26E57B3B7E2C51F"));
             return false;
         }
 
         if (delaySeconds < PlayerModsService.InfiniteSprintDelaySecondsMinimum
             || delaySeconds > PlayerModsService.InfiniteSprintDelaySecondsMaximum)
         {
-            message = $"Infinite Sprint delay must be between {PlayerModsService.InfiniteSprintDelaySecondsMinimum:0.0} and {PlayerModsService.InfiniteSprintDelaySecondsMaximum:0.0} seconds.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S5A77277E28999130", PlayerModsService.InfiniteSprintDelaySecondsMinimum, PlayerModsService.InfiniteSprintDelaySecondsMaximum));
             return false;
         }
 
@@ -4099,9 +4344,7 @@ public sealed class Plugin : IDalamudPlugin
         Configuration.InfiniteSprintDelaySeconds = delaySeconds;
         PlayerMods.ApplyInfiniteSprintConfiguration(delaySeconds);
         Configuration.Save();
-        message = Configuration.InfiniteSprintEnabled
-            ? $"Infinite Sprint delay set to {delaySeconds:0.0#} seconds."
-            : $"Infinite Sprint delay saved as {delaySeconds:0.0#} seconds.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (Configuration.InfiniteSprintEnabled ? global::XASlave.Localization.UiMessage.Format("S0B09DF321F29C514", delaySeconds) : global::XASlave.Localization.UiMessage.Format("S32D31A7A16ACBBBA", delaySeconds)));
         return true;
     }
 
@@ -4437,15 +4680,24 @@ public sealed class Plugin : IDalamudPlugin
     internal bool IsAutoRetainerMultiModeEnabled()
         => IpcClient.AutoRetainerGetMultiModeEnabled();
 
-    internal bool CanEnableSpecialRenderHideChat(out string message)
+    internal bool CanEnableSpecialRenderHideChat(out string message) => CanEnableSpecialRenderHideChatLocalizedCore(out _, out message);
+    internal bool CanEnableSpecialRenderHideChatMessage(out global::XASlave.Localization.UiMessage message)
     {
+        var success = CanEnableSpecialRenderHideChatLocalizedCore(out var presentation, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool CanEnableSpecialRenderHideChatLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
+    {
+        replyPresentation = null;
         if (IsAutoRetainerMultiModeEnabled())
         {
-            message = "Hide Chat is blocked while AutoRetainer Multi Mode is enabled.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SEB943E4D3D42AAD7"));
             return false;
         }
 
-        message = string.Empty;
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         return true;
     }
 
@@ -4458,35 +4710,62 @@ public sealed class Plugin : IDalamudPlugin
             || Configuration.SpecialRenderHideAddonsKeepNameplatesEnabled;
     }
 
-    internal bool CanTriggerLogoutActions(out string message)
+    internal bool CanTriggerLogoutActions(out string message) => CanTriggerLogoutActionsLocalizedCore(out _, out message);
+    internal bool CanTriggerLogoutActionsMessage(out global::XASlave.Localization.UiMessage message)
     {
-        if (IsSpecialRenderChatCurrentlyHidden())
-        {
-            message = "Logout and kill-game actions are blocked while Special Rendering Modes is hiding chat. Restore chat first.";
-            return false;
-        }
-
-        message = string.Empty;
-        return true;
-    }
-
-    internal bool TryRequestLogoutAction(out string message)
-    {
-        if (!CanTriggerLogoutActions(out message))
-            return false;
-
-        var success = InstantLogout.RequestLogout();
-        message = success ? string.Empty : InstantLogout.StatusText;
+        var success = CanTriggerLogoutActionsLocalizedCore(out var presentation, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
         return success;
     }
 
-    internal bool TryRequestKillGameAction(out string message)
+    private bool CanTriggerLogoutActionsLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
     {
-        if (!CanTriggerLogoutActions(out message))
+        replyPresentation = null;
+        if (IsSpecialRenderChatCurrentlyHidden())
+        {
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SA7ACABC39D2A620F"));
+            return false;
+        }
+
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Raw(string.Empty));
+        return true;
+    }
+
+    internal bool TryRequestLogoutAction(out string message) => TryRequestLogoutActionLocalizedCore(out _, out message);
+    internal bool TryRequestLogoutActionMessage(out global::XASlave.Localization.UiMessage message)
+    {
+        var success = TryRequestLogoutActionLocalizedCore(out var presentation, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryRequestLogoutActionLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
+    {
+        replyPresentation = null;
+        if (!CanTriggerLogoutActionsLocalizedCore(out replyPresentation, out message))
+            return false;
+
+        var success = InstantLogout.RequestLogout();
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (success ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : InstantLogout.StatusTextMessage));
+        return success;
+    }
+
+    internal bool TryRequestKillGameAction(out string message) => TryRequestKillGameActionLocalizedCore(out _, out message);
+    internal bool TryRequestKillGameActionMessage(out global::XASlave.Localization.UiMessage message)
+    {
+        var success = TryRequestKillGameActionLocalizedCore(out var presentation, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryRequestKillGameActionLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
+    {
+        replyPresentation = null;
+        if (!CanTriggerLogoutActionsLocalizedCore(out replyPresentation, out message))
             return false;
 
         var success = InstantLogout.RequestKillGame();
-        message = success ? string.Empty : InstantLogout.StatusText;
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (success ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : InstantLogout.StatusTextMessage));
         return success;
     }
 
@@ -4594,7 +4873,7 @@ public sealed class Plugin : IDalamudPlugin
                 Configuration.NotifyWhenFriendIsNearCooldownSeconds, explicitApply: true);
             PublishNearbyPlayerRules(validated, Configuration.NotifyWhenFriendIsNearCooldownSeconds, save || validated.Migrated);
         }
-        catch (ArgumentException error) { NotifyWhenFriendIsNear.ReportConfigurationError(error.Message); }
+        catch (ArgumentException error) { NotifyWhenFriendIsNear.ReportConfigurationError(global::XASlave.Localization.UiMessage.FromException(error)); }
     }
 
     internal void PublishNearbyPlayerRules(NearbyPlayerRuleSnapshot validated, int legacyCooldown, bool save, Guid? changedRule = null)
@@ -4683,17 +4962,26 @@ public sealed class Plugin : IDalamudPlugin
             Log.Warning($"[XASlave] {message}");
     }
 
-    internal bool QueueDisableAllXAMods(Action<bool, string>? onCompleted, out string message)
+    internal bool QueueDisableAllXAMods(Action<bool, string>? onCompleted, out string message) => QueueDisableAllXAModsLocalizedCore(out _, onCompleted == null ? null : (success, result) => onCompleted(success, result.Original), out message);
+    internal bool QueueDisableAllXAModsMessage(Action<bool, global::XASlave.Localization.UiMessage>? onCompleted, out global::XASlave.Localization.UiMessage message)
     {
-        return QueueXAModMutation(
-            "disable all XA Mods",
+        var success = QueueDisableAllXAModsLocalizedCore(out var presentation, onCompleted, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool QueueDisableAllXAModsLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, Action<bool, global::XASlave.Localization.UiMessage>? onCompleted, out string message)
+    {
+        replyPresentation = null;
+        return QueueXAModMutationLocalizedCore(out replyPresentation,
+            global::XASlave.Localization.UiMessage.Key("S61070CA176D93921"),
             () =>
             {
                 var definitions = GetAllXAModDefinitions().ToArray();
                 var result = DisableXAModDefinitions(definitions);
                 var resultMessage = result.Failures == 0
-                    ? $"Disabled {result.DisabledCount} enabled XA Mod toggle(s) across {definitions.Length} definitions."
-                    : $"Disabled {result.DisabledCount} enabled XA Mod toggle(s); {result.Failures} of {definitions.Length} teardown(s) failed - see the log.";
+                    ? global::XASlave.Localization.UiMessage.Format("SDA0EE7E297360BF9" , result.DisabledCount, definitions.Length)
+                    : global::XASlave.Localization.UiMessage.Format("S76FC98C08B9FE841" , result.DisabledCount, result.Failures, definitions.Length);
                 return (result.Failures == 0, resultMessage);
             },
             onCompleted,
@@ -4706,22 +4994,54 @@ public sealed class Plugin : IDalamudPlugin
         Func<bool, bool> apply,
         Action<bool> store,
         Action<bool, string>? onCompleted,
+        out string message) => QueueXAModToggleLocalizedCore(out _, label, enabled, apply, store, onCompleted == null ? null : (success, result) => onCompleted(success, result.Original), out message);
+    internal bool QueueXAModToggleMessage(
+        string label,
+        bool enabled,
+        Func<bool, bool> apply,
+        Action<bool> store,
+        Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
+        out global::XASlave.Localization.UiMessage message)
+    {
+        var success = QueueXAModToggleLocalizedCore(out var presentation, label, enabled, apply, store, onCompleted, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool QueueXAModToggleLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation,
+        string label,
+        bool enabled,
+        Func<bool, bool> apply,
+        Action<bool> store,
+        Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
         out string message)
     {
-        return QueueXAModMutation(
-            $"set XA Mod '{label}' {(enabled ? "on" : "off")}",
+        replyPresentation = null;
+        return QueueXAModMutationLocalizedCore(out replyPresentation,
+            global::XASlave.Localization.UiMessage.Format("S545018A55338A7BE" , global::XASlave.Localization.UiMessage.Authored(label), ((enabled ? global::XASlave.Localization.UiMessage.Key("SB8D31E852725AFB1") : global::XASlave.Localization.UiMessage.Key("SB4DC66DDE806261B")))),
             () =>
             {
                 var applied = apply(enabled);
                 store(applied);
-                return (applied == enabled, $"XA Mod '{label}' is {(applied ? "enabled" : "disabled")}.");
+                return (applied == enabled, global::XASlave.Localization.UiMessage.Format("S86D96967C8476665" , global::XASlave.Localization.UiMessage.Authored(label), ((applied ? global::XASlave.Localization.UiMessage.Key("SFB9CF75606B4070D") : global::XASlave.Localization.UiMessage.Key("S17EB3C0168D0D7B2")))));
             },
             onCompleted,
             out message);
     }
 
-    public bool LoadModListPreset(string name, out string message)
-        => LoadSavedXAModsPreset(name, out message);
+    public bool LoadModListPreset(string name, out string message) => LoadModListPresetLocalizedCore(out _, name, out message);
+    internal bool LoadModListPresetMessage(string name, out global::XASlave.Localization.UiMessage message)
+    {
+        var success = LoadModListPresetLocalizedCore(out var presentation, name, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool LoadModListPresetLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string name, out string message)
+    {
+        replyPresentation = null;
+        return LoadSavedXAModsPresetLocalizedCore(out replyPresentation, name, out message);
+    }
 
     public IReadOnlyList<string> GetSavedModListNames()
         => Configuration.ToonModsSavedLists.Select(entry => entry.Name).ToList();
@@ -4760,14 +5080,34 @@ public sealed class Plugin : IDalamudPlugin
     public bool HasAnyEnabledXAMods()
         => GetAllXAModDefinitions().Any(definition => definition.GetCurrent());
 
-    public bool SetXAModEnabledByKey(string key, bool enabled, out string message)
-        => SetXAModEnabled(GetXAModDefinition(key), enabled, out message);
-
-    public bool ToggleXAModByKey(string key, out bool enabled, out string message)
+    public bool SetXAModEnabledByKey(string key, bool enabled, out string message) => SetXAModEnabledByKeyLocalizedCore(out _, key, enabled, out message);
+    internal bool SetXAModEnabledByKeyMessage(string key, bool enabled, out global::XASlave.Localization.UiMessage message)
     {
+        var success = SetXAModEnabledByKeyLocalizedCore(out var presentation, key, enabled, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool SetXAModEnabledByKeyLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string key, bool enabled, out string message)
+    {
+        replyPresentation = null;
+        return SetXAModEnabledLocalizedCore(out replyPresentation, GetXAModDefinition(key), enabled, out message);
+    }
+
+    public bool ToggleXAModByKey(string key, out bool enabled, out string message) => ToggleXAModByKeyLocalizedCore(out _, key, out enabled, out message);
+    internal bool ToggleXAModByKeyMessage(string key, out bool enabled, out global::XASlave.Localization.UiMessage message)
+    {
+        var success = ToggleXAModByKeyLocalizedCore(out var presentation, key, out enabled, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool ToggleXAModByKeyLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string key, out bool enabled, out string message)
+    {
+        replyPresentation = null;
         var definition = GetXAModDefinition(key);
         var targetState = !definition.GetCurrent();
-        var success = SetXAModEnabled(definition, targetState, out message);
+        var success = SetXAModEnabledLocalizedCore(out replyPresentation, definition, targetState, out message);
         enabled = definition.GetCurrent();
         return success;
     }
@@ -4930,37 +5270,55 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    private bool RestoreAllXAMods(out string message)
+    private bool RestoreAllXAMods(out string message) => RestoreAllXAModsLocalizedCore(out _, out message);
+    private bool RestoreAllXAModsMessage(out global::XASlave.Localization.UiMessage message)
     {
-        return QueueXAModMutation(
-            "restore all XA Mods",
+        var success = RestoreAllXAModsLocalizedCore(out var presentation, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool RestoreAllXAModsLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
+    {
+        replyPresentation = null;
+        return QueueXAModMutationLocalizedCore(out replyPresentation,
+            global::XASlave.Localization.UiMessage.Key("S5198539B7F790BA0"),
             () =>
             {
                 var result = DisableXAModDefinitions(GetAllXAModDefinitions());
                 var resultMessage = result.Failures > 0
-                    ? $"Disabled {result.DisabledCount} XA Mods toggle(s); {result.Failures} teardown(s) failed."
+                    ? global::XASlave.Localization.UiMessage.Format("SCFAA61F7974343FF" , result.DisabledCount, result.Failures)
                     : result.DisabledCount > 0
-                        ? $"Disabled {result.DisabledCount} XA Mods toggle(s)."
-                        : "XA Mods were already off.";
+                        ? global::XASlave.Localization.UiMessage.Format("SE16BF9841FC18102" , result.DisabledCount)
+                        : global::XASlave.Localization.UiMessage.Key("SAFD66D2BD201F3DD");
                 return (result.Failures == 0, resultMessage);
             },
             null,
             out message);
     }
 
-    private bool RestoreXAModsSection(XAModsRestoreScope scope, out string message)
+    private bool RestoreXAModsSection(XAModsRestoreScope scope, out string message) => RestoreXAModsSectionLocalizedCore(out _, scope, out message);
+    private bool RestoreXAModsSectionMessage(XAModsRestoreScope scope, out global::XASlave.Localization.UiMessage message)
     {
+        var success = RestoreXAModsSectionLocalizedCore(out var presentation, scope, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool RestoreXAModsSectionLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, XAModsRestoreScope scope, out string message)
+    {
+        replyPresentation = null;
         var scopeLabel = GetXAModsRestoreScopeLabel(scope);
-        return QueueXAModMutation(
-            $"restore XA Mods section '{scopeLabel}'",
+        return QueueXAModMutationLocalizedCore(out replyPresentation,
+            global::XASlave.Localization.UiMessage.Format("SBC606CC462DAE49F" , global::XASlave.Localization.UiMessage.Authored(scopeLabel)),
             () =>
             {
                 var result = DisableXAModDefinitions(GetAllXAModDefinitions().Where(definition => definition.Scope == scope));
                 var resultMessage = result.Failures > 0
-                    ? $"Disabled {result.DisabledCount} {scopeLabel} toggle(s); {result.Failures} teardown(s) failed."
+                    ? global::XASlave.Localization.UiMessage.Format("SC97F0F236D1F01C3" , result.DisabledCount, global::XASlave.Localization.UiMessage.Authored(scopeLabel), result.Failures)
                     : result.DisabledCount > 0
-                        ? $"Disabled {result.DisabledCount} {scopeLabel} toggle(s)."
-                        : $"{scopeLabel} were already off.";
+                        ? global::XASlave.Localization.UiMessage.Format("SD7948C434715C5AB" , result.DisabledCount, global::XASlave.Localization.UiMessage.Authored(scopeLabel))
+                        : global::XASlave.Localization.UiMessage.Format("S7A0C85C48C19C1EA" , global::XASlave.Localization.UiMessage.Authored(scopeLabel));
                 return (result.Failures == 0, resultMessage);
             },
             null,
@@ -5004,17 +5362,34 @@ public sealed class Plugin : IDalamudPlugin
         string operationLabel,
         Func<(bool Success, string Message)> operation,
         Action<bool, string>? onCompleted,
+        out string message) => QueueXAModMutationLocalizedCore(out _, global::XASlave.Localization.UiMessage.Raw(operationLabel), () => { var result = operation(); return (result.Success, global::XASlave.Localization.UiMessage.Raw(result.Message)); }, onCompleted == null ? null : (success, result) => onCompleted(success, result.Original), out message);
+    private bool QueueXAModMutationMessage(
+        global::XASlave.Localization.UiMessage operationLabel,
+        Func<(bool Success, global::XASlave.Localization.UiMessage Message)> operation,
+        Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
+        out global::XASlave.Localization.UiMessage message)
+    {
+        var success = QueueXAModMutationLocalizedCore(out var presentation, operationLabel, operation, onCompleted, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool QueueXAModMutationLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation,
+        global::XASlave.Localization.UiMessage operationLabel,
+        Func<(bool Success, global::XASlave.Localization.UiMessage Message)> operation,
+        Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
         out string message)
     {
+        replyPresentation = null;
         if (isDisposed)
         {
-            message = $"Could not {operationLabel}: XA Slave is disposing.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S40F574F85879F4DC", operationLabel));
             return false;
         }
 
         if (xaModMutationPending)
         {
-            message = $"Could not {operationLabel}: another XA Mods change is already queued or running.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S525FD3ECC889706B", operationLabel));
             return false;
         }
 
@@ -5030,14 +5405,14 @@ public sealed class Plugin : IDalamudPlugin
                 }
 
                 var success = false;
-                var resultMessage = string.Empty;
+                var resultMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
                 try
                 {
                     (success, resultMessage) = operation();
                 }
                 catch (Exception ex)
                 {
-                    resultMessage = $"XA Mods operation '{operationLabel}' failed: {ex.Message}";
+                    resultMessage = global::XASlave.Localization.UiMessage.Format("SD544F9A1033E952E" , operationLabel, global::XASlave.Localization.UiMessage.FromException(ex));
                     Log.Error(ex, $"[XASlave] XA Mods operation '{operationLabel}' failed.");
                 }
 
@@ -5048,9 +5423,9 @@ public sealed class Plugin : IDalamudPlugin
                 catch (Exception ex)
                 {
                     success = false;
-                    resultMessage = string.IsNullOrWhiteSpace(resultMessage)
-                        ? $"XA Mods operation '{operationLabel}' completed, but configuration persistence failed: {ex.Message}"
-                        : $"{resultMessage} Configuration persistence failed: {ex.Message}";
+                    resultMessage = string.IsNullOrWhiteSpace(resultMessage.Original)
+                        ? global::XASlave.Localization.UiMessage.Format("SBA655CA36053B8D5" , operationLabel, global::XASlave.Localization.UiMessage.FromException(ex))
+                        : global::XASlave.Localization.UiMessage.Format("SFECF66189A5555F8" , resultMessage, global::XASlave.Localization.UiMessage.FromException(ex));
                     Log.Error(ex, $"[XASlave] Saving configuration after XA Mods operation '{operationLabel}' failed.");
                 }
                 finally
@@ -5076,56 +5451,82 @@ public sealed class Plugin : IDalamudPlugin
         catch (Exception ex)
         {
             xaModMutationPending = false;
-            message = $"Could not queue XA Mods operation '{operationLabel}': {ex.Message}";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S1610A29226E26759", operationLabel, global::XASlave.Localization.UiMessage.FromException(ex)));
             Log.Error(ex, $"[XASlave] Queuing XA Mods operation '{operationLabel}' failed.");
             return false;
         }
 
-        message = $"Queued XA Mods operation: {operationLabel}.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("SB5D4108B7CA907BF", operationLabel));
         return true;
     }
 
     private readonly record struct XAModDisableResult(int DisabledCount, int Failures);
 
-    private bool TryOpenViewItemCommand(string args, out string message)
+    private bool TryOpenViewItemCommand(string args, out string message) => TryOpenViewItemCommandLocalizedCore(out _, args, out message);
+    private bool TryOpenViewItemCommandMessage(string args, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryOpenViewItemCommandLocalizedCore(out var presentation, args, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryOpenViewItemCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string args, out string message)
+    {
+        replyPresentation = null;
         if (!string.IsNullOrWhiteSpace(args))
         {
-            message = "Usage: /xa viewitem";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S1BD468BE08040BEA"));
             return false;
         }
         ViewItemWindow.OpenSearch();
-        message = ViewSingleItem.IsEnabled ? "Opened View Single Item search."
-            : "Enable XA Mods > Player Mods > View Single Item to search and preview items.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (ViewSingleItem.IsEnabled ? global::XASlave.Localization.UiMessage.Key("S83A7A91D0D895024") : global::XASlave.Localization.UiMessage.Key("SBA73E9489389CB7E")));
         return true;
     }
 
-    private bool TryHandleNearbyPlayersCommand(string args, out string message)
+    private bool TryHandleNearbyPlayersCommand(string args, out string message) => TryHandleNearbyPlayersCommandLocalizedCore(out _, args, out message);
+    private bool TryHandleNearbyPlayersCommandMessage(string args, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryHandleNearbyPlayersCommandLocalizedCore(out var presentation, args, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryHandleNearbyPlayersCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string args, out string message)
+    {
+        replyPresentation = null;
         var command = args.Trim().ToLowerInvariant();
-        if (command.Length == 0) { NearbyPlayers.WindowOpen = !NearbyPlayers.WindowOpen; message = "Toggled Nearby Players."; return true; }
-        if (command is "on" or "off") { NearbyPlayers.SetEnabled(command == "on"); message = "Nearby Players change queued."; return true; }
-        if (command == "clear") { NearbyPlayers.ClearHistory(); message = "Nearby history clear queued; Peep history is preserved."; return true; }
-        message = "Usage: /xa nearby [on|off|clear]";
+        if (command.Length == 0) { NearbyPlayers.WindowOpen = !NearbyPlayers.WindowOpen; message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SA9FA298C7AB41A33")); return true; }
+        if (command is "on" or "off") { NearbyPlayers.SetEnabled(command == "on"); message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S23C055730CFB5D11")); return true; }
+        if (command == "clear") { NearbyPlayers.ClearHistory(); message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SE60A973CEA5F59E7")); return true; }
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SA88EB381D4F13A91"));
         return false;
     }
 
-    private bool TryHandleXAPeepCommand(string args, out string message)
+    private bool TryHandleXAPeepCommand(string args, out string message) => TryHandleXAPeepCommandLocalizedCore(out _, args, out message);
+    private bool TryHandleXAPeepCommandMessage(string args, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryHandleXAPeepCommandLocalizedCore(out var presentation, args, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryHandleXAPeepCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string args, out string message)
+    {
+        replyPresentation = null;
         var trimmed = args.Trim();
         if (string.IsNullOrWhiteSpace(trimmed)
             || trimmed.Equals("open", StringComparison.OrdinalIgnoreCase)
             || trimmed.Equals("toggle", StringComparison.OrdinalIgnoreCase))
         {
             ToggleXAPeepUi();
-            message = XAPeepWindow.IsOpen ? "Opened XA Peep." : "Closed XA Peep.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (XAPeepWindow.IsOpen ? global::XASlave.Localization.UiMessage.Key("S54949459E0D02D92") : global::XASlave.Localization.UiMessage.Key("SC93777417B3CCEF5")));
             return true;
         }
 
         if (trimmed.Equals("close", StringComparison.OrdinalIgnoreCase))
         {
             XAPeepWindow.IsOpen = false;
-            message = "Closed XA Peep.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SC93777417B3CCEF5"));
             return true;
         }
 
@@ -5133,17 +5534,17 @@ public sealed class Plugin : IDalamudPlugin
             || trimmed.Equals("clearhistory", StringComparison.OrdinalIgnoreCase))
         {
             XAPeep.ClearHistory();
-            message = "Cleared XA Peep history.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SF08BFD24AD058978"));
             return true;
         }
 
-        if (!TryParseToggleCommandState(trimmed, out var enabled, out var parseMessage))
+        if (!TryParseToggleCommandStateMessage(trimmed, out var enabled, out var parseMessage))
         {
-            message = $"{parseMessage} Usage: /xa peep [on|off|open|close|clear]";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S2D4105971B78FB23", parseMessage));
             return false;
         }
 
-        return SetXAModEnabled(GetXAModDefinition("xa-peep"), enabled, out message);
+        return SetXAModEnabledLocalizedCore(out replyPresentation, GetXAModDefinition("xa-peep"), enabled, out message);
     }
 
     private XAModCommandDefinition GetXAModDefinition(string key)
@@ -5154,14 +5555,14 @@ public sealed class Plugin : IDalamudPlugin
 
     private IEnumerable<XAModCommandDefinition> GetAllXAModDefinitions()
     {
-        yield return new("custom-mouse", "Custom Mouse", XAModsRestoreScope.Game, () => Configuration.CustomMouseEnabled, CustomMouse.SetEnabled, applied => Configuration.CustomMouseEnabled = applied, () => CustomMouse.StatusText);
-        yield return new("auto-allow-multiple-game-instances", "Allow Multiple Game Instances", XAModsRestoreScope.Game, () => Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.SetAllowMultipleGameInstancesEnabled, applied => Configuration.AutoAllowMultipleGameInstancesEnabled = applied, () => SystemWindowMods.AllowMultipleGameInstancesStatusText);
-        yield return new("auto-cancel-login-cooldown", "Cancel Login Cooldown", XAModsRestoreScope.Game, () => Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.SetCancelLoginCooldownEnabled, applied => Configuration.AutoCancelLoginCooldownEnabled = applied, () => SystemWindowMods.CancelLoginCooldownStatusText);
-        yield return new("inspect-outfit-try-on", "Inspect Outfit Try-on", XAModsRestoreScope.Ui, () => Configuration.InspectOutfitTryOnEnabled, InspectOutfitTryOn.SetEnabled, applied => Configuration.InspectOutfitTryOnEnabled = applied, () => InspectOutfitTryOn.StatusText);
-        yield return new("view-single-item", "View Single Item", XAModsRestoreScope.Player, () => Configuration.ViewSingleItemEnabled, ViewSingleItem.SetEnabled, applied => Configuration.ViewSingleItemEnabled = applied, () => ViewSingleItem.StatusText);
-        yield return new("auto-display-msq-progress", "Display MSQ Progress", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayMsqProgressEnabled, MsqProgressDisplay.SetEnabled, applied => Configuration.AutoDisplayMsqProgressEnabled = applied, () => MsqProgressDisplay.StatusText);
-        yield return new("disable-title-screen-movie", "Disable Title Screen Movie", XAModsRestoreScope.Graphic, () => Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.SetDisableTitleScreenMovieEnabled, applied => Configuration.DisableTitleScreenMovieEnabled = applied, () => SystemWindowMods.DisableTitleScreenMovieStatusText);
-        yield return new("auto-display-ids", "Auto Display IDs", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayIdsEnabled, value =>
+        yield return new("custom-mouse", global::XASlave.Localization.UiLocale.Native("SD216F5BE3C2D80DD"), XAModsRestoreScope.Game, () => Configuration.CustomMouseEnabled, CustomMouse.SetEnabled, applied => Configuration.CustomMouseEnabled = applied, () => CustomMouse.StatusTextMessage);
+        yield return new("auto-allow-multiple-game-instances", global::XASlave.Localization.UiLocale.Native("S70C9D007A7F6FE3E"), XAModsRestoreScope.Game, () => Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.SetAllowMultipleGameInstancesEnabled, applied => Configuration.AutoAllowMultipleGameInstancesEnabled = applied, () => SystemWindowMods.AllowMultipleGameInstancesStatusTextMessage);
+        yield return new("auto-cancel-login-cooldown", global::XASlave.Localization.UiLocale.Native("SBAA9A862D2C2AC8C"), XAModsRestoreScope.Game, () => Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.SetCancelLoginCooldownEnabled, applied => Configuration.AutoCancelLoginCooldownEnabled = applied, () => SystemWindowMods.CancelLoginCooldownStatusTextMessage);
+        yield return new("inspect-outfit-try-on", global::XASlave.Localization.UiLocale.Native("S48A68C87A51F1E37"), XAModsRestoreScope.Ui, () => Configuration.InspectOutfitTryOnEnabled, InspectOutfitTryOn.SetEnabled, applied => Configuration.InspectOutfitTryOnEnabled = applied, () => InspectOutfitTryOn.StatusTextMessage);
+        yield return new("view-single-item", global::XASlave.Localization.UiLocale.Native("S26AFC61257A5D865"), XAModsRestoreScope.Player, () => Configuration.ViewSingleItemEnabled, ViewSingleItem.SetEnabled, applied => Configuration.ViewSingleItemEnabled = applied, () => ViewSingleItem.StatusMessage);
+        yield return new("auto-display-msq-progress", global::XASlave.Localization.UiLocale.Native("S10F930E55675BD2E"), XAModsRestoreScope.Ui, () => Configuration.AutoDisplayMsqProgressEnabled, MsqProgressDisplay.SetEnabled, applied => Configuration.AutoDisplayMsqProgressEnabled = applied, () => MsqProgressDisplay.StatusTextMessage);
+        yield return new("disable-title-screen-movie", global::XASlave.Localization.UiLocale.Native("S2A42EC4294B8E320"), XAModsRestoreScope.Graphic, () => Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.SetDisableTitleScreenMovieEnabled, applied => Configuration.DisableTitleScreenMovieEnabled = applied, () => SystemWindowMods.DisableTitleScreenMovieStatusTextMessage);
+        yield return new("auto-display-ids", global::XASlave.Localization.UiLocale.Native("S123052455FC6ED8D"), XAModsRestoreScope.Ui, () => Configuration.AutoDisplayIdsEnabled, value =>
         {
             Configuration.AutoDisplayIdsEnabled = value;
             ApplyAutoDisplayIdsConfiguration(save: false);
@@ -5170,117 +5571,117 @@ public sealed class Plugin : IDalamudPlugin
                 return AutoDisplayIds.SetEnabled(false);
 
             return AutoDisplayIds.SetEnabled(true);
-        }, applied => Configuration.AutoDisplayIdsEnabled = applied, () => AutoDisplayIds.StatusText);
-        yield return new("display-network-latency", "Display Network Latency", XAModsRestoreScope.Ui, () => Configuration.AutoDisplayNetworkLatencyEnabled, value =>
+        }, applied => Configuration.AutoDisplayIdsEnabled = applied, () => AutoDisplayIds.StatusTextMessage);
+        yield return new("display-network-latency", global::XASlave.Localization.UiLocale.Native("SEE47AC5C8172FBBB"), XAModsRestoreScope.Ui, () => Configuration.AutoDisplayNetworkLatencyEnabled, value =>
         {
             ApplyAutoDisplayNetworkLatencyConfiguration(save: false);
             return AutoDisplayNetworkLatency.SetEnabled(value);
-        }, applied => Configuration.AutoDisplayNetworkLatencyEnabled = applied, () => AutoDisplayNetworkLatency.StatusText);
-        yield return new("custom-timestamp-format", "Custom Timestamp Format", XAModsRestoreScope.Ui, () => Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.SetEnabled, applied => Configuration.CustomTimestampFormatEnabled = applied, () => ChatTimestampFormat.StatusText);
-        yield return new("instant-teleport", "Instant Teleport", XAModsRestoreScope.Illegal, () => Configuration.InstantTeleportEnabled, InstantTeleport.SetEnabled, applied => Configuration.InstantTeleportEnabled = applied, () => InstantTeleport.StatusText);
-        yield return new("no-ui-fade", "No UI Fade", XAModsRestoreScope.Graphic, () => Configuration.NoUiFadeEnabled, NoUiFade.SetEnabled, applied => Configuration.NoUiFadeEnabled = applied, () => NoUiFade.StatusText);
-        yield return new("auto-skip-cutscenes", "Skip Cutscenes", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesEnabled, value =>
+        }, applied => Configuration.AutoDisplayNetworkLatencyEnabled = applied, () => AutoDisplayNetworkLatency.StatusTextMessage);
+        yield return new("custom-timestamp-format", global::XASlave.Localization.UiLocale.Native("S7F54A2B6E5B74BC5"), XAModsRestoreScope.Ui, () => Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.SetEnabled, applied => Configuration.CustomTimestampFormatEnabled = applied, () => ChatTimestampFormat.StatusTextMessage);
+        yield return new("instant-teleport", global::XASlave.Localization.UiLocale.Native("S645072C9892CD773"), XAModsRestoreScope.Illegal, () => Configuration.InstantTeleportEnabled, InstantTeleport.SetEnabled, applied => Configuration.InstantTeleportEnabled = applied, () => InstantTeleport.StatusMessage);
+        yield return new("no-ui-fade", global::XASlave.Localization.UiLocale.Native("SEAB3878411C39C89"), XAModsRestoreScope.Graphic, () => Configuration.NoUiFadeEnabled, NoUiFade.SetEnabled, applied => Configuration.NoUiFadeEnabled = applied, () => NoUiFade.StatusTextMessage);
+        yield return new("auto-skip-cutscenes", global::XASlave.Localization.UiLocale.Native("S87AEB02125D0132D"), XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesEnabled, value =>
         {
             AutoSkipCutscenes.ApplyConfiguration(Configuration);
             return AutoSkipCutscenes.SetEnabled(value);
-        }, applied => Configuration.AutoSkipCutscenesEnabled = applied, () => AutoSkipCutscenes.StatusText);
-        yield return new("auto-skip-cutscenes-feeding-chocobo", "Skip Cutscenes Feeding Chocobo", XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesFeedingChocoboEnabled, BuddyFeedCutsceneSkip.SetEnabled, applied => Configuration.AutoSkipCutscenesFeedingChocoboEnabled = applied, () => BuddyFeedCutsceneSkip.StatusText);
-        yield return new("auto-hide-unnecessary-popups", "Hide Unnecessary Popups", XAModsRestoreScope.Graphic, () => Configuration.AutoHideUnnecessaryPopupsEnabled, PopupCleaner.SetEnabled, applied => Configuration.AutoHideUnnecessaryPopupsEnabled = applied, () => PopupCleaner.StatusText);
-        yield return new("dalamud-notifications-suck", "Dalamud Notifications Suck", XAModsRestoreScope.Ui, () => Configuration.DalamudNotificationsSuckEnabled, value =>
+        }, applied => Configuration.AutoSkipCutscenesEnabled = applied, () => AutoSkipCutscenes.StatusTextMessage);
+        yield return new("auto-skip-cutscenes-feeding-chocobo", global::XASlave.Localization.UiLocale.Native("SBCFD770DCE01F19F"), XAModsRestoreScope.Game, () => Configuration.AutoSkipCutscenesFeedingChocoboEnabled, BuddyFeedCutsceneSkip.SetEnabled, applied => Configuration.AutoSkipCutscenesFeedingChocoboEnabled = applied, () => BuddyFeedCutsceneSkip.StatusTextMessage);
+        yield return new("auto-hide-unnecessary-popups", global::XASlave.Localization.UiLocale.Native("S5644B7CB830E4670"), XAModsRestoreScope.Graphic, () => Configuration.AutoHideUnnecessaryPopupsEnabled, PopupCleaner.SetEnabled, applied => Configuration.AutoHideUnnecessaryPopupsEnabled = applied, () => PopupCleaner.StatusTextMessage);
+        yield return new("dalamud-notifications-suck", global::XASlave.Localization.UiLocale.Native("SE5A6781ECCBB2E55"), XAModsRestoreScope.Ui, () => Configuration.DalamudNotificationsSuckEnabled, value =>
         {
             ApplyDalamudNotificationsSuckConfiguration(save: false);
             return DalamudNotificationsSuck.SetEnabled(value);
-        }, applied => Configuration.DalamudNotificationsSuckEnabled = applied, () => DalamudNotificationsSuck.StatusText);
-        yield return new("dalamud-log-cleaner", "Dalamud Log Cleaner", XAModsRestoreScope.Game, () => Configuration.DalamudLogCleanerAutomaticEnabled, SetDalamudLogCleanerAutomatic, applied => Configuration.DalamudLogCleanerAutomaticEnabled = applied, () => DalamudLogCleaner.AutomaticStatusText);
-        yield return new("clean-chat", "Clean Chat", XAModsRestoreScope.Game, () => Configuration.CleanChatEnabled, SetCleanChatEnabled, applied => Configuration.CleanChatEnabled = applied, () => CleanChat.StatusText);
-        yield return new("dalamud-log-disabler", "Dalamud Log Disabler", XAModsRestoreScope.Game, () => Configuration.DalamudLogDisablerEnabled, value =>
+        }, applied => Configuration.DalamudNotificationsSuckEnabled = applied, () => DalamudNotificationsSuck.StatusTextMessage);
+        yield return new("dalamud-log-cleaner", global::XASlave.Localization.UiLocale.Native("SDCB2003435386091"), XAModsRestoreScope.Game, () => Configuration.DalamudLogCleanerAutomaticEnabled, SetDalamudLogCleanerAutomatic, applied => Configuration.DalamudLogCleanerAutomaticEnabled = applied, () => DalamudLogCleaner.AutomaticStatusMessage);
+        yield return new("clean-chat", global::XASlave.Localization.UiLocale.Native("S619A69E12D201498"), XAModsRestoreScope.Game, () => Configuration.CleanChatEnabled, SetCleanChatEnabled, applied => Configuration.CleanChatEnabled = applied, () => CleanChat.StatusMessage);
+        yield return new("dalamud-log-disabler", global::XASlave.Localization.UiLocale.Native("S6249A72639DF6380"), XAModsRestoreScope.Game, () => Configuration.DalamudLogDisablerEnabled, value =>
         {
             DalamudLogDisabler.ApplyConfiguration(Configuration.DalamudLogDisablerBlockedPlugins, Configuration.DalamudLogDisablerMinimumKeptLevel);
             return DalamudLogDisabler.SetEnabled(value);
-        }, applied => Configuration.DalamudLogDisablerEnabled = applied, () => DalamudLogDisabler.StatusText);
-        yield return new("better-highlight-potential-targets", "Better Highlight Potential Targets", XAModsRestoreScope.Ui, () => Configuration.BetterHighlightPotentialTargetsEnabled, value =>
+        }, applied => Configuration.DalamudLogDisablerEnabled = applied, () => DalamudLogDisabler.StatusTextMessage);
+        yield return new("better-highlight-potential-targets", global::XASlave.Localization.UiLocale.Native("S01C98DEAB6E2632E"), XAModsRestoreScope.Ui, () => Configuration.BetterHighlightPotentialTargetsEnabled, value =>
         {
             ApplyBetterHighlightPotentialTargetsConfiguration(save: false);
             return BetterHighlightPotentialTargets.SetEnabled(value);
-        }, applied => Configuration.BetterHighlightPotentialTargetsEnabled = applied, () => BetterHighlightPotentialTargets.StatusText);
-        yield return new("auto-prevent-game-exiting-from-lobby-errors", "Prevent Game Exiting From Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.SetPreventLobbyExitEnabled, applied => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled = applied, () => SystemWindowMods.PreventLobbyExitStatusText);
-        yield return new("auto-close-lobby-errors", "Close Lobby Errors", XAModsRestoreScope.Game, () => Configuration.AutoCloseLobbyErrorsEnabled, LobbyErrorAutoClose.SetEnabled, applied => Configuration.AutoCloseLobbyErrorsEnabled = applied, () => LobbyErrorAutoClose.StatusText);
-        yield return new("bailout-esc-menu", "Bailout ESC Menu", XAModsRestoreScope.Ui, () => Configuration.BailoutEscMenuEnabled, EscMenuBailout.SetEnabled, applied => Configuration.BailoutEscMenuEnabled = applied, () => EscMenuBailout.StatusText);
-        yield return new("auto-skip-dialogue", "Skip Dialogue", XAModsRestoreScope.Game, () => Configuration.AutoSkipDialogueEnabled, DialogueSkip.SetEnabled, applied => Configuration.AutoSkipDialogueEnabled = applied, () => DialogueSkip.StatusText);
-        yield return new("lock-game-window-in-combat", "Lock Game Window In Combat", XAModsRestoreScope.Game, () => Configuration.LockGameWindowInCombatEnabled, AutoLockGameWindow.SetEnabled, applied => Configuration.LockGameWindowInCombatEnabled = applied, () => AutoLockGameWindow.StatusText);
-        yield return new("notify-when-friend-is-near", "Notify When Friend Is Near", XAModsRestoreScope.Player, () => Configuration.NotifyWhenFriendIsNearEnabled, value =>
+        }, applied => Configuration.BetterHighlightPotentialTargetsEnabled = applied, () => BetterHighlightPotentialTargets.StatusTextMessage);
+        yield return new("auto-prevent-game-exiting-from-lobby-errors", global::XASlave.Localization.UiLocale.Native("S0BB03716893147BA"), XAModsRestoreScope.Game, () => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.SetPreventLobbyExitEnabled, applied => Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled = applied, () => SystemWindowMods.PreventLobbyExitStatusTextMessage);
+        yield return new("auto-close-lobby-errors", global::XASlave.Localization.UiLocale.Native("S272725A7DCEDD630"), XAModsRestoreScope.Game, () => Configuration.AutoCloseLobbyErrorsEnabled, LobbyErrorAutoClose.SetEnabled, applied => Configuration.AutoCloseLobbyErrorsEnabled = applied, () => LobbyErrorAutoClose.StatusTextMessage);
+        yield return new("bailout-esc-menu", global::XASlave.Localization.UiLocale.Native("SA41C83913F62F6ED"), XAModsRestoreScope.Ui, () => Configuration.BailoutEscMenuEnabled, EscMenuBailout.SetEnabled, applied => Configuration.BailoutEscMenuEnabled = applied, () => EscMenuBailout.StatusTextMessage);
+        yield return new("auto-skip-dialogue", global::XASlave.Localization.UiLocale.Native("SACBF3F6A5B6FFEB5"), XAModsRestoreScope.Game, () => Configuration.AutoSkipDialogueEnabled, DialogueSkip.SetEnabled, applied => Configuration.AutoSkipDialogueEnabled = applied, () => DialogueSkip.StatusTextMessage);
+        yield return new("lock-game-window-in-combat", global::XASlave.Localization.UiLocale.Native("S29F583707A18B82E"), XAModsRestoreScope.Game, () => Configuration.LockGameWindowInCombatEnabled, AutoLockGameWindow.SetEnabled, applied => Configuration.LockGameWindowInCombatEnabled = applied, () => AutoLockGameWindow.StatusMessage);
+        yield return new("notify-when-friend-is-near", global::XASlave.Localization.UiLocale.Native("S565B74269109BD23"), XAModsRestoreScope.Player, () => Configuration.NotifyWhenFriendIsNearEnabled, value =>
         {
             ApplyNotifyWhenFriendIsNearConfiguration(save: false);
             return NotifyWhenFriendIsNear.SetEnabled(value);
-        }, applied => Configuration.NotifyWhenFriendIsNearEnabled = applied, () => NotifyWhenFriendIsNear.StatusText);
-        yield return new("alert-when-typing-in-combat", "Alert When Typing In Combat", XAModsRestoreScope.Player, () => Configuration.AlertWhenTypingInCombatEnabled, value =>
+        }, applied => Configuration.NotifyWhenFriendIsNearEnabled = applied, () => NotifyWhenFriendIsNear.StatusTextMessage);
+        yield return new("alert-when-typing-in-combat", global::XASlave.Localization.UiLocale.Native("S3CBE7B499836F879"), XAModsRestoreScope.Player, () => Configuration.AlertWhenTypingInCombatEnabled, value =>
         {
             ApplyAlertWhenTypingInCombatConfiguration(save: false);
             return AlertWhenTypingInCombat.SetEnabled(value);
-        }, applied => Configuration.AlertWhenTypingInCombatEnabled = applied, () => AlertWhenTypingInCombat.StatusText);
-        yield return new("better-cast-bar", "Better Cast Bar", XAModsRestoreScope.Ui, () => Configuration.BetterCastBarEnabled, value =>
+        }, applied => Configuration.AlertWhenTypingInCombatEnabled = applied, () => AlertWhenTypingInCombat.StatusTextMessage);
+        yield return new("better-cast-bar", global::XASlave.Localization.UiLocale.Native("S49DE54B84FC8AA53"), XAModsRestoreScope.Ui, () => Configuration.BetterCastBarEnabled, value =>
         {
             ApplyBetterCastBarConfiguration(save: false);
             return BetterCastBar.SetEnabled(value);
-        }, applied => Configuration.BetterCastBarEnabled = applied, () => BetterCastBar.StatusText);
-        yield return new("better-duty-finder", "Better Duty Finder", XAModsRestoreScope.Ui, () => Configuration.BetterDutyFinderEnabled, BetterDutyFinder.SetEnabled, applied => Configuration.BetterDutyFinderEnabled = applied, () => BetterDutyFinder.StatusText);
-        yield return new("display-actual-queue-position", "Display Actual Queue Position", XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusText);
-        yield return new("replace-unowned-mount-hotbars", "Replace Unowned Mount Hotbars", XAModsRestoreScope.Game, () => Configuration.ReplaceUnownedMountHotbarsEnabled, ReplaceUnownedMountHotbars.SetEnabled, applied => Configuration.ReplaceUnownedMountHotbarsEnabled = applied, () => ReplaceUnownedMountHotbars.StatusText);
-        yield return new("target-command-fix", "Fix /target Command", XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusText);
-        yield return new("copy-item-name-for-all", "Copy Item Name For All", XAModsRestoreScope.Ui, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusText);
-        yield return new("expanded-player-right-click-menu-search", "Expanded Player Right-Click Menu Search", XAModsRestoreScope.Ui, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusText);
-        yield return new("estate-teleportation-context-menu", "Estate Teleportation Context Menu", XAModsRestoreScope.Player, () => Configuration.EstateTeleportationContextMenuEnabled, EstateTeleportationContextMenu.SetEnabled, applied => Configuration.EstateTeleportationContextMenuEnabled = applied, () => EstateTeleportationContextMenu.StatusText);
-        yield return new("live-anonymous-mode", "Anonymous Mode", XAModsRestoreScope.Ui, () => Configuration.LiveAnonymousModeEnabled, NameplatePrivacy.SetAnonymousModeEnabled, applied => Configuration.LiveAnonymousModeEnabled = applied, () => NameplatePrivacy.AnonymousModeStatusText);
-        yield return new("better-inventory-mover", "Better Inventory Mover", XAModsRestoreScope.Player, () => Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.SetEnabled, applied => Configuration.BetterInventoryMoverEnabled = applied, () => BetterInventoryMover.StatusText);
-        yield return new("better-company-chest", "Better Company Chest", XAModsRestoreScope.Player, () => Configuration.BetterCompanyChestEnabled, BetterCompanyChest.SetEnabled, applied => Configuration.BetterCompanyChestEnabled = applied, () => BetterCompanyChest.StatusText);
-        yield return new("auto-open-moogle-mail", "Auto Open Moogle Mail", XAModsRestoreScope.Player, () => Configuration.AutoOpenMoogleMailEnabled, AutoOpenMoogleMail.SetEnabled, applied => Configuration.AutoOpenMoogleMailEnabled = applied, () => AutoOpenMoogleMail.StatusText);
-        yield return new("enable-item-icon-in-shops", "Enable Item Icon In Shops", XAModsRestoreScope.Ui, () => Configuration.EnableItemIconInShopsEnabled, EnableItemIconInShops.SetEnabled, applied => Configuration.EnableItemIconInShopsEnabled = applied, () => EnableItemIconInShops.StatusText);
-        yield return new("field-operations-entry-command", "Field Operations Entry Command", XAModsRestoreScope.Eureka, () => Configuration.FieldEntryCommandEnabled, FieldEntryCommand.SetEnabled, applied => Configuration.FieldEntryCommandEnabled = applied, () => FieldEntryCommand.StatusText);
+        }, applied => Configuration.BetterCastBarEnabled = applied, () => BetterCastBar.StatusTextMessage);
+        yield return new("better-duty-finder", global::XASlave.Localization.UiLocale.Native("S023C4C5983AAE7D3"), XAModsRestoreScope.Ui, () => Configuration.BetterDutyFinderEnabled, BetterDutyFinder.SetEnabled, applied => Configuration.BetterDutyFinderEnabled = applied, () => BetterDutyFinder.StatusTextMessage);
+        yield return new("display-actual-queue-position", global::XASlave.Localization.UiLocale.Native("SA67487F2DBAEAB93"), XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusTextMessage);
+        yield return new("replace-unowned-mount-hotbars", global::XASlave.Localization.UiLocale.Native("S6D3BD3F66D7757D7"), XAModsRestoreScope.Game, () => Configuration.ReplaceUnownedMountHotbarsEnabled, ReplaceUnownedMountHotbars.SetEnabled, applied => Configuration.ReplaceUnownedMountHotbarsEnabled = applied, () => ReplaceUnownedMountHotbars.StatusTextMessage);
+        yield return new("target-command-fix", global::XASlave.Localization.UiLocale.Native("S762FC3E87F23DC97"), XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusTextMessage);
+        yield return new("copy-item-name-for-all", global::XASlave.Localization.UiLocale.Native("SE47CEA80BEEED0B2"), XAModsRestoreScope.Ui, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusTextMessage);
+        yield return new("expanded-player-right-click-menu-search", global::XASlave.Localization.UiLocale.Native("SF6F93682DCAB79ED"), XAModsRestoreScope.Ui, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusTextMessage);
+        yield return new("estate-teleportation-context-menu", global::XASlave.Localization.UiLocale.Native("S9DFC8C2F4F794E5C"), XAModsRestoreScope.Player, () => Configuration.EstateTeleportationContextMenuEnabled, EstateTeleportationContextMenu.SetEnabled, applied => Configuration.EstateTeleportationContextMenuEnabled = applied, () => EstateTeleportationContextMenu.StatusTextMessage);
+        yield return new("live-anonymous-mode", global::XASlave.Localization.UiLocale.Native("S82ED5909A4A95EC2"), XAModsRestoreScope.Ui, () => Configuration.LiveAnonymousModeEnabled, NameplatePrivacy.SetAnonymousModeEnabled, applied => Configuration.LiveAnonymousModeEnabled = applied, () => NameplatePrivacy.AnonymousModeStatusTextMessage);
+        yield return new("better-inventory-mover", global::XASlave.Localization.UiLocale.Native("SD322E1206FB77885"), XAModsRestoreScope.Player, () => Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.SetEnabled, applied => Configuration.BetterInventoryMoverEnabled = applied, () => BetterInventoryMover.StatusTextMessage);
+        yield return new("better-company-chest", global::XASlave.Localization.UiLocale.Native("S60090C51AF9AAB79"), XAModsRestoreScope.Player, () => Configuration.BetterCompanyChestEnabled, BetterCompanyChest.SetEnabled, applied => Configuration.BetterCompanyChestEnabled = applied, () => BetterCompanyChest.StatusTextMessage);
+        yield return new("auto-open-moogle-mail", global::XASlave.Localization.UiLocale.Native("SFF7567E271F23362"), XAModsRestoreScope.Player, () => Configuration.AutoOpenMoogleMailEnabled, AutoOpenMoogleMail.SetEnabled, applied => Configuration.AutoOpenMoogleMailEnabled = applied, () => AutoOpenMoogleMail.StatusTextMessage);
+        yield return new("enable-item-icon-in-shops", global::XASlave.Localization.UiLocale.Native("S3837B5DE6FD2CC40"), XAModsRestoreScope.Ui, () => Configuration.EnableItemIconInShopsEnabled, EnableItemIconInShops.SetEnabled, applied => Configuration.EnableItemIconInShopsEnabled = applied, () => EnableItemIconInShops.StatusTextMessage);
+        yield return new("field-operations-entry-command", global::XASlave.Localization.UiLocale.Native("SF44939EAF2840308"), XAModsRestoreScope.Eureka, () => Configuration.FieldEntryCommandEnabled, FieldEntryCommand.SetEnabled, applied => Configuration.FieldEntryCommandEnabled = applied, () => FieldEntryCommand.StatusTextMessage);
 
-        yield return new("auto-ignore-minimum-window-size", "Ignore Minimum Window Size", XAModsRestoreScope.Graphic, () => Configuration.AutoIgnoreMinimumWindowSizeEnabled, SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled, applied => Configuration.AutoIgnoreMinimumWindowSizeEnabled = applied, () => SystemWindowMods.IgnoreMinimumWindowSizeStatusText);
-        yield return new("auto-hide-game-objects", "Hide Game Objects", XAModsRestoreScope.Graphic, () => Configuration.AutoHideGameObjectsEnabled, SetAutoHideGameObjectsEnabled, applied => Configuration.AutoHideGameObjectsEnabled = applied, () => AutoHideGameObjects.StatusText);
-        yield return new("custom-resolutions", "Custom Resolutions", XAModsRestoreScope.Graphic, () => Configuration.CustomResolutionsEnabled, SystemWindowMods.SetCustomResolutionsEnabled, applied => Configuration.CustomResolutionsEnabled = applied, () => SystemWindowMods.CustomResolutionsStatusText);
-        yield return new("disable-background-game-rendering", "Disable Background Rendering", XAModsRestoreScope.Graphic, () => Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.SetDisableBackgroundRenderingEnabled, applied => Configuration.DisableBackgroundGameRenderingEnabled = applied, () => SystemWindowMods.DisableBackgroundRenderingStatusText);
-        yield return new("low-resolution", "Low Resolution", XAModsRestoreScope.Graphic, () => Configuration.LowResolutionEnabled, SystemWindowMods.SetLowResolutionEnabled, applied => Configuration.LowResolutionEnabled = applied, () => SystemWindowMods.LowResolutionStatusText);
-        yield return new("special-rendering-modes", "Special Rendering Modes", XAModsRestoreScope.Graphic, () => Configuration.SpecialRenderModesEnabled, SetSpecialRenderModesEnabled, applied => Configuration.SpecialRenderModesEnabled = applied, () => Configuration.SpecialRenderModesEnabled ? SystemWindowMods.SpecialRenderModesStatusText : "Disabled");
+        yield return new("auto-ignore-minimum-window-size", global::XASlave.Localization.UiLocale.Native("SD9CCEE8B9E9A452B"), XAModsRestoreScope.Graphic, () => Configuration.AutoIgnoreMinimumWindowSizeEnabled, SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled, applied => Configuration.AutoIgnoreMinimumWindowSizeEnabled = applied, () => SystemWindowMods.IgnoreMinimumWindowSizeStatusTextMessage);
+        yield return new("auto-hide-game-objects", global::XASlave.Localization.UiLocale.Native("SFC7DFC9B7B8D3E3D"), XAModsRestoreScope.Graphic, () => Configuration.AutoHideGameObjectsEnabled, SetAutoHideGameObjectsEnabled, applied => Configuration.AutoHideGameObjectsEnabled = applied, () => AutoHideGameObjects.StatusTextMessage);
+        yield return new("custom-resolutions", global::XASlave.Localization.UiLocale.Native("S5FE7C6A49AB02414"), XAModsRestoreScope.Graphic, () => Configuration.CustomResolutionsEnabled, SystemWindowMods.SetCustomResolutionsEnabled, applied => Configuration.CustomResolutionsEnabled = applied, () => SystemWindowMods.CustomResolutionsStatusTextMessage);
+        yield return new("disable-background-game-rendering", global::XASlave.Localization.UiLocale.Native("SA0D7106CA86D90A6"), XAModsRestoreScope.Graphic, () => Configuration.DisableBackgroundGameRenderingEnabled, SystemWindowMods.SetDisableBackgroundRenderingEnabled, applied => Configuration.DisableBackgroundGameRenderingEnabled = applied, () => SystemWindowMods.DisableBackgroundRenderingStatusTextMessage);
+        yield return new("low-resolution", global::XASlave.Localization.UiLocale.Native("S87DA16CCE36926CD"), XAModsRestoreScope.Graphic, () => Configuration.LowResolutionEnabled, SystemWindowMods.SetLowResolutionEnabled, applied => Configuration.LowResolutionEnabled = applied, () => SystemWindowMods.LowResolutionStatusTextMessage);
+        yield return new("special-rendering-modes", global::XASlave.Localization.UiLocale.Native("SB26660220C4D59AB"), XAModsRestoreScope.Graphic, () => Configuration.SpecialRenderModesEnabled, SetSpecialRenderModesEnabled, applied => Configuration.SpecialRenderModesEnabled = applied, () => (Configuration.SpecialRenderModesEnabled ? SystemWindowMods.SpecialRenderModesStatusTextMessage : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")));
 
-        yield return new("anti-afk", "Anti-AFK", XAModsRestoreScope.Player, () => Configuration.AntiAfkEnabled, AntiAfk.SetEnabled, applied => Configuration.AntiAfkEnabled = applied, () => AntiAfk.StatusText);
-        yield return new("auto-duty-commence", "Auto Duty Commence", XAModsRestoreScope.Player, () => Configuration.AutoDutyCommenceEnabled, AutoDutyCommence.SetEnabled, applied => Configuration.AutoDutyCommenceEnabled = applied, () => AutoDutyCommence.StatusText);
-        yield return new("auto-expert-delivery", "Automate Expert Delivery", XAModsRestoreScope.Player, () => Configuration.AutoUnlockExpertDeliveryEnabled, AutoUnlockExpertDelivery.SetEnabled, applied => Configuration.AutoUnlockExpertDeliveryEnabled = applied, () => AutoUnlockExpertDelivery.StatusText);
-        yield return new("auto-leave-duty", "Auto Leave Duty", XAModsRestoreScope.Player, () => Configuration.AutoLeaveDutyEnabled, AutoLeaveDuty.SetEnabled, applied => Configuration.AutoLeaveDutyEnabled = applied, () => AutoLeaveDuty.StatusText);
-        yield return new("auto-merge", "Auto Merge", XAModsRestoreScope.Player, () => Configuration.AutoMergeEnabled, AutoMerge.SetEnabled, applied => Configuration.AutoMergeEnabled = applied, () => AutoMerge.StatusText);
-        yield return new("auto-sort-items", "Auto Sort Items", XAModsRestoreScope.Player, () => Configuration.AutoSortItemsEnabled, AutoSortItems.SetEnabled, applied => Configuration.AutoSortItemsEnabled = applied, () => AutoSortItems.StatusText);
-        yield return new("auto-restore-furniture", "Auto Restore Furniture", XAModsRestoreScope.Player, () => Configuration.AutoRestoreFurnitureEnabled, AutoRestoreFurniture.SetEnabled, applied => Configuration.AutoRestoreFurnitureEnabled = applied, () => AutoRestoreFurniture.StatusText);
-        yield return new("quick-return", "Instant Return", XAModsRestoreScope.Illegal, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusText);
-        yield return new("auto-refuse-trade-request", "Refuse Trade Request", XAModsRestoreScope.Player, () => Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.SetEnabled, applied => Configuration.AutoRefuseTradeRequestEnabled = applied, () => AutoRefuseTrade.StatusText);
-        yield return new("show-titles-as-playernames", "Show Titles As Playernames", XAModsRestoreScope.Player, () => Configuration.ShowTitlesAsPlayernamesEnabled, NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled, applied => Configuration.ShowTitlesAsPlayernamesEnabled = applied, () => NameplatePrivacy.ShowTitlesAsPlayernamesStatusText);
-        yield return new("hide-nameplate-status-icons", "Hide Nameplate Status Icons", XAModsRestoreScope.Player, () => Configuration.HideNameplateStatusIconsEnabled, value =>
+        yield return new("anti-afk", global::XASlave.Localization.UiLocale.Native("SEE53F9C504B94DCF"), XAModsRestoreScope.Player, () => Configuration.AntiAfkEnabled, AntiAfk.SetEnabled, applied => Configuration.AntiAfkEnabled = applied, () => AntiAfk.StatusTextMessage);
+        yield return new("auto-duty-commence", global::XASlave.Localization.UiLocale.Native("SBCF1820DD8640D0F"), XAModsRestoreScope.Player, () => Configuration.AutoDutyCommenceEnabled, AutoDutyCommence.SetEnabled, applied => Configuration.AutoDutyCommenceEnabled = applied, () => AutoDutyCommence.StatusTextMessage);
+        yield return new("auto-expert-delivery", global::XASlave.Localization.UiLocale.Native("SDDD0990DE8ED14DD"), XAModsRestoreScope.Player, () => Configuration.AutoUnlockExpertDeliveryEnabled, AutoUnlockExpertDelivery.SetEnabled, applied => Configuration.AutoUnlockExpertDeliveryEnabled = applied, () => AutoUnlockExpertDelivery.StatusTextMessage);
+        yield return new("auto-leave-duty", global::XASlave.Localization.UiLocale.Native("S6CDBCC0A69DE6B17"), XAModsRestoreScope.Player, () => Configuration.AutoLeaveDutyEnabled, AutoLeaveDuty.SetEnabled, applied => Configuration.AutoLeaveDutyEnabled = applied, () => AutoLeaveDuty.StatusTextMessage);
+        yield return new("auto-merge", global::XASlave.Localization.UiLocale.Native("S90D9264B8B7B93D3"), XAModsRestoreScope.Player, () => Configuration.AutoMergeEnabled, AutoMerge.SetEnabled, applied => Configuration.AutoMergeEnabled = applied, () => AutoMerge.StatusTextMessage);
+        yield return new("auto-sort-items", global::XASlave.Localization.UiLocale.Native("SA318747875972AD1"), XAModsRestoreScope.Player, () => Configuration.AutoSortItemsEnabled, AutoSortItems.SetEnabled, applied => Configuration.AutoSortItemsEnabled = applied, () => AutoSortItems.StatusTextMessage);
+        yield return new("auto-restore-furniture", global::XASlave.Localization.UiLocale.Native("S62F6C455F98922D0"), XAModsRestoreScope.Player, () => Configuration.AutoRestoreFurnitureEnabled, AutoRestoreFurniture.SetEnabled, applied => Configuration.AutoRestoreFurnitureEnabled = applied, () => AutoRestoreFurniture.StatusTextMessage);
+        yield return new("quick-return", global::XASlave.Localization.UiLocale.Native("S6CF86715A47CB6D6"), XAModsRestoreScope.Illegal, () => Configuration.QuickReturnEnabled, QuickReturn.SetEnabled, applied => Configuration.QuickReturnEnabled = applied, () => QuickReturn.StatusTextMessage);
+        yield return new("auto-refuse-trade-request", global::XASlave.Localization.UiLocale.Native("SD4C5C475E71938D8"), XAModsRestoreScope.Player, () => Configuration.AutoRefuseTradeRequestEnabled, AutoRefuseTrade.SetEnabled, applied => Configuration.AutoRefuseTradeRequestEnabled = applied, () => AutoRefuseTrade.StatusTextMessage);
+        yield return new("show-titles-as-playernames", global::XASlave.Localization.UiLocale.Native("S3CAF43B3413D96EB"), XAModsRestoreScope.Player, () => Configuration.ShowTitlesAsPlayernamesEnabled, NameplatePrivacy.SetShowTitlesAsPlayernamesEnabled, applied => Configuration.ShowTitlesAsPlayernamesEnabled = applied, () => NameplatePrivacy.ShowTitlesAsPlayernamesStatusTextMessage);
+        yield return new("hide-nameplate-status-icons", global::XASlave.Localization.UiLocale.Native("S6FC3FB611DBCAA8B"), XAModsRestoreScope.Player, () => Configuration.HideNameplateStatusIconsEnabled, value =>
         {
             NameplatePrivacy.ApplyStatusIconConfiguration(Configuration.HiddenNameplateStatusIds);
             return NameplatePrivacy.SetHideStatusIconsEnabled(value);
-        }, applied => Configuration.HideNameplateStatusIconsEnabled = applied, () => NameplatePrivacy.HideStatusIconsStatusText);
-        yield return new("remove-nameplate-fc-tag", "Remove FC Tag", XAModsRestoreScope.Player, () => Configuration.RemoveNameplateFcTagEnabled, NameplatePrivacy.SetRemoveFcTagEnabled, applied => Configuration.RemoveNameplateFcTagEnabled = applied, () => NameplatePrivacy.RemoveFcTagStatusText);
-        yield return new("show-blacklisted-playername-in-party", "Show Blacklisted Playername In Party", XAModsRestoreScope.Player, () => Configuration.ShowBlacklistedPlayernameInPartyEnabled, BlacklistedPartyName.SetEnabled, applied => Configuration.ShowBlacklistedPlayernameInPartyEnabled = applied, () => BlacklistedPartyName.StatusText);
-        yield return new("show-traveler-world-names", "Show Traveler World Names", XAModsRestoreScope.Player, () => Configuration.ShowTravelerWorldNamesEnabled, value =>
+        }, applied => Configuration.HideNameplateStatusIconsEnabled = applied, () => NameplatePrivacy.HideStatusIconsStatusTextMessage);
+        yield return new("remove-nameplate-fc-tag", global::XASlave.Localization.UiLocale.Native("S2455041D1042D3DD"), XAModsRestoreScope.Player, () => Configuration.RemoveNameplateFcTagEnabled, NameplatePrivacy.SetRemoveFcTagEnabled, applied => Configuration.RemoveNameplateFcTagEnabled = applied, () => NameplatePrivacy.RemoveFcTagStatusTextMessage);
+        yield return new("show-blacklisted-playername-in-party", global::XASlave.Localization.UiLocale.Native("S04E4A04253B995BA"), XAModsRestoreScope.Player, () => Configuration.ShowBlacklistedPlayernameInPartyEnabled, BlacklistedPartyName.SetEnabled, applied => Configuration.ShowBlacklistedPlayernameInPartyEnabled = applied, () => BlacklistedPartyName.StatusTextMessage);
+        yield return new("show-traveler-world-names", global::XASlave.Localization.UiLocale.Native("S1C8BB37AFDACB597"), XAModsRestoreScope.Player, () => Configuration.ShowTravelerWorldNamesEnabled, value =>
         {
             NameplatePrivacy.ApplyShowTravelerWorldNamesConfiguration(
                 Configuration.ShowTravelerWorldNamesDisableInDuties,
                 Configuration.ShowTravelerWorldNamesAddSpacer);
             return NameplatePrivacy.SetShowTravelerWorldNamesEnabled(value);
-        }, applied => Configuration.ShowTravelerWorldNamesEnabled = applied, () => NameplatePrivacy.ShowTravelerWorldNamesStatusText);
-        yield return new("auto-reveal-undiscovered-areas", "Reveal Undiscovered Areas", XAModsRestoreScope.Player, () => Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.SetRevealUndiscoveredAreasEnabled, applied => Configuration.AutoRevealUndiscoveredAreasEnabled = applied, () => SystemWindowMods.RevealUndiscoveredAreasStatusText);
-        yield return new("auto-clear-teleportation-lock", "Clear Teleportation Lock", XAModsRestoreScope.Player, () => Configuration.AutoClearTeleportationLockEnabled, TeleportLockClear.SetEnabled, applied => Configuration.AutoClearTeleportationLockEnabled = applied, () => TeleportLockClear.StatusText);
-        yield return new("custom-sight-distance", "Custom Sight Distance", XAModsRestoreScope.Player, () => Configuration.CustomSightDistanceEnabled, SightDistance.SetEnabled, applied => Configuration.CustomSightDistanceEnabled = applied, () => SightDistance.StatusText);
-        yield return new("doze-sit-anywhere", "Doze & Sit Anywhere", XAModsRestoreScope.Player, () => Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.SetEnabled, applied => Configuration.DozeSitAnywhereEnabled = applied, () => DozeSitAnywhere.StatusText);
-        yield return new("infinite-sprint", "Infinite Sprint", XAModsRestoreScope.Player, () => Configuration.InfiniteSprintEnabled, PlayerMods.SetInfiniteSprintEnabled, applied => Configuration.InfiniteSprintEnabled = applied, () => PlayerMods.InfiniteSprintStatusText);
-        yield return new("instant-logout", "Instant Logout", XAModsRestoreScope.Illegal, () => Configuration.InstantLogoutEnabled, InstantLogout.SetEnabled, applied => Configuration.InstantLogoutEnabled = applied, () => InstantLogout.StatusText);
-        yield return new("item-commands", "Item Commands", XAModsRestoreScope.Player, () => Configuration.ItemCommandsEnabled, ItemCommands.SetEnabled, applied => Configuration.ItemCommandsEnabled = applied, () => ItemCommands.StatusText);
-        yield return new("nearby-players", "Nearby Players", XAModsRestoreScope.Player, () => Configuration.NearbyPlayers.Enabled, NearbyPlayers.SetEnabled, applied => Configuration.NearbyPlayers.Enabled = applied, () => NearbyPlayers.StatusText);
-        yield return new("xa-peep", "XA Peep", XAModsRestoreScope.Player, () => Configuration.XAPeepEnabled, SetXAPeepEnabled, applied => Configuration.XAPeepEnabled = applied, () => XAPeep.StatusText);
+        }, applied => Configuration.ShowTravelerWorldNamesEnabled = applied, () => NameplatePrivacy.ShowTravelerWorldNamesStatusTextMessage);
+        yield return new("auto-reveal-undiscovered-areas", global::XASlave.Localization.UiLocale.Native("S58BFF7A44F39AA88"), XAModsRestoreScope.Player, () => Configuration.AutoRevealUndiscoveredAreasEnabled, SystemWindowMods.SetRevealUndiscoveredAreasEnabled, applied => Configuration.AutoRevealUndiscoveredAreasEnabled = applied, () => SystemWindowMods.RevealUndiscoveredAreasStatusTextMessage);
+        yield return new("auto-clear-teleportation-lock", global::XASlave.Localization.UiLocale.Native("S1123E9E883367E74"), XAModsRestoreScope.Player, () => Configuration.AutoClearTeleportationLockEnabled, TeleportLockClear.SetEnabled, applied => Configuration.AutoClearTeleportationLockEnabled = applied, () => TeleportLockClear.StatusTextMessage);
+        yield return new("custom-sight-distance", global::XASlave.Localization.UiLocale.Native("SA911299386D7574E"), XAModsRestoreScope.Player, () => Configuration.CustomSightDistanceEnabled, SightDistance.SetEnabled, applied => Configuration.CustomSightDistanceEnabled = applied, () => SightDistance.StatusTextMessage);
+        yield return new("doze-sit-anywhere", global::XASlave.Localization.UiLocale.Native("S024F9EF0DF86E54F"), XAModsRestoreScope.Player, () => Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.SetEnabled, applied => Configuration.DozeSitAnywhereEnabled = applied, () => DozeSitAnywhere.StatusTextMessage);
+        yield return new("infinite-sprint", global::XASlave.Localization.UiLocale.Native("S3187BAA85C51F55B"), XAModsRestoreScope.Player, () => Configuration.InfiniteSprintEnabled, PlayerMods.SetInfiniteSprintEnabled, applied => Configuration.InfiniteSprintEnabled = applied, () => PlayerMods.InfiniteSprintStatusTextMessage);
+        yield return new("instant-logout", global::XASlave.Localization.UiLocale.Native("SB358629B2E68D434"), XAModsRestoreScope.Illegal, () => Configuration.InstantLogoutEnabled, InstantLogout.SetEnabled, applied => Configuration.InstantLogoutEnabled = applied, () => InstantLogout.StatusTextMessage);
+        yield return new("item-commands", global::XASlave.Localization.UiLocale.Native("S943452438F6F70FE"), XAModsRestoreScope.Player, () => Configuration.ItemCommandsEnabled, ItemCommands.SetEnabled, applied => Configuration.ItemCommandsEnabled = applied, () => ItemCommands.StatusTextMessage);
+        yield return new("nearby-players", global::XASlave.Localization.UiLocale.Native("S4530D44B49AF489D"), XAModsRestoreScope.Player, () => Configuration.NearbyPlayers.Enabled, NearbyPlayers.SetEnabled, applied => Configuration.NearbyPlayers.Enabled = applied, () => NearbyPlayers.StatusTextMessage);
+        yield return new("xa-peep", global::XASlave.Localization.UiLocale.Native("S1079C85AFAB8AEDC"), XAModsRestoreScope.Player, () => Configuration.XAPeepEnabled, SetXAPeepEnabled, applied => Configuration.XAPeepEnabled = applied, () => XAPeep.StatusTextMessage);
 
         yield return new(
             "anonymize-character-lists",
-            "Anonymize Character Lists",
+            global::XASlave.Localization.UiLocale.Native("S94ACE94457981245"),
             XAModsRestoreScope.Plugin,
             () => Configuration.GlobalCharacterListAnonymizeEnabled,
             enabled =>
@@ -5289,28 +5690,26 @@ public sealed class Plugin : IDalamudPlugin
                 return enabled;
             },
             applied => Configuration.GlobalCharacterListAnonymizeEnabled = applied,
-            () => Configuration.GlobalCharacterListAnonymizeEnabled
-                ? "Enabled - character-list tables and duplicate summaries use deterministic aliases for screenshot-safe local views."
-                : "Disabled");
-        yield return new("force-peepingtom", "Force PeepingTom", XAModsRestoreScope.Plugin, () => Configuration.ForcePeepingTomEnabled, PeepingTomIntegration.SetForceEnabled, applied => Configuration.ForcePeepingTomEnabled = applied, () => PeepingTomIntegration.StatusText);
-        yield return new("disable-this", "Plugin Guard", XAModsRestoreScope.Plugin, () => Configuration.DisableThisEnabled, PluginGuard.SetEnabled, applied => Configuration.DisableThisEnabled = applied, () => PluginGuard.StatusText);
-        yield return new("arealmrecorded-all-zones", "ARealmRecorded All Zones", XAModsRestoreScope.Plugin, () => Configuration.ARealmRecordedAllZonesEnabled, value =>
+            () => (Configuration.GlobalCharacterListAnonymizeEnabled ? global::XASlave.Localization.UiMessage.Key("S75D0374F3B1E4F74") : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")));
+        yield return new("force-peepingtom", global::XASlave.Localization.UiLocale.Native("SEFE91AA503DA1BAF"), XAModsRestoreScope.Plugin, () => Configuration.ForcePeepingTomEnabled, PeepingTomIntegration.SetForceEnabled, applied => Configuration.ForcePeepingTomEnabled = applied, () => PeepingTomIntegration.StatusTextMessage);
+        yield return new("disable-this", global::XASlave.Localization.UiLocale.Native("S0678DE437AABA714"), XAModsRestoreScope.Plugin, () => Configuration.DisableThisEnabled, PluginGuard.SetEnabled, applied => Configuration.DisableThisEnabled = applied, () => PluginGuard.StatusTextMessage);
+        yield return new("arealmrecorded-all-zones", global::XASlave.Localization.UiLocale.Native("S7BA474F5BFACF460"), XAModsRestoreScope.Plugin, () => Configuration.ARealmRecordedAllZonesEnabled, value =>
         {
             ARealmRecordedIntegration.ApplyConfiguration(
                 Configuration.ARealmRecordedAllZonesAllContentTypes,
                 Configuration.ARealmRecordedAllZonesSelectedContentTypes);
             return ARealmRecordedIntegration.SetForceEnabled(value);
-        }, applied => Configuration.ARealmRecordedAllZonesEnabled = applied, () => ARealmRecordedIntegration.StatusText);
-        yield return new("teleport-helper", "Teleport Helper", XAModsRestoreScope.Plugin, () => Configuration.TeleportHelperEnabled, value =>
+        }, applied => Configuration.ARealmRecordedAllZonesEnabled = applied, () => ARealmRecordedIntegration.StatusTextMessage);
+        yield return new("teleport-helper", global::XASlave.Localization.UiLocale.Native("SECA9B296F48C520C"), XAModsRestoreScope.Plugin, () => Configuration.TeleportHelperEnabled, value =>
         {
             TeleportHelper.ApplyConfiguration(Configuration.TeleportHelperSelectYes);
             return TeleportHelper.SetEnabled(value);
-        }, applied => Configuration.TeleportHelperEnabled = applied, () => TeleportHelper.StatusText);
+        }, applied => Configuration.TeleportHelperEnabled = applied, () => TeleportHelper.StatusTextMessage);
 
-        yield return new("eureka-instance-id", "Instance ID", XAModsRestoreScope.Eureka, () => Configuration.EurekaInstanceIdEnabled, EurekaInstanceId.SetEnabled, applied => Configuration.EurekaInstanceIdEnabled = applied, () => EurekaInstanceId.StatusText);
+        yield return new("eureka-instance-id", global::XASlave.Localization.UiLocale.Native("S0DC49FB52EF24934"), XAModsRestoreScope.Eureka, () => Configuration.EurekaInstanceIdEnabled, EurekaInstanceId.SetEnabled, applied => Configuration.EurekaInstanceIdEnabled = applied, () => EurekaInstanceId.StatusTextMessage);
 
-        yield return new("auto-unlock-expert-delivery", "Unlock Expert Delivery", XAModsRestoreScope.Illegal, () => Configuration.UnlockExpertDeliveryEnabled, ExpertDeliveryUnlock.SetEnabled, applied => Configuration.UnlockExpertDeliveryEnabled = applied, () => ExpertDeliveryUnlock.StatusText);
-        yield return new("moveable-after-death", "Moveable After Death", XAModsRestoreScope.Illegal, () => Configuration.MoveableAfterDeathEnabled, PlayerMods.SetMoveableAfterDeathEnabled, applied => Configuration.MoveableAfterDeathEnabled = applied, () => PlayerMods.MoveableAfterDeathStatusText);
+        yield return new("auto-unlock-expert-delivery", global::XASlave.Localization.UiLocale.Native("SBF1FF873224BC93F"), XAModsRestoreScope.Illegal, () => Configuration.UnlockExpertDeliveryEnabled, ExpertDeliveryUnlock.SetEnabled, applied => Configuration.UnlockExpertDeliveryEnabled = applied, () => ExpertDeliveryUnlock.StatusTextMessage);
+        yield return new("moveable-after-death", global::XASlave.Localization.UiLocale.Native("SCD920ED5B9679DFF"), XAModsRestoreScope.Illegal, () => Configuration.MoveableAfterDeathEnabled, PlayerMods.SetMoveableAfterDeathEnabled, applied => Configuration.MoveableAfterDeathEnabled = applied, () => PlayerMods.MoveableAfterDeathStatusTextMessage);
     }
 
     private bool TryHandleXAModToggleCommand(string subcommand, string value)
@@ -5357,14 +5756,23 @@ public sealed class Plugin : IDalamudPlugin
         Configuration.Save();
     }
 
-    private bool SetXAModEnabled(XAModCommandDefinition definition, bool enabled, out string message)
+    private bool SetXAModEnabled(XAModCommandDefinition definition, bool enabled, out string message) => SetXAModEnabledLocalizedCore(out _, definition, enabled, out message);
+    private bool SetXAModEnabledMessage(XAModCommandDefinition definition, bool enabled, out global::XASlave.Localization.UiMessage message)
     {
+        var success = SetXAModEnabledLocalizedCore(out var presentation, definition, enabled, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool SetXAModEnabledLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, XAModCommandDefinition definition, bool enabled, out string message)
+    {
+        replyPresentation = null;
         if (!enabled)
         {
             definition.Apply(false);
             definition.Store(false);
             Configuration.Save();
-            message = $"{definition.DisplayName} disabled.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S3DB828D8EB4F90DE", definition.DisplayNameMessage));
             return true;
         }
 
@@ -5372,14 +5780,21 @@ public sealed class Plugin : IDalamudPlugin
         var applied = definition.Apply(true);
         definition.Store(applied);
         Configuration.Save();
-        message = applied
-            ? $"{definition.DisplayName} enabled. {definition.GetStatusText()}"
-            : definition.GetStatusText();
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (applied ? global::XASlave.Localization.UiMessage.Format("SFE2A0B6758F70664", definition.DisplayNameMessage, definition.GetStatusMessage()) : definition.GetStatusMessage()));
         return applied;
     }
 
-    private static bool TryParseToggleCommandState(string value, out bool enabled, out string message)
+    private static bool TryParseToggleCommandState(string value, out bool enabled, out string message) => TryParseToggleCommandStateLocalizedCore(out _, value, out enabled, out message);
+    private static bool TryParseToggleCommandStateMessage(string value, out bool enabled, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryParseToggleCommandStateLocalizedCore(out var presentation, value, out enabled, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private static bool TryParseToggleCommandStateLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string value, out bool enabled, out string message)
+    {
+        replyPresentation = null;
         enabled = false;
         if (value.Equals("on", StringComparison.OrdinalIgnoreCase)
             || value.Equals("enable", StringComparison.OrdinalIgnoreCase)
@@ -5387,7 +5802,7 @@ public sealed class Plugin : IDalamudPlugin
             || value.Equals("true", StringComparison.OrdinalIgnoreCase)
             || value.Equals("1", StringComparison.OrdinalIgnoreCase))
         {
-            message = string.Empty;
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Raw(string.Empty));
             enabled = true;
             return true;
         }
@@ -5398,12 +5813,12 @@ public sealed class Plugin : IDalamudPlugin
             || value.Equals("false", StringComparison.OrdinalIgnoreCase)
             || value.Equals("0", StringComparison.OrdinalIgnoreCase))
         {
-            message = string.Empty;
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Raw(string.Empty));
             enabled = false;
             return true;
         }
 
-        message = "Use on/off, enable/disable, true/false, or 1/0.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S2EFBCF767B0F9C3D"));
         return false;
     }
 
@@ -5911,5 +6326,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.55";
+    public const string Version = "0.0.0.56";
 }

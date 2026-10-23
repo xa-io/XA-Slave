@@ -44,23 +44,23 @@ public partial class SlaveWindow
     {
         EnsureFcFloaterOptionsInitialized();
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Auto-Accept FC Invites/Leave");
-        ImGui.TextDisabled("Monitors for FC invitations, accepts them, waits, then leaves.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S561FC262F8C8D0F9"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S6E9723C65EA6A2AB"));
         ImGui.Spacing();
 
         ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-            "WARNING: This WILL leave the FC your character is in. Do not run if you don't want to leave any FC.");
+            global::XASlave.Localization.UiLocale.Get("S343D00CC761CCB2A"));
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
         // Configuration
-        ImGui.Text("Configuration:");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("SEF75F631B332CA1D"));
         ImGui.Spacing();
 
         ImGui.SetNextItemWidth(Scale(80f));
         var checkInt = fcFloaterCheckInterval;
-        if (ImGui.InputFloat("Check Interval (sec)##fcFloaterCheck", ref checkInt, 0.5f, 1.0f, "%.1f"))
+        if (global::XASlave.Localization.UiNative.InputFloat((global::XASlave.Localization.UiLocale.Native("S450DA347330F7030") + "##fcFloaterCheck"), ref checkInt, 0.5f, 1.0f, "%.1f"))
         {
             if (checkInt < 0.5f) checkInt = 0.5f;
             if (checkInt > 10f) checkInt = 10f;
@@ -71,7 +71,7 @@ public partial class SlaveWindow
 
         ImGui.SetNextItemWidth(Scale(80f));
         var dlgTimeout = fcFloaterDialogTimeout;
-        if (ImGui.InputFloat("Dialog Timeout (sec)##fcFloaterDlg", ref dlgTimeout, 1f, 1f, "%.0f"))
+        if (global::XASlave.Localization.UiNative.InputFloat((global::XASlave.Localization.UiLocale.Native("S4369F1FAD55DD134") + "##fcFloaterDlg"), ref dlgTimeout, 1f, 1f, "%.0f"))
         {
             if (dlgTimeout < 1f) dlgTimeout = 1f;
             if (dlgTimeout > 30f) dlgTimeout = 30f;
@@ -82,7 +82,7 @@ public partial class SlaveWindow
 
         ImGui.SetNextItemWidth(Scale(80f));
         var waitJoin = fcFloaterWaitAfterJoin;
-        if (ImGui.InputFloat("Wait After Join (sec)##fcFloaterWait", ref waitJoin, 1f, 5f, "%.0f"))
+        if (global::XASlave.Localization.UiNative.InputFloat((global::XASlave.Localization.UiLocale.Native("SBE7F3D59078C57AD") + "##fcFloaterWait"), ref waitJoin, 1f, 5f, "%.0f"))
         {
             if (waitJoin < 1f) waitJoin = 1f;
             if (waitJoin > 300f) waitJoin = 300f;
@@ -93,7 +93,7 @@ public partial class SlaveWindow
 
         ImGui.SetNextItemWidth(Scale(80f));
         var timeout = fcFloaterTimeoutMinutes;
-        if (ImGui.InputFloat("Idle Timeout (min)##fcFloaterTimeout", ref timeout, 1f, 5f, "%.0f"))
+        if (global::XASlave.Localization.UiNative.InputFloat((global::XASlave.Localization.UiLocale.Native("S3CE6463A541ED987") + "##fcFloaterTimeout"), ref timeout, 1f, 5f, "%.0f"))
         {
             if (timeout < 1f) timeout = 1f;
             if (timeout > 120f) timeout = 120f;
@@ -109,10 +109,10 @@ public partial class SlaveWindow
         // Start/Stop
         var started = DrawPriorityTaskActionButton(
             SlaveTask.AutoAcceptFcInvite,
-            "Start FC Floater##fcFloaterStart",
+            (global::XASlave.Localization.UiLocale.Native("S7A52B03A4B3E7385") + "##fcFloaterStart"),
             !plugin.TaskRunner.IsRunning,
             StartAutoAcceptFcInviteTask,
-            "Another XA Slave task is already using the task runner.");
+            global::XASlave.Localization.UiLocale.Get("SFFA14D5B20D4D1E9"));
         if (started)
             AutoOpenTaskLogIfVerbose(ref fcFloaterShowLog);
 
@@ -125,7 +125,7 @@ public partial class SlaveWindow
             if (remaining > 0)
             {
                 ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f),
-                    $"Monitoring... ({remaining:F0}s until timeout) | Invites processed: {fcFloaterInvitesProcessed}");
+                    global::XASlave.Localization.UiLocale.FormatKey("S0D9ACC058FAE2871", remaining, fcFloaterInvitesProcessed));
             }
             else
             {
@@ -136,7 +136,7 @@ public partial class SlaveWindow
         else if (plugin.TaskRunner.IsRunning && TryMapPriorityTaskName(plugin.TaskRunner.CurrentTaskName, out var activeTask) && activeTask == SlaveTask.AutoAcceptFcInvite)
         {
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Processing current invite...");
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("SE435DD8232E22011"));
         }
 
         DrawTaskLog("fcFloater", ref fcFloaterShowLog, plugin.TaskRunner);
@@ -246,7 +246,7 @@ public partial class SlaveWindow
         // Open the notification dialog
         steps.Add(new TaskStep
         {
-            Name = $"FC Floater: Open {invitationName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SFBDA825082410AF1", invitationName),
             OnEnter = () =>
             {
                 runner.AddVerboseLog($"Opening {invitationName} notification...");
@@ -257,12 +257,12 @@ public partial class SlaveWindow
             MaxRetries = 1,
             OnTimeout = () => FailFlow($"Could not open the {invitationName} notification."),
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: Wait Dialog", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S8E9EE6ECC51BD7E5"), 1.0f));
 
         // Wait for SelectYesno and accept
         steps.Add(new TaskStep
         {
-            Name = $"FC Floater: Accept {invitationName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SB2071868AE62CA8D", invitationName),
             OnEnter = () => { },
             IsComplete = () => IsExpectedFcInvitationPrompt(invitationType, out _),
             TimeoutSec = fcFloaterDialogTimeout,
@@ -275,7 +275,7 @@ public partial class SlaveWindow
 
         steps.Add(new TaskStep
         {
-            Name = "FC Floater: Click Yes",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S5E6A65CFCB8C1BCD"),
             OnEnter = () =>
             {
                 if (IsExpectedFcInvitationPrompt(invitationType, out var prompt))
@@ -292,12 +292,12 @@ public partial class SlaveWindow
             TimeoutSec = 5f,
             OnTimeout = () => FailFlow($"The {invitationName} confirmation did not resolve."),
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: Post-Accept", 3.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S8BAED153236C308D"), 3.0f));
 
         // Wait after joining
         steps.Add(new TaskStep
         {
-            Name = "FC Floater: Wait After Join",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SD8944314461EBAB6"),
             OnEnter = () =>
             {
                 runner.AddLog($"Waiting {fcFloaterWaitAfterJoin}s before leaving FC...");
@@ -305,12 +305,12 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: Join Wait", fcFloaterWaitAfterJoin));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("SEE5362E1D92FCFB6"), fcFloaterWaitAfterJoin));
 
         // Leave FC - open FC window, navigate to Info tab, click Leave button
         steps.Add(new TaskStep
         {
-            Name = "FC Floater: Open FC Window",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SA714EFE3E2061AA3"),
             OnEnter = () =>
             {
                 runner.AddVerboseLog("Opening FC window to leave...");
@@ -320,12 +320,12 @@ public partial class SlaveWindow
             TimeoutSec = 5f,
             OnTimeout = () => FailFlow("The Free Company window did not open after joining."),
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: FC Load", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S1F24D56E71AEF278"), 1.0f));
 
         // Navigate to Info tab - callback "FreeCompany false 0 5"
         steps.Add(new TaskStep
         {
-            Name = "FC Floater: Info Tab",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S3D2380200C880B5C"),
             OnEnter = () =>
             {
                 runner.AddVerboseLog("Navigating to FC Info tab...");
@@ -336,12 +336,12 @@ public partial class SlaveWindow
             TimeoutSec = 5f,
             OnTimeout = () => FailFlow("The Free Company status page did not open."),
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: Info Load", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S0416EA98AC11CDA5"), 1.0f));
 
         // Click Leave FC - callback "FreeCompanyStatus true 3"
         steps.Add(new TaskStep
         {
-            Name = "FC Floater: Click Leave",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SEC55BE45E290DD4C"),
             OnEnter = () =>
             {
                 runner.AddVerboseLog("Clicking Leave Free Company...");
@@ -356,12 +356,12 @@ public partial class SlaveWindow
                 FailFlow($"The leave confirmation prompt was not positively identified (visible text: '{prompt}').");
             },
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: Leave Dialog", 0.5f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("SC0701DAB536AB3F5"), 0.5f));
 
         // Confirm leave
         steps.Add(new TaskStep
         {
-            Name = "FC Floater: Confirm Leave",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S847B5DE7CD9B125E"),
             OnEnter = () =>
             {
                 if (IsExpectedFcLeavePrompt(out var prompt))
@@ -376,12 +376,12 @@ public partial class SlaveWindow
             TimeoutSec = 5f,
             OnTimeout = () => FailFlow("The Free Company leave confirmation did not resolve."),
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: Post-Leave", 2.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S0B249B535798A783"), 2.0f));
 
         // Close remaining FC windows
         steps.Add(new TaskStep
         {
-            Name = "FC Floater: Close FC Windows",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SB4507E5D85C5C6B7"),
             OnEnter = () =>
             {
                 AddonHelper.CloseAddon("FreeCompanyStatus");
@@ -390,7 +390,7 @@ public partial class SlaveWindow
             IsComplete = () => !AddonHelper.IsAddonVisible("FreeCompany"),
             TimeoutSec = 3f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("FC Floater: FC Close", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("SB38A53DDD9AEFEE3"), 1.0f));
 
         for (var index = guardedStart; index < steps.Count; index++)
             steps[index] = MonthlyReloggerTask.WithSkip(steps[index], () => flowFailed);
@@ -398,7 +398,7 @@ public partial class SlaveWindow
         // Resume monitoring
         steps.Add(new TaskStep
         {
-            Name = "FC Floater: Resume",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SE035502A6485EF6B"),
             OnEnter = () =>
             {
                 if (!flowFailed)
@@ -417,7 +417,7 @@ public partial class SlaveWindow
             TimeoutSec = 1f,
         });
 
-        if (!runner.Start("FC Floater: Process Invite", steps, onLog: (msg) =>
+        if (!runner.Start(global::XASlave.Localization.UiMessage.Key("SE2B2059260E2D1A3"), steps, onLog: (msg) =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
         }))

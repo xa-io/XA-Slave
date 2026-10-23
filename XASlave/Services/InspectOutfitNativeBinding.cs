@@ -26,12 +26,12 @@ internal sealed unsafe class InspectOutfitNativeBinding
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
         if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)
-            throw new InvalidOperationException("Inspection try-on requires a revalidated game build.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S61C6777880B2BA9C"), originalMessageText => new InvalidOperationException(originalMessageText));
         using var stream = new MemoryStream(bytes, false);
         using var pe = new PEReader(stream);
         moduleBase = module.BaseAddress;
         if (pe.PEHeaders.PEHeader?.SizeOfImage != module.ModuleMemorySize)
-            throw new InvalidOperationException("The inspection try-on executable image changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD3B49FB6663016D4"), originalMessageText => new InvalidOperationException(originalMessageText));
         // Validate the supported disk build and typed bindings, not unmodified
         // live function bodies: Dalamud and other plugins may legitimately hook
         // inspection and TryOn. Source/session/preview checks remain per request.
@@ -41,7 +41,7 @@ internal sealed unsafe class InspectOutfitNativeBinding
     internal static void RequireSupportedClientStructs(string actualSha256)
     {
         if (actualSha256 != ClientStructs15037Sha256 && actualSha256 != ClientStructs15038Sha256 && actualSha256 != ClientStructs15039Sha256)
-            throw new InvalidOperationException($"Inspection try-on requires revalidated client structures. Actual SHA256: {actualSha256}; supported SHA256: {ClientStructs15037Sha256}, {ClientStructs15038Sha256} or {ClientStructs15039Sha256}.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S424297BD6717DCF7" , actualSha256, ClientStructs15037Sha256, ClientStructs15038Sha256, ClientStructs15039Sha256), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     internal void Validate()
@@ -49,7 +49,7 @@ internal sealed unsafe class InspectOutfitNativeBinding
         NearbyZoneNativeBinding.RequireFramework();
         if ((nint)AgentTryon.MemberFunctionPointers.TryOn != moduleBase + 0xC7C580
             || (nint)UIState.Instance() != moduleBase + 0x2AE3F90)
-            throw new InvalidOperationException("The typed inspection or try-on binding changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SA4A062DC3A1D4C38"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     internal bool IsPreviewActive() => Agent()->IsAgentActive();
@@ -60,20 +60,20 @@ internal sealed unsafe class InspectOutfitNativeBinding
     internal void ClearPreview(bool requireClosed = false)
     {
         if (!Plugin.ClientState.IsLoggedIn || !Plugin.PlayerState.IsLoaded)
-            throw new InvalidOperationException("The fitting-room login session ended before clearing.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE2043E40FB4C479B"), originalMessageText => new InvalidOperationException(originalMessageText));
         var agent = Agent();
         if (requireClosed && agent->IsAgentActive())
-            throw new InvalidOperationException("The fitting room must be closed before clearing its previous outfit.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S922EB274B2D29A69"), originalMessageText => new InvalidOperationException(originalMessageText));
         // Supported-build native clear: resets all fourteen TryOnItems. Its
         // inactive path returns without refreshing or reopening the addon.
         var clear = (delegate* unmanaged<AgentTryon*, void>)(moduleBase + 0xC7C1B0);
         clear(agent);
         var current = Agent();
         if (current != agent || (requireClosed && current->IsAgentActive()))
-            throw new InvalidOperationException("The fitting room changed while clearing its previous outfit.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S5875C8BA0BABFC60"), originalMessageText => new InvalidOperationException(originalMessageText));
         foreach (var item in current->TryOnItems)
             if (item.Id != 0 || item.GlamourId != 0 || item.EquipSlotCategory != 14)
-                throw new InvalidOperationException("The previous fitting-room outfit did not clear completely.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S64DCC709D936E81E"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     private static byte[] CapturePreviewGear(AgentTryon* agent)
@@ -88,20 +88,22 @@ internal sealed unsafe class InspectOutfitNativeBinding
         return bytes.ToArray();
     }
 
-    internal string TryOnOwnedFacewear(ushort glassesId, Func<bool> requestAlive)
+    internal string TryOnOwnedFacewear(ushort glassesId, Func<bool> requestAlive) => TryOnOwnedFacewearMessage(glassesId, requestAlive).Original;
+
+    internal global::XASlave.Localization.UiMessage TryOnOwnedFacewearMessage(ushort glassesId, Func<bool> requestAlive)
     {
-        if (glassesId == 0) return string.Empty;
+        if (glassesId == 0) return global::XASlave.Localization.UiMessage.Raw(string.Empty);
         Validate();
         if (!requestAlive() || !Plugin.ClientState.IsLoggedIn || !Plugin.PlayerState.IsLoaded)
-            return "Facewear skipped because the request ended.";
+            return global::XASlave.Localization.UiMessage.Key("S2BCFC289B5D6A8BA");
         var glasses = Plugin.DataManager.GetExcelSheet<Glasses>().GetRowOrDefault(glassesId);
-        if (glasses == null) return "Facewear skipped because its data is unavailable.";
+        if (glasses == null) return global::XASlave.Localization.UiMessage.Key("SD44E5B72952D0A8F");
         var player = PlayerState.Instance();
         if (player == null || !player->IsGlassesUnlocked(glassesId))
-            return "Facewear skipped because it is not unlocked on this character.";
+            return global::XASlave.Localization.UiMessage.Key("SEACAB08A2B21082E");
         var agent = Agent();
         if (!agent->IsAgentActive() || agent->TryOnItemsChanged || agent->GearItemsChanged || !requestAlive())
-            return "Facewear skipped because the preview is busy.";
+            return global::XASlave.Localization.UiMessage.Key("SFAB680C8E5ADAEA3");
         var gear = CapturePreviewGear(agent);
         var original = agent->SaveDeleteOutfit;
         try
@@ -120,14 +122,14 @@ internal sealed unsafe class InspectOutfitNativeBinding
                 if (live == agent && live->SaveDeleteOutfit) live->SaveDeleteOutfit = original;
             }
         }
-        if (!requestAlive()) return "Facewear request interrupted.";
+        if (!requestAlive()) return global::XASlave.Localization.UiMessage.Key("S5ADD9A6214E47855");
         var current = Agent();
         if (current != agent || !gear.AsSpan().SequenceEqual(CapturePreviewGear(current)))
-            throw new InvalidOperationException("Facewear submission changed the gear preview unexpectedly.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S581CA561E7A24B2C"), originalMessageText => new InvalidOperationException(originalMessageText));
         foreach (var item in current->TryOnItems)
             if (item.EquipSlotCategory == 13 && item.Id == glassesId)
-                return "Owned facewear sent to the fitting room.";
-        return "Facewear was not accepted; the gear preview was retained.";
+                return global::XASlave.Localization.UiMessage.Key("S456A54E9F2A2BD03");
+        return global::XASlave.Localization.UiMessage.Key("S252D8358C2D51D22");
     }
 
     internal AgentTryon* Agent()
@@ -139,7 +141,7 @@ internal sealed unsafe class InspectOutfitNativeBinding
         NearbyZoneNativeBinding.RequireReadable((nint)module, sizeof(AgentModule));
         var registered = module->GetAgentByInternalId(AgentId.Tryon);
         if ((nint)registered != (nint)agent)
-            throw new InvalidOperationException($"The registered fitting-room agent changed (resolved 0x{(nint)agent:X}, registered 0x{(nint)registered:X}).");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SF9F144709679C50B" , (nint)agent, (nint)registered), originalMessageText => new InvalidOperationException(originalMessageText));
         // Vtable replacement is a normal virtual-hook mechanism. Identity comes
         // from the current agent registry, not the pristine executable vtable.
         NearbyZoneNativeBinding.RequireReadable((nint)agent->VirtualTable, sizeof(AgentTryon.AgentTryonVirtualTable));

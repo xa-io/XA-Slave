@@ -31,7 +31,7 @@ internal static class PluginInspectionIpcMetadata
 
     internal static IReadOnlyList<PluginInspectionIpcDeclaration> Capture(MemberInfo member,
         string pluginInternalName, Func<bool> shouldContinue, Func<string?, int, string> captureText,
-        Func<Type, string> typeName, Action<string> markIncomplete)
+        Func<Type, string> typeName, Action<global::XASlave.Localization.UiMessage> markIncomplete)
     {
         var result = new List<PluginInspectionIpcDeclaration>();
         if (member is not (MethodInfo or FieldInfo or PropertyInfo) || !shouldContinue())
@@ -40,7 +40,7 @@ internal static class PluginInspectionIpcMetadata
         // CustomAttributeData reads constructor arguments without constructing the attribute.
         var attributes = CustomAttributeData.GetCustomAttributes(member);
         if (attributes.Count > MaxAttributes)
-            markIncomplete("IPC attribute inspection limited to 64 attributes per member.");
+            markIncomplete(global::XASlave.Localization.UiMessage.Key("SD542956A33CFD8CF"));
         for (var index = 0; index < attributes.Count && index < MaxAttributes && shouldContinue(); index++)
         {
             var attribute = attributes[index];
@@ -55,11 +55,11 @@ internal static class PluginInspectionIpcMetadata
     private static PluginInspectionIpcDeclaration CaptureDeclaration(MemberInfo member,
         CustomAttributeData attribute, string attributeName, string pluginInternalName,
         Func<bool> shouldContinue, Func<string?, int, string> captureText,
-        Func<Type, string> typeName, Action<string> markIncomplete)
+        Func<Type, string> typeName, Action<global::XASlave.Localization.UiMessage> markIncomplete)
     {
         var notes = new List<string>
         {
-            "Attribute declaration only; initialization, ownership, live registration and invocation were not verified.",
+            global::XASlave.Localization.UiMessage.Key("SFB1DB4DF69F9929A").Original,
         };
         var isEvent = attributeName == EzIpcEventAttribute;
         var isMethod = member is MethodInfo;
@@ -69,8 +69,8 @@ internal static class PluginInspectionIpcMetadata
             out var declaredName, out var applyPrefix, out var actionReturnType);
         if (!validAttribute)
         {
-            notes.Add("Unsupported or interrupted EzIPC attribute arguments; channel and call-gate signature remain unresolved.");
-            markIncomplete("An EzIPC declaration used unsupported or incomplete attribute metadata.");
+            notes.Add(global::XASlave.Localization.UiMessage.Key("S56DF6C6C599B00C3").Original);
+            markIncomplete(global::XASlave.Localization.UiMessage.Key("SDC5F2288F0833CB9"));
         }
 
         string? channelName = null;
@@ -91,18 +91,18 @@ internal static class PluginInspectionIpcMetadata
                 if (!applyPrefix && substituted.Length > 0 && channelTemplate == substituted)
                     channelName = channelTemplate;
                 else if (!applyPrefix && substituted.Length == 0)
-                    notes.Add("Empty declared channel name; no usable exact channel was established.");
+                    notes.Add(global::XASlave.Localization.UiMessage.Key("S757EEC5E1D794CC1").Original);
                 else if (channelTemplate != template)
-                    notes.Add("Channel template was truncated; it is not an exact channel name.");
+                    notes.Add(global::XASlave.Localization.UiMessage.Key("S2C9B9DD287D4085F").Original);
             }
             else
             {
                 channelTemplate = captureText(rawName, MaxChannelLength);
-                notes.Add("Channel substitution omitted because a name exceeded the metadata bounds.");
-                markIncomplete("An EzIPC channel name exceeded the metadata bounds.");
+                notes.Add(global::XASlave.Localization.UiMessage.Key("S64F6152EB9CFA805").Original);
+                markIncomplete(global::XASlave.Localization.UiMessage.Key("SFAFF5EE3A92B19E2"));
             }
             if (applyPrefix)
-                notes.Add("The EzIPC.Init prefix may differ from the plugin internal name; resolve the full name using live registry evidence.");
+                notes.Add(global::XASlave.Localization.UiMessage.Key("SF635062E18AB5703").Original);
         }
 
         var signature = GetSignature(member);
@@ -115,13 +115,13 @@ internal static class PluginInspectionIpcMetadata
             if (signature.ContainsGenericParameters)
             {
                 signatureComplete = false;
-                notes.Add("Open generic signature; a concrete IPC signature was not established.");
+                notes.Add(global::XASlave.Localization.UiMessage.Key("S4229F577695D689C").Original);
             }
             var parameterInfos = signature.GetParameters();
             if (parameterInfos.Length > MaxParameters)
             {
                 signatureComplete = false;
-                markIncomplete("IPC declaration parameter list limited to 64 entries.");
+                markIncomplete(global::XASlave.Localization.UiMessage.Key("S3B17B0A8C24AE618"));
             }
             for (var index = 0; index < parameterInfos.Length && index < MaxParameters; index++)
             {
@@ -141,7 +141,7 @@ internal static class PluginInspectionIpcMetadata
             if (isEvent && signature.ReturnType != typeof(void))
             {
                 signatureComplete = false;
-                notes.Add("EzIPC events require a void return type; the declaration does not match that contract.");
+                notes.Add(global::XASlave.Localization.UiMessage.Key("SC554817A9417DE4A").Original);
             }
             if (signature.ReturnType.IsByRef || signature.ReturnType.IsPointer || signature.ReturnType.IsFunctionPointer
                 || signature.ReturnType.IsByRefLike || signature.ReturnType.ContainsGenericParameters)
@@ -159,7 +159,7 @@ internal static class PluginInspectionIpcMetadata
         else
         {
             signatureComplete = false;
-            notes.Add("No delegate or method signature was available; member values were not read.");
+            notes.Add(global::XASlave.Localization.UiMessage.Key("S2A9D88B7E7C23C90").Original);
         }
 
         return new(member.DeclaringType == null ? string.Empty : typeName(member.DeclaringType),

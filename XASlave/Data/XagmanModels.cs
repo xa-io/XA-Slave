@@ -104,7 +104,17 @@ public sealed class XagmanTradeRequestEntry
     public long CurrentValueScaled2 { get; set; }
     public long ValueDeficitScaled2 { get; set; }
     public bool GreenScanComplete { get; set; } = true;
-    public string GreenScanError { get; set; } = string.Empty;
+    private string greenScanError = string.Empty;
+    private global::XASlave.Localization.UiMessage? greenScanErrorMessage;
+    public string GreenScanError { get => greenScanError; set { greenScanError = value; greenScanErrorMessage = null; } }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
+    internal global::XASlave.Localization.UiMessage GreenScanErrorMessage
+    {
+        get => global::XASlave.Localization.UiMessage.Capture(greenScanErrorMessage, greenScanError);
+        set { greenScanErrorMessage = value; greenScanError = value.Original; }
+    }
 }
 
 public sealed class XagmanPartialOwnerState
@@ -112,7 +122,17 @@ public sealed class XagmanPartialOwnerState
     public string CharacterNameWorld { get; set; } = string.Empty;
     public List<XagmanTradeRequestEntry> RequestedItems { get; set; } = new();
     public List<XagmanTradeRequestEntry> PendingGiveItems { get; set; } = new();
-    public string Reason { get; set; } = string.Empty;
+    private string reason = string.Empty;
+    private global::XASlave.Localization.UiMessage? reasonMessage;
+    public string Reason { get => reason; set { reason = value; reasonMessage = null; } }
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    [Newtonsoft.Json.JsonIgnore]
+    internal global::XASlave.Localization.UiMessage ReasonMessage
+    {
+        get => global::XASlave.Localization.UiMessage.Capture(reasonMessage, reason);
+        set { reasonMessage = value; reason = value.Original; }
+    }
 }
 
 public sealed class XagmanGreenValueSnapshot

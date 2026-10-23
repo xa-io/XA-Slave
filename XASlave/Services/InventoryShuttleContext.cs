@@ -67,8 +67,8 @@ internal sealed unsafe class InventoryShuttleContext : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         var current = ReadWorld();
-        if (requiresRetainer && current.Retainer == 0) throw new InvalidOperationException("An active retainer is required.");
-        if (world != null && world != current) throw new InvalidOperationException("Inventory access changed while preparing destinations.");
+        if (requiresRetainer && current.Retainer == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S7DBDBD91609CCD46"), originalMessage => new InvalidOperationException(originalMessage));
+        if (world != null && world != current) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1EC21D30ED135F2A"), originalMessage => new InvalidOperationException(originalMessage));
         var from = RequireReady(source); var to = RequireReady(destination);
         world = current; claimed.Add(from); claimed.Add(to);
         return new(current, from, to);
@@ -78,13 +78,13 @@ internal sealed unsafe class InventoryShuttleContext : IDisposable
     {
         ObjectDisposedException.ThrowIf(disposed, this);
         if (world != access.World || ReadWorld() != access.World || !IsCurrent(access.Source) || !IsCurrent(access.Destination))
-            throw new InvalidOperationException("Character, focus, territory, retainer or inventory addon ownership changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S4375C35C6A6C69F2"), originalMessage => new InvalidOperationException(originalMessage));
     }
 
     private InventoryShuttleAddon RequireReady(string name)
     {
         if (!observed.TryGetValue(name, out var stamp) || !IsCurrent(stamp))
-            throw new InvalidOperationException("The required inventory interface is not ready: " + name);
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SFDEBBB74E55AE9A6"), global::XASlave.Localization.UiMessage.Raw(name)), originalMessage => new InvalidOperationException(originalMessage));
         return stamp;
     }
 
@@ -117,9 +117,9 @@ internal sealed unsafe class InventoryShuttleContext : IDisposable
         var input = UIInputData.Instance();
         if (!Plugin.PlayerState.IsLoaded || player == null || input == null || !input->CursorInputs.IsGameWindowFocused
             || Plugin.Condition[ConditionFlag.BetweenAreas] || Plugin.Condition[ConditionFlag.BetweenAreas51])
-            throw new InvalidOperationException("A focused, loaded character outside area transitions is required.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SA05ECE1F02E898F1"), originalMessage => new InvalidOperationException(originalMessage));
         var character = (Character*)player.Address;
-        if (character == null || character->ContentId == 0) throw new InvalidOperationException("Character identity is unavailable.");
+        if (character == null || character->ContentId == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SB70311A1C08EA833"), originalMessage => new InvalidOperationException(originalMessage));
         var manager = RetainerManager.Instance();
         var retainer = manager == null ? null : manager->GetActiveRetainer();
         return new(player.GameObjectId, character->ContentId, Plugin.ClientState.TerritoryType, retainer == null ? 0 : retainer->RetainerId);

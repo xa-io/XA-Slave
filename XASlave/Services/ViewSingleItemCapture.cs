@@ -2,6 +2,7 @@ using System;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
+using XASlave.Localization;
 using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 
 namespace XASlave.Services;
@@ -13,7 +14,7 @@ internal sealed record ViewSingleItemOrnament(ushort Id, ushort ModelCharaId)
     internal void Validate()
     {
         if ((Id == 0) != (ModelCharaId == 0))
-            throw new InvalidDataException("The saved fashion accessory is incomplete.");
+            throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("SFCA5214E0E29A93C")), UiMessage.Key("SFCA5214E0E29A93C"));
     }
 
     internal string Hash() => Convert.ToHexString(SHA256.HashData(new byte[]
@@ -28,7 +29,7 @@ internal sealed record ViewSingleItemCatalogItem(uint ItemId, int Key, uint? Fra
     {
         if (ItemId is 0 or >= 500_000 || (!InspectOutfitPlan.Slots.Any(slot => slot == Key) && Key is not (103 or 104 or 105 or 106))
             || (Key == 105) != FramerKitId.HasValue)
-            throw new InvalidDataException("The saved shop item is invalid.");
+            throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("S3149D0DE91BD8A7D")), UiMessage.Key("S3149D0DE91BD8A7D"));
     }
 
     internal string Hash() => Convert.ToHexString(SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(
@@ -49,20 +50,20 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
     internal void Validate()
     {
         if (Schema is not (1 or 2 or 3) || GameBuild != NearbyZoneNativeBinding.SupportedSha256 || Layout != SupportedLayout)
-            throw new InvalidDataException("This capture belongs to a different game or appearance format.");
+            throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("SE828AEBEB7C17892")), UiMessage.Key("SE828AEBEB7C17892"));
         // Schema 1 has no accessory data. Schema 2 distinguishes an unavailable
         // capture (null) from a confirmed empty accessory slot (zero IDs).
         if ((Schema == 1 && (Ornament != null || OrnamentHash != null))
             || (Ornament == null && OrnamentHash != null)
             || (Ornament != null && OrnamentHash != Ornament.Hash()))
-            throw new InvalidDataException("The saved fashion accessory is damaged.");
+            throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("SEABBA29863DF3C4C")), UiMessage.Key("SEABBA29863DF3C4C"));
         Ornament?.Validate();
         if (Schema < 3 && (Minion != null || MinionHash != null || Mount != null || MountHash != null || Catalog != null || CatalogHash != null))
-            throw new InvalidDataException("This older capture contains unsupported subject data.");
+            throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("S3911D2AA5B9885B9")), UiMessage.Key("S3911D2AA5B9885B9"));
         if ((Minion == null ? MinionHash != null : Minion.Key != 103 || MinionHash != Minion.Hash())
             || (Mount == null ? MountHash != null : Mount.Key != 104 || MountHash != Mount.Hash())
             || (Catalog == null ? CatalogHash != null : CatalogHash != Catalog.Hash()))
-            throw new InvalidDataException("The saved preview subject is damaged.");
+            throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("S1A0293390ADC4095")), UiMessage.Key("S1A0293390ADC4095"));
         Minion?.Validate(); Mount?.Validate(); Catalog?.Validate();
         var expectedKeys = Catalog != null ? new[] { Catalog.Key } : Schema == 3 ? ExtendedKeys : Keys;
         if (string.IsNullOrWhiteSpace(PlayerName) || PlayerName.Length > (Catalog == null ? 64 : 512)
@@ -74,7 +75,7 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
             || !Choices.Select(choice => choice.Key).Order().SequenceEqual(expectedKeys.Order())
             || Appearance == null || Appearance.Length != 0x98
             || AppearanceHash != Convert.ToHexString(SHA256.HashData(Appearance)))
-            throw new InvalidDataException("The saved outfit is incomplete or damaged.");
+            throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("SF0F322B2348FF62B")), UiMessage.Key("SF0F322B2348FF62B"));
         InspectOutfitPlan.Create(Equipment);
         if (Catalog != null)
         {
@@ -83,13 +84,13 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
                 || (Catalog.Key == 104 ? Mount is not { Id: > 0 } : Mount != null)
                 || Equipment.Any(item => item.GlamourId != 0 || item.Stain0 != 0 || item.Stain1 != 0
                     || item.BaseId != (item.Slot == Catalog.Key ? Catalog.ItemId : 0)))
-                throw new InvalidDataException("The saved shop capture contains unrelated items.");
+                throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("S9D4F18854424D54E")), UiMessage.Key("S9D4F18854424D54E"));
         }
         // Canonical value encoding excludes native padding and noncanonical bools.
         if (Appearance[0x1E] != 0 || Appearance[0x1F] != 0
             || Appearance.Skip(0x8C).Take(4).Any(value => value != 0)
             || Appearance.Skip(0x88).Take(4).Any(value => value > 1))
-            throw new InvalidDataException("The saved appearance contains invalid flags or padding.");
+            throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("S4489963431C778C0")), UiMessage.Key("S4489963431C778C0"));
     }
 
     internal static readonly int[] Keys = [0, 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 100, 101, 102];
@@ -97,7 +98,7 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
 
     internal static unsafe byte[] Encode(CharaViewModelData appearance)
     {
-        if (sizeof(CharaViewModelData) != 0x98) throw new InvalidDataException("The appearance layout changed.");
+        if (sizeof(CharaViewModelData) != 0x98) throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("SCCCBEAA91197FB2E")), UiMessage.Key("SCCCBEAA91197FB2E"));
         var bytes = new byte[0x98];
         new ReadOnlySpan<byte>(&appearance, bytes.Length).CopyTo(bytes);
         bytes[0x1E] = bytes[0x1F] = 0;
@@ -108,7 +109,7 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
     internal unsafe CharaViewModelData Decode()
     {
         Validate();
-        if (sizeof(CharaViewModelData) != 0x98) throw new InvalidDataException("The appearance layout changed.");
+        if (sizeof(CharaViewModelData) != 0x98) throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("SCCCBEAA91197FB2E")), UiMessage.Key("SCCCBEAA91197FB2E"));
         var appearance = default(CharaViewModelData);
         Appearance.AsSpan().CopyTo(new Span<byte>(&appearance, 0x98));
         return appearance;

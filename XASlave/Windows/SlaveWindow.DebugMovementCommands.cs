@@ -12,15 +12,24 @@ public partial class SlaveWindow
     private const int DebugLeaveDutyQuickPromptAttempts = 12;
     private const int DebugLeaveDutyQuickRetryDelayMilliseconds = 250;
 
-    public bool TryExecuteXaMovementCommand(string subcommand, string arguments, out string message, out bool handled)
+    public bool TryExecuteXaMovementCommand(string subcommand, string arguments, out string message, out bool handled) => TryExecuteXaMovementCommandLocalizedCore(out _, subcommand, arguments, out message, out handled);
+    internal bool TryExecuteXaMovementCommandMessage(string subcommand, string arguments, out global::XASlave.Localization.UiMessage message, out bool handled)
     {
+        var success = TryExecuteXaMovementCommandLocalizedCore(out var presentation, subcommand, arguments, out var originalReply, out handled);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryExecuteXaMovementCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string subcommand, string arguments, out string message, out bool handled)
+    {
+        replyPresentation = null;
         handled = true;
         var normalized = subcommand.Trim();
 
         if (normalized.Equals("leaveduty", StringComparison.OrdinalIgnoreCase) && !string.IsNullOrWhiteSpace(arguments))
         {
             handled = false;
-            message = string.Empty;
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Raw(string.Empty));
             return false;
         }
 
@@ -36,7 +45,7 @@ public partial class SlaveWindow
                 case "stopmovement":
                 case "pathtotargetinteract":
                 case "pathsmartinteract":
-                    message = $"Usage: /xa {normalized.ToLowerInvariant()}.";
+                    message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S20EA4C8DF7D58B90", normalized.ToLowerInvariant()));
                     return false;
             }
         }
@@ -53,8 +62,8 @@ public partial class SlaveWindow
             "pathsmartinteract";
         if (isExclusiveCommand && System.Threading.Volatile.Read(ref exclusiveWorkerRunning) != 0)
         {
-            message = $"'{normalizedCommand}' rejected - another movement command is already running.";
-            SetDebugResult(message);
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S905A12A28BF0E892", normalizedCommand));
+            SetDebugResult(global::XASlave.Localization.UiMessage.Capture(ref replyPresentation, message));
             return false;
         }
 
@@ -62,43 +71,43 @@ public partial class SlaveWindow
         {
             case "movingcheatersmart":
                 RunDebugMovingCheaterSmart();
-                message = "Triggered MovingCheater Smart.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SF383D8F8AC15EC67"));
                 return true;
             case "movingcheaterfly":
                 RunDebugMovingCheaterFly();
-                message = "Triggered MovingCheater Fly.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S9D9ABC17F0C4FA53"));
                 return true;
             case "movingcheaterwalk":
                 RunDebugMovingCheaterWalk();
-                message = "Triggered MovingCheater Walk.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S71B0C31A668F7DAC"));
                 return true;
             case "interact":
                 RunDebugInteract();
-                message = "Triggered Interact.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S61C62D8FF363B419"));
                 return true;
             case "leaveduty":
                 RunDebugLeaveDuty();
-                message = "Triggered direct Leave Duty.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SD9B1D3C78E6358DE"));
                 return true;
             case "recommendedgear":
                 RunDebugRecommendedGear();
-                message = "Triggered Recommended Gear.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SDACFB0CF655229F4"));
                 return true;
             case "stopmovement":
                 RunDebugVnavStop();
-                message = "Triggered vnav stop.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SD055D283714989B1"));
                 return true;
             case "pathtotargetinteract":
                 RunDebugPathToTargetThenInteract();
-                message = "Triggered PathToTargetThenInteract.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SBB60179249761A0C"));
                 return true;
             case "pathsmartinteract":
                 RunDebugPathSmartThenInteract();
-                message = "Triggered PathSmartThenInteract.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S76966C02C3BF6F1F"));
                 return true;
             default:
                 handled = false;
-                message = string.Empty;
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Raw(string.Empty));
                 return false;
         }
     }
@@ -109,7 +118,7 @@ public partial class SlaveWindow
         {
             token.ThrowIfCancellationRequested();
             var ok = await Plugin.RunOnGameThread(AddonHelper.InteractWithTarget);
-            SetDebugResult(ok ? "InteractWithTarget: OK" : "No target or interaction failed");
+            SetDebugResult((ok ? global::XASlave.Localization.UiMessage.Key("S2EAB5B5CB4CE3A25") : global::XASlave.Localization.UiMessage.Key("S14EEF80FC742EEB5")));
         }, exclusive: true);
     }
 
@@ -165,7 +174,7 @@ public partial class SlaveWindow
         {
             token.ThrowIfCancellationRequested();
             await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
-            SetDebugResult("Sent: vnavmesh.Path.Stop()");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("S17CFF3C86F7F809A"));
         });
     }
 
@@ -181,13 +190,7 @@ public partial class SlaveWindow
 
                 var canFly = HasFlightUnlocked();
                 ChatHelper.SendMessage(canFly ? "/vnav flyflag" : "/vnav moveflag");
-                SetDebugResult(canFly
-                    ? alreadyMounted
-                        ? "Smart: Already mounted + /vnav flyflag (flying unlocked in zone)"
-                        : "Smart: Mount + /vnav flyflag (flying unlocked in zone)"
-                    : alreadyMounted
-                        ? "Smart: Already mounted + /vnav moveflag (flying NOT unlocked, ground pathfind)"
-                        : "Smart: Mount + /vnav moveflag (flying NOT unlocked, ground pathfind)");
+                SetDebugResult((canFly ? (alreadyMounted ? global::XASlave.Localization.UiMessage.Key("S106B99C03B486527") : global::XASlave.Localization.UiMessage.Key("SF3BC5B65D4FCC981")) : (alreadyMounted ? global::XASlave.Localization.UiMessage.Key("S933AEE2452DF8C19") : global::XASlave.Localization.UiMessage.Key("S497CFA0F191ACE4E"))));
             });
         }, exclusive: true);
     }
@@ -204,13 +207,7 @@ public partial class SlaveWindow
 
                 var canFly = HasFlightUnlocked();
                 ChatHelper.SendMessage(canFly ? "/vnav flyflag" : "/vnav moveflag");
-                SetDebugResult(canFly
-                    ? alreadyMounted
-                        ? "Sent: already mounted + /vnav flyflag (flying unlocked)"
-                        : "Sent: Mount + /vnav flyflag (flying unlocked)"
-                    : alreadyMounted
-                        ? "Sent: already mounted + /vnav moveflag (flight NOT unlocked, fallback to ground)"
-                        : "Sent: Mount + /vnav moveflag (flight NOT unlocked, fallback to ground)");
+                SetDebugResult((canFly ? (alreadyMounted ? global::XASlave.Localization.UiMessage.Key("S84B80D52B02E83CC") : global::XASlave.Localization.UiMessage.Key("SF2B9551F66550620")) : (alreadyMounted ? global::XASlave.Localization.UiMessage.Key("S5638ED37F076B095") : global::XASlave.Localization.UiMessage.Key("SA272D6B5E40B0476"))));
             });
         }, exclusive: true);
     }
@@ -226,9 +223,7 @@ public partial class SlaveWindow
                     return;
 
                 ChatHelper.SendMessage("/vnav moveflag");
-                SetDebugResult(alreadyMounted
-                    ? "Sent: already mounted + /vnav moveflag (force ground)"
-                    : "Sent: Mount + /vnav moveflag (force ground)");
+                SetDebugResult((alreadyMounted ? global::XASlave.Localization.UiMessage.Key("S877308520625A029") : global::XASlave.Localization.UiMessage.Key("SB43D6835E6C691D3")));
             });
         }, exclusive: true);
     }
@@ -238,7 +233,7 @@ public partial class SlaveWindow
         alreadyMounted = false;
         if (!plugin.IpcClient.VnavIsReady())
         {
-            SetDebugResult("vnavmesh not ready, cannot navigate");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("S027810E57B428737"));
             return false;
         }
 
@@ -258,13 +253,13 @@ public partial class SlaveWindow
         var target = local?.TargetObject;
         if (target == null)
         {
-            SetDebugResult("No target selected");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("S70E90A9A75A8FED3"));
             return;
         }
 
         if (local == null || !plugin.IpcClient.VnavIsReady())
         {
-            SetDebugResult("vnavmesh not ready");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("S6E7B4A556C347411"));
             return;
         }
 
@@ -277,11 +272,11 @@ public partial class SlaveWindow
         var ok = plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, false, stopDist);
         if (!ok)
         {
-            SetDebugResult("Pathfind failed, vnav could not start route");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("S4D77D79F828C32C8"));
             return;
         }
 
-        SetDebugResult($"Pathing to {targetName} (stop={stopDist:F1}y, interact<={interactRange:F1}y ring)");
+        SetDebugResult(global::XASlave.Localization.UiMessage.Format("SE52123C6DC9C71FB", targetName, stopDist, interactRange));
         Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: {targetName} hitbox={targetHitbox:F1} stopDist={stopDist:F1} interactRange={interactRange:F1}");
         RunWorker("PathToTargetThenInteract", async token =>
         {
@@ -315,11 +310,11 @@ public partial class SlaveWindow
                     return (rd, cd, plugin.IpcClient.VnavPathIsRunning(), plugin.IpcClient.VnavSimpleMovePathfindInProgress());
                 });
 
-                if (ringDist == float.MinValue) { SetDebugResult("Lost target, aborting"); break; }
+                if (ringDist == float.MinValue) { SetDebugResult(global::XASlave.Localization.UiMessage.Key("S70E90BBB6E6F1BAF")); break; }
 
                 if (ringDist <= 0)
                 {
-                    SetDebugResult($"Overlapping {targetName}: ring={ringDist:F1}y, interacting");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("S19A3FEE3105458CA", targetName, ringDist));
                     await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                     await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                     Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: overlapping interact with {targetName} (ring={ringDist:F1}y)");
@@ -342,7 +337,7 @@ public partial class SlaveWindow
 
                 if (ringDist <= interactRange)
                 {
-                    SetDebugResult($"In range of {targetName}: ring={ringDist:F1}y, interacting");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("S4B08E1291CA212CA", targetName, ringDist));
                     await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                     await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                     Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: interacted with {targetName} (ring={ringDist:F1}y center={centerDist:F1}y)");
@@ -351,7 +346,7 @@ public partial class SlaveWindow
                 }
                 else if (stalled && ringDist < 20.0f)
                 {
-                    SetDebugResult($"Stalled near {targetName}: ring={ringDist:F1}y, jumping to unstuck");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("S793578DEFF36CA49", targetName, ringDist));
                     Plugin.Log.Information($"[XASlave] PathToTargetThenInteract: stalled at ring={ringDist:F1}y, jump attempt {jumpAttempts + 1}");
                     if (jumpAttempts < 5)
                     {
@@ -364,26 +359,26 @@ public partial class SlaveWindow
                 }
                 else if (!pathActive)
                 {
-                    SetDebugResult($"Path ended at ring={ringDist:F1}y, vnav routing done");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("SFE19EEBCC77A6562", ringDist));
                     Plugin.Log.Warning($"[XASlave] PathToTargetThenInteract: path ended for {targetName} (ring={ringDist:F1}y center={centerDist:F1}y)");
                     if (ringDist <= interactRange * 3)
                     {
                         await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
-                        SetDebugResult($"Path ended, attempted interact at ring={ringDist:F1}y");
+                        SetDebugResult(global::XASlave.Localization.UiMessage.Format("S9B61E7BEB8AA0707", ringDist));
                         interacted = true;
                     }
                     break;
                 }
                 else if (elapsed % 3000 < pollMs)
                 {
-                    SetDebugResult($"Pathing to {targetName}: ring={ringDist:F1}y");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("S5B7A61E9F75ADEEC", targetName, ringDist));
                 }
             }
 
             if (!interacted && elapsed >= maxTimeoutMs)
             {
                 await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
-                SetDebugResult($"PathToTargetThenInteract timeout (60s) for {targetName}");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Format("S6757A7A90F506A16", targetName));
             }
         }, exclusive: true);
     }
@@ -397,13 +392,13 @@ public partial class SlaveWindow
         var target = local?.TargetObject;
         if (target == null)
         {
-            SetDebugResult("No target selected");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("S70E90A9A75A8FED3"));
             return;
         }
 
         if (local == null || !plugin.IpcClient.VnavIsReady())
         {
-            SetDebugResult("vnavmesh not ready");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("S6E7B4A556C347411"));
             return;
         }
 
@@ -420,7 +415,7 @@ public partial class SlaveWindow
         var canFly = HasFlightUnlocked();
         var shouldMount = ringDist0 > 20.0f;
 
-        SetDebugResult($"PathSmart to {targetName}: ring={ringDist0:F0}y, fly={canFly}, mount={shouldMount}");
+        SetDebugResult(global::XASlave.Localization.UiMessage.Format("S6D427FE9886F3A9E", targetName, ringDist0, canFly, shouldMount));
         Plugin.Log.Information($"[XASlave] PathSmartThenInteract: {targetName} ring={ringDist0:F1}y fly={canFly} mount={shouldMount} stop={stopDist:F1}");
 
         RunWorker("PathSmartThenInteract", async token =>
@@ -431,7 +426,7 @@ public partial class SlaveWindow
             var fly = canFly && shouldMount;
             var pathOk = await Plugin.RunOnGameThread(() =>
                 plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, fly, stopDist));
-            if (!pathOk) { SetDebugResult("Pathfind failed"); return; }
+            if (!pathOk) { SetDebugResult(global::XASlave.Localization.UiMessage.Key("S298904A962E111A9")); return; }
 
             var distSamples = new System.Collections.Generic.List<float>();
             const int maxSamples = 7;
@@ -462,12 +457,12 @@ public partial class SlaveWindow
                     return (r, plugin.IpcClient.VnavPathIsRunning(), plugin.IpcClient.VnavSimpleMovePathfindInProgress());
                 });
 
-                if (rd == float.MinValue) { SetDebugResult("Lost target, aborting"); break; }
+                if (rd == float.MinValue) { SetDebugResult(global::XASlave.Localization.UiMessage.Key("S70E90BBB6E6F1BAF")); break; }
 
                 if (rd <= 0)
                 {
                     await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
-                    SetDebugResult($"Overlapping {targetName}: ring={rd:F1}y, interacting");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("S19A3FEE3105458CA", targetName, rd));
                     await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                     Plugin.Log.Information($"[XASlave] PathSmartThenInteract: overlapping interact with {targetName} (ring={rd:F1}y)");
                     interacted = true;
@@ -494,7 +489,7 @@ public partial class SlaveWindow
                         Plugin.Condition[ConditionFlag.Mounted] || Plugin.Condition[ConditionFlag.RidingPillion]);
                     if (isMounted)
                     {
-                        SetDebugResult($"In range of {targetName}: ring={rd:F1}y, dismounting...");
+                        SetDebugResult(global::XASlave.Localization.UiMessage.Format("S7B22DEC4B65C87B0", targetName, rd));
                         await Plugin.RunOnGameThread(() => ChatHelper.SendMessage("/mount"));
                         for (int w = 0; w < 30; w++)
                         {
@@ -528,7 +523,7 @@ public partial class SlaveWindow
 
                     if (postDismountRd != float.MinValue && postDismountRd > interactRange)
                     {
-                        SetDebugResult($"Post-dismount too far: ring={postDismountRd:F1}y, re-pathing on foot");
+                        SetDebugResult(global::XASlave.Localization.UiMessage.Format("S41004770A9885670", postDismountRd));
                         Plugin.Log.Information($"[XASlave] PathSmartThenInteract: post-dismount ring={postDismountRd:F1}y > {interactRange:F1}y, re-pathing");
                         await Plugin.RunOnGameThread(() =>
                             plugin.IpcClient.VnavPathfindAndMoveCloseTo(targetPos, false, stopDist));
@@ -550,7 +545,7 @@ public partial class SlaveWindow
                         }
                     }
 
-                    SetDebugResult($"In range of {targetName}: ring={postDismountRd:F1}y, interacting");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("S4B08E1291CA212CA", targetName, postDismountRd));
                     await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
                     await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
                     Plugin.Log.Information($"[XASlave] PathSmartThenInteract: interacted with {targetName} (ring={postDismountRd:F1}y)");
@@ -580,7 +575,7 @@ public partial class SlaveWindow
                     }
                     else
                     {
-                        SetDebugResult($"Stalled near {targetName}: ring={rd:F1}y, jumping");
+                        SetDebugResult(global::XASlave.Localization.UiMessage.Format("SE92C4552FB23B1F3", targetName, rd));
                         if (jumpAttempts < 5)
                         {
                             await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(KeyInputHelper.VK_SPACE));
@@ -593,7 +588,7 @@ public partial class SlaveWindow
                 }
                 else if (!pathActive)
                 {
-                    SetDebugResult($"Path ended at ring={rd:F1}y, routing done");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("S333FDCF0B0DB732F", rd));
                     Plugin.Log.Warning($"[XASlave] PathSmartThenInteract: path ended for {targetName} (ring={rd:F1}y)");
                     if (rd <= interactRange * 3)
                     {
@@ -611,21 +606,21 @@ public partial class SlaveWindow
                             }
                         }
                         await Plugin.RunOnGameThread(() => AddonHelper.InteractWithTarget());
-                        SetDebugResult($"Path ended, attempted interact at ring={rd:F1}y");
+                        SetDebugResult(global::XASlave.Localization.UiMessage.Format("S9B61E7BEB8AA0707", rd));
                         interacted = true;
                     }
                     break;
                 }
                 else if (elapsed % 3000 < pollMs)
                 {
-                    SetDebugResult($"PathSmart to {targetName}: ring={rd:F1}y");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("S4F87AB1CACB590AD", targetName, rd));
                 }
             }
 
             if (!interacted && elapsed >= maxTimeoutMs)
             {
                 await Plugin.RunOnGameThread(() => plugin.IpcClient.VnavStop());
-                SetDebugResult($"PathSmartThenInteract timeout (60s) for {targetName}");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Format("S289B7ABC7D660C71", targetName));
             }
         }, exclusive: true);
     }
@@ -635,17 +630,17 @@ public partial class SlaveWindow
         var inDuty = Plugin.Condition[ConditionFlag.BoundByDuty];
         if (!inDuty)
         {
-            SetDebugResult("Not in a duty, nothing to leave.");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("SB0E55651B808D075"));
             return;
         }
 
-        SetDebugResult("In duty, attempting to leave...");
+        SetDebugResult(global::XASlave.Localization.UiMessage.Key("SD41BA9F009CB7227"));
         RunWorker("Leave Duty", async token =>
         {
             var inCombat = await Plugin.RunOnGameThread(() => Plugin.Condition[ConditionFlag.InCombat]);
             if (inCombat)
             {
-                SetDebugResult("In combat, waiting up to 30s for combat to end...");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Key("S34CCB72B78B8B39D"));
                 for (int w = 0; w < 60; w++)
                 {
                     await System.Threading.Tasks.Task.Delay(500, token);
@@ -654,10 +649,10 @@ public partial class SlaveWindow
                 }
                 if (inCombat)
                 {
-                    SetDebugResult("Still in combat after 30s, cannot leave duty.");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Key("S5EF03CF68E05E5E0"));
                     return;
                 }
-                SetDebugResult("Combat ended, leaving duty...");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Key("SCAA26D1C6277112B"));
             }
 
             await Plugin.RunOnGameThread(() => KeyInputHelper.PressKey(0x55));
@@ -668,17 +663,15 @@ public partial class SlaveWindow
 
             if (leaveClicked)
             {
-                SetDebugResult("Leave Duty: clicked Leave button, waiting for confirmation...");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Key("S6FF534E0169308ED"));
                 await System.Threading.Tasks.Task.Delay(500, token);
 
                 var yesClicked = await Plugin.RunOnGameThread(() => AddonHelper.ClickYesNo(true));
-                SetDebugResult(yesClicked
-                    ? "Leave Duty: confirmed Yes, leaving instance."
-                    : "Leave Duty: Leave clicked but SelectYesno not visible, may need manual confirm.");
+                SetDebugResult((yesClicked ? global::XASlave.Localization.UiMessage.Key("S76130C7163E94B28") : global::XASlave.Localization.UiMessage.Key("S938D82F98BCFE1DA")));
             }
             else
             {
-                SetDebugResult("Leave Duty: ContentsFinderMenu not visible or Leave button not found.");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Key("S4F6FB59F662DCEEF"));
             }
         }, exclusive: true);
     }
@@ -687,23 +680,23 @@ public partial class SlaveWindow
     {
         if (!Plugin.Condition[ConditionFlag.BoundByDuty])
         {
-            SetDebugResult("Leave Duty Quick: not in a duty, nothing to leave.");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("SE9DAAE607FDE508E"));
             return;
         }
 
         if (Plugin.Condition[ConditionFlag.InCombat])
         {
-            SetDebugResult("Leave Duty Quick blocked: combat is active.");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Key("SE36ED0AFE3EF08D4"));
             return;
         }
 
         if (TryGetDebugLeaveDutyQuickBlocker(out var blocker))
         {
-            SetDebugResult($"Leave Duty Quick blocked: {blocker}.");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Format("S8960F99885809609", blocker));
             return;
         }
 
-        SetDebugResult("Leave Duty Quick: opening the game-owned duty menu without pressing U...");
+        SetDebugResult(global::XASlave.Localization.UiMessage.Key("SF69C39861987D64B"));
         RunWorker("Leave Duty Quick", async token =>
         {
             try
@@ -720,16 +713,14 @@ public partial class SlaveWindow
                 });
                 if (existingPromptState < 0)
                 {
-                    SetDebugResult("Leave Duty Quick stopped: an unrelated or unreadable SelectYesno is already open.");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Key("S6CA5CE55BDC87E41"));
                     return;
                 }
 
                 if (existingPromptState > 0)
                 {
                     var confirmed = await Plugin.RunOnGameThread(() => AddonHelper.ClickYesNo(true));
-                    SetDebugResult(confirmed
-                        ? "Leave Duty Quick: confirmed the existing validated leave-duty prompt; waiting for zone-out."
-                        : "Leave Duty Quick: validated the existing leave-duty prompt, but the Yes callback failed.");
+                    SetDebugResult((confirmed ? global::XASlave.Localization.UiMessage.Key("S6D6F56E388BD4BE8") : global::XASlave.Localization.UiMessage.Key("S14B17F7EF2B57FC6")));
                     return;
                 }
 
@@ -738,7 +729,7 @@ public partial class SlaveWindow
                 {
                     if (!await Plugin.RunOnGameThread(() => Plugin.Condition[ConditionFlag.BoundByDuty]))
                     {
-                        SetDebugResult("Leave Duty Quick: duty exit already started.");
+                        SetDebugResult(global::XASlave.Localization.UiMessage.Key("SA5687DC1A55B2C75"));
                         return;
                     }
 
@@ -750,7 +741,7 @@ public partial class SlaveWindow
                             AddonHelper.ShowAgent(AgentId.ContentsFinderMenu));
                         if (!agentShown && attempt == DebugLeaveDutyQuickMenuAttempts)
                         {
-                            SetDebugResult("Leave Duty Quick: ContentsFinderMenu agent was unavailable.");
+                            SetDebugResult(global::XASlave.Localization.UiMessage.Key("SC9B3C84BAC900DCA"));
                             return;
                         }
 
@@ -768,16 +759,16 @@ public partial class SlaveWindow
 
                 if (!callbacksSent)
                 {
-                    SetDebugResult("Leave Duty Quick: the duty menu opened, but its Leave Duty callbacks failed.");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Key("S79798ECC36BAB1DA"));
                     return;
                 }
 
-                SetDebugResult("Leave Duty Quick: leave callbacks sent; waiting for the validated confirmation...");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Key("SA91AAC7E07EE1D91"));
                 for (var attempt = 1; attempt <= DebugLeaveDutyQuickPromptAttempts; attempt++)
                 {
                     if (!await Plugin.RunOnGameThread(() => Plugin.Condition[ConditionFlag.BoundByDuty]))
                     {
-                        SetDebugResult("Leave Duty Quick: duty exit started.");
+                        SetDebugResult(global::XASlave.Localization.UiMessage.Key("SA49CBF5A60D7A27D"));
                         return;
                     }
 
@@ -797,14 +788,12 @@ public partial class SlaveWindow
                             AddonHelper.IsLeaveDutyConfirmationPrompt);
                         if (!isLeavePrompt)
                         {
-                            SetDebugResult("Leave Duty Quick stopped: SelectYesno is not a readable leave-duty prompt.");
+                            SetDebugResult(global::XASlave.Localization.UiMessage.Key("S01789992C0C3292B"));
                             return;
                         }
 
                         var confirmed = await Plugin.RunOnGameThread(() => AddonHelper.ClickYesNo(true));
-                        SetDebugResult(confirmed
-                            ? "Leave Duty Quick: confirmed the validated leave-duty prompt; waiting for zone-out."
-                            : "Leave Duty Quick: validated the leave-duty prompt, but the Yes callback failed.");
+                        SetDebugResult((confirmed ? global::XASlave.Localization.UiMessage.Key("S4A7255EAF31D904E") : global::XASlave.Localization.UiMessage.Key("S0D3CA611480F316C")));
                         return;
                     }
 
@@ -822,7 +811,7 @@ public partial class SlaveWindow
                     await System.Threading.Tasks.Task.Delay(DebugLeaveDutyQuickRetryDelayMilliseconds, token);
                 }
 
-                SetDebugResult("Leave Duty Quick: no leave-duty confirmation appeared within 3 seconds.");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Key("S4979AF9BD8CE77F4"));
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
@@ -831,7 +820,7 @@ public partial class SlaveWindow
             catch (Exception ex)
             {
                 Plugin.Log.Warning(ex, "[XASlave] Leave Duty Quick failed.");
-                SetDebugResult($"Leave Duty Quick error: {ex.Message}");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Format("S6969C1B81AA5CB08", ex.Message));
             }
         }, exclusive: true);
     }
@@ -866,13 +855,13 @@ public partial class SlaveWindow
 
     private void RunDebugRecommendedGear()
     {
-        SetDebugResult("Recommended Gear: starting Step1/2/3/close sequence.");
+        SetDebugResult(global::XASlave.Localization.UiMessage.Key("SC40A74BE1BAEB48F"));
         RunWorker("Recommended Gear", async token =>
         {
             await Plugin.RunOnGameThread(() => RunDebugRecommendedGearStep1());
             if (!await WaitForDebugAddonVisibleAsync("Character", 3000, token))
             {
-                SetDebugResult("Recommended Gear: Character addon did not open.");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Key("S628D04FCBA4C3E88"));
                 return;
             }
 
@@ -882,7 +871,7 @@ public partial class SlaveWindow
 
             if (!await WaitForDebugAddonVisibleAsync("RecommendEquip", 3000, token))
             {
-                SetDebugResult("Recommended Gear: RecommendEquip addon did not open.");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Key("S1D916C4F365B9506"));
                 return;
             }
 
@@ -890,25 +879,21 @@ public partial class SlaveWindow
             await System.Threading.Tasks.Task.Delay(500, token);
             await Plugin.RunOnGameThread(() => RunDebugRecommendedGearClose());
             if (equipClicked)
-                SetDebugResult("Recommended Gear: Step1/2/3/close complete.");
+                SetDebugResult(global::XASlave.Localization.UiMessage.Key("SF1DAAF29922088C2"));
         }, exclusive: true);
     }
 
     private void RunDebugRecommendedGearStep1()
     {
         ChatHelper.SendMessage("/character");
-        SetDebugResult("Opened Character window, next: Step2 to fire callback");
+        SetDebugResult(global::XASlave.Localization.UiMessage.Key("S81AD4F4DDA3FBB7F"));
     }
 
     private bool RunDebugRecommendedGearStep2()
     {
         var addonReady = AddonHelper.IsAddonReady("Character");
         var ok = addonReady && AddonHelper.ClickAddonButton("Character", AddonNodes.CharacterRecommendEquip);
-        SetDebugResult(ok
-            ? $"Clicked Character NodeList[{AddonNodes.CharacterRecommendEquip}] -> RecommendEquip should open"
-            : addonReady
-                ? $"Character is ready, but recommend node {AddonNodes.CharacterRecommendEquip} is unavailable; verify the current addon layout."
-                : "Character addon is not ready; open it first with Step1.");
+        SetDebugResult((ok ? global::XASlave.Localization.UiMessage.Format("S39A900F2F42B92DB", AddonNodes.CharacterRecommendEquip) : (addonReady ? global::XASlave.Localization.UiMessage.Format("S5EAF06873B8860C4", AddonNodes.CharacterRecommendEquip) : global::XASlave.Localization.UiMessage.Key("S2EC325F5B43A6024"))));
         return ok;
     }
 
@@ -916,11 +901,7 @@ public partial class SlaveWindow
     {
         var addonReady = AddonHelper.IsAddonReady("RecommendEquip");
         var ok = addonReady && AddonHelper.ClickAddonButton("RecommendEquip", AddonNodes.RecommendEquipConfirm);
-        SetDebugResult(ok
-            ? $"Clicked RecommendEquip NodeList[{AddonNodes.RecommendEquipConfirm}] -> gear equipped"
-            : addonReady
-                ? $"RecommendEquip is ready, but confirm node {AddonNodes.RecommendEquipConfirm} is unavailable; verify the current addon layout."
-                : "RecommendEquip addon is not ready; run Step2 first.");
+        SetDebugResult((ok ? global::XASlave.Localization.UiMessage.Format("S49451160C7E0CC9C", AddonNodes.RecommendEquipConfirm) : (addonReady ? global::XASlave.Localization.UiMessage.Format("SD66B39D66CB9369B", AddonNodes.RecommendEquipConfirm) : global::XASlave.Localization.UiMessage.Key("SE9C9F14DF2EE5DF0"))));
         return ok;
     }
 
@@ -928,6 +909,6 @@ public partial class SlaveWindow
     {
         AddonHelper.CloseAddon("RecommendEquip");
         AddonHelper.CloseAddon("Character");
-        SetDebugResult("Closed RecommendEquip + Character addons");
+        SetDebugResult(global::XASlave.Localization.UiMessage.Key("S2C55C73ED15B0C58"));
     }
 }

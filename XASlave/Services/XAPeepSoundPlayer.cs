@@ -138,10 +138,12 @@ internal static class XAPeepSoundPlayer
         }
     }
 
-    public static string GetToneLabel(int toneId)
+    public static string GetToneLabel(int toneId) => GetToneLabelMessage(toneId).Original;
+
+    internal static global::XASlave.Localization.UiMessage GetToneLabelMessage(int toneId)
     {
         var clampedId = Math.Clamp(toneId, 1, BaseFrequencies.Length);
-        return $"Tone {clampedId} ({BaseFrequencies[clampedId - 1]:0.##} Hz)";
+        return global::XASlave.Localization.UiMessage.Format("SD510D0A4E73C1F7D", clampedId, BaseFrequencies[clampedId - 1]);
     }
 
     private static void PlayAlertInternal(Guid deviceGuid, byte[] wavData, float volume, Dalamud.Plugin.Services.IPluginLog log)

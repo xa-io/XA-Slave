@@ -107,7 +107,7 @@ public partial class SlaveWindow
         // existing transition retains warning results and owns final cohort cleanup.
         foreach (var partialState in xagmanPartialOwners.Values.Where(state =>
             GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(xagmanSweepRegion, StringComparison.OrdinalIgnoreCase)))
-            partialState.Reason = "selected regional suppliers exhausted; remaining items unavailable in this run";
+            partialState.ReasonMessage = global::XASlave.Localization.UiMessage.Key("SD1575C3099CCA925");
         if (!TryAdvanceXagmanSweepToNextNeededRegion(pending.Count > 0
             ? "exhausted useful regional supplies with unresolved owner needs" : "fully served"))
         {
@@ -135,7 +135,7 @@ public partial class SlaveWindow
 
     private void StartXagmanServerSupplyTony(string character)
     {
-        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, $"server supply rotation to {character}")) return;
+        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Format("SBB1877B70056A1EC", character))) return;
         xagmanActiveTradePartner = xagmanActiveTradePartnerInstanceId = string.Empty;
         ResetXagmanTonyApproachWait();
         xagmanObservedDropboxBusy = false;

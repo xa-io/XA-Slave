@@ -121,7 +121,7 @@ internal static class PluginInspectionCatalog
                 capture.Text(command.Attribution, MaxSignatureLength)));
         }
         if (commands.Count > MaxCommands)
-            capture.Incomplete($"Command list limited to {MaxCommands} entries.");
+            capture.Incomplete(global::XASlave.Localization.UiMessage.Format("S89B703BF11B560B3", MaxCommands));
 
         var types = new List<PluginInspectionType>();
         var visitedTypes = 0;
@@ -133,23 +133,23 @@ internal static class PluginInspectionCatalog
                 if (type == null || type.Assembly != assembly) continue;
                 if (visitedTypes >= MaxTypes)
                 {
-                    capture.Incomplete($"Type list limited to {MaxTypes} entries from the selected assembly.");
+                    capture.Incomplete(global::XASlave.Localization.UiMessage.Format("S877B0F719BFB53BA", MaxTypes));
                     break;
                 }
                 visitedTypes++;
 
                 try { types.Add(CaptureType(type, capture)); }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception exception) { capture.Failure("Type metadata", exception); }
+                catch (Exception exception) { capture.Failure(global::XASlave.Localization.UiMessage.Key("S8367FF8B6F11E253"), exception); }
                 if (capture.MemberLimitReached) break;
             }
         }
 
         token.ThrowIfCancellationRequested();
-        return new(copiedIdentity, Freeze(copiedCommands), Freeze(types), capture.Limitations, capture.Truncated)
+        return PluginInspectionPresentation.Attach(new PluginInspectionReport(copiedIdentity, Freeze(copiedCommands), Freeze(types), capture.Limitations, capture.Truncated)
         {
             IpcDeclarations = Freeze(capture.IpcDeclarations),
-        };
+        }, capture.LimitationMessages);
     }
 
     private static IEnumerable<Type?> GetTypes(Assembly assembly, CaptureState capture)
@@ -157,19 +157,19 @@ internal static class PluginInspectionCatalog
         try { return assembly.GetTypes(); }
         catch (ReflectionTypeLoadException exception)
         {
-            capture.Failure("Assembly type enumeration returned a partial list", exception);
+            capture.Failure(global::XASlave.Localization.UiMessage.Key("S5A075720C6D8B196"), exception);
             foreach (var loaderException in exception.LoaderExceptions.Take(MaxAttributes))
             {
                 if (!capture.Continue()) break;
-                if (loaderException != null) capture.Failure("Type loader", loaderException);
+                if (loaderException != null) capture.Failure(global::XASlave.Localization.UiMessage.Key("S41AC4C98F8BD8287"), loaderException);
             }
             if (exception.LoaderExceptions.Length > MaxAttributes)
-                capture.Incomplete("Additional type loader diagnostics omitted.");
+                capture.Incomplete(global::XASlave.Localization.UiMessage.Key("S051A37FFFB69D84C"));
             return exception.Types;
         }
         catch (Exception exception)
         {
-            capture.Failure("Assembly type enumeration", exception);
+            capture.Failure(global::XASlave.Localization.UiMessage.Key("S2977D6085515E209"), exception);
             return Array.Empty<Type>();
         }
     }
@@ -192,12 +192,12 @@ internal static class PluginInspectionCatalog
         {
             if (currentBase.FullName == "Dalamud.Interface.Windowing.Window")
             {
-                labels.Add("Window candidate (unverified): derives from Dalamud.Interface.Windowing.Window; no window instance or embedding support was tested.");
+                labels.Add(global::XASlave.Localization.UiMessage.Key("S5D593860DD22350B").Original);
                 break;
             }
             currentBase = currentBase.BaseType;
             if (depth == 31 && currentBase != null)
-                capture.Incomplete("Base-type evidence traversal limited to 32 levels.");
+                capture.Incomplete(global::XASlave.Localization.UiMessage.Key("SCCC9726724874B3B"));
         }
 
         var members = new List<PluginInspectionMember>();
@@ -208,7 +208,7 @@ internal static class PluginInspectionCatalog
             try { declared = type.GetMembers(DeclaredMembers); }
             catch (Exception exception)
             {
-                capture.Failure("Declared member enumeration", exception);
+                capture.Failure(global::XASlave.Localization.UiMessage.Key("SF1D129D3EE82D442"), exception);
                 declared = Array.Empty<MemberInfo>();
             }
             foreach (var member in declared)
@@ -222,10 +222,10 @@ internal static class PluginInspectionCatalog
                     members.Add(snapshot);
                     if (snapshot.CandidateLabels.Count > 0 && labels.Count < 2
                         && !labels.Any(label => label.StartsWith("IPC candidate", StringComparison.Ordinal)))
-                        labels.Add("IPC candidate (unverified): members reference a call-gate contract or known IPC declaration; consult ipc and ipcDeclarations for separate registry and metadata evidence.");
+                        labels.Add(global::XASlave.Localization.UiMessage.Key("SC688547FBF5B403C").Original);
                 }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception exception) { capture.Failure("Member metadata", exception); }
+                catch (Exception exception) { capture.Failure(global::XASlave.Localization.UiMessage.Key("S1B7FA52A04841C4D"), exception); }
             }
         }
 
@@ -296,28 +296,28 @@ internal static class PluginInspectionCatalog
         var signature = capture.Text($"{visibility} {(isStatic ? "static " : string.Empty)}{returnType} {name}{genericSuffix}{parameterSuffix}", MaxSignatureLength);
         var labels = new List<string>();
         if (IsCallGateType(valueType, capture) || parameters.Take(MaxParameters).Any(parameter => IsCallGateType(parameter.ParameterType, capture)))
-            labels.Add("IPC contract reference (unverified): signature contains Dalamud.Plugin.Ipc.ICallGateProvider/ICallGateSubscriber; no channel or callable registration is established.");
+            labels.Add(global::XASlave.Localization.UiMessage.Key("S1CCEE5F4AA081370").Original);
 
         try
         {
             if (capture.IpcDeclarations.Count >= MaxIpcDeclarations)
-                capture.Incomplete("IPC declarations limited to 2048 entries; ordinary member metadata continues.");
+                capture.Incomplete(global::XASlave.Localization.UiMessage.Key("SB2EB459DCAFEF64D"));
             else
             {
                 var declarationIssueCount = capture.IssueCount;
                 var declarations = PluginInspectionIpcMetadata.Capture(member, capture.PluginInternalName,
                     capture.Continue, capture.Text, type => TypeName(type, capture), capture.Incomplete);
                 var remaining = MaxIpcDeclarations - capture.IpcDeclarations.Count;
-                if (declarations.Count > remaining) capture.Incomplete("IPC declarations limited to 2048 entries.");
+                if (declarations.Count > remaining) capture.Incomplete(global::XASlave.Localization.UiMessage.Key("SB5BF967E9FD8627F"));
                 foreach (var declaration in declarations.Take(remaining))
                     capture.IpcDeclarations.Add(capture.IssueCount == declarationIssueCount ? declaration
                         : declaration with { SignatureComplete = false });
                 if (declarations.Count > 0)
-                    labels.Add("EzIPC declaration (unverified): see ipcDeclarations for role, channel template and signature; see ipc for observed registrations.");
+                    labels.Add(global::XASlave.Localization.UiMessage.Key("S0FDD21C7A81B5CFC").Original);
             }
         }
         catch (OperationCanceledException) { throw; }
-        catch (Exception exception) { capture.Failure("IPC declaration metadata", exception); }
+        catch (Exception exception) { capture.Failure(global::XASlave.Localization.UiMessage.Key("SDE7CC33B649013CF"), exception); }
 
         return new(kind, name, signature, visibility, isStatic, returnType, parameterSnapshots,
             genericSnapshots, Freeze(accessors), Attributes(member, capture), Freeze(labels));
@@ -326,7 +326,7 @@ internal static class PluginInspectionCatalog
     private static IReadOnlyList<PluginInspectionParameter> Parameters(ParameterInfo[] parameters, CaptureState capture)
     {
         var result = new List<PluginInspectionParameter>();
-        if (parameters.Length > MaxParameters) capture.Incomplete($"Parameter or generic-argument lists limited to {MaxParameters} entries.");
+        if (parameters.Length > MaxParameters) capture.Incomplete(global::XASlave.Localization.UiMessage.Format("S584E7D0054D4A5A6", MaxParameters));
         foreach (var parameter in parameters.Take(MaxParameters))
         {
             if (!capture.Continue()) break;
@@ -343,7 +343,7 @@ internal static class PluginInspectionCatalog
     private static IReadOnlyList<string> GenericParameters(Type[] arguments, CaptureState capture)
     {
         var result = new List<string>();
-        if (arguments.Length > MaxParameters) capture.Incomplete($"Parameter or generic-argument lists limited to {MaxParameters} entries.");
+        if (arguments.Length > MaxParameters) capture.Incomplete(global::XASlave.Localization.UiMessage.Format("S584E7D0054D4A5A6", MaxParameters));
         foreach (var argument in arguments.Take(MaxParameters))
         {
             if (!capture.Continue()) break;
@@ -353,7 +353,7 @@ internal static class PluginInspectionCatalog
             if ((flags & GenericParameterAttributes.ReferenceTypeConstraint) != 0) constraints.Add("class");
             if ((flags & GenericParameterAttributes.NotNullableValueTypeConstraint) != 0) constraints.Add("struct");
             var metadataConstraints = argument.GetGenericParameterConstraints();
-            if (metadataConstraints.Length > MaxParameters) capture.Incomplete("Generic constraint list truncated.");
+            if (metadataConstraints.Length > MaxParameters) capture.Incomplete(global::XASlave.Localization.UiMessage.Key("SA4CF50F3AB1CE822"));
             foreach (var constraint in metadataConstraints.Take(MaxParameters))
             {
                 if (!capture.Continue()) break;
@@ -373,7 +373,7 @@ internal static class PluginInspectionCatalog
         if (!capture.Continue()) return Array.Empty<string>();
         try { return AttributeNames(CustomAttributeData.GetCustomAttributes(member), capture); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception exception) { capture.Failure("Attribute metadata", exception); return Array.Empty<string>(); }
+        catch (Exception exception) { capture.Failure(global::XASlave.Localization.UiMessage.Key("SDB942819D22B469D"), exception); return Array.Empty<string>(); }
     }
 
     private static IReadOnlyList<string> Attributes(ParameterInfo parameter, CaptureState capture)
@@ -381,13 +381,13 @@ internal static class PluginInspectionCatalog
         if (!capture.Continue()) return Array.Empty<string>();
         try { return AttributeNames(CustomAttributeData.GetCustomAttributes(parameter), capture); }
         catch (OperationCanceledException) { throw; }
-        catch (Exception exception) { capture.Failure("Parameter attribute metadata", exception); return Array.Empty<string>(); }
+        catch (Exception exception) { capture.Failure(global::XASlave.Localization.UiMessage.Key("SA867FADFEBC160A1"), exception); return Array.Empty<string>(); }
     }
 
     private static IReadOnlyList<string> AttributeNames(IList<CustomAttributeData> attributes, CaptureState capture)
     {
         var result = new List<string>();
-        if (attributes.Count > MaxAttributes) capture.Incomplete($"Attribute lists limited to {MaxAttributes} entries.");
+        if (attributes.Count > MaxAttributes) capture.Incomplete(global::XASlave.Localization.UiMessage.Format("S254A124EE7AC74FF", MaxAttributes));
         foreach (var attribute in attributes.Take(MaxAttributes))
         {
             if (!capture.Continue()) break;
@@ -401,7 +401,7 @@ internal static class PluginInspectionCatalog
         if (!capture.Continue()) return "<capture deadline>";
         if (depth >= MaxTypeDepth)
         {
-            capture.Incomplete($"Type-signature nesting limited to {MaxTypeDepth} levels.");
+            capture.Incomplete(global::XASlave.Localization.UiMessage.Format("S300AD1332A2CB224", MaxTypeDepth));
             return "<type nesting limit>";
         }
         if (type.HasElementType)
@@ -416,7 +416,7 @@ internal static class PluginInspectionCatalog
         if (!type.IsGenericType) return capture.Text(type.FullName ?? type.Name, MaxSignatureLength);
         var definition = type.GetGenericTypeDefinition();
         var arguments = type.GetGenericArguments();
-        if (arguments.Length > MaxParameters) capture.Incomplete($"Parameter or generic-argument lists limited to {MaxParameters} entries.");
+        if (arguments.Length > MaxParameters) capture.Incomplete(global::XASlave.Localization.UiMessage.Format("S584E7D0054D4A5A6", MaxParameters));
         return capture.Text((definition.FullName ?? definition.Name) + "<"
             + string.Join(", ", arguments.Take(MaxParameters).Select(argument => TypeName(argument, capture, depth + 1))) + ">", MaxSignatureLength);
     }
@@ -464,16 +464,17 @@ internal static class PluginInspectionCatalog
         internal int IssueCount { get; private set; }
         internal string PluginInternalName { get; }
         internal List<PluginInspectionIpcDeclaration> IpcDeclarations { get; } = new();
-        internal List<string> Limitations { get; } = new()
+        internal List<global::XASlave.Localization.UiMessage> LimitationMessages { get; } = new()
         {
-            "Metadata inventory only: no inspected getters, constructors, methods, attribute constructors, or field values were evaluated. Discovered members are unverified and are not automatically safe or callable controls.",
-            "Only the selected assembly is enumerated. Dependency types appear as signatures or base-type evidence; their members are not recursively inspected.",
-            "Command attribution is supplied by the host snapshot and can be unknown or ambiguous. Subcommands parsed inside handlers are not enumerated.",
-            "IPC member labels and EzIPC declarations are metadata evidence only. The separate ipc snapshot records observed registrations; neither source proves safe invocation, semantics or future availability.",
-            "Window candidates use base-type evidence only. No live window, draw delegate, rendering, or embedding support was tested.",
-            "Capture has cooperative five-second and cancellation checks. Individual reflection calls, including GetTypes/GetMembers, cannot be interrupted and may exceed that deadline.",
-            "Attribute type names and allowlisted EzIPC declaration arguments are captured through CustomAttributeData without constructing attributes. Runtime object/configuration values are omitted.",
+            global::XASlave.Localization.UiMessage.Key("SE6E19E574C3C233F"),
+            global::XASlave.Localization.UiMessage.Key("S04FABBFD8955496E"),
+            global::XASlave.Localization.UiMessage.Key("SF5F7E3FCD9BDEAE8"),
+            global::XASlave.Localization.UiMessage.Key("SFB230DDC03EAA867"),
+            global::XASlave.Localization.UiMessage.Key("S2BF3DE69A9AB95DA"),
+            global::XASlave.Localization.UiMessage.Key("S026024E3E6348527"),
+            global::XASlave.Localization.UiMessage.Key("S906A1865FCB874D1"),
         };
+        internal List<string> Limitations => LimitationMessages.Select(message => message.Original).ToList();
 
         internal CaptureState(CancellationToken token, string pluginInternalName)
         {
@@ -486,7 +487,7 @@ internal static class PluginInspectionCatalog
             token.ThrowIfCancellationRequested();
             if (capturedTextCharacters >= MaxCapturedTextCharacters) return false;
             if (clock.Elapsed < CaptureBudget) return true;
-            Incomplete("Cooperative five-second metadata capture deadline reached; remaining metadata was omitted.");
+            Incomplete(global::XASlave.Localization.UiMessage.Key("S9423B579BB05ACF7"));
             return false;
         }
 
@@ -494,7 +495,7 @@ internal static class PluginInspectionCatalog
         {
             if (memberCount < MaxMembers) { memberCount++; return true; }
             MemberLimitReached = true;
-            Incomplete($"Member list limited to {MaxMembers} entries across the selected assembly.");
+            Incomplete(global::XASlave.Localization.UiMessage.Format("S193D534683B14C31", MaxMembers));
             return false;
         }
 
@@ -506,27 +507,61 @@ internal static class PluginInspectionCatalog
             if (text.Length >= remaining)
             {
                 maximum = Math.Min(maximum, remaining);
-                Incomplete("Cumulative metadata text limit reached; remaining metadata was omitted.");
+                Incomplete(global::XASlave.Localization.UiMessage.Key("S49B3019EF19DEC37"));
                 capturedTextCharacters = MaxCapturedTextCharacters;
             }
             else capturedTextCharacters += Math.Min(text.Length, maximum);
             if (text.Length <= maximum) return text;
-            Incomplete("Long names, help text, or signatures were truncated to the catalog text bounds.");
+            Incomplete(global::XASlave.Localization.UiMessage.Key("S89A67701F82F2844"));
             var length = maximum - 1;
             if (length > 0 && char.IsHighSurrogate(text[length - 1])) length--;
             return text[..length] + "…";
         }
 
-        internal void Failure(string scope, Exception exception)
-            => Incomplete(scope + " unavailable (" + Text(exception.GetType().FullName ?? exception.GetType().Name, MaxNameLength) + ").");
+        internal void Failure(global::XASlave.Localization.UiMessage scope, Exception exception)
+            => Incomplete(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(scope, global::XASlave.Localization.UiMessage.Key("SB3A7321F8FEEABAE")), global::XASlave.Localization.UiMessage.Raw(Text(exception.GetType().FullName ?? exception.GetType().Name, MaxNameLength))), global::XASlave.Localization.UiMessage.Raw(").")));
 
-        internal void Incomplete(string message)
+        internal void Incomplete(global::XASlave.Localization.UiMessage message)
         {
             IssueCount++;
             Truncated = true;
-            if (Limitations.Contains(message, StringComparer.Ordinal)) return;
-            if (Limitations.Count < 63) Limitations.Add(message);
-            else if (Limitations.Count == 63) Limitations.Add("Additional metadata diagnostics omitted after the diagnostic limit.");
+            if (LimitationMessages.Any(existing => string.Equals(existing.Original, message.Original, StringComparison.Ordinal))) return;
+            if (LimitationMessages.Count < 63) LimitationMessages.Add(message);
+            else if (LimitationMessages.Count == 63) LimitationMessages.Add(global::XASlave.Localization.UiMessage.Key("S69DC87DA3A6DD6F5"));
         }
+    }
+}
+
+
+// Presentation metadata is attached to the report identity, never looked up from provider text.
+// Raw JSON fields and positional-record equality remain unchanged.
+internal static class PluginInspectionPresentation
+{
+    private sealed record Presentation(global::XASlave.Localization.UiMessage? Status, global::XASlave.Localization.UiMessage[] Limitations);
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<object, Presentation> Presentations = new();
+
+    internal static T Attach<T>(T owner, IEnumerable<global::XASlave.Localization.UiMessage> limitations, global::XASlave.Localization.UiMessage? status = null) where T : class
+    {
+        Presentations.AddOrUpdate(owner, new Presentation(status, limitations.ToArray()));
+        return owner;
+    }
+
+    internal static void Append(object owner, IEnumerable<global::XASlave.Localization.UiMessage> limitations)
+    {
+        Presentations.TryGetValue(owner, out var existing);
+        Presentations.AddOrUpdate(owner, new Presentation(existing?.Status,
+            (existing?.Limitations ?? Array.Empty<global::XASlave.Localization.UiMessage>()).Concat(limitations).ToArray()));
+    }
+
+    internal static string Status(object owner, string original)
+        => Presentations.TryGetValue(owner, out var presentation)
+            ? global::XASlave.Localization.UiMessage.Capture(presentation.Status, original).Display : original;
+
+    internal static IEnumerable<string> Limitations(object owner, IReadOnlyList<string> originals)
+    {
+        Presentations.TryGetValue(owner, out var presentation);
+        for (var index = 0; index < originals.Count; index++)
+            yield return presentation != null && index < presentation.Limitations.Length
+                ? global::XASlave.Localization.UiMessage.Capture(presentation.Limitations[index], originals[index]).Display : originals[index];
     }
 }

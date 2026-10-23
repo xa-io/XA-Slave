@@ -23,7 +23,10 @@ public unsafe sealed class TeleportLockClearService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -34,13 +37,13 @@ public unsafe sealed class TeleportLockClearService : IDisposable
         {
             enabled = false;
             UpdateSubscription(false);
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         enabled = true;
         UpdateSubscription(true);
-        StatusText = "Enabled - teleport lock log 1665 is suppressed and Teleport is retried locally.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S8F04415D023F7CDD"));
         return true;
     }
 

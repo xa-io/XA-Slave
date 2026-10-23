@@ -16,14 +16,14 @@ public partial class SlaveWindow
             return;
 
         ImGui.Spacing();
-        ImGui.TextColored(new Vector4(0.45f, 0.9f, 0.55f, 1f), "Green Gear Value Forecast");
+        ImGui.TextColored(new Vector4(0.45f, 0.9f, 0.55f, 1f), global::XASlave.Localization.UiLocale.Get("SB747618CD265D7E8"));
         ImGui.TextDisabled(
-            "GC Seals and FC Credits / Rank Progress use one physical green-item pool; the two rows are not additive.");
+            global::XASlave.Localization.UiLocale.Get("S4ED285F793897919"));
         if (cfg.XagmanOutsideNetworkHelper)
         {
             ImGui.TextColored(
                 new Vector4(1f, 0.55f, 0.25f, 1f),
-                "Unavailable in Outside Network Helper. Use connected peer-managed Xagman.");
+                global::XASlave.Localization.UiLocale.Get("S26704386F45678B4"));
             return;
         }
 
@@ -44,12 +44,12 @@ public partial class SlaveWindow
                 ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingStretchProp))
         if (imguiScope41)
         {
-            ImGui.TableSetupColumn("Metric");
-            ImGui.TableSetupColumn("Current");
-            ImGui.TableSetupColumn("Goal");
-            ImGui.TableSetupColumn("Shortage");
-            ImGui.TableSetupColumn("Tony safe supply");
-            ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S2D275A74912CCA2E"));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SE0D1B68224BF0B31"));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SCDBF6975E8A35B0D"));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S91A7AE692DB73732"));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S74F34DB1FFDD9938"));
+            global::XASlave.Localization.UiNative.TableHeadersRow();
 
             foreach (var selector in selectors)
             {
@@ -114,27 +114,27 @@ public partial class SlaveWindow
 
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted(GetXagmanGreenValueSelectorName(selector));
+                ImGui.TextUnformatted(GetXagmanGreenValueSelectorNameMessage(selector).Display);
                 ImGui.TableNextColumn();
                 if (currentKnown)
                     ImGui.TextUnformatted(FormatXagmanScaled2(currentScaled2));
                 else
-                    ImGui.TextDisabled("Unknown");
+                    ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SB764CDC0EAB71374"));
                 ImGui.TableNextColumn();
                 if (targetKnown)
                     ImGui.TextUnformatted(FormatXagmanScaled2(targetScaled2));
                 else
-                    ImGui.TextDisabled("Unknown");
+                    ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SB764CDC0EAB71374"));
                 ImGui.TableNextColumn();
                 if (currentKnown && targetKnown)
                     ImGui.TextUnformatted(FormatXagmanScaled2(shortageScaled2));
                 else
-                    ImGui.TextDisabled("Unknown");
+                    ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SB764CDC0EAB71374"));
                 ImGui.TableNextColumn();
                 if (tonySupplyKnown)
                     ImGui.TextUnformatted(FormatXagmanScaled2(tonySupplyScaled2));
                 else
-                    ImGui.TextDisabled("Unknown");
+                    ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SB764CDC0EAB71374"));
             }
 
 
@@ -142,23 +142,19 @@ public partial class SlaveWindow
 
         if (localSnapshot == null)
         {
-            ImGui.TextDisabled("Waiting for the next presence-tick inventory scan.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S1CB78C7A40D5D11E"));
         }
         else if (!localSnapshot.Complete)
         {
             ImGui.TextColored(
                 new Vector4(1f, 0.45f, 0.35f, 1f),
-                $"Fail closed: {localSnapshot.Error}");
+                global::XASlave.Localization.UiMessage.Format("S4CC16551D6CF7CB5", xagmanGreenValueScanCache!.ErrorMessage).Display);
         }
         else
         {
             var age = Math.Max(0, (DateTime.UtcNow - localSnapshot.GeneratedAtUtc).TotalSeconds);
             ImGui.TextDisabled(
-                $"Safe held items: {localSnapshot.SafeItemCount.ToString("N0", CultureInfo.InvariantCulture)}; " +
-                $"Dropbox-selectable: {localSnapshot.DropboxSafeItemCount.ToString("N0", CultureInfo.InvariantCulture)}; " +
-                $"excluded: {localSnapshot.ExcludedItemCount.ToString("N0", CultureInfo.InvariantCulture)}; " +
-                $"blocked keys: {localSnapshot.BlockedKeyCount.ToString("N0", CultureInfo.InvariantCulture)}; " +
-                $"scan age: {age:0}s.");
+                global::XASlave.Localization.UiLocale.FormatKey("S7E4A3BB3F8EAB5C6", localSnapshot.SafeItemCount.ToString("N0", CultureInfo.InvariantCulture), localSnapshot.DropboxSafeItemCount.ToString("N0", CultureInfo.InvariantCulture), localSnapshot.ExcludedItemCount.ToString("N0", CultureInfo.InvariantCulture), localSnapshot.BlockedKeyCount.ToString("N0", CultureInfo.InvariantCulture), age));
         }
     }
 

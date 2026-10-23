@@ -1,4 +1,5 @@
 using System;
+using XASlave.Localization;
 using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -10,30 +11,30 @@ public partial class SlaveWindow
     // -- All known built-in menu labels for custom fav target picker --
     private static readonly string[] AllBuiltInMenuLabels =
     {
-        "AutoRetainer Helper",
-        "Save to XA Database",
-        "Auto-Glam Weather",
-        "City Chat Flooder",
+        UiLocale.Native("S83A8F587FFB9A4C2"),
+        UiLocale.Native("S0AED21970EED8844"),
+        UiLocale.Native("SEFBF04736214F41C"),
+        UiLocale.Native("S5C5514B66531FC2E"),
         "Xagman",
-        "Monthly Relogger",
-        "Prep Logistics",
-        "Auto-Accept FC Invites",
-        "FC Permissions Updater",
-        "Check Duplicate Plots",
-        "Return Alts To Homeworlds",
-        "Refresh Sub/Bell/Chest",
-        "Eureka Instance Hunter",
+        UiLocale.Native("S4D398C5A9609297E"),
+        UiLocale.Native("S2AE13753A8D90982"),
+        UiLocale.Native("S26AC3F3DFD044284"),
+        UiLocale.Native("SA6711086459806CB"),
+        UiLocale.Native("SA455BD4F4CF7E92B"),
+        UiLocale.Native("S99446740287A7C89"),
+        UiLocale.Native("S85CC8B46B386EB84"),
+        UiLocale.Native("S5578C356136F70AA"),
         "XA Mods",
-        "Window Renamer",
-        "Plugin Operations",
-        "Export Data",
-        "Repo List",
-        "IPC Calls Available",
-        "Commands",
-        "Splash Screen",
+        UiLocale.Native("S05F3A5D5B4F5775C"),
+        UiLocale.Native("S7DD7E3FD85B28A2A"),
+        UiLocale.Native("S2ED227401538531A"),
+        UiLocale.Native("S273D7A925BD20F8A"),
+        UiLocale.Native("S03BD054B237A0FA2"),
+        UiLocale.Native("SB269DC4E81A528A4"),
+        UiLocale.Native("S86F4EE2A3639FB2B"),
     };
 
-    private static readonly string[] CustomFavSlotLabels = { "Bookmark", "Hashtag", "ThumbsUp", "Star" };
+    private static readonly string[] CustomFavSlotLabels = { UiLocale.Native("S1BAC4007880BA129"), UiLocale.Native("SB4E1300F7AC5CAA7"), UiLocale.Native("S10482F3CF8E4FCA2"), UiLocale.Native("SE357D396871D1012") };
     private const int MaxResolutionFavItems = 4;
 
     // custom fav slot state (parallel lists, index-stable)
@@ -100,14 +101,14 @@ public partial class SlaveWindow
 
     private static void FavRowLabel(string text)
     {
-        ImGui.TextUnformatted(text);
+        ImGui.TextUnformatted(UiLocale.T(text));
     }
 
     private static string GetCustomFavSlotLabel(int slotIndex)
     {
         return slotIndex < CustomFavSlotLabels.Length
-            ? CustomFavSlotLabels[slotIndex]
-            : $"Star {slotIndex + 1}";
+            ? UiLocale.T(CustomFavSlotLabels[slotIndex])
+            : UiLocale.FormatKey("S0A99B656138C31E7", slotIndex + 1);
     }
 
     private void AddPluginOpsCustomFavRow()
@@ -136,7 +137,9 @@ public partial class SlaveWindow
         {
             if (option.Label.Contains(term, StringComparison.OrdinalIgnoreCase)
                 || option.Category.Contains(term, StringComparison.OrdinalIgnoreCase)
-                || option.Key.Contains(term, StringComparison.OrdinalIgnoreCase))
+                || option.Key.Contains(term, StringComparison.OrdinalIgnoreCase)
+                || GetLocalizedFavoriteLabel(option).Contains(term, StringComparison.OrdinalIgnoreCase)
+                || UiLocale.T(option.Category).Contains(term, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
             }
@@ -153,31 +156,34 @@ public partial class SlaveWindow
 
         var cfg = plugin.Configuration;
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Plugin Operations");
-        ImGui.TextDisabled("Configure XA Slave startup, logging, and window behavior.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), UiLocale.Get("S7DD7E3FD85B28A2A"));
+        ImGui.TextDisabled(UiLocale.Get("S549D7BEFF93005E4"));
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
+        UiLocale.DrawLanguageSelector("OperationsLanguage", cfg, showLabel: true);
+        ImGui.Spacing();
+
         var openPluginOnLoad = cfg.OpenPluginOnLoad;
-        if (ImGui.Checkbox("Open Plugin on Load", ref openPluginOnLoad))
+        if (UiNative.Checkbox(UiLocale.Native("S07D88BC00368A01D"), ref openPluginOnLoad))
         {
             cfg.OpenPluginOnLoad = openPluginOnLoad;
             cfg.Save();
         }
 
-        ImGui.TextDisabled("Opens XA Slave when the plugin loads and when the character logs in.");
+        ImGui.TextDisabled(UiLocale.Get("SCA69709CBD6BBC2D"));
 
         ImGui.Spacing();
 
         var customResolutionOnLoad = cfg.CustomResolutionOnLoadEnabled;
-        if (ImGui.Checkbox("Custom Resolution on Plugin Load", ref customResolutionOnLoad))
+        if (UiNative.Checkbox(UiLocale.Native("S2DBBF28C1D7B07C1"), ref customResolutionOnLoad))
         {
             cfg.CustomResolutionOnLoadEnabled = customResolutionOnLoad;
             cfg.Save();
         }
 
-        ImGui.TextDisabled("Force-resizes the game window to a custom resolution when the plugin loads (same engine as XA Mods → Custom Resolutions).");
+        ImGui.TextDisabled(UiLocale.Get("S5798EA0539A8A3EB"));
 
         using (ImRaii.Disabled(!cfg.CustomResolutionOnLoadEnabled))
         {
@@ -185,7 +191,7 @@ public partial class SlaveWindow
 
             var customResWidth = cfg.CustomResolutionOnLoadWidth;
             ImGui.SetNextItemWidth(Scale(160f));
-            if (ImGui.InputInt("Width##CustomResolutionOnLoadWidth", ref customResWidth))
+            if (UiNative.InputInt(UiLocale.Native("S3019947B6DAF18B0") + "##CustomResolutionOnLoadWidth", ref customResWidth))
             {
                 cfg.CustomResolutionOnLoadWidth = Math.Clamp(customResWidth, 250, 16384);
                 cfg.Save();
@@ -193,68 +199,68 @@ public partial class SlaveWindow
 
             var customResHeight = cfg.CustomResolutionOnLoadHeight;
             ImGui.SetNextItemWidth(Scale(160f));
-            if (ImGui.InputInt("Height##CustomResolutionOnLoadHeight", ref customResHeight))
+            if (UiNative.InputInt(UiLocale.Native("SBFE2ECA401797325") + "##CustomResolutionOnLoadHeight", ref customResHeight))
             {
                 cfg.CustomResolutionOnLoadHeight = Math.Clamp(customResHeight, 200, 16384);
                 cfg.Save();
             }
 
             var customResIgnoreMin = cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize;
-            if (ImGui.Checkbox("Ignore Minimum Window Size##CustomResolutionOnLoad", ref customResIgnoreMin))
+            if (UiNative.Checkbox(UiLocale.Native("SD9CCEE8B9E9A452B") + "##CustomResolutionOnLoad", ref customResIgnoreMin))
             {
                 cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize = customResIgnoreMin;
                 cfg.Save();
             }
 
-            ImGui.TextDisabled("Lowers the client minimum window size so resolutions below 1024x720 stick instead of snapping back. Recommended on for small resolutions.");
+            ImGui.TextDisabled(UiLocale.Get("SAD0D4FD81C156819"));
 
             ImGui.Unindent();
         }
 
         var showVersionInTitle = cfg.ShowVersionInUpdatesTitle;
-        if (ImGui.Checkbox("Show Version in Window Title", ref showVersionInTitle))
+        if (UiNative.Checkbox(UiLocale.Native("S820A3236DFFB92C2"), ref showVersionInTitle))
         {
             cfg.ShowVersionInUpdatesTitle = showVersionInTitle;
             cfg.ShowVersionInWindowTitleDefaultApplied = true;
             cfg.Save();
         }
 
-        ImGui.TextDisabled("Appends the current version number to the main XA Slave window title bar. The Updates window stays XA Slave - Updates.");
+        ImGui.TextDisabled(UiLocale.Get("S59178E761D419FF4"));
 
         ImGui.Spacing();
 
         var verboseTaskLogging = cfg.VerboseTaskLogging;
-        if (ImGui.Checkbox("Verbose Task Logging", ref verboseTaskLogging))
+        if (UiNative.Checkbox(UiLocale.Native("SB26EFA6CFC770C3B"), ref verboseTaskLogging))
         {
             cfg.VerboseTaskLogging = verboseTaskLogging;
             cfg.Save();
         }
 
-        ImGui.TextDisabled("Off: normal user-facing task logs. On: detailed step timing, relog wait state, and CharacterSafeWait diagnostics.");
+        ImGui.TextDisabled(UiLocale.Get("SE0424DB4984690C3"));
 
         ImGui.Spacing();
 
         var messageLogEnabled = cfg.MessageLogEnabled;
-        if (ImGui.Checkbox("Log Chat, Messages and Emotes to /xllog", ref messageLogEnabled))
+        if (UiNative.Checkbox(UiLocale.Native("S0AC3D95C9DB80023"), ref messageLogEnabled))
         {
             cfg.MessageLogEnabled = messageLogEnabled;
             cfg.Save();
         }
 
-        ImGui.TextWrapped("Writes delivered chat, system/error messages, and emotes to the Dalamud log, including sender names and private chat text.");
-        ImGui.TextDisabled("Off by default. Applies immediately and saves across reloads. Xagman error detection stays active.");
+        ImGui.TextWrapped(UiLocale.Get("S6D81DEA8C71452E6"));
+        ImGui.TextDisabled(UiLocale.Get("S82E5F102393AA845"));
 
-        if (ImGui.TreeNode("Logged message categories"))
+        if (UiNative.TreeNode(UiLocale.Native("S1F47450C226114E6")))
         {
             cfg.MessageLogDisabledTypes ??= new();
-            ImGui.TextWrapped("Uncheck Action and GainBuff to hide the crafting/action and buff messages shown in the log. These filters affect log output only.");
-            if (ImGui.Button("Enable all##MessageLog"))
+            ImGui.TextWrapped(UiLocale.Get("S5FB2389A32BDC05B"));
+            if (UiNative.Button(UiLocale.Native("S06F08E7C2F8A8C00") + "##MessageLog"))
             {
                 cfg.MessageLogDisabledTypes.Clear();
                 cfg.Save();
             }
             ImGui.SameLine();
-            if (ImGui.Button("Disable all##MessageLog"))
+            if (UiNative.Button(UiLocale.Native("S6CB2279DBFE762E0") + "##MessageLog"))
             {
                 foreach (var type in Enum.GetValues<Dalamud.Game.Text.XivChatType>())
                     cfg.MessageLogDisabledTypes.Add((ushort)type);
@@ -269,7 +275,7 @@ public partial class SlaveWindow
                     if (!seen.Add(id)) continue;
                     ImGui.TableNextColumn();
                     var enabled = !cfg.MessageLogDisabledTypes.Contains(id);
-                    if (ImGui.Checkbox($"{type} ({id})##MessageLogType", ref enabled))
+                    if (UiNative.Checkbox($"{type} ({id})##MessageLogType", ref enabled))
                     {
                         if (enabled) cfg.MessageLogDisabledTypes.Remove(id);
                         else cfg.MessageLogDisabledTypes.Add(id);
@@ -283,18 +289,18 @@ public partial class SlaveWindow
 
         ImGui.Spacing();
 
-        if (ImGui.Button("⬆  Show Updates"))
+        if (UiNative.Button(UiLocale.Native("S442F6AC84868237B")))
         {
             Plugin.Instance.UpdatesWindow.Toggle();
         }
-        ImGui.TextDisabled("Open the version history window.  Also available via /xa updates.");
+        ImGui.TextDisabled(UiLocale.Get("S54F629842C983FEC"));
 
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Titlebar Favourite Buttons");
-        ImGui.TextDisabled("Add quick-action buttons to the right of the title bar, to the left of collapse/close.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), UiLocale.Get("SAB65E9B248037C0C"));
+        ImGui.TextDisabled(UiLocale.Get("S8761982E4347A015"));
         ImGui.Spacing();
 
         DrawPluginOpsFavFixedButtons(cfg);
@@ -308,12 +314,12 @@ public partial class SlaveWindow
     {
         EnsureKillGameTitleBarDependency();
 
-        ImGui.TextDisabled("Fixed Actions");
+        ImGui.TextDisabled(UiLocale.Get("S0B96B9109FAB6CFF"));
         ImGui.Spacing();
 
         // Kill Game
         var killGame = cfg.TitleBarFavKillGameEnabled;
-        if (ImGui.Checkbox("##favKillGame", ref killGame))
+        if (UiNative.Checkbox("##favKillGame", ref killGame))
         {
             if (killGame && !cfg.InstantLogoutEnabled)
             {
@@ -329,34 +335,34 @@ public partial class SlaveWindow
             RebuildTitleBarFavButtons();
         }
         ImGui.SameLine();
-        FavRowLabel("Kill Game  [skull]  - hold Ctrl+Shift to fire");
+        FavRowLabel(UiLocale.Native("S50692C3DE4A6F725"));
 
-        ImGui.TextDisabled("Enabling this also turns on XA Mods > Instant Logout. Disabling this titlebar icon does not disable the XA Mod.");
+        ImGui.TextDisabled(UiLocale.Get("S6D56C77641AB6738"));
         ImGui.Spacing();
 
         // Disable All XA Mods
         var disableMods = cfg.TitleBarFavDisableAllModsEnabled;
-        if (ImGui.Checkbox("##favDisableMods", ref disableMods))
+        if (UiNative.Checkbox("##favDisableMods", ref disableMods))
         {
             cfg.TitleBarFavDisableAllModsEnabled = disableMods;
             cfg.Save();
             RebuildTitleBarFavButtons();
         }
         ImGui.SameLine();
-        FavRowLabel("Disable All XA Mods  [recycle]");
+        FavRowLabel(UiLocale.Native("SB211664F7A5A3C70"));
 
         ImGui.Spacing();
 
         // Fav Mod List
         var modList = cfg.TitleBarFavModListEnabled;
-        if (ImGui.Checkbox("##favModList", ref modList))
+        if (UiNative.Checkbox("##favModList", ref modList))
         {
             cfg.TitleBarFavModListEnabled = modList;
             cfg.Save();
             RebuildTitleBarFavButtons();
         }
         ImGui.SameLine();
-        FavRowLabel("Load XA Mod List  [list]");
+        FavRowLabel(UiLocale.Native("S6AC11E07FAC5DB36"));
 
         if (modList)
         {
@@ -364,7 +370,7 @@ public partial class SlaveWindow
             var savedNames = plugin.GetSavedModListNames();
             var currentName = cfg.TitleBarFavModListName;
             ImGui.SetNextItemWidth(Scale(200f));
-            using (var imguiScope317 = ImRaii.Combo("##favModListName", string.IsNullOrEmpty(currentName) ? "(pick list)" : currentName))
+            using (var imguiScope317 = ImRaii.Combo("##favModListName", string.IsNullOrEmpty(currentName) ? UiLocale.Get("S89C3351CC641CE17") : currentName))
             if (imguiScope317)
             {
                 foreach (var name in savedNames)
@@ -386,55 +392,55 @@ public partial class SlaveWindow
 
         // Auto-Glam Weather
         var glamWeather = cfg.TitleBarFavGlamWeatherEnabled;
-        if (ImGui.Checkbox("##favGlamWeather", ref glamWeather))
+        if (UiNative.Checkbox("##favGlamWeather", ref glamWeather))
         {
             cfg.TitleBarFavGlamWeatherEnabled = glamWeather;
             cfg.Save();
             RebuildTitleBarFavButtons();
         }
         ImGui.SameLine();
-        FavRowLabel("Auto-Glam Weather toggle  [sun]");
+        FavRowLabel(UiLocale.Native("SA515FED62A4035A1"));
 
         ImGui.Spacing();
 
         // AR Pre-Process
         var arPre = cfg.TitleBarFavArPreProcessEnabled;
-        if (ImGui.Checkbox("##favArPre", ref arPre))
+        if (UiNative.Checkbox("##favArPre", ref arPre))
         {
             cfg.TitleBarFavArPreProcessEnabled = arPre;
             cfg.Save();
             RebuildTitleBarFavButtons();
         }
         ImGui.SameLine();
-        FavRowLabel("AR Pre-Process toggle  [gas pump]");
+        FavRowLabel(UiLocale.Native("S35ADEE40AF5CA4B9"));
 
         ImGui.Spacing();
 
         // AR Post-Process
         var arPost = cfg.TitleBarFavArPostProcessEnabled;
-        if (ImGui.Checkbox("##favArPost", ref arPost))
+        if (UiNative.Checkbox("##favArPost", ref arPost))
         {
             cfg.TitleBarFavArPostProcessEnabled = arPost;
             cfg.Save();
             RebuildTitleBarFavButtons();
         }
         ImGui.SameLine();
-        FavRowLabel("AR Post-Process toggle  [flag]");
+        FavRowLabel(UiLocale.Native("SDA1C3D4E0D12DF75"));
     }
 
     private void DrawPluginOpsFavCustomItems(Configuration cfg)
     {
-        ImGui.TextDisabled("Custom Favourites");
-        ImGui.TextDisabled("  Add or remove rows as needed. The first four rows use bookmark, hashtag, thumbsup, and star; extra rows use star.");
-        ImGui.TextDisabled("  Rows can open panels, toggle any XA Mod, drive Special Rendering Modes tools, fire Sit / Doze, run All XA Mods Off, or trigger Stop All Automated Tasks.");
-        ImGui.TextDisabled("  Use the search box inside the picker to filter large panel and XA Mod lists.");
+        ImGui.TextDisabled(UiLocale.Get("SBD53CD58F0A7B7CC"));
+        ImGui.TextDisabled(UiLocale.Get("SE065D1B8DDF0CF42"));
+        ImGui.TextDisabled(UiLocale.Get("S8DA9B09C51D4192B"));
+        ImGui.TextDisabled(UiLocale.Get("S166EEB2973D8EBFB"));
         ImGui.Spacing();
 
         var changed = false;
         var removedIndex = -1;
         var selectionOptions = GetTitleBarFavSelectionOptions();
 
-        if (ImGui.Button("Add Favourite"))
+        if (UiNative.Button(UiLocale.Native("S82F7A50E9BA42744")))
         {
             AddPluginOpsCustomFavRow();
             SaveCustomFavItems(cfg);
@@ -443,7 +449,7 @@ public partial class SlaveWindow
         if (pluginOpsFavCustomEnabled.Count == 0)
         {
             ImGui.SameLine();
-            ImGui.TextDisabled("No custom favourites configured.");
+            ImGui.TextDisabled(UiLocale.Get("SA374F5421E962C05"));
         }
 
         ImGui.Spacing();
@@ -454,7 +460,7 @@ public partial class SlaveWindow
             {
 
                 var en = pluginOpsFavCustomEnabled[i];
-                if (ImGui.Checkbox($"##en{i}", ref en))
+                if (UiNative.Checkbox($"##en{i}", ref en))
                 {
                     pluginOpsFavCustomEnabled[i] = en;
                     changed = true;
@@ -464,7 +470,7 @@ public partial class SlaveWindow
                 ImGui.SetNextItemWidth(Scale(220f));
                 var comboLabel = pluginOpsFavCustomMenuInputs[i].Length > 0
                     ? GetTitleBarFavSelectionLabel(pluginOpsFavCustomMenuInputs[i])
-                    : "(none - click to pick)";
+                    : UiLocale.Get("SD9E10EF8B9864688");
                 using (var imguiScope416 = ImRaii.Combo($"##menu{i}", comboLabel))
                 if (imguiScope416)
                 {
@@ -476,12 +482,12 @@ public partial class SlaveWindow
                     }
 
                     ImGui.SetNextItemWidth(-1f);
-                    ImGui.InputTextWithHint($"##menuSearch{i}", "Search panels, mods, actions", ref searchInput, 128);
+                    ImGui.InputTextWithHint($"##menuSearch{i}", UiLocale.Get("S9517C93CCF98B1C5"), ref searchInput, 128);
                     pluginOpsFavCustomSearchInputs[i] = searchInput;
 
                     ImGui.Separator();
 
-                    if (ImGui.Selectable("(none)", string.IsNullOrEmpty(pluginOpsFavCustomMenuInputs[i])))
+                    if (UiNative.Selectable(UiLocale.Native("S552E423045FCBD94"), string.IsNullOrEmpty(pluginOpsFavCustomMenuInputs[i])))
                     {
                         pluginOpsFavCustomMenuInputs[i] = string.Empty;
                         pluginOpsFavCustomSearchInputs[i] = string.Empty;
@@ -501,12 +507,12 @@ public partial class SlaveWindow
                             if (lastCategory.Length > 0)
                                 ImGui.Spacing();
 
-                            ImGui.TextDisabled(option.Category);
+                            ImGui.TextDisabled(UiLocale.T(option.Category));
                             lastCategory = option.Category;
                         }
 
                         var selected = pluginOpsFavCustomMenuInputs[i].Equals(option.Key, StringComparison.OrdinalIgnoreCase);
-                        if (ImGui.Selectable(option.Label, selected))
+                        if (UiNative.Selectable(option.Label, selected, display: GetLocalizedFavoriteLabel(option)))
                         {
                             pluginOpsFavCustomMenuInputs[i] = option.Key;
                             pluginOpsFavCustomSearchInputs[i] = string.Empty;
@@ -516,7 +522,7 @@ public partial class SlaveWindow
                     }
 
                     if (!matchesFound)
-                        ImGui.TextDisabled("No matches.");
+                        ImGui.TextDisabled(UiLocale.Get("SD6572BD2E77380CE"));
 
 
                 }
@@ -546,8 +552,8 @@ public partial class SlaveWindow
 
     private void DrawPluginOpsFavResolutionItems(Configuration cfg)
     {
-        ImGui.TextDisabled("Resolution Shortcuts  (up to 4)");
-        ImGui.TextDisabled("  Check to show button. Enter width x height. [x] removes the slot.");
+        ImGui.TextDisabled(UiLocale.Get("S764E0B1A3C91E3D5"));
+        ImGui.TextDisabled(UiLocale.Get("SAA91DE9D8FED94FD"));
         ImGui.Spacing();
 
         var changed = false;
@@ -558,7 +564,7 @@ public partial class SlaveWindow
             {
 
                 var en = pluginOpsFavResEnabled[i];
-                if (ImGui.Checkbox($"##en{i}", ref en))
+                if (UiNative.Checkbox($"##en{i}", ref en))
                 {
                     pluginOpsFavResEnabled[i] = en;
                     changed = true;
@@ -574,7 +580,7 @@ public partial class SlaveWindow
                 }
 
                 ImGui.SameLine();
-                ImGui.TextDisabled("x");
+                ImGui.TextDisabled(UiLocale.Get("S2D711642B726B044"));
                 ImGui.SameLine();
                 ImGui.SetNextItemWidth(Scale(60f));
                 ImGui.InputText($"##resH{i}", ref pluginOpsFavResHeightInputs[i], 6);
@@ -594,7 +600,7 @@ public partial class SlaveWindow
                 }
 
                 ImGui.SameLine();
-                FavRowLabel($"[desktop]  {pluginOpsFavResWidthInputs[i]}x{pluginOpsFavResHeightInputs[i]}");
+                FavRowLabel(UiLocale.FormatKey("SA1F512BC7534D4F3", pluginOpsFavResWidthInputs[i], pluginOpsFavResHeightInputs[i]));
 
             }
         }

@@ -27,7 +27,7 @@ internal sealed class PluginBuilderWindow : Window
     private IReadOnlyList<PluginBuilderSource> orderedSources = Array.Empty<PluginBuilderSource>();
 
     internal PluginBuilderWindow(PluginBuilderWindowDefinition definition, PluginBuilderService service)
-        : base(VisibleTitle(definition.Title) + "###XAPluginBuilder" + definition.Id.ToString("N"))
+        : base(VisibleTitle(definition.Title, localizeFallback: true) + "###XAPluginBuilder" + definition.Id.ToString("N"))
     {
         this.definition = definition;
         this.service = service;
@@ -64,7 +64,7 @@ internal sealed class PluginBuilderWindow : Window
 
     public override void PreDraw()
     {
-        WindowName = VisibleTitle(definition.Title) + "###XAPluginBuilder" + definition.Id.ToString("N");
+        WindowName = VisibleTitle(definition.Title, localizeFallback: true) + "###XAPluginBuilder" + definition.Id.ToString("N");
         SizeConstraints = new WindowSizeConstraints
         {
             MinimumSize = new Vector2(420, 240) * ImGuiHelpers.GlobalScale,
@@ -95,7 +95,7 @@ internal sealed class PluginBuilderWindow : Window
         {
             if (definition.Pages.Count > 1)
             {
-                using var pages = ImRaii.Combo("Page", CurrentPageTitle());
+                using var pages = global::XASlave.Localization.UiNative.ComboScope(global::XASlave.Localization.UiLocale.Native("S0A30A815D67D7DD2"), CurrentPageTitle());
                 if (pages) DrawPageSelection();
             }
             DrawBody();
@@ -113,7 +113,7 @@ internal sealed class PluginBuilderWindow : Window
         if (!definition.Pages.Any(page => page.Id == selectedPageId)) selectedPageId = definition.Pages.FirstOrDefault()?.Id ?? Guid.Empty;
     }
 
-    private string CurrentPageTitle() => definition.Pages.FirstOrDefault(page => page.Id == selectedPageId)?.Title ?? "Overview";
+    private string CurrentPageTitle() => definition.Pages.FirstOrDefault(page => page.Id == selectedPageId)?.Title ?? global::XASlave.Localization.UiLocale.Get("SD4B1EA5708DD5329");
 
     private void SelectPage(Guid pageId)
     {
@@ -126,18 +126,18 @@ internal sealed class PluginBuilderWindow : Window
         foreach (var page in definition.Pages)
         {
             using var id = ImRaii.PushId(page.Id.ToString("N"));
-            if (ImGui.Selectable(VisibleTitle(page.Title), page.Id == selectedPageId)) SelectPage(page.Id);
+            if (global::XASlave.Localization.UiNative.Selectable(VisibleTitle(page.Title), page.Id == selectedPageId, display: VisibleTitle(page.Title, localizeFallback: true))) SelectPage(page.Id);
         }
     }
 
     private void DrawToolbar()
     {
         var rightEdge = ImGui.GetCursorPosX() + ImGui.GetContentRegionAvail().X;
-        if (ImGui.Button("Refresh##page")) RefreshCurrentPage();
-        var editLabel = editing ? "Done" : "Edit";
-        var editWidth = ImGui.CalcTextSize(editLabel).X + ImGui.GetStyle().FramePadding.X * 2;
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S0E91610117029A62") + "##page"))) RefreshCurrentPage();
+        var editLabel = editing ? global::XASlave.Localization.UiLocale.Native("S11A6767D5674C7E4") : global::XASlave.Localization.UiLocale.Native("S464C4FFD019E1E96");
+        var editWidth = ImGui.CalcTextSize(global::XASlave.Localization.UiLocale.T(editLabel)).X + ImGui.GetStyle().FramePadding.X * 2;
         ImGui.SameLine(Math.Max(ImGui.GetCursorPosX() + ImGui.GetStyle().ItemSpacing.X, rightEdge - editWidth));
-        if (ImGui.Button(editLabel + "##mode"))
+        if (global::XASlave.Localization.UiNative.Button(editLabel + "##mode"))
         {
             editing = !editing;
             service.SetWindowOpen(definition.Id, false);
@@ -158,42 +158,42 @@ internal sealed class PluginBuilderWindow : Window
 
     private void DrawWindowSettings()
     {
-        using var settings = ImRaii.TreeNode("Window settings");
+        using var settings = global::XASlave.Localization.UiNative.TreeScope(global::XASlave.Localization.UiLocale.Native("S11EC92789D80A212"));
         if (!settings) return;
         var changed = false;
         var title = definition.Title;
-        if (ImGui.InputText("Window title", ref title, 128)) { definition.Title = title; changed = true; }
+        if (global::XASlave.Localization.UiNative.InputText(global::XASlave.Localization.UiLocale.Native("S534837B3B824387D"), ref title, 128)) { definition.Title = title; changed = true; }
         var openOnLoad = definition.OpenOnLoad;
-        if (ImGui.Checkbox("Open on plugin load", ref openOnLoad)) { definition.OpenOnLoad = openOnLoad; changed = true; }
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SF9DA3CCF916B9B89"), ref openOnLoad)) { definition.OpenOnLoad = openOnLoad; changed = true; }
         var timestamps = definition.ShowTimestamps;
-        if (ImGui.Checkbox("Show timestamps", ref timestamps)) { definition.ShowTimestamps = timestamps; changed = true; }
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S7ECD3D57E2EB6FF5"), ref timestamps)) { definition.ShowTimestamps = timestamps; changed = true; }
         var sidebar = definition.ShowSidebar;
-        if (ImGui.Checkbox("Show page sidebar", ref sidebar)) { definition.ShowSidebar = sidebar; changed = true; }
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S835B3FBE5AF46E1F"), ref sidebar)) { definition.ShowSidebar = sidebar; changed = true; }
         if (sidebar)
         {
             var width = definition.SidebarWidth;
-            if (ImGui.InputInt("Sidebar width", ref width)) { definition.SidebarWidth = Math.Clamp(width, 100, 400); changed = true; }
+            if (global::XASlave.Localization.UiNative.InputInt(global::XASlave.Localization.UiLocale.Native("SC65C56269E5F3513"), ref width)) { definition.SidebarWidth = Math.Clamp(width, 100, 400); changed = true; }
         }
         if (changed) service.Save();
     }
 
     private void DrawPageSettings()
     {
-        using var pages = ImRaii.TreeNode("Manage pages");
+        using var pages = global::XASlave.Localization.UiNative.TreeScope(global::XASlave.Localization.UiLocale.Native("S102CD0C01BBDCEA6"));
         if (!pages) return;
         var page = definition.Pages.FirstOrDefault(item => item.Id == selectedPageId);
         if (page != null)
         {
             var title = page.Title;
-            if (ImGui.InputText("Page title", ref title, 64)) { page.Title = title; service.Save(); }
+            if (global::XASlave.Localization.UiNative.InputText(global::XASlave.Localization.UiLocale.Native("S02660FFE391C0147"), ref title, 64)) { page.Title = title; service.Save(); }
             var index = definition.Pages.IndexOf(page);
             using (ImRaii.Disabled(index == 0))
-                if (ImGui.SmallButton("Move page up")) { definition.Pages.RemoveAt(index); definition.Pages.Insert(index - 1, page); service.Save(); }
+                if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("SDFF3C0D94EB9F7B4"))) { definition.Pages.RemoveAt(index); definition.Pages.Insert(index - 1, page); service.Save(); }
             ImGui.SameLine();
             using (ImRaii.Disabled(index >= definition.Pages.Count - 1))
-                if (ImGui.SmallButton("Move page down")) { definition.Pages.Remove(page); definition.Pages.Insert(index + 1, page); service.Save(); }
+                if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S1B2E761405D39D89"))) { definition.Pages.Remove(page); definition.Pages.Insert(index + 1, page); service.Save(); }
             using (ImRaii.Disabled(definition.Pages.Count <= 1))
-                if (ImGui.SmallButton("Remove page"))
+                if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S5C9F97796D9C9CA6")))
                 {
                     var fallback = definition.Pages.First(item => item.Id != page.Id);
                     foreach (var control in definition.Controls.Where(item => item.PageId == page.Id)) control.PageId = fallback.Id;
@@ -202,11 +202,11 @@ internal sealed class PluginBuilderWindow : Window
                     SelectPage(fallback.Id);
                     service.Save();
                 }
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Move this page's widgets to the first remaining page.");
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S9051B1C67127CF1C"));
         }
-        ImGui.InputTextWithHint("##newPage", "New page title", ref newPageTitle, 64);
+        ImGui.InputTextWithHint("##newPage", global::XASlave.Localization.UiLocale.Get("S2950D57D492E8986"), ref newPageTitle, 64);
         using (ImRaii.Disabled(string.IsNullOrWhiteSpace(newPageTitle) || definition.Pages.Count >= 32))
-            if (ImGui.Button("Add page"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SAE764A4A4D8BB1E9")))
             {
                 var added = new PluginBuilderPageDefinition { Title = newPageTitle.Trim() };
                 definition.Pages.Add(added);
@@ -224,11 +224,11 @@ internal sealed class PluginBuilderWindow : Window
         ImGui.TextUnformatted(CurrentPageTitle());
         using (ImRaii.Disabled(definition.Controls.Count >= MaxControls))
         {
-            if (ImGui.Button("Add Info Panel")) BeginDraft(PluginBuilderControlKind.Info);
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S8B4C9C06DC11AA32"))) BeginDraft(PluginBuilderControlKind.Info);
             ImGui.SameLine();
-            if (ImGui.Button("Add Action Button")) BeginDraft(PluginBuilderControlKind.Action);
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S801BF80AB2A7F7E5"))) BeginDraft(PluginBuilderControlKind.Action);
         }
-        if (definition.Controls.Count >= MaxControls) ImGui.TextDisabled("This window has reached its 64-widget limit.");
+        if (definition.Controls.Count >= MaxControls) ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S759560112BAC8D2A"));
         if (draft != null) DrawDraft();
         ImGui.Separator();
 
@@ -240,20 +240,20 @@ internal sealed class PluginBuilderWindow : Window
             var control = definition.Controls[index];
             if (control.PageId != selectedPageId) continue;
             using var id = ImRaii.PushId(control.Id.ToString("N"));
-            ImGui.TextUnformatted($"{index + 1}. {control.Kind}: {control.Label}");
+            ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.FormatKey("SF8227E4FA1686AB1", index + 1, ControlKindLabel(control.Kind), control.Label));
             var previous = definition.Controls.FindLastIndex(index, item => item.Id != control.Id && item.PageId == selectedPageId);
             var next = definition.Controls.FindIndex(index + 1, item => item.PageId == selectedPageId);
             using (ImRaii.Disabled(previous < 0))
-                if (ImGui.SmallButton("Up")) { moveFrom = index; moveTo = previous; }
+                if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S55490A4BF3A8E8CB"))) { moveFrom = index; moveTo = previous; }
             ImGui.SameLine();
             using (ImRaii.Disabled(next < 0))
-                if (ImGui.SmallButton("Down")) { moveFrom = index; moveTo = next; }
+                if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("SB86D11AF79188E58"))) { moveFrom = index; moveTo = next; }
             ImGui.SameLine();
-            if (ImGui.SmallButton("Remove")) remove = index;
+            if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("SC3812FC4ACB861D5"))) remove = index;
             ImGui.SameLine();
-            if (ImGui.SmallButton("Change source")) BeginDraft(control.Kind, control);
-            if (!service.IsAvailable(control.Source)) ImGui.TextWrapped("Source unavailable. Choose Change source to scan or reconnect it.");
-            using (var settings = ImRaii.TreeNode("Settings##widget"))
+            if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S34A6A9B07B12EBB9"))) BeginDraft(control.Kind, control);
+            if (!service.IsAvailable(control.Source)) ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S835960A78D1FBC12"));
+            using (var settings = global::XASlave.Localization.UiNative.TreeScope((global::XASlave.Localization.UiLocale.Native("S74A883A037BC227F") + "##widget")))
             {
                 if (settings)
                 {
@@ -275,7 +275,7 @@ internal sealed class PluginBuilderWindow : Window
             definition.Controls.Insert(moveTo, control);
             service.Save();
         }
-        if (!definition.Controls.Any(control => control.PageId == selectedPageId) && draft == null) ImGui.TextDisabled("Add a panel or button, then press Done.");
+        if (!definition.Controls.Any(control => control.PageId == selectedPageId) && draft == null) ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S2AA5A71BE8B4F8B0"));
     }
 
     private void BeginDraft(PluginBuilderControlKind kind, PluginBuilderControlDefinition? replacement = null)
@@ -304,9 +304,9 @@ internal sealed class PluginBuilderWindow : Window
         if (control == null) return;
         using var draftId = ImRaii.PushId("newBuilderWidget");
         ImGui.Separator();
-        ImGui.TextUnformatted(replacingControlId != null ? "Replace widget source"
-            : control.Kind == PluginBuilderControlKind.Info ? "New information panel" : "New action button");
-        using (var plugins = ImRaii.Combo("Source plugin", sourcePlugin.Length > 0 ? sourcePlugin : "Select a plugin"))
+        ImGui.TextUnformatted(replacingControlId != null ? global::XASlave.Localization.UiLocale.Get("SDF9B348B4FF0D9E5")
+            : control.Kind == PluginBuilderControlKind.Info ? global::XASlave.Localization.UiLocale.Get("S8C52470B47D4B5AF") : global::XASlave.Localization.UiLocale.Get("S0E4F208986447A3B"));
+        using (var plugins = global::XASlave.Localization.UiNative.ComboScope(global::XASlave.Localization.UiLocale.Native("S8716343FA721CC69"), sourcePlugin.Length > 0 ? sourcePlugin : global::XASlave.Localization.UiLocale.Get("SCF0666C237C15903")))
         {
             if (plugins)
                 foreach (var name in service.PluginNames)
@@ -319,10 +319,10 @@ internal sealed class PluginBuilderWindow : Window
                         if (!service.IsScanning && service.GetCatalog(name) == null) service.Scan(name);
                     }
         }
-        if (ImGui.SmallButton("Refresh plugins")) service.RefreshPlugins();
+        if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S0986F19F7A29E4C0"))) service.RefreshPlugins();
         ImGui.SameLine();
         using (ImRaii.Disabled(service.IsScanning || sourcePlugin.Length == 0))
-            if (ImGui.SmallButton("Scan sources")) service.Scan(sourcePlugin);
+            if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S0BA39332052B93E6"))) service.Scan(sourcePlugin);
         var catalog = service.GetCatalog(sourcePlugin);
         if (!ReferenceEquals(choicesCatalog, catalog))
         {
@@ -333,11 +333,11 @@ internal sealed class PluginBuilderWindow : Window
         }
         if (catalog == null)
         {
-            ImGui.TextWrapped("Select a loaded plugin and scan its sources.");
-            ImGui.TextWrapped(service.Status);
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SF052AD7CD0C1049C"));
+            ImGui.TextWrapped(service.LocalizedStatus);
         }
-        else ImGui.TextDisabled("Choose IPC first, then commands or reviewed reflection.");
-        ImGui.InputTextWithHint("##sourceFilter", "Search IPC, commands or reflection sources", ref sourceFilter, 160);
+        else ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S92D51F4EC29A8A30"));
+        ImGui.InputTextWithHint("##sourceFilter", global::XASlave.Localization.UiLocale.Get("S119699E93228EC34"), ref sourceFilter, 160);
         var matches = 0;
         using (var list = ImRaii.Child("##builderSources", new Vector2(0, 170 * ImGuiHelpers.GlobalScale), true))
         if (list)
@@ -353,14 +353,14 @@ internal sealed class PluginBuilderWindow : Window
                 supported &= source.UnsupportedReason.Length == 0;
                 using var sourceId = ImRaii.PushId(source.Id);
                 using (ImRaii.Disabled(!supported))
-                    if (ImGui.Selectable(VisibleTitle(SourceLabel(source)), control.Source.Id == source.Id)) SelectSource(control, source);
+                    if (global::XASlave.Localization.UiNative.Selectable(VisibleTitle(SourceLabel(source)), control.Source.Id == source.Id, display: VisibleTitle(SourceLabel(source, localize: true)))) SelectSource(control, source);
                 if (!supported)
-                    ImGui.TextDisabled(source.UnsupportedReason.Length > 0 ? source.UnsupportedReason
-                        : control.Kind == PluginBuilderControlKind.Info ? "Available as an action only." : "Available as information only.");
+                    ImGui.TextDisabled(source.UnsupportedReason.Length > 0 ? source.LocalizedUnsupportedReason
+                        : control.Kind == PluginBuilderControlKind.Info ? global::XASlave.Localization.UiLocale.Get("S624538466129957F") : global::XASlave.Localization.UiLocale.Get("SDEEBED90243387EF"));
             }
-            if (matches == 0) ImGui.TextDisabled("No matching sources.");
+            if (matches == 0) ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SCC7ECBB106C96673"));
         }
-        if (matches > 100) ImGui.TextDisabled($"Showing 100 of {matches} sources; narrow the search.");
+        if (matches > 100) ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S3DE698B4264D1491", matches));
         if (control.Source.Id.Length > 0) DrawControlSettings(control);
         var supportedSelection = control.Source.Id.Length > 0
             && (control.Kind == PluginBuilderControlKind.Info ? control.Source.CanRead : control.Source.CanExecute)
@@ -371,7 +371,7 @@ internal sealed class PluginBuilderWindow : Window
         using (ImRaii.Disabled(!supportedSelection || string.IsNullOrWhiteSpace(control.Label)
             || replacingControlId == null && definition.Controls.Count >= MaxControls))
         {
-            if (ImGui.Button(replacingControlId == null ? "Add to window" : "Replace source"))
+            if (global::XASlave.Localization.UiNative.Button(replacingControlId == null ? global::XASlave.Localization.UiLocale.Native("S8D9FDB7A7562AE2D") : global::XASlave.Localization.UiLocale.Native("S6C3109BEEE945E34")))
             {
                 var existingIndex = replacingControlId is { } id
                     ? definition.Controls.FindIndex(existing => existing.Id == id) : -1;
@@ -383,7 +383,7 @@ internal sealed class PluginBuilderWindow : Window
             }
         }
         ImGui.SameLine();
-        if (ImGui.Button("Cancel")) { draft = null; replacingControlId = null; }
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S19766ED6CCB2F4A3"))) { draft = null; replacingControlId = null; }
     }
 
     private static void SelectSource(PluginBuilderControlDefinition control, PluginBuilderSource source)
@@ -403,15 +403,15 @@ internal sealed class PluginBuilderWindow : Window
     {
         var changed = false;
         var label = control.Label;
-        if (ImGui.InputText("Label", ref label, 128)) { control.Label = label; changed = true; }
+        if (global::XASlave.Localization.UiNative.InputText(global::XASlave.Localization.UiLocale.Native("S0E66373F45DCF3DD"), ref label, 128)) { control.Label = label; changed = true; }
         var page = definition.Pages.FirstOrDefault(item => item.Id == control.PageId);
-        using (var pages = ImRaii.Combo("Page", page?.Title ?? "Overview"))
+        using (var pages = global::XASlave.Localization.UiNative.ComboScope(global::XASlave.Localization.UiLocale.Native("S0A30A815D67D7DD2"), page?.Title ?? global::XASlave.Localization.UiLocale.Get("SD4B1EA5708DD5329")))
         {
             if (pages)
                 foreach (var candidate in definition.Pages)
                 {
                     using var pageId = ImRaii.PushId(candidate.Id.ToString("N"));
-                    if (ImGui.Selectable(VisibleTitle(candidate.Title), candidate.Id == control.PageId))
+                    if (global::XASlave.Localization.UiNative.Selectable(VisibleTitle(candidate.Title), candidate.Id == control.PageId, display: VisibleTitle(candidate.Title, localizeFallback: true)))
                     {
                         control.PageId = candidate.Id;
                         changed = true;
@@ -419,39 +419,39 @@ internal sealed class PluginBuilderWindow : Window
                 }
         }
         var sameLine = control.SameLine;
-        if (ImGui.Checkbox("Place beside previous widget", ref sameLine)) { control.SameLine = sameLine; changed = true; }
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SC44FBB83C74F6B66"), ref sameLine)) { control.SameLine = sameLine; changed = true; }
         var width = control.Width;
-        if (ImGui.InputInt("Width (0 = automatic)", ref width)) { control.Width = Math.Clamp(width, 0, 1200); changed = true; }
-        ImGui.TextWrapped(SourceLabel(control.Source));
-        ImGui.TextDisabled("Provided by " + control.Source.PluginName);
-        if (control.Source.UnsupportedReason.Length > 0) ImGui.TextWrapped(control.Source.UnsupportedReason);
+        if (global::XASlave.Localization.UiNative.InputInt(global::XASlave.Localization.UiLocale.Native("S0D0F9EB47BF21670"), ref width)) { control.Width = Math.Clamp(width, 0, 1200); changed = true; }
+        ImGui.TextWrapped(SourceLabel(control.Source, localize: true));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S35328694F67B2F24", control.Source.PluginName));
+        if (control.Source.UnsupportedReason.Length > 0) ImGui.TextWrapped(control.Source.LocalizedUnsupportedReason);
         if (control.Source.RequiresReflectionConfirmation)
         {
             var confirmed = control.ReflectionReadConfirmed;
-            if (ImGui.Checkbox("Allow this selected reflection source", ref confirmed))
+            if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SD0D3BB3CB10E7F21"), ref confirmed))
             {
                 control.ReflectionReadConfirmed = confirmed;
                 changed = true;
             }
-            ImGui.TextWrapped("Reflection accesses the selected loaded member. Methods and property getters can have side effects.");
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SDD4254188B3031D2"));
         }
         for (var index = 0; index < control.Arguments.Count; index++)
         {
             using var id = ImRaii.PushId(index);
             var argument = control.Arguments[index];
-            var name = index < control.Source.ParameterNames.Count ? control.Source.ParameterNames[index] : "Argument " + (index + 1);
+            var name = index < control.Source.ParameterNames.Count ? control.Source.ParameterNames[index] : global::XASlave.Localization.UiLocale.FormatKey("SF629367797FE82E5", index + 1);
             var type = index < control.Source.ParameterTypes.Count ? control.Source.ParameterTypes[index] : string.Empty;
             var shortType = type.Split(',')[0];
             ImGui.TextWrapped(name + " : " + shortType);
             var binding = argument.UseCurrentCharacterId ? 1 : argument.UseCurrentCharacterName ? 2 : 0;
-            var bindingNames = new[] { "Fixed value", "Current character CID", "Current character name" };
-            using (var combo = ImRaii.Combo("Value source", bindingNames[binding]))
+            var bindingNames = new[] { global::XASlave.Localization.UiLocale.Native("SE1B164E3CD3D0E5E"), global::XASlave.Localization.UiLocale.Native("S446403B3CC284FF9"), global::XASlave.Localization.UiLocale.Native("S45940AC335FC57E7") };
+            using (var combo = global::XASlave.Localization.UiNative.ComboScope(global::XASlave.Localization.UiLocale.Native("S980B10E3E81D06B1"), global::XASlave.Localization.UiLocale.T(bindingNames[binding])))
             if (combo)
                 for (var option = 0; option < bindingNames.Length; option++)
                 {
                     using var disabled = ImRaii.Disabled(option == 1 && shortType != "System.UInt64"
                         || option == 2 && shortType != "System.String");
-                    if (ImGui.Selectable(bindingNames[option], binding == option))
+                    if (global::XASlave.Localization.UiNative.Selectable(bindingNames[option], binding == option))
                     {
                         argument.UseCurrentCharacterId = option == 1;
                         argument.UseCurrentCharacterName = option == 2;
@@ -464,24 +464,24 @@ internal sealed class PluginBuilderWindow : Window
                 if (shortType == "System.Boolean")
                 {
                     var boolean = bool.TryParse(value, out var parsed) && parsed;
-                    if (ImGui.Checkbox("Value", ref boolean)) { argument.Value = boolean ? "true" : "false"; changed = true; }
+                    if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S8E37953D23DACA5F"), ref boolean)) { argument.Value = boolean ? "true" : "false"; changed = true; }
                 }
-                else if (ImGui.InputText("Value", ref value, 2048)) { argument.Value = value; changed = true; }
+                else if (global::XASlave.Localization.UiNative.InputText(global::XASlave.Localization.UiLocale.Native("S8E37953D23DACA5F"), ref value, 2048)) { argument.Value = value; changed = true; }
             }
-            else ImGui.TextDisabled("Resolved when used; requires a logged-in character and a compatible parameter type.");
+            else ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S0C3BFFCD5B609BA9"));
         }
         if (control.Kind == PluginBuilderControlKind.Info)
         {
             var path = control.MemberPath;
-            if (ImGui.InputText("Value field (optional)", ref path, 256)) { control.MemberPath = path; changed = true; }
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Enter a returned field, key or list index, using dots for nested values. Leave blank to display the returned value.");
+            if (global::XASlave.Localization.UiNative.InputText(global::XASlave.Localization.UiLocale.Native("S66D45366A4E2EEC9"), ref path, 256)) { control.MemberPath = path; changed = true; }
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S23C309F419F94EBF"));
             var refresh = control.AutoRefreshSeconds;
-            if (ImGui.InputInt("Refresh seconds (0 = manual)", ref refresh))
+            if (global::XASlave.Localization.UiNative.InputInt(global::XASlave.Localization.UiLocale.Native("S22CDC0C4E429EE54"), ref refresh))
             {
                 control.AutoRefreshSeconds = Math.Clamp(refresh, 0, 300);
                 changed = true;
             }
-            ImGui.TextWrapped("Enable repeat refresh only for a source you know is safe to read repeatedly. Return types do not establish whether a call changes plugin state.");
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S3275C4CACB8A2C39"));
         }
         return changed;
     }
@@ -490,7 +490,7 @@ internal sealed class PluginBuilderWindow : Window
     {
         if (!definition.Controls.Any(control => control.PageId == selectedPageId))
         {
-            ImGui.TextDisabled("Press Edit to add panels or buttons to this page.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SCF2E5AFC3AAE0B11"));
             return;
         }
         var hasPrevious = false;
@@ -502,7 +502,7 @@ internal sealed class PluginBuilderWindow : Window
             var availableWidth = Math.Max(1, ImGui.GetContentRegionAvail().X);
             var wantedWidth = control.Width > 0 ? control.Width * ImGuiHelpers.GlobalScale
                 : control.Kind == PluginBuilderControlKind.Info ? 240 * ImGuiHelpers.GlobalScale
-                : ImGui.CalcTextSize(VisibleTitle(control.Label)).X + ImGui.GetStyle().FramePadding.X * 2;
+                : ImGui.CalcTextSize(VisibleTitle(control.Label, localizeFallback: true)).X + ImGui.GetStyle().FramePadding.X * 2;
             if (control.SameLine && hasPrevious && wantedWidth > availableWidth)
             {
                 ImGui.NewLine();
@@ -527,43 +527,50 @@ internal sealed class PluginBuilderWindow : Window
         {
             ImGui.TextUnformatted(control.Label);
             using (ImRaii.Disabled(!canUse || !control.Source.CanRead))
-                if (ImGui.SmallButton("Refresh##widget")) service.QueueRead(definition.Id, control.Id);
+                if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S0E91610117029A62") + "##widget"))) service.QueueRead(definition.Id, control.Id);
         }
         else
         {
             using (ImRaii.Disabled(!canUse || !control.Source.CanExecute))
-                if (ImGui.Button(VisibleTitle(control.Label) + "##action", new Vector2(width, 0))) service.QueueAction(definition.Id, control.Id);
+                if (global::XASlave.Localization.UiNative.Button(VisibleTitle(control.Label) + "##action", new Vector2(width, 0), display: VisibleTitle(control.Label, localizeFallback: true))) service.QueueAction(definition.Id, control.Id);
         }
         var sample = service.GetSample(definition.Id, control.Id);
-        if (!canUse) ImGui.TextUnformatted("Unavailable. Edit to reconnect.");
+        if (!canUse) ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.Get("S253FA2B06264A582"));
         else if (control.Kind == PluginBuilderControlKind.Info)
-            ImGui.TextUnformatted(sample.Text.Length > 0 ? sample.Text : "No value yet.");
+            ImGui.TextUnformatted(sample.Text.Length > 0 ? sample.LocalizedText : global::XASlave.Localization.UiLocale.Get("SE2843C9ACE38E933"));
         else if (sample.Status == "Invoked")
         {
-            if (ImGui.IsItemHovered() && sample.Text.Length > 0) ImGui.SetTooltip(sample.Text);
+            if (ImGui.IsItemHovered() && sample.Text.Length > 0) ImGui.SetTooltip(sample.LocalizedText);
         }
         if (sample.Status != "Observed" && sample.Status != "Invoked" && sample.Status != "Not read")
         {
-            ImGui.TextUnformatted(sample.Status);
-            if (control.Kind == PluginBuilderControlKind.Action && sample.Text.Length > 0) ImGui.TextUnformatted(sample.Text);
+            ImGui.TextUnformatted(sample.LocalizedStatus);
+            if (control.Kind == PluginBuilderControlKind.Action && sample.Text.Length > 0) ImGui.TextUnformatted(sample.LocalizedText);
         }
         if (definition.ShowTimestamps && sample.TimestampUtc is { } timestamp)
-            ImGui.TextDisabled("Updated " + timestamp.ToLocalTime().ToString("HH:mm:ss"));
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S38A186BB32684C56", timestamp.ToLocalTime().ToString("HH:mm:ss")));
     }
 
-    private static string SourceLabel(PluginBuilderSource source)
+    private static string SourceLabel(PluginBuilderSource source, bool localize = false)
     {
         var prefix = source.Kind switch
         {
-            PluginBuilderSourceKind.IpcFunction or PluginBuilderSourceKind.IpcAction => "IPC",
-            PluginBuilderSourceKind.Command => "Command",
-            _ => "Reflection",
+            PluginBuilderSourceKind.IpcFunction or PluginBuilderSourceKind.IpcAction => global::XASlave.Localization.UiLocale.Native("S331B8EE48FD11AF7"),
+            PluginBuilderSourceKind.Command => global::XASlave.Localization.UiLocale.Native("S713166971D730F81"),
+            _ => global::XASlave.Localization.UiLocale.Native("S7538C2135B030E4E"),
         };
-        return prefix + " · " + source.Label;
+        return (localize ? global::XASlave.Localization.UiLocale.T(prefix) : prefix) + " · " + source.Label;
     }
 
-    private static string VisibleTitle(string value)
-        => string.IsNullOrWhiteSpace(value) ? "Plugin Window" : value.Replace("#", "＃", StringComparison.Ordinal);
+    private static string VisibleTitle(string value, bool localizeFallback = false)
+        => string.IsNullOrWhiteSpace(value) ? (localizeFallback ? global::XASlave.Localization.UiLocale.Get("SAF04A4017BD7799F") : global::XASlave.Localization.UiLocale.Native("SAF04A4017BD7799F")) : value.Replace("#", "＃", StringComparison.Ordinal);
+
+    private static string ControlKindLabel(PluginBuilderControlKind kind) => kind switch
+    {
+        PluginBuilderControlKind.Info => global::XASlave.Localization.UiLocale.Get("S170322A32F3C35B2"),
+        PluginBuilderControlKind.Action => global::XASlave.Localization.UiLocale.Get("S64CFF1319D2FD2CB"),
+        _ => kind.ToString(),
+    };
 
     private static PluginBuilderSource CloneSource(PluginBuilderSource source) => new()
     {
@@ -583,5 +590,6 @@ internal sealed class PluginBuilderWindow : Window
         CanRead = source.CanRead,
         CanExecute = source.CanExecute,
         UnsupportedReason = source.UnsupportedReason,
+        UnsupportedMessage = source.UnsupportedMessage,
     };
 }

@@ -87,6 +87,7 @@ public partial class SlaveWindow
     {
         public XagmanGreenValueSnapshot Snapshot { get; init; } = new();
         public List<XagmanGreenValueCandidate> Candidates { get; init; } = new();
+        public global::XASlave.Localization.UiMessage ErrorMessage { get; init; } = global::XASlave.Localization.UiMessage.Raw(string.Empty);
     }
 
     private sealed class XagmanGreenQueueEntry
@@ -124,11 +125,11 @@ public partial class SlaveWindow
         try
         {
             if (!Plugin.ClientState.IsLoggedIn)
-                return CreateIncompleteXagmanGreenValueScan(generatedAtUtc, "The local character is not logged in.");
+                return CreateIncompleteXagmanGreenValueScan(generatedAtUtc, global::XASlave.Localization.UiMessage.Key("S1F109AE84C0C5C97"));
 
             var inventoryManager = InventoryManager.Instance();
             if (inventoryManager == null)
-                return CreateIncompleteXagmanGreenValueScan(generatedAtUtc, "InventoryManager is unavailable.");
+                return CreateIncompleteXagmanGreenValueScan(generatedAtUtc, global::XASlave.Localization.UiMessage.Key("S7903E5E3D3ED0D17"));
 
             foreach (var inventoryType in XagmanGreenValueInventoryTypes)
             {
@@ -137,7 +138,7 @@ public partial class SlaveWindow
                 {
                     return CreateIncompleteXagmanGreenValueScan(
                         generatedAtUtc,
-                        $"{GetXagmanGreenInventoryLabel(inventoryType)} is not loaded.");
+                        global::XASlave.Localization.UiMessage.Format("SBFFAC0441E83B256", GetXagmanGreenInventoryLabel(inventoryType)));
                 }
             }
 
@@ -149,20 +150,20 @@ public partial class SlaveWindow
                     scannedInventoryTypes.Add(inventoryType);
             }
 
-            if (!TryBuildXagmanGreenGearsetKeys(out var gearsetKeys, out var gearsetError))
+            if (!TryBuildXagmanGreenGearsetKeysMessage(out var gearsetKeys, out var gearsetError))
                 return CreateIncompleteXagmanGreenValueScan(generatedAtUtc, gearsetError);
 
             if (!plugin.IpcClient.IsAutoRetainerAvailable())
             {
                 return CreateIncompleteXagmanGreenValueScan(
                     generatedAtUtc,
-                    "AutoRetainer protection data is unavailable.");
+                    global::XASlave.Localization.UiMessage.Key("SDC4C1F85A8B99FC8"));
             }
 
             var itemSheet = Plugin.DataManager.GetExcelSheet<Item>();
             var rewardSheet = Plugin.DataManager.GetExcelSheet<GCSupplyDutyReward>();
             if (itemSheet == null || rewardSheet == null)
-                return CreateIncompleteXagmanGreenValueScan(generatedAtUtc, "Lumina item or Grand Company reward data is unavailable.");
+                return CreateIncompleteXagmanGreenValueScan(generatedAtUtc, global::XASlave.Localization.UiMessage.Key("S12727C000078F31B"));
 
             var candidates = new List<XagmanGreenValueCandidate>();
             var blockedDropboxKeys = new HashSet<XagmanGreenValueItemKey>();
@@ -176,7 +177,7 @@ public partial class SlaveWindow
                 {
                     return CreateIncompleteXagmanGreenValueScan(
                         generatedAtUtc,
-                        $"{GetXagmanGreenInventoryLabel(inventoryType)} became unavailable during the scan.");
+                        global::XASlave.Localization.UiMessage.Format("S9C99E98F652CFD90", GetXagmanGreenInventoryLabel(inventoryType)));
                 }
 
                 for (var slotIndex = 0; slotIndex < container->Size; slotIndex++)
@@ -196,7 +197,7 @@ public partial class SlaveWindow
                     {
                         return CreateIncompleteXagmanGreenValueScan(
                             generatedAtUtc,
-                            $"Lumina item row {itemId} is unavailable.");
+                            global::XASlave.Localization.UiMessage.Format("S2ECAD832365445E6", itemId));
                     }
 
                     if (itemRow.Rarity != 2)
@@ -217,7 +218,7 @@ public partial class SlaveWindow
                         {
                             return CreateIncompleteXagmanGreenValueScan(
                                 generatedAtUtc,
-                                $"AutoRetainer protection lookup failed for item {itemId}.");
+                                global::XASlave.Localization.UiMessage.Format("S2397FB1DCADEE284", itemId));
                         }
 
                         autoRetainerProtection[itemId] = isAutoRetainerProtected;
@@ -308,7 +309,7 @@ public partial class SlaveWindow
         catch (Exception ex)
         {
             Plugin.Log.Warning(ex, "[Xagman] Green-item value scan failed closed.");
-            return CreateIncompleteXagmanGreenValueScan(generatedAtUtc, $"Green-item scan failed: {ex.Message}");
+            return CreateIncompleteXagmanGreenValueScan(generatedAtUtc, global::XASlave.Localization.UiMessage.Format("S32E7189080719252", ex.Message));
         }
     }
 
@@ -338,13 +339,22 @@ public partial class SlaveWindow
         out HashSet<XagmanGreenValueItemKey> keys,
         out string error)
     {
+        var result = TryBuildXagmanGreenGearsetKeysMessage(out keys, out var presentation);
+        error = presentation.Original;
+        return result;
+    }
+
+    private static unsafe bool TryBuildXagmanGreenGearsetKeysMessage(
+        out HashSet<XagmanGreenValueItemKey> keys,
+        out global::XASlave.Localization.UiMessage error)
+    {
         keys = new HashSet<XagmanGreenValueItemKey>();
-        error = string.Empty;
+        error = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
         var gearsetModule = RaptureGearsetModule.Instance();
         if (gearsetModule == null)
         {
-            error = "RaptureGearsetModule is unavailable.";
+            error = global::XASlave.Localization.UiMessage.Key("SD7DEAF7E32ABC949");
             return false;
         }
 
@@ -438,8 +448,19 @@ public partial class SlaveWindow
         out List<XagmanGreenQueueEntry> queue,
         out string error)
     {
+        var result = TryPlanXagmanGreenSupplyMessage(requests, exactSupplyRequests, out queue, out var presentation);
+        error = presentation.Original;
+        return result;
+    }
+
+    private bool TryPlanXagmanGreenSupplyMessage(
+        IReadOnlyList<XagmanTradeRequestEntry> requests,
+        IReadOnlyList<XagmanTradeRequestEntry> exactSupplyRequests,
+        out List<XagmanGreenQueueEntry> queue,
+        out global::XASlave.Localization.UiMessage error)
+    {
         queue = new List<XagmanGreenQueueEntry>();
-        error = string.Empty;
+        error = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
         long gcSealsDeficitScaled2 = 0;
         long fcCreditsDeficitScaled2 = 0;
@@ -457,7 +478,7 @@ public partial class SlaveWindow
                     fcCreditsDeficitScaled2 = AddXagmanGreenLong(fcCreditsDeficitScaled2, deficit);
                     break;
                 default:
-                    error = $"Unsupported green-item selector revision: {request.SelectorKind}.";
+                    error = global::XASlave.Localization.UiMessage.Format("S29EE2B7B6A635B65", request.SelectorKind);
                     return false;
             }
         }
@@ -467,9 +488,7 @@ public partial class SlaveWindow
 
         if (!TryGetXagmanGreenValueScan(false, out var scan))
         {
-            error = string.IsNullOrWhiteSpace(scan.Snapshot.Error)
-                ? "Green-item supply is unavailable because the local scan is incomplete."
-                : scan.Snapshot.Error;
+            error = (string.IsNullOrWhiteSpace(scan.Snapshot.Error) ? global::XASlave.Localization.UiMessage.Key("S56058FD97B99F734") : scan.ErrorMessage);
             return false;
         }
 
@@ -585,7 +604,7 @@ public partial class SlaveWindow
             {
                 if (selected.Count == 0 && !hasExactSupplyProgress)
                 {
-                    error = "Tony has no safe Dropbox-selectable green-item supply for the requested value target.";
+                    error = global::XASlave.Localization.UiMessage.Key("S816422E1A57C8703");
                     return false;
                 }
 
@@ -657,14 +676,15 @@ public partial class SlaveWindow
 
     private static XagmanGreenValueScanResult CreateIncompleteXagmanGreenValueScan(
         DateTime generatedAtUtc,
-        string error)
+        global::XASlave.Localization.UiMessage error)
     {
         var snapshot = CreateEmptyXagmanGreenValueSnapshot(generatedAtUtc);
         snapshot.Complete = false;
-        snapshot.Error = error;
+        snapshot.Error = error.Original;
         return new XagmanGreenValueScanResult
         {
             Snapshot = snapshot,
+            ErrorMessage = error,
             Candidates = new List<XagmanGreenValueCandidate>(),
         };
     }
@@ -690,28 +710,28 @@ public partial class SlaveWindow
         };
     }
 
-    private static string GetXagmanGreenInventoryLabel(InventoryType inventoryType)
+    private static global::XASlave.Localization.UiMessage GetXagmanGreenInventoryLabel(InventoryType inventoryType)
     {
         return inventoryType switch
         {
-            InventoryType.Inventory1 => "Inventory 1",
-            InventoryType.Inventory2 => "Inventory 2",
-            InventoryType.Inventory3 => "Inventory 3",
-            InventoryType.Inventory4 => "Inventory 4",
-            InventoryType.ArmoryMainHand => "Armoury Main Hand",
-            InventoryType.ArmoryOffHand => "Armoury Off Hand",
-            InventoryType.ArmoryHead => "Armoury Head",
-            InventoryType.ArmoryBody => "Armoury Body",
-            InventoryType.ArmoryHands => "Armoury Hands",
-            InventoryType.ArmoryLegs => "Armoury Legs",
-            InventoryType.ArmoryWaist => "Armoury Waist",
-            InventoryType.ArmoryFeets => "Armoury Feet",
-            InventoryType.ArmoryEar => "Armoury Earrings",
-            InventoryType.ArmoryNeck => "Armoury Necklaces",
-            InventoryType.ArmoryWrist => "Armoury Bracelets",
-            InventoryType.ArmoryRings => "Armoury Rings",
-            InventoryType.ArmorySoulCrystal => "Armoury Soul Crystals",
-            _ => inventoryType.ToString(),
+            InventoryType.Inventory1 => global::XASlave.Localization.UiMessage.Key("SDF27398427D31589"),
+            InventoryType.Inventory2 => global::XASlave.Localization.UiMessage.Key("S3B3743EC6C83E553"),
+            InventoryType.Inventory3 => global::XASlave.Localization.UiMessage.Key("S17ECC6C15565FAF4"),
+            InventoryType.Inventory4 => global::XASlave.Localization.UiMessage.Key("S97E55078F6B87EFC"),
+            InventoryType.ArmoryMainHand => global::XASlave.Localization.UiMessage.Key("S0CFE43338B3849EE"),
+            InventoryType.ArmoryOffHand => global::XASlave.Localization.UiMessage.Key("SCF5E05CA0B2B391B"),
+            InventoryType.ArmoryHead => global::XASlave.Localization.UiMessage.Key("S4B3D5FF344D6620A"),
+            InventoryType.ArmoryBody => global::XASlave.Localization.UiMessage.Key("SA4A133CEDAE5399A"),
+            InventoryType.ArmoryHands => global::XASlave.Localization.UiMessage.Key("SE6C6865F9E2EB132"),
+            InventoryType.ArmoryLegs => global::XASlave.Localization.UiMessage.Key("S10BA25BA1B713E5D"),
+            InventoryType.ArmoryWaist => global::XASlave.Localization.UiMessage.Key("SE33322CFD58B2ABF"),
+            InventoryType.ArmoryFeets => global::XASlave.Localization.UiMessage.Key("SA62CA3BB1CBC7176"),
+            InventoryType.ArmoryEar => global::XASlave.Localization.UiMessage.Key("SC8745458D3CBCFB3"),
+            InventoryType.ArmoryNeck => global::XASlave.Localization.UiMessage.Key("SDC41FEA93EADB0E1"),
+            InventoryType.ArmoryWrist => global::XASlave.Localization.UiMessage.Key("S178A89AC72294FD4"),
+            InventoryType.ArmoryRings => global::XASlave.Localization.UiMessage.Key("S3B2136478C6289CD"),
+            InventoryType.ArmorySoulCrystal => global::XASlave.Localization.UiMessage.Key("S4BCAF8FAB6523C94"),
+            _ => global::XASlave.Localization.UiMessage.Raw(inventoryType.ToString()),
         };
     }
 

@@ -62,10 +62,19 @@ public unsafe sealed class BetterCastBarService : IDisposable
         actionSheet = dataManager.GetExcelSheet<ActionRow>();
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
     public bool IsCastBarVisible { get; private set; }
-    public string CurrentCastName { get; private set; } = "None";
+    public string CurrentCastName { get; private set; } = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5").Original;
+    private global::XASlave.Localization.UiMessage? uiCurrentCastName = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5");
+    internal global::XASlave.Localization.UiMessage CurrentCastNameMessage => global::XASlave.Localization.UiMessage.Capture(ref uiCurrentCastName, CurrentCastName);
+    internal string LocalizedCurrentCastName => global::XASlave.Localization.UiMessage.Resolve(ref uiCurrentCastName, CurrentCastName);
     public int CurrentCastTimeMs { get; private set; }
     public int CurrentCastRemainingMs { get; private set; }
     public float CurrentCastProgress { get; private set; }
@@ -99,7 +108,7 @@ public unsafe sealed class BetterCastBarService : IDisposable
         slidecastReadyColor = configuration.BetterCastBarSlidecastReadyColor;
 
         if (enabled)
-            StatusText = BuildStatusText();
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
     }
 
     public bool SetEnabled(bool value)
@@ -113,13 +122,13 @@ public unsafe sealed class BetterCastBarService : IDisposable
             RestoreVisibleCastBar();
             Unsubscribe();
             ClearCastState();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         enabled = true;
         Subscribe();
-        StatusText = BuildStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
         return true;
     }
 
@@ -204,16 +213,16 @@ public unsafe sealed class BetterCastBarService : IDisposable
         finally { ClearCastState(); }
     }
 
-    private string BuildStatusText()
+    private global::XASlave.Localization.UiMessage BuildStatusText()
     {
         var modeText = slidecastMode switch
         {
-            SlidecastModeZone => "zone",
-            SlidecastModeLine => "line",
-            _ => "disabled",
+            SlidecastModeZone => global::XASlave.Localization.UiMessage.Key("S543E33C48B3C23D3"),
+            SlidecastModeLine => global::XASlave.Localization.UiMessage.Key("S38A9C1E721584DA2"),
+            _ => global::XASlave.Localization.UiMessage.Key("S17EB3C0168D0D7B2"),
         };
 
-        return $"Enabled - _CastBar nodes are restyled locally and the slidecast {modeText} overlay is active.";
+        return global::XASlave.Localization.UiMessage.Format("S67ABB2C88CBAFD56", modeText);
     }
 
     private void Subscribe()
@@ -277,17 +286,15 @@ public unsafe sealed class BetterCastBarService : IDisposable
         CurrentCastTimeMs = (int)Math.Max(0f, battleChara.TotalCastTime * 1000f);
         CurrentCastRemainingMs = (int)Math.Max(0f, (battleChara.TotalCastTime - battleChara.CurrentCastTime) * 1000f);
         CurrentCastProgress = Math.Clamp(battleChara.CurrentCastTime / battleChara.TotalCastTime, 0f, 1f);
-        CurrentCastName = ResolveCastName(battleChara.CastActionId);
+        CurrentCastName = global::XASlave.Localization.UiMessage.Store(ref uiCurrentCastName, ResolveCastName(battleChara.CastActionId));
     }
 
-    private string ResolveCastName(uint castActionId)
+    private global::XASlave.Localization.UiMessage ResolveCastName(uint castActionId)
     {
         if (castActionId == 0 || actionSheet == null)
-            return "None";
+            return global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5");
 
-        return actionSheet.TryGetRow(castActionId, out var actionRow) && !string.IsNullOrWhiteSpace(actionRow.Name.ToString())
-            ? actionRow.Name.ToString()
-            : $"Action {castActionId}";
+        return (actionSheet.TryGetRow(castActionId, out var actionRow) && !string.IsNullOrWhiteSpace(actionRow.Name.ToString()) ? global::XASlave.Localization.UiMessage.Raw(actionRow.Name.ToString()) : global::XASlave.Localization.UiMessage.Format("S48D7DB9B2B65D27D", castActionId));
     }
 
     private void CaptureNodeState(AtkUnitBase* addon)
@@ -303,7 +310,7 @@ public unsafe sealed class BetterCastBarService : IDisposable
         iconOriginal = CaptureResNode(addon->GetNodeById(8));
         trackedAddonAddress = addonAddress;
         nodeStateCaptured = true;
-        LastActionText = $"Last action: captured the original _CastBar node layout at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S7880937EA4DD3063", DateTime.Now));
     }
 
     private static TextNodeLayout CaptureTextNode(AtkTextNode* node)
@@ -357,7 +364,7 @@ public unsafe sealed class BetterCastBarService : IDisposable
 
         RestoreNodeLayout(addon);
         ClearTrackedNodeState();
-        LastActionText = $"Last action: restored the original _CastBar node layout at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S6161ED2800FCD7F1", DateTime.Now));
     }
 
     private void RestoreNodeLayout(AtkUnitBase* addon)
@@ -402,7 +409,7 @@ public unsafe sealed class BetterCastBarService : IDisposable
     private void ClearCastState()
     {
         IsCastBarVisible = false;
-        CurrentCastName = "None";
+        CurrentCastName = global::XASlave.Localization.UiMessage.Store(ref uiCurrentCastName, global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5"));
         CurrentCastTimeMs = 0;
         CurrentCastRemainingMs = 0;
         CurrentCastProgress = 0f;

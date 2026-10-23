@@ -32,7 +32,10 @@ public sealed class InstantLogoutService : IDisposable
         this.lobbyErrorAutoClose = lobbyErrorAutoClose;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -41,7 +44,7 @@ public sealed class InstantLogoutService : IDisposable
             enabled = false;
             killGamePending = false;
             UpdateSubscription(false);
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -61,7 +64,7 @@ public sealed class InstantLogoutService : IDisposable
         EnsureInitialized();
         if (requestContentsFinder == null)
         {
-            StatusText = "Unavailable - contents finder request signature missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SB013F18866F50C38"));
             return false;
         }
 
@@ -110,13 +113,11 @@ public sealed class InstantLogoutService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
-        StatusText = requestContentsFinder == null
-            ? "Ready - `/xa logout` and `/xa killgame` will resolve their request surface on first use."
-            : "Enabled - `/xa logout` hard logs out and `/xa killgame` exits after logout.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (requestContentsFinder == null ? global::XASlave.Localization.UiMessage.Key("S1E3021D0CD928E90") : global::XASlave.Localization.UiMessage.Key("S208B6D4568075D44")));
     }
 
     private void UpdateSubscription(bool targetEnabled)

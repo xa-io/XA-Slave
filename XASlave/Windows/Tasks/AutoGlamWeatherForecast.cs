@@ -8,15 +8,18 @@ namespace XASlave.Windows;
 
 public partial class SlaveWindow
 {
-    private sealed record AutoGlamForecastRow(string StartsAt, string Weather);
+    private sealed record AutoGlamForecastRow(string StartsAt, global::XASlave.Localization.UiMessage Weather);
 
     private DateTime glamForecastNextRefresh = DateTime.MinValue;
     private uint glamForecastTerritory;
     private int glamForecastLanguage = -1;
     private long glamForecastPeriod = -1;
-    private string glamForecastZone = string.Empty;
-    private string glamForecastCurrent = "Unavailable";
-    private string glamForecastNotice = "Log in to view the current zone's weather.";
+    private string glamForecastZone = global::XASlave.Localization.UiMessage.Raw(string.Empty).Original;
+    private global::XASlave.Localization.UiMessage? glamForecastZoneMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    private string glamForecastCurrent = global::XASlave.Localization.UiMessage.Key("SCA184496974204A0").Original;
+    private global::XASlave.Localization.UiMessage? glamForecastCurrentMessage = global::XASlave.Localization.UiMessage.Key("SCA184496974204A0");
+    private string glamForecastNotice = global::XASlave.Localization.UiMessage.Key("SB1AB5EE30D922D7A").Original;
+    private global::XASlave.Localization.UiMessage? glamForecastNoticeMessage = global::XASlave.Localization.UiMessage.Key("SB1AB5EE30D922D7A");
     private bool glamForecastSpecialZone;
     private uint glamForecastNaturalWeather;
     private readonly Dictionary<uint, string> glamForecastWeatherNames = new();
@@ -33,7 +36,7 @@ public partial class SlaveWindow
 
         if (!Plugin.PlayerState.IsLoaded || Plugin.ClientState.TerritoryType == 0)
         {
-            ClearAutoGlamForecast("Log in to view the current zone's weather.");
+            ClearAutoGlamForecast(global::XASlave.Localization.UiMessage.Key("SB1AB5EE30D922D7A"));
             return;
         }
 
@@ -44,14 +47,14 @@ public partial class SlaveWindow
             var period = WeatherForecast.PeriodStart(new DateTimeOffset(now).ToUnixTimeSeconds());
             if (territoryId != glamForecastTerritory || language != glamForecastLanguage || period != glamForecastPeriod)
             {
-                ClearAutoGlamForecast("Forecast unavailable for this zone.");
+                ClearAutoGlamForecast(global::XASlave.Localization.UiMessage.Key("SF96EE281310C9151"));
                 var territory = Plugin.DataManager.GetExcelSheet<TerritoryType>()?.GetRowOrDefault(territoryId);
                 if (!territory.HasValue)
                     return;
 
-                glamForecastZone = territory.Value.PlaceName.ValueNullable?.Name.ExtractText() ?? $"Zone {territoryId}";
+                glamForecastZone = global::XASlave.Localization.UiMessage.Store(ref glamForecastZoneMessage, (territory.Value.PlaceName.ValueNullable?.Name.ExtractText() is { } zoneName ? global::XASlave.Localization.UiMessage.Raw(zoneName) : global::XASlave.Localization.UiMessage.Format("S565669559E71B77C", territoryId)));
                 if (string.IsNullOrWhiteSpace(glamForecastZone))
-                    glamForecastZone = $"Zone {territoryId}";
+                    glamForecastZone = global::XASlave.Localization.UiMessage.Store(ref glamForecastZoneMessage, global::XASlave.Localization.UiMessage.Format("S565669559E71B77C", territoryId));
                 glamForecastSpecialZone = territory.Value.ContentFinderCondition.RowId != 0
                     || territory.Value.IndividualWeather.RowId != 0;
 
@@ -90,44 +93,40 @@ public partial class SlaveWindow
 
             var manager = FFXIVClientStructs.FFXIV.Client.Game.WeatherManager.Instance();
             var currentWeather = manager == null ? 0u : manager->GetCurrentWeather();
-            glamForecastCurrent = GetAutoGlamForecastWeatherName(currentWeather);
+            glamForecastCurrent = global::XASlave.Localization.UiMessage.Store(ref glamForecastCurrentMessage, GetAutoGlamForecastWeatherName(currentWeather));
             var overridden = manager != null && manager->WeatherOverride != 0;
             var differs = currentWeather != 0 && glamForecastNaturalWeather != 0 && currentWeather != glamForecastNaturalWeather;
-            glamForecastNotice = glamForecastRows.Length == 0
-                ? "Forecast unavailable for this zone."
-                : overridden || differs || glamForecastSpecialZone
-                    ? "Normal zone forecast only; quest, duty or special weather can override it."
-                    : "Next six normal zone periods; special weather can override them. Start times: local / Eorzea time (ET).";
+            glamForecastNotice = global::XASlave.Localization.UiMessage.Store(ref glamForecastNoticeMessage, (glamForecastRows.Length == 0 ? global::XASlave.Localization.UiMessage.Key("SF96EE281310C9151") : (overridden || differs || glamForecastSpecialZone ? global::XASlave.Localization.UiMessage.Key("S44DB55A2F24D889E") : global::XASlave.Localization.UiMessage.Key("SA9BADC05603ACA22"))));
         }
         catch (Exception)
         {
             // Clear stale territory/weather on a missing row or a transient zone transition.
-            ClearAutoGlamForecast("Weather data is temporarily unavailable.");
+            ClearAutoGlamForecast(global::XASlave.Localization.UiMessage.Key("S745FD07B41ABA708"));
         }
     }
 
-    private string GetAutoGlamForecastWeatherName(uint weatherId)
+    private global::XASlave.Localization.UiMessage GetAutoGlamForecastWeatherName(uint weatherId)
     {
         if (weatherId == 0)
-            return "Unavailable";
+            return global::XASlave.Localization.UiMessage.Key("SCA184496974204A0");
         if (glamForecastWeatherNames.TryGetValue(weatherId, out var cached))
-            return cached;
+            return global::XASlave.Localization.UiMessage.Raw(cached);
         var row = Plugin.DataManager.GetExcelSheet<Weather>()?.GetRowOrDefault(weatherId);
         var name = row?.Name.ExtractText();
         if (string.IsNullOrWhiteSpace(name))
-            return $"Unknown weather ({weatherId})";
+            return global::XASlave.Localization.UiMessage.Format("SF32C0C76C2AA95F9", weatherId);
         glamForecastWeatherNames[weatherId] = name;
-        return name;
+        return global::XASlave.Localization.UiMessage.Raw(name);
     }
 
-    private void ClearAutoGlamForecast(string notice)
+    private void ClearAutoGlamForecast(global::XASlave.Localization.UiMessage notice)
     {
         glamForecastTerritory = 0;
         glamForecastLanguage = -1;
         glamForecastPeriod = -1;
-        glamForecastZone = string.Empty;
-        glamForecastCurrent = "Unavailable";
-        glamForecastNotice = notice;
+        glamForecastZone = global::XASlave.Localization.UiMessage.Store(ref glamForecastZoneMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
+        glamForecastCurrent = global::XASlave.Localization.UiMessage.Store(ref glamForecastCurrentMessage, global::XASlave.Localization.UiMessage.Key("SCA184496974204A0"));
+        glamForecastNotice = global::XASlave.Localization.UiMessage.Store(ref glamForecastNoticeMessage, notice);
         glamForecastSpecialZone = false;
         glamForecastNaturalWeather = 0;
         glamForecastRows = Array.Empty<AutoGlamForecastRow>();
@@ -139,25 +138,25 @@ public partial class SlaveWindow
         ImGui.Spacing();
         if (!string.IsNullOrEmpty(glamForecastZone))
         {
-            ImGui.TextUnformatted($"Weather in {glamForecastZone}");
-            ImGui.TextUnformatted($"Current: {glamForecastCurrent}");
+            ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.FormatKey("S1A17CAFF6E846B91", global::XASlave.Localization.UiMessage.Resolve(ref glamForecastZoneMessage, glamForecastZone)));
+            ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.FormatKey("S4C1CA9FE0E115CC8", global::XASlave.Localization.UiMessage.Resolve(ref glamForecastCurrentMessage, glamForecastCurrent)));
         }
-        ImGui.TextWrapped(glamForecastNotice);
+        ImGui.TextWrapped(global::XASlave.Localization.UiMessage.Resolve(ref glamForecastNoticeMessage, glamForecastNotice));
         if (glamForecastRows.Length == 0)
             return;
 
         if (ImGui.BeginTable("##autoGlamForecast", 2, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         {
-            ImGui.TableSetupColumn("Starts (local / ET)");
-            ImGui.TableSetupColumn("Normal forecast");
-            ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S63EA14A7572A3E48"));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S47E4AE84C45D86F7"));
+            global::XASlave.Localization.UiNative.TableHeadersRow();
             foreach (var row in glamForecastRows)
             {
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(row.StartsAt);
                 ImGui.TableNextColumn();
-                ImGui.TextUnformatted(row.Weather);
+                ImGui.TextUnformatted(row.Weather.Display);
             }
             ImGui.EndTable();
         }

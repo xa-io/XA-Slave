@@ -37,7 +37,7 @@ internal sealed unsafe partial class ViewSingleItemScene
             || Marshal.OffsetOf<hkArray<nint>>(nameof(hkArray<nint>.Data)).ToInt32() != 0
             || Marshal.OffsetOf<hkArray<nint>>(nameof(hkArray<nint>.Length)).ToInt32() != 8
             || Marshal.OffsetOf<hkArray<nint>>(nameof(hkArray<nint>.CapacityAndFlags)).ToInt32() != 12)
-            throw new InvalidOperationException("The standalone animation layout changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SDDD50C7847338DB0"), originalMessageText => new InvalidOperationException(originalMessageText));
         RequireOffset<CharacterBase>(nameof(CharacterBase.Skeleton), 0xA0);
         RequireOffset<Skeleton>(nameof(Skeleton.Owner), 0xB8);
         RequireOffset<Skeleton>(nameof(Skeleton.PartialSkeletonCount), 0x50);
@@ -155,8 +155,7 @@ internal sealed unsafe partial class ViewSingleItemScene
                 primaryAnimationControl = null;
                 animationTimelineRevision++;
             }
-            animationState = new(false, animationPlaying, 0, 0, animationTimelineRevision,
-                "Animation timing is unavailable for this model.");
+            animationState = ViewSingleItemAnimationState.Create(false, animationPlaying, 0, 0, animationTimelineRevision, global::XASlave.Localization.UiMessage.Key("S859E91E4FA25DB4F"));
             if (animationReadFailure == error.Message) return;
             animationReadFailure = error.Message;
             if (Environment.TickCount64 - animationReadWarningAt < 5000) return;
@@ -170,7 +169,7 @@ internal sealed unsafe partial class ViewSingleItemScene
         if (!AnimationReadyForDisplay() || !TryReadAnimationControls(out var current))
         {
             if (animationControls.Length != 0) { ResetAnimationControls(); animationTimelineRevision++; }
-            animationState = new(false, animationPlaying, 0, 0, animationTimelineRevision, "Animation is loading.");
+            animationState = ViewSingleItemAnimationState.Create(false, animationPlaying, 0, 0, animationTimelineRevision, global::XASlave.Localization.UiMessage.Key("S44036EB352ED01CD"));
             return;
         }
         var identities = current.Select(value => value.Identity).ToArray();
@@ -184,13 +183,12 @@ internal sealed unsafe partial class ViewSingleItemScene
         }
         if (primary == null)
         {
-            animationState = new(true, animationPlaying, 0, 0, animationTimelineRevision, "This model has no skeletal animation timeline.");
+            animationState = ViewSingleItemAnimationState.Create(true, animationPlaying, 0, 0, animationTimelineRevision, global::XASlave.Localization.UiMessage.Key("SF215CBEDEEFAC5C5"));
             return;
         }
         var selected = current.First(value => value.Identity == primary.Value);
         var length = selected.Identity.End - selected.Identity.Start;
-        animationState = new(true, animationPlaying, Math.Clamp(selected.Time - selected.Identity.Start, 0, length),
-            length, animationTimelineRevision, animationPlaying ? "Playing." : "Paused.");
+        animationState = ViewSingleItemAnimationState.Create(true, animationPlaying, Math.Clamp(selected.Time - selected.Identity.Start, 0, length), length, animationTimelineRevision, (animationPlaying ? global::XASlave.Localization.UiMessage.Key("SE23CE955254CC419") : global::XASlave.Localization.UiMessage.Key("SAF0ECB7FCC51ED23")));
     }
 
 }

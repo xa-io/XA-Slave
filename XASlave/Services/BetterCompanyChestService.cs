@@ -96,9 +96,18 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
             .ToArray();
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
-    public string CurrentPageLabel { get; private set; } = "Closed";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
+    public string CurrentPageLabel { get; private set; } = global::XASlave.Localization.UiMessage.Key("SC21EAD0614E7E1B7").Original;
+    private global::XASlave.Localization.UiMessage? uiCurrentPageLabel = global::XASlave.Localization.UiMessage.Key("SC21EAD0614E7E1B7");
+    internal global::XASlave.Localization.UiMessage CurrentPageLabelMessage => global::XASlave.Localization.UiMessage.Capture(ref uiCurrentPageLabel, CurrentPageLabel);
+    internal string LocalizedCurrentPageLabel => global::XASlave.Localization.UiMessage.Resolve(ref uiCurrentPageLabel, CurrentPageLabel);
     public long CurrentExchangeableValue => lastExchangeableValue;
     public bool QuickMoveEnabled => quickMoveEnabled;
     public bool AutoConfirmNumericInputEnabled => autoConfirmNumericInput;
@@ -113,7 +122,7 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
         this.showExchangeableValue = showExchangeableValue;
 
         if (enabled)
-            StatusText = BuildStatusText();
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
     }
 
     public bool SetEnabled(bool value)
@@ -126,16 +135,16 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
             enabled = false;
             awaitingNumericConfirm = false;
             awaitingNumericConfirmUntilUtc = DateTime.MinValue;
-            CurrentPageLabel = "Closed";
+            CurrentPageLabel = global::XASlave.Localization.UiMessage.Store(ref uiCurrentPageLabel, global::XASlave.Localization.UiMessage.Key("SC21EAD0614E7E1B7"));
             lastExchangeableValue = 0;
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         enabled = true;
         Subscribe();
-        StatusText = BuildStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
         return true;
     }
 
@@ -181,16 +190,16 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
 
         drawList.AddRectFilled(min, max, fillColor, rounding);
         drawList.AddRect(min, max, borderColor, rounding, ImDrawFlags.None, borderThickness);
-        drawList.AddText(min + new Vector2(9f * scale, 6f * scale), titleColor, "Exchangeable value");
-        drawList.AddText(min + new Vector2(9f * scale, 22f * scale), valueColor, $"{lastExchangeableValue:n0} gil");
+        drawList.AddText(min + new Vector2(9f * scale, 6f * scale), titleColor, global::XASlave.Localization.UiLocale.Get("SFF33F1036ECC8ADA"));
+        drawList.AddText(min + new Vector2(9f * scale, 22f * scale), valueColor, global::XASlave.Localization.UiLocale.FormatKey("SD67354F6CD6233B2", lastExchangeableValue));
 
         ImGui.End();
     }
 
-    private string BuildStatusText()
+    private global::XASlave.Localization.UiMessage BuildStatusText()
     {
-        var defaultPageText = defaultPageIndex == 0 ? "no default page" : DescribePage(GetConfiguredPage());
-        return $"Enabled - default page: {defaultPageText}, quick move {(quickMoveEnabled ? "on" : "off")}, numeric confirm {(autoConfirmNumericInput ? "on" : "off")}, gil value overlay {(showExchangeableValue ? "on" : "off")}.";
+        var defaultPageText = (defaultPageIndex == 0 ? global::XASlave.Localization.UiMessage.Key("S68BE7D82286C4A2E") : DescribePage(GetConfiguredPage()));
+        return global::XASlave.Localization.UiMessage.Format("SE57FCEEE8B848F66", defaultPageText, ((quickMoveEnabled ? global::XASlave.Localization.UiMessage.Key("SB8D31E852725AFB1") : global::XASlave.Localization.UiMessage.Key("SB4DC66DDE806261B"))), ((autoConfirmNumericInput ? global::XASlave.Localization.UiMessage.Key("SB8D31E852725AFB1") : global::XASlave.Localization.UiMessage.Key("SB4DC66DDE806261B"))), ((showExchangeableValue ? global::XASlave.Localization.UiMessage.Key("SB8D31E852725AFB1") : global::XASlave.Localization.UiMessage.Key("SB4DC66DDE806261B"))));
     }
 
     private void Subscribe()
@@ -236,12 +245,12 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
 
                     if (!TryGetCurrentPage(addon, out var currentPage))
                     {
-                        CurrentPageLabel = "Unavailable";
+                        CurrentPageLabel = global::XASlave.Localization.UiMessage.Store(ref uiCurrentPageLabel, global::XASlave.Localization.UiMessage.Key("SCA184496974204A0"));
                         lastExchangeableValue = 0;
                         return;
                     }
 
-                    CurrentPageLabel = DescribePage(currentPage);
+                    CurrentPageLabel = global::XASlave.Localization.UiMessage.Store(ref uiCurrentPageLabel, DescribePage(currentPage));
                     lastExchangeableValue = showExchangeableValue && TryGetExchangeableValue(currentPage, out var totalPrice)
                         ? totalPrice
                         : 0;
@@ -262,14 +271,14 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
                         return;
 
                     AddonHelper.ClickComponent(addon, component);
-                    LastActionText = $"Last action: selected {DescribePage(GetConfiguredPage())} when Free Company Chest opened at {DateTime.Now:HH:mm:ss}.";
+                    LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S66C5D3E3966AAF8F", DescribePage(GetConfiguredPage()), DateTime.Now));
                     break;
                 }
                 case AddonEvent.PreFinalize:
                     awaitingNumericConfirm = false;
                     closeContextMenuOnDraw = false;
                     awaitingNumericConfirmUntilUtc = DateTime.MinValue;
-                    CurrentPageLabel = "Closed";
+                    CurrentPageLabel = global::XASlave.Localization.UiMessage.Store(ref uiCurrentPageLabel, global::XASlave.Localization.UiMessage.Key("SC21EAD0614E7E1B7"));
                     lastExchangeableValue = 0;
                     break;
             }
@@ -328,7 +337,7 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
             awaitingNumericConfirm = false;
             awaitingNumericConfirmUntilUtc = DateTime.MinValue;
             addon->FireCallbackInt((int)callbackValue);
-            LastActionText = $"Last action: auto-confirmed the Free Company Chest quantity prompt at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S7BD17CD799EB8E2A", DateTime.Now));
         }
         catch (Exception ex)
         {
@@ -382,7 +391,7 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
                 inventorySourceSlot,
                 currentPage,
                 destinationSlotInChest,
-                $"stored item {inventorySourceItem->GetItemId()} in {DescribePage(currentPage)}");
+                global::XASlave.Localization.UiMessage.Format("SF6658C1E360867C9", inventorySourceItem->GetItemId(), DescribePage(currentPage)));
         }
         catch (Exception ex)
         {
@@ -406,7 +415,7 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
             sourceSlot,
             destinationInventory,
             destinationSlot,
-            $"withdrew item {sourceItem->GetItemId()} to inventory"))
+            global::XASlave.Localization.UiMessage.Format("S15FAEF7052EB8D6A", sourceItem->GetItemId())))
         {
             return false;
         }
@@ -415,7 +424,7 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
         return true;
     }
 
-    private bool ExecuteMove(InventoryType sourceInventory, ushort sourceSlot, InventoryType destinationInventory, ushort destinationSlot, string actionDescription)
+    private bool ExecuteMove(InventoryType sourceInventory, ushort sourceSlot, InventoryType destinationInventory, ushort destinationSlot, global::XASlave.Localization.UiMessage actionDescription)
     {
         try
         {
@@ -431,7 +440,7 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
             awaitingNumericConfirm = autoConfirmNumericInput;
             awaitingNumericConfirmUntilUtc = awaitingNumericConfirm ? DateTime.UtcNow.AddSeconds(2) : DateTime.MinValue;
             closeContextMenuOnDraw = true;
-            LastActionText = $"Last action: {actionDescription} at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S0B42A0AB4428C05D", actionDescription, DateTime.Now));
             return true;
         }
         catch (Exception ex)
@@ -687,17 +696,17 @@ public unsafe sealed class BetterCompanyChestService : IDisposable
         };
     }
 
-    private static string DescribePage(InventoryType page)
+    private static global::XASlave.Localization.UiMessage DescribePage(InventoryType page)
     {
         return page switch
         {
-            InventoryType.FreeCompanyPage1 => "Company Chest Page 1",
-            InventoryType.FreeCompanyPage2 => "Company Chest Page 2",
-            InventoryType.FreeCompanyPage3 => "Company Chest Page 3",
-            InventoryType.FreeCompanyPage4 => "Company Chest Page 4",
-            InventoryType.FreeCompanyPage5 => "Company Chest Page 5",
-            InventoryType.FreeCompanyCrystals => "Company Chest Crystals",
-            _ => "None",
+            InventoryType.FreeCompanyPage1 => global::XASlave.Localization.UiMessage.Key("SE69C4460E12BF891"),
+            InventoryType.FreeCompanyPage2 => global::XASlave.Localization.UiMessage.Key("S868927760EBD28D0"),
+            InventoryType.FreeCompanyPage3 => global::XASlave.Localization.UiMessage.Key("S1D1FD7A315428F9C"),
+            InventoryType.FreeCompanyPage4 => global::XASlave.Localization.UiMessage.Key("SE15E60C7CFC34D8E"),
+            InventoryType.FreeCompanyPage5 => global::XASlave.Localization.UiMessage.Key("S0749EA3D846CE22D"),
+            InventoryType.FreeCompanyCrystals => global::XASlave.Localization.UiMessage.Key("S128C33CC91FFADC1"),
+            _ => global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5"),
         };
     }
 }

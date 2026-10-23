@@ -1,4 +1,5 @@
 using System;
+using XASlave.Localization;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -92,57 +93,58 @@ public partial class SlaveWindow : Window, IDisposable
 
     private static readonly (SlaveTask Task, string Label)[] TaskItems =
     {
-        (SlaveTask.AutoRetainerTasks, "AutoRetainer Helper"),
-        (SlaveTask.SaveToXaDatabase, "Save to XA Database"),
+        (SlaveTask.AutoRetainerTasks, UiLocale.Native("S83A8F587FFB9A4C2")),
+        (SlaveTask.SaveToXaDatabase, UiLocale.Native("S0AED21970EED8844")),
     };
 
     private static readonly (SlaveTask Task, string Label)[] CityShenanigansItems =
     {
-        (SlaveTask.AutoGlamWeather, "Auto-Glam Weather"),
-        (SlaveTask.CityChatFlooder, "City Chat Flooder"),
+        (SlaveTask.AutoGlamWeather, UiLocale.Native("SEFBF04736214F41C")),
+        (SlaveTask.CityChatFlooder, UiLocale.Native("S5C5514B66531FC2E")),
     };
 
     private static readonly (SlaveTask Task, string Label)[] FcItems =
     {
         (SlaveTask.Xagman, "Xagman"),
-        (SlaveTask.MonthlyRelogger, "Monthly Relogger"),
-        (SlaveTask.PrepLogistics, "Prep Logistics"),
-        (SlaveTask.AutoAcceptFcInvite, "Auto-Accept FC Invites"),
-        (SlaveTask.MultiFcPermissions, "FC Permissions Updater"),
-        (SlaveTask.CheckDuplicatePlots, "Check Duplicate Plots"),
-        (SlaveTask.ReturnAltsToHomeworlds, "Return Alts To Homeworlds"),
-        (SlaveTask.RefreshArSubsBell, "Refresh Sub/Bell/Chest"),
+        (SlaveTask.MonthlyRelogger, UiLocale.Native("S4D398C5A9609297E")),
+        (SlaveTask.PrepLogistics, UiLocale.Native("S2AE13753A8D90982")),
+        (SlaveTask.AutoAcceptFcInvite, UiLocale.Native("S26AC3F3DFD044284")),
+        (SlaveTask.MultiFcPermissions, UiLocale.Native("SA6711086459806CB")),
+        (SlaveTask.CheckDuplicatePlots, UiLocale.Native("SA455BD4F4CF7E92B")),
+        (SlaveTask.ReturnAltsToHomeworlds, UiLocale.Native("S99446740287A7C89")),
+        (SlaveTask.RefreshArSubsBell, UiLocale.Native("S85CC8B46B386EB84")),
     };
 
     private static readonly (SlaveTask Task, string Label)[] FieldOperationsItems =
     {
-        (SlaveTask.EurekaInstanceHunter, "Instance Hunter"),
-        (SlaveTask.EurekaLogogramCreator, "Logogram Creator"),
+        (SlaveTask.EurekaInstanceHunter, UiLocale.Native("S4B03ED11C88B1622")),
+        (SlaveTask.EurekaLogogramCreator, UiLocale.Native("S4D24F60E78E1A812")),
     };
 
     private static readonly (SlaveTask Task, string Label)[] UtilityItems =
     {
         (SlaveTask.XAMods, "XA Mods"),
-        (SlaveTask.WindowRenamer, "Window Renamer"),
-        (SlaveTask.PluginOperations, "Plugin Operations"),
-        (SlaveTask.PluginBuilder, "Plugin Builder"),
+        (SlaveTask.WindowRenamer, UiLocale.Native("S05F3A5D5B4F5775C")),
+        (SlaveTask.PluginOperations, UiLocale.Native("S7DD7E3FD85B28A2A")),
+        (SlaveTask.PluginBuilder, UiLocale.Native("SA20967C40751B062")),
     };
 
     private static readonly (SlaveTask Task, string Label)[] ReferenceItems =
     {
 #if DEBUG
-        (SlaveTask.DebugCommands, "Debug / Test"),
+        (SlaveTask.DebugCommands, UiLocale.Native("S5B74822E75E008EF")),
 #endif
-        (SlaveTask.ExportData, "Export Data"),
-        (SlaveTask.RepoList, "Repo List"),
-        (SlaveTask.IpcCallsAvailable, "IPC Calls Available"),
-        (SlaveTask.CommandsReference, "Commands"),
-        (SlaveTask.SplashScreen, "Splash Screen"),
+        (SlaveTask.ExportData, UiLocale.Native("S2ED227401538531A")),
+        (SlaveTask.RepoList, UiLocale.Native("S273D7A925BD20F8A")),
+        (SlaveTask.IpcCallsAvailable, UiLocale.Native("S03BD054B237A0FA2")),
+        (SlaveTask.CommandsReference, UiLocale.Native("SB269DC4E81A528A4")),
+        (SlaveTask.SplashScreen, UiLocale.Native("S86F4EE2A3639FB2B")),
     };
 
     private SlaveTask? selectedTask;
     private bool debugMenuVisible;
     private string debugResult = string.Empty;
+    private global::XASlave.Localization.UiMessage? debugResultUiMessage;
     private DateTime debugResultExpiry = DateTime.MinValue;
 
     private ITaskPanel? selectedExternalTask;
@@ -310,10 +312,10 @@ public partial class SlaveWindow : Window, IDisposable
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
-                    ImGui.TextUnformatted($"Resolution: {w}x{h}");
+                    ImGui.TextUnformatted(UiLocale.FormatKey("S3339F918A7D9E893", w, h));
                     ImGui.TextDisabled(plugin.Configuration.CustomResolutionsEnabled
-                        ? "Custom Resolutions is enabled."
-                        : "Enable XA Mods > Custom Resolutions first.");
+                        ? UiLocale.Get("S336CD00F920C09F7")
+                        : UiLocale.Get("SB0CF66153D292FAB"));
                 },
                 Click = _ =>
                 {
@@ -350,8 +352,8 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     using var tt = ImRaii.Tooltip();
                     ImGui.TextUnformatted(plugin.Configuration.ArPostProcessEnabled
-                        ? "AR Post-Process: On - click to disable"
-                        : "AR Post-Process: Off - click to enable");
+                        ? UiLocale.Get("S3B8D40944683971B")
+                        : UiLocale.Get("S1ED25BFBED04F52B"));
                 },
                 Click = _ =>
                 {
@@ -373,8 +375,8 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     using var tt = ImRaii.Tooltip();
                     ImGui.TextUnformatted(plugin.Configuration.ArPreProcessEnabled
-                        ? "AR Pre-Process: On - click to disable"
-                        : "AR Pre-Process: Off - click to enable");
+                        ? UiLocale.Get("SC78569009A8AA783")
+                        : UiLocale.Get("SC4884A3C8A307CF5"));
                 },
                 Click = _ =>
                 {
@@ -396,8 +398,8 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     using var tt = ImRaii.Tooltip();
                     ImGui.TextUnformatted(glamWeatherRunning
-                        ? "Auto-Glam Weather: Running - click to stop"
-                        : "Auto-Glam Weather: Stopped - click to start");
+                        ? UiLocale.Get("SC7C1792DB747BE71")
+                        : UiLocale.Get("S5F7090986E98AEA5"));
                 },
                 Click = _ =>
                 {
@@ -420,7 +422,7 @@ public partial class SlaveWindow : Window, IDisposable
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
-                    ImGui.TextUnformatted($"Load XA Mod List: {listName}");
+                    ImGui.TextUnformatted(UiLocale.FormatKey("S464CCCF62ECE75C8", listName));
                 },
                 Click = _ => { plugin.LoadModListPreset(listName, out var loadMsg); },
             });
@@ -436,7 +438,7 @@ public partial class SlaveWindow : Window, IDisposable
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
-                    ImGui.TextUnformatted("Disable All XA Mods");
+                    ImGui.TextUnformatted(UiLocale.Get("S2B24BF8B797CBD75"));
                 },
                 Click = _ => plugin.DisableAllXAMods(),
             });
@@ -453,17 +455,17 @@ public partial class SlaveWindow : Window, IDisposable
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
-                    if (!plugin.CanTriggerLogoutActions(out var blockedMessage))
+                    if (!plugin.CanTriggerLogoutActionsMessage(out var blockedMessage))
                     {
-                        ImGui.TextUnformatted(blockedMessage);
+                        ImGui.TextUnformatted(blockedMessage.Display);
                         return;
                     }
 
                     var held = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
                     if (held)
-                        ImGui.TextUnformatted("/xa killgame - release Ctrl+Shift to cancel");
+                        ImGui.TextUnformatted(UiLocale.Get("S8BBFA69C960F45CA"));
                     else
-                        ImGui.TextUnformatted("/xa killgame - hold Ctrl+Shift to unlock");
+                        ImGui.TextUnformatted(UiLocale.Get("SF9C203CD2306F618"));
                 },
                 Click = _ =>
                 {
@@ -484,22 +486,22 @@ public partial class SlaveWindow : Window, IDisposable
         var options = new List<TitleBarFavSelectionOption>(AllBuiltInMenuLabels.Length + 48);
 
         foreach (var menuLabel in AllBuiltInMenuLabels)
-            options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.FromMenuTarget(menuLabel), menuLabel, "Open Panel"));
+            options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.FromMenuTarget(menuLabel), menuLabel, UiLocale.Native("S456C3B74A97616BB")));
 
         foreach (var modInfo in plugin.GetTitleBarFavXAModInfos())
             options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.FromXAModKey(modInfo.Key), $"XA Mod: {modInfo.DisplayName}", "XA Mods"));
 
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepNameplatesKey, "Hide addons / keep nameplates", "Special Rendering Modes"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepChatKey, "Hide addons / keep chat", "Special Rendering Modes"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideChatKey, "Hide chat", "Special Rendering Modes"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideActionBarsKey, "Hide action bars", "Special Rendering Modes"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideTargetInfoKey, "Hide target info", "Special Rendering Modes"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideNameplatesKey, "Hide nameplates", "Special Rendering Modes"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderRestoreAllKey, "Restore all", "Special Rendering Modes"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SitNowKey, "Sit now", "Doze & Sit Anywhere"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.DozeNowKey, "Doze now", "Doze & Sit Anywhere"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.DisableAllXAModsKey, "All XA Mods Off", "Quick Actions"));
-        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.StopAllKey, "Stop All Automated Tasks", "Quick Actions"));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepNameplatesKey, UiLocale.Native("S6ECB725DD7371264"), UiLocale.Native("SB26660220C4D59AB")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepChatKey, UiLocale.Native("S87AF1E4B608FFC77"), UiLocale.Native("SB26660220C4D59AB")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideChatKey, UiLocale.Native("S1ED9F9BF080A444B"), UiLocale.Native("SB26660220C4D59AB")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideActionBarsKey, UiLocale.Native("S0F9816C6DFF380D2"), UiLocale.Native("SB26660220C4D59AB")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideTargetInfoKey, UiLocale.Native("S6268111E849ED78F"), UiLocale.Native("SB26660220C4D59AB")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderHideNameplatesKey, UiLocale.Native("S1A218F4BA3356A8D"), UiLocale.Native("SB26660220C4D59AB")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SpecialRenderRestoreAllKey, UiLocale.Native("SA9C39CA5E456C9A7"), UiLocale.Native("SB26660220C4D59AB")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.SitNowKey, UiLocale.Native("SC6017E42F83A1AEE"), UiLocale.Native("S024F9EF0DF86E54F")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.DozeNowKey, UiLocale.Native("SAD122E8E9A11CBF5"), UiLocale.Native("S024F9EF0DF86E54F")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.DisableAllXAModsKey, UiLocale.Native("S5F891DDBDE2EC40D"), UiLocale.Native("S2CC2B6F7F200E65C")));
+        options.Add(new TitleBarFavSelectionOption(TitleBarFavSelectionKeys.StopAllKey, UiLocale.Native("S0716D61F057E2395"), UiLocale.Native("S2CC2B6F7F200E65C")));
         return options;
     }
 
@@ -507,15 +509,23 @@ public partial class SlaveWindow : Window, IDisposable
     {
         var normalizedSelectionKey = TitleBarFavSelectionKeys.Normalize(selectionKey, legacyMenuTarget);
         if (string.IsNullOrWhiteSpace(normalizedSelectionKey))
-            return "(none)";
+            return UiLocale.Get("S552E423045FCBD94");
 
         foreach (var option in GetTitleBarFavSelectionOptions())
         {
             if (option.Key.Equals(normalizedSelectionKey, StringComparison.OrdinalIgnoreCase))
-                return option.Label;
+                return GetLocalizedFavoriteLabel(option);
         }
 
         return normalizedSelectionKey;
+    }
+
+    private static string GetLocalizedFavoriteLabel(TitleBarFavSelectionOption option)
+    {
+        const string modPrefix = "XA Mod: ";
+        return option.Category == "XA Mods" && option.Label.StartsWith(modPrefix, StringComparison.Ordinal)
+            ? UiLocale.FormatKey("S60B3C83A05E52089", UiLocale.T(option.Label[modPrefix.Length..]))
+            : UiLocale.T(option.Label);
     }
 
     private bool HasAnySpecialRenderStoredUiToggles()
@@ -567,9 +577,9 @@ public partial class SlaveWindow : Window, IDisposable
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
-                    ImGui.TextUnformatted(title);
+                    ImGui.TextUnformatted(UiLocale.T(title));
                     if (subtitle.Length > 0)
-                        ImGui.TextDisabled(subtitle);
+                        ImGui.TextDisabled(UiLocale.T(subtitle));
                 },
                 Click = _ => click(),
             });
@@ -589,7 +599,7 @@ public partial class SlaveWindow : Window, IDisposable
                 ShowTooltip = () =>
                 {
                     using var tt = ImRaii.Tooltip();
-                    ImGui.TextUnformatted(menuTarget);
+                    ImGui.TextUnformatted(UiLocale.T(menuTarget));
                 },
                 Click = _ => NavigateToMenuLabel(menuTarget),
             });
@@ -608,8 +618,8 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     using var tt = ImRaii.Tooltip();
                     var enabled = plugin.IsXAModEnabled(xamodKey);
-                    ImGui.TextUnformatted($"{modInfo.DisplayName} [{modInfo.ScopeLabel}]");
-                    ImGui.TextUnformatted(enabled ? "On - click to disable" : "Off - click to enable");
+                    ImGui.TextUnformatted($"{UiLocale.T(modInfo.DisplayName)} [{UiLocale.T(modInfo.ScopeLabel)}]");
+                    ImGui.TextUnformatted(enabled ? UiLocale.Get("S259ED98F36260936") : UiLocale.Get("SC9D570E8531DCAF0"));
                 },
                 Click = _button =>
                 {
@@ -624,8 +634,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepNameplatesKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Special Rendering Modes: Hide addons / keep nameplates",
-                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                UiLocale.Native("S560149D53269475F"),
+                UiLocale.Native("S50AD2E4C44A54303"),
                 () => ToggleSpecialRenderTitleBarSetting(
                     cfg => cfg.SpecialRenderHideAddonsKeepNameplatesEnabled,
                     (cfg, value) => cfg.SpecialRenderHideAddonsKeepNameplatesEnabled = value),
@@ -635,8 +645,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideAddonsKeepChatKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Special Rendering Modes: Hide addons / keep chat",
-                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                UiLocale.Native("SB106BB941CC82200"),
+                UiLocale.Native("S50AD2E4C44A54303"),
                 () => ToggleSpecialRenderTitleBarSetting(
                     cfg => cfg.SpecialRenderHideAddonsKeepChatEnabled,
                     (cfg, value) => cfg.SpecialRenderHideAddonsKeepChatEnabled = value),
@@ -646,8 +656,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideChatKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Special Rendering Modes: Hide chat",
-                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                UiLocale.Native("SB6533E35E8ABBD62"),
+                UiLocale.Native("S50AD2E4C44A54303"),
                 () =>
                 {
                     var shouldEnable = !plugin.Configuration.SpecialRenderModesEnabled || !plugin.Configuration.SpecialRenderHideChatEnabled;
@@ -667,8 +677,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideActionBarsKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Special Rendering Modes: Hide action bars",
-                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                UiLocale.Native("SE3DA8F5412BFD89B"),
+                UiLocale.Native("S50AD2E4C44A54303"),
                 () => ToggleSpecialRenderTitleBarSetting(
                     cfg => cfg.SpecialRenderHideActionBarsEnabled,
                     (cfg, value) => cfg.SpecialRenderHideActionBarsEnabled = value),
@@ -678,8 +688,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideTargetInfoKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Special Rendering Modes: Hide target info",
-                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                UiLocale.Native("S6E02900D6A36047A"),
+                UiLocale.Native("S50AD2E4C44A54303"),
                 () => ToggleSpecialRenderTitleBarSetting(
                     cfg => cfg.SpecialRenderHideTargetInfoEnabled,
                     (cfg, value) => cfg.SpecialRenderHideTargetInfoEnabled = value),
@@ -689,8 +699,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderHideNameplatesKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Special Rendering Modes: Hide nameplates",
-                "Turns on the stored UI preset and enables Special Rendering Modes if needed.",
+                UiLocale.Native("S807ADE6FB11DC534"),
+                UiLocale.Native("S50AD2E4C44A54303"),
                 () => ToggleSpecialRenderTitleBarSetting(
                     cfg => cfg.SpecialRenderHideNameplatesEnabled,
                     (cfg, value) => cfg.SpecialRenderHideNameplatesEnabled = value),
@@ -700,8 +710,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.SpecialRenderRestoreAllKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Special Rendering Modes: Restore all",
-                "Restores world and UI visibility, then clears the stored Special Rendering Modes UI toggles.",
+                UiLocale.Native("SF9FB14E71905DD48"),
+                UiLocale.Native("S9D8B7431D11B154C"),
                 RestoreAllSpecialRenderTitleBarSettings,
                 () => plugin.Configuration.SpecialRenderModesEnabled || HasAnySpecialRenderStoredUiToggles() ? FavIconColorOn : FavIconColorOff);
         }
@@ -709,8 +719,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.SitNowKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Sit now",
-                "Requires XA Mods > Doze & Sit Anywhere to be enabled.",
+                UiLocale.Native("SC6017E42F83A1AEE"),
+                UiLocale.Native("S930B2432626B7102"),
                 () => plugin.DozeSitAnywhere.RequestSit(),
                 () => plugin.Configuration.DozeSitAnywhereEnabled ? FavIconColorOn : FavIconColorOff);
         }
@@ -718,8 +728,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.DozeNowKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Doze now",
-                "Requires XA Mods > Doze & Sit Anywhere to be enabled.",
+                UiLocale.Native("SAD122E8E9A11CBF5"),
+                UiLocale.Native("S930B2432626B7102"),
                 () => plugin.DozeSitAnywhere.RequestDoze(),
                 () => plugin.Configuration.DozeSitAnywhereEnabled ? FavIconColorOn : FavIconColorOff);
         }
@@ -727,8 +737,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.DisableAllXAModsKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "All XA Mods Off",
-                "Disable every XA Mod toggle.",
+                UiLocale.Native("S5F891DDBDE2EC40D"),
+                UiLocale.Native("S4C4A2A1248AEA3CE"),
                 () =>
                 {
                     plugin.DisableAllXAMods();
@@ -740,8 +750,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (selectionKey.Equals(TitleBarFavSelectionKeys.StopAllKey, StringComparison.OrdinalIgnoreCase))
         {
             return AddQuickActionButton(
-                "Stop All Automated Tasks",
-                "Stop active XA task flows and disconnect Xagman.",
+                UiLocale.Native("S0716D61F057E2395"),
+                UiLocale.Native("S68B0A2D885D457FA"),
                 StopAllTitleBarOperations,
                 () => HasStopAllTitleBarTargets() ? FavIconColorOn : FavIconColorOff);
         }
@@ -899,8 +909,17 @@ public partial class SlaveWindow : Window, IDisposable
         SelectBuiltInTask(SlaveTask.CommandsReference);
     }
 
-    public bool ToggleDebugMenu(out string message)
+    public bool ToggleDebugMenu(out string message) => ToggleDebugMenuLocalizedCore(out _, out message);
+    internal bool ToggleDebugMenuMessage(out global::XASlave.Localization.UiMessage message)
     {
+        var success = ToggleDebugMenuLocalizedCore(out var presentation, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool ToggleDebugMenuLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
+    {
+        replyPresentation = null;
 #if !DEBUG
         debugMenuVisible = false;
         if (plugin.Configuration.DebugMenuVisible)
@@ -909,7 +928,7 @@ public partial class SlaveWindow : Window, IDisposable
             plugin.Configuration.SaveDeferred();
         }
 
-        message = "Debug / Test commands are unavailable in Release builds.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S21B510C0C190BDEB"));
         return false;
 #else
         debugMenuVisible = !debugMenuVisible;
@@ -924,21 +943,21 @@ public partial class SlaveWindow : Window, IDisposable
             IsOpen = true;
             SetMenuSectionExpanded(MenuSection.Reference, true);
             SelectBuiltInTask(SlaveTask.DebugCommands);
-            message = "Debug / Test menu shown and will stay visible until `/xa debug` is typed again.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S66341C96B4C32540"));
             return true;
         }
 
         if (selectedTask == SlaveTask.DebugCommands)
             ClearTaskSelection();
 
-        message = "Debug / Test menu hidden.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S506C365B678AF61F"));
         return true;
 #endif
     }
 
-    private void SetDebugResult(string msg)
+    private void SetDebugResult(global::XASlave.Localization.UiMessage msg)
     {
-        debugResult = $"[{DateTime.Now:HH:mm:ss}] {msg}";
+        debugResult = global::XASlave.Localization.UiMessage.Store(ref debugResultUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Raw($"[{DateTime.Now:HH:mm:ss}] "), msg));
         debugResultExpiry = DateTime.UtcNow.AddSeconds(15);
         Plugin.Log.Information($"[XASlave] Debug: {msg}");
     }
@@ -957,7 +976,7 @@ public partial class SlaveWindow : Window, IDisposable
         DetachDuringDispose("ClientState.Login", () => Plugin.ClientState.Login -= OnExportDataLogin);
         DetachDuringDispose("ClientState.Logout", () => Plugin.ClientState.Logout -= OnExportDataLogoutHandler);
 #if DEBUG
-        DetachDuringDispose("Plugin Inspector", DisposePluginInspector);
+        DetachDuringDispose(UiLocale.Native("SE9D93BD5231580C6"), DisposePluginInspector);
         DetachDuringDispose("NamePlateGui.OnDataUpdate", () => Plugin.NamePlateGui.OnDataUpdate -= OnXaAbuseNamePlateUpdate);
         DetachDuringDispose("UiBuilder.Draw", () => Plugin.PluginInterface.UiBuilder.Draw -= DrawXaAbuseOverlay);
         DetachDuringDispose("AR RetainerListTaskButtonsDraw", () => plugin.IpcClient.AutoRetainerUnsubscribeRetainerListTaskButtonsDraw(OnDebugAutoRetainerDepositGilListTaskButtonsDraw));
@@ -988,13 +1007,13 @@ public partial class SlaveWindow : Window, IDisposable
     {
         if (isDisposed || workerCts.IsCancellationRequested)
         {
-            SetDebugResult($"'{label}' rejected - XA Slave is disposing.");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Format("SF37458C796DC49DB", label));
             return false;
         }
 
         if (exclusive && System.Threading.Interlocked.CompareExchange(ref exclusiveWorkerRunning, 1, 0) != 0)
         {
-            SetDebugResult($"'{label}' rejected - another movement command is already running.");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Format("S905A12A28BF0E892", label));
             return false;
         }
 
@@ -1014,7 +1033,7 @@ public partial class SlaveWindow : Window, IDisposable
                 catch (Exception ex)
                 {
                     Plugin.Log.Error(ex, $"[XASlave] Worker '{label}' failed.");
-                    SetDebugResult($"{label} failed: {ex.Message}");
+                    SetDebugResult(global::XASlave.Localization.UiMessage.Format("S59C8945497B012FC", label, ex.Message));
                 }
                 finally
                 {
@@ -1029,7 +1048,7 @@ public partial class SlaveWindow : Window, IDisposable
             if (exclusive)
                 System.Threading.Interlocked.Exchange(ref exclusiveWorkerRunning, 0);
             Plugin.Log.Error(ex, $"[XASlave] Could not start worker '{label}'.");
-            SetDebugResult($"{label} could not start: {ex.Message}");
+            SetDebugResult(global::XASlave.Localization.UiMessage.Format("S6712320D407C9581", label, ex.Message));
             return false;
         }
     }
@@ -1039,7 +1058,7 @@ public partial class SlaveWindow : Window, IDisposable
         if (System.Threading.Volatile.Read(ref exclusiveWorkerRunning) == 0)
             return false;
 
-        SetDebugResult($"'{label}' rejected - another movement command is already running.");
+        SetDebugResult(global::XASlave.Localization.UiMessage.Format("S905A12A28BF0E892", label));
         return true;
     }
 
@@ -1108,19 +1127,21 @@ public partial class SlaveWindow : Window, IDisposable
         return 0;
     }
 
-    private static string FormatCheckEveryHours(int hours)
+    private static string FormatCheckEveryHours(int hours) => FormatCheckEveryHoursMessage(hours).Original;
+
+    private static global::XASlave.Localization.UiMessage FormatCheckEveryHoursMessage(int hours)
     {
         var normalized = NormalizeCheckEveryHours(hours);
         if (normalized == 0)
-            return "Always";
+            return global::XASlave.Localization.UiMessage.Key("SDE9F057A471CDB8D");
 
         if (normalized % 24 == 0)
         {
             var days = normalized / 24;
-            return days == 1 ? "1 day" : $"{days} days";
+            return (days == 1 ? global::XASlave.Localization.UiMessage.Key("SFA665D95D29E83BC") : global::XASlave.Localization.UiMessage.Format("SAF78BEB0F18B8974", days));
         }
 
-        return normalized == 1 ? "1 hour" : $"{normalized} hours";
+        return (normalized == 1 ? global::XASlave.Localization.UiMessage.Key("SF8B8883F0C9D8D82") : global::XASlave.Localization.UiMessage.Format("S4D0AA096B452CC31", normalized));
     }
 
     public void ScheduleAutoCollection()
@@ -1145,7 +1166,7 @@ public partial class SlaveWindow : Window, IDisposable
         autoCollectScheduledDelaySeconds = plugin.Configuration.AutoCollectDelaySeconds;
         autoCollectResumeArOnCompletion = arMultiEnabled;
         autoCollectSkipPending = false;
-        autoCollectSkipMessage = string.Empty;
+        autoCollectSkipMessage = global::XASlave.Localization.UiMessage.Store(ref autoCollectSkipMessageUiMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
 
         if (arMultiEnabled)
             plugin.IpcClient.AutoRetainerSetSuppressed(true);
@@ -1154,14 +1175,14 @@ public partial class SlaveWindow : Window, IDisposable
         {
             autoCollectSkipPending = true;
             autoCollectScheduledDelaySeconds = arMultiEnabled ? 1f : 0f;
-            autoCollectSkipMessage = $"XA Database sync skipped - last sync is still within the {FormatCheckEveryHours(cadenceHours)} window.";
+            autoCollectSkipMessage = global::XASlave.Localization.UiMessage.Store(ref autoCollectSkipMessageUiMessage, global::XASlave.Localization.UiMessage.Format("S4E41A36F22D8C565", FormatCheckEveryHoursMessage(cadenceHours)));
         }
 
         if (arMultiEnabled && plugin.Configuration.AutoCollectDisableWhenArMultiEnabled)
         {
             autoCollectSkipPending = true;
             autoCollectScheduledDelaySeconds = 1f;
-            autoCollectSkipMessage = "AR Multi enabled, skipping XA Database push.";
+            autoCollectSkipMessage = global::XASlave.Localization.UiMessage.Store(ref autoCollectSkipMessageUiMessage, global::XASlave.Localization.UiMessage.Key("S76F60F72B081DB4F"));
         }
 
         Plugin.Log.Information($"[XASlave] Auto-collection scheduled (delay {autoCollectScheduledDelaySeconds}s, arMulti={arMultiEnabled}, skipPending={autoCollectSkipPending}).");
@@ -1173,7 +1194,7 @@ public partial class SlaveWindow : Window, IDisposable
         autoCollectScheduledAt = null;
         autoCollectScheduledDelaySeconds = 0f;
         autoCollectSkipPending = false;
-        autoCollectSkipMessage = string.Empty;
+        autoCollectSkipMessage = global::XASlave.Localization.UiMessage.Store(ref autoCollectSkipMessageUiMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         autoCollectResumeArOnCompletion = false;
 
         if (shouldResumeAr)
@@ -1198,7 +1219,7 @@ public partial class SlaveWindow : Window, IDisposable
         else
         {
             plugin.AutoCollector.AddLog($"Scheduled auto-collection skipped because {taskLabel} took priority.");
-            SetIpcResult($"{taskLabel} took priority over login auto-collection.");
+            SetIpcResult(global::XASlave.Localization.UiMessage.Format("SF90F01FC5D5CA135", taskLabel));
         }
     }
 
@@ -1237,14 +1258,14 @@ public partial class SlaveWindow : Window, IDisposable
         if (autoCollectSkipPending)
         {
             if (!string.IsNullOrWhiteSpace(autoCollectSkipMessage))
-                SetIpcResult(autoCollectSkipMessage);
+                SetIpcResult(global::XASlave.Localization.UiMessage.Capture(ref autoCollectSkipMessageUiMessage, autoCollectSkipMessage));
 
             if (autoCollectResumeArOnCompletion)
                 plugin.IpcClient.AutoRetainerSetSuppressed(false);
 
             autoCollectScheduledDelaySeconds = 0f;
             autoCollectSkipPending = false;
-            autoCollectSkipMessage = string.Empty;
+            autoCollectSkipMessage = global::XASlave.Localization.UiMessage.Store(ref autoCollectSkipMessageUiMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
             autoCollectResumeArOnCompletion = false;
             CompleteFrameworkUpdateTiming(totalStopwatch);
             return;
@@ -1253,7 +1274,7 @@ public partial class SlaveWindow : Window, IDisposable
         var resumeArAfterCollection = autoCollectResumeArOnCompletion;
         autoCollectScheduledDelaySeconds = 0f;
         autoCollectSkipPending = false;
-        autoCollectSkipMessage = string.Empty;
+        autoCollectSkipMessage = global::XASlave.Localization.UiMessage.Store(ref autoCollectSkipMessageUiMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         autoCollectResumeArOnCompletion = false;
         MeasureFrameworkUpdateStep("SlaveWindow.RunAutoCollection", () => RunAutoCollection(resumeArAfterCollection));
         CompleteFrameworkUpdateTiming(totalStopwatch);
@@ -1374,11 +1395,11 @@ public partial class SlaveWindow : Window, IDisposable
         {
             if (child.Success)
             {
-                DrawMenuSection(MenuSection.AutomatedTasks, "Automated Tasks", TaskItems, new Vector4(0.4f, 0.8f, 1.0f, 1.0f));
-                DrawMenuSection(MenuSection.CityShenanigans, "City Shenanigans", CityShenanigansItems, new Vector4(1.0f, 0.7f, 0.4f, 1.0f));
-                DrawMenuSection(MenuSection.FcRelations, "FC Relations", FcItems, new Vector4(0.8f, 0.6f, 1.0f, 1.0f));
-                DrawMenuSection(MenuSection.FieldOperations, "Field Operations", FieldOperationsItems, new Vector4(0.8f, 1.0f, 0.55f, 1.0f));
-                DrawMenuSection(MenuSection.Utility, "Utility", UtilityItems, new Vector4(0.6f, 1.0f, 0.6f, 1.0f));
+                DrawMenuSection(MenuSection.AutomatedTasks, UiLocale.Native("SFCA0F574403E0669"), TaskItems, new Vector4(0.4f, 0.8f, 1.0f, 1.0f));
+                DrawMenuSection(MenuSection.CityShenanigans, UiLocale.Native("SB7AB3A8FEC4F7EEC"), CityShenanigansItems, new Vector4(1.0f, 0.7f, 0.4f, 1.0f));
+                DrawMenuSection(MenuSection.FcRelations, UiLocale.Native("S8B64706A3D3FA23E"), FcItems, new Vector4(0.8f, 0.6f, 1.0f, 1.0f));
+                DrawMenuSection(MenuSection.FieldOperations, UiLocale.Native("S9820D743FD29145C"), FieldOperationsItems, new Vector4(0.8f, 1.0f, 0.55f, 1.0f));
+                DrawMenuSection(MenuSection.Utility, UiLocale.Native("S9450D833FA7707C7"), UtilityItems, new Vector4(0.6f, 1.0f, 0.6f, 1.0f));
 
                 foreach (var ext in plugin.ExternalTaskLoader.Tasks)
                 {
@@ -1391,7 +1412,7 @@ public partial class SlaveWindow : Window, IDisposable
                     {
                         ImGui.TextColored(
                             new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                            $"[task DLL error] {ex.Message}");
+                            UiLocale.FormatKey("S5D7FB8F7FF81E3FC", ex.Message));
                         continue;
                     }
                     if (!TryGetVisibleTaskLabel(label, out var visibleLabel))
@@ -1406,7 +1427,7 @@ public partial class SlaveWindow : Window, IDisposable
                     }
                 }
 
-                DrawMenuSection(MenuSection.Reference, "Reference", ReferenceItems, new Vector4(0.6f, 0.6f, 0.6f, 1.0f));
+                DrawMenuSection(MenuSection.Reference, UiLocale.Native("S71BF90935FC231D2"), ReferenceItems, new Vector4(0.6f, 0.6f, 0.6f, 1.0f));
             }
         }
     }
@@ -1422,13 +1443,14 @@ public partial class SlaveWindow : Window, IDisposable
                 {
                     try
                     {
+                        using var externalFont = UiLocaleFonts.PreserveExternalFont();
                         Plugin.RunOnGameThread(selectedExternalTask.Draw)
                             .GetAwaiter()
                             .GetResult();
                     }
                     catch (Exception ex)
                     {
-                        ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), $"Error: {ex.Message}");
+                        ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), UiLocale.FormatKey("S43F78154E1D78FBB", ex.Message));
                     }
                 }
                 else
@@ -1520,7 +1542,7 @@ public partial class SlaveWindow : Window, IDisposable
                         Plugin.Log.Error(ex, $"[XASlave] Panel '{selectedTask}' threw during Draw.");
                         ImGui.TextColored(
                             new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                            $"Panel error: {ex.Message}");
+                            UiLocale.FormatKey("S3DA15639D209F5BE", ex.Message));
                     }
                 }
             }
@@ -1626,42 +1648,45 @@ public partial class SlaveWindow : Window, IDisposable
     }
 
     private static string GetPriorityTaskLabel(SlaveTask task)
+        => GetPriorityTaskLabelMessage(task).Original;
+
+    private static global::XASlave.Localization.UiMessage GetPriorityTaskLabelMessage(SlaveTask task)
     {
         return task switch
         {
-            SlaveTask.CityChatFlooder => "City Chat Flooder",
-            SlaveTask.AutoGlamWeather => "Auto-Glam Weather",
-            SlaveTask.MonthlyRelogger => "Monthly Relogger",
-            SlaveTask.CheckDuplicatePlots => "Check Duplicate Plots",
-            SlaveTask.Xagman => "Xagman",
-            SlaveTask.ReturnAltsToHomeworlds => "Return Alts To Homeworlds",
-            SlaveTask.PrepLogistics => "Prep Logistics",
-            SlaveTask.RefreshArSubsBell => "Refresh Sub/Bell/Chest",
-            SlaveTask.MultiFcPermissions => "FC Permissions Updater",
-            SlaveTask.AutoAcceptFcInvite => "Auto-Accept FC Invites",
-            _ => string.Empty,
+            SlaveTask.CityChatFlooder => global::XASlave.Localization.UiMessage.Key("S5C5514B66531FC2E"),
+            SlaveTask.AutoGlamWeather => global::XASlave.Localization.UiMessage.Key("SEFBF04736214F41C"),
+            SlaveTask.MonthlyRelogger => global::XASlave.Localization.UiMessage.Key("S4D398C5A9609297E"),
+            SlaveTask.CheckDuplicatePlots => global::XASlave.Localization.UiMessage.Key("SA455BD4F4CF7E92B"),
+            SlaveTask.Xagman => global::XASlave.Localization.UiMessage.Key("S0A1690A11A18319C"),
+            SlaveTask.ReturnAltsToHomeworlds => global::XASlave.Localization.UiMessage.Key("S99446740287A7C89"),
+            SlaveTask.PrepLogistics => global::XASlave.Localization.UiMessage.Key("S2AE13753A8D90982"),
+            SlaveTask.RefreshArSubsBell => global::XASlave.Localization.UiMessage.Key("S85CC8B46B386EB84"),
+            SlaveTask.MultiFcPermissions => global::XASlave.Localization.UiMessage.Key("SA6711086459806CB"),
+            SlaveTask.AutoAcceptFcInvite => global::XASlave.Localization.UiMessage.Key("S26AC3F3DFD044284"),
+            _ => global::XASlave.Localization.UiMessage.Raw(string.Empty),
         };
     }
 
-    private static string GetPriorityTaskDtrLabel(SlaveTask task)
+    private static global::XASlave.Localization.UiMessage GetPriorityTaskDtrLabel(SlaveTask task)
     {
         return task switch
         {
-            SlaveTask.AutoGlamWeather => "Auto-Glam",
-            _ => GetPriorityTaskLabel(task),
+            SlaveTask.AutoGlamWeather => global::XASlave.Localization.UiMessage.Key("SA23D0405BB489334"),
+            _ => GetPriorityTaskLabelMessage(task),
         };
     }
 
-    private string GetPriorityTaskStatusLabel(SlaveTask task)
+    private global::XASlave.Localization.UiMessage GetPriorityTaskStatusLabel(SlaveTask task)
     {
         return task switch
         {
             SlaveTask.Xagman => GetXagmanPriorityStatusLabel(),
-            _ => GetPriorityTaskLabel(task),
+            _ => GetPriorityTaskLabelMessage(task),
         };
     }
 
-    private string GetPriorityTaskExternalStatusLabel(SlaveTask task)
+    private global::XASlave.Localization.UiMessage GetPriorityTaskExternalStatusLabel(SlaveTask task)
     {
         return task switch
         {
@@ -1780,7 +1805,7 @@ public partial class SlaveWindow : Window, IDisposable
             colors.Push(ImGuiCol.Border, new Vector4(0.25f, 0.25f, 0.25f, 1.0f));
             styles.Push(ImGuiStyleVar.FrameRounding, Scale(4f));
             ImGui.SetNextItemOpen(expanded, ImGuiCond.Always);
-            isOpen = ImGui.CollapsingHeader($"{header}##{section}");
+            isOpen = UiNative.CollapsingHeader($"{header}##{section}");
         }
         if (isOpen != expanded)
             SetMenuSectionExpanded(section, isOpen);
@@ -1799,7 +1824,7 @@ public partial class SlaveWindow : Window, IDisposable
                 var isSelected = isSplashScreen
                     ? selectedExternalTask == null && selectedTask == null
                     : selectedExternalTask == null && selectedTask == task;
-                if (ImGui.Selectable(visibleLabel, isSelected))
+                if (UiNative.Selectable(visibleLabel, isSelected))
                 {
                     if (isSplashScreen)
                         ClearTaskSelection();
@@ -1894,8 +1919,8 @@ public partial class SlaveWindow : Window, IDisposable
         using (ImRaii.TextWrapPos(0f))
         {
             using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(0.95f, 0.85f, 0.50f, 1.0f)))
-                ImGui.TextWrapped($"XA Slave v{PluginVersion}");
-            ImGui.Text("General information, support links, and setup guidance for XA Slave.");
+                ImGui.TextWrapped(UiLocale.FormatKey("SF01C495E563A9095", PluginVersion));
+            ImGui.Text(UiLocale.Get("S0F3ABD2B158D71AC"));
         }
 
         ImGui.Spacing();
@@ -1903,40 +1928,46 @@ public partial class SlaveWindow : Window, IDisposable
             OpenExternalLink(WebsiteUrl);
 
         var remainingWidth = ImGui.GetContentRegionAvail().X;
-        var discordButtonWidth = ImGui.CalcTextSize("Join Discord").X + (ImGui.GetStyle().FramePadding.X * 2f);
+        var discordButtonWidth = ImGui.CalcTextSize(UiLocale.Get("S62D97F7509105F04")).X + (ImGui.GetStyle().FramePadding.X * 2f);
         if (remainingWidth >= discordButtonWidth + ImGui.GetStyle().ItemSpacing.X)
             ImGui.SameLine();
-        if (ImGui.Button("Join Discord"))
+        if (UiNative.Button(UiLocale.Native("S62D97F7509105F04")))
             OpenExternalLink(DiscordUrl);
 
-        var updatesButtonWidth = ImGui.CalcTextSize("Update History").X + (ImGui.GetStyle().FramePadding.X * 2f);
+        var updatesButtonWidth = ImGui.CalcTextSize(UiLocale.Get("S77439943B6C3E9FD")).X + (ImGui.GetStyle().FramePadding.X * 2f);
         if (ImGui.GetContentRegionAvail().X >= updatesButtonWidth + ImGui.GetStyle().ItemSpacing.X)
             ImGui.SameLine();
-        if (ImGui.Button("Update History"))
+        if (UiNative.Button(UiLocale.Native("S77439943B6C3E9FD")))
             plugin.UpdatesWindow.Toggle();
+
+        var languageWidth = UiLocale.LanguageSelectorWidth(plugin.Configuration);
+        var rowRight = ImGui.GetWindowPos().X + ImGui.GetWindowContentRegionMax().X;
+        if (ImGui.GetItemRectMax().X + ImGui.GetStyle().ItemSpacing.X + languageWidth <= rowRight)
+            ImGui.SameLine();
+        UiLocale.DrawLanguageSelector("SplashLanguage", plugin.Configuration);
 
         ImGui.Separator();
         using (ImRaii.TextWrapPos(0f))
         {
-            ImGui.Text("XA Slave is still in a very early phase. Expect ongoing changes, new automation surfaces, and many months of additional features.");
+            ImGui.Text(UiLocale.Get("S6CC66C7BF00B3E49"));
 
             ImGui.Spacing();
-            DrawWrappedDisabledText("General Terms");
-            DrawWrappedBulletText("Treat every automation workflow as supervised until you trust the exact task and configuration you are running.");
-            DrawWrappedBulletText("Enable Show Log when you need visibility, or enable Plugin Operations > Verbose Task Logging when reporting issues.");
-            DrawWrappedBulletText("Make sure supporting plugins and character data are configured before running tasks that depend on AutoRetainer, XA Database, Lifestream, or Dropbox.");
-            DrawWrappedBulletText("Use Logout on Complete or Enable AR Multi on Complete when you do not want characters left idle in game after a run.");
+            DrawWrappedDisabledText(UiLocale.Native("S77A928E2B344C600"));
+            DrawWrappedBulletText(UiLocale.Native("S3A98D2D8FA09EFB0"));
+            DrawWrappedBulletText(UiLocale.Native("SC82AEBD5662B7DCD"));
+            DrawWrappedBulletText(UiLocale.Native("SAE0CA6F0E0BC0B78"));
+            DrawWrappedBulletText(UiLocale.Native("S28E089F6D3E25906"));
 
             ImGui.Spacing();
-            DrawWrappedDisabledText("First Time");
-            DrawWrappedBulletText("Import characters from AutoRetainer before expecting XA Slave task lists to populate cleanly.");
-            DrawWrappedBulletText("Pull XA Database info before relying on matching/selection features that use stored inventory or character data.");
-            DrawWrappedBulletText("Running Monthly Relogger across your roster first is the best way to sweep and normalize character data.");
+            DrawWrappedDisabledText(UiLocale.Native("S179E0374A95838FB"));
+            DrawWrappedBulletText(UiLocale.Native("SD982A681DA958B7A"));
+            DrawWrappedBulletText(UiLocale.Native("S4127C75A38C14D46"));
+            DrawWrappedBulletText(UiLocale.Native("S3C9AFFB127664BCB"));
 
             ImGui.Spacing();
-            DrawWrappedDisabledText("Support");
-            DrawWrappedBulletText("The website includes general plugin information and project-facing links.");
-            DrawWrappedBulletText("The Discord server is the fastest route for reporting issues, feature requests, and feedback.");
+            DrawWrappedDisabledText(UiLocale.Native("SBE91940B79F46910"));
+            DrawWrappedBulletText(UiLocale.Native("S19141D6CBBF42CC9"));
+            DrawWrappedBulletText(UiLocale.Native("S6CC0677A06905CF9"));
         }
     }
 
@@ -1944,7 +1975,7 @@ public partial class SlaveWindow : Window, IDisposable
     {
         using (ImRaii.PushColor(ImGuiCol.Text, ImGui.GetStyle().Colors[(int)ImGuiCol.TextDisabled]))
         using (ImRaii.TextWrapPos(0f))
-            ImGui.TextUnformatted(text);
+            ImGui.TextUnformatted(UiLocale.T(text));
     }
 
     private static void DrawWrappedBulletText(string text)
@@ -1952,7 +1983,7 @@ public partial class SlaveWindow : Window, IDisposable
         ImGui.Bullet();
         ImGui.SameLine();
         using (ImRaii.TextWrapPos(0f))
-            ImGui.TextUnformatted(text);
+            ImGui.TextUnformatted(UiLocale.T(text));
     }
 
     private void DrawDefaultLandingPageIcon()
@@ -1994,18 +2025,18 @@ public partial class SlaveWindow : Window, IDisposable
 
     private void DrawStatusBar()
     {
-        ImGui.TextDisabled($"XA Slave v{PluginVersion}");
+        ImGui.TextDisabled(UiLocale.FormatKey("SF01C495E563A9095", PluginVersion));
         ImGui.SameLine();
         ImGui.TextDisabled("|");
         ImGui.SameLine();
-        ImGui.TextDisabled("/xa to toggle");
+        ImGui.TextDisabled(UiLocale.Get("S9E55BBBD3FBADB6B"));
 
         if (plugin.AutoCollector.IsRunning)
         {
             ImGui.SameLine();
             ImGui.TextDisabled("|");
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), plugin.AutoCollector.StatusText);
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), plugin.AutoCollector.LocalizedStatusText);
         }
 
         if (plugin.TaskRunner.IsRunning)
@@ -2014,8 +2045,8 @@ public partial class SlaveWindow : Window, IDisposable
             ImGui.TextDisabled("|");
             ImGui.SameLine();
             var taskLabel = TryMapPriorityTaskName(plugin.TaskRunner.CurrentTaskName, out var activeTask)
-                ? GetPriorityTaskLabel(activeTask)
-                : plugin.TaskRunner.CurrentTaskName;
+                ? UiLocale.T(GetPriorityTaskLabel(activeTask))
+                : plugin.TaskRunner.CurrentTaskNameDisplay;
             var label = plugin.TaskRunner.TotalItems > 0
                 ? $"{taskLabel}: {plugin.TaskRunner.CompletedItems}/{plugin.TaskRunner.TotalItems}"
                 : taskLabel;
@@ -2026,14 +2057,14 @@ public partial class SlaveWindow : Window, IDisposable
             ImGui.SameLine();
             ImGui.TextDisabled("|");
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), GetPriorityTaskStatusLabel(activePriorityTask));
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), GetPriorityTaskStatusLabel(activePriorityTask).Display);
         }
         else if (plugin.EurekaInstanceId.IsScanning)
         {
             ImGui.SameLine();
             ImGui.TextDisabled("|");
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(0.35f, 1.0f, 0.45f, 1.0f), "Eureka Hunter");
+            ImGui.TextColored(new Vector4(0.35f, 1.0f, 0.45f, 1.0f), UiLocale.Get("SCA0CA696037588CF"));
         }
     }
 }

@@ -78,6 +78,9 @@ public sealed class WindowRenamerService : IDisposable
     public bool IsXIVWindowResizerHandleReady { get; private set; }
     public bool HasXIVWindowResizerCompatibilityError { get; private set; }
     public string XIVWindowResizerCompatibilityStatusText { get; private set; } = string.Empty;
+    private global::XASlave.Localization.UiMessage? uiXIVWindowResizerCompatibilityStatusText = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    internal string LocalizedXIVWindowResizerCompatibilityStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiXIVWindowResizerCompatibilityStatusText, XIVWindowResizerCompatibilityStatusText);
+    internal global::XASlave.Localization.UiMessage XIVWindowResizerCompatibilityStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiXIVWindowResizerCompatibilityStatusText, XIVWindowResizerCompatibilityStatusText);
     public bool IsCustomTitleApplied => isRenamed;
 
     /// <summary>
@@ -225,7 +228,7 @@ public sealed class WindowRenamerService : IDisposable
             return;
 
         HasXIVWindowResizerCompatibilityError = false;
-        XIVWindowResizerCompatibilityStatusText = string.Empty;
+        XIVWindowResizerCompatibilityStatusText = global::XASlave.Localization.UiMessage.Store(ref uiXIVWindowResizerCompatibilityStatusText, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         Interlocked.Exchange(ref windowRenamerEnabled, config.WindowRenamerEnabled ? 1 : 0);
         if (!config.WindowRenamerEnabled)
         {
@@ -240,7 +243,7 @@ public sealed class WindowRenamerService : IDisposable
         {
             IsXIVWindowResizerCompatibilityActive = false;
             RegisterCompatibilityFailure(
-                "XA could not read Dalamud's loaded-plugin state. The custom title remains active, but XIVWindowResizer compatibility could not be confirmed.",
+                global::XASlave.Localization.UiMessage.Key("S968F293541FF6D43"),
                 isCompatibilityRetry);
         }
         else if (xivWindowResizerLoaded)
@@ -253,7 +256,7 @@ public sealed class WindowRenamerService : IDisposable
             {
                 IsXIVWindowResizerHandleReady = true;
                 HasXIVWindowResizerCompatibilityError = false;
-                XIVWindowResizerCompatibilityStatusText = compatibilityStatus;
+                XIVWindowResizerCompatibilityStatusText = global::XASlave.Localization.UiMessage.Store(ref uiXIVWindowResizerCompatibilityStatusText, compatibilityStatus);
                 Interlocked.Exchange(ref compatibilityPrimeAttempts, 0);
                 if (!compatibilityWasActive || !handleWasReady)
                     log.Information($"[XASlave] WindowRenamer: {compatibilityStatus}");
@@ -287,14 +290,14 @@ public sealed class WindowRenamerService : IDisposable
         Rename(title, config.WindowRenamerUseProcessId, config.WindowRenamerShowCurrentCharacter, currentCharacterNameOverride);
     }
 
-    private void RegisterCompatibilityFailure(string status, bool isCompatibilityRetry)
+    private void RegisterCompatibilityFailure(global::XASlave.Localization.UiMessage status, bool isCompatibilityRetry)
     {
         if (!isCompatibilityRetry)
             Interlocked.Exchange(ref compatibilityPrimeAttempts, 0);
 
         IsXIVWindowResizerHandleReady = false;
         HasXIVWindowResizerCompatibilityError = true;
-        XIVWindowResizerCompatibilityStatusText = status;
+        XIVWindowResizerCompatibilityStatusText = global::XASlave.Localization.UiMessage.Store(ref uiXIVWindowResizerCompatibilityStatusText, status);
         var attempt = Interlocked.Increment(ref compatibilityPrimeAttempts);
         log.Warning(
             $"[XASlave] WindowRenamer: {status} Compatibility attempt {attempt}/{MaxCompatibilityPrimeAttempts}; Window Renamer remains active.");
@@ -354,11 +357,11 @@ public sealed class WindowRenamerService : IDisposable
         }
     }
 
-    private bool TryPrepareXIVWindowResizerHandle(out string status)
+    private bool TryPrepareXIVWindowResizerHandle(out global::XASlave.Localization.UiMessage status)
     {
         if (!TryGetGameWindow(out var gameWindowHandle))
         {
-            status = "XA could not resolve the current FFXIV window before preparing XIVWindowResizer.";
+            status = global::XASlave.Localization.UiMessage.Key("SC94B0F2053EA1419");
             return false;
         }
 
@@ -367,7 +370,7 @@ public sealed class WindowRenamerService : IDisposable
             pluginInstance,
             gameWindowHandle,
             IsUsableCurrentProcessWindow);
-        status = result.Message;
+        status = result.MessageToken;
         return result.Success;
     }
 
@@ -500,8 +503,7 @@ public sealed class WindowRenamerService : IDisposable
                 && Volatile.Read(ref windowRenamerEnabled) != 0)
             {
                 HasXIVWindowResizerCompatibilityError = true;
-                XIVWindowResizerCompatibilityStatusText =
-                    "XA could not schedule an XIVWindowResizer compatibility refresh. The custom title remains active; use Apply Now to retry.";
+                XIVWindowResizerCompatibilityStatusText = global::XASlave.Localization.UiMessage.Store(ref uiXIVWindowResizerCompatibilityStatusText, global::XASlave.Localization.UiMessage.Key("SB86507FAB0B0BBAA"));
             }
         }
     }
@@ -518,7 +520,7 @@ public sealed class WindowRenamerService : IDisposable
         IsXIVWindowResizerCompatibilityActive = false;
         IsXIVWindowResizerHandleReady = false;
         HasXIVWindowResizerCompatibilityError = false;
-        XIVWindowResizerCompatibilityStatusText = string.Empty;
+        XIVWindowResizerCompatibilityStatusText = global::XASlave.Localization.UiMessage.Store(ref uiXIVWindowResizerCompatibilityStatusText, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         Restore();
     }
 }

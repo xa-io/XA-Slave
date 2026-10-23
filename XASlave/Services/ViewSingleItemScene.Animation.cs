@@ -4,13 +4,25 @@ using System.Runtime.InteropServices;
 namespace XASlave.Services;
 
 internal readonly record struct ViewSingleItemAnimationState(bool Ready, bool Playing, float Position,
-    float Duration, long Revision, string Status, int FrameCount = 0, int FrameIndex = 0);
+    float Duration, long Revision, string Status, int FrameCount = 0, int FrameIndex = 0)
+{
+    internal global::XASlave.Localization.UiMessage? StatusMessage { get; init; }
+    internal global::XASlave.Localization.UiMessage StatusPresentation => global::XASlave.Localization.UiMessage.Capture(StatusMessage, Status);
+    internal string LocalizedStatus => StatusPresentation.Display;
+    public bool Equals(ViewSingleItemAnimationState other) => Ready == other.Ready && Playing == other.Playing
+        && Position.Equals(other.Position) && Duration.Equals(other.Duration) && Revision == other.Revision
+        && Status == other.Status && FrameCount == other.FrameCount && FrameIndex == other.FrameIndex;
+    public override int GetHashCode() => HashCode.Combine(Ready, Playing, Position, Duration, Revision, Status, FrameCount, FrameIndex);
+    internal static ViewSingleItemAnimationState Create(bool ready, bool playing, float position, float duration,
+        long revision, global::XASlave.Localization.UiMessage status, int frameCount = 0, int frameIndex = 0)
+        => new(ready, playing, position, duration, revision, status.Original, frameCount, frameIndex) { StatusMessage = status };
+}
 
 internal sealed unsafe partial class ViewSingleItemScene
 {
     private bool animationReady, animationPlaying;
     private long animationTimelineRevision;
-    private ViewSingleItemAnimationState animationState = new(false, false, 0, 0, 0, "Animation is loading.");
+    private ViewSingleItemAnimationState animationState = ViewSingleItemAnimationState.Create(false, false, 0, 0, 0, global::XASlave.Localization.UiMessage.Key("S44036EB352ED01CD"));
 
     internal ViewSingleItemAnimationState Animation { get { lock (sync) return animationState; } }
 
@@ -44,12 +56,12 @@ internal sealed unsafe partial class ViewSingleItemScene
         animationReady = animationPlaying = false;
         animationTimelineRevision++;
         ResetAnimationControls();
-        animationState = new(false, false, 0, 0, animationTimelineRevision, "Animation is loading.");
+        animationState = ViewSingleItemAnimationState.Create(false, false, 0, 0, animationTimelineRevision, global::XASlave.Localization.UiMessage.Key("S44036EB352ED01CD"));
     }
 
     private void SuspendAnimationTimeline()
     {
         animationReady = false;
-        animationState = new(false, false, 0, 0, animationTimelineRevision, "Animation is loading.");
+        animationState = ViewSingleItemAnimationState.Create(false, false, 0, 0, animationTimelineRevision, global::XASlave.Localization.UiMessage.Key("S44036EB352ED01CD"));
     }
 }

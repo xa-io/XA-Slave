@@ -122,29 +122,56 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         this.framework.Update += OnFrameworkUpdate;
     }
 
-    public string AllowMultipleGameInstancesStatusText { get; private set; } = "Disabled";
+    public string AllowMultipleGameInstancesStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiAllowMultipleGameInstancesStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedAllowMultipleGameInstancesStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiAllowMultipleGameInstancesStatusText, AllowMultipleGameInstancesStatusText);
+    internal global::XASlave.Localization.UiMessage AllowMultipleGameInstancesStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiAllowMultipleGameInstancesStatusText, AllowMultipleGameInstancesStatusText);
 
     public bool IsAllowMultipleGameInstancesStartupPending => allowMultipleGameInstancesStartupPending;
 
-    public string CancelLoginCooldownStatusText { get; private set; } = "Disabled";
+    public string CancelLoginCooldownStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiCancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedCancelLoginCooldownStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiCancelLoginCooldownStatusText, CancelLoginCooldownStatusText);
+    internal global::XASlave.Localization.UiMessage CancelLoginCooldownStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiCancelLoginCooldownStatusText, CancelLoginCooldownStatusText);
 
     public bool IsCancelLoginCooldownStartupArmingPending => cancelLoginCooldownStartupArmingPending;
 
-    public string CustomResolutionsStatusText { get; private set; } = "Disabled";
+    public string CustomResolutionsStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiCustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedCustomResolutionsStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiCustomResolutionsStatusText, CustomResolutionsStatusText);
+    internal global::XASlave.Localization.UiMessage CustomResolutionsStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiCustomResolutionsStatusText, CustomResolutionsStatusText);
 
-    public string DisableTitleScreenMovieStatusText { get; private set; } = "Disabled";
+    public string DisableTitleScreenMovieStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiDisableTitleScreenMovieStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedDisableTitleScreenMovieStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiDisableTitleScreenMovieStatusText, DisableTitleScreenMovieStatusText);
+    internal global::XASlave.Localization.UiMessage DisableTitleScreenMovieStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiDisableTitleScreenMovieStatusText, DisableTitleScreenMovieStatusText);
 
-    public string IgnoreMinimumWindowSizeStatusText { get; private set; } = "Disabled";
+    public string IgnoreMinimumWindowSizeStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiIgnoreMinimumWindowSizeStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedIgnoreMinimumWindowSizeStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiIgnoreMinimumWindowSizeStatusText, IgnoreMinimumWindowSizeStatusText);
+    internal global::XASlave.Localization.UiMessage IgnoreMinimumWindowSizeStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiIgnoreMinimumWindowSizeStatusText, IgnoreMinimumWindowSizeStatusText);
 
-    public string LowResolutionStatusText { get; private set; } = "Disabled";
+    public string LowResolutionStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiLowResolutionStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedLowResolutionStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiLowResolutionStatusText, LowResolutionStatusText);
+    internal global::XASlave.Localization.UiMessage LowResolutionStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLowResolutionStatusText, LowResolutionStatusText);
 
-    public string PreventLobbyExitStatusText { get; private set; } = "Disabled";
+    public string PreventLobbyExitStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiPreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedPreventLobbyExitStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiPreventLobbyExitStatusText, PreventLobbyExitStatusText);
+    internal global::XASlave.Localization.UiMessage PreventLobbyExitStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiPreventLobbyExitStatusText, PreventLobbyExitStatusText);
 
     public bool IsPreventLobbyExitStartupArmingPending => preventLobbyExitStartupArmingPending;
 
-    public string RevealUndiscoveredAreasStatusText { get; private set; } = "Disabled";
+    public string RevealUndiscoveredAreasStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiRevealUndiscoveredAreasStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedRevealUndiscoveredAreasStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiRevealUndiscoveredAreasStatusText, RevealUndiscoveredAreasStatusText);
+    internal global::XASlave.Localization.UiMessage RevealUndiscoveredAreasStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiRevealUndiscoveredAreasStatusText, RevealUndiscoveredAreasStatusText);
 
-    public string DisableBackgroundRenderingStatusText { get; private set; } = "Disabled";
+    public string DisableBackgroundRenderingStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiDisableBackgroundRenderingStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedDisableBackgroundRenderingStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiDisableBackgroundRenderingStatusText, DisableBackgroundRenderingStatusText);
+    internal global::XASlave.Localization.UiMessage DisableBackgroundRenderingStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiDisableBackgroundRenderingStatusText, DisableBackgroundRenderingStatusText);
 
     public bool IsSpecialRenderWorldFadeAvailable
     {
@@ -155,18 +182,18 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         }
     }
 
-    public string SpecialRenderModesStatusText
+    internal global::XASlave.Localization.UiMessage SpecialRenderModesStatusTextMessage
     {
         get
         {
             if (UIModule.Instance() == null)
-                return "Unavailable - UI module surface missing.";
+                return global::XASlave.Localization.UiMessage.Key("S15F659DA614392B9");
 
-            return IsSpecialRenderWorldFadeAvailable
-                ? "Ready - UI visibility and world fade controls are available."
-                : "Ready - UI visibility controls are available; world fade unavailable.";
+            return (IsSpecialRenderWorldFadeAvailable ? global::XASlave.Localization.UiMessage.Key("SEFA151BB9C3DDE70") : global::XASlave.Localization.UiMessage.Key("S103A3C8E99B627B1"));
         }
     }
+    public string SpecialRenderModesStatusText => SpecialRenderModesStatusTextMessage.Original;
+    internal string LocalizedSpecialRenderModesStatusText => SpecialRenderModesStatusTextMessage.Display;
 
     public static float ClampLowResolutionScale(float value)
     {
@@ -175,22 +202,29 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
     public static bool TryNormalizeCustomResolution(int width, int height, out int normalizedWidth, out int normalizedHeight, out string message)
     {
+        var success = TryNormalizeCustomResolutionMessage(width, height, out normalizedWidth, out normalizedHeight, out var presentation);
+        message = presentation.Original;
+        return success;
+    }
+
+    internal static bool TryNormalizeCustomResolutionMessage(int width, int height, out int normalizedWidth, out int normalizedHeight, out global::XASlave.Localization.UiMessage message)
+    {
         normalizedWidth = width;
         normalizedHeight = height;
 
         if (width < SafeMinimumWindowWidth || height < SafeMinimumWindowHeight)
         {
-            message = $"Custom resolutions must be at least {SafeMinimumWindowWidth}x{SafeMinimumWindowHeight}.";
+            message = global::XASlave.Localization.UiMessage.Format("S1435993620DE22AD", SafeMinimumWindowWidth, SafeMinimumWindowHeight);
             return false;
         }
 
         if (width > MaximumCustomWindowWidth || height > MaximumCustomWindowHeight)
         {
-            message = $"Custom resolutions must be at most {MaximumCustomWindowWidth}x{MaximumCustomWindowHeight}.";
+            message = global::XASlave.Localization.UiMessage.Format("S67F4FEED5A150C3F", MaximumCustomWindowWidth, MaximumCustomWindowHeight);
             return false;
         }
 
-        message = string.Empty;
+        message = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         return true;
     }
 
@@ -199,7 +233,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (!value)
         {
             CancelAllowMultipleGameInstancesStartupCleanup();
-            AllowMultipleGameInstancesStatusText = "Disabled";
+            AllowMultipleGameInstancesStatusText = global::XASlave.Localization.UiMessage.Store(ref uiAllowMultipleGameInstancesStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -209,14 +243,12 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         try
         {
             var closedHandles = ReleaseMultipleGameInstanceHandles();
-            AllowMultipleGameInstancesStatusText = closedHandles > 0
-                ? $"Enabled - cleared {closedHandles} multi-instance launch lock handle(s) for this client process."
-                : "Enabled - no additional multi-instance launch lock handle was present in this client process.";
+            AllowMultipleGameInstancesStatusText = global::XASlave.Localization.UiMessage.Store(ref uiAllowMultipleGameInstancesStatusText, (closedHandles > 0 ? global::XASlave.Localization.UiMessage.Format("S955879300418F185", closedHandles) : global::XASlave.Localization.UiMessage.Key("S90189F98F4D237CD")));
             return true;
         }
         catch (Exception ex)
         {
-            AllowMultipleGameInstancesStatusText = "Unavailable - failed while clearing the multi-instance launch lock.";
+            AllowMultipleGameInstancesStatusText = global::XASlave.Localization.UiMessage.Store(ref uiAllowMultipleGameInstancesStatusText, global::XASlave.Localization.UiMessage.Key("SF12C4858E9A42384"));
             log.Warning(ex, "[XASlave] Failed to clear the multi-instance launch lock.");
             return false;
         }
@@ -227,7 +259,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (allowMultipleGameInstancesStartupPending)
             return true;
 
-        AllowMultipleGameInstancesStatusText = "Arming - multi-instance launch lock cleanup is running outside the startup queue.";
+        AllowMultipleGameInstancesStatusText = global::XASlave.Localization.UiMessage.Store(ref uiAllowMultipleGameInstancesStatusText, global::XASlave.Localization.UiMessage.Key("SA9D6B8EF826F6700"));
         StartAllowMultipleGameInstancesStartupCleanup();
         return true;
     }
@@ -239,7 +271,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             cancelLoginCooldownEnabled = false;
             CancelCancelLoginCooldownStartupArming(disposeCompletedResult: true);
             UpdateAgentLobbyHookState();
-            CancelLoginCooldownStatusText = "Disabled";
+            CancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCancelLoginCooldownStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -250,14 +282,14 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         cancelLoginCooldownEnabled = true;
         if (clientState.IsLoggedIn)
         {
-            CancelLoginCooldownStatusText = "Ready - login cooldown hook will arm when you return to lobby.";
+            CancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCancelLoginCooldownStatusText, global::XASlave.Localization.UiMessage.Key("S898FC0DDDCCAC820"));
             return true;
         }
 
         if (!agentLobbyHookInitialized || agentLobbyUpdateHook == null)
         {
             agentLobbyHookInitialized = false;
-            CancelLoginCooldownStatusText = "Arming - login cooldown hook is initializing on the framework thread.";
+            CancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCancelLoginCooldownStatusText, global::XASlave.Localization.UiMessage.Key("S4B3A10AB78A29118"));
             StartCancelLoginCooldownStartupHookCreation();
             return true;
         }
@@ -265,12 +297,12 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (agentLobbyUpdateHook == null)
         {
             cancelLoginCooldownEnabled = false;
-            CancelLoginCooldownStatusText = "Unavailable - AgentLobby update hook missing.";
+            CancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCancelLoginCooldownStatusText, global::XASlave.Localization.UiMessage.Key("SE715688E4C90D34A"));
             return false;
         }
 
         UpdateAgentLobbyHookState();
-        CancelLoginCooldownStatusText = "Enabled - character-select login cooldown is cleared locally.";
+        CancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCancelLoginCooldownStatusText, global::XASlave.Localization.UiMessage.Key("S28F95D3E4A862F89"));
         return true;
     }
 
@@ -285,14 +317,14 @@ public unsafe sealed class SystemWindowModsService : IDisposable
                 ResetWindowSizeSynchronizationState();
 
             RefreshWindowSizeLimits();
-            CustomResolutionsStatusText = "Disabled";
+            CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         var gameWindow = GameWindow.Instance();
         if (gameWindow == null || gameWindow->WindowHandle == nint.Zero)
         {
-            CustomResolutionsStatusText = "Unavailable - game window surface missing.";
+            CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, global::XASlave.Localization.UiMessage.Key("S576E8B6032A3B92C"));
             return false;
         }
 
@@ -301,7 +333,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         customResolutionsEnabled = true;
         RefreshWindowSizeLimits(gameWindow);
         PrimeWindowSizeSynchronization(gameWindow);
-        CustomResolutionsStatusText = "Enabled - preset buttons and `/xa res <width>x<height>` or `/xa res <width> <height>` can change the client size locally.";
+        CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, global::XASlave.Localization.UiMessage.Key("S0D576AD79B356D79"));
         return true;
     }
 
@@ -310,7 +342,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (!value)
         {
             disableTitleScreenMovieEnabled = false;
-            DisableTitleScreenMovieStatusText = "Disabled";
+            DisableTitleScreenMovieStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableTitleScreenMovieStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -329,14 +361,14 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
             RefreshWindowSizeLimits();
 
-            IgnoreMinimumWindowSizeStatusText = GetIgnoreMinimumWindowSizeDisabledStatusText();
+            IgnoreMinimumWindowSizeStatusText = global::XASlave.Localization.UiMessage.Store(ref uiIgnoreMinimumWindowSizeStatusText, GetIgnoreMinimumWindowSizeDisabledStatusText());
             return false;
         }
 
         var gameWindow = GameWindow.Instance();
         if (gameWindow == null)
         {
-            IgnoreMinimumWindowSizeStatusText = "Unavailable - game window surface missing.";
+            IgnoreMinimumWindowSizeStatusText = global::XASlave.Localization.UiMessage.Store(ref uiIgnoreMinimumWindowSizeStatusText, global::XASlave.Localization.UiMessage.Key("S576E8B6032A3B92C"));
             return false;
         }
 
@@ -344,7 +376,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         ignoreMinimumWindowSizeEnabled = true;
         RefreshWindowSizeLimits(gameWindow);
         PrimeWindowSizeSynchronization(gameWindow);
-        IgnoreMinimumWindowSizeStatusText = GetIgnoreMinimumWindowSizeStatusText();
+        IgnoreMinimumWindowSizeStatusText = global::XASlave.Localization.UiMessage.Store(ref uiIgnoreMinimumWindowSizeStatusText, GetIgnoreMinimumWindowSizeStatusText());
         return true;
     }
 
@@ -371,7 +403,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         var graphicsConfig = GraphicsConfig.Instance();
         if (graphicsConfig == null)
         {
-            LowResolutionStatusText = "Unavailable - graphics configuration surface missing.";
+            LowResolutionStatusText = global::XASlave.Localization.UiMessage.Store(ref uiLowResolutionStatusText, global::XASlave.Localization.UiMessage.Key("S55FF6F244E28A5C8"));
             return false;
         }
 
@@ -389,7 +421,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             preventLobbyExitEnabled = false;
             CancelPreventLobbyExitStartupArming(disposeCompletedResult: true);
             UpdateAtkMessageBoxHookState();
-            PreventLobbyExitStatusText = "Disabled";
+            PreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Store(ref uiPreventLobbyExitStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -400,14 +432,14 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         preventLobbyExitEnabled = true;
         if (clientState.IsLoggedIn)
         {
-            PreventLobbyExitStatusText = "Ready - lobby error hook will arm when you return to lobby.";
+            PreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Store(ref uiPreventLobbyExitStatusText, global::XASlave.Localization.UiMessage.Key("SFB72D4B40FD08B82"));
             return true;
         }
 
         if (!atkMessageBoxHookInitialized || atkMessageBoxReceiveEventHook == null)
         {
             atkMessageBoxHookInitialized = false;
-            PreventLobbyExitStatusText = "Arming - lobby error hook is initializing on the framework thread.";
+            PreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Store(ref uiPreventLobbyExitStatusText, global::XASlave.Localization.UiMessage.Key("SD98EB49BAF2BF0F4"));
             StartPreventLobbyExitStartupHookCreation();
             return true;
         }
@@ -415,12 +447,12 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (atkMessageBoxReceiveEventHook == null)
         {
             preventLobbyExitEnabled = false;
-            PreventLobbyExitStatusText = "Unavailable - lobby error hook missing.";
+            PreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Store(ref uiPreventLobbyExitStatusText, global::XASlave.Localization.UiMessage.Key("SA05686B931194474"));
             return false;
         }
 
         UpdateAtkMessageBoxHookState();
-        PreventLobbyExitStatusText = "Enabled - lobby shutdown timeout is overridden.";
+        PreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Store(ref uiPreventLobbyExitStatusText, global::XASlave.Localization.UiMessage.Key("S6F3A6B8B0896251C"));
         return true;
     }
 
@@ -430,20 +462,20 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         {
             revealUndiscoveredAreasEnabled = false;
             UpdateAgentMapHookState();
-            RevealUndiscoveredAreasStatusText = "Disabled";
+            RevealUndiscoveredAreasStatusText = global::XASlave.Localization.UiMessage.Store(ref uiRevealUndiscoveredAreasStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         EnsureAgentMapHookInitialized();
         if (agentMapUpdateHook == null)
         {
-            RevealUndiscoveredAreasStatusText = "Unavailable - map update hook missing.";
+            RevealUndiscoveredAreasStatusText = global::XASlave.Localization.UiMessage.Store(ref uiRevealUndiscoveredAreasStatusText, global::XASlave.Localization.UiMessage.Key("S9C10E11F85941317"));
             return false;
         }
 
         revealUndiscoveredAreasEnabled = true;
         UpdateAgentMapHookState();
-        RevealUndiscoveredAreasStatusText = "Enabled - local map discovery is cleared.";
+        RevealUndiscoveredAreasStatusText = global::XASlave.Localization.UiMessage.Store(ref uiRevealUndiscoveredAreasStatusText, global::XASlave.Localization.UiMessage.Key("SDA50894BBA33F8DD"));
         return true;
     }
 
@@ -451,7 +483,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     {
         disableBackgroundRenderingOnlyWhenMinimized = value;
         if (disableBackgroundRenderingEnabled)
-            DisableBackgroundRenderingStatusText = GetBackgroundRenderingStatusText();
+            DisableBackgroundRenderingStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableBackgroundRenderingStatusText, GetBackgroundRenderingStatusText());
     }
 
     public void SetDisableBackgroundRenderingDisableWhenArMultiIsOn(bool value)
@@ -468,7 +500,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         }
 
         if (disableBackgroundRenderingEnabled)
-            DisableBackgroundRenderingStatusText = GetBackgroundRenderingStatusText();
+            DisableBackgroundRenderingStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableBackgroundRenderingStatusText, GetBackgroundRenderingStatusText());
     }
 
     public bool SetDisableBackgroundRenderingEnabled(bool value)
@@ -480,40 +512,47 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             backgroundRenderingSuppressed = false;
             cachedAutoRetainerMultiModeEnabled = false;
             autoRetainerMultiModeCacheExpiresAt = 0;
-            DisableBackgroundRenderingStatusText = "Disabled";
+            DisableBackgroundRenderingStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableBackgroundRenderingStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         EnsureBackgroundRenderingHooksInitialized();
         if (deviceDx11PostTickHook == null || namePlateDrawHook == null)
         {
-            DisableBackgroundRenderingStatusText = "Unavailable - render hooks are incomplete.";
+            DisableBackgroundRenderingStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableBackgroundRenderingStatusText, global::XASlave.Localization.UiMessage.Key("SCDAD43067CED4691"));
             return false;
         }
 
         disableBackgroundRenderingEnabled = true;
         RefreshAutoRetainerMultiModeCache(true);
         UpdateBackgroundRenderingHookState();
-        DisableBackgroundRenderingStatusText = GetBackgroundRenderingStatusText();
+        DisableBackgroundRenderingStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableBackgroundRenderingStatusText, GetBackgroundRenderingStatusText());
         return true;
     }
 
     public bool TryApplyCustomResolution(int width, int height, out string message)
     {
+        var success = TryApplyCustomResolutionMessage(width, height, out var presentation);
+        message = presentation.Original;
+        return success;
+    }
+
+    internal bool TryApplyCustomResolutionMessage(int width, int height, out global::XASlave.Localization.UiMessage message)
+    {
         if (!customResolutionsEnabled)
         {
-            message = "Enable Custom Resolutions in XA Mods first.";
+            message = global::XASlave.Localization.UiMessage.Key("SAC53FE4900891E3E");
             return false;
         }
 
-        if (!TryNormalizeCustomResolution(width, height, out var normalizedWidth, out var normalizedHeight, out message))
+        if (!TryNormalizeCustomResolutionMessage(width, height, out var normalizedWidth, out var normalizedHeight, out message))
             return false;
 
         var gameWindow = GameWindow.Instance();
         if (gameWindow == null || gameWindow->WindowHandle == nint.Zero)
         {
-            message = "Game window surface missing.";
-            CustomResolutionsStatusText = "Unavailable - game window surface missing.";
+            message = global::XASlave.Localization.UiMessage.Key("SA33325F441CF44C8");
+            CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, global::XASlave.Localization.UiMessage.Key("S576E8B6032A3B92C"));
             return false;
         }
 
@@ -523,8 +562,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
         if (!TryResizeClientWindow(gameWindow->WindowHandle, normalizedWidth, normalizedHeight))
         {
-            message = $"Could not resize the client window to {normalizedWidth}x{normalizedHeight}.";
-            CustomResolutionsStatusText = "Unavailable - failed while resizing the client window.";
+            message = global::XASlave.Localization.UiMessage.Format("SCC684B632CC71B0A", normalizedWidth, normalizedHeight);
+            CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, global::XASlave.Localization.UiMessage.Key("S981E6BBEF8B03ED3"));
             return false;
         }
 
@@ -540,24 +579,31 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         UpdateObservedWindowSizeState(synchronizedWidth, synchronizedHeight);
         lastAppliedCustomResolutionWidth = synchronizedWidth;
         lastAppliedCustomResolutionHeight = synchronizedHeight;
-        CustomResolutionsStatusText = GetCustomResolutionsStatusText();
-        message = $"Applied custom resolution {synchronizedWidth}x{synchronizedHeight}.";
+        CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, GetCustomResolutionsStatusText());
+        message = global::XASlave.Localization.UiMessage.Format("S64F836C832F0A6EB", synchronizedWidth, synchronizedHeight);
         return true;
     }
 
     public bool TryResetCustomResolution(out string message)
     {
+        var success = TryResetCustomResolutionMessage(out var presentation);
+        message = presentation.Original;
+        return success;
+    }
+
+    internal bool TryResetCustomResolutionMessage(out global::XASlave.Localization.UiMessage message)
+    {
         if (!customResolutionsEnabled)
         {
-            message = "Enable Custom Resolutions in XA Mods first.";
+            message = global::XASlave.Localization.UiMessage.Key("SAC53FE4900891E3E");
             return false;
         }
 
         var gameWindow = GameWindow.Instance();
         if (gameWindow == null || gameWindow->WindowHandle == nint.Zero)
         {
-            message = "Game window surface missing.";
-            CustomResolutionsStatusText = "Unavailable - game window surface missing.";
+            message = global::XASlave.Localization.UiMessage.Key("SA33325F441CF44C8");
+            CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, global::XASlave.Localization.UiMessage.Key("S576E8B6032A3B92C"));
             return false;
         }
 
@@ -565,16 +611,16 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         CaptureOriginalClientSize(gameWindow);
         if (!capturedOriginalClientSize)
         {
-            message = "Could not read the original client size for reset.";
-            CustomResolutionsStatusText = "Unavailable - original client size was not captured.";
+            message = global::XASlave.Localization.UiMessage.Key("S760D1BED0A89636C");
+            CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, global::XASlave.Localization.UiMessage.Key("SF73A2DCAF792D055"));
             return false;
         }
 
         RefreshWindowSizeLimits(gameWindow);
         if (!TryResizeClientWindow(gameWindow->WindowHandle, originalClientWidth, originalClientHeight))
         {
-            message = $"Could not reset the client window to {originalClientWidth}x{originalClientHeight}.";
-            CustomResolutionsStatusText = "Unavailable - failed while resetting the client window size.";
+            message = global::XASlave.Localization.UiMessage.Format("SA777AA7A1054614C", originalClientWidth, originalClientHeight);
+            CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, global::XASlave.Localization.UiMessage.Key("SCE182654B5F1C7BB"));
             return false;
         }
 
@@ -590,8 +636,8 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         UpdateObservedWindowSizeState(synchronizedWidth, synchronizedHeight);
         lastAppliedCustomResolutionWidth = 0;
         lastAppliedCustomResolutionHeight = 0;
-        CustomResolutionsStatusText = $"Enabled - reset the client size to the captured original {synchronizedWidth}x{synchronizedHeight}.";
-        message = $"Reset client resolution to {synchronizedWidth}x{synchronizedHeight}.";
+        CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, global::XASlave.Localization.UiMessage.Format("SDA60E48783D1F6C0", synchronizedWidth, synchronizedHeight));
+        message = global::XASlave.Localization.UiMessage.Format("SE2326451344C4818", synchronizedWidth, synchronizedHeight);
         return true;
     }
 
@@ -630,42 +676,34 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         DisposeHook(ref namePlateDrawHook);
     }
 
-    private string GetIgnoreMinimumWindowSizeStatusText()
+    private global::XASlave.Localization.UiMessage GetIgnoreMinimumWindowSizeStatusText()
     {
-        return $"Enabled - minimum size is clamped to {SafeMinimumWindowWidth}x{SafeMinimumWindowHeight} and XA will correct undersized restore or maximize results after the window changes.";
+        return global::XASlave.Localization.UiMessage.Format("S5E4F34D4818AF7D1", SafeMinimumWindowWidth, SafeMinimumWindowHeight);
     }
 
-    private string GetIgnoreMinimumWindowSizeDisabledStatusText()
+    private global::XASlave.Localization.UiMessage GetIgnoreMinimumWindowSizeDisabledStatusText()
     {
         var restoredMinimumWidth = GetRestoredMinimumWindowWidth();
         var restoredMinimumHeight = GetRestoredMinimumWindowHeight();
         if (restoredMinimumWidth > 0 && restoredMinimumHeight > 0)
-            return $"Disabled - restored the normal minimum size floor of {restoredMinimumWidth}x{restoredMinimumHeight}.";
+            return global::XASlave.Localization.UiMessage.Format("S0E33701B4C73EA19", restoredMinimumWidth, restoredMinimumHeight);
 
-        return "Disabled";
+        return global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
     }
 
-    private string GetCustomResolutionsStatusText()
+    private global::XASlave.Localization.UiMessage GetCustomResolutionsStatusText()
     {
-        return lastAppliedCustomResolutionWidth > 0 && lastAppliedCustomResolutionHeight > 0
-            ? $"Enabled - last applied custom client size is {lastAppliedCustomResolutionWidth}x{lastAppliedCustomResolutionHeight}."
-            : "Enabled - preset buttons and `/xa res <width>x<height>` or `/xa res <width> <height>` can change the client size locally.";
+        return (lastAppliedCustomResolutionWidth > 0 && lastAppliedCustomResolutionHeight > 0 ? global::XASlave.Localization.UiMessage.Format("S99B3FD6AAE8E9D18", lastAppliedCustomResolutionWidth, lastAppliedCustomResolutionHeight) : global::XASlave.Localization.UiMessage.Key("S0D576AD79B356D79"));
     }
 
-    private string GetBackgroundRenderingStatusText()
+    private global::XASlave.Localization.UiMessage GetBackgroundRenderingStatusText()
     {
         if (disableBackgroundRenderingDisableWhenArMultiIsOn)
         {
-            return cachedAutoRetainerMultiModeEnabled
-                ? "Enabled - render hooks are armed, but AutoRetainer Multi keeps background rendering active."
-                : disableBackgroundRenderingOnlyWhenMinimized
-                    ? "Enabled - DX11 and nameplate hooks pause rendering only while minimized. AR Multi override is armed."
-                    : "Enabled - DX11 and nameplate hooks pause rendering while inactive. AR Multi override is armed.";
+            return (cachedAutoRetainerMultiModeEnabled ? global::XASlave.Localization.UiMessage.Key("S13FFA59B2556B9E0") : (disableBackgroundRenderingOnlyWhenMinimized ? global::XASlave.Localization.UiMessage.Key("S356A428674D68FE2") : global::XASlave.Localization.UiMessage.Key("SD0C2CACE8AC104CC")));
         }
 
-        return disableBackgroundRenderingOnlyWhenMinimized
-            ? "Enabled - DX11 and nameplate hooks pause rendering only while minimized."
-            : "Enabled - DX11 and nameplate hooks pause rendering while inactive.";
+        return (disableBackgroundRenderingOnlyWhenMinimized ? global::XASlave.Localization.UiMessage.Key("SBF069764EC64FDBB") : global::XASlave.Localization.UiMessage.Key("SE4CE22ED4EC75A4A"));
     }
 
     private void StartAllowMultipleGameInstancesStartupCleanup()
@@ -731,13 +769,11 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
         if (completed)
         {
-            AllowMultipleGameInstancesStatusText = closedHandles > 0
-                ? $"Enabled - cleared {closedHandles} multi-instance launch lock handle(s) for this client process."
-                : "Enabled - no additional multi-instance launch lock handle was present in this client process.";
+            AllowMultipleGameInstancesStatusText = global::XASlave.Localization.UiMessage.Store(ref uiAllowMultipleGameInstancesStatusText, (closedHandles > 0 ? global::XASlave.Localization.UiMessage.Format("S955879300418F185", closedHandles) : global::XASlave.Localization.UiMessage.Key("S90189F98F4D237CD")));
         }
         else
         {
-            AllowMultipleGameInstancesStatusText = "Unavailable - failed while clearing the multi-instance launch lock.";
+            AllowMultipleGameInstancesStatusText = global::XASlave.Localization.UiMessage.Store(ref uiAllowMultipleGameInstancesStatusText, global::XASlave.Localization.UiMessage.Key("SF12C4858E9A42384"));
         }
     }
 
@@ -860,14 +896,12 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (agentLobbyUpdateHook == null)
         {
             cancelLoginCooldownEnabled = false;
-            CancelLoginCooldownStatusText = "Unavailable - AgentLobby update hook missing.";
+            CancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCancelLoginCooldownStatusText, global::XASlave.Localization.UiMessage.Key("SE715688E4C90D34A"));
             return;
         }
 
         UpdateAgentLobbyHookState();
-        CancelLoginCooldownStatusText = agentLobbyUpdateHook.IsEnabled
-            ? "Enabled - character-select login cooldown is cleared locally."
-            : "Unavailable - AgentLobby update hook could not be enabled.";
+        CancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCancelLoginCooldownStatusText, (agentLobbyUpdateHook.IsEnabled ? global::XASlave.Localization.UiMessage.Key("S28F95D3E4A862F89") : global::XASlave.Localization.UiMessage.Key("SF7DB9382398CA51A")));
     }
 
     private void EnsureAtkMessageBoxHookInitialized()
@@ -989,14 +1023,12 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (atkMessageBoxReceiveEventHook == null)
         {
             preventLobbyExitEnabled = false;
-            PreventLobbyExitStatusText = "Unavailable - lobby error hook missing.";
+            PreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Store(ref uiPreventLobbyExitStatusText, global::XASlave.Localization.UiMessage.Key("SA05686B931194474"));
             return;
         }
 
         UpdateAtkMessageBoxHookState();
-        PreventLobbyExitStatusText = atkMessageBoxReceiveEventHook.IsEnabled
-            ? "Enabled - lobby shutdown timeout is overridden."
-            : "Unavailable - lobby error hook could not be enabled.";
+        PreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Store(ref uiPreventLobbyExitStatusText, (atkMessageBoxReceiveEventHook.IsEnabled ? global::XASlave.Localization.UiMessage.Key("S6F3A6B8B0896251C") : global::XASlave.Localization.UiMessage.Key("SD254F9326D115E80")));
     }
 
     private void EnsureAgentMapHookInitialized()
@@ -1175,14 +1207,14 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         {
             if (!agentLobbyHookInitialized)
             {
-                CancelLoginCooldownStatusText = "Arming - login cooldown hook is initializing on the framework thread.";
+                CancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCancelLoginCooldownStatusText, global::XASlave.Localization.UiMessage.Key("S4B3A10AB78A29118"));
                 StartCancelLoginCooldownStartupHookCreation();
             }
             else
             {
                 MeasureFrameworkUpdateStep("SystemWindowMods.CancelLoginCooldownLobbyArm", UpdateAgentLobbyHookState);
                 if (agentLobbyUpdateHook != null && !agentLobbyUpdateHook.IsDisposed && agentLobbyUpdateHook.IsEnabled)
-                    CancelLoginCooldownStatusText = "Enabled - character-select login cooldown is cleared locally.";
+                    CancelLoginCooldownStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCancelLoginCooldownStatusText, global::XASlave.Localization.UiMessage.Key("S28F95D3E4A862F89"));
             }
         }
 
@@ -1192,14 +1224,14 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         {
             if (!atkMessageBoxHookInitialized)
             {
-                PreventLobbyExitStatusText = "Arming - lobby error hook is initializing on the framework thread.";
+                PreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Store(ref uiPreventLobbyExitStatusText, global::XASlave.Localization.UiMessage.Key("SD98EB49BAF2BF0F4"));
                 StartPreventLobbyExitStartupHookCreation();
             }
             else
             {
                 MeasureFrameworkUpdateStep("SystemWindowMods.PreventLobbyExitLobbyArm", UpdateAtkMessageBoxHookState);
                 if (atkMessageBoxReceiveEventHook != null && !atkMessageBoxReceiveEventHook.IsDisposed && atkMessageBoxReceiveEventHook.IsEnabled)
-                    PreventLobbyExitStatusText = "Enabled - lobby shutdown timeout is overridden.";
+                    PreventLobbyExitStatusText = global::XASlave.Localization.UiMessage.Store(ref uiPreventLobbyExitStatusText, global::XASlave.Localization.UiMessage.Key("S6F3A6B8B0896251C"));
             }
         }
 
@@ -1221,7 +1253,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             && disableBackgroundRenderingDisableWhenArMultiIsOn
             && MeasureFrameworkUpdateStep("SystemWindowMods.RefreshAutoRetainerMultiModeCache", () => RefreshAutoRetainerMultiModeCache(false)))
         {
-            DisableBackgroundRenderingStatusText = GetBackgroundRenderingStatusText();
+            DisableBackgroundRenderingStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableBackgroundRenderingStatusText, GetBackgroundRenderingStatusText());
         }
 
         if (totalStopwatch != null)
@@ -1420,10 +1452,10 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         lastSynchronizedClientWidth = clientWidth;
         lastSynchronizedClientHeight = clientHeight;
         if (ignoreMinimumWindowSizeEnabled)
-            IgnoreMinimumWindowSizeStatusText = GetIgnoreMinimumWindowSizeStatusText();
+            IgnoreMinimumWindowSizeStatusText = global::XASlave.Localization.UiMessage.Store(ref uiIgnoreMinimumWindowSizeStatusText, GetIgnoreMinimumWindowSizeStatusText());
 
         if (customResolutionsEnabled)
-            CustomResolutionsStatusText = GetCustomResolutionsStatusText();
+            CustomResolutionsStatusText = global::XASlave.Localization.UiMessage.Store(ref uiCustomResolutionsStatusText, GetCustomResolutionsStatusText());
 
     }
 
@@ -1434,19 +1466,19 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
         if (clientState.IsLoggedIn)
         {
-            DisableTitleScreenMovieStatusText = "Ready - title screen movie timer will stay reset when you return to lobby.";
+            DisableTitleScreenMovieStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableTitleScreenMovieStatusText, global::XASlave.Localization.UiMessage.Key("S61655DD6836FCCF7"));
             return;
         }
 
         var agentLobby = AgentLobby.Instance();
         if (agentLobby == null)
         {
-            DisableTitleScreenMovieStatusText = "Ready - waiting for the lobby agent.";
+            DisableTitleScreenMovieStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableTitleScreenMovieStatusText, global::XASlave.Localization.UiMessage.Key("S182CA192262426CD"));
             return;
         }
 
         agentLobby->IdleTime = 0;
-        DisableTitleScreenMovieStatusText = "Enabled - title screen idle movie timer is kept at zero.";
+        DisableTitleScreenMovieStatusText = global::XASlave.Localization.UiMessage.Store(ref uiDisableTitleScreenMovieStatusText, global::XASlave.Localization.UiMessage.Key("SF17B5DCEF6D7D2D8"));
     }
 
     private bool TryClampClientSizeToSafeMinimum(GameWindow* gameWindow, int clientWidth, int clientHeight)
@@ -1459,7 +1491,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         var graphicsConfig = GraphicsConfig.Instance();
         if (graphicsConfig == null)
         {
-            LowResolutionStatusText = "Unavailable - graphics configuration surface missing.";
+            LowResolutionStatusText = global::XASlave.Localization.UiMessage.Store(ref uiLowResolutionStatusText, global::XASlave.Localization.UiMessage.Key("S55FF6F244E28A5C8"));
             return;
         }
 
@@ -1468,9 +1500,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (Math.Abs(GetGraphicsResScale(graphicsConfig) - normalizedScale) > 0.0001f)
             SetGraphicsResScale(graphicsConfig, normalizedScale);
 
-        LowResolutionStatusText = forcedFallbackUpscaler
-            ? $"Enabled - 3D resolution scale is forced to {normalizedScale:0.00}, and DLSS is temporarily switched to AMD FSR while Low Resolution is active."
-            : $"Enabled - 3D resolution scale is forced to {normalizedScale:0.00}.";
+        LowResolutionStatusText = global::XASlave.Localization.UiMessage.Store(ref uiLowResolutionStatusText, (forcedFallbackUpscaler ? global::XASlave.Localization.UiMessage.Format("S4E9D5F5AB60230A7", normalizedScale) : global::XASlave.Localization.UiMessage.Format("S66CD26E3EA384990", normalizedScale)));
     }
 
     private void BeginLowResolutionDisable()
@@ -1485,7 +1515,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             return;
         }
 
-        LowResolutionStatusText = "Disabling - 3D resolution scale is forced to 1.00 for a full render pass before Low Resolution turns off.";
+        LowResolutionStatusText = global::XASlave.Localization.UiMessage.Store(ref uiLowResolutionStatusText, global::XASlave.Localization.UiMessage.Key("S04742446DE218D53"));
     }
 
     private void UpdateLowResolutionDisableReset()
@@ -1499,7 +1529,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         if (lowResolutionDisableResetFramesRemaining > 0)
         {
             lowResolutionDisableResetFramesRemaining--;
-            LowResolutionStatusText = "Disabling - 3D resolution scale is forced to 1.00 for a full render pass before Low Resolution turns off.";
+            LowResolutionStatusText = global::XASlave.Localization.UiMessage.Store(ref uiLowResolutionStatusText, global::XASlave.Localization.UiMessage.Key("S04742446DE218D53"));
             return;
         }
 
@@ -1511,7 +1541,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         var graphicsConfig = GraphicsConfig.Instance();
         if (graphicsConfig == null)
         {
-            LowResolutionStatusText = "Unavailable - graphics configuration surface missing.";
+            LowResolutionStatusText = global::XASlave.Localization.UiMessage.Store(ref uiLowResolutionStatusText, global::XASlave.Localization.UiMessage.Key("S55FF6F244E28A5C8"));
             return false;
         }
 
@@ -1527,9 +1557,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
         lowResolutionDisablePending = false;
         lowResolutionDisableResetFramesRemaining = 0;
         RestoreLowResolutionConfiguration(forceDisabledScale);
-        LowResolutionStatusText = forceDisabledScale
-            ? "Disabled - 3D resolution scale forced to 1.00."
-            : "Disabled - 3D resolution scale reset to 1.00.";
+        LowResolutionStatusText = global::XASlave.Localization.UiMessage.Store(ref uiLowResolutionStatusText, (forceDisabledScale ? global::XASlave.Localization.UiMessage.Key("S087285C32FE87651") : global::XASlave.Localization.UiMessage.Key("S75DF19FEE3B3B4C3")));
     }
 
     private void DisableLowResolutionForPluginUnload()
@@ -1539,7 +1567,7 @@ public unsafe sealed class SystemWindowModsService : IDisposable
 
         UpdateLowResolutionDisableResetScale();
         FinishLowResolutionDisable(forceDisabledScale: true);
-        LowResolutionStatusText = "Disabled - 3D resolution scale forced to 1.00 during plugin unload; saved XA scale is preserved for the next enable.";
+        LowResolutionStatusText = global::XASlave.Localization.UiMessage.Store(ref uiLowResolutionStatusText, global::XASlave.Localization.UiMessage.Key("SA629787850F336E4"));
     }
 
     private void RestoreLowResolutionConfiguration(bool forceDisabledScale = false)

@@ -27,11 +27,11 @@ internal sealed unsafe class FurnitureObserverHook<T> : IDisposable where T : De
         this.binding = binding; this.name = name; this.stackArguments = stackArguments; this.callback = callback;
         var manager = typeof(IFramework).Assembly.GetType("Dalamud.Hooking.Internal.HookManager", throwOnError: true)!;
         hookLock = manager.GetProperty("HookEnableSyncRoot", BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic)?.GetValue(null) as Lock
-            ?? throw new NotSupportedException("Furniture hook synchronization is unavailable.");
+            ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S67F23680ADDC889D"), originalMessageText => new NotSupportedException(originalMessageText));
         registerUnhooker = manager.GetMethod("RegisterUnhooker", BindingFlags.Static | BindingFlags.Public, null, [typeof(nint)], null)
-            ?? throw new NotSupportedException("Furniture hook registration is unavailable.");
+            ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6C8C8807C3262631"), originalMessageText => new NotSupportedException(originalMessageText));
         trimUnhooker = registerUnhooker.ReturnType.GetMethod("TrimAfterHook", BindingFlags.Instance | BindingFlags.Public)
-            ?? throw new NotSupportedException("Furniture hook restoration tracking is unavailable.");
+            ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SA64CD66EAE669543"), originalMessageText => new NotSupportedException(originalMessageText));
     }
     internal void Enable()
     {

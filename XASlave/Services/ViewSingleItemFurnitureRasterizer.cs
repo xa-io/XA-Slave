@@ -29,14 +29,14 @@ internal static class ViewSingleItemFurnitureRasterizer
         {
             cancellation.ThrowIfCancellationRequested();
             if (Stopwatch.GetTimestamp() > deadline)
-                throw new InvalidOperationException("This furnishing exceeded the preview rendering time limit.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S440F74235E30C1FB"), originalMessageText => new InvalidOperationException(originalMessageText));
         }
 
         internal void AddPixels(long count)
         {
             pixelTests += count;
             if (pixelTests > MaximumPixelTests)
-                throw new InvalidOperationException("This furnishing is too complex for the static preview.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6873C685620E6A32"), originalMessageText => new InvalidOperationException(originalMessageText));
             Check();
         }
     }
@@ -49,15 +49,15 @@ internal static class ViewSingleItemFurnitureRasterizer
     {
         ArgumentNullException.ThrowIfNull(model);
         if (width < 1 || height < 1 || width > MaximumDimension || height > MaximumDimension)
-            throw new ArgumentOutOfRangeException(nameof(width), "Furniture preview dimensions must be between 1 and 1024.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0A2F07678512B217"), originalMessageText => new ArgumentOutOfRangeException(nameof(width), originalMessageText));
         if (!Finite(model.Minimum) || !Finite(model.Maximum) || !float.IsFinite(yaw)
             || !float.IsFinite(pitch) || !float.IsFinite(roll) || !float.IsFinite(zoom)
             || !float.IsFinite(pan.X) || !float.IsFinite(pan.Y))
-            throw new ArgumentException("The furniture preview contains invalid bounds or camera values.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S48712DFDF3B17857"), originalMessageText => new ArgumentException(originalMessageText));
         var extent = model.Maximum - model.Minimum;
         var radius = extent.Length() * 0.5f;
         if (extent.X < 0 || extent.Y < 0 || extent.Z < 0 || !float.IsFinite(radius) || radius <= 0.000001f)
-            throw new InvalidOperationException("This furnishing has no usable model bounds.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1E2140C40D94FFE8"), originalMessageText => new InvalidOperationException(originalMessageText));
 
         var budget = new Budget(cancellation);
         budget.Check();
@@ -79,10 +79,10 @@ internal static class ViewSingleItemFurnitureRasterizer
             budget.Check();
             triangleCount += mesh.Indices.Length / 3;
             if (triangleCount > MaximumTriangles)
-                throw new InvalidOperationException("This furnishing exceeds the preview triangle limit.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SBF8CE5567AF12E45"), originalMessageText => new InvalidOperationException(originalMessageText));
             vertexCount += mesh.Positions.Length;
             if (vertexCount > MaximumVertices)
-                throw new InvalidOperationException("This furnishing exceeds the preview vertex limit.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SAEC8067E2F83AB67"), originalMessageText => new InvalidOperationException(originalMessageText));
             Texture? texture = null;
             if (mesh.Texture is { } sourceTexture)
             {
@@ -134,7 +134,7 @@ internal static class ViewSingleItemFurnitureRasterizer
             }
         }
         if (opaque.Count + transparent.Count == 0)
-            throw new InvalidOperationException("This furnishing has no drawable model triangles.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S83F72E5178C2BB65"), originalMessageText => new InvalidOperationException(originalMessageText));
 
         var pixels = new byte[checked(width * height * 4)];
         var depth = new float[width * height];
@@ -154,7 +154,7 @@ internal static class ViewSingleItemFurnitureRasterizer
     {
         var required = (long)source.Width * source.Height * 4;
         if (source.Width <= 0 || source.Height <= 0 || required > source.Bgra.LongLength || required > 128L * 1024 * 1024)
-            throw new InvalidOperationException("The furnishing contains an invalid or oversized texture.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6B4470F0EF2DB2AD"), originalMessageText => new InvalidOperationException(originalMessageText));
         var translucent = false;
         for (var i = 3; i < required; i += 4)
         {

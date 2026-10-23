@@ -95,8 +95,12 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
     internal bool IsStandaloneModel => IsFashionAccessory
         || ((itemSelection is 103 or 104) && previewCompanion is { Id: > 0, ModelCharaId: > 0 });
     private uint StandaloneModelId => IsFashionAccessory ? fashionAccessory!.ModelCharaId : previewCompanion?.ModelCharaId ?? 0;
-    private string StandaloneModelName => itemSelection == 103 ? "minion" : itemSelection == 104 ? "mount" : "fashion accessory";
-    internal string StatusText { get; private set; } = "Waiting for a standalone preview slot...";
+    private global::XASlave.Localization.UiMessage StandaloneModelMessage => (itemSelection == 103 ? global::XASlave.Localization.UiMessage.Key("SBBEBEC50E47B8DC6") : (itemSelection == 104 ? global::XASlave.Localization.UiMessage.Key("SD4536F2555836B0B") : global::XASlave.Localization.UiMessage.Key("SC2277A8D51D1B647")));
+    private string StandaloneModelName => StandaloneModelMessage.Original;
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("SC0C66C2F6C508475");
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(statusMessage, StatusText);
+    internal string LocalizedStatusText => StatusTextMessage.Display;
+    internal string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("SC0C66C2F6C508475");
     internal string ReadinessDiagnostic { get; private set; } = "stage=no-scene";
     internal string CameraDiagnostic => $"yaw={yaw:F3}; pitch={pitch:F3}; roll={roll:F3}; zoom={zoom:F3}; pan={panX:F3},{panY:F3}; viewport={viewport.X:F0}x{viewport.Y:F0}; itemSelection={itemSelection}; weaponSelection={weaponSelection}; paired={pairedWeapon}; requestedDrawn={DesiredWeaponDrawn}; accessory={fashionAccessory?.Id ?? 0}; companion={previewCompanion?.Id ?? 0}; standaloneModel={StandaloneModelId}; accessoryProjected={accessoryProjected}; {animationDiagnostic}";
 
@@ -260,7 +264,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             || sizeof(Human) != 0xCD0 || sizeof(NativeCharacter) != 0x2370 || sizeof(CharacterBase) != 0xA20
             || sizeof(Model) != 0x180 || sizeof(ModelResourceHandle) != 0x2A0 || sizeof(ModelRenderer.Callback) != 0x20
             || sizeof(Companion) != 0x2470 || sizeof(CompanionContainer) != 0x20 || sizeof(MountContainer) != 0x68)
-            throw new InvalidOperationException("The standalone preview layout changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S256189DAEF48FFB9"), originalMessageText => new InvalidOperationException(originalMessageText));
         RequireOffset<ClientObjectManager>("_battleCharas", 0x10);
         RequireOffset<ClientObjectManager.BattleCharaEntry>("BattleChara", 0);
         RequireOffset<ClientObjectManager.BattleCharaEntry>("ObjectKind", 8);
@@ -332,20 +336,20 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
     {
         var field = typeof(T).GetField(name, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
         if (field?.GetCustomAttribute<FieldOffsetAttribute>()?.Value != offset)
-            throw new InvalidOperationException("The standalone preview field changed: " + typeof(T).Name + "." + name);
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S3C7EC1012B010261" , typeof(T).Name, name), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     private void RequirePointer(nint pointer, int rva)
     {
         if (pointer != moduleBase + rva)
-            throw new InvalidOperationException("The standalone preview native binding changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2466DF1446E291FA"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     private void AddProof(PEReader disk, int rva, int length)
     {
         var bytes = disk.GetSectionData(rva).GetContent(0, length).ToArray();
         if (!NearbyZoneNativeBinding.Read(moduleBase + rva, length).AsSpan().SequenceEqual(bytes))
-            throw new InvalidOperationException($"Standalone preview code changed at RVA 0x{rva:X}.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S1499CCB0FD60BDEB" , rva), originalMessageText => new InvalidOperationException(originalMessageText));
         proofs.Add((rva, bytes));
     }
 
@@ -357,19 +361,19 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
 
     private void AddVtableProof(PEReader disk, int rva, int length)
     {
-        var header = disk.PEHeaders.PEHeader ?? throw new InvalidOperationException("Missing standalone preview PE header.");
+        var header = disk.PEHeaders.PEHeader ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD417D2FE9E47A2BA"), originalMessageText => new InvalidOperationException(originalMessageText));
         var bytes = disk.GetSectionData(rva).GetContent(0, length).ToArray();
-        if (length % sizeof(ulong) != 0) throw new InvalidOperationException("Invalid standalone preview virtual table length.");
+        if (length % sizeof(ulong) != 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1408F3B1F33A2E29"), originalMessageText => new InvalidOperationException(originalMessageText));
         for (var offset = 0; offset < length; offset += sizeof(ulong))
         {
             var diskPointer = BitConverter.ToUInt64(bytes, offset);
             if (diskPointer < header.ImageBase || diskPointer - header.ImageBase >= (ulong)header.SizeOfImage)
-                throw new InvalidOperationException("The standalone preview virtual table target changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD34B00CA11AB4E79"), originalMessageText => new InvalidOperationException(originalMessageText));
             var loadedPointer = checked((ulong)(nuint)moduleBase + (diskPointer - header.ImageBase));
             BitConverter.GetBytes(loadedPointer).CopyTo(bytes, offset);
         }
         if (!NearbyZoneNativeBinding.Read(moduleBase + rva, length).AsSpan().SequenceEqual(bytes))
-            throw new InvalidOperationException($"Standalone preview virtual table changed at RVA 0x{rva:X}.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S51F36B62025E0BCC" , rva), originalMessageText => new InvalidOperationException(originalMessageText));
         proofs.Add((rva, bytes));
     }
 
@@ -381,17 +385,14 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         byte[]? saved;
         try { saved = ViewSingleItemRendererHookState.ReadSavedEntry(moduleBase + rva, length, rva == 0x1759180); }
         catch (InvalidOperationException error)
-        { throw new InvalidOperationException($"Standalone preview hook at RVA 0x{rva:X} is unavailable. " + error.Message, error); }
+        { throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S8391DA809DD9CA6B" , global::XASlave.Localization.UiMessage.Format("SE984AC6BEE2C9FAC" , rva), global::XASlave.Localization.UiMessage.FromException(error)), originalMessageText => new InvalidOperationException(originalMessageText, error)); }
         var loaded = NearbyZoneNativeBinding.Read(moduleBase + rva, length);
         if (!ViewSingleItemRendererHookState.MatchesSupportedCode(bytes, loaded, saved, entryLength))
-            throw new InvalidOperationException($"Standalone preview hook changed at RVA 0x{rva:X}. "
-                + ViewSingleItemRendererDiagnostics.DescribeBytes(rva, bytes, loaded) + " "
-                + ViewSingleItemRendererDiagnostics.DescribeSavedEntry(saved) + " "
-                + ViewSingleItemRendererDiagnostics.DescribeOwners(moduleBase + rva, length));
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S0ABB535B06A7D2F5" , global::XASlave.Localization.UiMessage.Format("S4DACCC8CF9C2540E" , rva), ViewSingleItemRendererDiagnostics.DescribeBytes(rva, bytes, loaded), ViewSingleItemRendererDiagnostics.DescribeSavedEntry(saved), ViewSingleItemRendererDiagnostics.DescribeOwners(moduleBase + rva, length)), originalMessageText => new InvalidOperationException(originalMessageText));
         var hook = Plugin.GameInterop.HookFromAddress(moduleBase + rva, detour);
         hooks.Add(hook);
         if (hook.BackendName != "Reloaded")
-            throw new InvalidOperationException($"Standalone preview hook at RVA 0x{rva:X} requires the reviewed Reloaded backend.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S9EAAC5584C66D572" , rva), originalMessageText => new InvalidOperationException(originalMessageText));
         hookProofs.Add((hook.Enable, rva, length));
         return hook;
     }
@@ -414,12 +415,12 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
                 if (!MatchesNativeBytes(moduleBase + proof.Rva, proof.Bytes))
                 {
                     preempted = true; RetireFilterSafely();
-                    throw new InvalidOperationException("The standalone preview native code changed.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S4DF6AB6D3DFC248B"), originalMessageText => new InvalidOperationException(originalMessageText));
                 }
             if (hooks.Any(hook => hook.IsDisposed || !hook.IsEnabled))
             {
                 preempted = true; RetireFilterSafely();
-                throw new InvalidOperationException("The standalone preview hooks are unavailable.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6F869A470852CF22"), originalMessageText => new InvalidOperationException(originalMessageText));
             }
         }
     }
@@ -445,7 +446,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         Validate();
         lock (sync)
         {
-            if (!captured) throw new InvalidOperationException("No outfit has been captured.");
+            if (!captured) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1BE83053D7E1622E"), originalMessageText => new InvalidOperationException(originalMessageText));
             return ViewSingleItemCapture.Encode(appearance);
         }
     }
@@ -510,7 +511,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             var nextCompanion = key is 103 or 104 ? companion : null;
             nextCompanion?.Validate();
             if (nextCompanion != null && nextCompanion.Key != key)
-                throw new InvalidOperationException("The captured model belongs to another category.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC14387B1583DD925"), originalMessageText => new InvalidOperationException(originalMessageText));
             if (selectionReady && itemSelection == key && weaponSelection == next && pairedWeapon == paired
                 && accessorySelection == nextAccessorySelection && Equals(fashionAccessory, nextAccessory)
                 && Equals(previewCompanion, nextCompanion)) return;
@@ -529,19 +530,18 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
                 var model = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.ModelChara>().GetRowOrDefault(selectedAccessory.ModelCharaId);
                 if (row == null || row.Value.Model != selectedAccessory.ModelCharaId
                     || model == null || model.Value.Type is not (2 or 3))
-                    throw new InvalidOperationException("The captured fashion accessory has no supported standalone model.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SEE51965C297DD693"), originalMessageText => new InvalidOperationException(originalMessageText));
                 accessoryModelType = (CharacterBase.ModelType)model.Value.Type;
             }
             else if (IsStandaloneModel)
             {
                 var selectedCompanion = previewCompanion!;
-                var current = ViewSingleItemCompanions.Create(key, selectedCompanion.Id, out var unavailable);
+                var current = ViewSingleItemCompanions.CreateMessage(key, selectedCompanion.Id, out var unavailable);
                 if (current == null || !Equals(current, selectedCompanion))
-                    throw new InvalidOperationException(string.IsNullOrEmpty(unavailable)
-                        ? "The captured minion or mount model changed in the current game data." : unavailable);
+                    throw global::XASlave.Localization.UiMessage.CreateException((string.IsNullOrEmpty(unavailable.Original) ? global::XASlave.Localization.UiMessage.Key("S7C2C161CB97ECCA8") : unavailable), originalMessageText => new InvalidOperationException(originalMessageText));
                 var model = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.ModelChara>().GetRowOrDefault(current.ModelCharaId);
                 if (model == null || model.Value.Type is not (2 or 3))
-                    throw new InvalidOperationException("The captured minion or mount has no supported standalone model.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S51C9A3BF0BDAC951"), originalMessageText => new InvalidOperationException(originalMessageText));
                 accessoryModelType = (CharacterBase.ModelType)model.Value.Type;
             }
             retryAfter = 0;
@@ -577,7 +577,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
     {
         var manager = SceneCameraManager.Instance();
         NearbyZoneNativeBinding.RequireReadable((nint)manager, sizeof(SceneCameraManager));
-        if (index >= SlotCount) throw new InvalidOperationException("Invalid standalone preview slot.");
+        if (index >= SlotCount) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S47C8FE408732C084"), originalMessageText => new InvalidOperationException(originalMessageText));
         return (nint)manager + SceneSlotsOffset + checked((int)index) * 8;
     }
 
@@ -585,7 +585,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
     {
         var manager = Manager.Instance();
         var address = (nint)manager + ContextCountsOffset + checked((int)index) * 4;
-        if (manager == null) throw new InvalidOperationException("The preview renderer is unavailable.");
+        if (manager == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S8712B9FAA778CDD7"), originalMessageText => new InvalidOperationException(originalMessageText));
         NearbyZoneNativeBinding.RequireReadable(address, 4);
         return Marshal.ReadInt32(address);
     }
@@ -595,20 +595,18 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         if (disposed || cleanupBlocked || !captured || !selectionReady || view != null || Environment.TickCount64 < retryAfter) return;
         if (accessorySelection && !IsFashionAccessory)
         {
-            StatusText = fashionAccessory == null ? "No fashion accessory was captured for this player."
-                : "The player was not using a fashion accessory when captured.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (fashionAccessory == null ? global::XASlave.Localization.UiMessage.Key("SD513795DB06FCF2A") : global::XASlave.Localization.UiMessage.Key("S25021858F2FAC488")));
             ReadinessDiagnostic = $"stage=accessory-unavailable; captured={fashionAccessory != null}";
             return;
         }
         if ((itemSelection is 103 or 104) && !IsStandaloneModel)
         {
-            StatusText = previewCompanion == null ? "No " + StandaloneModelName + " was captured."
-                : "The player had no visible " + StandaloneModelName + " when captured.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (previewCompanion == null ? global::XASlave.Localization.UiMessage.Format("S9735AAA1789548F7" , StandaloneModelMessage) : global::XASlave.Localization.UiMessage.Format("S6F764566CC3CB516" , StandaloneModelMessage)));
             ReadinessDiagnostic = $"stage=companion-unavailable; key={itemSelection}; captured={previewCompanion != null}";
             return;
         }
         if (IsStandaloneModel && accessoryModelType is not (CharacterBase.ModelType.DemiHuman or CharacterBase.ModelType.Monster))
-            throw new InvalidOperationException("The captured " + StandaloneModelName + " model type was not admitted.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S7EC89460ADB932E1" , StandaloneModelMessage), originalMessageText => new InvalidOperationException(originalMessageText));
         var manager = Objects();
         for (var index = SlotCount; index-- > 0;)
         {
@@ -620,7 +618,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             var space = IMemorySpace.GetUISpace();
             NearbyZoneNativeBinding.RequireReadable((nint)space, sizeof(IMemorySpace));
             var memory = (CharaView*)space->Malloc((ulong)sizeof(CharaView), 16);
-            if (memory == null) throw new InvalidOperationException("The standalone preview allocation failed.");
+            if (memory == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC996288954126F0A"), originalMessageText => new InvalidOperationException(originalMessageText));
             var adopted = false;
             try
             {
@@ -632,7 +630,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
                 view->Ctor();
                 constructed = true;
                 if (Marshal.ReadIntPtr((nint)view) != moduleBase + 0x21A1CC8)
-                    throw new InvalidOperationException("The standalone preview virtual table changed.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF67A240C18F7A83A"), originalMessageText => new InvalidOperationException(originalMessageText));
                 // Native Initialize deletes an existing slot. Recheck while holding our
                 // lease lock and before the call; foreign requests use the preemption hooks.
                 if (foreignOperations[index] != 0 || entry.BattleChara != null || (byte)entry.ObjectKind != 0
@@ -640,7 +638,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
                 { ReleaseLocked(); continue; }
                 RunOwned(1, () => view->Initialize(null, index, 0));
                 character = (nint)manager->GetObjectByIndex(checked((ushort)(FirstObject + index)));
-                if (character == 0) throw new InvalidOperationException("The standalone preview character allocation failed.");
+                if (character == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1553698932C3ADD6"), originalMessageText => new InvalidOperationException(originalMessageText));
                 leaseAppearance = CreateLeaseAppearance();
                 var copy = leaseAppearance;
                 view->SetModelData(&copy);
@@ -649,7 +647,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
                     copy.WeaponModelIds[1].Id, copy.WeaponModelIds[2].Id, slot,
                     fashionAccessory?.Id ?? 0, fashionAccessory?.ModelCharaId ?? 0, EquipmentSlotForChoice(itemSelection));
                 leaseStarted = Environment.TickCount64;
-                StatusText = "Loading the captured appearance in the standalone preview...";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SB13AFB9ECF0A1AFE"));
                 return;
             }
             catch
@@ -660,7 +658,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             }
         }
         retryAfter = Environment.TickCount64 + 250;
-        StatusText = "Native preview windows are using all available slots. Close a preview window to continue.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S38E24527EDC45B82"));
     }
 
     private void RunOwned(int operation, Action action)
@@ -694,9 +692,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
                 SuspendAnimationTimeline();
                 animationDiagnostic = $"animation=loading; slot={slot}";
                 stillReadyAt = 0;
-                StatusText = Environment.TickCount64 - leaseStarted > 10000
-                    ? "The captured model is still loading. Choose another inspected item or reopen View Item."
-                    : "Loading the captured appearance in the standalone preview...";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (Environment.TickCount64 - leaseStarted > 10000 ? global::XASlave.Localization.UiMessage.Key("SC5C873A87DFAD85C") : global::XASlave.Localization.UiMessage.Key("SB13AFB9ECF0A1AFE")));
                 return;
             }
             if (!ApplyWeaponState()) { SuspendAnimationTimeline(); return; }
@@ -724,7 +720,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         ReadinessDiagnostic = $"stage=accessory-projection; key={itemSelection}; slot={slot}; state={view->State}; model={modelId}";
         if (view->State < 3)
         {
-            StatusText = "Preparing the standalone " + StandaloneModelName + " scene...";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S20EF1D6B7D1C54BA" , StandaloneModelMessage));
             return;
         }
         // Render's initial appearance stage falls into model-ready in the same
@@ -734,13 +730,13 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         // Minions and mounts use the same lease, never world summon/mount calls.
         // A changed sequence is rejected instead of writing native view state.
         if (view->State != 3 || view->CharacterDataCopied || view->CharacterLoaded)
-            throw new InvalidOperationException($"The standalone {StandaloneModelName} initialization sequence changed (state={view->State}, appearancePending={view->CharacterDataCopied}, modelPending={view->CharacterLoaded}).");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SFE8FD4560EFD13C3" , StandaloneModelMessage, view->State, view->CharacterDataCopied, view->CharacterLoaded), originalMessageText => new InvalidOperationException(originalMessageText));
         if (Marshal.ReadIntPtr((nint)view) != moduleBase + 0x21A1CC8 || view->CameraManager == 0
             || view->Camera == null || Marshal.ReadIntPtr(SceneSlot(slot)) != (nint)view->Camera || ContextCount(slot) != 1)
-            throw new InvalidOperationException("The standalone " + StandaloneModelName + " render context could not be confirmed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SFAB322CD7D49730D" , StandaloneModelMessage), originalMessageText => new InvalidOperationException(originalMessageText));
         NearbyZoneNativeBinding.RequireReadable((nint)view->CameraManager, 0x20);
         if (Marshal.ReadIntPtr((nint)view->CameraManager) != moduleBase + 0x214D248)
-            throw new InvalidOperationException("The standalone " + StandaloneModelName + " render context ownership changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SB8C7236DE9FAE6A3" , StandaloneModelMessage), originalMessageText => new InvalidOperationException(originalMessageText));
         RequireFashionValue("StillOwner", ConfirmStillOwner() ? 1 : 0, 1);
         RequireFashionValue("AnimationPaused", animationPaused ? 1 : 0, 0);
         RequireFashionValue("OwnsPauseReason", ownsPauseReason ? 1 : 0, 0);
@@ -772,19 +768,19 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         {
             NearbyZoneNativeBinding.RequireWritable(initialDraw, sizeof(CharacterBase));
             if (((CharacterBase*)initialDraw)->GetModelType() != CharacterBase.ModelType.Human)
-                throw new InvalidOperationException("The " + StandaloneModelName + " initial standalone model changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S57FD84C49FA5C3D8" , StandaloneModelMessage), originalMessageText => new InvalidOperationException(originalMessageText));
             RunOwned(3, () => disableDraw(character));
         }
         if (!ConfirmStillOwner() || clone->DrawObject != null)
-            throw new InvalidOperationException("The " + StandaloneModelName + " initial standalone model could not be retired.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SE00C21DCB5E161B7" , StandaloneModelMessage), originalMessageText => new InvalidOperationException(originalMessageText));
         RunOwned(3, () => setupModel(character + 0x1B10, modelId, 0, 0, 0, 1f));
         if (!ConfirmStillOwner() || clone->DrawObject != null
             || Marshal.ReadInt32(character + 0x1B38) != modelId
             || Marshal.ReadByte(character + 0x1B48) != (byte)accessoryModelType)
-            throw new InvalidOperationException("The " + StandaloneModelName + " standalone model setup could not be confirmed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S98E00F76F461C993" , StandaloneModelMessage), originalMessageText => new InvalidOperationException(originalMessageText));
         accessoryProjected = true;
         animationDiagnostic = $"animation=accessory-model-loading; key={itemSelection}; slot={slot}; model={modelId}; type={accessoryModelType}";
-        StatusText = "Loading the captured " + StandaloneModelName + " in the standalone preview...";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("SD82C7E05F976FCCA" , StandaloneModelMessage));
         Plugin.Log.Information("[View Item] Standalone model projection: key={Key}; row={Row}; model={Model}; type={Type}; slot={Slot}; initialRootRetired={Retired}; state={State}.",
             itemSelection, IsFashionAccessory ? fashionAccessory!.Id : previewCompanion!.Id, modelId, accessoryModelType, slot, initialDraw != 0, view->State);
     }
@@ -794,7 +790,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         if (actual == expected) return;
         ReadinessDiagnostic = $"stage=accessory-owner-rejected; field={field}; actual=0x{actual:X}; expected=0x{expected:X}; "
             + $"slot={slot}; clientIndex={FirstObject + slot}; character=0x{character:X}; {animationDiagnostic}";
-        throw new InvalidOperationException("The standalone " + StandaloneModelName + " clone ownership could not be confirmed. " + ReadinessDiagnostic);
+        throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S757B6ABFD5546644" , StandaloneModelMessage, ReadinessDiagnostic), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     private bool ApplyWeaponState()
@@ -807,7 +803,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         if (isolatedOffhand && !OffhandGeometryReady())
         {
             animationPaused = false; stillReadyAt = 0;
-            StatusText = "Waiting for the standalone off-hand model to load...";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S58EAE6222E0BEA7C"));
             return false;
         }
         if (clone->IsWeaponDrawn == DesiredWeaponDrawn) return true;
@@ -816,7 +812,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             animationPaused = false;
             RetireFilterSafely();
             animationDiagnostic = $"animation=weapon-state-paused; slot={slot}; requestedDrawn={DesiredWeaponDrawn}; actualDrawn={clone->IsWeaponDrawn}";
-            StatusText = "Waiting for an unpaused standalone model before changing its weapon state...";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SBDF6D780D3C41DF2"));
             return false;
         }
         if (!isolatedOffhand)
@@ -830,11 +826,11 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         // with the same animation argument, only for this confirmed owned case.
         if (!StillGeometryReady(out _) || Environment.TickCount64 < weaponStateRetryAt) return false;
         if (weaponStateAttempts >= 3)
-            throw new InvalidOperationException("The standalone off-hand weapon state could not be confirmed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S415FF69CB3531A44"), originalMessageText => new InvalidOperationException(originalMessageText));
         if (Marshal.ReadIntPtr(character + 0x638) != character)
-            throw new InvalidOperationException("The standalone off-hand emote owner changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SB6C9F8193D2CD731"), originalMessageText => new InvalidOperationException(originalMessageText));
         if (Marshal.ReadByte(character + 0x1CD) == 0xA)
-            throw new InvalidOperationException("This off-hand animation uses linked actors and cannot be isolated.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S44B11BBAFD1232A2"), originalMessageText => new InvalidOperationException(originalMessageText));
         NearbyZoneNativeBinding.RequireWritable(character, sizeof(NativeCharacter));
         if (!ConfirmStillOwner()) return false;
         weaponStateAttempts++;
@@ -883,7 +879,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             || Marshal.ReadInt16(character + 0x688) != 0 || Marshal.ReadInt16(character + 0x978) != 0)
         {
             animationDiagnostic = $"animation=owner-rejected; slot={slot}; character=0x{character:X}";
-            StatusText = "Waiting for a confirmed standalone model before freezing its animation...";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SE49C85EA01EAD9A1"));
             return false;
         }
         return true;
@@ -968,11 +964,11 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         if (draw == null) return false;
         NearbyZoneNativeBinding.RequireReadable((nint)draw, sizeof(CharacterBase));
         if (draw->GetModelType() != CharacterBase.ModelType.Human)
-            throw new InvalidOperationException("The full item preview no longer owns a human model.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SBE5008837E9C9D80"), originalMessageText => new InvalidOperationException(originalMessageText));
         NearbyZoneNativeBinding.RequireReadable((nint)draw, sizeof(Human));
         var selectedSlot = itemSelection == 100 ? 10 : EquipmentSlotForChoice(itemSelection);
         if (draw->SlotCount <= selectedSlot || draw->SlotCount > 32 || draw->Models == null)
-            throw new InvalidOperationException("The full item preview model collection changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S986CE28E4B33BAF5"), originalMessageText => new InvalidOperationException(originalMessageText));
         NearbyZoneNativeBinding.RequireReadable((nint)draw->Models, checked(draw->SlotCount * sizeof(nint)));
         var model = draw->Models[selectedSlot];
         // A genuinely absent model still uses the existing MissingModels result.
@@ -981,7 +977,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         if (model->ModelResourceHandle == null || model->RenderModelCallback == null) return false;
         NearbyZoneNativeBinding.RequireReadable((nint)model->RenderModelCallback, sizeof(ModelRenderer.Callback));
         if (model->SlotIndex != (uint)selectedSlot || (nint)model->RenderModelCallback->ThisArg != (nint)draw)
-            throw new InvalidOperationException("The full item preview model owner changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0FDA986170A3A06D"), originalMessageText => new InvalidOperationException(originalMessageText));
         var resource = (nint)model->ModelResourceHandle;
         NearbyZoneNativeBinding.RequireReadable(resource, sizeof(ModelResourceHandle));
         var visible = (Marshal.ReadInt32((nint)model + 0x28) & 1) != 0;
@@ -1015,7 +1011,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         {
             animationPaused = false; stillReadyAt = 0;
             animationDiagnostic = $"animation=geometry-pending; slot={slot}; weaponRequired={weaponPresent}; weaponDrawn={clone->IsWeaponDrawn}; requestedDrawn={DesiredWeaponDrawn}";
-            StatusText = "Waiting for the standalone model and weapon attachments to settle...";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SEA85DC39BF4336B2"));
             return;
         }
         var now = Environment.TickCount64;
@@ -1026,13 +1022,13 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         if (now - stillReadyAt < 1000)
         {
             animationDiagnostic = $"animation=settling; slot={slot}; stableMs={now - stillReadyAt}";
-            StatusText = "Preparing a still view of the selected item...";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S548D3FB9D1F52907"));
             return;
         }
         if (!ApplyFullItemVisibility())
         {
             animationPaused = false; stillReadyAt = 0;
-            StatusText = "Waiting for the selected item's complete model...";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S633D593F184E45A5"));
             return;
         }
         if (animationPlaying)
@@ -1042,7 +1038,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             ResumeOwnedAnimation();
             animationReady = !ownsPauseReason && Marshal.ReadByte(character + 0x1BA4) == 0;
             animationDiagnostic = $"animation={(animationReady ? "playing" : "externally-paused")}; slot={slot}; character=0x{character:X}";
-            if (!animationReady) StatusText = "Waiting for the standalone animation to resume...";
+            if (!animationReady) StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S2E2F40F931102E71"));
             return;
         }
         var nativePaused = (Marshal.ReadByte(character + 0x1BA4) & 0x10) != 0 && ConfirmPausedDraws();
@@ -1063,7 +1059,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         animationPaused = nativePaused;
         animationReady = nativePaused;
         animationDiagnostic = $"animation={(nativePaused ? "paused" : "pause-unconfirmed")}; slot={slot}; character=0x{character:X}; geometry=0x{geometry:X}";
-        if (!nativePaused) StatusText = "Waiting for the standalone animation pause to be confirmed...";
+        if (!nativePaused) StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S8AAE8CE4569285AF"));
     }
 
     private void ResumeOwnedAnimation()
@@ -1075,7 +1071,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             if (!MatchesNativeBytes(moduleBase + proof.Rva, proof.Bytes))
             {
                 cleanupBlocked = true;
-                throw new InvalidOperationException("The standalone animation cleanup binding changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE6BD6B14F614E6B5"), originalMessageText => new InvalidOperationException(originalMessageText));
             }
         NearbyZoneNativeBinding.RequireWritable(character, sizeof(NativeCharacter));
         RequirePauseDrawsWritable();
@@ -1105,13 +1101,13 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             if (disposed || preempted || !OwnsCharacter())
             {
                 ReadinessDiagnostic = $"stage=scene-owner; slot={slot}; disposed={disposed}; preempted={preempted}; character=0x{character:X}";
-                StatusText = "Waiting for a confirmed standalone preview owner...";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SF74A63450333D10E"));
                 return null;
             }
             ReadinessDiagnostic = $"stage=scene-loading; slot={slot}; state={view->State}; "
                 + $"appearancePending={view->CharacterDataCopied}; modelPending={view->CharacterLoaded}; character=0x{character:X}";
             if (view->State != 6 || view->CharacterDataCopied || view->CharacterLoaded)
-            { StatusText = "Loading the captured appearance in the standalone preview..."; return null; }
+            { StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SB13AFB9ECF0A1AFE")); return null; }
             if (!ConfirmStillOwner() || !AnimationReadyForDisplay())
             {
                 animationPaused = false;
@@ -1124,14 +1120,14 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             ReadinessDiagnostic = $"stage=scene-camera; slot={slot}; camera=0x{(nint)camera:X}; "
                 + $"assigned=0x{assignedCamera:X}; contexts={contexts}";
             if (camera == null || assignedCamera != (nint)camera || contexts != 1)
-            { StatusText = "Waiting for the standalone preview camera and render context..."; return null; }
+            { StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SA97DAEFE4B037DB2")); return null; }
             NearbyZoneNativeBinding.RequireReadable((nint)camera, sizeof(SceneCamera));
             var offscreen = OffscreenRenderingManager.Instance();
             NearbyZoneNativeBinding.RequireReadable((nint)offscreen, sizeof(OffscreenRenderingManager));
             if (camera->RenderCamera == null || offscreen->Cameras[checked((int)slot)].Value != camera->RenderCamera)
             {
                 ReadinessDiagnostic = $"stage=scene-offscreen-camera; slot={slot}; renderCamera=0x{(nint)camera->RenderCamera:X}";
-                StatusText = "Waiting for the standalone camera to render..."; return null;
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SAF94CF0856718C27")); return null;
             }
             var clone = (NativeCharacter*)character;
             NearbyZoneNativeBinding.RequireReadable((nint)clone, sizeof(NativeCharacter));
@@ -1139,7 +1135,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             if (draw == null)
             {
                 ReadinessDiagnostic = $"stage=scene-draw-object; slot={slot}; character=0x{character:X}";
-                StatusText = "The standalone character model is still loading."; return null;
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SDF80815A77ED7162")); return null;
             }
             NearbyZoneNativeBinding.RequireReadable((nint)draw, sizeof(CharacterBase));
             var expectedType = IsStandaloneModel ? accessoryModelType : CharacterBase.ModelType.Human;
@@ -1148,7 +1144,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
                 || Marshal.ReadInt32(character + 0x1B38) != StandaloneModelId)))
             {
                 ReadinessDiagnostic = $"stage=scene-model-type; slot={slot}; draw=0x{(nint)draw:X}; expected={expectedType}; actual={actualType}; accessoryProjected={accessoryProjected}";
-                StatusText = "The standalone preview has an unsupported character model."; return null;
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SD541A4D7F02601DB")); return null;
             }
             if (!IsStandaloneModel) NearbyZoneNativeBinding.RequireReadable((nint)draw, sizeof(Human));
             ReadinessDiagnostic = $"stage=scene-ready; slot={slot}; character=0x{character:X}; draw=0x{(nint)draw:X}; camera=0x{(nint)camera:X}";
@@ -1198,7 +1194,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         NearbyZoneNativeBinding.RequireWritable((nint)render, sizeof(RenderCamera));
         var ratio = view->ZoomRatio;
         if (!float.IsFinite(ratio) || ratio < 0.01f || ratio > 100)
-        { StatusText = "Waiting for the standalone camera scale..."; return; }
+        { StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S645D522DCC8F5D4C")); return; }
         var nextBaseHeight = Math.Clamp(5 / ratio, 0.1f, 50);
         var nextTargetHeight = Math.Clamp(1.25f / ratio, 0.0125f, 12.5f);
         // Roll turns the camera's right/up axes around its viewing direction.
@@ -1235,7 +1231,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         preempted = true;
         RetireFilterSafely();
         retryAfter = Environment.TickCount64 + 250;
-        StatusText = "A native preview took this slot. Waiting for another standalone slot...";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S588938D15B8641DB"));
         // Foreign callers outside the framework retire render admission immediately.
         // The next Tick frees only our own remaining resources using identity checks.
         if (Plugin.Framework.IsInFrameworkUpdateThread) ReleaseLocked();
@@ -1405,20 +1401,20 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             // Keep the allocation alive rather than free native resources through an
             // unproved virtual table. No further optional scene can be admitted.
             cleanupBlocked = true;
-            StatusText = "The standalone preview's native ownership changed. Close View Item.";
-            throw new InvalidOperationException("The standalone preview cannot safely release its changed virtual table.");
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S47A24A49ED916BE2"));
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S627EA1CDA543C804"), originalMessageText => new InvalidOperationException(originalMessageText));
         }
         if (retired->CameraManager != 0)
         {
             NearbyZoneNativeBinding.RequireReadable((nint)retired->CameraManager, 0x20);
             if (Marshal.ReadIntPtr((nint)retired->CameraManager) != moduleBase + 0x214D248)
-            { cleanupBlocked = true; throw new InvalidOperationException("The standalone preview context ownership changed."); }
+            { cleanupBlocked = true; throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S44895003FA7F1CAF"), originalMessageText => new InvalidOperationException(originalMessageText)); }
         }
         if (retired->Camera != null)
         {
             NearbyZoneNativeBinding.RequireReadable((nint)retired->Camera, sizeof(SceneCamera));
             if (Marshal.ReadIntPtr((nint)retired->Camera) != moduleBase + 0x216C9D8)
-            { cleanupBlocked = true; throw new InvalidOperationException("The standalone preview camera ownership changed."); }
+            { cleanupBlocked = true; throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2E098BA3E0609D6F"), originalMessageText => new InvalidOperationException(originalMessageText)); }
         }
         var manager = Objects();
         var ownsClone = retiredCharacter != 0
@@ -1462,7 +1458,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         selectionReady = pairedWeapon = false; itemSelection = weaponSelection = -1; weaponDrawn = true;
         accessorySelection = accessoryProjected = false; fashionAccessory = null; accessoryModelType = default;
         previewCompanion = null;
-        StatusText = "Choose an inspected item.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SE3872DCC0D95A9AE"));
     }
 
     internal void Clear()

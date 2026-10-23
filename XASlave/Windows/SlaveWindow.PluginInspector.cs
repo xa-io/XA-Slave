@@ -20,6 +20,7 @@ public partial class SlaveWindow
     private string[] inspectorPlugins = [];
     private string inspectorSelected = string.Empty;
     private string inspectorStatus = "Refresh the loaded plugin list, select a plugin, then Scan.";
+    private global::XASlave.Localization.UiMessage? inspectorStatusUiMessage = global::XASlave.Localization.UiMessage.Key("SE4E560F5DD0F88C3");
     private string inspectorExportPath = string.Empty;
     private string inspectorIpcFilter = string.Empty;
     private bool inspectorShowAllIpc;
@@ -32,13 +33,13 @@ public partial class SlaveWindow
 
     private void DrawPluginInspector()
     {
-        if (!ImGui.CollapsingHeader("Plugin Inspector##xaAbuse")) return;
+        if (!global::XASlave.Localization.UiNative.CollapsingHeader((global::XASlave.Localization.UiLocale.Native("SE9D93BD5231580C6") + "##xaAbuse"))) return;
         PollPluginInspector();
-        ImGui.TextWrapped("Inspect IPC, commands and member metadata for possible integrations. Prefer IPC, then commands, then reviewed reflection. Scanning does not call discovered controls.");
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S13AAA4C4C3E83E04"));
         using (ImRaii.Disabled(inspectorTask != null))
         {
-            if (ImGui.Button("Refresh plugins##inspector")) RefreshInspectorPlugins();
-            using (var combo = ImRaii.Combo("Plugin##inspector", inspectorSelected.Length == 0 ? "Select plugin" : inspectorSelected))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S0986F19F7A29E4C0") + "##inspector"))) RefreshInspectorPlugins();
+            using (var combo = global::XASlave.Localization.UiNative.ComboScope((global::XASlave.Localization.UiLocale.Native("SAB1173EED1D477D9") + "##inspector"), inspectorSelected.Length == 0 ? global::XASlave.Localization.UiLocale.Get("S53827013EDD04E78") : inspectorSelected))
             if (combo)
             {
                 foreach (var name in inspectorPlugins)
@@ -48,32 +49,32 @@ public partial class SlaveWindow
                         inspectorSnapshot = null;
                         inspectorInstance = null;
                         inspectorExportPath = string.Empty;
-                        inspectorStatus = "Ready to scan " + name + ".";
+                        inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S597F7BD04E1BC619"), global::XASlave.Localization.UiMessage.Value(name)), global::XASlave.Localization.UiMessage.Key("SCDB4EE2AEA69CC6A")));
                     }
             }
             using (ImRaii.Disabled(inspectorSelected.Length == 0))
-                if (ImGui.Button("Scan IPC and metadata##inspector")) StartPluginInspection();
+                if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S6D9A2DE6103D1EBB") + "##inspector"))) StartPluginInspection();
         }
         if (inspectorTask != null)
         {
             ImGui.SameLine();
-            if (ImGui.Button("Cancel scan##inspector")) inspectorCancellation?.Cancel();
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S298360E0B166F75D") + "##inspector"))) inspectorCancellation?.Cancel();
         }
-        ImGui.TextWrapped(inspectorStatus);
+        ImGui.TextWrapped(global::XASlave.Localization.UiMessage.Resolve(ref inspectorStatusUiMessage, inspectorStatus));
         if (inspectorSnapshot is { } snapshot)
         {
-            ImGui.TextWrapped($"Captured {snapshot.Report.Identity.InternalName}; MVID {inspectorModuleId:D}.");
-            ImGui.TextWrapped($"Types: {snapshot.Report.Types.Count}; commands: {snapshot.Report.Commands.Count}; metadata entries: {snapshot.MemberCount}; partial: {snapshot.Report.Partial}.");
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("SA72BC12DBCFF8C01", snapshot.Report.Identity.InternalName, inspectorModuleId));
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("S14161D2EE9B022DE", snapshot.Report.Types.Count, snapshot.Report.Commands.Count, snapshot.MemberCount, snapshot.Report.Partial));
             DrawInspectorIpc(snapshot.Report);
-            if (ImGui.Button("Export JSON##inspector")) ExportPluginInspection();
-            using (var details = ImRaii.TreeNode("Discovery limits##inspector"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SFF25653EE9E47F2A") + "##inspector"))) ExportPluginInspection();
+            using (var details = global::XASlave.Localization.UiNative.TreeScope((global::XASlave.Localization.UiLocale.Native("SDBB2757E0137D24D") + "##inspector")))
             if (details)
-                foreach (var limitation in snapshot.Report.Limitations) ImGui.TextWrapped(limitation);
+                foreach (var limitation in PluginInspectionPresentation.Limitations(snapshot.Report, snapshot.Report.Limitations)) ImGui.TextWrapped(limitation);
         }
         if (inspectorExportPath.Length > 0)
         {
-            ImGui.TextWrapped("Export: " + inspectorExportPath);
-            if (ImGui.Button("Copy export path##inspector")) ImGui.SetClipboardText(inspectorExportPath);
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("S10EE28D4515037B5", inspectorExportPath));
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S1E6060104EDEE8CC") + "##inspector"))) ImGui.SetClipboardText(inspectorExportPath);
         }
     }
 
@@ -81,12 +82,12 @@ public partial class SlaveWindow
     {
         if (report.Ipc is not { } ipc) return;
         var attributed = ipc.Channels.Count(channel => channel.AttributedToSelectedPlugin);
-        ImGui.TextWrapped($"IPC registry: {ipc.Status}; channels: {ipc.Channels.Count}; providers attributed to selected plugin: {attributed}; declarations: {report.IpcDeclarations.Count}.");
-        using var details = ImRaii.TreeNode("IPC discovery##inspector");
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("SCF9FC1C134F1886E", PluginInspectionPresentation.Status(ipc, ipc.Status), ipc.Channels.Count, attributed, report.IpcDeclarations.Count));
+        using var details = global::XASlave.Localization.UiNative.TreeScope((global::XASlave.Localization.UiLocale.Native("S51DF77B6E304E40A") + "##inspector"));
         if (!details) return;
-        ImGui.TextWrapped("Snapshot only. Registrations can change; signatures do not establish behavior or thread requirements. Event subscribers do not identify the publisher. Shared wrappers can hide ownership.");
-        ImGui.Checkbox("Show all registry channels##inspector", ref inspectorShowAllIpc);
-        ImGui.InputText("Filter channel##inspector", ref inspectorIpcFilter, 256);
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SF4655A9A477414CD"));
+        global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SDDC0570C0FDC9063") + "##inspector"), ref inspectorShowAllIpc);
+        global::XASlave.Localization.UiNative.InputText((global::XASlave.Localization.UiLocale.Native("S1463741E8FBFE681") + "##inspector"), ref inspectorIpcFilter, 256);
         var matched = 0;
         foreach (var channel in ipc.Channels)
         {
@@ -95,14 +96,14 @@ public partial class SlaveWindow
             matched++;
             if (matched > 100) continue;
             ImGui.TextUnformatted(channel.Name);
-            if (!channel.NameComplete) ImGui.TextWrapped("Channel name incomplete; use a fresh complete capture before mapping a control.");
-            ImGui.TextWrapped($"{channel.RegistrationState}; provider ownership: {(channel.AttributedToSelectedPlugin ? "selected assembly evidence" : "unresolved for selected plugin")}; selected plugin subscribes: {channel.SelectedPluginSubscribes}.");
-            if (channel.Function != null) ImGui.TextWrapped("Function" + (channel.Function.SignatureComplete ? ": " : " (incomplete): ") + channel.Function.InvokeSignature);
-            if (channel.Action != null) ImGui.TextWrapped("Action" + (channel.Action.SignatureComplete ? ": " : " (incomplete): ") + channel.Action.InvokeSignature);
+            if (!channel.NameComplete) ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S08F957737A55BDB5"));
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("SFEDB043979A284C8", channel.RegistrationMessage.Display, (channel.AttributedToSelectedPlugin ? global::XASlave.Localization.UiLocale.Get("SF909B541B275B451") : global::XASlave.Localization.UiLocale.Get("S62A959A75BC09212")), channel.SelectedPluginSubscribes));
+            if (channel.Function != null) ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("SAAF12F8C1085F648", channel.Function.SignatureComplete ? ": " : global::XASlave.Localization.UiLocale.Get("S597234AE46CFD890"), channel.Function.InvokeSignature));
+            if (channel.Action != null) ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("SFF75D30FDA520964", channel.Action.SignatureComplete ? ": " : global::XASlave.Localization.UiLocale.Get("S597234AE46CFD890"), channel.Action.InvokeSignature));
         }
-        if (matched == 0) ImGui.TextWrapped("No matching registry channels. Declarations may still be present; check the export and discovery limits.");
-        if (matched > 100) ImGui.TextWrapped($"Showing 100 of {matched} matches. Filter further or export JSON for the captured list.");
-        foreach (var limitation in ipc.Limitations) ImGui.TextWrapped(limitation);
+        if (matched == 0) ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SF76B03243797CC40"));
+        if (matched > 100) ImGui.TextWrapped(global::XASlave.Localization.UiLocale.FormatKey("SF7FAFC372F1A54BF", matched));
+        foreach (var limitation in PluginInspectionPresentation.Limitations(ipc, ipc.Limitations)) ImGui.TextWrapped(limitation);
     }
 
     private void RefreshInspectorPlugins()
@@ -117,9 +118,9 @@ public partial class SlaveWindow
                 inspectorSnapshot = null;
                 inspectorInstance = null;
             }
-            inspectorStatus = $"{inspectorPlugins.Length} loaded plugins available.";
+            inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Format("S28E8BB682BA2FDF6", inspectorPlugins.Length));
         }
-        catch (Exception error) { inspectorStatus = "Plugin list unavailable: " + error.GetType().Name; }
+        catch (Exception error) { inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SC22825757777599F"), global::XASlave.Localization.UiMessage.Value(error.GetType().Name))); }
     }
 
     private void StartPluginInspection()
@@ -134,7 +135,7 @@ public partial class SlaveWindow
             var instance = AutoRetainerUiReflectionService.TryGetLoadedPluginInstance(inspectorSelected, string.Empty);
             if (exposed == null || instance == null)
             {
-                inspectorStatus = "The selected plugin's loaded instance is unavailable. Refresh and try again.";
+                inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Key("S5845D296E51D68C9"));
                 return;
             }
             var assembly = instance.GetType().Assembly;
@@ -157,7 +158,8 @@ public partial class SlaveWindow
                 var ipc = PluginInspectionIpcRegistry.Capture(assembly, hostInterface, token);
                 var report = PluginInspectionCatalog.Capture(assembly, identity, commands, token);
                 report.Ipc = ipc;
-                report.Limitations.AddRange(commandLimitations);
+                report.Limitations.AddRange(commandLimitations.Select(message => message.Original));
+                PluginInspectionPresentation.Append(report, commandLimitations);
                 report.CommandCaptureIncomplete = commandLimitations.Count > 1;
                 report.HasMainUi = hasMainUi;
                 report.HasConfigUi = hasConfigUi;
@@ -170,23 +172,23 @@ public partial class SlaveWindow
                 });
                 token.ThrowIfCancellationRequested();
                 if (Encoding.UTF8.GetByteCount(json) > InspectorMaxJsonBytes)
-                    throw new InvalidOperationException("Inspector export exceeded its size limit.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S100D0FDC945D07C6"), originalMessage => new InvalidOperationException(originalMessage));
                 return new InspectorSnapshot(report, json, report.Types.Sum(type => type.Members.Count));
             }, token);
             // Observe faults even if the debug panel stays closed or XA Slave is disposed.
             _ = inspectorTask.ContinueWith(task => { _ = task.Exception; }, CancellationToken.None,
                 TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-            inspectorStatus = "Scanning IPC registry and metadata...";
+            inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Key("SD187EDA6AFD8AE11"));
         }
-        catch (Exception error) { inspectorStatus = "Inspection could not start: " + error.GetType().Name; }
+        catch (Exception error) { inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SB0331AFAA1246AC9"), global::XASlave.Localization.UiMessage.Value(error.GetType().Name))); }
     }
 
-    private static IReadOnlyList<PluginInspectionCommand> CaptureInspectorCommands(Assembly assembly, out List<string> limitations)
+    private static IReadOnlyList<PluginInspectionCommand> CaptureInspectorCommands(Assembly assembly, out List<global::XASlave.Localization.UiMessage> limitations)
     {
         const int maxRegistryEntries = 4096;
         const int maxCommands = 512;
         var commands = new List<PluginInspectionCommand>();
-        limitations = ["Commands are attributed by handler declaration or target type assembly. Shared wrappers can hide ownership; this is not proof of complete command coverage."];
+        limitations = [global::XASlave.Localization.UiMessage.Key("S93A1C851E40EA695")];
         var scanned = 0;
         try
         {
@@ -194,7 +196,7 @@ public partial class SlaveWindow
             {
                 if (scanned++ >= maxRegistryEntries || commands.Count >= maxCommands)
                 {
-                    limitations.Add("Command capture truncated at its registry/command limit.");
+                    limitations.Add(global::XASlave.Localization.UiMessage.Key("S07E10BCC72D344F5"));
                     break;
                 }
                 try
@@ -207,17 +209,16 @@ public partial class SlaveWindow
                     if (!declaredHere && !targetHere) continue;
                     commands.Add(new PluginInspectionCommand(InspectorText(pair.Key), InspectorText(pair.Value.HelpMessage),
                         InspectorText((method.DeclaringType?.FullName ?? "<dynamic>") + "." + method.Name),
-                        declaredHere ? "Handler declaring assembly matches selected loaded assembly; ownership candidate."
-                            : "Handler target type assembly matches selected loaded assembly; ownership candidate."));
+                        (declaredHere ? global::XASlave.Localization.UiMessage.Key("SBE146A39EB0856EF") : global::XASlave.Localization.UiMessage.Key("S1C33941227393F93")).Original));
                 }
                 catch (Exception error)
                 {
                     if (limitations.Count < 64)
-                        limitations.Add("A command entry could not be inspected: " + error.GetType().Name);
+                        limitations.Add(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S3D5DAB93B67BF18B"), global::XASlave.Localization.UiMessage.Raw(error.GetType().Name)));
                 }
             }
         }
-        catch (Exception error) { limitations.Add("Command registry capture incomplete: " + error.GetType().Name); }
+        catch (Exception error) { limitations.Add(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SA3AC8D3E912D043E"), global::XASlave.Localization.UiMessage.Raw(error.GetType().Name))); }
         return commands;
     }
 
@@ -244,20 +245,20 @@ public partial class SlaveWindow
         var canceled = inspectorCancellation?.IsCancellationRequested == true;
         inspectorCancellation?.Dispose();
         inspectorCancellation = null;
-        if (canceled || task.IsCanceled) { inspectorStatus = "Inspection canceled."; return; }
+        if (canceled || task.IsCanceled) { inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Key("SA61BB768273A9233")); return; }
         if (task.IsFaulted)
         {
-            inspectorStatus = "Inspection failed: " + (task.Exception?.GetBaseException().GetType().Name ?? "unknown error");
+            inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SD1BD98B7F9A8A300"), ((task.Exception?.GetBaseException().GetType().Name is { } failureType ? global::XASlave.Localization.UiMessage.Raw(failureType) : global::XASlave.Localization.UiMessage.Key("S3E4443E52275A9A0")))));
             return;
         }
         if (!InspectorInstanceIsCurrent())
         {
             inspectorInstance = null;
-            inspectorStatus = "The plugin unloaded or reloaded during capture. Refresh and scan its current instance.";
+            inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Key("S5A8C809317442C36"));
             return;
         }
         inspectorSnapshot = task.Result;
-        inspectorStatus = "IPC and metadata captured. Review discovery limits, then Export JSON.";
+        inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Key("SA42BDD4E50A5DFF9"));
     }
 
     private void ExportPluginInspection()
@@ -266,7 +267,7 @@ public partial class SlaveWindow
         if (!InspectorInstanceIsCurrent())
         {
             inspectorSnapshot = null;
-            inspectorStatus = "This capture belongs to an unloaded or replaced instance. Scan again before exporting.";
+            inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Key("SE605F148E3A494A2"));
             return;
         }
         string? temporaryPath = null;
@@ -287,9 +288,9 @@ public partial class SlaveWindow
             File.Move(temporaryPath, destination, overwrite: false);
             temporaryPath = null;
             inspectorExportPath = destination;
-            inspectorStatus = "JSON exported. Member candidates have not been invoked or verified as controls.";
+            inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Key("S2596AA0163D5270D"));
         }
-        catch (Exception error) { inspectorStatus = "Export failed: " + error.GetType().Name; }
+        catch (Exception error) { inspectorStatus = global::XASlave.Localization.UiMessage.Store(ref inspectorStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SE82FD5F506B4B84B"), global::XASlave.Localization.UiMessage.Value(error.GetType().Name))); }
         finally
         {
             if (ownsTemporary && temporaryPath != null)

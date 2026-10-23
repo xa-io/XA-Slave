@@ -42,7 +42,10 @@ public unsafe sealed class PopupCleanerService : IDisposable
     public bool IsEnabled => enabled;
     public bool HideHowToNotice => hideHowToNotice;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public void ApplyConfiguration(bool hideHowToNotice)
     {
@@ -133,12 +136,10 @@ public unsafe sealed class PopupCleanerService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
-        StatusText = hideHowToNotice
-            ? "Enabled - common popups plus HowToNotice are auto-closed."
-            : "Enabled - common popups are auto-closed.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (hideHowToNotice ? global::XASlave.Localization.UiMessage.Key("SFD8801E845E0A752") : global::XASlave.Localization.UiMessage.Key("SCFC29D5E94845FDE")));
     }
 }

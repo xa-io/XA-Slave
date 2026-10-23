@@ -28,7 +28,10 @@ public sealed class TargetCommandFixService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -61,17 +64,13 @@ public sealed class TargetCommandFixService : IDisposable
         if (!shouldEnable)
         {
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         Subscribe();
 
-        StatusText = requiredByXagman && !enabled
-            ? "Enabled for Xagman - failed /target lookups select the closest targetable matching actor even though the XA Mod toggle is off."
-            : requiredByXagman
-                ? "Enabled - failed /target lookups select the closest targetable matching actor; Xagman also requires this while running."
-                : "Enabled - failed /target lookups select the closest targetable matching actor.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (requiredByXagman && !enabled ? global::XASlave.Localization.UiMessage.Key("SDB73313C3B4F07B6") : (requiredByXagman ? global::XASlave.Localization.UiMessage.Key("SFD5A748407AED826") : global::XASlave.Localization.UiMessage.Key("S45E27CAC194E49BA"))));
     }
 
     private void Subscribe()

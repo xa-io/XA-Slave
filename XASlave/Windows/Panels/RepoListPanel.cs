@@ -21,27 +21,28 @@ public partial class SlaveWindow
 
     private DateTime repoListStatusExpiry = DateTime.MinValue;
     private string repoListStatus = string.Empty;
+    private global::XASlave.Localization.UiMessage? repoListStatusUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
     private PolledValue<RepoListEntry[]>? repoListEntries;
     private HashSet<string> repoInstalledPluginNames = new(StringComparer.OrdinalIgnoreCase);
 
     private void DrawRepoList()
     {
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Repo List");
-        ImGui.TextDisabled("Helpful and commonly required repositories for XA Slave integrations.");
-        ImGui.TextWrapped("Rows include every plugin currently published by the referenced repositories. Status shows whether Dalamud reports the plugin installed or directly available.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S273D7A925BD20F8A"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S98B1FFD5FE9DF20F"));
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S006F26FBE0C5D37E"));
 
         if (!string.IsNullOrWhiteSpace(repoListStatus) && DateTime.UtcNow <= repoListStatusExpiry)
         {
             ImGui.Spacing();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), repoListStatus);
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiMessage.Resolve(ref repoListStatusUiMessage, repoListStatus));
         }
 
         ImGui.Spacing();
-        if (ImGui.Button("Open Plugin Installer"))
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S6385ED5C00583D51")))
             Plugin.ScheduleOnGameThread(() => ChatHelper.SendMessage("/xlplugins"));
 
         ImGui.SameLine();
-        if (ImGui.Button("Open Plugin Settings"))
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S32FB2F527CAA7AF4")))
             Plugin.ScheduleOnGameThread(() => ChatHelper.SendMessage("/xlsettings"));
 
         ImGui.Spacing();
@@ -152,12 +153,12 @@ public partial class SlaveWindow
         using (var imguiScope152 = ImRaii.Table("RepoPlugins", 5, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp | ImGuiTableFlags.Sortable))
         if (imguiScope152)
         {
-            ImGui.TableSetupColumn("Group", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.DefaultSort, 1.35f);
-            ImGui.TableSetupColumn("Author", ImGuiTableColumnFlags.WidthStretch, 1.05f);
-            ImGui.TableSetupColumn("Plugin Name", ImGuiTableColumnFlags.WidthStretch, 1.35f);
-            ImGui.TableSetupColumn("Status", ImGuiTableColumnFlags.WidthStretch, 0.85f);
-            ImGui.TableSetupColumn("Copy Repo Button", ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoSort, 1.0f);
-            ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S34CA0E76608842FF"), ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.DefaultSort, 1.35f);
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SD95082A2EE57F3E4"), ImGuiTableColumnFlags.WidthStretch, 1.05f);
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S739C4897C863E9EB"), ImGuiTableColumnFlags.WidthStretch, 1.35f);
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S920E413C7D411B61"), ImGuiTableColumnFlags.WidthStretch, 0.85f);
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SD61B4BACFD879567"), ImGuiTableColumnFlags.WidthStretch | ImGuiTableColumnFlags.NoSort, 1.0f);
+            global::XASlave.Localization.UiNative.TableHeadersRow();
 
             var sortedEntries = SortRepositoryEntries(entries);
             for (var i = 0; i < sortedEntries.Length; i++)
@@ -176,24 +177,24 @@ public partial class SlaveWindow
 
                 ImGui.TableNextColumn();
                 if (entry.Installed)
-                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Installed");
+                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("SF8B32F4E92BD84CE"));
                 else
-                    ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), "Not installed");
+                    ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("SD177CDC09A4EA3F3"));
 
                 ImGui.TableNextColumn();
                 if (string.IsNullOrWhiteSpace(entry.RepoUrl))
                 {
-                    ImGui.TextDisabled("Configured repo");
+                    ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S3E39A0679B3589A6"));
                 }
-                else if (ImGui.SmallButton($"Copy##RepoListCopy{i}"))
+                else if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("SE21F935F11D7E966") + $"##RepoListCopy{i}")))
                 {
                     ImGui.SetClipboardText(entry.RepoUrl);
-                    repoListStatus = $"Copied {entry.Author} repo URL to clipboard.";
+                    repoListStatus = global::XASlave.Localization.UiMessage.Store(ref repoListStatusUiMessage, global::XASlave.Localization.UiMessage.Format("S5FF02E196156561D", entry.Author));
                     repoListStatusExpiry = DateTime.UtcNow.AddSeconds(5);
                 }
 
                 if (ImGui.IsItemHovered())
-                    ImGui.SetTooltip(string.IsNullOrWhiteSpace(entry.RepoUrl) ? "Install from your configured plugin repositories." : entry.RepoUrl);
+                    ImGui.SetTooltip(string.IsNullOrWhiteSpace(entry.RepoUrl) ? global::XASlave.Localization.UiLocale.Get("S88A8E3F819453519") : entry.RepoUrl);
             }
 
 

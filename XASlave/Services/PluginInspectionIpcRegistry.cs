@@ -28,8 +28,8 @@ internal sealed record PluginInspectionIpcChannel(
     PluginInspectionIpcDelegate? Function, PluginInspectionIpcDelegate? Action,
     IReadOnlyList<PluginInspectionIpcDelegate> Subscriptions)
 {
-    public string RegistrationState => HasFunction || HasAction ? "provider registered"
-        : SubscriptionCount > 0 ? "message subscribers only; publisher unknown" : "empty channel; no provider observed";
+    internal global::XASlave.Localization.UiMessage RegistrationMessage => (HasFunction || HasAction ? global::XASlave.Localization.UiMessage.Key("SD25D34CB0C025ED5") : (SubscriptionCount > 0 ? global::XASlave.Localization.UiMessage.Key("S57EC2F07651D2AB5") : global::XASlave.Localization.UiMessage.Key("SB9D93D2C3661E977")));
+    public string RegistrationState => RegistrationMessage.Original;
 }
 
 internal sealed record PluginInspectionIpcSnapshot(
@@ -65,22 +65,22 @@ internal static class PluginInspectionIpcRegistry
         var host = typeof(IDalamudPluginInterface).Assembly;
         var hostVersion = host.GetName().Version?.ToString() ?? string.Empty;
         var channels = new List<PluginInspectionIpcChannel>();
-        var status = "available";
+        var status = global::XASlave.Localization.UiMessage.Key("SDDD9818ABACFDE7A");
         try
         {
             token.ThrowIfCancellationRequested();
             var contract = ResolveContract(host, initializedPluginInterface);
-            if (!state.Continue()) return Result("partial");
+            if (!state.Continue()) return Result(global::XASlave.Localization.UiMessage.Key("S9834A14AB9BCAA0F"));
             // The actual initialized host interface establishes that service initialization has completed.
             // GetNullable(None) returns immediately for an unavailable/faulted service; never use Get/GetAsync.
             var registry = contract.GetNullable.Invoke(null, new[] { contract.NoPropagation });
-            if (registry == null) return Result("unavailable: host registry is not ready", incomplete: true);
+            if (registry == null) return Result(global::XASlave.Localization.UiMessage.Key("S702FE424F0EBEB41"), incomplete: true);
             if (registry.GetType() != contract.RegistryType) throw new NotSupportedException();
-            if (!state.Continue()) return Result("partial");
+            if (!state.Continue()) return Result(global::XASlave.Localization.UiMessage.Key("S9834A14AB9BCAA0F"));
             var snapshot = contract.Gates.GetValue(registry);
             if (snapshot?.GetType() != contract.DictionaryType || snapshot is not IDictionary gates)
                 throw new NotSupportedException();
-            if (gates.Count > MaxChannels) state.Incomplete("Registry channel list limited to 4096 entries.");
+            if (gates.Count > MaxChannels) state.Incomplete(global::XASlave.Localization.UiMessage.Key("S8C7ECD75B0E2459D"));
             var visitedChannels = 0;
             foreach (DictionaryEntry entry in gates)
             {
@@ -90,29 +90,29 @@ internal static class PluginInspectionIpcRegistry
                     throw new NotSupportedException();
                 try { channels.Add(CaptureChannel(name, entry.Value, contract, selectedAssembly, state)); }
                 catch (OperationCanceledException) { throw; }
-                catch (Exception exception) { state.Failure("Channel metadata", exception); }
+                catch (Exception exception) { state.Failure(global::XASlave.Localization.UiMessage.Key("S9B67097118FC25C2"), exception); }
             }
         }
         catch (OperationCanceledException) { throw; }
         catch (NotSupportedException)
         {
-            status = "unsupported host registry layout";
-            state.Incomplete("The loaded host does not match the allowlisted IPC registry contract; no fallback factories or plugin object traversal were attempted.");
+            status = global::XASlave.Localization.UiMessage.Key("SE13C722135132D84");
+            state.Incomplete(global::XASlave.Localization.UiMessage.Key("S7FF3E36B79B29F9C"));
         }
         catch (Exception exception)
         {
-            status = "registry capture unavailable or partial";
-            state.Failure("Host IPC registry", exception);
+            status = global::XASlave.Localization.UiMessage.Key("S6A3CC4250CB913C9");
+            state.Failure(global::XASlave.Localization.UiMessage.Key("S5439776DB85C6DC9"), exception);
         }
         token.ThrowIfCancellationRequested();
         return Result(status);
 
-        PluginInspectionIpcSnapshot Result(string resultStatus, bool incomplete = false)
+        PluginInspectionIpcSnapshot Result(global::XASlave.Localization.UiMessage resultStatus, bool incomplete = false)
         {
             token.ThrowIfCancellationRequested();
-            if (resultStatus == "available" && (incomplete || state.IsIncomplete)) resultStatus = "partial";
-            return new(resultStatus, hostVersion, capturedUtc, incomplete || state.IsIncomplete,
-                Array.AsReadOnly(channels.ToArray()), Array.AsReadOnly(state.Limitations.ToArray()));
+            if (resultStatus.Original == "available" && (incomplete || state.IsIncomplete)) resultStatus = global::XASlave.Localization.UiMessage.Key("S9834A14AB9BCAA0F");
+            return PluginInspectionPresentation.Attach(new PluginInspectionIpcSnapshot(resultStatus.Original, hostVersion, capturedUtc, incomplete || state.IsIncomplete,
+                Array.AsReadOnly(channels.ToArray()), Array.AsReadOnly(state.Limitations.ToArray())), state.LimitationMessages, resultStatus);
         }
     }
 
@@ -188,7 +188,7 @@ internal static class PluginInspectionIpcRegistry
         var actionInfo = action == null ? null : CaptureDelegate(action, selectedAssembly, state);
         var functionInfo = function == null ? null : CaptureDelegate(function, selectedAssembly, state);
         var subscribers = new List<PluginInspectionIpcDelegate>();
-        if (subscriptions.Count > MaxSubscriptions) state.Incomplete("Subscriptions per channel limited to 64 entries.");
+        if (subscriptions.Count > MaxSubscriptions) state.Incomplete(global::XASlave.Localization.UiMessage.Key("SECE0E0464DD1694C"));
         for (var index = 0; index < subscriptions.Count && index < MaxSubscriptions && state.Continue(); index++)
             subscribers.Add(CaptureDelegate(subscriptions[index], selectedAssembly, state));
         return new(channelName, nameComplete, function != null, action != null, subscriptions.Count,
@@ -205,11 +205,11 @@ internal static class PluginInspectionIpcRegistry
         var invoke = delegateType.GetMethod("Invoke", BindingFlags.Public | BindingFlags.Instance | BindingFlags.DeclaredOnly);
         if (invoke == null) throw new NotSupportedException();
         var supported = !delegateType.ContainsGenericParameters && !invoke.ContainsGenericParameters;
-        if (!supported) state.Incomplete("Open generic IPC delegate signatures require a separately reviewed contract.");
+        if (!supported) state.Incomplete(global::XASlave.Localization.UiMessage.Key("S8F5749EEB0223563"));
         var delegateTypeName = TypeName(delegateType, state);
         var parameters = new List<PluginInspectionIpcParameter>();
         var parameterMetadata = invoke.GetParameters();
-        if (parameterMetadata.Length > MaxParameters) state.Incomplete("IPC parameter lists limited to 64 entries.");
+        if (parameterMetadata.Length > MaxParameters) state.Incomplete(global::XASlave.Localization.UiMessage.Key("S5371416D90D43A3C"));
         foreach (var parameter in parameterMetadata.Take(MaxParameters))
         {
             if (!state.Continue()) break;
@@ -225,7 +225,7 @@ internal static class PluginInspectionIpcRegistry
             && state.IncompleteRevision == signatureRevision;
         var handlers = new List<PluginInspectionIpcHandler>();
         var invocationList = value.GetInvocationList();
-        if (invocationList.Length > MaxInvocationList) state.Incomplete("Multicast invocation metadata limited to 16 handlers per delegate.");
+        if (invocationList.Length > MaxInvocationList) state.Incomplete(global::XASlave.Localization.UiMessage.Key("S0060ACB2028394BD"));
         foreach (var handler in invocationList.Take(MaxInvocationList))
         {
             if (!state.ReserveHandler()) break;
@@ -252,26 +252,26 @@ internal static class PluginInspectionIpcRegistry
         if (!state.Continue()) return false;
         if (depth >= MaxTypeDepth)
         {
-            state.Incomplete("IPC signature type validation exceeded the 12-level nesting bound.");
+            state.Incomplete(global::XASlave.Localization.UiMessage.Key("S0B7EEAC56092D65E"));
             return false;
         }
         if (type.IsByRef || type.IsPointer || type.IsFunctionPointer || type.IsByRefLike || type.ContainsGenericParameters)
         {
-            state.Incomplete("By-reference, pointer, function-pointer, ref-like or open generic IPC signature types require a separately reviewed contract; SignatureComplete is false.");
+            state.Incomplete(global::XASlave.Localization.UiMessage.Key("SDD55F83DB3756E00"));
             return false;
         }
         if (type.HasElementType)
         {
             var element = type.GetElementType();
             if (element != null) return SignatureTypeSupported(element, state, depth + 1);
-            state.Incomplete("IPC signature element type metadata was unavailable.");
+            state.Incomplete(global::XASlave.Localization.UiMessage.Key("S462CC7473CD012DD"));
             return false;
         }
         if (!type.IsGenericType) return true;
         var arguments = type.GetGenericArguments();
         if (arguments.Length > MaxParameters)
         {
-            state.Incomplete("IPC signature generic argument validation exceeded the 64-entry bound.");
+            state.Incomplete(global::XASlave.Localization.UiMessage.Key("SD4A7C9157423B6CD"));
             return false;
         }
         var supported = true;
@@ -283,7 +283,7 @@ internal static class PluginInspectionIpcRegistry
     private static string TypeName(Type type, CaptureState state, int depth = 0)
     {
         if (!state.Continue()) return "<capture limit>";
-        if (depth >= MaxTypeDepth) { state.Incomplete("IPC type nesting limited to 12 levels."); return "<type nesting limit>"; }
+        if (depth >= MaxTypeDepth) { state.Incomplete(global::XASlave.Localization.UiMessage.Key("S010ECF0C456E65FF")); return "<type nesting limit>"; }
         if (type.HasElementType)
         {
             var element = type.GetElementType();
@@ -292,7 +292,7 @@ internal static class PluginInspectionIpcRegistry
         }
         if (!type.IsGenericType) return state.Text(type.FullName ?? type.Name);
         var arguments = type.GetGenericArguments();
-        if (arguments.Length > MaxParameters) state.Incomplete("IPC generic argument lists limited to 64 entries.");
+        if (arguments.Length > MaxParameters) state.Incomplete(global::XASlave.Localization.UiMessage.Key("SC539C0E1ED48A701"));
         return state.Text((type.GetGenericTypeDefinition().FullName ?? type.Name) + "<"
             + string.Join(", ", arguments.Take(MaxParameters).Select(argument => TypeName(argument, state, depth + 1))) + ">");
     }
@@ -309,19 +309,20 @@ internal static class PluginInspectionIpcRegistry
         private int handlers;
         internal bool IsIncomplete { get; private set; }
         internal long IncompleteRevision { get; private set; }
-        internal List<string> Limitations { get; } = new()
+        internal List<global::XASlave.Localization.UiMessage> LimitationMessages { get; } = new()
         {
-            "Host-wide runtime IPC registry snapshot, including unrelated channels; selected-plugin ownership is separate evidence, not inferred from channel prefixes.",
-            "Function/action registration means a provider delegate was observed, not that calling it is safe, documented, ready, or free of side effects. No endpoint was invoked, subscribed, registered, created, or removed.",
-            "Message subscriptions identify listeners, not the publisher. Empty channels can be created by consumers or remain after unload; they are not available calls.",
-            "Attribution compares exact handler/target assembly instances. Shared-library wrappers may hide the provider; plugin target objects and closure fields are never traversed.",
-            "Callable signatures come from delegate Invoke metadata. Handler method names are attribution evidence; parameter semantics, threading, lifecycle preconditions and supported contract versions require review.",
-            "Action/message delegates return void and do not reveal the dummy return-type generic argument used by the provider/subscriber call-gate contract. That generic argument cannot be inferred solely from this delegate signature.",
-            "NameComplete and SignatureComplete describe bounded metadata capture and supported type shapes only; true does not establish a safe callable contract or complete handler ownership evidence.",
-            "Gates/Subscriptions are host-owned immutable snapshots, but channel delegates may change during capture. This is not an atomic view and must be refreshed after plugin load/unload or before designing an adapter.",
-            "Five-second time/cancellation limits are cooperative. Individual host snapshot getters and reflection calls cannot be interrupted; host locks or large snapshots may exceed the budget.",
-            "Private host layout is supported only when it matches the verified contract. Registry metadata cannot discover endpoints a plugin has not registered or non-Dalamud transports.",
+            global::XASlave.Localization.UiMessage.Key("SDED17DDCA08DAC56"),
+            global::XASlave.Localization.UiMessage.Key("SF1BC5079D63CCB55"),
+            global::XASlave.Localization.UiMessage.Key("SE63DC26A53EFCFB6"),
+            global::XASlave.Localization.UiMessage.Key("S312E618480F29257"),
+            global::XASlave.Localization.UiMessage.Key("S031A8089AE07CD68"),
+            global::XASlave.Localization.UiMessage.Key("S0E7960774F67F424"),
+            global::XASlave.Localization.UiMessage.Key("S9AD9658A083718B5"),
+            global::XASlave.Localization.UiMessage.Key("SC7FDC4675DA7CDA2"),
+            global::XASlave.Localization.UiMessage.Key("SBEDAE754182EE864"),
+            global::XASlave.Localization.UiMessage.Key("SCCFED0BFC095D483"),
         };
+        internal List<string> Limitations => LimitationMessages.Select(message => message.Original).ToList();
 
         internal CaptureState(CancellationToken token) => this.token = token;
 
@@ -330,11 +331,11 @@ internal static class PluginInspectionIpcRegistry
             token.ThrowIfCancellationRequested();
             if (textCharacters >= MaxCapturedTextCharacters || handlers >= MaxHandlers)
             {
-                Incomplete("IPC cumulative text or handler bound prevents further metadata capture.");
+                Incomplete(global::XASlave.Localization.UiMessage.Key("S33E078E6A8471FAC"));
                 return false;
             }
             if (clock.Elapsed < CaptureBudget) return true;
-            Incomplete("Cooperative five-second IPC registry deadline reached.");
+            Incomplete(global::XASlave.Localization.UiMessage.Key("S76C2DD478A3CE924"));
             return false;
         }
 
@@ -342,7 +343,7 @@ internal static class PluginInspectionIpcRegistry
         {
             if (!Continue()) return false;
             handlers++;
-            if (handlers == MaxHandlers) Incomplete("IPC handler metadata limited to 10000 entries.");
+            if (handlers == MaxHandlers) Incomplete(global::XASlave.Localization.UiMessage.Key("S22C860BC81BB3928"));
             return true;
         }
 
@@ -352,29 +353,29 @@ internal static class PluginInspectionIpcRegistry
             var remaining = MaxCapturedTextCharacters - textCharacters;
             if (remaining <= 0)
             {
-                if (text.Length > 0) Incomplete("IPC text omitted after the cumulative text bound.");
+                if (text.Length > 0) Incomplete(global::XASlave.Localization.UiMessage.Key("SC6548C1D7E1D027C"));
                 return string.Empty;
             }
             var maximum = Math.Min(MaxTextLength, remaining);
             var length = Math.Min(maximum, text.Length);
             if (length < text.Length)
             {
-                Incomplete("IPC text exceeded the 2048-character value or two-million-character total bound; affected names/signatures are not exact callable identifiers.");
+                Incomplete(global::XASlave.Localization.UiMessage.Key("SF9CD6267B116ACE9"));
                 if (length > 0 && char.IsHighSurrogate(text[length - 1])) length--;
             }
             textCharacters += length;
-            if (length == remaining) Incomplete("IPC cumulative text bound reached.");
+            if (length == remaining) Incomplete(global::XASlave.Localization.UiMessage.Key("S201E14016DE7DA60"));
             return text[..length];
         }
 
-        internal void Failure(string scope, Exception exception)
-            => Incomplete(scope + " unavailable (" + Text(exception.GetType().FullName) + ").");
+        internal void Failure(global::XASlave.Localization.UiMessage scope, Exception exception)
+            => Incomplete(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(scope, global::XASlave.Localization.UiMessage.Key("SB3A7321F8FEEABAE")), global::XASlave.Localization.UiMessage.Raw(Text(exception.GetType().FullName))), global::XASlave.Localization.UiMessage.Raw(").")));
 
-        internal void Incomplete(string message)
+        internal void Incomplete(global::XASlave.Localization.UiMessage message)
         {
             IsIncomplete = true;
             IncompleteRevision++;
-            if (Limitations.Count < 64 && !Limitations.Contains(message, StringComparer.Ordinal)) Limitations.Add(message);
+            if (Limitations.Count < 64 && !Limitations.Contains(message.Original, StringComparer.Ordinal)) LimitationMessages.Add(message);
         }
     }
 }

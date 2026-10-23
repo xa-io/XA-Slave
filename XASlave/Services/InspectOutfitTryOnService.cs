@@ -19,7 +19,10 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
     private bool enabled, disposed, retiring;
     private bool resetPreviewOnClose, previewWasActive;
     private string lastReadinessReason = string.Empty;
-    internal string StatusText { get; private set; } = "Disabled";
+    internal string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
     internal bool IsRunning => queue is { Terminal: false };
 
     internal InspectOutfitTryOnService(SlaveNativeUiLibrary library, Action unavailable, Configuration configuration, Action openHistory)
@@ -42,13 +45,13 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
             Plugin.AddonLifecycle.RegisterListener(AddonEvent.PostDraw, "CharacterInspect", Observe);
             Plugin.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, "CharacterInspect", Observe);
             Plugin.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, "Tryon", ObserveFittingRoom);
-            StatusText = "Enabled: open a player inspection and choose Try On All.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S416EB39699F009B9"));
         }
         else
         {
             ResetHistoryObservation();
             resetPreviewOnClose = false; previewWasActive = false;
-            Stop("Disabled");
+            Stop(global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             Plugin.Framework.Update -= Update;
             Plugin.ClientState.Logout -= Logout;
             Plugin.AddonLifecycle.UnregisterListener(Observe);
@@ -58,12 +61,14 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
         return enabled;
     }
 
-    internal void Stop(string reason = "Try-on stopped; submitted native work may finish.")
+    internal void Stop() => Stop(global::XASlave.Localization.UiMessage.Key("SE7CEF21ECCF72D44"));
+    internal void Stop(string reason) => Stop(global::XASlave.Localization.UiMessage.Raw(reason));
+    internal void Stop(global::XASlave.Localization.UiMessage reason)
     {
         generation++;
         queue?.Cancel(reason); queue = null;
         savedSource = null; pendingHistoryId = null;
-        StatusText = reason;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, reason);
     }
 
     private void Logout(int type, int code)
@@ -71,7 +76,7 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
         ResetHistoryObservation();
         resetPreviewOnClose = false; previewWasActive = false;
         session++;
-        Stop("Logged out; inspection try-on cancelled.");
+        Stop(global::XASlave.Localization.UiMessage.Key("S4A7DD9A5E88CB628"));
         controls?.StopCallbacks();
         fittingControls?.StopCallbacks();
         QueueRetirement();
@@ -85,7 +90,7 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
         {
             resetPreviewOnClose = false;
             session++;
-            Stop("Fitting room closed; outfit cleared for the next inspection.");
+            Stop(global::XASlave.Localization.UiMessage.Key("S6B20A6FCCFFAA439"));
             binding.ClearClosedPreview();
         }
         previewWasActive = active;
@@ -118,10 +123,10 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
         if (!enabled || disposed || fittingControls == null || !fittingControls.IsCurrent || binding == null) return;
         try
         {
-            session++; Stop("Clearing fitting-room preview.");
+            session++; Stop(global::XASlave.Localization.UiMessage.Key("S387C753060FB95B8"));
             binding.ClearPreview();
             resetPreviewOnClose = true; previewWasActive = true;
-            StatusText = "Fitting room cleared; choose another outfit to try on.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S0316829888AB9B79"));
         }
         catch (Exception error) { Fail(error); }
     }
@@ -145,14 +150,14 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
             if (controls != null && controls.Host != host)
             {
                 hostEpoch++;
-                if (savedSource == null) Stop("The inspection window changed.");
+                if (savedSource == null) Stop(global::XASlave.Localization.UiMessage.Key("S7E125B6913364B9F"));
                 ResetHistoryObservation(); RetireControls();
             }
             var visibleHost = InspectOutfitControls.Resolve(hostEpoch);
             ObserveHistory(visibleHost);
             if (visibleHost == null)
             {
-                if (IsRunning && savedSource == null) Stop("Inspection hidden; try-on cancelled.");
+                if (IsRunning && savedSource == null) Stop(global::XASlave.Localization.UiMessage.Key("S2B41278DAE6B8B5A"));
                 controls?.Update(false, false);
                 if (savedSource == null) return;
             }
@@ -160,7 +165,7 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
             if (active == null) return;
             active.Tick(Environment.TickCount64);
             if (queue != active || !enabled || disposed) return;
-            StatusText = active.Status;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, active.StatusMessage);
             if (active.Terminal)
             {
                 // Retire before logging so the same failure is reported only once.
@@ -171,14 +176,14 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
                     var epoch = session;
                     try
                     {
-                        var result = binding.TryOnOwnedFacewear(savedSource?.Facewear ?? world!.Facewear(source),
+                        var result = binding.TryOnOwnedFacewearMessage(savedSource?.Facewear ?? world!.Facewear(source),
                             () => enabled && !disposed && generation == owner && session == epoch);
-                        if (generation == owner && session == epoch && !string.IsNullOrEmpty(result)) StatusText += " " + result;
+                        if (generation == owner && session == epoch && !string.IsNullOrEmpty(result.Original)) StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(uiStatusText, StatusText), global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Raw(" "), result)));
                     }
                     catch (Exception error)
                     {
                         Plugin.Log.Warning(error, "Gear try-on completed, but optional facewear could not be applied.");
-                        if (generation == owner && session == epoch) StatusText += " Facewear could not be applied.";
+                        if (generation == owner && session == epoch) StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(uiStatusText, StatusText), global::XASlave.Localization.UiMessage.Key("S59A2E538F7CE375A")));
                     }
                 }
                 savedSource = null;
@@ -200,7 +205,7 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
             if (kind == AddonEvent.PreFinalize)
             {
                 if (controls != null && controls.Host.Addon != args.Addon.Address) return;
-                if (savedSource == null) Stop("Inspection finalized; try-on cancelled.");
+                if (savedSource == null) Stop(global::XASlave.Localization.UiMessage.Key("SAF534BB69CD86B1E"));
                 ResetHistoryObservation();
                 RetireControls(); hostEpoch++;
                 return;
@@ -208,7 +213,7 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
             if (kind == AddonEvent.PostSetup)
             {
                 hostEpoch++;
-                if (savedSource == null) Stop("Inspection ready; choose Try On All.");
+                if (savedSource == null) Stop(global::XASlave.Localization.UiMessage.Key("SB79D1B847619CD00"));
                 ResetHistoryObservation(); RetireControls(); return;
             }
             if (kind != AddonEvent.PostDraw || retiring) return;
@@ -217,10 +222,10 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
             if (controls != null && controls.Host != host)
             {
                 hostEpoch++;
-                if (savedSource == null) Stop("The inspection layout changed.");
+                if (savedSource == null) Stop(global::XASlave.Localization.UiMessage.Key("S66A00A7CD4D6F582"));
                 ResetHistoryObservation(); RetireControls(); return;
             }
-            if (!library.EnsureReady()) { StatusText = "Preparing native inspection controls."; return; }
+            if (!library.EnsureReady()) { StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SDE4DC91FFBBCF082")); return; }
             if (!enabled || disposed) return;
             binding ??= new InspectOutfitNativeBinding();
             world ??= new InspectOutfitWorld(binding.Validate, () => frame);
@@ -244,7 +249,7 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
         if (IsRunning) return;
         if (!ready)
         {
-            StatusText = "Try On All unavailable: " + reason;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S5BE4EB35F0E19C02"), global::XASlave.Localization.UiMessage.Value(reason)));
             if (lastReadinessReason != reason)
                 Plugin.Log.Information("Inspection try-on unavailable: {Reason}", reason);
             lastReadinessReason = reason;
@@ -252,7 +257,7 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
         else if (lastReadinessReason != string.Empty)
         {
             lastReadinessReason = string.Empty;
-            StatusText = "Inspection ready; choose Try On All.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SB79D1B847619CD00"));
         }
     }
 
@@ -264,7 +269,7 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
         {
             var identity = world.Identity();
             if (identity == null || InspectOutfitControls.Resolve(hostEpoch) != controls.Host)
-            { StatusText = "A ready player inspection is required."; return; }
+            { StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S8823EEED33DAC183")); return; }
             previewWasActive = binding.IsPreviewActive();
             if (!previewWasActive) binding.ClearClosedPreview();
             resetPreviewOnClose = true;
@@ -273,11 +278,11 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
                 candidate => enabled && !disposed && generation == candidate);
             var adapter = new InspectOutfitNativeAdapter(world, access);
             queue = new InspectOutfitSequence(adapter, controls.Host, identity.Value, owner, Environment.TickCount64);
-            StatusText = queue.Status;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, queue.StatusMessage);
         }
         catch (Exception error)
         {
-            Stop("Try-on unavailable: " + error.Message);
+            Stop(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SF027662512726AC7"), global::XASlave.Localization.UiMessage.FromException(error)));
             Plugin.Log.Warning(error, "Inspection try-on could not start.");
         }
     }
@@ -285,7 +290,7 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
     private void Fail(Exception error)
     {
         SetEnabled(false); unavailable();
-        StatusText = "Unavailable: " + error.Message;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SF5646BBF5EE343C7"), global::XASlave.Localization.UiMessage.FromException(error)));
         Plugin.Log.Warning(error, "Inspection try-on stopped at a native lifecycle boundary.");
     }
 
@@ -320,18 +325,18 @@ internal sealed partial class InspectOutfitTryOnService : IDisposable
     internal void DrawOptions()
     {
         ImGui.TextWrapped(StatusText);
-        ImGui.TextWrapped("Use Try On All on a player inspection. Both dyes and duplicate rings are retained; incompatible gear may be replaced by the game. Owned facewear is tried after the gear; unavailable facewear is skipped. Use Clear in the fitting room to start a fresh preview.");
-        if (ImGui.Button("Outfit History##InspectOutfit")) openHistory();
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S36F5E06518DE4BA5"));
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S4005BB983C75D162") + "##InspectOutfit"))) openHistory();
         ImGui.SameLine();
         ImGui.BeginDisabled(!IsRunning);
-        if (ImGui.Button("Stop##InspectOutfit")) Stop();
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SCAE7D57BC067A514") + "##InspectOutfit"))) Stop();
         ImGui.EndDisabled();
     }
 
     public void Dispose()
     {
         if (disposed) return;
-        SetEnabled(false); disposed = true; session++; Stop("Inspection try-on disposed.");
+        SetEnabled(false); disposed = true; session++; Stop(global::XASlave.Localization.UiMessage.Key("S3BAF6D60439CAEF5"));
         controls?.StopCallbacks();
         // Plugin's shared library retires any remaining wrappers on framework
         // before toolkit shutdown, including late asynchronous initialization.

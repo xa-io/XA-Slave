@@ -54,7 +54,10 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             $"struct=0x{sizeof(AgentWorldTravel):X}, active=0x{NativeOffsets.WorldTravelQueueActive:X}, elapsed=0x{NativeOffsets.WorldTravelQueueElapsedSeconds:X}, position=0x{NativeOffsets.WorldTravelQueuePosition:X}");
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool IsStartupArmingPending => startupArmingPending;
 
@@ -70,7 +73,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             ToggleHook(updateWorldTravelDataHook, false, "UpdateWorldTravelData");
             ToggleHook(agentWorldTravelUpdateHook, false, "AgentWorldTravelUpdate");
             ToggleHook(contentFinderQueuePositionDataHook, false, "ContentFinderQueuePositionData");
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -86,12 +89,12 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         activeSurfaces += ToggleHook(contentFinderQueuePositionDataHook, true, "ContentFinderQueuePositionData");
         if (activeSurfaces == 0)
         {
-            StatusText = "Unavailable - queue hooks are missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S4CF5AB0842909CF8"));
             return false;
         }
 
         enabled = true;
-        StatusText = GetEnabledStatusText(activeSurfaces);
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText(activeSurfaces));
         return true;
     }
 
@@ -104,7 +107,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
             return SetEnabled(true);
 
         enabled = true;
-        StatusText = "Arming - queue display hooks are initializing on the framework thread.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S3E68327ECA6A57A9"));
         StartStartupHookCreation();
         return true;
     }
@@ -259,7 +262,7 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         if (result == null)
         {
             enabled = false;
-            StatusText = "Unavailable - queue hooks could not be initialized.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S2ED2F878B75421C1"));
             return;
         }
 
@@ -280,12 +283,12 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         if (activeSurfaces == 0)
         {
             enabled = false;
-            StatusText = "Unavailable - queue hooks are missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S4CF5AB0842909CF8"));
             return;
         }
 
         enabled = true;
-        StatusText = GetEnabledStatusText(activeSurfaces);
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText(activeSurfaces));
     }
 
     private Hook<T>? TryCreateHook<T>(ProtectedSig signature, T detour, string label)
@@ -449,10 +452,8 @@ public unsafe sealed class QueuePositionDisplayService : IDisposable
         contentFinderQueuePositionDataHook?.OriginalDisposeSafe(info, state, infoState);
     }
 
-    private static string GetEnabledStatusText(int activeSurfaces)
-        => activeSurfaces < TotalHookSurfaces
-            ? $"Partially enabled - expanded queue details active on {activeSurfaces}/{TotalHookSurfaces} surfaces."
-            : $"Enabled - expanded queue details active on all {TotalHookSurfaces} surfaces.";
+    private static global::XASlave.Localization.UiMessage GetEnabledStatusText(int activeSurfaces)
+        => (activeSurfaces < TotalHookSurfaces ? global::XASlave.Localization.UiMessage.Format("S29FFAC52A3C5383D", activeSurfaces, TotalHookSurfaces) : global::XASlave.Localization.UiMessage.Format("S28A1D4AA55D7F2C5", TotalHookSurfaces));
 
     private static double CalculateQueueWaitSeconds(int position)
     {

@@ -54,7 +54,7 @@ internal sealed unsafe class NearbyZoneNativeGate : IDisposable
 
     internal void SetOriginal(nint original)
     {
-        if (retired || original == 0 || Marshal.ReadIntPtr(state, 8) != 0) throw new InvalidOperationException("Initialize the zone Original once before exposure.");
+        if (retired || original == 0 || Marshal.ReadIntPtr(state, 8) != 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S83D3600CE8DDAE3D"), originalMessageText => new InvalidOperationException(originalMessageText));
         Marshal.WriteIntPtr(state, 8, original);
     }
 
@@ -62,14 +62,14 @@ internal sealed unsafe class NearbyZoneNativeGate : IDisposable
     internal void RedirectInactiveOriginal(nint original)
     {
         if (retired || original == 0 || Volatile.Read(ref Unsafe.AsRef<int>((void*)state)) != 0)
-            throw new InvalidOperationException("Redirect only an inactive zone relay.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SAD054252AA9E8676"), originalMessageText => new InvalidOperationException(originalMessageText));
         Interlocked.Exchange(ref Unsafe.AsRef<nint>((void*)(state + 8)), original);
     }
 
     internal void Activate()
     {
         ObjectDisposedException.ThrowIf(retired, this);
-        if (Marshal.ReadIntPtr(state, 8) == 0) throw new InvalidOperationException("Zone Original is unavailable.");
+        if (Marshal.ReadIntPtr(state, 8) == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE10FEB37D1B73D89"), originalMessageText => new InvalidOperationException(originalMessageText));
         Volatile.Write(ref Unsafe.AsRef<int>((void*)state), 1);
     }
 
@@ -103,13 +103,13 @@ internal sealed unsafe class NearbyZoneNativeGate : IDisposable
         BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(tableAt + 4), (uint)code.Length);
         BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(tableAt + 8), (uint)unwindAt);
         var address = VirtualAlloc(0, (nuint)image.Length, 0x3000, 4);
-        if (address == 0) throw new InvalidOperationException("Cannot allocate zone relay.");
+        if (address == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCC67EB299222E940"), originalMessageText => new InvalidOperationException(originalMessageText));
         try
         {
             Marshal.Copy(image, 0, address, image.Length);
             if (!VirtualProtect(address, (nuint)image.Length, 0x20, out _) || !FlushInstructionCache(GetCurrentProcess(), address, (nuint)image.Length))
-                throw new InvalidOperationException("Cannot publish zone relay code.");
-            if (!RtlAddFunctionTable(address + tableAt, 1, (ulong)address)) throw new InvalidOperationException("Cannot register zone relay unwind data.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD8083E25E0E1BCD9"), originalMessageText => new InvalidOperationException(originalMessageText));
+            if (!RtlAddFunctionTable(address + tableAt, 1, (ulong)address)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC38C537693F6DC41"), originalMessageText => new InvalidOperationException(originalMessageText));
             return address;
         }
         catch { VirtualFree(address, 0, 0x8000); throw; }

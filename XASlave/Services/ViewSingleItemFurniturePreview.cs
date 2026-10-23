@@ -21,11 +21,14 @@ internal sealed class ViewSingleItemFurniturePreview : IDisposable
     private int width = 640, height = 480;
     private float yaw = 0.45f, pitch = -0.25f, roll, zoom = 1;
     private Vector2 pan;
-    private string status = "Choose a furnishing.";
+    private string status = global::XASlave.Localization.UiLocale.Native("S79A1A6EE49441B20");
 
     private sealed record Rendered(ViewSingleItemFurnitureModel Model, IDalamudTextureWrap Image);
     private sealed record Pending(long Generation, long CameraRevision, CancellationTokenSource Cancellation, Task<Rendered> Task);
 
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("S79A1A6EE49441B20");
+    internal global::XASlave.Localization.UiMessage StatusMessage { get { lock (sync) return global::XASlave.Localization.UiMessage.Capture(statusMessage, status); } }
+    internal string LocalizedStatus => StatusMessage.Display;
     internal string Status { get { lock (sync) return status; } }
 
     internal void Load(ViewSingleItemFurnitureAsset value)
@@ -36,7 +39,7 @@ internal sealed class ViewSingleItemFurniturePreview : IDisposable
             ClearCore();
             asset = value;
             ResetCameraCore();
-            status = "Loading the furnishing's models and textures...";
+            status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SA42719B747241482"));
         }
     }
 
@@ -59,7 +62,7 @@ internal sealed class ViewSingleItemFurniturePreview : IDisposable
                         image?.Dispose();
                         image = result.Image;
                         dirty = completed.CameraRevision != cameraRevision;
-                        status = string.IsNullOrEmpty(model.Notes) ? "Static furnishing preview." : model.Notes;
+                        status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (string.IsNullOrEmpty(model.Notes) ? global::XASlave.Localization.UiMessage.Key("S2A23CDBB9FA97CCE") : model.NotesPresentation));
                     }
                 }
                 else
@@ -71,7 +74,7 @@ internal sealed class ViewSingleItemFurniturePreview : IDisposable
                         // Preserve an input made while an older view failed;
                         // unchanged failed views remain stopped until new input.
                         dirty = completed.CameraRevision != cameraRevision;
-                        status = "Furniture preview unavailable: " + error.Message;
+                        status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("SC23F340A1A7167D4" , global::XASlave.Localization.UiMessage.FromException(error)));
                         Plugin.Log.Warning(error, "[View Item] Furniture preview failed for item {ItemId}.", asset.ItemId);
                     }
                 }
@@ -169,7 +172,7 @@ internal sealed class ViewSingleItemFurniturePreview : IDisposable
         // accumulate independent loaders, pixel buffers or texture uploads.
         asset = null; model = null; dirty = false;
         image?.Dispose(); image = null;
-        status = "Choose a furnishing.";
+        status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S79A1A6EE49441B20"));
     }
 
     public void Dispose()

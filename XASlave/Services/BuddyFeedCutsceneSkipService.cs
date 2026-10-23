@@ -42,7 +42,10 @@ public unsafe sealed class BuddyFeedCutsceneSkipService : IDisposable
 
     public bool IsEnabled => enabled;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -63,7 +66,7 @@ public unsafe sealed class BuddyFeedCutsceneSkipService : IDisposable
             if (playFeedBuddySceneHook is { IsDisposed: false, IsEnabled: true })
                 playFeedBuddySceneHook.Disable();
 
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -214,25 +217,23 @@ public unsafe sealed class BuddyFeedCutsceneSkipService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (unavailable)
         {
-            StatusText = "Unavailable - buddy feed signature missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S03364DE6A8A8BABD"));
             return;
         }
 
         if (playFeedBuddySceneHook is { IsDisposed: false, IsEnabled: true })
         {
-            StatusText = "Enabled - buddy feed cutscenes are skipped.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SCCBCF2E40B109952"));
             return;
         }
 
-        StatusText = startupArmDeferred
-            ? "Ready - buddy feed hook will arm after a later housing-zone transition instead of during plugin startup."
-            : "Ready - buddy feed hook will arm when you enter a housing district.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (startupArmDeferred ? global::XASlave.Localization.UiMessage.Key("S44D6C8AC5304E341") : global::XASlave.Localization.UiMessage.Key("S2BA0670415BD056F")));
     }
 
     private void PlayFeedBuddySceneDetour(HousingManager* manager)

@@ -63,14 +63,14 @@ internal sealed unsafe class WindowSubclassNativeGate : IDisposable
 
     internal void SetOriginal(nint original)
     {
-        if (retired || original == 0 || Marshal.ReadIntPtr(state, 8) != 0) throw new InvalidOperationException("Initialize the window subclass Original once before exposure.");
+        if (retired || original == 0 || Marshal.ReadIntPtr(state, 8) != 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S71EBEC79009F35D6"), original => new InvalidOperationException(original));
         Marshal.WriteIntPtr(state, 8, original);
     }
 
     internal void Activate()
     {
         ObjectDisposedException.ThrowIf(retired, this);
-        if (Marshal.ReadIntPtr(state, 8) == 0) throw new InvalidOperationException("Subclass forwarding is unavailable.");
+        if (Marshal.ReadIntPtr(state, 8) == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF84F40906119D799"), original => new InvalidOperationException(original));
         Volatile.Write(ref Unsafe.AsRef<int>((void*)state), 1);
     }
 
@@ -105,13 +105,13 @@ internal sealed unsafe class WindowSubclassNativeGate : IDisposable
         BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(tableAt + 4), (uint)code.Length);
         BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(tableAt + 8), (uint)unwindAt);
         var address = VirtualAlloc(0, (nuint)image.Length, 0x3000, 4);
-        if (address == 0) throw new InvalidOperationException("Cannot allocate window subclass relay.");
+        if (address == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9BFCED6DB9FD4319"), original => new InvalidOperationException(original));
         try
         {
             Marshal.Copy(image, 0, address, image.Length);
             if (!VirtualProtect(address, (nuint)image.Length, 0x20, out _) || !FlushInstructionCache(GetCurrentProcess(), address, (nuint)image.Length))
-                throw new InvalidOperationException("Cannot publish window subclass relay code.");
-            if (!RtlAddFunctionTable(address + tableAt, 1, (ulong)address)) throw new InvalidOperationException("Cannot register window subclass relay unwind data.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF3F84EEA84042455"), original => new InvalidOperationException(original));
+            if (!RtlAddFunctionTable(address + tableAt, 1, (ulong)address)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S538E497914A6A3A9"), original => new InvalidOperationException(original));
             return address;
         }
         catch { VirtualFree(address, 0, 0x8000); throw; }

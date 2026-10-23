@@ -20,7 +20,7 @@ internal sealed class InspectOutfitNativeAdapter : IInspectOutfitAdapter
             || settled.DisplayGear != current.DisplayGear || settled.Inventory != current.Inventory || settled.Opener != current.Opener
             || settled.Addon != current.Addon || settled.AddonId != current.AddonId
             || !settled.RawRecords.AsSpan().SequenceEqual(current.RawRecords)))
-            throw new InvalidOperationException("The fitting-room preview changed outside this request.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S353465EE9D0E97CA"), originalMessageText => new InvalidOperationException(originalMessageText));
         last = current;
         // Do not freeze an in-progress initial preview or opening animation as
         // the settled baseline. Its records/addon may still resolve naturally.
@@ -33,11 +33,11 @@ internal sealed class InspectOutfitNativeAdapter : IInspectOutfitAdapter
 
     public InspectOutfitSubmission Submit(InspectOutfitSnapshot source, InspectOutfitItem item, InspectOutfitPreview before, long generation)
     {
-        if (last == null || !ReferenceEquals(last.Preview, before)) throw new InvalidOperationException("A fresh owned preview capture is required.");
+        if (last == null || !ReferenceEquals(last.Preview, before)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S85916CD30FA6EF03"), originalMessageText => new InvalidOperationException(originalMessageText));
         var result = native.Submit(source, item, last, generation);
         settled = null;
         if (result.Accepted && !InspectOutfitReconciliation.Inserted(last, result.After, item))
-            throw new InvalidOperationException("The native insertion changed more than the requested appearance.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S976C9D399B710A7A"), originalMessageText => new InvalidOperationException(originalMessageText));
         insertion = result.Accepted ? result.After : null;
         last = result.After;
         return new(result.Accepted, result.After.Preview);

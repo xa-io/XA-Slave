@@ -18,13 +18,16 @@ internal sealed class AutoRestoreFurnitureService : IDisposable
     private volatile bool enabled, disposed;
     private long generation;
     private bool showResults;
-    internal string StatusText { get; private set; } = "Disabled";
+    internal string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
     internal bool IsRunning => task.IsRunning;
 
     internal AutoRestoreFurnitureService(TaskRunner runner, MessageLogService messages, Action unavailable)
     {
         this.runner = runner; this.unavailable = unavailable;
-        task = new(runner, () => new FurnitureRestoreNativeAdapter(context ?? throw new InvalidOperationException("Furniture controls are disabled."),
+        task = new(runner, () => new FurnitureRestoreNativeAdapter(context ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC0C5DC6A93C89562"), originalMessage => new InvalidOperationException(originalMessage)),
             messages, Plugin.ToastGui, Plugin.DataManager));
     }
 
@@ -35,11 +38,11 @@ internal sealed class AutoRestoreFurnitureService : IDisposable
         if (!value)
         {
             enabled = false; generation++;
-            task.Stop("Furniture restoration disabled.");
+            task.Stop(global::XASlave.Localization.UiMessage.Key("SDA6B6607DE83C912"));
             Plugin.Framework.Update -= Update;
             Plugin.AddonLifecycle.UnregisterListener(Observe);
             try { RetireControls(); }
-            finally { context?.Dispose(); context = null; StatusText = "Disabled"; }
+            finally { context?.Dispose(); context = null; StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")); }
             return false;
         }
         var run = ++generation;
@@ -48,20 +51,20 @@ internal sealed class AutoRestoreFurnitureService : IDisposable
         {
             FurnitureRestoreNativeBinding.Prepare();
             // Context invalidation listener must precede controls' destruction.
-            var created = new FurnitureRestoreContext(Plugin.AddonLifecycle, reason => task.Stop(reason));
+            var created = new FurnitureRestoreContext(Plugin.AddonLifecycle, reason => task.Stop(reason)) { MessageRevoked = reason => task.Stop(reason) };
             if (disposed || !enabled || generation != run) { created.Dispose(); return false; }
             context = created;
             Plugin.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, "HousingGoods", Observe);
             if (disposed || !enabled || generation != run) { Plugin.AddonLifecycle.UnregisterListener(Observe); return false; }
             Plugin.Framework.Update += Update;
-            StatusText = "Enabled: open HousingGoods to choose a full furniture batch.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S7081B426E2E7BAC2"));
             return true;
         }
         catch (Exception error)
         {
             enabled = false; Plugin.Framework.Update -= Update; Plugin.AddonLifecycle.UnregisterListener(Observe);
             context?.Dispose(); context = null;
-            StatusText = "Unavailable: " + error.Message; return false;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SF5646BBF5EE343C7"), global::XASlave.Localization.UiMessage.FromException(error))); return false;
         }
     }
 
@@ -72,7 +75,7 @@ internal sealed class AutoRestoreFurnitureService : IDisposable
         {
             var host = context.Fresh("HousingGoods");
             if (controls != null && controls.Host != host) RetireControls();
-            if (host == null) { StatusText = "Enabled: open HousingGoods to choose a full furniture batch."; return; }
+            if (host == null) { StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S7081B426E2E7BAC2")); return; }
             if (controls == null)
             {
                 if (disposed || !enabled || context.Fresh("HousingGoods") != host) return;
@@ -87,12 +90,12 @@ internal sealed class AutoRestoreFurnitureService : IDisposable
                 ? "Choose a furniture action." : task.Status;
             if (task.Results.Count > 0) text = $"{completed}/{task.Results.Count} outcomes; {confirmed} confirmed.\n{text}";
             controls.Update(task.IsRunning, !runner.IsRunning, text);
-            StatusText = task.Status;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, task.StatusMessage);
         }
         catch (Exception error)
         {
             SetEnabled(false); unavailable();
-            StatusText = "Unavailable: " + error.Message;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SF5646BBF5EE343C7"), global::XASlave.Localization.UiMessage.FromException(error)));
             Plugin.Log.Warning(error, "Furniture controls stopped at a native lifecycle boundary.");
         }
     }
@@ -103,16 +106,16 @@ internal sealed class AutoRestoreFurnitureService : IDisposable
         var owner = controls;
         task.Start(mode);
         if (disposed || !enabled || controls != owner) return;
-        StatusText = task.Status;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, task.StatusMessage);
         owner.Update(task.IsRunning, !runner.IsRunning, task.Status);
     }
 
-    internal void Stop() { task.Stop(); StatusText = task.Status; }
+    internal void Stop() { task.Stop(); StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, task.StatusMessage); }
 
     private void Observe(AddonEvent kind, AddonArgs args)
     {
         if (kind != AddonEvent.PreFinalize || controls == null || controls.Host.Address != args.Addon.Address) return;
-        task.Stop("HousingGoods finalized.");
+        task.Stop(global::XASlave.Localization.UiMessage.Key("S5D9BA91658521EEE"));
         RetireControls();
     }
 
@@ -125,11 +128,11 @@ internal sealed class AutoRestoreFurnitureService : IDisposable
     internal void DrawOptions()
     {
         ImGui.TextWrapped(task.Status);
-        ImGui.TextWrapped("Choose a mode on HousingGoods. Load the native storeroom list before a batch that needs storage pages. Each native removal warning requires your own decision.");
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S6B18B21D1F28F168"));
         ImGui.BeginDisabled(!task.IsRunning);
-        if (ImGui.Button("Stop##FurnitureRestore")) Stop();
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SCAE7D57BC067A514") + "##FurnitureRestore"))) Stop();
         ImGui.EndDisabled(); ImGui.SameLine();
-        if (ImGui.Button("Per-item results##FurnitureRestore")) showResults = true;
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SD37890AACA8D8854") + "##FurnitureRestore"))) showResults = true;
     }
 
     internal void DrawResults()
@@ -138,19 +141,19 @@ internal sealed class AutoRestoreFurnitureService : IDisposable
         if (enabled) controls?.Draw();
         if (!showResults) return;
         ImGui.SetNextWindowSize(new Vector2(720, 420), ImGuiCond.FirstUseEver);
-        if (ImGui.Begin("Furniture restore results", ref showResults))
+        if (ImGui.Begin(global::XASlave.Localization.UiLocale.Native("SEB7847D9D349D0F3"), ref showResults))
         {
             DrawOptions();
             if (ImGui.BeginTable("##FurnitureResults", 4, ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.ScrollY, new Vector2(0, 260)))
             {
-                ImGui.TableSetupColumn("Initial source"); ImGui.TableSetupColumn("Item / quantity");
-                ImGui.TableSetupColumn("Outcome"); ImGui.TableSetupColumn("Detail"); ImGui.TableHeadersRow();
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S3EB6F86354FDFCF0")); global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SFB5C069688BF5E05"));
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S4E80ABB5B14656D4")); global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SFB5F27D5457C4641")); global::XASlave.Localization.UiNative.TableHeadersRow();
                 foreach (var result in task.Results)
                 {
                     ImGui.TableNextRow(); ImGui.TableNextColumn(); ImGui.TextUnformatted($"{result.Source.Container}:{result.Source.Slot}");
-                    ImGui.TableNextColumn(); ImGui.TextUnformatted($"{result.Source.State.FullId} x{result.Source.Quantity}");
+                    ImGui.TableNextColumn(); ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.FormatKey("S01C87B980A517967", result.Source.State.FullId, result.Source.Quantity));
                     ImGui.TableNextColumn(); ImGui.TextUnformatted(result.Outcome.ToString());
-                    ImGui.TableNextColumn(); ImGui.TextWrapped(result.Detail);
+                    ImGui.TableNextColumn(); ImGui.TextWrapped(result.LocalizedDetail);
                 }
                 ImGui.EndTable();
             }

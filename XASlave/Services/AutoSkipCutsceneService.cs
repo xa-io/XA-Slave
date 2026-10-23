@@ -145,12 +145,19 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     public uint CurrentTerritoryId => clientState.TerritoryType;
 
     public string CurrentTerritoryName => GetTerritoryName(CurrentTerritoryId);
+    internal global::XASlave.Localization.UiMessage CurrentTerritoryNameMessage => GetTerritoryNameMessage(CurrentTerritoryId);
+    internal string LocalizedCurrentTerritoryName => CurrentTerritoryNameMessage.Display;
 
     public bool CurrentTerritoryAllowed => IsZoneAllowed(CurrentTerritoryId);
 
-    public string CurrentCategoryLabel => GetCurrentCategoryLabel();
+    internal global::XASlave.Localization.UiMessage CurrentCategoryLabelMessage => GetCurrentCategoryLabel();
+    public string CurrentCategoryLabel => CurrentCategoryLabelMessage.Original;
+    internal string LocalizedCurrentCategoryLabel => CurrentCategoryLabelMessage.Display;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public void ApplyConfiguration(Configuration configuration)
     {
@@ -197,7 +204,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         startupArmingPending = true;
         availableSurfaceCount = 0;
         availableOptionalSurfaceCount = 0;
-        StatusText = "Arming - cutscene hook surfaces are initializing on the framework thread.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SF62BAC9873805ECC"));
         StartStartupHookCreation();
         return true;
     }
@@ -218,7 +225,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         if (!value)
         {
             Disable();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -249,19 +256,21 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         DisposeHook(ref innContentDirectorHook);
     }
 
-    public string GetTerritoryName(uint territoryId)
+    public string GetTerritoryName(uint territoryId) => GetTerritoryNameMessage(territoryId).Original;
+
+    internal global::XASlave.Localization.UiMessage GetTerritoryNameMessage(uint territoryId)
     {
         if (territoryId == 0)
-            return "Unknown";
+            return global::XASlave.Localization.UiMessage.Key("SB764CDC0EAB71374");
 
         try
         {
             var row = dataManager.GetExcelSheet<TerritoryType>()?.GetRowOrDefault(territoryId);
-            return row?.PlaceName.ValueNullable?.Name.ToString() ?? "Unknown";
+            return row?.PlaceName.ValueNullable?.Name.ToString() is { } name ? global::XASlave.Localization.UiMessage.Raw(name) : global::XASlave.Localization.UiMessage.Key("SB764CDC0EAB71374");
         }
         catch
         {
-            return "Unknown";
+            return global::XASlave.Localization.UiMessage.Key("SB764CDC0EAB71374");
         }
     }
 
@@ -352,7 +361,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             enabled = false;
             UnsubscribeFramework();
             UpdateClientStateSubscriptions(false);
-            StatusText = "Unavailable - cutscene signatures were not found.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SCCC8BB549C57E8A7"));
             log.Warning("[XASlave] Auto Skip Cutscenes unavailable: no cutscene hook or patch signatures were found.");
             return;
         }
@@ -375,7 +384,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             enabled = false;
             UnsubscribeFramework();
             UpdateClientStateSubscriptions(false);
-            StatusText = "Unavailable - cutscene hooks failed to enable.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SEFAC8E5D8C96C191"));
             log.Warning("[XASlave] Auto Skip Cutscenes could not enable any hook or patch surfaces.");
             return;
         }
@@ -387,38 +396,38 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (startupArmingPending)
         {
-            StatusText = "Arming - cutscene hook surfaces are initializing on the framework thread.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SF62BAC9873805ECC"));
             return;
         }
 
         if (!initialized)
         {
-            StatusText = "Ready - cutscene hooks will arm when the next cutscene starts.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SC37B97AEBB220927"));
             return;
         }
 
         var surfaceCount = availableSurfaceCount + availableOptionalSurfaceCount;
         if (surfaceCount == 0)
         {
-            StatusText = "Unavailable - cutscene hooks failed to enable.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SEFAC8E5D8C96C191"));
             return;
         }
 
-        var availabilityLabel = HasMissingConfiguredSurface() ? "Partially enabled" : "Enabled";
+        var availabilityLabel = (HasMissingConfiguredSurface() ? global::XASlave.Localization.UiMessage.Key("S14F862A9FCF680A8") : global::XASlave.Localization.UiMessage.Key("S92C1CDFDF4CB9CF6"));
         var inactiveReason = GetInactiveReason();
-        if (!string.IsNullOrWhiteSpace(inactiveReason))
+        if (!string.IsNullOrWhiteSpace(inactiveReason.Original))
         {
-            StatusText = $"{availabilityLabel} but inactive here ({CurrentTerritoryId} {CurrentTerritoryName}, {CurrentCategoryLabel}) - {inactiveReason}. {surfaceCount} cutscene surfaces available.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S41CBCDECD9081959", availabilityLabel, CurrentTerritoryId, CurrentTerritoryNameMessage, CurrentCategoryLabelMessage, inactiveReason, surfaceCount));
             return;
         }
 
-        StatusText = $"{availabilityLabel} ({surfaceCount} cutscene surfaces available; current: {CurrentTerritoryId} {CurrentTerritoryName}, {CurrentCategoryLabel}).";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S6D1DBB5F0D289586", availabilityLabel, surfaceCount, CurrentTerritoryId, CurrentTerritoryNameMessage, CurrentCategoryLabelMessage));
     }
 
     private bool HasMissingConfiguredSurface()
@@ -880,7 +889,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             enabled = false;
             availableSurfaceCount = 0;
             availableOptionalSurfaceCount = 0;
-            StatusText = "Unavailable - cutscene hook surfaces could not be initialized.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S9E9ECDE16F194EAF"));
             UnsubscribeFramework();
             UpdateClientStateSubscriptions(false);
             return;
@@ -898,7 +907,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             enabled = false;
             availableSurfaceCount = 0;
             availableOptionalSurfaceCount = 0;
-            StatusText = "Unavailable - cutscene signatures were not found.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SCCC8BB549C57E8A7"));
             UnsubscribeFramework();
             UpdateClientStateSubscriptions(false);
             log.Warning("[XASlave] Auto Skip Cutscenes unavailable: no cutscene hook or patch signatures were found.");
@@ -965,7 +974,7 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
         if (availableSurfaceCount + availableOptionalSurfaceCount == 0)
         {
             enabled = false;
-            StatusText = "Unavailable - cutscene hooks failed to enable.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SEFAC8E5D8C96C191"));
             UnsubscribeFramework();
             UpdateClientStateSubscriptions(false);
             log.Warning("[XASlave] Auto Skip Cutscenes could not enable any hook or patch surfaces.");
@@ -1293,68 +1302,68 @@ public unsafe sealed class AutoSkipCutsceneService : IDisposable
             || goldSaucerFashionReport;
     }
 
-    private string GetInactiveReason()
+    private global::XASlave.Localization.UiMessage GetInactiveReason()
     {
         if (!clientState.IsLoggedIn)
-            return "not logged in";
+            return global::XASlave.Localization.UiMessage.Key("SF18A2548C063C5A2");
 
         if (condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
-            return "between areas";
+            return global::XASlave.Localization.UiMessage.Key("SCB3A2529F156ED88");
 
         if (!IsZoneAllowed(clientState.TerritoryType))
-            return useZoneWhitelist ? "current territory is not whitelisted" : "current territory is blacklisted";
+            return (useZoneWhitelist ? global::XASlave.Localization.UiMessage.Key("SB6DE0631EB22C691") : global::XASlave.Localization.UiMessage.Key("SA8F122AE4DBD0BAE"));
 
         if (!IsCurrentCategoryAllowed())
-            return "no enabled category matches the current territory";
+            return global::XASlave.Localization.UiMessage.Key("S5B1B9430998B0D8F");
 
-        return string.Empty;
+        return global::XASlave.Localization.UiMessage.Raw(string.Empty);
     }
 
-    private string GetCurrentCategoryLabel()
+    private global::XASlave.Localization.UiMessage GetCurrentCategoryLabel()
     {
         var territoryId = (ushort)clientState.TerritoryType;
         var intendedUse = GetCurrentTerritoryIntendedUse();
 
         if (IsMsqTerritory(territoryId))
-            return "MSQ duty";
+            return global::XASlave.Localization.UiMessage.Key("S2FC067B2AC969B07");
 
         if (intendedUse == TerritoryIntendedUse.OceanFishing)
-            return "Ocean Fishing";
+            return global::XASlave.Localization.UiMessage.Key("S47E207D2117C12DF");
 
         if (IsCrystallineConflict(intendedUse))
-            return "Crystalline Conflict";
+            return global::XASlave.Localization.UiMessage.Key("SF2620CB02EB807BA");
 
         if (IsFrontlineOrRivalWings(intendedUse))
-            return "Frontline/Rival Wings";
+            return global::XASlave.Localization.UiMessage.Key("S6E7ED371D7F7E892");
 
         if (intendedUse == TerritoryIntendedUse.Inn)
-            return "Inn";
+            return global::XASlave.Localization.UiMessage.Key("SC53B45B2D2916331");
 
         if (IsMahjong(territoryId, intendedUse))
-            return "Gold Saucer - Mahjong";
+            return global::XASlave.Localization.UiMessage.Key("SB9E85420800E83B7");
 
         if (IsAirForceOne(territoryId, intendedUse))
-            return "Gold Saucer - Air Force One";
+            return global::XASlave.Localization.UiMessage.Key("SE9E161513B449A79");
 
         if (intendedUse == TerritoryIntendedUse.ChocoboRacing)
-            return "Gold Saucer - Chocobo Racing";
+            return global::XASlave.Localization.UiMessage.Key("SCCE7F66886887949");
 
         if (intendedUse == TerritoryIntendedUse.LordOfVerminion)
-            return "Gold Saucer - Lord of Verminion";
+            return global::XASlave.Localization.UiMessage.Key("S33899D0D746A82D9");
 
         if (IsTripleTriad(intendedUse))
-            return "Gold Saucer - Triple Triad";
+            return global::XASlave.Localization.UiMessage.Key("S45A3281A0A0B9636");
 
         if (intendedUse == TerritoryIntendedUse.Blunderville)
-            return "Gold Saucer - Blunderville";
+            return global::XASlave.Localization.UiMessage.Key("SB7C5927CE841B251");
 
         if (IsFashionReportTerritory(territoryId, intendedUse))
-            return "Gold Saucer - Fashion Report / main area";
+            return global::XASlave.Localization.UiMessage.Key("S01389C246D96725D");
 
         if (IsGoldSaucerTerritoryOrUse(territoryId, intendedUse))
-            return "Gold Saucer";
+            return global::XASlave.Localization.UiMessage.Key("S264127BB1C4A3A70");
 
-        return intendedUse == 0 ? "Normal/unknown" : $"Normal/other ({intendedUse})";
+        return (intendedUse == 0 ? global::XASlave.Localization.UiMessage.Key("S118F120B173614A2") : global::XASlave.Localization.UiMessage.Format("S73CE6CC9BCA2BBEF", intendedUse));
     }
 
     private TerritoryIntendedUse GetCurrentTerritoryIntendedUse()

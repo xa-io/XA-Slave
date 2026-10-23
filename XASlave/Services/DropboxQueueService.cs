@@ -64,6 +64,7 @@ public sealed class DropboxQueueService
     };
 
     private const string UsageText = "Usage: /xa db <itemId:qty ...> (negative qty keeps that many) | inv | clear | begin | request <itemId:qty ...> | shards | crystals | clusters | shards+crystals | crystals+clusters | shards+crystals+clusters | subloot | subgil <gil-value> | subsupplies <days>";
+    private static global::XASlave.Localization.UiMessage UsageMessage => global::XASlave.Localization.UiMessage.Key("S92A9EBB8CF764199");
 
     // /xa db subloot expands to the eight subaquatic loot items (22500-22507), each at 99999.
     private static readonly string SublootArguments =
@@ -109,12 +110,21 @@ public sealed class DropboxQueueService
         this.log = log;
     }
 
-    public bool TryExecute(string arguments, out string message)
+    public bool TryExecute(string arguments, out string message) => TryExecuteLocalizedCore(out _, arguments, out message);
+    internal bool TryExecuteMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryExecuteLocalizedCore(out var presentation, arguments, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryExecuteLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    {
+        replyPresentation = null;
         var trimmed = arguments.Trim();
         if (string.IsNullOrWhiteSpace(trimmed))
         {
-            message = UsageText;
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, UsageMessage);
             return false;
         }
 
@@ -126,92 +136,117 @@ public sealed class DropboxQueueService
         {
             case "*s":
             case "shards":
-                return TryBuildRequest(BuildCrystalRequestArguments(2, 6), out message);
+                return TryBuildRequestLocalizedCore(out replyPresentation, BuildCrystalRequestArguments(2, 6), out message);
             case "*c":
             case "crystals":
-                return TryBuildRequest(BuildCrystalRequestArguments(8, 6), out message);
+                return TryBuildRequestLocalizedCore(out replyPresentation, BuildCrystalRequestArguments(8, 6), out message);
             case "*x":
             case "clusters":
-                return TryBuildRequest(BuildCrystalRequestArguments(14, 6), out message);
+                return TryBuildRequestLocalizedCore(out replyPresentation, BuildCrystalRequestArguments(14, 6), out message);
             case "*sc":
             case "shards+crystals":
-                return TryBuildRequest(BuildCrystalRequestArguments(2, 12), out message);
+                return TryBuildRequestLocalizedCore(out replyPresentation, BuildCrystalRequestArguments(2, 12), out message);
             case "*cx":
             case "crystals+clusters":
-                return TryBuildRequest(BuildCrystalRequestArguments(8, 12), out message);
+                return TryBuildRequestLocalizedCore(out replyPresentation, BuildCrystalRequestArguments(8, 12), out message);
             case "*scx":
             case "shards+crystals+clusters":
-                return TryBuildRequest(BuildCrystalRequestArguments(2, 18), out message);
+                return TryBuildRequestLocalizedCore(out replyPresentation, BuildCrystalRequestArguments(2, 18), out message);
             case "subloot":
-                return TryAddToQueue(SublootArguments, out message);
+                return TryAddToQueueLocalizedCore(out replyPresentation, SublootArguments, out message);
             case "subgil":
-                return TryQueueSublootValue(subcommandArgs, out message);
+                return TryQueueSublootValueLocalizedCore(out replyPresentation, subcommandArgs, out message);
             case "subsupplies":
-                return TryQueueSubmarineSupplies(subcommandArgs, out message);
+                return TryQueueSubmarineSuppliesLocalizedCore(out replyPresentation, subcommandArgs, out message);
             case "request":
-                return TryBuildRequest(subcommandArgs, out message);
+                return TryBuildRequestLocalizedCore(out replyPresentation, subcommandArgs, out message);
             case "inv":
-                return TryQueueMainInventory(out message);
+                return TryQueueMainInventoryLocalizedCore(out replyPresentation, out message);
             case "clear":
-                return TryClearQueue(out message);
+                return TryClearQueueLocalizedCore(out replyPresentation, out message);
             case "begin":
-                return TryBeginTrading(out message);
+                return TryBeginTradingLocalizedCore(out replyPresentation, out message);
             default:
-                return TryAddToQueue(trimmed, out message);
+                return TryAddToQueueLocalizedCore(out replyPresentation, trimmed, out message);
         }
     }
 
-    private bool TryQueueSubmarineSupplies(string arguments, out string message)
+    private bool TryQueueSubmarineSupplies(string arguments, out string message) => TryQueueSubmarineSuppliesLocalizedCore(out _, arguments, out message);
+    private bool TryQueueSubmarineSuppliesMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryQueueSubmarineSuppliesLocalizedCore(out var presentation, arguments, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryQueueSubmarineSuppliesLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    {
+        replyPresentation = null;
         if (!SubmarineSupplyCalculator.TryCalculate(arguments, out var tanks, out var repairKits))
         {
-            message = "Usage: /xa db subsupplies <positive days> (example: /xa db subsupplies 30). "
-                + "Use a decimal point for fractional days; supply totals must fit the Dropbox queue.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S4932D60DF29756DF"), global::XASlave.Localization.UiMessage.Key("SC8EA6EEAC88C8450")));
             return false;
         }
 
         var queueArguments = FormattableString.Invariant(
             $"{SubmarineSupplyCalculator.CeruleumTankItemId}:{tanks} {SubmarineSupplyCalculator.MagitekRepairKitItemId}:{repairKits}");
         var started = TryAddToQueue(queueArguments, out var queueMessage);
-        message = $"Supplies for {arguments.Trim()} day(s), 4 submarines: requested {tanks:N0} Ceruleum Tanks "
-            + $"and {repairKits:N0} Magitek Repair Kits. {queueMessage}";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("S48A32FB23A245978", arguments.Trim(), tanks), global::XASlave.Localization.UiMessage.Format("S9447B3D83E7CA844", repairKits, queueMessage)));
         return started;
     }
 
-    public bool TryClearQueue(out string message)
+    public bool TryClearQueue(out string message) => TryClearQueueLocalizedCore(out _, out message);
+    internal bool TryClearQueueMessage(out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryClearQueueLocalizedCore(out var presentation, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryClearQueueLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
+    {
+        replyPresentation = null;
         if (!ipcClient.IsDropboxAvailable())
         {
-            message = "Dropbox is not available.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S9030550D2CA76977"));
             return false;
         }
 
         if (!TryGetItemQuantities(out var itemQuantities))
         {
-            message = "Could not access Dropbox's item queue UI. Make sure Dropbox is loaded.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SBAA08583C908960B"));
             return false;
         }
 
         itemQuantities.Clear();
-        message = "Cleared the Dropbox item queue.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SE31DCC3C6708CADE"));
         return true;
     }
 
-    public bool TryQueueSublootValue(string arguments, out string message)
+    public bool TryQueueSublootValue(string arguments, out string message) => TryQueueSublootValueLocalizedCore(out _, arguments, out message);
+    internal bool TryQueueSublootValueMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryQueueSublootValueLocalizedCore(out var presentation, arguments, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryQueueSublootValueLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    {
+        replyPresentation = null;
         if (!SublootValueSelector.TryParseTarget(arguments, out var targetValue))
         {
-            message = "Usage: /xa db subgil <positive gil value> (example: /xa db subgil 5000000).";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S09B291780377D89C"));
             return false;
         }
 
         if (!ipcClient.IsDropboxAvailable())
         {
-            message = "Dropbox is not available.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S9030550D2CA76977"));
             return false;
         }
 
-        if (!TryClearQueue(out message))
+        if (!TryClearQueueLocalizedCore(out replyPresentation, out message))
             return false;
 
         var itemCounts = GetItemCounts();
@@ -235,13 +270,13 @@ public sealed class DropboxQueueService
         catch (Exception ex)
         {
             log.Warning(ex, "[XASlave] Failed to calculate a minimum-overflow subloot selection.");
-            message = $"Could not calculate a subloot selection: {ex.Message}";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S9877978E6792E7C0", ex.Message));
             return false;
         }
 
         if (selection.SelectedItemCount == 0)
         {
-            message = $"Found no local subaquatic loot for the {targetValue:N0} gil target; Dropbox trading was not started.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S3EA58D1B680CDCE4", targetValue));
             return false;
         }
 
@@ -255,7 +290,7 @@ public sealed class DropboxQueueService
 
             if (nqQuantity > 0)
             {
-                if (!TryEnqueueItem(selected.Key, false, nqQuantity, out message))
+                if (!TryEnqueueItemLocalizedCore(out replyPresentation, selected.Key, false, nqQuantity, out message))
                     return false;
 
                 queuedEntries++;
@@ -264,7 +299,7 @@ public sealed class DropboxQueueService
 
             if (hqQuantity > 0)
             {
-                if (!TryEnqueueItem(selected.Key, true, hqQuantity, out message))
+                if (!TryEnqueueItemLocalizedCore(out replyPresentation, selected.Key, true, hqQuantity, out message))
                     return false;
 
                 queuedEntries++;
@@ -272,46 +307,50 @@ public sealed class DropboxQueueService
             }
         }
 
-        var targetResult = selection.TargetReached
-            ? selection.Overflow == 0
-                ? "exact target"
-                : $"{selection.Overflow:N0} gil over target; minimum reachable overflow"
-            : $"{selection.Shortfall:N0} gil short; queued all available subloot";
+        var targetResult = (selection.TargetReached ? (selection.Overflow == 0 ? global::XASlave.Localization.UiMessage.Key("S6B8C7CBC10E07C5D") : global::XASlave.Localization.UiMessage.Format("SCF3CA99703563AF5" , selection.Overflow)) : global::XASlave.Localization.UiMessage.Format("SF2B2DF50BA2CFB15" , selection.Shortfall));
         if (!DropboxQueuePolicy.ShouldStartTrading(queuedEntries))
         {
-            message = $"Selected subloot for the {targetValue:N0} gil target ({targetResult}), but queued no Dropbox entries; trading was not started.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S49DB190C0F99938A", targetValue, targetResult));
             return false;
         }
 
         var startResult = TryStartTrading(out var partnerName);
-        var queuedText = $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling "
-                         + $"{queuedTotal} subloot item(s), valued at {selection.SelectedValue:N0} gil for the "
-                         + $"{targetValue:N0} gil target ({targetResult})";
-        message = startResult switch
+        var queuedText = global::XASlave.Localization.UiMessage.Format("SF25B2CEBA8A52CAD" , global::XASlave.Localization.UiMessage.Format("S710BABB2F3BA63E5" , queuedEntries, ((queuedEntries == 1 ? global::XASlave.Localization.UiMessage.Key("SA1FCE4363854FF88") : global::XASlave.Localization.UiMessage.Key("S388F91EA04D6EAEB")))), global::XASlave.Localization.UiMessage.Format("S3C1D3CC678D99BD1" , queuedTotal, selection.SelectedValue), global::XASlave.Localization.UiMessage.Format("S481287861C6221AE" , targetValue, targetResult));
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, startResult switch
         {
-            TradeStartResult.Started => $"{queuedText}; trading with {partnerName}.",
-            TradeStartResult.AlreadyTrading => $"{queuedText}, but Dropbox was already trading; this queue may not be the one in flight.",
-            TradeStartResult.NoPartner => $"{queuedText}, but no player is targeted or focused; trading was not started.",
-            _ => $"{queuedText}, but Dropbox declined to start trading.",
-        };
+            TradeStartResult.Started => global::XASlave.Localization.UiMessage.Format("S719C5A4E17E44597" , queuedText, partnerName),
+            TradeStartResult.AlreadyTrading => global::XASlave.Localization.UiMessage.Format("S2F8B1D374683D59D" , queuedText),
+            TradeStartResult.NoPartner => global::XASlave.Localization.UiMessage.Format("S3662FA3ED42E845C" , queuedText),
+            _ => global::XASlave.Localization.UiMessage.Format("SE98C28D5D41F8B46" , queuedText),
+        });
         return startResult == TradeStartResult.Started;
     }
 
-    private bool TryBuildRequest(string arguments, out string message)
+    private bool TryBuildRequest(string arguments, out string message) => TryBuildRequestLocalizedCore(out _, arguments, out message);
+    private bool TryBuildRequestMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryBuildRequestLocalizedCore(out var presentation, arguments, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryBuildRequestLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    {
+        replyPresentation = null;
         if (string.IsNullOrWhiteSpace(arguments))
         {
-            message = "Usage: /xa db request item1:qty1 item2:qty2 [...]";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SD34B55A9D4BD26D2"));
             return false;
         }
 
-        var parsed = ParseArguments(arguments, out message);
+        var parsed = ParseArgumentsMessage(arguments, out var parseMessage);
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, parseMessage);
         if (parsed == null)
             return false;
 
         if (parsed.Any(item => item.Needed < 0))
         {
-            message = "db: Negative keep-remaining quantities are supported only when queueing with /xa db <itemId:-keep ...>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SE3C8792D740E7BBD"));
             return false;
         }
 
@@ -320,7 +359,7 @@ public sealed class DropboxQueueService
             var inventoryManager = InventoryManager.Instance();
             if (inventoryManager == null)
             {
-                message = "Inventory manager is not available.";
+                message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S6F9411C459B1B8ED"));
                 return false;
             }
 
@@ -338,27 +377,35 @@ public sealed class DropboxQueueService
                 .Where(item => item.Needed > 0)
                 .ToList();
 
-            message = needed.Count == 0
-                ? "No items need to be filled."
-                : "/xa db " + string.Join(" ", needed);
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (needed.Count == 0 ? global::XASlave.Localization.UiMessage.Key("S24EA61BF8B970967") : global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S98BD98427A6AD014"), global::XASlave.Localization.UiMessage.Value(string.Join(" ", needed)))));
             return true;
         }
     }
 
-    private bool TryAddToQueue(string arguments, out string message)
+    private bool TryAddToQueue(string arguments, out string message) => TryAddToQueueLocalizedCore(out _, arguments, out message);
+    private bool TryAddToQueueMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryAddToQueueLocalizedCore(out var presentation, arguments, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryAddToQueueLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    {
+        replyPresentation = null;
         if (!ipcClient.IsDropboxAvailable())
         {
-            message = "Dropbox is not available.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S9030550D2CA76977"));
             return false;
         }
 
-        var parsed = ParseArguments(arguments, out message);
+        var parsed = ParseArgumentsMessage(arguments, out var parseMessage);
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, parseMessage);
         if (parsed == null)
             return false;
 
         // Clear once per valid command; individual items remain additive within this batch.
-        if (!TryClearQueue(out message))
+        if (!TryClearQueueLocalizedCore(out replyPresentation, out message))
             return false;
 
         var itemCounts = GetItemCounts();
@@ -381,7 +428,7 @@ public sealed class DropboxQueueService
 
             if (nqQuantity > 0)
             {
-                if (!TryEnqueueItem(item.ItemId, false, nqQuantity, out message))
+                if (!TryEnqueueItemLocalizedCore(out replyPresentation, item.ItemId, false, nqQuantity, out message))
                     return false;
 
                 queuedEntries++;
@@ -390,7 +437,7 @@ public sealed class DropboxQueueService
 
             if (hqQuantity > 0)
             {
-                if (!TryEnqueueItem(item.ItemId, true, hqQuantity, out message))
+                if (!TryEnqueueItemLocalizedCore(out replyPresentation, item.ItemId, true, hqQuantity, out message))
                     return false;
 
                 queuedEntries++;
@@ -405,44 +452,49 @@ public sealed class DropboxQueueService
             }
         }
 
-        var keepSummary = keepRequestCount > 0
-            ? $" after reserving the requested remainder for {keepRequestCount} item ID{(keepRequestCount == 1 ? string.Empty : "s")}"
-            : string.Empty;
+        var keepSummary = (keepRequestCount > 0 ? global::XASlave.Localization.UiMessage.Format("S18DF6A28E5F4DA2D" , keepRequestCount, ((keepRequestCount == 1 ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Key("S043A718774C572BD")))) : global::XASlave.Localization.UiMessage.Raw(string.Empty));
         if (!DropboxQueuePolicy.ShouldStartTrading(queuedEntries))
         {
-            message = keepRequestCount > 0
-                ? "Queued no items; local quantities do not exceed the requested keep-remaining amounts, so trading was not started."
-                : "Queued no matching local items; trading was not started.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, (keepRequestCount > 0 ? global::XASlave.Localization.UiMessage.Key("S195C88F704745CF6") : global::XASlave.Localization.UiMessage.Key("S2799EB3F4FCD9D6F")));
             return false;
         }
 
         var startResult = TryStartTrading(out var partnerName);
-        var queuedText = $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s){FormatQueuedValue(queuedValue)}{keepSummary}";
-        message = startResult switch
+        var queuedText = global::XASlave.Localization.UiMessage.Format("S9CE4EAF0B3065E1D" , queuedEntries, ((queuedEntries == 1 ? global::XASlave.Localization.UiMessage.Key("SA1FCE4363854FF88") : global::XASlave.Localization.UiMessage.Key("S388F91EA04D6EAEB"))), queuedTotal, FormatQueuedValueMessage(queuedValue), keepSummary);
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, startResult switch
         {
-            TradeStartResult.Started => $"{queuedText}; trading with {partnerName}.",
-            TradeStartResult.AlreadyTrading => $"{queuedText}, but Dropbox was already trading; this queue may not be the one in flight.",
-            TradeStartResult.NoPartner => $"{queuedText}, but no player is targeted or focused; trading was not started.",
-            _ => $"{queuedText}, but Dropbox declined to start trading.",
-        };
+            TradeStartResult.Started => global::XASlave.Localization.UiMessage.Format("S719C5A4E17E44597" , queuedText, partnerName),
+            TradeStartResult.AlreadyTrading => global::XASlave.Localization.UiMessage.Format("S2F8B1D374683D59D" , queuedText),
+            TradeStartResult.NoPartner => global::XASlave.Localization.UiMessage.Format("S3662FA3ED42E845C" , queuedText),
+            _ => global::XASlave.Localization.UiMessage.Format("SE98C28D5D41F8B46" , queuedText),
+        });
         return startResult == TradeStartResult.Started;
     }
 
-    private bool TryQueueMainInventory(out string message)
+    private bool TryQueueMainInventory(out string message) => TryQueueMainInventoryLocalizedCore(out _, out message);
+    private bool TryQueueMainInventoryMessage(out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryQueueMainInventoryLocalizedCore(out var presentation, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryQueueMainInventoryLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
+    {
+        replyPresentation = null;
         if (!ipcClient.IsDropboxAvailable())
         {
-            message = "Dropbox is not available.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S9030550D2CA76977"));
             return false;
         }
 
-        if (!TryClearQueue(out message))
+        if (!TryClearQueueLocalizedCore(out replyPresentation, out message))
             return false;
 
         var itemCounts = GetMainInventoryItemCounts();
         if (itemCounts.Count == 0)
         {
-            message = "Found no eligible tradable items in Inventory1-4; Dropbox trading was not started.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S568BFE5B1CC92DE3"));
             return false;
         }
 
@@ -454,7 +506,7 @@ public sealed class DropboxQueueService
         {
             if (entry.Value.NormalQualityQuantity > 0)
             {
-                if (!TryEnqueueItem(entry.Key, false, entry.Value.NormalQualityQuantity, out message))
+                if (!TryEnqueueItemLocalizedCore(out replyPresentation, entry.Key, false, entry.Value.NormalQualityQuantity, out message))
                     return false;
 
                 queuedEntries++;
@@ -463,7 +515,7 @@ public sealed class DropboxQueueService
 
             if (entry.Value.HighQualityQuantity > 0)
             {
-                if (!TryEnqueueItem(entry.Key, true, entry.Value.HighQualityQuantity, out message))
+                if (!TryEnqueueItemLocalizedCore(out replyPresentation, entry.Key, true, entry.Value.HighQualityQuantity, out message))
                     return false;
 
                 queuedEntries++;
@@ -476,49 +528,67 @@ public sealed class DropboxQueueService
 
         if (!DropboxQueuePolicy.ShouldStartTrading(queuedEntries))
         {
-            message = "Queued no eligible Inventory1-4 entries; Dropbox trading was not started.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S0D3F6C266FD0013D"));
             return false;
         }
 
         var startResult = TryStartTrading(out var partnerName);
-        var queuedText = $"Queued {queuedEntries} Dropbox entr{(queuedEntries == 1 ? "y" : "ies")} totaling {queuedTotal} item(s) from Inventory1-4{FormatQueuedValue(queuedValue)}";
-        message = startResult switch
+        var queuedText = global::XASlave.Localization.UiMessage.Format("S3CEA16DC4C17BA70" , queuedEntries, ((queuedEntries == 1 ? global::XASlave.Localization.UiMessage.Key("SA1FCE4363854FF88") : global::XASlave.Localization.UiMessage.Key("S388F91EA04D6EAEB"))), queuedTotal, FormatQueuedValueMessage(queuedValue));
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, startResult switch
         {
-            TradeStartResult.Started => $"{queuedText}; trading with {partnerName}.",
-            TradeStartResult.AlreadyTrading => $"{queuedText}, but Dropbox was already trading; this queue may not be the one in flight.",
-            TradeStartResult.NoPartner => $"{queuedText}, but no player is targeted or focused; trading was not started.",
-            _ => $"{queuedText}, but Dropbox declined to start trading.",
-        };
+            TradeStartResult.Started => global::XASlave.Localization.UiMessage.Format("S719C5A4E17E44597" , queuedText, partnerName),
+            TradeStartResult.AlreadyTrading => global::XASlave.Localization.UiMessage.Format("S2F8B1D374683D59D" , queuedText),
+            TradeStartResult.NoPartner => global::XASlave.Localization.UiMessage.Format("S3662FA3ED42E845C" , queuedText),
+            _ => global::XASlave.Localization.UiMessage.Format("SE98C28D5D41F8B46" , queuedText),
+        });
         return startResult == TradeStartResult.Started;
     }
 
-    public bool TryEnqueueXagmanItem(uint itemId, bool isHq, int quantity, out string message)
+    public bool TryEnqueueXagmanItem(uint itemId, bool isHq, int quantity, out string message) => TryEnqueueXagmanItemLocalizedCore(out _, itemId, isHq, quantity, out message);
+    internal bool TryEnqueueXagmanItemMessage(uint itemId, bool isHq, int quantity, out global::XASlave.Localization.UiMessage message)
     {
-        return TryEnqueueItem(itemId, isHq, quantity, out message);
+        var success = TryEnqueueXagmanItemLocalizedCore(out var presentation, itemId, isHq, quantity, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
     }
 
-    private bool TryEnqueueItem(uint itemId, bool isHq, int quantity, out string message)
+    private bool TryEnqueueXagmanItemLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, uint itemId, bool isHq, int quantity, out string message)
     {
+        replyPresentation = null;
+        return TryEnqueueItemLocalizedCore(out replyPresentation, itemId, isHq, quantity, out message);
+    }
+
+    private bool TryEnqueueItem(uint itemId, bool isHq, int quantity, out string message) => TryEnqueueItemLocalizedCore(out _, itemId, isHq, quantity, out message);
+    private bool TryEnqueueItemMessage(uint itemId, bool isHq, int quantity, out global::XASlave.Localization.UiMessage message)
+    {
+        var success = TryEnqueueItemLocalizedCore(out var presentation, itemId, isHq, quantity, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryEnqueueItemLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, uint itemId, bool isHq, int quantity, out string message)
+    {
+        replyPresentation = null;
         if (quantity <= 0)
         {
-            message = $"Refusing to queue item {itemId} with a non-positive quantity ({quantity}).";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S3E92678DA402A0C1", itemId, quantity));
             return false;
         }
 
         if (!ipcClient.DropboxTryGetItemQuantity(itemId, isHq, out var existingQuantity)
             || !DropboxQueuePolicy.TryCalculateTargetQuantity(existingQuantity, quantity, out var targetQuantity))
         {
-            message = $"Failed to read the current Dropbox quantity for item {itemId}{(isHq ? " HQ" : string.Empty)}.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S0C4703A02F17450F", itemId, ((isHq ? global::XASlave.Localization.UiMessage.Key("S91A133F748E97815") : global::XASlave.Localization.UiMessage.Value(string.Empty)))));
             return false;
         }
 
         if (!ipcClient.DropboxSetItemQuantity(itemId, isHq, targetQuantity))
         {
-            message = $"Failed to queue item {itemId}{(isHq ? " HQ" : string.Empty)} in Dropbox.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S6743B90A54B57954", itemId, ((isHq ? global::XASlave.Localization.UiMessage.Key("S91A133F748E97815") : global::XASlave.Localization.UiMessage.Value(string.Empty)))));
             return false;
         }
 
-        message = string.Empty;
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         return true;
     }
 
@@ -555,28 +625,39 @@ public sealed class DropboxQueueService
         return ipcClient.DropboxIsBusy() ? TradeStartResult.Started : TradeStartResult.NotStarted;
     }
 
-    public bool TryBeginTrading(out string message)
+    public bool TryBeginTrading(out string message) => TryBeginTradingLocalizedCore(out _, out message);
+    internal bool TryBeginTradingMessage(out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryBeginTradingLocalizedCore(out var presentation, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryBeginTradingLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
+    {
+        replyPresentation = null;
         if (!ipcClient.IsDropboxAvailable())
         {
-            message = "Dropbox is not available.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S9030550D2CA76977"));
             return false;
         }
 
         var result = TryStartTrading(out var partnerName);
-        message = result switch
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, result switch
         {
-            TradeStartResult.Started => $"Started Dropbox trading with {partnerName}.",
-            TradeStartResult.AlreadyTrading => "Dropbox is already trading.",
-            TradeStartResult.NoPartner => "Target or focus target your trade partner first.",
-            _ => "Dropbox did not start trading (is the item queue empty?).",
-        };
+            TradeStartResult.Started => global::XASlave.Localization.UiMessage.Format("S6206C8E4C192E24B" , partnerName),
+            TradeStartResult.AlreadyTrading => global::XASlave.Localization.UiMessage.Key("SC0C74990B6A8250A"),
+            TradeStartResult.NoPartner => global::XASlave.Localization.UiMessage.Key("S26E8E88849DD6E1E"),
+            _ => global::XASlave.Localization.UiMessage.Key("S6FD54E28D83CE407"),
+        });
         return result == TradeStartResult.Started;
     }
 
-    private static string FormatQueuedValue(long queuedValue)
+    private static string FormatQueuedValue(long queuedValue) => FormatQueuedValueMessage(queuedValue).Original;
+
+    private static global::XASlave.Localization.UiMessage FormatQueuedValueMessage(long queuedValue)
     {
-        return queuedValue > 0 ? $", valued at {queuedValue:N0} gil" : string.Empty;
+        return queuedValue > 0 ? global::XASlave.Localization.UiMessage.Format("S883E6A44479F2D92" , queuedValue) : global::XASlave.Localization.UiMessage.Raw(string.Empty);
     }
 
     private static string BuildCrystalRequestArguments(int startItemId, int count)
@@ -586,28 +667,35 @@ public sealed class DropboxQueueService
 
     private static IReadOnlyList<NeededItem>? ParseArguments(string arguments, out string message)
     {
+        var result = ParseArgumentsMessage(arguments, out var presentation);
+        message = presentation.Original;
+        return result;
+    }
+
+    private static IReadOnlyList<NeededItem>? ParseArgumentsMessage(string arguments, out global::XASlave.Localization.UiMessage message)
+    {
         var tokens = arguments.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (tokens.Length == 0)
         {
-            message = UsageText;
+            message = UsageMessage;
             return null;
         }
 
         var items = new List<NeededItem>(tokens.Length);
-        var errors = new List<string>();
+        var errors = new List<global::XASlave.Localization.UiMessage>();
 
         foreach (var token in tokens)
         {
             var parts = token.Split(':', 2, StringSplitOptions.TrimEntries);
             if (parts.Length != 2)
             {
-                errors.Add($"Unable to parse `{token}`.");
+                errors.Add(global::XASlave.Localization.UiMessage.Format("S7486B12FCB516CE2" , token));
                 continue;
             }
 
             if (!uint.TryParse(parts[0], out var itemId))
             {
-                errors.Add($"Unable to parse item id `{parts[0]}`.");
+                errors.Add(global::XASlave.Localization.UiMessage.Format("S19E4E59E47E9B62D" , parts[0]));
                 continue;
             }
 
@@ -618,7 +706,7 @@ public sealed class DropboxQueueService
             }
             else if (!int.TryParse(parts[1], out quantity))
             {
-                errors.Add($"Unable to parse quantity `{parts[1]}`.");
+                errors.Add(global::XASlave.Localization.UiMessage.Format("SAA3FD7A4DA4EBE0F" , parts[1]));
                 continue;
             }
 
@@ -627,17 +715,17 @@ public sealed class DropboxQueueService
 
         if (errors.Count == 1)
         {
-            message = $"db: {errors[0]}";
+            message = global::XASlave.Localization.UiMessage.Format("SE74525E1F729DE58" , errors[0]);
             return null;
         }
 
         if (errors.Count > 1)
         {
-            message = $"db: Multiple errors occurred: {string.Join(" | ", errors)}";
+            message = global::XASlave.Localization.UiMessage.Format("S2E60DEDC2C7AD82B" , global::XASlave.Localization.UiMessage.Join(" | ", errors));
             return null;
         }
 
-        message = string.Empty;
+        message = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         return items;
     }
 

@@ -89,22 +89,40 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
-    public string LastSourceAddon { get; private set; } = "None";
-    public string LastDestinationLabel { get; private set; } = "None";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
+    public string LastSourceAddon { get; private set; } = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5").Original;
+    private global::XASlave.Localization.UiMessage? uiLastSourceAddon = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5");
+    internal global::XASlave.Localization.UiMessage LastSourceAddonMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastSourceAddon, LastSourceAddon);
+    internal string LocalizedLastSourceAddon => global::XASlave.Localization.UiMessage.Resolve(ref uiLastSourceAddon, LastSourceAddon);
+    public string LastDestinationLabel { get; private set; } = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5").Original;
+    private InventoryShuttleFamily? lastDestinationFamily;
+    private global::XASlave.Localization.UiMessage? uiLastDestinationLabel = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5");
+    internal global::XASlave.Localization.UiMessage LastDestinationLabelMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastDestinationLabel, LastDestinationLabel);
+    internal string LocalizedLastDestinationLabel => lastDestinationFamily is { } family ? DestinationMessage(family).Display : global::XASlave.Localization.UiMessage.Resolve(ref uiLastDestinationLabel, LastDestinationLabel);
     public uint LastItemId { get; private set; }
     public int AvailableDestinationCount { get; private set; }
     public BetterInventoryMoverModifierKey QuickMoveModifier => quickMoveModifier;
     public string QuickMoveModifierLabel => GetModifierLabel(quickMoveModifier);
-    public string OccupiedStackStatus { get; private set; } = "Occupied-stack binding has not been inspected.";
+    internal global::XASlave.Localization.UiMessage QuickMoveModifierLabelMessage => global::XASlave.Localization.UiMessage.Authored(QuickMoveModifierLabel);
+    internal string LocalizedQuickMoveModifierLabel => QuickMoveModifierLabelMessage.Display;
+    public string OccupiedStackStatus { get; private set; } = global::XASlave.Localization.UiMessage.Key("SB12D6DC32BFE9B3D").Original;
+    private global::XASlave.Localization.UiMessage? uiOccupiedStackStatus = global::XASlave.Localization.UiMessage.Key("SB12D6DC32BFE9B3D");
+    internal global::XASlave.Localization.UiMessage OccupiedStackStatusMessage => global::XASlave.Localization.UiMessage.Capture(ref uiOccupiedStackStatus, OccupiedStackStatus);
+    internal string LocalizedOccupiedStackStatus => global::XASlave.Localization.UiMessage.Resolve(ref uiOccupiedStackStatus, OccupiedStackStatus);
 
     public void ApplyConfiguration(BetterInventoryMoverModifierKey quickMoveModifier)
     {
-        CancelTransfer("Configuration changed."); generation++;
+        CancelTransfer(global::XASlave.Localization.UiMessage.Key("S4AA7E5DBE5D6A9E8")); generation++;
         this.quickMoveModifier = NormalizeModifier(quickMoveModifier);
         if (enabled)
-            StatusText = BuildStatusText();
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
     }
 
     public bool SetEnabled(bool value)
@@ -113,25 +131,25 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         if (value == enabled)
             return enabled;
 
-        CancelTransfer("Inventory mover enable state changed."); generation++;
+        CancelTransfer(global::XASlave.Localization.UiMessage.Key("S338F03D99534E648")); generation++;
         if (!value)
         {
             enabled = false;
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         enabled = true;
         Subscribe();
-        StatusText = BuildStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
         return true;
     }
 
     public void Dispose()
     {
         if (disposed) return;
-        CancelTransfer("Inventory mover disposed."); disposed = true; generation++;
+        CancelTransfer(global::XASlave.Localization.UiMessage.Key("SCE33ACC2517C886C")); disposed = true; generation++;
         enabled = false;
         Unsubscribe();
     }
@@ -141,7 +159,7 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         if (subscribed)
             return;
 
-        access = new InventoryShuttleContext(Plugin.AddonLifecycle, () => { CancelTransfer("Inventory access was revoked."); generation++; });
+        access = new InventoryShuttleContext(Plugin.AddonLifecycle, () => { CancelTransfer(global::XASlave.Localization.UiMessage.Key("SD03752294380D934")); generation++; });
         contextMenu.OnMenuOpened += OnMenuOpened;
         Plugin.Framework.Update += UpdateTransfer;
         subscribed = true;
@@ -160,7 +178,7 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
 
     private void OnMenuOpened(IMenuOpenedArgs args)
     {
-        CancelTransfer("A new context menu revoked the previous transfer.");
+        CancelTransfer(global::XASlave.Localization.UiMessage.Key("SB72DF9C37C6C1172"));
         var menuGeneration = ++generation;
         access?.Reset();
         if (disposed || !enabled ||
@@ -180,7 +198,7 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         try
         {
             preparingSourceAddon = addonName;
-            LastSourceAddon = addonName;
+            LastSourceAddon = global::XASlave.Localization.UiMessage.Store(ref uiLastSourceAddon, global::XASlave.Localization.UiMessage.Raw(addonName));
             LastItemId = item.ItemId;
 
             if (!TryCaptureSource(addonName, item, out var source)) return;
@@ -211,8 +229,8 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         }
     }
 
-    private string BuildStatusText()
-        => $"Enabled - hold {QuickMoveModifierLabel} while right-clicking an item to move it to the first available open destination, or use the added context-menu move actions.";
+    private global::XASlave.Localization.UiMessage BuildStatusText()
+        => global::XASlave.Localization.UiMessage.Format("S4DC2CCADE89252D7", QuickMoveModifierLabelMessage);
 
     private bool IsQuickMoveModifierHeld()
         => (GetAsyncKeyState(GetVirtualKey(quickMoveModifier)) & 0x8000) != 0;
@@ -220,16 +238,24 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
     public static BetterInventoryMoverModifierKey NormalizeModifier(BetterInventoryMoverModifierKey modifier)
         => Enum.IsDefined(modifier) ? modifier : BetterInventoryMoverModifierKey.LeftShift;
 
+
+    private static global::XASlave.Localization.UiMessage DestinationMessage(InventoryShuttleFamily family) => family switch
+    {
+        InventoryShuttleFamily.Saddlebag => global::XASlave.Localization.UiMessage.Key("SD1F7B2FD72406658"),
+        InventoryShuttleFamily.PremiumSaddlebag => global::XASlave.Localization.UiMessage.Key("SA7D97AE47D499B60"),
+        InventoryShuttleFamily.Retainer => global::XASlave.Localization.UiMessage.Key("S5CCF2F9822C645DC"),
+        _ => global::XASlave.Localization.UiMessage.Key("S38108F5329F4CC53"),
+    };
     public static string GetModifierLabel(BetterInventoryMoverModifierKey modifier)
     {
         return NormalizeModifier(modifier) switch
         {
-            BetterInventoryMoverModifierKey.LeftControl => "Left Ctrl",
-            BetterInventoryMoverModifierKey.LeftAlt => "Left Alt",
-            BetterInventoryMoverModifierKey.RightShift => "Right Shift",
-            BetterInventoryMoverModifierKey.RightControl => "Right Ctrl",
-            BetterInventoryMoverModifierKey.RightAlt => "Right Alt",
-            _ => "Left Shift",
+            BetterInventoryMoverModifierKey.LeftControl => global::XASlave.Localization.UiMessage.Key("S539598885559F790").Original,
+            BetterInventoryMoverModifierKey.LeftAlt => global::XASlave.Localization.UiMessage.Key("SC975C1DD0C72505F").Original,
+            BetterInventoryMoverModifierKey.RightShift => global::XASlave.Localization.UiMessage.Key("SB0EA7AEB7ECA95F9").Original,
+            BetterInventoryMoverModifierKey.RightControl => global::XASlave.Localization.UiMessage.Key("SCCA19102E414EE3C").Original,
+            BetterInventoryMoverModifierKey.RightAlt => global::XASlave.Localization.UiMessage.Key("S473CBE010F45A6A5").Original,
+            _ => global::XASlave.Localization.UiMessage.Key("SF75AA1DEB96DFE23").Original,
         };
     }
 
@@ -342,21 +368,22 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
             if (!AddonHelper.IsAddonVisible(sourceAddon) || !DestinationOpen(destination.Family)
                 || !TryGetInventorySource(out var currentInventory, out var currentSlot)
                 || currentInventory != sourceItem.Inventory || currentSlot != sourceItem.Slot)
-                throw new InvalidOperationException("The captured inventory context changed.");
-            if (ReadSlot(sourceItem.Inventory, sourceItem.Slot) != sourceItem) throw new InvalidOperationException("The captured source item changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6842F0249DCE04E9"), originalMessage => new InvalidOperationException(originalMessage));
+            if (ReadSlot(sourceItem.Inventory, sourceItem.Slot) != sourceItem) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S56263FFFF5CD2258"), originalMessage => new InvalidOperationException(originalMessage));
             transferGeneration = ++generation;
             transfer = new(new TransferAdapter(this, destination), sourceItem, Environment.TickCount64);
-            LastDestinationLabel = destination.MenuLabel; LastItemId = sourceItem.State.FullId;
+            lastDestinationFamily = destination.Family;
+            LastDestinationLabel = global::XASlave.Localization.UiMessage.Store(ref uiLastDestinationLabel, global::XASlave.Localization.UiMessage.Raw(destination.MenuLabel)); LastItemId = sourceItem.State.FullId;
             PublishTransfer();
             // The first framework update follows menu setup, allowing an exact close stamp.
         }
-        catch (Exception error) { LastActionText = "Failed: " + error.Message; log.Warning(error, "Inventory transfer admission refused."); }
+        catch (Exception error) { LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SC5BC264875D7526E"), global::XASlave.Localization.UiMessage.FromException(error))); log.Warning(error, "Inventory transfer admission refused."); }
     }
 
     private static InventoryShuttleSource ReadSlot(InventoryType inventory, ushort index)
     {
         if (!NativeArrayAccess.TryGetInventorySlot(InventoryManager.Instance(), inventory, index, out var slot) || slot->IsSymbolic)
-            throw new InvalidOperationException("The required inventory slot is unavailable.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCDB0FE516F3DB20A"), originalMessage => new InvalidOperationException(originalMessage));
         return slot->GetItemId() == 0 ? new(inventory, index, 0, default)
             : new(inventory, index, slot->Quantity, InventoryShuttleItemState.Read(slot));
     }
@@ -364,12 +391,12 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
     private void UpdateTransfer(IFramework framework)
     {
         if (disposed || !enabled || transfer == null) return;
-        if (transferGeneration != generation) transfer.Cancel("Transfer generation was revoked.");
+        if (transferGeneration != generation) transfer.Cancel(global::XASlave.Localization.UiMessage.Key("S924FD5BD3A8EB883"));
         else transfer.Tick(Environment.TickCount64);
         PublishTransfer();
     }
 
-    private void CancelTransfer(string reason)
+    private void CancelTransfer(global::XASlave.Localization.UiMessage reason)
     {
         if (transfer == null) return;
         transfer.Cancel(reason); PublishTransfer(); transfer = null;
@@ -378,8 +405,8 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
     private void PublishTransfer()
     {
         if (transfer == null) return;
-        LastActionText = $"{transfer.Outcome}: {transfer.Moved} observed locally, {transfer.Remaining} remaining. {transfer.Detail}";
-        if (transfer.NativeCode is { } code) LastActionText += $" Native code: {code}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S79B2BE0E5AD1B88F", transfer.OutcomeMessage, transfer.Moved, transfer.Remaining, transfer.DetailMessage));
+        if (transfer.NativeCode is { } code) LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(uiLastActionText, LastActionText), global::XASlave.Localization.UiMessage.Format("S78EBE4629C6A87F0", code)));
     }
 
     private sealed class TransferAdapter(BetterInventoryMoverService owner, ShuttleDestination destination) : IInventoryShuttleAdapter
@@ -388,7 +415,7 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         public void Validate()
         {
             if (owner.disposed || !owner.enabled || owner.transferGeneration != owner.generation)
-                throw new InvalidOperationException("Inventory transfer ownership ended.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SAACDBA7AF55B9703"), originalMessage => new InvalidOperationException(originalMessage));
             owner.access!.Require(destination.Access);
             if (!menuBound) { owner.access.BindMenu(); menuBound = true; }
         }
@@ -399,15 +426,15 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
         {
             Validate();
             if (Read(source.Inventory, source.Slot) != source || Read(target.Before.Inventory, target.Before.Slot) != target.Before)
-                throw new InvalidOperationException("Inventory changed before native entry.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S53FC8736B9CE9B09"), originalMessage => new InvalidOperationException(originalMessage));
             var manager = InventoryManager.Instance();
             if (!owner.dataManager.GetExcelSheet<Item>().TryGetRow(source.State.BaseId, out var data) || data.StackSize != target.Capacity)
-                throw new InvalidOperationException("Item stack capacity changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S4EE783D4E60C83A0"), originalMessage => new InvalidOperationException(originalMessage));
             if (target.Before.Quantity > 0)
             {
                 if (target.Capacity <= 1 || source.Quantity > target.Capacity || target.Before.Quantity >= target.Capacity
                     || !NativeArrayAccess.TryGetInventorySlot(manager, target.Before.Inventory, target.Before.Slot, out var slot) || !owner.IsSameItem(slot, source))
-                    throw new InvalidOperationException("Occupied destination no longer permits an equivalent-state transfer.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9A8738FA92EE47F1"), originalMessage => new InvalidOperationException(originalMessage));
             }
             Validate();
             return manager->MoveItemSlot(source.Inventory, source.Slot, target.Before.Inventory, target.Before.Slot, true);
@@ -466,13 +493,13 @@ public unsafe sealed class BetterInventoryMoverService : IDisposable
                 || source->IsSymbolic || source->Quantity != item.Quantity || InventoryShuttleItemState.Read(source) != item.State) return false;
             mergeBinding ??= new InventoryShuttleNativeBinding();
             var equal = mergeBinding.ReadSlot20(source) == mergeBinding.ReadSlot20(slot);
-            OccupiedStackStatus = "Pinned occupied-stack comparison available.";
+            OccupiedStackStatus = global::XASlave.Localization.UiMessage.Store(ref uiOccupiedStackStatus, global::XASlave.Localization.UiMessage.Key("S85FB3F6CF400E735"));
             return equal;
         }
         catch (Exception error)
         {
             mergeBindingUnavailable = true;
-            OccupiedStackStatus = "Occupied-stack transfer unavailable; empty destinations only: " + error.Message;
+            OccupiedStackStatus = global::XASlave.Localization.UiMessage.Store(ref uiOccupiedStackStatus, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S3A5CC536BEC15FA7"), global::XASlave.Localization.UiMessage.FromException(error)));
             return false;
         }
     }

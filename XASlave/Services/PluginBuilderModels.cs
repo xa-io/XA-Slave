@@ -31,6 +31,9 @@ public sealed class PluginBuilderSource
     public bool CanRead { get; set; }
     public bool CanExecute { get; set; }
     public string UnsupportedReason { get; set; } = string.Empty;
+    internal global::XASlave.Localization.UiMessage? UnsupportedMessage { get; set; }
+    internal global::XASlave.Localization.UiMessage UnsupportedPresentation => global::XASlave.Localization.UiMessage.Capture(UnsupportedMessage, UnsupportedReason);
+    internal string LocalizedUnsupportedReason => UnsupportedPresentation.Display;
     public bool RequiresReflectionConfirmation => Kind is PluginBuilderSourceKind.ReflectionField or PluginBuilderSourceKind.ReflectionProperty or PluginBuilderSourceKind.ReflectionMethod;
 }
 
@@ -72,4 +75,29 @@ public sealed class PluginBuilderWindowDefinition
 }
 
 internal sealed record PluginBuilderCatalog(string PluginName, string ModuleVersionId, IReadOnlyList<PluginBuilderSource> Sources);
-internal sealed record PluginBuilderSample(string Status, string Text, DateTime? TimestampUtc);
+internal sealed record PluginBuilderSample(string Status, string Text, DateTime? TimestampUtc)
+{
+    private sealed record Presentation(global::XASlave.Localization.UiMessage? StatusMessage, global::XASlave.Localization.UiMessage? TextMessage);
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<PluginBuilderSample, Presentation> Presentations = new();
+    private static readonly Presentation EmptyPresentation = new(null, null);
+    private Presentation Messages => Presentations.TryGetValue(this, out var value) ? value : EmptyPresentation;
+    internal global::XASlave.Localization.UiMessage? StatusMessage
+    {
+        get => Messages.StatusMessage;
+        init => Presentations.AddOrUpdate(this, Messages with { StatusMessage = value });
+    }
+    internal global::XASlave.Localization.UiMessage? TextMessage
+    {
+        get => Messages.TextMessage;
+        init => Presentations.AddOrUpdate(this, Messages with { TextMessage = value });
+    }
+    private PluginBuilderSample(PluginBuilderSample original)
+    {
+        Status = original.Status;
+        Text = original.Text;
+        TimestampUtc = original.TimestampUtc;
+        if (Presentations.TryGetValue(original, out var presentation)) Presentations.Add(this, presentation);
+    }
+    internal string LocalizedStatus => global::XASlave.Localization.UiMessage.Resolve(StatusMessage, Status);
+    internal string LocalizedText => global::XASlave.Localization.UiMessage.Resolve(TextMessage, Text);
+}

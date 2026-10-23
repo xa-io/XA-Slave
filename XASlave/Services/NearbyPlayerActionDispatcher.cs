@@ -40,14 +40,20 @@ internal sealed class NearbyPlayerActionDispatcher
     private bool draining;
     private int jobCount;
     internal int FreeJobs => Math.Max(0, 256 - jobCount);
-    internal string Status { get; private set; } = string.Empty;
-    internal string SpeechStatus { get; private set; } = string.Empty;
+    internal string Status { get; private set; } = global::XASlave.Localization.UiMessage.Raw(string.Empty).Original;
+    private global::XASlave.Localization.UiMessage? uiStatus = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatus, Status);
+    internal string LocalizedStatus => global::XASlave.Localization.UiMessage.Resolve(ref uiStatus, Status);
+    internal string SpeechStatus { get; private set; } = global::XASlave.Localization.UiMessage.Raw(string.Empty).Original;
+    private global::XASlave.Localization.UiMessage? uiSpeechStatus = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    internal global::XASlave.Localization.UiMessage SpeechStatusMessage => global::XASlave.Localization.UiMessage.Capture(ref uiSpeechStatus, SpeechStatus);
+    internal string LocalizedSpeechStatus => global::XASlave.Localization.UiMessage.Resolve(ref uiSpeechStatus, SpeechStatus);
 
     internal NearbyPlayerActionDispatcher(INearbyPlayerNotificationOutput output) { this.output = output; }
 
     internal void Cancel()
     {
-        generation++; batches.Clear(); jobCount = 0; Status = string.Empty; SpeechStatus = string.Empty;
+        generation++; batches.Clear(); jobCount = 0; Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Raw(string.Empty)); SpeechStatus = global::XASlave.Localization.UiMessage.Store(ref uiSpeechStatus, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         // Keep rate deadlines across toggles/config edits; cancellation cannot bypass
         // the service-wide chat-entry or speech admission interval.
     }
@@ -67,7 +73,7 @@ internal sealed class NearbyPlayerActionDispatcher
         {
             foreach (var rule in emission.Rules)
             {
-                if (jobCount + jobs.Count >= 256) { Status = "Action capacity reached; additional jobs suppressed."; break; }
+                if (jobCount + jobs.Count >= 256) { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S45E72BE0FA6FFA08")); break; }
                 var commands = new List<string>();
                 if (rule.CommandsEnabled)
                 {
@@ -79,7 +85,7 @@ internal sealed class NearbyPlayerActionDispatcher
                         foreach (var command in expanded)
                             if (uniqueCommands.Add((emission.Key.Name, emission.Key.World, command))) commands.Add(command);
                     }
-                    catch (Exception) { Status = "Command expansion failed; this rule's entries were not queued."; }
+                    catch (Exception) { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("SF6F7AF1A3D363BA7")); }
                 }
                 jobs.Add(new(emission, rule, commands.ToArray()));
             }
@@ -113,8 +119,8 @@ internal sealed class NearbyPlayerActionDispatcher
                     if (text.Length != 0)
                     {
                         nextSpeech = now + 2000;
-                        try { SpeechStatus = output.Speech(text) ? "Speech requested through EdgeTTS." : "Speech unavailable: EdgeTTS provider is missing or incompatible."; }
-                        catch { SpeechStatus = "Speech unavailable: EdgeTTS request failed."; }
+                        try { SpeechStatus = global::XASlave.Localization.UiMessage.Store(ref uiSpeechStatus, (output.Speech(text) ? global::XASlave.Localization.UiMessage.Key("S08E8DDAE134EFB99") : global::XASlave.Localization.UiMessage.Key("SD0204F7CC55AC3B3"))); }
+                        catch { SpeechStatus = global::XASlave.Localization.UiMessage.Store(ref uiSpeechStatus, global::XASlave.Localization.UiMessage.Key("SAB9DEDD7331D7C72")); }
                         if (admittedGeneration != generation) return;
                     }
                 }
@@ -134,9 +140,9 @@ internal sealed class NearbyPlayerActionDispatcher
                     if (!sent)
                     {
                         job.Index = job.Commands.Length;
-                        Status = "Command dispatch failed; remaining entries in this job were cancelled without retry.";
+                        Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S6E394E45B49591B2"));
                     }
-                    else Status = "Command submitted locally; downstream completion is not confirmed.";
+                    else Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("SF3256682F1287D36"));
                 }
                 if (pendingCommands && batch.Jobs.Any(job => job.Index < job.Commands.Length)) return;
                 if (!batch.SpeechDone)
@@ -153,21 +159,21 @@ internal sealed class NearbyPlayerActionDispatcher
 
     private bool Current(Job job) => !job.Cancelled && job.Rule.Enabled && output.IsCurrent(job.Emission, job.Rule.Id);
     private string TextFor(Batch batch, Func<Job, bool> channel) => string.Join("\n", batch.Jobs
-        .Where(job => channel(job) && Current(job)).Select(job => $"Player nearby: {job.Emission.Player.Name}@{job.Emission.Player.WorldName}").Distinct(StringComparer.Ordinal));
+        .Where(job => channel(job) && Current(job)).Select(job => global::XASlave.Localization.UiMessage.Format("SE6BB7BCEBA5414C9", job.Emission.Player.Name, job.Emission.Player.WorldName).Original).Distinct(StringComparer.Ordinal));
 
     private void Announce(Batch batch, long admittedGeneration)
     {
-        Emit(TextFor(batch, job => job.Rule.LocalChat), output.LocalChat, "Local chat");
+        Emit(TextFor(batch, job => job.Rule.LocalChat), output.LocalChat, global::XASlave.Localization.UiMessage.Key("S1D979518DA0E679C"));
         if (admittedGeneration != generation) return;
-        Emit(TextFor(batch, job => job.Rule.Toast), output.Toast, "Toast");
+        Emit(TextFor(batch, job => job.Rule.Toast), output.Toast, global::XASlave.Localization.UiMessage.Key("S34B86033459D0EA5"));
         if (admittedGeneration != generation) return;
-        Emit(TextFor(batch, job => job.Rule.Notification), output.Notification, "Notification");
+        Emit(TextFor(batch, job => job.Rule.Notification), output.Notification, global::XASlave.Localization.UiMessage.Key("S7D31B83313991D4C"));
     }
-    private void Emit(string text, Action<string> emit, string channel)
+    private void Emit(string text, Action<string> emit, global::XASlave.Localization.UiMessage channel)
     {
         if (text.Length == 0) return;
         try { emit(text); }
-        catch { Status = channel + " failed; other enabled outputs remain eligible."; }
+        catch { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Concat(channel, global::XASlave.Localization.UiMessage.Key("SC412EBEE27544343"))); }
     }
     private void Drop(Batch batch) { batches.Dequeue(); jobCount -= batch.Jobs.Length; }
 }

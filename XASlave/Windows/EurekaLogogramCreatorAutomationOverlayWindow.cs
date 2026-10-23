@@ -54,7 +54,7 @@ public sealed class EurekaLogogramCreatorAutomationOverlayWindow : Window
         var activeOverlay = ImGui.ColorConvertFloat4ToU32(new Vector4(0.0f, 0.0f, 0.0f, 0.18f));
         var textColor = ImGui.GetColorU32(ImGuiCol.Text);
         var drawList = ImGui.GetWindowDrawList();
-        const string label = "Cancel Auto Logo Action";
+        var label = global::XASlave.Localization.UiLocale.Get("S81085E3046888AE3");
 
         if (ImGui.InvisibleButton("##CancelEurekaLogogramCreatorAutoLogoAction", new Vector2(CancelButtonWidth, CancelButtonHeight)))
         {
@@ -86,7 +86,7 @@ public sealed class EurekaLogogramCreatorAutomationOverlayWindow : Window
 
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Stops the current Auto Logo Action run and clears all queued plates.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SF549FA94E60C7270"));
         }
     }
 }

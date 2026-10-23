@@ -25,7 +25,7 @@ internal static class ViewSingleItemRendererHookState
     private const string Reloaded15039Sha256 = "A867659817E745BD38BA28C7E0F649BDFCCC5D4B4B01A45E375E27B6382E41FE";
 
     private static Type Manager => typeof(IDalamudHook).Assembly.GetType("Dalamud.Hooking.Internal.HookManager")
-        ?? throw new InvalidOperationException("The preview hook registry is unavailable.");
+        ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S3AE573BF0C96C5BF"), originalMessageText => new InvalidOperationException(originalMessageText));
 
     internal static Lock GetSyncRoot()
     {
@@ -33,9 +33,9 @@ internal static class ViewSingleItemRendererHookState
         if (!IsSupportedBackendPair(
                 Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(assembly.Location))),
                 Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(Reloaded.Hooks.ReloadedHooks).Assembly.Location)))))
-            throw new InvalidOperationException("View Item requires a revalidated Dalamud hook backend.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1B916DD686A02912"), originalMessageText => new InvalidOperationException(originalMessageText));
         return Manager.GetProperty("HookEnableSyncRoot", StaticFlags)?.GetValue(null) as Lock
-            ?? throw new InvalidOperationException("The preview hook synchronization changed.");
+            ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SEC1483689B45BC06"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     // Each pair has matching emitted hook/loader metadata and backend bodies.
@@ -54,11 +54,11 @@ internal static class ViewSingleItemRendererHookState
         var manager = Manager;
         if (manager.GetProperty("TrackedHooks", StaticFlags)?.GetValue(null) is not IDictionary tracked
             || manager.GetProperty("Unhookers", StaticFlags)?.GetValue(null) is not IDictionary unhookers)
-            throw new InvalidOperationException("The preview hook registry changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S8B2C50C46320794C"), originalMessageText => new InvalidOperationException(originalMessageText));
         foreach (var value in tracked.Values)
         {
             if (value == null || value.GetType().GetProperty("Hook", InstanceFlags)?.GetValue(value) is not IDalamudHook hook)
-                throw new InvalidOperationException("The preview hook registration changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD6D017E0C7471B0D"), originalMessageText => new InvalidOperationException(originalMessageText));
             if (hook.IsDisposed) continue;
             var offset = (long)hook.Address - (long)entry;
             if (offset >= 0 && offset < length)
@@ -66,8 +66,7 @@ internal static class ViewSingleItemRendererHookState
                 // Only the reviewed TitleEdit character-creation hook may chain here.
                 // Its Original remains in the chain; no foreign hook is changed.
                 if (offset == 0 && allowTitleEditCreate && IsReviewedTitleEditCreate(value, hook)) continue;
-                throw new InvalidOperationException("The preview renderer has another registered hook. "
-                    + ViewSingleItemRendererDiagnostics.DescribeOwners(entry, length));
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SD171E2FC725ABBD1" , ViewSingleItemRendererDiagnostics.DescribeOwners(entry, length)), originalMessageText => new InvalidOperationException(originalMessageText));
             }
         }
         if (!unhookers.Contains(entry)) return null;
@@ -77,7 +76,7 @@ internal static class ViewSingleItemRendererHookState
             || type.GetField("address", InstanceFlags)?.GetValue(saved) is not nint address || address != entry
             || type.GetField("trimmed", InstanceFlags)?.GetValue(saved) is not true
             || type.GetField("originalBytes", InstanceFlags)?.GetValue(saved) is not byte[] prefix)
-            throw new InvalidOperationException("The saved preview renderer entry cannot be verified.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S18DFB6F8E816747F"), originalMessageText => new InvalidOperationException(originalMessageText));
         return (byte[])prefix.Clone();
     }
 

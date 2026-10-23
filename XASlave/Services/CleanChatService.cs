@@ -26,7 +26,7 @@ public sealed class CleanChatService : IDisposable
     private const int MaxDiagnostics = 32;
     private readonly IChatGui chatGui;
     private readonly object syncRoot = new();
-    private readonly List<string> diagnostics = new();
+    private readonly List<global::XASlave.Localization.UiMessage> diagnostics = new();
     private List<CompiledRule> rules = new();
     private CleanChatSettings settings = new();
     private bool enabled;
@@ -38,19 +38,25 @@ public sealed class CleanChatService : IDisposable
         this.chatGui = chatGui ?? throw new ArgumentNullException(nameof(chatGui));
     }
 
-    public string StatusText
+    public string StatusText => StatusMessage.Original;
+    public string LocalizedStatusText => StatusMessage.Display;
+    internal global::XASlave.Localization.UiMessage StatusMessage
     {
         get
         {
             lock (syncRoot)
-                return disposed ? "Disposed" : !enabled ? "Disabled" :
-                    $"Enabled - English announcement filters; {rules.Count(x => !x.Quarantined)} valid regex rules ({(settings.RegexEnabled ? "on" : "off")}).";
+                return (disposed ? global::XASlave.Localization.UiMessage.Key("S3B8D3AEEFFD977D0") : (!enabled ? global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E") : global::XASlave.Localization.UiMessage.Format("SE9A1F648094E5ED6" , rules.Count(x => !x.Quarantined), (settings.RegexEnabled ? global::XASlave.Localization.UiMessage.Key("SB8D31E852725AFB1") : global::XASlave.Localization.UiMessage.Key("SB4DC66DDE806261B")))));
         }
     }
 
     public IReadOnlyList<string> Diagnostics
     {
-        get { lock (syncRoot) return diagnostics.ToArray(); }
+        get { lock (syncRoot) return diagnostics.Select(message => message.Original).ToArray(); }
+    }
+
+    public IReadOnlyList<string> LocalizedDiagnostics
+    {
+        get { lock (syncRoot) return diagnostics.Select(message => message.Display).ToArray(); }
     }
 
     public void ApplyConfiguration(CleanChatSettings? configuration)
@@ -74,7 +80,7 @@ public sealed class CleanChatService : IDisposable
             rules = new List<CompiledRule>();
             if (settings.RegexRules.Length > MaxRules * (MaxPatternLength + 2))
             {
-                AddDiagnostic("Regex text exceeds the bounded settings size; shorten it and apply again.");
+                AddDiagnostic(global::XASlave.Localization.UiMessage.Key("S63AACC98DD1E3CEC"));
                 return;
             }
             var ruleCount = 0;
@@ -85,12 +91,12 @@ public sealed class CleanChatService : IDisposable
                 if (string.IsNullOrWhiteSpace(pattern)) continue;
                 if (++ruleCount > MaxRules)
                 {
-                    AddDiagnostic($"Only the first {MaxRules} nonblank regex rules are accepted.");
+                    AddDiagnostic(global::XASlave.Localization.UiMessage.Format("S1EA194666E4A0186" , MaxRules));
                     break;
                 }
                 if (pattern.Length > MaxPatternLength)
                 {
-                    AddDiagnostic($"Rule on line {index + 1} exceeds {MaxPatternLength} characters; quarantined until reapplied.");
+                    AddDiagnostic(global::XASlave.Localization.UiMessage.Format("SBF2A304B54AC7B6C" , index + 1, MaxPatternLength));
                     continue;
                 }
                 try
@@ -102,7 +108,7 @@ public sealed class CleanChatService : IDisposable
                 }
                 catch (ArgumentException)
                 {
-                    AddDiagnostic($"Rule on line {index + 1} is invalid; quarantined until reapplied.");
+                    AddDiagnostic(global::XASlave.Localization.UiMessage.Format("S9F14AA79E427AC8F" , index + 1));
                 }
             }
         }
@@ -152,7 +158,7 @@ public sealed class CleanChatService : IDisposable
         catch (Exception)
         {
             // Filtering must fail open. Do not expose message contents in diagnostics.
-            lock (syncRoot) AddDiagnostic("A chat filter failed; the affected message was preserved.");
+            lock (syncRoot) AddDiagnostic(global::XASlave.Localization.UiMessage.Key("S7D3756BC41D36F26"));
         }
     }
 
@@ -175,7 +181,7 @@ public sealed class CleanChatService : IDisposable
                 // the message instead of trying all remaining rules on the game thread.
                 if (ElapsedMilliseconds(startedAt) >= MessageBudgetMilliseconds - RuleTimeoutMilliseconds)
                 {
-                    AddDiagnostic("Regex message budget reached; remaining rules were skipped and the message preserved.");
+                    AddDiagnostic(global::XASlave.Localization.UiMessage.Key("SC439661ECABA850D"));
                     return false;
                 }
                 try
@@ -184,7 +190,7 @@ public sealed class CleanChatService : IDisposable
                     if (ElapsedMilliseconds(startedAt) > MessageBudgetMilliseconds)
                     {
                         rule.Quarantined = true;
-                        AddDiagnostic($"Rule on line {rule.LineNumber} exceeded the message budget; quarantined until reapplied.");
+                        AddDiagnostic(global::XASlave.Localization.UiMessage.Format("S99179081324C6FB4" , rule.LineNumber));
                         return false;
                     }
                     if (matched) return true;
@@ -192,7 +198,7 @@ public sealed class CleanChatService : IDisposable
                 catch (RegexMatchTimeoutException)
                 {
                     rule.Quarantined = true;
-                    AddDiagnostic($"Rule on line {rule.LineNumber} timed out; quarantined until reapplied.");
+                    AddDiagnostic(global::XASlave.Localization.UiMessage.Format("SE04B2E313C2D60F4" , rule.LineNumber));
                 }
             }
             return false;
@@ -266,9 +272,9 @@ public sealed class CleanChatService : IDisposable
     private static bool IsPlayerChannel(XivChatType channel) => channel is XivChatType.Say or XivChatType.Shout or XivChatType.Yell or XivChatType.TellIncoming;
     private static double ElapsedMilliseconds(long startedAt) => (Stopwatch.GetTimestamp() - startedAt) * 1000d / Stopwatch.Frequency;
 
-    private void AddDiagnostic(string message)
+    private void AddDiagnostic(global::XASlave.Localization.UiMessage message)
     {
-        if (diagnostics.Count < MaxDiagnostics && !diagnostics.Contains(message)) diagnostics.Add(message);
+        if (diagnostics.Count < MaxDiagnostics && !diagnostics.Any(item => item.Original == message.Original)) diagnostics.Add(message);
     }
 
     private sealed class CompiledRule

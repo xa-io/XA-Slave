@@ -47,7 +47,10 @@ public unsafe sealed class TooltipItemIdService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -56,7 +59,7 @@ public unsafe sealed class TooltipItemIdService : IDisposable
             enabled = false;
             UpdateHookState(false);
             UpdateSubscription();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -65,7 +68,7 @@ public unsafe sealed class TooltipItemIdService : IDisposable
         {
             enabled = false;
             UpdateSubscription();
-            StatusText = "Unavailable - item tooltip generator hook missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD115A1D6D60730D4"));
             return false;
         }
 
@@ -74,12 +77,12 @@ public unsafe sealed class TooltipItemIdService : IDisposable
         {
             enabled = false;
             UpdateSubscription();
-            StatusText = "Unavailable - failed to enable the item tooltip generator hook.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD13D339B14F92086"));
             return false;
         }
 
         UpdateSubscription();
-        StatusText = "Enabled - item IDs are appended before ItemDetail tooltips render.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S4FAA7ADB8E3DD81A"));
         TryEnableMultilineOnVisibleItemDetail();
         return true;
     }
@@ -219,7 +222,7 @@ public unsafe sealed class TooltipItemIdService : IDisposable
         seString.Payloads.Add(new UIForegroundPayload(0));
 
         stringArrayData->SetValue(ItemUiCategoryStringIndex, seString.EncodeWithNullTerminator(), false);
-        StatusText = $"Enabled - last item tooltip ID: {itemId}.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S567A9798F13BA4E2", itemId));
     }
 
     private static SeString? GetTooltipString(StringArrayData* stringArrayData, int field)

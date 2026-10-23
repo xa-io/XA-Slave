@@ -47,7 +47,10 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool IsStartupArmingPending => startupArmingPending;
 
@@ -66,7 +69,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
     {
         timestampFormat = NormalizeFormat(format);
         if (enabled)
-            StatusText = GetEnabledStatusText();
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText());
     }
 
     public bool SetEnabled(bool value)
@@ -76,7 +79,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
             CancelStartupArming(disposeCompletedResult: true);
             enabled = false;
             UpdateHookState(false);
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -89,7 +92,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
         if (applyTextFormatHook == null)
         {
             enabled = false;
-            StatusText = "Unavailable - chat timestamp formatter hook missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SDA320196EF60F2BD"));
             return false;
         }
 
@@ -97,11 +100,11 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
         if (!UpdateHookState(true))
         {
             enabled = false;
-            StatusText = "Unavailable - failed to enable the chat timestamp formatter hook.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S95E14DD124B41EE3"));
             return false;
         }
 
-        StatusText = GetEnabledStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText());
         return true;
     }
 
@@ -115,7 +118,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
 
         EnsureStringAllocated();
         enabled = true;
-        StatusText = "Arming - chat timestamp hook is initializing on the framework thread.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SCEEFEFEB8173E1D7"));
         StartStartupHookCreation();
         return true;
     }
@@ -127,9 +130,7 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
 
         EnsureStringAllocated();
         EnsureHookInitialized();
-        StatusText = applyTextFormatHook == null
-            ? "Unavailable - chat timestamp formatter hook missing."
-            : "Ready - chat timestamp formatter hook prepared for startup restore.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (applyTextFormatHook == null ? global::XASlave.Localization.UiMessage.Key("SDA320196EF60F2BD") : global::XASlave.Localization.UiMessage.Key("S05E1D9191792E5C7")));
     }
 
     public void Dispose()
@@ -313,18 +314,18 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
         if (applyTextFormatHook == null)
         {
             enabled = false;
-            StatusText = "Unavailable - chat timestamp formatter hook missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SDA320196EF60F2BD"));
             return;
         }
 
         if (!UpdateHookState(true))
         {
             enabled = false;
-            StatusText = "Unavailable - failed to enable the chat timestamp formatter hook.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S95E14DD124B41EE3"));
             return;
         }
 
-        StatusText = GetEnabledStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText());
     }
 
     private bool UpdateHookState(bool shouldEnable)
@@ -387,8 +388,8 @@ public unsafe sealed class ChatTimestampFormatService : IDisposable
         }
     }
 
-    private string GetEnabledStatusText()
-        => $"Enabled - chat timestamps use `{timestampFormat}`.";
+    private global::XASlave.Localization.UiMessage GetEnabledStatusText()
+        => global::XASlave.Localization.UiMessage.Format("S00673334450F45D5", timestampFormat);
 
     private static void DisposeHook(Hook<ApplyTextFormatDelegate>? hook)
     {

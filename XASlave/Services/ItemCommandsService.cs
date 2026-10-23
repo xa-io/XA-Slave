@@ -45,7 +45,10 @@ public unsafe sealed class ItemCommandsService : IDisposable
         this.playerState = playerState;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -73,66 +76,84 @@ public unsafe sealed class ItemCommandsService : IDisposable
         RefreshStatusText();
     }
 
-    public bool TryExecuteEquipCommand(string arguments, out string message)
+    public bool TryExecuteEquipCommand(string arguments, out string message) => TryExecuteEquipCommandLocalizedCore(out _, arguments, out message);
+    internal bool TryExecuteEquipCommandMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryExecuteEquipCommandLocalizedCore(out var presentation, arguments, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryExecuteEquipCommandLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    {
+        replyPresentation = null;
         if (!enabled)
         {
-            message = "Item Commands is disabled. Enable it first with /xa itemcommands on.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S0B6F506C8432A611"));
             return false;
         }
 
         if (!uint.TryParse(arguments.Trim(), out var itemId))
         {
-            message = "Usage: /xa equip <itemId>.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SF4032C09EE53EA17"));
             return false;
         }
 
-        return TryEquipItem(itemId, out message);
+        return TryEquipItemLocalizedCore(out replyPresentation, itemId, out message);
     }
 
-    private bool TryEquipItem(uint itemId, out string message)
+    private bool TryEquipItem(uint itemId, out string message) => TryEquipItemLocalizedCore(out _, itemId, out message);
+    private bool TryEquipItemMessage(uint itemId, out global::XASlave.Localization.UiMessage message)
     {
+        var success = TryEquipItemLocalizedCore(out var presentation, itemId, out var originalReply);
+        message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
+        return success;
+    }
+
+    private bool TryEquipItemLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, uint itemId, out string message)
+    {
+        replyPresentation = null;
         if (!playerState.IsLoaded || !playerState.ClassJob.IsValid)
         {
-            message = "Local player state is not ready.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S6B38309E395E5688"));
             return false;
         }
 
         var itemSheet = dataManager.GetExcelSheet<Item>();
         if (!itemSheet.TryGetRow(itemId, out var itemRow))
         {
-            message = $"Item {itemId} was not found in the local item sheet.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S5BF1396D85DAD226", itemId));
             return false;
         }
 
         if (itemRow.EquipSlotCategory.RowId == 0)
         {
-            message = $"Item {itemId} is not equippable.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S8FDC09B28F6A2E75", itemId));
             return false;
         }
 
         var inventoryManager = InventoryManager.Instance();
         if (inventoryManager == null)
         {
-            message = "Inventory manager is not available.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S6F9411C459B1B8ED"));
             return false;
         }
 
         if (!TryFindEquippableItemLocation(inventoryManager, itemId, out var sourceLocation))
         {
-            message = $"Item {itemId} was not found in the main inventory or armory chest.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S968367142E431157", itemId));
             return false;
         }
 
         if (!CanEquip(itemId))
         {
-            message = $"Item {itemId} cannot be equipped by the current character or class/job.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S5DB3411D0E537413", itemId));
             return false;
         }
 
         if (!TryGetDestinationSlot(itemRow, inventoryManager, sourceLocation.Container, out var destinationSlot, out var destinationLabel))
         {
-            message = $"Item {itemId} uses an unsupported equip slot.";
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("SF8E05B17CCA6F21B", itemId));
             return false;
         }
 
@@ -143,7 +164,7 @@ public unsafe sealed class ItemCommandsService : IDisposable
             destinationSlot,
             true);
 
-        message = $"Queued item {itemId} for equip to {destinationLabel}.";
+        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Format("S51469852549E82CB", itemId, destinationLabel));
         return true;
     }
 
@@ -295,10 +316,10 @@ public unsafe sealed class ItemCommandsService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
-        StatusText = "Enabled - /xa equip <itemId> is available.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S0411B728D7F6F273"));
     }
 }

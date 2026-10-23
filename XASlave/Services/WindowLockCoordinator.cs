@@ -32,13 +32,15 @@ internal sealed class WindowLockCoordinator
     private IWindowSubclassLease? lease;
     private long generation;
     private bool enabled, combat;
-    internal string Status { get; private set; } = "Disabled";
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string Status { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(statusMessage, Status);
     internal bool IsLocked => enabled && combat && lease is { Registered: true, Destroyed: false, BlocksMovement: true };
     internal bool CleanupPending => lease is { Detached: false } && !lease.BlocksMovement;
 
     internal WindowLockCoordinator(IWindowSubclassPlatform platform) { this.platform = platform; }
 
-    internal void WaitForFramework() { Status = "Waiting for framework window admission"; }
+    internal void WaitForFramework() { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S5E525FAF99E9464D")); }
 
     internal void SetDesired(bool enable, bool inCombat)
     {
@@ -47,7 +49,7 @@ internal sealed class WindowLockCoordinator
         {
             lease?.Deactivate();
             try { lease?.RequestRemoval(); }
-            catch (Exception error) { Status = "Cleanup pending: " + error.Message; }
+            catch (Exception error) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S18484189CB01E58E" , global::XASlave.Localization.UiMessage.FromException(error))); }
         }
     }
 
@@ -60,18 +62,18 @@ internal sealed class WindowLockCoordinator
             if (lease != null && (!enabled || !combat || lease.Destroyed || !lease.Registered || !lease.BlocksMovement || lease.Target != target || target.Process != platform.CurrentProcess || target.Thread != platform.CurrentThread))
             {
                 lease.Deactivate(); lease.RequestRemoval();
-                if (!lease.Detached) { Status = "Cleanup pending: the old window lease is inactive and remains rooted."; return; }
+                if (!lease.Detached) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S41B152FCF37D3292")); return; }
                 lease = null;
             }
             if (currentGeneration != generation) return;
-            if (!enabled) { Status = "Disabled"; return; }
-            if (!combat) { Status = "Enabled: position locking is armed for combat."; return; }
-            if (target.Handle == 0) { Status = "Waiting for game window"; return; }
-            if (target.Process != platform.CurrentProcess) { Status = "Unsupported game window process"; return; }
-            if (target.Thread != platform.CurrentThread) { Status = "Unsupported window thread"; return; }
+            if (!enabled) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")); return; }
+            if (!combat) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S18E08B55FC670541")); return; }
+            if (target.Handle == 0) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SF6E79B4DC7B09CBE")); return; }
+            if (target.Process != platform.CurrentProcess) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S88686A1159D7E5D2")); return; }
+            if (target.Thread != platform.CurrentThread) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S0828430226AAD1B3")); return; }
             if (lease != null)
             {
-                Status = IsLocked ? "Locked: game window position" : "Cleanup pending";
+                Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (IsLocked ? global::XASlave.Localization.UiMessage.Key("S03B838C4F572E616") : global::XASlave.Localization.UiMessage.Key("S747D464599CC00C2")));
                 return;
             }
             // Installation starts inert. Reentrant disable/replacement cannot turn a
@@ -82,7 +84,7 @@ internal sealed class WindowLockCoordinator
             {
                 candidate.Deactivate(); candidate.RequestRemoval();
                 if (candidate.Detached) lease = null;
-                Status = candidate.Detached ? "Failed: window lock admission changed or registration failed." : "Cleanup pending";
+                Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (candidate.Detached ? global::XASlave.Localization.UiMessage.Key("SA5019236BABA54F5") : global::XASlave.Localization.UiMessage.Key("S747D464599CC00C2")));
                 return;
             }
             candidate.Activate();
@@ -90,26 +92,26 @@ internal sealed class WindowLockCoordinator
             {
                 candidate.Deactivate(); candidate.RequestRemoval();
                 if (candidate.Detached) lease = null;
-                Status = "Cleanup pending: lock activation was revoked.";
+                Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SFB66FA3206FD999C"));
                 return;
             }
-            Status = IsLocked ? "Locked: game window position" : "Failed: window lease is not active.";
+            Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (IsLocked ? global::XASlave.Localization.UiMessage.Key("S03B838C4F572E616") : global::XASlave.Localization.UiMessage.Key("S0F9867865FBEBF77")));
         }
         catch (Exception error)
         {
             lease?.Deactivate();
             try { lease?.RequestRemoval(); } catch { /* Retain the inactive lease on cleanup failure. */ }
-            Status = "Failed: " + error.Message;
+            Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S03154105C765F481" , global::XASlave.Localization.UiMessage.FromException(error)));
         }
     }
 
     internal void Stop()
     {
         SetDesired(false, false);
-        if (lease == null) { Status = "Disabled"; return; }
+        if (lease == null) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")); return; }
         try { lease.RequestRemoval(); }
-        catch (Exception error) { Status = "Cleanup pending: " + error.Message; return; }
-        Status = lease.Detached ? "Disabled" : "Cleanup pending: movement blocking is off; callback state remains rooted.";
+        catch (Exception error) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S18484189CB01E58E" , global::XASlave.Localization.UiMessage.FromException(error))); return; }
+        Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (lease.Detached ? global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E") : global::XASlave.Localization.UiMessage.Key("S31ABE62528FC167E")));
         if (lease.Detached) lease = null;
     }
 }

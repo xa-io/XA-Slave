@@ -36,6 +36,7 @@ public partial class SlaveWindow
     private bool reloggerHasLastRunSnapshot;
 
     private string arImportStatus = string.Empty;
+    private global::XASlave.Localization.UiMessage? arImportStatusUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
     private DateTime arImportStatusExpiry = DateTime.MinValue;
     private readonly object xaDbPullSync = new();
     private readonly List<Action> xaDbPullCallbacks = new();
@@ -63,53 +64,53 @@ public partial class SlaveWindow
         var staleSelectDays = reloggerStaleSelectDaysInput;
 
         // -- Title + Description --
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Monthly Relogger");
-        ImGui.TextDisabled("Rotate through characters, executing actions on each.");
-        ImGui.TextDisabled("This is used to ensure you do not lose FC Master Rank or Plots.");
-        ImGui.TextDisabled("Requires Lifestream Path To Door, and Enter House in Lifestream settings, to work correctly.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S4D398C5A9609297E"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S9F6CECBFE10D2B12"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S472C8DACA7891B0C"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SFB0907B203D8862E"));
         ImGui.Spacing();
 
         // -- Import / Refresh buttons --
-        ImGui.TextDisabled("Press buttons in order: Import from AutoRetainer → Refresh AR Data → Pull XA Database Info.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S5D0A9A52986AD069"));
         ImGui.Spacing();
 
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
         using (ImRaii.Disabled(!arConfigExists))
         {
-            if (ImGui.Button("Import from AutoRetainer"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S74BC538828226264")))
                 ImportFromAutoRetainer(cfg.ReloggerHonorArExclusions);
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(arConfigExists
-                ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
-                : "AutoRetainer config not found.\nExpected: " + plugin.ArConfigReader.GetAutoRetainerConfigPath());
+                ? global::XASlave.Localization.UiLocale.FormatKey("S4F45236F63C59987", plugin.ArConfigReader.GetAutoRetainerConfigPath())
+                : global::XASlave.Localization.UiLocale.FormatKey("S7F848B59CF50E7D8", plugin.ArConfigReader.GetAutoRetainerConfigPath()));
 
         DrawHonorAutoRetainerExclusions("relogger", cfg.ReloggerHonorArExclusions,
             value => cfg.ReloggerHonorArExclusions = value,
             () => PruneAutoRetainerExcludedSelections(chars, reloggerSelectedIndices, cfg.ReloggerHonorArExclusions));
         PruneAutoRetainerExcludedSelections(chars, reloggerSelectedIndices, cfg.ReloggerHonorArExclusions);
 
-        if (ImGui.Button("Refresh AR Data"))
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S2D11B96CDCB0C642")))
             RefreshArCharacterCache(cfg.ReloggerHonorArExclusions);
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Reload character details (Lv, Gil, FC) from AutoRetainer config without adding/removing characters.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SCEB9286E8021F3B7"));
 
         ImGui.SameLine();
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
         using (ImRaii.Disabled(!xaDbAvailable))
         {
-            if (ImGui.Button("Pull XA Database Info"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S658431DD798692FF")))
                 PullXaDatabaseInfo();
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(xaDbAvailable
-                ? "Read XA Database to update Lv, Gil, FC, Last Logged In for all characters.\nPulls directly from the SQLite database."
-                : "XA Database plugin not available.");
+                ? global::XASlave.Localization.UiLocale.Get("SBD37079F51057B5F")
+                : global::XASlave.Localization.UiLocale.Get("S2A0686AE2571326E"));
 
         if (!string.IsNullOrEmpty(arImportStatus) && DateTime.UtcNow < arImportStatusExpiry)
         {
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), arImportStatus);
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiMessage.Resolve(ref arImportStatusUiMessage, arImportStatus));
         }
 
 
@@ -127,15 +128,15 @@ public partial class SlaveWindow
             CaptureReloggerSnapshot(runner);
 
             var progress = runner.TotalItems > 0 ? (float)runner.CompletedItems / runner.TotalItems : 0f;
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"Running: {runner.StatusText}");
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S8EB69248AA11B2FD", runner.LocalizedStatusText));
             ImGui.ProgressBar(progress, new Vector2(-1, 0), $"{runner.CompletedItems}/{runner.TotalItems}");
             if (!string.IsNullOrEmpty(runner.CurrentItemLabel))
-                ImGui.TextDisabled(runner.CurrentItemLabel);
+                ImGui.TextDisabled(runner.CurrentItemLabelDisplay);
 
             DrawProcessingList(runner);
 
             ImGui.Spacing();
-            if (ImGui.Button("Cancel Relogger"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S2FE1B6A0EBF90132")))
                 runner.Cancel();
         }
         else
@@ -154,34 +155,34 @@ public partial class SlaveWindow
 
             var started = DrawPriorityTaskActionButton(
                 SlaveTask.MonthlyRelogger,
-                $"Start Relogger ({selectedChars.Count} chars)",
+                string.Format(global::XASlave.Localization.UiLocale.Native("SBDC6E111A6E71B00"), selectedChars.Count),
                 canStart,
                 () => StartMonthlyRelogger(selectedChars),
                 !allRequiredPluginsOk
-                    ? "Missing required plugins. Check the Plugin Status section above."
-                    : "Select at least one character to start.");
+                    ? global::XASlave.Localization.UiLocale.Get("S16F64611FEB5E5AC")
+                    : global::XASlave.Localization.UiLocale.Get("S630BBC121AA0D071"), displayButtonLabel: global::XASlave.Localization.UiLocale.FormatKey("SBDC6E111A6E71B00", selectedChars.Count));
             if (started)
                 AutoOpenTaskLogIfVerbose(ref reloggerShowLog);
 
             ImGui.SameLine();
-            if (ImGui.Button("Check All"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S8D36DE8ED9DBBB1B")))
                 SelectVisibleReloggerCharacters(_ => true);
             ImGui.SameLine();
-            if (ImGui.Button("Clear All"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SDDCEB7ADFDB8816E")))
                 reloggerSelectedIndices.Clear();
 
-            if (ImGui.Button("Check Masters"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SFB0DDEC1A540C1F1")))
                 SelectVisibleReloggerCharacters(IsFcMasterRank);
             ImGui.SameLine();
-            if (ImGui.Button("Check Personal"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S63A4CE12716B40C8")))
                 SelectVisibleReloggerCharacters(HasPersonalEstate);
 
-            var staleButtonLabel = $"Select Stale ({GetReloggerStaleButtonLabel(staleSelectDays)})";
-            var staleButtonWidth = ImGui.CalcTextSize("Select Stale (>45d)").X + ImGui.GetStyle().FramePadding.X * 2f;
-            if (ImGui.Button(staleButtonLabel, new Vector2(staleButtonWidth, 0f)))
+            var staleButtonLabel = string.Format(global::XASlave.Localization.UiLocale.Native("S2F6BE69180B20E36"), staleSelectDays);
+            var staleButtonWidth = ImGui.CalcTextSize(global::XASlave.Localization.UiLocale.Get("SB33EB7B7DD95F947")).X + ImGui.GetStyle().FramePadding.X * 2f;
+            if (global::XASlave.Localization.UiNative.Button(staleButtonLabel, new Vector2(staleButtonWidth, 0f), display: global::XASlave.Localization.UiLocale.FormatKey("S2F6BE69180B20E36", staleSelectDays)))
                 SelectReloggerStaleCharacters(staleSelectDays);
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip($"Select all characters with Last Logged In {GetReloggerStaleTooltipText(staleSelectDays)} (or never logged in).");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.FormatKey("S6ED38D4495F1B29F", GetReloggerStaleTooltipText(staleSelectDays)));
 
             ImGui.SameLine();
             ImGui.SetNextItemWidth(Scale(170f));
@@ -193,7 +194,7 @@ public partial class SlaveWindow
                 cfg.Save();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Set the stale-day threshold used by the stale mass-select button. The maximum slider value is 45, which selects characters with Last Logged In over 45 days ago.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SC030B14536073327"));
         }
 
         ImGui.Spacing();
@@ -201,13 +202,13 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Character List --
-        DrawCharacterListHeader("Character List", $"({chars.Count} total)", "reloggerAnonymize");
+        DrawCharacterListHeader(global::XASlave.Localization.UiLocale.Get("S9127EB7A3D10F5D6"), global::XASlave.Localization.UiLocale.FormatKey("S261FA25B9E69A2B0", chars.Count), "reloggerAnonymize");
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
         // Region filter
         var reloggerRegionFilter = cfg.ReloggerRegionFilter;
-        if (DrawRegionFilterCombo("Region##RelogFilter", ref reloggerRegionFilter))
+        if (DrawRegionFilterCombo((global::XASlave.Localization.UiLocale.Native("SD3A008EF1335692D") + "##RelogFilter"), ref reloggerRegionFilter))
         {
             cfg.ReloggerRegionFilter = reloggerRegionFilter;
             cfg.Save();
@@ -216,7 +217,7 @@ public partial class SlaveWindow
         // Search filter
         ImGui.SameLine();
         ImGui.SetNextItemWidth(Scale(200f));
-        ImGui.InputTextWithHint("##RelogSearch", "Search name or world...", ref reloggerSearchFilter, 128);
+        ImGui.InputTextWithHint("##RelogSearch", global::XASlave.Localization.UiLocale.Get("SF62AB4CE4380C1B9"), ref reloggerSearchFilter, 128);
 
         ImGui.Spacing();
 
@@ -229,20 +230,20 @@ public partial class SlaveWindow
             ScaledVector(0f, 250f)))
         if (imguiScope220)
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f)); // checkbox
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
-            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("Region / DC", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
-            ImGui.TableSetupColumn("Lv", ImGuiTableColumnFlags.WidthFixed, Scale(30f));
-            ImGui.TableSetupColumn("Gil", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
-            ImGui.TableSetupColumn("Current Rank", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
-            ImGui.TableSetupColumn("FC", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
-            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, Scale(45f));
-            ImGui.TableSetupColumn("Personal", ImGuiTableColumnFlags.WidthFixed, Scale(55f));
-            ImGui.TableSetupColumn("Last Logged In", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f)); // remove
+            global::XASlave.Localization.UiNative.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f)); // checkbox
+            global::XASlave.Localization.UiNative.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S1405A63E8A78B85C"), ImGuiTableColumnFlags.WidthStretch);
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SFE1780A6B87DF813"), ImGuiTableColumnFlags.WidthFixed, Scale(110f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SAB6378F0885BFB60"), ImGuiTableColumnFlags.WidthFixed, Scale(30f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S1C41C2A178AA300D"), ImGuiTableColumnFlags.WidthFixed, Scale(80f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SD0F463A3915C7232"), ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SB4777CCC172FB07E"), ImGuiTableColumnFlags.WidthFixed, Scale(110f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SCE3AF698202265E0"), ImGuiTableColumnFlags.WidthFixed, Scale(45f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S845F9286400F4269"), ImGuiTableColumnFlags.WidthFixed, Scale(55f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S497351C18DB9E57E"), ImGuiTableColumnFlags.WidthFixed, Scale(80f));
+            global::XASlave.Localization.UiNative.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f)); // remove
             ImGui.TableSetupScrollFreeze(0, 1);
-            ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableHeadersRow();
 
             // Build filtered list using persistent data
             var filtered = new List<(int OrigIdx, string CharName, string World, string RegionDc, ReloggerCharacterData? Info)>();
@@ -348,17 +349,17 @@ public partial class SlaveWindow
                     {
                         ImGui.Text(displayCharName);
                         ImGui.Separator();
-                        ImGui.Text($"Level: {info.HighestLevel}");
-                        ImGui.Text($"Gil: {info.Gil:N0}");
-                        var rankLabel = GetFcMemberRankLabel(info);
+                        ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("SCF6D4FE7FB495393", info.HighestLevel));
+                        ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("S1362AE4BE63316A7", info.Gil));
+                        var rankLabel = GetFcMemberRankLabelMessage(info).Display;
                         if (!string.IsNullOrEmpty(rankLabel))
-                            ImGui.Text($"Current Rank: {rankLabel}");
+                            ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("SEAAE09D72FCA210C", rankLabel));
                         if (!string.IsNullOrEmpty(info.FcName))
-                            ImGui.Text($"FC: {info.FcName}");
+                            ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("S83823F76B1EDDF94", info.FcName));
                         if (!string.IsNullOrWhiteSpace(info.PersonalEstate))
-                            ImGui.Text($"Personal Estate: {info.PersonalEstate}");
+                            ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("S03CB04B40DCEE607", info.PersonalEstate));
                         if (info.LastLoggedIn != DateTime.MinValue)
-                            ImGui.Text($"Last Logged In: {info.LastLoggedIn.ToLocalTime():yyyy-MM-dd HH:mm:ss}");
+                            ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("S2C0B7ACB3CF2C8C8", info.LastLoggedIn.ToLocalTime()));
                     }
                 }
 
@@ -366,9 +367,9 @@ public partial class SlaveWindow
                 if (info != null && info.FoundInAutoRetainer == false)
                 {
                     ImGui.SameLine();
-                    ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), "(not found in AR)");
+                    ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("S029F15BB9567E1F5"));
                     if (ImGui.IsItemHovered())
-                        ImGui.SetTooltip("AutoRetainer has no data for this character (manually added or unknown).\nIt cannot be relogged with /ays relog and will fail to log in.\nRe-run \"Import from AutoRetainer\" / \"Refresh AR Data\" after fixing it in AutoRetainer.");
+                        ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S078561B9A82CFD72"));
                 }
 
                 // Region / DC
@@ -385,13 +386,13 @@ public partial class SlaveWindow
                 // Gil
                 ImGui.TableNextColumn();
                 if (info != null && info.Gil > 0)
-                    ImGui.Text($"{info.Gil:N0}");
+                    ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("SDB3BB14865C18617", info.Gil));
                 else
                     ImGui.TextDisabled("-");
 
                 // Current Rank
                 ImGui.TableNextColumn();
-                var currentRankLabel = GetFcMemberRankLabel(info);
+                var currentRankLabel = GetFcMemberRankLabelMessage(info).Display;
                 if (!string.IsNullOrEmpty(currentRankLabel))
                     ImGui.TextDisabled(currentRankLabel);
                 else
@@ -407,7 +408,7 @@ public partial class SlaveWindow
                 // In FC
                 ImGui.TableNextColumn();
                 if (info != null && info.FCID != 0)
-                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Yes");
+                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("S85A39AB345D672FF"));
                 else
                     ImGui.TextDisabled("-");
 
@@ -415,7 +416,7 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 if (HasPersonalEstate(info))
                 {
-                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Yes");
+                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("S85A39AB345D672FF"));
                     if (ImGui.IsItemHovered() && info != null)
                         ImGui.SetTooltip(info.PersonalEstate);
                 }
@@ -437,7 +438,7 @@ public partial class SlaveWindow
                     else
                         ImGui.TextDisabled(label);
                     if (ImGui.IsItemHovered())
-                        ImGui.SetTooltip($"Last logged in: {info.LastLoggedIn.ToLocalTime():yyyy-MM-dd HH:mm:ss}");
+                        ImGui.SetTooltip(global::XASlave.Localization.UiLocale.FormatKey("S4F55E7F945A50D21", info.LastLoggedIn.ToLocalTime()));
                 }
                 else
                     ImGui.TextDisabled("\u2014");
@@ -446,7 +447,7 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
-                    if (ImGui.SmallButton($"X##rm{i}"))
+                    if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S4B68AB3847FEDA7D") + $"##rm{i}")))
                     {
                         chars.RemoveAt(i);
                         reloggerSelectedIndices.Remove(i);
@@ -468,9 +469,9 @@ public partial class SlaveWindow
 
         // Add character input
         ImGui.SetNextItemWidth(Scale(250f));
-        var enterPressed = ImGui.InputTextWithHint("##RelogAdd", "Name Surname@World", ref reloggerAddInput, 128, ImGuiInputTextFlags.EnterReturnsTrue);
+        var enterPressed = ImGui.InputTextWithHint("##RelogAdd", global::XASlave.Localization.UiLocale.Get("SF32C73F5DCC35D82"), ref reloggerAddInput, 128, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
-        if ((ImGui.Button("Add") || enterPressed) && !string.IsNullOrWhiteSpace(reloggerAddInput))
+        if ((global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S9FD728C66C9A256B")) || enterPressed) && !string.IsNullOrWhiteSpace(reloggerAddInput))
         {
             var trimmed = reloggerAddInput.Trim();
             if (!chars.Contains(trimmed))
@@ -482,14 +483,14 @@ public partial class SlaveWindow
         }
 
         ImGui.SameLine();
-        ImGui.TextDisabled("Format: FirstName LastName@World");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S1B7CB3CFDA6217B9"));
 
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
         // -- Per-Character Action Config --
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Actions Per Character");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SD077709C2945CC78"));
         ImGui.Spacing();
 
         var changed = false;
@@ -509,28 +510,28 @@ public partial class SlaveWindow
         var discardItems = cfg.ReloggerDoDiscardItems;
         var expertDelivery = cfg.ReloggerDoExpertDelivery;
 
-        changed |= ImGui.Checkbox("Enable TextAdvance (/at y)", ref v1);
-        changed |= ImGui.Checkbox("Remove Sprout (/nastatus off)", ref v2);
-        changed |= ImGui.Checkbox("Open Inventory", ref v3);
-        changed |= ImGui.Checkbox("Open Armoury Chest", ref v4);
-        changed |= ImGui.Checkbox("Open Saddlebags", ref v5);
-        changed |= ImGui.Checkbox("Open Journal", ref v6);
-        changed |= ImGui.Checkbox("Discard Items (AutoRetainer)", ref discardItems);
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S799FDA81A78E3803"), ref v1);
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S4714B2D36A35833C"), ref v2);
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S166DBD737506990A"), ref v3);
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S53649CACF2611F56"), ref v4);
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S04135E2D90F4F408"), ref v5);
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SF7B51D61398CF038"), ref v6);
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S40B6593737459861"), ref discardItems);
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Run AutoRetainer's configured discard policy before housing visits.\nUses its item protections and discard settings; disabled by default.");
-        changed |= ImGui.Checkbox("Expert Delivery (AutoRetainer)", ref expertDelivery);
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SACE9F8F24B44B0A3"));
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S1919D01E40553981"), ref expertDelivery);
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Run AutoRetainer's configured Grand Company delivery and exchange policy before housing visits.\nConfigure delivery for each character in AutoRetainer; disabled by default.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SE71E68B2095938FD"));
         if (discardItems || expertDelivery)
-            ImGui.TextDisabled("Stopping this task stops character rotation; active AutoRetainer/Lifestream work may need a separate stop.");
-        changed |= ImGui.Checkbox("Teleport Home (Lifestream)", ref v7);
-        changed |= ImGui.Checkbox("Collect Personal Plot Info (/housing -> signboard -> save)", ref v8);
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S1C9E329A3A6F81B2"));
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S621D93AD01358374"), ref v7);
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SC3068C461A6D4E55"), ref v8);
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Opens the housing menu, checks Apartment, Private Estate, and Shared Estate signboards when available,\nand triggers XA Database saves after each housing pass.");
-        changed |= ImGui.Checkbox("Teleport FC (Lifestream)", ref v9);
-        changed |= ImGui.Checkbox("Parse for XA Database (FC window + save)", ref v10);
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S42F6E4BE996AE7F4"));
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S45CB3AAD43EE350D"), ref v9);
+        changed |= global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SD46EE40E0A0D26E7"), ref v10);
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Opens FC window to collect FC data (name, members, points, plot),\nthen saves all collected data to XA Database.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S2DF64D3CBE4FDB09"));
         changed |= DrawSharedCompletionAndLogFooter("relogger", "relogger", ref v11, ref v12, ref v13, ref reloggerShowLog, runner);
 
         if (changed)
@@ -566,9 +567,9 @@ public partial class SlaveWindow
             var incompleteCount = runner.IncompleteCharacters.Count;
             if (failedCount > 0 || incompleteCount > 0)
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                    $"Relogger completed: {failedCount} failed (red), {incompleteCount} incomplete (purple).");
+                    global::XASlave.Localization.UiLocale.FormatKey("S8F45C73568B86076", failedCount, incompleteCount));
             else
-                ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Relogger completed successfully.");
+                ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("S7CC34A2A7E677B64"));
         }
     }
 
@@ -598,7 +599,7 @@ public partial class SlaveWindow
             return;
 
         ImGui.Spacing();
-        ImGui.TextDisabled("Last relogger run (kept until you clear results):");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S1ACFE83F8AFE17F9"));
         var eta = GetReloggerEtaLabel(reloggerLastRunList, reloggerLastRunDurations);
         if (!string.IsNullOrWhiteSpace(eta))
             ImGui.TextDisabled(eta);
@@ -607,9 +608,9 @@ public partial class SlaveWindow
         var failedCount = reloggerLastRunFailed.Count;
         var incompleteCount = reloggerLastRunIncomplete.Count;
         if (failedCount > 0 || incompleteCount > 0)
-            ImGui.TextDisabled($"{failedCount} failed (red), {incompleteCount} incomplete (purple) still need another pass.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S0F3B115C85A29873", failedCount, incompleteCount));
 
-        if (ImGui.Button("Clear results##reloggerClearResults"))
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S9D613B6C8ECDCA7D") + "##reloggerClearResults")))
         {
             reloggerHasLastRunSnapshot = false;
             reloggerLastRunList.Clear();
@@ -687,14 +688,9 @@ public partial class SlaveWindow
         }
     }
 
-    private static string GetReloggerStaleButtonLabel(int staleDays)
-    {
-        return $">{staleDays}d";
-    }
-
     private static string GetReloggerStaleTooltipText(int staleDays)
     {
-        return $"over {staleDays} days ago";
+        return global::XASlave.Localization.UiLocale.FormatKey("SAD5DAFFFF1A38040", staleDays);
     }
 
     /// <summary>Start the Monthly Relogger task with the given character list.</summary>
@@ -736,7 +732,7 @@ public partial class SlaveWindow
             if (idx >= 0)
                 reloggerSelectedIndices.Remove(idx);
         });
-        if (plugin.TaskRunner.Start("Monthly Relogger", steps, totalItems: characters.Count, suppressLogoutCancel: true,
+        if (plugin.TaskRunner.Start(global::XASlave.Localization.UiMessage.Key("S4D398C5A9609297E"), steps, totalItems: characters.Count, suppressLogoutCancel: true,
             onTerminal: runTask.EndInventoryOperation, haltOnStepError: runTask.DoDiscardItems || runTask.DoExpertDelivery))
         {
             HaltAutoCollectionForPriorityTask("Monthly Relogger");
@@ -756,7 +752,7 @@ public partial class SlaveWindow
             var arChars = ReadAutoRetainerCharactersForTask(honorExclusions);
             if (arChars.Count == 0)
             {
-                arImportStatus = "No characters found in AR config." + (honorExclusions ? plugin.ArConfigReader.ExclusionStatusSuffix : string.Empty);
+                arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S5F3A3118607810DC"), ((honorExclusions ? plugin.ArConfigReader.ExclusionStatusMessage : global::XASlave.Localization.UiMessage.Value(string.Empty)))));
                 arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 return;
             }
@@ -787,18 +783,16 @@ public partial class SlaveWindow
 
             cfg.Save();
 
-            arImportStatus = added > 0
-                ? $"Imported {added} new ({arChars.Count} total)"
-                : $"All {arChars.Count} already in list";
+            arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, (added > 0 ? global::XASlave.Localization.UiMessage.Format("SAFF25205F56B2E82", added, arChars.Count) : global::XASlave.Localization.UiMessage.Format("SECB3F6AE67AFB0B6", arChars.Count)));
             if (honorExclusions)
-                arImportStatus += plugin.ArConfigReader.ExclusionStatusSuffix;
+                arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref arImportStatusUiMessage, arImportStatus), plugin.ArConfigReader.ExclusionStatusMessage));
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
 
             Plugin.Log.Information($"[XASlave] AR Import: {arChars.Count} characters loaded, {added} new added, persistent data updated.");
         }
         catch (Exception ex)
         {
-            arImportStatus = $"Import failed: {ex.Message}";
+            arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Format("S002C95411A310E05", ex.Message));
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
             Plugin.Log.Error($"[XASlave] AR Import error: {ex.Message}");
         }
@@ -829,16 +823,14 @@ public partial class SlaveWindow
 
             var notFound = cfg.ReloggerCharacters.Count(k =>
                 cfg.ReloggerCharacterInfo.TryGetValue(k, out var d) && d.FoundInAutoRetainer == false);
-            arImportStatus = notFound > 0
-                ? $"Refreshed {updated} characters ({notFound} not in AR)"
-                : $"Refreshed {updated} characters";
+            arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, (notFound > 0 ? global::XASlave.Localization.UiMessage.Format("S045902FB9A4ADB5F", updated, notFound) : global::XASlave.Localization.UiMessage.Format("S93AEB39B4CBECAB7", updated)));
             if (honorExclusions)
-                arImportStatus += plugin.ArConfigReader.ExclusionStatusSuffix;
+                arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref arImportStatusUiMessage, arImportStatus), plugin.ArConfigReader.ExclusionStatusMessage));
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
         }
         catch (Exception ex)
         {
-            arImportStatus = $"Refresh failed: {ex.Message}";
+            arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Format("SB4FA16D87D7EB0B3", ex.Message));
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
         }
     }
@@ -959,12 +951,12 @@ public partial class SlaveWindow
 
         if (System.Threading.Interlocked.CompareExchange(ref xaDbPullRunning, 1, 0) != 0)
         {
-            arImportStatus = "XA DB pull already in progress...";
+            arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Key("S38293A646AB3C960"));
             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
             return;
         }
 
-        arImportStatus = "XA DB: reading...";
+        arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Key("S75BF3F0F2BD463CD"));
         arImportStatusExpiry = DateTime.UtcNow.AddSeconds(30);
         if (!RunWorker("XA Database pull", async token =>
         {
@@ -1003,7 +995,7 @@ public partial class SlaveWindow
                     {
                         if (!isDisposed)
                         {
-                            arImportStatus = $"XA DB pull failed: {ex.Message}";
+                            arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Format("S7290DDF827F3EF7C", ex.Message));
                             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                             Plugin.Log.Error(ex, "[XASlave] Applying XA Database rows failed.");
                         }
@@ -1027,7 +1019,7 @@ public partial class SlaveWindow
                     {
                         if (!isDisposed && !token.IsCancellationRequested && (xaDbPullHasManualRequest || (shouldApply?.Invoke() ?? true)))
                         {
-                            arImportStatus = $"XA DB pull failed: {ex.Message}";
+                            arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Format("S7290DDF827F3EF7C", ex.Message));
                             arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                             Plugin.Log.Error(ex, "[XASlave] PullXaDatabaseInfo failed.");
                         }
@@ -1146,7 +1138,7 @@ public partial class SlaveWindow
         }
 
         cfg.SaveDeferred();
-        arImportStatus = $"XA DB: Updated {rows.Count} characters";
+        arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Format("S3941BF2F057C28D0", rows.Count));
         arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
         Plugin.Log.Information($"[XASlave] Pulled XA Database info for {rows.Count} characters from {dbPath}");
 
@@ -1476,12 +1468,12 @@ public partial class SlaveWindow
 
         // Summary line
         if (allRequiredOk)
-            ImGui.TextColored(green, "All required plugins loaded.");
+            ImGui.TextColored(green, global::XASlave.Localization.UiLocale.Get("SCB98E3ED3C5CB275"));
         else
-            ImGui.TextColored(red, "WARNING: Missing required plugins - relogger may not function correctly.");
+            ImGui.TextColored(red, global::XASlave.Localization.UiLocale.Get("SBA1869894BA4586D"));
 
         // Required plugins row
-        ImGui.Text("Required: ");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("S4588EB2A8F8AB239"));
         foreach (var p in required)
         {
             ImGui.SameLine();
@@ -1489,7 +1481,7 @@ public partial class SlaveWindow
         }
 
         // Optional plugins row
-        ImGui.Text("Optional: ");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("S36B1A941DF5FFC4F"));
         foreach (var p in optional)
         {
             ImGui.SameLine();

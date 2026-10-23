@@ -51,7 +51,10 @@ public unsafe sealed class NoUiFadeService : IDisposable
         }
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool IsStartupArmingPending => startupArmingPending;
 
@@ -71,7 +74,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
             CancelStartupArming(disposeCompletedResult: true);
             enabled = false;
             ToggleAllHooks(false);
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -80,7 +83,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
         if (availableHookSurfaces == 0)
         {
             enabled = false;
-            StatusText = "Unavailable - no UI fade hooks could be resolved.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S5D80814ED1C690D1"));
             return false;
         }
 
@@ -88,7 +91,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
         if (activeSurfaces == 0)
         {
             enabled = false;
-            StatusText = "Unavailable - UI fade hooks could not be enabled.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S50539A7FAB6DBCFC"));
             return false;
         }
 
@@ -106,7 +109,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
             return SetEnabled(true);
 
         enabled = true;
-        StatusText = "Arming - UI fade hooks are initializing on the framework thread.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SB015B8D0BD0DF969"));
         StartStartupHookCreation();
         return true;
     }
@@ -272,7 +275,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
         if (result == null)
         {
             enabled = false;
-            StatusText = "Unavailable - UI fade hooks could not be initialized.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S3F376706172696C0"));
             return;
         }
 
@@ -293,7 +296,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
         if (availableHookSurfaces == 0)
         {
             enabled = false;
-            StatusText = "Unavailable - no UI fade hooks could be resolved.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S5D80814ED1C690D1"));
             return;
         }
 
@@ -301,7 +304,7 @@ public unsafe sealed class NoUiFadeService : IDisposable
         if (activeSurfaces == 0)
         {
             enabled = false;
-            StatusText = "Unavailable - UI fade hooks could not be enabled.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S50539A7FAB6DBCFC"));
             return;
         }
 
@@ -382,14 +385,12 @@ public unsafe sealed class NoUiFadeService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         var surfaceCount = activeSurfaces ?? CountActiveHookSurfaces();
-        StatusText = surfaceCount < TotalHookSurfaces
-            ? $"Partially enabled - suppressing {surfaceCount}/{TotalHookSurfaces} UI fade surfaces. Suppressed fades: {suppressedFadeCalls}."
-            : $"Enabled - suppressing all {TotalHookSurfaces} UI fade surfaces. Suppressed fades: {suppressedFadeCalls}.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (surfaceCount < TotalHookSurfaces ? global::XASlave.Localization.UiMessage.Format("S94DA6595671974A8", surfaceCount, TotalHookSurfaces, suppressedFadeCalls) : global::XASlave.Localization.UiMessage.Format("S2037052FE8C72834", TotalHookSurfaces, suppressedFadeCalls)));
     }
 
     private int CountActiveHookSurfaces()

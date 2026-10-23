@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.0.0.55</Version>
+    <Version>0.0.0.56</Version>
     <LangVersion>preview</LangVersion>
     <PackageProjectUrl>https://aethertek.io/</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
@@ -36,6 +36,19 @@
   <ItemGroup>
     <None Include="images\**" CopyToOutputDirectory="PreserveNewest" />
     <None Include="Data\EurekaLogogramCreator\**" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Keep each locale in the host assembly so private/public distribution does not need satellites. -->
+    <EmbeddedResource Update="Lang\**\Strings.resx">
+      <WithCulture>false</WithCulture>
+      <LogicalName>XASlave.$([System.String]::Copy('%(Identity)').Replace('\', '.').Replace('/', '.').Replace('.resx', '.resources'))</LogicalName>
+      <Generator></Generator>
+    </EmbeddedResource>
+    <EmbeddedResource Update="Lang\NativeLabels.resx">
+      <WithCulture>false</WithCulture>
+      <LogicalName>XASlave.Lang.NativeLabels.resources</LogicalName>
+      <Generator></Generator>
+    </EmbeddedResource>
   </ItemGroup>
   <ItemGroup>
     <!-- Pinned native UI source capture, inventoried and recovered with ignored xapr/. -->

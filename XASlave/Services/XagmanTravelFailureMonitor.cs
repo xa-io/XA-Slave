@@ -8,7 +8,11 @@ internal readonly record struct XagmanTravelFailure(
     string Message,
     string ExpectedCharacter,
     string Command,
-    DateTime ObservedAtUtc);
+    DateTime ObservedAtUtc)
+{
+    internal global::XASlave.Localization.UiMessage ReasonMessage => Reason == global::XASlave.Localization.UiLocale.Native("S87440A605F6D761F") ? global::XASlave.Localization.UiMessage.Key("S87440A605F6D761F")
+        : Reason == global::XASlave.Localization.UiLocale.Native("S803E846C84906199") ? global::XASlave.Localization.UiMessage.Key("S803E846C84906199") : global::XASlave.Localization.UiMessage.Value(Reason);
+}
 
 /// <summary>
 /// Latches a known travel failure for one armed character operation. Chat observation only
@@ -44,7 +48,7 @@ internal sealed class XagmanTravelFailureMonitor : IDisposable
             || string.IsNullOrWhiteSpace(normalizedCharacter[..separator])
             || string.IsNullOrWhiteSpace(normalizedCharacter[(separator + 1)..]))
         {
-            throw new ArgumentException("A character name and home world are required.", nameof(expectedCharacter));
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SBFEE9A64CB1112FE"), originalMessage => new ArgumentException(originalMessage, nameof(expectedCharacter)));
         }
 
         lock (syncRoot)
@@ -103,9 +107,9 @@ internal sealed class XagmanTravelFailureMonitor : IDisposable
         var reason = entry.ChatType switch
         {
             XivChatType.ErrorMessage when entry.Message.Equals(
-                "Unable to teleport. Insufficient gil.", StringComparison.Ordinal) => "not enough gil",
+                "Unable to teleport. Insufficient gil.", StringComparison.Ordinal) => global::XASlave.Localization.UiLocale.Native("S87440A605F6D761F"),
             XivChatType.Urgent when entry.Message.StartsWith(
-                "No attuned Aetheryte found for ", StringComparison.Ordinal) => "unable to teleport to location",
+                "No attuned Aetheryte found for ", StringComparison.Ordinal) => global::XASlave.Localization.UiLocale.Native("S803E846C84906199"),
             _ => string.Empty,
         };
         if (reason.Length == 0)

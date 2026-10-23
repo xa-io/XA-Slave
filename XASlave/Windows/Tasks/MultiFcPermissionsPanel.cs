@@ -43,38 +43,36 @@ public partial class SlaveWindow
         var cfg = plugin.Configuration;
         var chars = cfg.FcPermsCharacters;
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Multi-FC Permissions Updater");
-        ImGui.TextDisabled("Log into multiple characters and update FC member role to have all permissions.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S5C55501A8E5A4274"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SD289936A6FCC000B"));
         ImGui.Spacing();
 
         // -- Import / Refresh buttons --
         var arConfigExists = plugin.ArConfigReader.ConfigFileExists();
         using (ImRaii.Disabled(!arConfigExists))
         {
-            if (ImGui.Button("Import from AutoRetainer##fcPermsImportAR"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S74BC538828226264") + "##fcPermsImportAR")))
             {
                 try
                 {
                     var (added, total) = ImportCharactersFromArToList(chars, cfg.FcPermsHonorArExclusions);
                     cfg.Save();
-                    arImportStatus = added > 0
-                        ? $"Imported {added} new ({total} total)"
-                        : $"All {total} already in list";
+                    arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, (added > 0 ? global::XASlave.Localization.UiMessage.Format("SAFF25205F56B2E82", added, total) : global::XASlave.Localization.UiMessage.Format("SECB3F6AE67AFB0B6", total)));
                     if (cfg.FcPermsHonorArExclusions)
-                        arImportStatus += plugin.ArConfigReader.ExclusionStatusSuffix;
+                        arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref arImportStatusUiMessage, arImportStatus), plugin.ArConfigReader.ExclusionStatusMessage));
                     arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 }
                 catch (Exception ex)
                 {
-                    arImportStatus = $"Import failed: {ex.Message}";
+                    arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Format("S002C95411A310E05", ex.Message));
                     arImportStatusExpiry = DateTime.UtcNow.AddSeconds(8);
                 }
             }
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(arConfigExists
-                ? "Read AutoRetainer's DefaultConfig.json to import all characters.\nPath: " + plugin.ArConfigReader.GetAutoRetainerConfigPath()
-                : "AutoRetainer config not found.\nExpected: " + plugin.ArConfigReader.GetAutoRetainerConfigPath());
+                ? global::XASlave.Localization.UiLocale.FormatKey("S4F45236F63C59987", plugin.ArConfigReader.GetAutoRetainerConfigPath())
+                : global::XASlave.Localization.UiLocale.FormatKey("S7F848B59CF50E7D8", plugin.ArConfigReader.GetAutoRetainerConfigPath()));
 
         DrawHonorAutoRetainerExclusions("fcPerms", cfg.FcPermsHonorArExclusions,
             value => cfg.FcPermsHonorArExclusions = value,
@@ -84,18 +82,18 @@ public partial class SlaveWindow
         var xaDbAvailable = plugin.IpcClient.IsXaDatabaseAvailable();
         using (ImRaii.Disabled(!xaDbAvailable))
         {
-            if (ImGui.Button("Pull XA Database Info##fcPermsPullXA"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S658431DD798692FF") + "##fcPermsPullXA")))
                 PullXaDatabaseInfo();
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
             ImGui.SetTooltip(xaDbAvailable
-                ? "Read XA Database to update FC name for all characters."
-                : "XA Database plugin not available.");
+                ? global::XASlave.Localization.UiLocale.Get("S711EAB8630E15C72")
+                : global::XASlave.Localization.UiLocale.Get("S2A0686AE2571326E"));
 
         if (!string.IsNullOrEmpty(arImportStatus) && DateTime.UtcNow < arImportStatusExpiry)
         {
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), arImportStatus);
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiMessage.Resolve(ref arImportStatusUiMessage, arImportStatus));
         }
 
         ImGui.Spacing();
@@ -106,7 +104,7 @@ public partial class SlaveWindow
         DrawTaskPluginStatus(false);
 
         ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-            "Note: Each character must have Master rank in their FC to edit permissions. \nIt's best to do this when you're rank 6+ so you have access to plot bidding.");
+            global::XASlave.Localization.UiLocale.Get("SFA2B21C2F60BF3CC"));
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -117,13 +115,13 @@ public partial class SlaveWindow
         if (isRunning)
         {
             var progress = plugin.TaskRunner.TotalItems > 0 ? (float)plugin.TaskRunner.CompletedItems / plugin.TaskRunner.TotalItems : 0f;
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"Running: {plugin.TaskRunner.StatusText}");
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S8EB69248AA11B2FD", plugin.TaskRunner.LocalizedStatusText));
             ImGui.ProgressBar(progress, new Vector2(-1, 0), $"{plugin.TaskRunner.CompletedItems}/{plugin.TaskRunner.TotalItems}");
             if (!string.IsNullOrEmpty(plugin.TaskRunner.CurrentItemLabel))
-                ImGui.TextDisabled(plugin.TaskRunner.CurrentItemLabel);
+                ImGui.TextDisabled(plugin.TaskRunner.CurrentItemLabelDisplay);
             DrawProcessingList(plugin.TaskRunner);
             ImGui.Spacing();
-            if (ImGui.Button("Cancel##fcPermsCancel"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S19766ED6CCB2F4A3") + "##fcPermsCancel")))
                 plugin.TaskRunner.Cancel();
         }
         else
@@ -132,18 +130,18 @@ public partial class SlaveWindow
             var canStart = selectedChars.Count > 0 && !plugin.TaskRunner.IsRunning;
             var started = DrawPriorityTaskActionButton(
                 SlaveTask.MultiFcPermissions,
-                $"Start ({selectedChars.Count} chars)##fcPermsStart",
+                (string.Format(global::XASlave.Localization.UiLocale.Native("SC0F20E306C7E38D9"), selectedChars.Count) + $"##fcPermsStart"),
                 canStart,
                 StartFcPermissionsUpdater,
-                "Select at least one character to start.");
+                global::XASlave.Localization.UiLocale.Get("S630BBC121AA0D071"), displayButtonLabel: global::XASlave.Localization.UiLocale.FormatKey("SC0F20E306C7E38D9", selectedChars.Count));
             if (started)
                 AutoOpenTaskLogIfVerbose(ref fcPermsShowLog);
 
             ImGui.SameLine();
-            if (ImGui.Button("Check All##fcPermsAll"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S8D36DE8ED9DBBB1B") + "##fcPermsAll")))
                 SelectVisibleFcPermsCharacters();
             ImGui.SameLine();
-            if (ImGui.Button("Clear All##fcPermsNone"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SDDCEB7ADFDB8816E") + "##fcPermsNone")))
                 fcPermsSelectedIndices.Clear();
         }
 
@@ -152,12 +150,12 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Character List --
-        DrawCharacterListHeader("Character List", $"({chars.Count} total)", "fcPermsAnonymize");
+        DrawCharacterListHeader(global::XASlave.Localization.UiLocale.Get("S9127EB7A3D10F5D6"), global::XASlave.Localization.UiLocale.FormatKey("S261FA25B9E69A2B0", chars.Count), "fcPermsAnonymize");
         var anonymizeCharacters = IsCharacterListAnonymizationEnabled();
         ImGui.Spacing();
 
         var fcPermsRegionFilter = cfg.FcPermsRegionFilter;
-        if (DrawRegionFilterCombo("Region##fcPermsRegion", ref fcPermsRegionFilter))
+        if (DrawRegionFilterCombo((global::XASlave.Localization.UiLocale.Native("SD3A008EF1335692D") + "##fcPermsRegion"), ref fcPermsRegionFilter))
         {
             cfg.FcPermsRegionFilter = fcPermsRegionFilter;
             cfg.Save();
@@ -166,7 +164,7 @@ public partial class SlaveWindow
         ImGui.SameLine();
         // Search filter
         ImGui.SetNextItemWidth(Scale(200f));
-        ImGui.InputTextWithHint("##fcPermsSearch", "Search name or world...", ref fcPermsSearchFilter, 128);
+        ImGui.InputTextWithHint("##fcPermsSearch", global::XASlave.Localization.UiLocale.Get("SF62AB4CE4380C1B9"), ref fcPermsSearchFilter, 128);
         ImGui.Spacing();
 
         // Character table - columns: checkbox, #, character, world, FC name, member rank, FC rank, in FC, remove
@@ -177,17 +175,17 @@ public partial class SlaveWindow
             ScaledVector(0f, 250f)))
         if (imguiScope167)
         {
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
-            ImGui.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
-            ImGui.TableSetupColumn("Character", ImGuiTableColumnFlags.WidthStretch);
-            ImGui.TableSetupColumn("World", ImGuiTableColumnFlags.WidthFixed, Scale(90f));
-            ImGui.TableSetupColumn("FC Name", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
-            ImGui.TableSetupColumn("Member Rank", ImGuiTableColumnFlags.WidthFixed, Scale(95f));
-            ImGui.TableSetupColumn("FC Rank", ImGuiTableColumnFlags.WidthFixed, Scale(60f));
-            ImGui.TableSetupColumn("In FC", ImGuiTableColumnFlags.WidthFixed, Scale(45f));
-            ImGui.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
+            global::XASlave.Localization.UiNative.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(30f));
+            global::XASlave.Localization.UiNative.TableSetupColumn("#", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort, Scale(30f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S1405A63E8A78B85C"), ImGuiTableColumnFlags.WidthStretch);
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S78AE647DC5544D22"), ImGuiTableColumnFlags.WidthFixed, Scale(90f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SF9130E467E662842"), ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S20B5F2B2DFB80E10"), ImGuiTableColumnFlags.WidthFixed, Scale(95f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S2095FD0D8B39DB4A"), ImGuiTableColumnFlags.WidthFixed, Scale(60f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SCE3AF698202265E0"), ImGuiTableColumnFlags.WidthFixed, Scale(45f));
+            global::XASlave.Localization.UiNative.TableSetupColumn("", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.NoSort, Scale(25f));
             ImGui.TableSetupScrollFreeze(0, 1);
-            ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableHeadersRow();
 
             // Build filtered list
             var filtered = new List<(int OrigIdx, string CharName, string World, ReloggerCharacterData? Info)>();
@@ -275,7 +273,7 @@ public partial class SlaveWindow
 
                 // Member Rank
                 ImGui.TableNextColumn();
-                var memberRankLabel = GetFcMemberRankLabel(info);
+                var memberRankLabel = GetFcMemberRankLabelMessage(info).Display;
                 if (!string.IsNullOrEmpty(memberRankLabel))
                     ImGui.TextDisabled(memberRankLabel);
                 else
@@ -292,7 +290,7 @@ public partial class SlaveWindow
                 // In FC
                 ImGui.TableNextColumn();
                 if (info != null && info.FCID != 0)
-                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), "Yes");
+                    ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("S85A39AB345D672FF"));
                 else
                     ImGui.TextDisabled("-");
 
@@ -300,7 +298,7 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 using (ImRaii.PushColor(ImGuiCol.Text, new Vector4(1.0f, 0.4f, 0.4f, 1.0f)))
                 {
-                    if (ImGui.SmallButton($"X##fpRm{i}"))
+                    if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S4B68AB3847FEDA7D") + $"##fpRm{i}")))
                     {
                         chars.RemoveAt(i);
                         fcPermsSelectedIndices.Remove(i);
@@ -322,9 +320,9 @@ public partial class SlaveWindow
 
         // Add character input
         ImGui.SetNextItemWidth(Scale(250f));
-        var enterPressed = ImGui.InputTextWithHint("##fcPermsAdd", "Name Surname@World", ref fcPermsNewChar, 128, ImGuiInputTextFlags.EnterReturnsTrue);
+        var enterPressed = ImGui.InputTextWithHint("##fcPermsAdd", global::XASlave.Localization.UiLocale.Get("SF32C73F5DCC35D82"), ref fcPermsNewChar, 128, ImGuiInputTextFlags.EnterReturnsTrue);
         ImGui.SameLine();
-        if ((ImGui.Button("Add##fcPermsAddBtn") || enterPressed) && !string.IsNullOrWhiteSpace(fcPermsNewChar))
+        if ((global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S9FD728C66C9A256B") + "##fcPermsAddBtn")) || enterPressed) && !string.IsNullOrWhiteSpace(fcPermsNewChar))
         {
             var trimmed = fcPermsNewChar.Trim();
             if (!chars.Contains(trimmed))
@@ -335,7 +333,7 @@ public partial class SlaveWindow
             fcPermsNewChar = "";
         }
         ImGui.SameLine();
-        ImGui.TextDisabled("Format: FirstName LastName@World");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S1B7CB3CFDA6217B9"));
 
         var logoutOnComplete = cfg.FcPermsLogoutOnComplete;
         var killGameOnComplete = cfg.FcPermsKillGameOnComplete;
@@ -389,7 +387,7 @@ public partial class SlaveWindow
 
         var steps = BuildFcPermissionsSteps(selected, plugin.TaskRunner);
 
-        if (!plugin.TaskRunner.Start("FC Permissions Updater", steps, onLog: (msg) =>
+        if (!plugin.TaskRunner.Start(global::XASlave.Localization.UiMessage.Key("SA6711086459806CB"), steps, onLog: (msg) =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
         }, totalItems: selected.Count, suppressLogoutCancel: true))
@@ -407,7 +405,7 @@ public partial class SlaveWindow
         // Disable AR Multi Mode
         steps.Add(new TaskStep
         {
-            Name = "Disable AR Multi Mode",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S22C41FFCBA42741B"),
             OnEnter = () =>
             {
                 runner.AddLog("Disabling AutoRetainer Multi Mode...");
@@ -416,7 +414,7 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 3f,
         });
-        steps.Add(MonthlyReloggerTask.MakeDelay("AR Disable Cooldown", 1.0f));
+        steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("SC4B6369ECA28F664"), 1.0f));
 
         for (int i = 0; i < characters.Count; i++)
         {
@@ -427,7 +425,7 @@ public partial class SlaveWindow
             // Label
             steps.Add(new TaskStep
             {
-                Name = $"[{charIndex}/{charTotal}] {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S5FB6F2415218C668", charIndex, charTotal, charName),
                 OnEnter = () =>
                 {
                     runner.CurrentItemLabel = $"[{charIndex}/{charTotal}] {charName}";
@@ -442,7 +440,7 @@ public partial class SlaveWindow
             var relogFailed = false;
             steps.Add(new TaskStep
             {
-                Name = $"Relog: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SB8BF19049E887413", charName),
                 OnEnter = () =>
                 {
                     var current = MonthlyReloggerTask.GetCurrentCharacterNameWorld();
@@ -458,12 +456,12 @@ public partial class SlaveWindow
                 IsComplete = () => true,
                 TimeoutSec = 3f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Relog Init: {charName}", 2.0f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S27A359F38EA15525", charName), 2.0f));
 
             // Wait for relog
             steps.Add(new TaskStep
             {
-                Name = $"Wait Relog: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S4B35E54CFF820E18", charName),
                 IsComplete = () =>
                 {
                     if (relogReady) return true;
@@ -511,7 +509,7 @@ public partial class SlaveWindow
             }
 
             // SafeWait 3-pass
-            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass($"SafeWait ({charName})"))
+            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Format("SFA31CB70A88EB43A", charName)))
             {
                 steps.Add(sw);
             }
@@ -519,7 +517,7 @@ public partial class SlaveWindow
             // Open FC window
             steps.Add(new TaskStep
             {
-                Name = $"Open FC Window: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SD9C5BF91F8698B01", charName),
                 OnEnter = () =>
                 {
                     runner.AddLog("Opening FC window...");
@@ -529,12 +527,12 @@ public partial class SlaveWindow
                 TimeoutSec = 5f,
                 OnTimeout = () => FailPermissionFlow("The Free Company window did not open."),
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"FC Window: {charName}", 0.5f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SB2D58B61830F7784", charName), 0.5f));
 
             // FC callback sequence ("FreeCompany true 0 2")
             steps.Add(new TaskStep
             {
-                Name = $"FC Navigate Ranks: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SCFEC22492021C846", charName),
                 OnEnter = () =>
                 {
                     runner.AddLog("Navigating to FC ranks...");
@@ -546,13 +544,13 @@ public partial class SlaveWindow
                 MaxRetries = 1,
                 OnTimeout = () => FailPermissionFlow("The ranks tab did not open after its callback."),
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"FC Ranks Nav: {charName}", 0.3f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S813F0477D6AF4612", charName), 0.3f));
 
             // FreeCompanyRank callbacks
             // ("FreeCompanyRank true 2 2 Undefined Undefined Undefined")
             steps.Add(new TaskStep
             {
-                Name = $"FC Rank Select: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SDCF062457237F08A", charName),
                 OnEnter = () =>
                 {
                     runner.AddLog("Selecting rank for editing...");
@@ -564,12 +562,12 @@ public partial class SlaveWindow
                 MaxRetries = 1,
                 OnTimeout = () => FailPermissionFlow("The target rank selection callback was not accepted."),
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"FC Rank Select Wait: {charName}", 0.3f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SF28AD6531CF142D3", charName), 0.3f));
 
             // ("FreeCompanyRank true 4 3 1513 557 Undefined")
             steps.Add(new TaskStep
             {
-                Name = $"FC Rank Edit: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SAD6EDB741A3F9278", charName),
                 OnEnter = () =>
                 {
                     if (AddonHelper.IsAddonReady("FreeCompanyRank"))
@@ -580,12 +578,12 @@ public partial class SlaveWindow
                 MaxRetries = 1,
                 OnTimeout = () => FailPermissionFlow("The target rank edit callback was not accepted."),
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"FC Rank Edit Wait: {charName}", 0.1f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SBC78A2CD15C1CA81", charName), 0.1f));
 
             // ("FreeCompanyRank true 3 2 Undefined Undefined Undefined")
             steps.Add(new TaskStep
             {
-                Name = $"FC Rank Confirm: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SB7BDB1754C1166E1", charName),
                 OnEnter = () =>
                 {
                     if (AddonHelper.IsAddonReady("FreeCompanyRank"))
@@ -596,12 +594,12 @@ public partial class SlaveWindow
                 MaxRetries = 1,
                 OnTimeout = () => FailPermissionFlow("The selected rank did not expose its context menu."),
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"FC Rank Confirm Wait: {charName}", 0.1f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SEC10F2F8423DFD75", charName), 0.1f));
 
             // ("ContextMenu true 0 0 0 Undefined Undefined")
             steps.Add(new TaskStep
             {
-                Name = $"FC Context Menu: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S51C32F0EEFB50424", charName),
                 OnEnter = () =>
                 {
                     if (AddonHelper.IsAddonReady("ContextMenu"))
@@ -612,13 +610,13 @@ public partial class SlaveWindow
                 MaxRetries = 1,
                 OnTimeout = () => FailPermissionFlow("The member-rank permissions editor did not open."),
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"FC Context Wait: {charName}", 0.1f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S50A2BDAD7936C19C", charName), 0.1f));
 
             // Apply all permissions
             // ("FreeCompanyMemberRankEdit true 0 Undefined 1 1 1 1 1 1 1 1 1 1 1 1 3 1 1 1 1 1 3 1 1 1 1 1 1 1 1 -1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 -1 1 1 1")
             steps.Add(new TaskStep
             {
-                Name = $"Apply Permissions: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S05911A8BCCB22731", charName),
                 OnEnter = () =>
                 {
                     if (!AddonHelper.IsAddonReady("FreeCompanyMemberRankEdit") ||
@@ -640,12 +638,12 @@ public partial class SlaveWindow
                 MaxRetries = 1,
                 OnTimeout = () => FailPermissionFlow("The verified Member rank permission callback was not accepted."),
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"Permissions Applied: {charName}", 0.5f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SF57943594251FB26", charName), 0.5f));
 
             // Close any remaining FC windows
             steps.Add(new TaskStep
             {
-                Name = $"Close FC Windows: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S2143476ACDD6160F", charName),
                 OnEnter = () =>
                 {
                     runner.AddLog("Closing FC windows...");
@@ -654,15 +652,15 @@ public partial class SlaveWindow
                 IsComplete = () => true,
                 TimeoutSec = 1f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"FC Close: {charName}", 0.5f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S8EDC86C1D7989100", charName), 0.5f));
             steps.Add(new TaskStep
             {
-                Name = $"Close FC Windows 2: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S432876B47B97C02C", charName),
                 OnEnter = () => KeyInputHelper.PressKey(KeyInputHelper.VK_ESCAPE),
                 IsComplete = () => true,
                 TimeoutSec = 1f,
             });
-            steps.Add(MonthlyReloggerTask.MakeDelay($"FC Close 2: {charName}", 0.5f));
+            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S53ABD5F8B5ACDD80", charName), 0.5f));
 
             // If relogging or any expected UI transition fails, skip the remaining permission
             // sequence so a later callback can never land on a stale or unintended rank editor.
@@ -674,7 +672,7 @@ public partial class SlaveWindow
             var capturedName = charName;
             steps.Add(new TaskStep
             {
-                Name = $"Complete: {capturedName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SB5063DC812CCDD2B", capturedName),
                 OnEnter = () =>
                 {
                     runner.CompletedItems = capturedIndex;
@@ -700,7 +698,7 @@ public partial class SlaveWindow
         // Summary
         steps.Add(new TaskStep
         {
-            Name = "FC Permissions Summary",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S065ED4E38ED2B325"),
             OnEnter = () =>
             {
                 if (!MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(cfg.FcPermsLogoutOnComplete, cfg.FcPermsKillGameOnComplete))

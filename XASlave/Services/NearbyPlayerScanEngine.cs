@@ -40,13 +40,16 @@ internal sealed class NearbyPlayerScanEngine
     private long login, passTime;
     private uint territory, pendingTerritory;
     internal bool Pending { get; private set; }
-    internal string Status { get; private set; } = string.Empty;
+    internal string Status { get; private set; } = global::XASlave.Localization.UiMessage.Raw(string.Empty).Original;
+    private global::XASlave.Localization.UiMessage? uiStatus = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatus, Status);
+    internal string LocalizedStatus => global::XASlave.Localization.UiMessage.Resolve(ref uiStatus, Status);
     internal int RecordCount => records.Count;
 
     internal void Reset(long loginGeneration)
     {
         CancelPass(); login = loginGeneration; territory = 0;
-        records.Clear(); published.Clear(); Status = string.Empty;
+        records.Clear(); published.Clear(); Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Raw(string.Empty));
     }
 
     internal void CancelPass(bool invalidatePublished = true)
@@ -71,7 +74,7 @@ internal sealed class NearbyPlayerScanEngine
         if (login != loginGeneration) Reset(loginGeneration);
         rules = snapshot; players = observations; pendingTerritory = territoryId; passTime = monotonicMilliseconds;
         actorIndex = 0; ruleIndex = 0; phase = 0; newMatches = 0; availableJobs = Math.Clamp(freeActionJobs, 0, 256);
-        staged = new(); matches = new(); emissions.Clear(); Status = string.Empty;
+        staged = new(); matches = new(); emissions.Clear(); Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         Pending = true;
         return true;
     }
@@ -101,7 +104,7 @@ internal sealed class NearbyPlayerScanEngine
                     // records and bound new match admission without evicting cooldowns.
                     if (!records.ContainsKey(key))
                     {
-                        if (records.Count + newMatches >= 8192) { Status = "Capacity reached: additional matches suppressed."; continue; }
+                        if (records.Count + newMatches >= 8192) { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("SC1629D844BF98B47")); continue; }
                         newMatches++;
                     }
                     matches[key] = match = new Match(player, actorIndex, ruleIndex - 1);
@@ -129,7 +132,7 @@ internal sealed class NearbyPlayerScanEngine
                 }
                 var entry = newCursor.Current;
                 if (records.ContainsKey(entry.Key)) continue;
-                if (staged.Count >= 8192) { Status = "Capacity reached: additional actors/rules suppressed."; continue; }
+                if (staged.Count >= 8192) { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("SC5D37EE06976797F")); continue; }
                 Merge(entry.Key, null, entry.Value);
             }
         } while (monotonicMilliseconds() - started < 2);
@@ -156,7 +159,7 @@ internal sealed class NearbyPlayerScanEngine
         staged[key] = state;
         if (!admitted) return;
         // Reserve before returning any actions; failures/capacity cannot replay an edge.
-        if (emissions.Count >= availableJobs) { Status = "Action capacity reached: additional transitions suppressed."; return; }
+        if (emissions.Count >= availableJobs) { Status = global::XASlave.Localization.UiMessage.Store(ref uiStatus, global::XASlave.Localization.UiMessage.Key("S40F4475342B20AD5")); return; }
         emissions.Add(new(key, match.Player, match.Rules.ToArray(), state.Episode, match.ActorOrder, match.RuleOrder));
     }
 

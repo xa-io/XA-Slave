@@ -13,7 +13,36 @@ using NativeCharacter = FFXIVClientStructs.FFXIV.Client.Game.Character.Character
 
 namespace XASlave.Services;
 
-internal sealed record ViewSingleItemChoice(int Key, string Label, uint ItemId, string UnavailableReason = "");
+internal sealed record ViewSingleItemChoice(int Key, string Label, uint ItemId, string UnavailableReason = "")
+{
+    private sealed record Presentation(global::XASlave.Localization.UiMessage? LabelMessage, global::XASlave.Localization.UiMessage? UnavailableMessage);
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ViewSingleItemChoice, Presentation> Presentations = new();
+    private static readonly Presentation EmptyPresentation = new(null, null);
+    private Presentation Messages => Presentations.TryGetValue(this, out var value) ? value : EmptyPresentation;
+    internal global::XASlave.Localization.UiMessage? LabelMessage
+    {
+        get => Messages.LabelMessage;
+        init => Presentations.AddOrUpdate(this, Messages with { LabelMessage = value });
+    }
+    internal global::XASlave.Localization.UiMessage? UnavailableMessage
+    {
+        get => Messages.UnavailableMessage;
+        init => Presentations.AddOrUpdate(this, Messages with { UnavailableMessage = value });
+    }
+    private ViewSingleItemChoice(ViewSingleItemChoice original)
+    {
+        Key = original.Key;
+        Label = original.Label;
+        ItemId = original.ItemId;
+        UnavailableReason = original.UnavailableReason;
+        if (Presentations.TryGetValue(original, out var presentation)) Presentations.Add(this, presentation);
+    }
+    internal string LocalizedLabel => global::XASlave.Localization.UiMessage.Resolve(LabelMessage, Label);
+    internal global::XASlave.Localization.UiMessage UnavailablePresentation => global::XASlave.Localization.UiMessage.Capture(UnavailableMessage, UnavailableReason);
+    internal string LocalizedUnavailableReason => UnavailablePresentation.Display;
+    internal static ViewSingleItemChoice Create(int key, global::XASlave.Localization.UiMessage label, uint itemId, global::XASlave.Localization.UiMessage? unavailable = null)
+        => new(key, label.Original, itemId, unavailable?.Original ?? string.Empty) { LabelMessage = label, UnavailableMessage = unavailable };
+}
 
 // Menu callbacks retain values only. Every native operation is re-admitted on
 // the framework thread against the current login and captured request.
@@ -37,7 +66,11 @@ internal sealed class ViewSingleItemService : IDisposable
     { this.contextMenu = contextMenu; this.log = log; history = new(databasePath); }
 
     internal Action? OpenWindow { get; set; }
-    internal string StatusText { get; private set; } = "Disabled";
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? waitingMessage;
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(statusMessage, StatusText);
+    internal string LocalizedStatusText => StatusMessage.Display;
+    internal string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
     internal string PlayerName => source?.Identity.Name ?? expected?.Name ?? string.Empty;
     internal IReadOnlyList<ViewSingleItemChoice> Choices { get; private set; } = Array.Empty<ViewSingleItemChoice>();
     internal int? SelectedKey { get; private set; }
@@ -47,6 +80,7 @@ internal sealed class ViewSingleItemService : IDisposable
     internal ViewSingleItemPreview? Preview => source == null ? null : preview;
     internal IReadOnlyList<ViewSingleItemHistoryEntry> History => history.Entries;
     internal string HistoryStatus => history.Status;
+    internal string LocalizedHistoryStatus => history.LocalizedStatus;
     internal void RefreshHistory() => history.Load();
     internal void ShowWindow() => OpenWindow?.Invoke();
 
@@ -64,7 +98,7 @@ internal sealed class ViewSingleItemService : IDisposable
             catch (Exception error)
             {
                 preview?.Dispose(); preview = null;
-                StatusText = "Unavailable: " + error.Message;
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S5367AFABD2DAF74F" , global::XASlave.Localization.UiMessage.FromException(error)));
                 log.Warning(error, "[View Item] Preview capability unavailable.");
                 return false;
             }
@@ -75,12 +109,12 @@ internal sealed class ViewSingleItemService : IDisposable
             Plugin.Framework.Update += Update;
             Plugin.ClientState.Logout += OnLogout;
             Plugin.ClientState.TerritoryChanged += OnTerritoryChanged;
-            StatusText = "Enabled - right-click a player or supported item and choose View Single Item.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SD33B23E63E47561D"));
             history.Load();
         }
         else
         {
-            enabled = false; Stop("Disabled");
+            enabled = false; Stop(global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             chatTwo?.Dispose(); chatTwo = null;
             contextMenu.OnMenuOpened -= OnMenuOpened;
             Plugin.Framework.Update -= Update;
@@ -94,8 +128,8 @@ internal sealed class ViewSingleItemService : IDisposable
     private static bool Ready() => Plugin.Framework.IsInFrameworkUpdateThread
         && Plugin.ClientState.IsLoggedIn && Plugin.PlayerState.IsLoaded && Plugin.PlayerState.ContentId != 0;
 
-    private void OnLogout(int _, int __) => Stop("Logged out; preview stopped.");
-    private void OnTerritoryChanged(uint _) => Stop("Area changed; reopen a player or item menu.");
+    private void OnLogout(int _, int __) => Stop(global::XASlave.Localization.UiMessage.Key("S355320765FC328AC"));
+    private void OnTerritoryChanged(uint _) => Stop(global::XASlave.Localization.UiMessage.Key("SD39607D68B12483F"));
 
     private void OnMenuOpened(IMenuOpenedArgs args)
     {
@@ -114,7 +148,7 @@ internal sealed class ViewSingleItemService : IDisposable
                 var shopGeneration = generation;
                 args.AddMenuItem(new MenuItem
                 {
-                    Name = new SeStringBuilder().AddText("View Single Item").Build(),
+                    Name = new SeStringBuilder().AddText(global::XASlave.Localization.UiLocale.Get("S26AFC61257A5D865")).Build(),
                     PrefixChar = 'X', PrefixColor = 539, UseDefaultPrefix = false,
                     OnClicked = _ =>
                     {
@@ -146,7 +180,7 @@ internal sealed class ViewSingleItemService : IDisposable
             var menuGeneration = generation;
             args.AddMenuItem(new MenuItem
             {
-                Name = new SeStringBuilder().AddText("View Single Item").Build(),
+                Name = new SeStringBuilder().AddText(global::XASlave.Localization.UiLocale.Get("S26AFC61257A5D865")).Build(),
                 PrefixChar = 'X', PrefixColor = 539, UseDefaultPrefix = false,
                 OnClicked = _ =>
                 {
@@ -192,10 +226,10 @@ internal sealed class ViewSingleItemService : IDisposable
         try
         {
             preview!.Validate();
-            if (!ViewSingleItemShopSource.TryDescribe(itemId, out var entry, out var reason))
-            { Stop("Item preview unavailable: " + reason); OpenWindow?.Invoke(); return; }
+            if (!ViewSingleItemShopSource.TryDescribeMessage(itemId, out var entry, out var reason))
+            { Stop(global::XASlave.Localization.UiMessage.Format("SA47B395A131DAB32" , reason)); OpenWindow?.Invoke(); return; }
             var player = Plugin.ObjectTable.LocalPlayer;
-            if (player == null) { Stop("The local character is not ready for an item preview."); return; }
+            if (player == null) { Stop(global::XASlave.Localization.UiMessage.Key("SE37A60441BE9928F")); return; }
             var address = player.Address;
             var entity = player.EntityId;
             var owner = Plugin.PlayerState.ContentId;
@@ -204,7 +238,7 @@ internal sealed class ViewSingleItemService : IDisposable
             var confirmed = Plugin.ObjectTable.LocalPlayer;
             if (!Ready() || Plugin.PlayerState.ContentId != owner || confirmed == null
                 || confirmed.Address != address || confirmed.EntityId != entity)
-            { Stop("The login session changed during item capture."); return; }
+            { Stop(global::XASlave.Localization.UiMessage.Key("SF06DD23D35E3FA40")); return; }
             source = capture.Snapshot();
             Choices = preview.Restore(capture, source);
             Select(Choices[0].Key);
@@ -236,8 +270,15 @@ internal sealed class ViewSingleItemService : IDisposable
 
     internal static unsafe ViewSingleItemOrnament? CaptureOrnament(InspectOutfitIdentity identity, out string unavailable)
     {
+        var value = CaptureOrnamentMessage(identity, out var presentation);
+        unavailable = presentation.Original;
+        return value;
+    }
+
+    internal static unsafe ViewSingleItemOrnament? CaptureOrnamentMessage(InspectOutfitIdentity identity, out global::XASlave.Localization.UiMessage unavailable)
+    {
         NearbyZoneNativeBinding.RequireFramework();
-        unavailable = string.Empty;
+        unavailable = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         try
         {
             // Examine can work for a player who is not nearby. Accessory capture
@@ -245,7 +286,7 @@ internal sealed class ViewSingleItemService : IDisposable
             var player = ResolvePlayer(identity.Entity, identity.Name, identity.World);
             if (player == null || !identity.IsPlayer || player.EntityId != identity.Entity)
             {
-                unavailable = "Fashion accessories require the inspected player to be nearby and loaded when captured.";
+                unavailable = global::XASlave.Localization.UiMessage.Key("SCE6DD9BEFCD07F14");
                 Plugin.Log.Information("[View Item] Fashion accessory capture unavailable: no matching loaded player; entity={Entity}; world={World}.",
                     identity.Entity, identity.World);
                 return null;
@@ -256,7 +297,7 @@ internal sealed class ViewSingleItemService : IDisposable
             NearbyZoneNativeBinding.RequireReadable(address, sizeof(NativeCharacter));
             // These offsets are admitted by the preview's exact SDK/layout gate.
             if (Marshal.ReadIntPtr(address + 0x968) != address)
-                throw new InvalidOperationException("The fashion accessory owner changed.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SEF690E09DB62BE76"), originalMessageText => new InvalidOperationException(originalMessageText));
             var id = unchecked((ushort)Marshal.ReadInt16(address + 0x978));
             var ornamentObject = Marshal.ReadIntPtr(address + 0x970);
             ushort modelId = 0;
@@ -264,36 +305,36 @@ internal sealed class ViewSingleItemService : IDisposable
             if (id != 0)
             {
                 if (ornamentObject == 0)
-                    throw new InvalidOperationException("The player's fashion accessory is still loading.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S11350D5EE4E56D60"), originalMessageText => new InvalidOperationException(originalMessageText));
                 NearbyZoneNativeBinding.RequireReadable(ornamentObject + 0x2370, sizeof(uint));
                 if (unchecked((uint)Marshal.ReadInt32(ornamentObject + 0x2370)) != id)
-                    throw new InvalidOperationException("The player's fashion accessory changed during capture.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S54B7D5CA00D203B3"), originalMessageText => new InvalidOperationException(originalMessageText));
                 var row = Plugin.DataManager.GetExcelSheet<Ornament>().GetRowOrDefault(id);
                 if (row == null || row.Value.Model == 0)
-                    throw new InvalidOperationException("The fashion accessory has no supported model data.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SB1B518338C789334"), originalMessageText => new InvalidOperationException(originalMessageText));
                 modelId = row.Value.Model;
                 var model = Plugin.DataManager.GetExcelSheet<ModelChara>().GetRowOrDefault(modelId);
                 if (model == null || model.Value.Type is not (2 or 3))
-                    throw new InvalidOperationException("This fashion accessory uses an unsupported model type.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD805486CB3F1E03C"), originalMessageText => new InvalidOperationException(originalMessageText));
                 modelType = model.Value.Type;
                 if (!OrnamentModelReady(address, ornamentObject, modelId, modelType))
-                    throw new InvalidOperationException("The player's fashion accessory model is still loading or changing.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S59FCDF6ED95D0446"), originalMessageText => new InvalidOperationException(originalMessageText));
             }
             else if (ornamentObject != 0)
-                throw new InvalidOperationException("The player's fashion accessory is changing.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S223CFC9EA21BB4A2"), originalMessageText => new InvalidOperationException(originalMessageText));
 
             var confirmed = ResolvePlayer(objectId, identity.Name, identity.World);
             if (confirmed == null || confirmed.Address != address || confirmed.EntityId != entityId
                 || Marshal.ReadIntPtr(address + 0x968) != address
                 || unchecked((ushort)Marshal.ReadInt16(address + 0x978)) != id
                 || Marshal.ReadIntPtr(address + 0x970) != ornamentObject)
-                throw new InvalidOperationException("The player or fashion accessory changed during capture.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9E3B16D5E1894FE0"), originalMessageText => new InvalidOperationException(originalMessageText));
             if (id != 0)
             {
                 NearbyZoneNativeBinding.RequireReadable(ornamentObject + 0x2370, sizeof(uint));
                 if (unchecked((uint)Marshal.ReadInt32(ornamentObject + 0x2370)) != id
                     || !OrnamentModelReady(address, ornamentObject, modelId, modelType))
-                    throw new InvalidOperationException("The fashion accessory model changed during capture.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6025BE1657345084"), originalMessageText => new InvalidOperationException(originalMessageText));
             }
             Plugin.Log.Information("[View Item] Fashion accessory captured: entity={Entity}; ornament={Ornament}; model={Model}; source=loaded-player.",
                 entityId, id, modelId);
@@ -301,7 +342,7 @@ internal sealed class ViewSingleItemService : IDisposable
         }
         catch (Exception error)
         {
-            unavailable = "Fashion accessory unavailable: " + error.Message;
+            unavailable = global::XASlave.Localization.UiMessage.Format("S18EB1FC06B569F92" , global::XASlave.Localization.UiMessage.FromException(error));
             Plugin.Log.Warning(error, "[View Item] Fashion accessory capture failed; ordinary equipment capture continues.");
             return null;
         }
@@ -338,11 +379,11 @@ internal sealed class ViewSingleItemService : IDisposable
             preview!.Validate();
             var actor = ResolvePlayer(player.ObjectId, player.Name, player.World);
             if (actor == null || actor.EntityId != player.EntityId)
-            { Stop("That player is no longer loaded. Reopen their context menu."); return; }
+            { Stop(global::XASlave.Localization.UiMessage.Key("S16CA952DFAC6010F")); return; }
             Begin(new(player.EntityId, checked((ushort)player.World), player.Name, 4));
             var agent = AgentInspect.Instance();
             if (agent == null || AgentInspect.MemberFunctionPointers.ExamineCharacter == null)
-                throw new InvalidOperationException("The game's player inspection is unavailable.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2A3AC738955C09BA"), originalMessageText => new InvalidOperationException(originalMessageText));
             agent->ExamineCharacter(player.EntityId);
         }
         catch (Exception error) { Fail(error); }
@@ -355,7 +396,7 @@ internal sealed class ViewSingleItemService : IDisposable
         {
             var identity = world?.Identity();
             if (identity == null || InspectOutfitControls.Resolve(generation) == null)
-            { Stop("Inspect a player first, then open View Item."); OpenWindow?.Invoke(); return; }
+            { Stop(global::XASlave.Localization.UiMessage.Key("SF9D9E5742F35AEB4")); OpenWindow?.Invoke(); return; }
             OpenInspection(identity.Value);
         }
         catch (Exception error) { Fail(error); }
@@ -364,7 +405,7 @@ internal sealed class ViewSingleItemService : IDisposable
     private void OpenInspection(InspectOutfitIdentity identity)
     {
         if (world?.Identity() != identity || InspectOutfitControls.Resolve(generation) == null)
-        { Stop("The inspected player changed. Reopen their context menu."); return; }
+        { Stop(global::XASlave.Localization.UiMessage.Key("SE936556C289688DA")); return; }
         Begin(identity);
     }
 
@@ -373,16 +414,16 @@ internal sealed class ViewSingleItemService : IDisposable
         Stop();
         expected = identity; loginOwner = Plugin.PlayerState.ContentId;
         waiting = true; deadline = Environment.TickCount64 + 15_000;
-        WaitFor("The player's inspection is being prepared.", "stage=inspection-request");
+        WaitFor(global::XASlave.Localization.UiMessage.Key("S53247835EFD3490F"), "stage=inspection-request");
         OpenWindow?.Invoke();
     }
 
-    private void WaitFor(string reason, string diagnostic)
+    private void WaitFor(global::XASlave.Localization.UiMessage reason, string diagnostic)
     {
-        StatusText = "Waiting: " + reason;
-        if (waitingReason == reason && waitingDiagnostic == diagnostic) return;
-        waitingReason = reason; waitingDiagnostic = diagnostic;
-        log.Information("[View Item] Waiting: {Reason} Details: {Diagnostic}", reason, diagnostic);
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("SA049806B28DC9897" , reason));
+        if (waitingReason == reason.Original && waitingDiagnostic == diagnostic) return;
+        waitingReason = global::XASlave.Localization.UiMessage.Store(ref waitingMessage, reason); waitingDiagnostic = diagnostic;
+        log.Information("[View Item] Waiting: {Reason} Details: {Diagnostic}", reason.Original, diagnostic);
     }
 
     private void Update(IFramework _)
@@ -392,59 +433,59 @@ internal sealed class ViewSingleItemService : IDisposable
         try
         {
             if (!Ready() || Plugin.PlayerState.ContentId != loginOwner)
-            { Stop("The login session changed; preview stopped."); return; }
+            { Stop(global::XASlave.Localization.UiMessage.Key("S9205CE38988B349F")); return; }
             if (source != null)
             {
                 // The captured outfit and owned preview survive Examine closing
                 // or switching players. Only initial capture reads its host.
                 preview!.Tick(frame);
-                StatusText = preview!.StatusText;
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, preview!.StatusMessage);
                 return;
             }
             var identity = world!.Identity();
             var host = InspectOutfitControls.Resolve(generation);
             if (Environment.TickCount64 >= deadline)
             {
-                var reason = string.IsNullOrEmpty(waitingReason) ? "No ready inspection was observed." : waitingReason;
-                log.Warning("[View Item] Inspection timed out. Last blocker: {Reason} Details: {Diagnostic}", reason, waitingDiagnostic);
-                Stop("The inspection did not become ready. Last blocker: " + reason + " Inspect the player again and reopen View Item.");
+                var reason = string.IsNullOrEmpty(waitingReason) ? global::XASlave.Localization.UiMessage.Key("SF892E21C3E615CDB") : global::XASlave.Localization.UiMessage.Capture(waitingMessage, waitingReason);
+                log.Warning("[View Item] Inspection timed out. Last blocker: {Reason} Details: {Diagnostic}", reason.Original, waitingDiagnostic);
+                Stop(global::XASlave.Localization.UiMessage.Format("SBB7C8A3E082D3DEE" , reason));
                 return;
             }
             if (identity is not { } currentIdentity)
             {
                 observed = null;
-                WaitFor(world!.UnavailableReason, "stage=inspection-identity");
+                WaitFor(world!.UnavailableMessage, "stage=inspection-identity");
                 return;
             }
             if (identity != expected)
             {
                 observed = null;
-                WaitFor("The inspection is showing a different player.", "stage=inspection-identity-mismatch");
+                WaitFor(global::XASlave.Localization.UiMessage.Key("SBFE9FFAA78DD021F"), "stage=inspection-identity-mismatch");
                 return;
             }
             if (host == null)
             {
                 observed = null;
-                WaitFor("Keep the player's Examine window open and visible.", "stage=inspection-window");
+                WaitFor(global::XASlave.Localization.UiMessage.Key("S40022DC7FF8BEE0F"), "stage=inspection-window");
                 return;
             }
             var snapshot = world!.Capture(host.Value, currentIdentity);
             if (snapshot == null)
             {
                 observed = null;
-                WaitFor(world!.UnavailableReason, "stage=equipment-capture");
+                WaitFor(world!.UnavailableMessage, "stage=equipment-capture");
                 return;
             }
             if (observed == null || !observed.SameSource(snapshot))
             {
                 observed = snapshot;
-                WaitFor("The inspected equipment is settling.", "stage=equipment-stabilization");
+                WaitFor(global::XASlave.Localization.UiMessage.Key("S82B4E59D1E596BF1"), "stage=equipment-stabilization");
                 return;
             }
             var choices = preview!.Prepare(snapshot);
             if (choices.Count == 0)
             {
-                WaitFor(preview!.UnavailableReason, preview!.ReadinessDiagnostic);
+                WaitFor(preview!.UnavailableMessage, preview!.ReadinessDiagnostic);
                 return;
             }
             source = snapshot; waiting = false; observed = null; Choices = choices;
@@ -463,7 +504,7 @@ internal sealed class ViewSingleItemService : IDisposable
             // A storage failure must not destroy a usable captured preview.
             log.Warning(error, "[View Item] The captured outfit could not be saved to history.");
             history.ReportFailure(error);
-            StatusText += " History save failed: " + error.Message;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S8391DA809DD9CA6B" , StatusMessage, global::XASlave.Localization.UiMessage.Format("S9E4F847663D09B5F" , global::XASlave.Localization.UiMessage.FromException(error))));
         }
     }
 
@@ -475,7 +516,7 @@ internal sealed class ViewSingleItemService : IDisposable
             if (candidate.Id == id) { entry = candidate; break; }
         if (entry == null) return;
         if (entry.Capture == null)
-        { StatusText = "Cannot open this saved outfit: " + entry.Error; return; }
+        { StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S936FA011B2E3075B" , entry.ErrorPresentation)); return; }
         try
         {
             entry.Capture.Validate();
@@ -495,35 +536,37 @@ internal sealed class ViewSingleItemService : IDisposable
         try
         {
             if (Plugin.PlayerState.ContentId != loginOwner)
-            { Stop("The login session changed; preview stopped."); return; }
+            { Stop(global::XASlave.Localization.UiMessage.Key("S9205CE38988B349F")); return; }
             if (preview!.Select(key, source))
             {
                 SelectedKey = key;
                 SelectionRevision++;
-                StatusText = preview!.StatusText;
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, preview!.StatusMessage);
             }
             else
             {
                 SelectedKey = null;
-                StatusText = preview!.StatusText;
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, preview!.StatusMessage);
             }
         }
         catch (Exception error) { Fail(error); }
     }
 
-    internal void Stop(string reason = "Preview stopped.")
+    internal void Stop() => Stop(global::XASlave.Localization.UiMessage.Key("SB8E649EB36E4EDC5"));
+    internal void Stop(string reason) => Stop(global::XASlave.Localization.UiMessage.Raw(reason));
+    private void Stop(global::XASlave.Localization.UiMessage reason)
     {
         generation++; waiting = false; observed = source = null; expected = null;
         waitingReason = waitingDiagnostic = string.Empty;
         Choices = Array.Empty<ViewSingleItemChoice>(); SelectedKey = null; loginOwner = 0;
         try { preview?.Clear(); }
         catch (Exception error) { log.Warning(error, "[View Item] Preview cleanup failed."); }
-        StatusText = reason;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, reason);
     }
 
     private void Fail(Exception error)
     {
-        Stop("View Item unavailable: " + error.Message);
+        Stop(global::XASlave.Localization.UiMessage.Format("S3EB902118C9BA996" , global::XASlave.Localization.UiMessage.FromException(error)));
         log.Warning(error, "[View Item] Request stopped.");
     }
 

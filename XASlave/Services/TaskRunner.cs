@@ -49,14 +49,32 @@ public sealed class TaskRunner : IDisposable
     /// </summary>
     public bool SuppressLogoutCancel { get; set; }
     public string CurrentTaskName { get; private set; } = string.Empty;
+    private global::XASlave.Localization.UiMessage? uiCurrentTaskName;
+    internal global::XASlave.Localization.UiMessage CurrentTaskNameMessage => global::XASlave.Localization.UiMessage.Capture(ref uiCurrentTaskName, CurrentTaskName);
+    internal string CurrentTaskNameDisplay => CurrentTaskNameMessage.Display;
     public string StatusText { get; private set; } = string.Empty;
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
     public int CurrentStep => stepMachine.CurrentStep;
     public int TotalSteps => stepMachine.TotalSteps;
 
     // Progress tracking
     public int CompletedItems { get; set; }
     public int TotalItems { get; set; }
-    public string CurrentItemLabel { get; set; } = string.Empty;
+    private string currentItemLabel = string.Empty;
+    private global::XASlave.Localization.UiMessage? currentItemLabelMessage;
+    public string CurrentItemLabel
+    {
+        get => currentItemLabel;
+        set { currentItemLabel = value; currentItemLabelMessage = null; }
+    }
+    internal global::XASlave.Localization.UiMessage CurrentItemLabelMessage
+    {
+        get => global::XASlave.Localization.UiMessage.Capture(ref currentItemLabelMessage, currentItemLabel);
+        set => currentItemLabel = global::XASlave.Localization.UiMessage.Store(ref currentItemLabelMessage, value);
+    }
+    internal string CurrentItemLabelDisplay => CurrentItemLabelMessage.Display;
 
     // Log messages for UI display
     private const int MaxLogMessages = 8000;
@@ -119,6 +137,20 @@ public sealed class TaskRunner : IDisposable
         bool preserveRunHistory = false,
         Action? onTerminal = null,
         bool haltOnStepError = false)
+        => Start(global::XASlave.Localization.UiMessage.Raw(taskName), taskSteps, onFinished, onLog,
+            suppressCompletionReport, totalItems, suppressLogoutCancel, preserveRunHistory, onTerminal, haltOnStepError);
+
+    internal bool Start(
+        global::XASlave.Localization.UiMessage taskName,
+        List<TaskStep> taskSteps,
+        Action? onFinished = null,
+        Action<string>? onLog = null,
+        bool suppressCompletionReport = false,
+        int? totalItems = null,
+        bool? suppressLogoutCancel = null,
+        bool preserveRunHistory = false,
+        Action? onTerminal = null,
+        bool haltOnStepError = false)
     {
         if (disposed || terminating) return false;
         var normalizedSteps = taskSteps ?? [];
@@ -146,7 +178,7 @@ public sealed class TaskRunner : IDisposable
             this.suppressCompletionReport = suppressCompletionReport;
             haltRequested = false;
             haltReason = string.Empty;
-            CurrentTaskName = taskName;
+            CurrentTaskName = global::XASlave.Localization.UiMessage.Store(ref uiCurrentTaskName, taskName);
             CompletedItems = 0;
             if (totalItems.HasValue)
                 TotalItems = Math.Max(0, totalItems.Value);
@@ -165,7 +197,7 @@ public sealed class TaskRunner : IDisposable
 
             stepMachine.Start(normalizedSteps);
             hasActiveRun = true;
-            StatusText = stepMachine.CurrentStepName;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, stepMachine.CurrentStepNameMessage);
             framework.Update += OnTick;
 
             AddLog(preserveRunHistory
@@ -222,7 +254,7 @@ public sealed class TaskRunner : IDisposable
         framework.Update -= OnTick;
         haltRequested = false;
         haltReason = string.Empty;
-        StatusText = "Cancelled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD353A99EB4556847"));
         SuppressLogoutCancel = false;
         suppressCompletionReport = false;
         TotalItems = 0;
@@ -257,7 +289,7 @@ public sealed class TaskRunner : IDisposable
         haltRequested = true;
         haltReason = string.IsNullOrWhiteSpace(reason) ? "A safety requirement failed." : reason.Trim();
         stepMachine.Stop();
-        StatusText = "Halted";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S465F4D49B1369DA4"));
         InvokeTerminal();
         AddLog($"[{CurrentTaskName}] Halted: {haltReason}");
         log.Warning($"[XASlave] TaskRunner: '{CurrentTaskName}' halted: {haltReason}");
@@ -303,6 +335,9 @@ public sealed class TaskRunner : IDisposable
         if (!hasActiveRun)
             UpdateDtrBar();
     }
+
+    internal void SetExternalStatus(global::XASlave.Localization.UiMessage statusText)
+        => SetExternalStatus(statusText.Original);
 
     public void ClearExternalStatus()
     {
@@ -414,7 +449,7 @@ public sealed class TaskRunner : IDisposable
             return;
         }
 
-        StatusText = stepMachine.CurrentStepName;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, stepMachine.CurrentStepNameMessage);
         if (stepMachine.CurrentStep != previousStep)
             UpdateDtrBar();
     }
@@ -454,7 +489,7 @@ public sealed class TaskRunner : IDisposable
         framework.Update -= OnTick;
         haltRequested = false;
         haltReason = string.Empty;
-        StatusText = "Complete";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S143B270A32602D41"));
         SuppressLogoutCancel = false;
         if (!suppressCompletionReport)
             AddLog($"[{CurrentTaskName}] Finished.");
@@ -468,7 +503,7 @@ public sealed class TaskRunner : IDisposable
         {
             if (!suppressCompletionReport)
             {
-                var taskName = CurrentTaskName;
+                var taskName = CurrentTaskNameMessage;
                 var completed = CompletedItems;
                 var total = TotalItems;
                 var failCount = FailedCharacters.Count;
@@ -477,13 +512,13 @@ public sealed class TaskRunner : IDisposable
                 {
                     string msg;
                     if (failCount > 0 && incompleteCount > 0)
-                        msg = $"XA Slave: {taskName} complete ({completed}/{total}, {failCount} failed, {incompleteCount} incomplete)";
+                        msg = global::XASlave.Localization.UiMessage.Format("SB1627C26F1F36C17", taskName, completed, total, failCount, incompleteCount).Original;
                     else if (failCount > 0)
-                        msg = $"XA Slave: {taskName} complete ({completed}/{total}, {failCount} failed)";
+                        msg = global::XASlave.Localization.UiMessage.Format("S2EF708FF1E7D8A78", taskName, completed, total, failCount).Original;
                     else if (incompleteCount > 0)
-                        msg = $"XA Slave: {taskName} complete ({completed}/{total}, {incompleteCount} incomplete)";
+                        msg = global::XASlave.Localization.UiMessage.Format("SBEFD7D1B18C6A69E", taskName, completed, total, incompleteCount).Original;
                     else
-                        msg = $"XA Slave: {taskName} complete ({completed}/{total})";
+                        msg = global::XASlave.Localization.UiMessage.Format("S8EF56F35834CB07D", taskName, completed, total).Original;
                     toastGui.ShowNormal(msg);
                 });
             }
@@ -500,7 +535,7 @@ public sealed class TaskRunner : IDisposable
         hasActiveRun = false;
         framework.Update -= OnTick;
         stepMachine.Stop();
-        StatusText = "Halted";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S465F4D49B1369DA4"));
         SuppressLogoutCancel = false;
         suppressCompletionReport = false;
         CurrentItemLabel = string.Empty;
@@ -546,13 +581,13 @@ public sealed class TaskRunner : IDisposable
         {
             dtrEntry ??= dtrBar.Get("XA Slave");
             if (hasActiveRun && TotalItems > 0)
-                dtrEntry.Text = $"XA: {CurrentTaskName} {CompletedItems}/{TotalItems}";
+                dtrEntry.Text = global::XASlave.Localization.UiMessage.Format("S01FD9056F743A278", CurrentTaskNameMessage, CompletedItems, TotalItems).Original;
             else if (hasActiveRun)
-                dtrEntry.Text = $"XA: {CurrentTaskName}";
+                dtrEntry.Text = global::XASlave.Localization.UiMessage.Format("S60C52F6C6F70C6BB", CurrentTaskNameMessage).Original;
             else if (!string.IsNullOrWhiteSpace(externalStatusText))
-                dtrEntry.Text = $"XA: {externalStatusText}";
+                dtrEntry.Text = global::XASlave.Localization.UiMessage.Format("S60C52F6C6F70C6BB", externalStatusText).Original;
             else
-                dtrEntry.Text = "XA: Idle";
+                dtrEntry.Text = global::XASlave.Localization.UiMessage.Key("S49769DA1ABED9346").Original;
             dtrEntry.Shown = true;
         }
         catch { /* DTR bar may not be available */ }
@@ -605,7 +640,17 @@ public sealed class TaskRunner : IDisposable
 /// </summary>
 public class TaskStep
 {
-    public string Name { get; init; } = string.Empty;
+    private string name = string.Empty;
+    private global::XASlave.Localization.UiMessage? nameMessage;
+
+    // The public label remains raw for external task builders, logs and task identity.
+    public string Name { get => name; init { name = value; nameMessage = null; } }
+    internal global::XASlave.Localization.UiMessage NameMessage
+    {
+        get => global::XASlave.Localization.UiMessage.Capture(nameMessage, name);
+        init { nameMessage = value; name = value.Original; }
+    }
+    internal string LocalizedName => NameMessage.Display;
     public Action? OnEnter { get; init; }
     public Func<bool> IsComplete { get; init; } = () => true;
     public Func<bool>? ShouldSkip { get; init; }

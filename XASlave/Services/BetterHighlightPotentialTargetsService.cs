@@ -59,7 +59,10 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool IsStartupArmingPending => enabled
         && !nativeUnavailable
@@ -77,12 +80,12 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
         var color = (ObjectHighlightColor)NormalizeHighlightColor(colorValue);
         return color switch
         {
-            ObjectHighlightColor.Red => "Red",
-            ObjectHighlightColor.Green => "Green",
-            ObjectHighlightColor.Blue => "Blue",
-            ObjectHighlightColor.Orange => "Orange",
-            ObjectHighlightColor.Magenta => "Magenta",
-            _ => "Magenta",
+            ObjectHighlightColor.Red => global::XASlave.Localization.UiLocale.Native("SBA19E9C3D5F49882"),
+            ObjectHighlightColor.Green => global::XASlave.Localization.UiLocale.Native("SD486DFBD5FB57834"),
+            ObjectHighlightColor.Blue => global::XASlave.Localization.UiLocale.Native("SEC7D56A01607001E"),
+            ObjectHighlightColor.Orange => global::XASlave.Localization.UiLocale.Native("S78E7771B8B46E11D"),
+            ObjectHighlightColor.Magenta => global::XASlave.Localization.UiLocale.Native("S1BCD009977982BF2"),
+            _ => global::XASlave.Localization.UiLocale.Native("S1BCD009977982BF2"),
         };
     }
 
@@ -117,18 +120,18 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
             UpdateClientStateSubscription(false);
             UpdateFrameworkSubscription(false);
             ForgetHighlightedObject();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         if (nativeUnavailable)
         {
-            StatusText = "Unavailable - native highlight backend failed and was disabled for this plugin session.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SEE21C9EB88682302"));
             return false;
         }
 
         enabled = true;
-        ScheduleRuntimeArming("enabled");
+        ScheduleRuntimeArming(global::XASlave.Localization.UiMessage.Key("SFB9CF75606B4070D"));
         UpdateClientStateSubscription(true);
         UpdateFrameworkSubscription(true);
         return true;
@@ -193,7 +196,7 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
         if (!enabled || disposed)
             return;
 
-        ScheduleRuntimeArming("login");
+        ScheduleRuntimeArming(global::XASlave.Localization.UiMessage.Key("S428821350E969149"));
     }
 
     private void OnLogout(int type, int code)
@@ -201,7 +204,7 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
         if (!enabled || disposed)
             return;
 
-        SuspendRuntime("Enabled - suspended during logout/relog.");
+        SuspendRuntime(global::XASlave.Localization.UiMessage.Key("S9D12D6BE9AA84C8C"));
     }
 
     private void OnTerritoryChanged(uint territory)
@@ -209,7 +212,7 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
         if (!enabled || disposed)
             return;
 
-        ScheduleRuntimeArming("territory change");
+        ScheduleRuntimeArming(global::XASlave.Localization.UiMessage.Key("S5927BFC0C06A40CF"));
     }
 
     private void OnFrameworkUpdate(IFramework _)
@@ -226,7 +229,7 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
 
         if (!IsClientReady())
         {
-            SuspendRuntime("Enabled - waiting for a fully loaded character before touching native highlight state.");
+            SuspendRuntime(global::XASlave.Localization.UiMessage.Key("S62553EE2913F8CDB"));
             return;
         }
 
@@ -236,14 +239,14 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
 
         if (now < activationNotBeforeUtc)
         {
-            StatusText = $"Arming - waiting for stable login/territory state before native highlight repaint ({Math.Max(0, (activationNotBeforeUtc - now).TotalSeconds):0.0}s).";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S20F75E155AE56999", Math.Max(0, (activationNotBeforeUtc - now).TotalSeconds)));
             return;
         }
 
         if (stableClientFrames < StableClientFramesRequired)
         {
             stableClientFrames++;
-            StatusText = $"Arming - waiting for stable client frames before native highlight repaint ({stableClientFrames}/{StableClientFramesRequired}).";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S106FCC007CBAF0C1", stableClientFrames, StableClientFramesRequired));
             return;
         }
 
@@ -261,22 +264,22 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
             && clientState.TerritoryType != 0
             && objectTable.LocalPlayer != null;
 
-    private void ScheduleRuntimeArming(string reason)
+    private void ScheduleRuntimeArming(global::XASlave.Localization.UiMessage reason)
     {
         runtimeArmed = false;
         stableClientFrames = 0;
         activationNotBeforeUtc = DateTime.UtcNow.AddSeconds(RuntimeActivationDelaySeconds);
         ForgetHighlightedObject();
-        StatusText = $"Arming - Better Highlight will wait for stable client state after {reason}.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S9096A20063DF20C0", reason));
     }
 
-    private void SuspendRuntime(string statusText)
+    private void SuspendRuntime(global::XASlave.Localization.UiMessage statusText)
     {
         runtimeArmed = false;
         stableClientFrames = 0;
         activationNotBeforeUtc = DateTime.MaxValue;
         ForgetHighlightedObject();
-        StatusText = statusText;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, statusText);
     }
 
     private void ApplyCurrentHoverHighlight(DateTime now)
@@ -396,7 +399,7 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
             UpdateClientStateSubscription(false);
             UpdateFrameworkSubscription(false);
             ForgetHighlightedObject();
-            StatusText = "Unavailable - native highlight backend failed and was disabled for this plugin session.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SEE21C9EB88682302"));
             hasFailureStatus = true;
             return false;
         }
@@ -406,22 +409,22 @@ public unsafe sealed class BetterHighlightPotentialTargetsService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (nativeUnavailable)
         {
-            StatusText = "Unavailable - native highlight backend failed and was disabled for this plugin session.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SEE21C9EB88682302"));
             return;
         }
 
         if (!runtimeArmed)
         {
-            StatusText = "Arming - waiting for stable client state before native highlight repaint.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S78FF4F5BD4C47D5C"));
             return;
         }
 
-        StatusText = $"Enabled - repainting hovered potential targets as {GetColorLabel((int)highlightColor)} after stable hover checks and clearing them on hover loss.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S2E669BBE5A702289", global::XASlave.Localization.UiMessage.Authored(GetColorLabel((int)highlightColor))));
     }
 }

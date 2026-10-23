@@ -24,13 +24,13 @@ public partial class SlaveWindow
         var fontScaling = ImGui.GetFontSize() / 17f;
         var isInManipulator = logogramCreator.IsManipulatorVisible();
 
-        ImGui.TextColored(new Vector4(0.82f, 1.0f, 0.55f, 1.0f), "Logogram Creator");
-        ImGui.TextDisabled("Field Operations task for Eureka Logos plate setup, queueing, and extraction.");
+        ImGui.TextColored(new Vector4(0.82f, 1.0f, 0.55f, 1.0f), global::XASlave.Localization.UiLocale.Get("S4D24F60E78E1A812"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SD1406075A2223BE2"));
 
-        if (ImGui.Button(
+        if (global::XASlave.Localization.UiNative.Button(
                 eurekaLogogramCreatorHowToUseExpanded
-                    ? "How to use [-]##EurekaLogogramCreatorHowToUse"
-                    : "How to use [+]##EurekaLogogramCreatorHowToUse"))
+                    ? (global::XASlave.Localization.UiLocale.Native("S6A4DC3ABD4C219BA") + "##EurekaLogogramCreatorHowToUse")
+                    : (global::XASlave.Localization.UiLocale.Native("S91F1A47CACCC47B8") + "##EurekaLogogramCreatorHowToUse")))
         {
             eurekaLogogramCreatorHowToUseExpanded = !eurekaLogogramCreatorHowToUseExpanded;
         }
@@ -39,9 +39,9 @@ public partial class SlaveWindow
         {
             using (ImRaii.TextWrapPos(0f))
             {
-                ImGui.TextDisabled("Go to a Logos Manipulator in Eureka to use the live synthesis and extraction workflow.");
-                ImGui.TextDisabled("Favorites, recipe locks, and source-logogram prices can be managed here even before you walk up to the manipulator.");
-                ImGui.TextDisabled("Once the manipulator is open, XA Slave unlocks the live action list, stock scan, queue processing, and extraction automation tabs.");
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S12D805CD994853DC"));
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S1DA812AEB76E3B8D"));
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SF239DE9D252CE458"));
             }
         }
 
@@ -51,7 +51,7 @@ public partial class SlaveWindow
         {
             ImGui.TextColored(
                 new Vector4(1.0f, 0.65f, 0.25f, 1.0f),
-                "Open the Logos Manipulator to unlock the live crafting tabs.");
+                global::XASlave.Localization.UiLocale.Get("SFD8417C81A5EA640"));
         }
 
         DrawEurekaLogogramCreatorToolbar(fontScaling, isInManipulator);
@@ -60,19 +60,19 @@ public partial class SlaveWindow
         if (!tabBar)
             return;
 
-        using (var favoritesTab = ImRaii.TabItem("Favorites"))
+        using (var favoritesTab = global::XASlave.Localization.UiNative.TabScope(global::XASlave.Localization.UiLocale.Native("S7A1F2A83ACA9A081")))
         {
             if (favoritesTab)
                 DrawEurekaLogogramCreatorFavoritesTab(fontScaling);
         }
 
-        using (var recipesTab = ImRaii.TabItem("Recipes"))
+        using (var recipesTab = global::XASlave.Localization.UiNative.TabScope(global::XASlave.Localization.UiLocale.Native("SD664282E62E41A19")))
         {
             if (recipesTab)
                 DrawEurekaLogogramCreatorRecipePreferencesTab(fontScaling);
         }
 
-        using (var costsTab = ImRaii.TabItem("Costs"))
+        using (var costsTab = global::XASlave.Localization.UiNative.TabScope(global::XASlave.Localization.UiLocale.Native("SB88FC5FC4765148E")))
         {
             if (costsTab)
                 DrawEurekaLogogramCreatorCostsTab(fontScaling);
@@ -80,19 +80,19 @@ public partial class SlaveWindow
 
         if (isInManipulator)
         {
-            using (var actionsTab = ImRaii.TabItem("Logos Actions"))
+            using (var actionsTab = global::XASlave.Localization.UiNative.TabScope(global::XASlave.Localization.UiLocale.Native("S3658F9EA003D76DC")))
             {
                 if (actionsTab)
                     DrawEurekaLogogramCreatorLogosActionsTab(fontScaling);
             }
 
-            using (var inventoryTab = ImRaii.TabItem("Logogram Inventory"))
+            using (var inventoryTab = global::XASlave.Localization.UiNative.TabScope(global::XASlave.Localization.UiLocale.Native("SDBC4C4CDA3BDC92C")))
             {
                 if (inventoryTab)
                     DrawEurekaLogogramCreatorInventoryTab(fontScaling);
             }
 
-            using (var queueTab = ImRaii.TabItem("Queue"))
+            using (var queueTab = global::XASlave.Localization.UiNative.TabScope(global::XASlave.Localization.UiLocale.Native("S3B2FE03E36893916")))
             {
                 if (queueTab)
                     DrawEurekaLogogramCreatorQueueTab(fontScaling);
@@ -106,14 +106,14 @@ public partial class SlaveWindow
 
         if (isInManipulator)
         {
-            if (ImGui.Button("Refresh All Pages"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SA462B071745135CC")))
             {
                 logogramCreator.RefreshKnownDataNow();
             }
 
             if (ImGui.IsItemHovered())
             {
-                ImGui.SetTooltip("Retries the static catalog when needed, then scans the currently open manipulator pages for stock and logos-action usage.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S97DD4FECF0548A0E"));
             }
         }
 
@@ -124,70 +124,70 @@ public partial class SlaveWindow
                 ImGui.SameLine();
             }
 
-            if (ImGui.Button("Retry Catalog Load"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S91419D8B5BD12059")))
             {
                 logogramCreator.RetryStaticCatalogLoad();
             }
 
             if (ImGui.IsItemHovered())
             {
-                ImGui.SetTooltip("Retries the packaged Data/EurekaLogogramCreator JSON files without requiring the manipulator to be open.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SA2B58F28581442C5"));
             }
         }
 
         var autoRefreshAllPagesOnOpen = logogramCreator.Configuration.AutoRefreshAllPagesOnOpen;
-        if (ImGui.Checkbox("Auto Refresh On Open", ref autoRefreshAllPagesOnOpen))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S1658E5DEA1877B4D"), ref autoRefreshAllPagesOnOpen))
         {
             logogramCreator.SetAutoRefreshAllPagesOnOpen(autoRefreshAllPagesOnOpen);
         }
 
         ImGui.SameLine();
         var autoDestroyWhenFull = logogramCreator.Configuration.AutoDestroyWhenMagiaBoardFull;
-        if (ImGui.Checkbox("Auto Destroy When Full", ref autoDestroyWhenFull))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SCDDDC1544A1FE266"), ref autoDestroyWhenFull))
         {
             logogramCreator.SetAutoDestroyWhenMagiaBoardFull(autoDestroyWhenFull);
         }
 
         var autoRetryFailedExtraction = logogramCreator.Configuration.AutoRetryFailedExtraction;
-        if (ImGui.Checkbox("Retry Failed Extraction", ref autoRetryFailedExtraction))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S72C89EADECBF6CAB"), ref autoRetryFailedExtraction))
         {
             logogramCreator.SetAutoRetryFailedExtraction(autoRetryFailedExtraction);
         }
 
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("After a failed extraction, acknowledge it and rebuild the same plate automatically if the cache still says mats remain.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S5D6BA2356F0B7950"));
         }
 
         ImGui.SameLine();
         var showFavoritesOverlay = logogramCreator.Configuration.ShowFavoritesOverlay;
-        if (ImGui.Checkbox("Show Favorites Overlay", ref showFavoritesOverlay))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S8729C3F40AB71CBD"), ref showFavoritesOverlay))
         {
             logogramCreator.SetShowFavoritesOverlay(showFavoritesOverlay);
         }
 
         ImGui.SetNextItemWidth(210 * fontScaling);
         var queueStepFrameDelay = logogramCreator.QueueStepFrameDelayFrames;
-        if (ImGui.SliderInt("Step Delay (Less is faster)", ref queueStepFrameDelay, 1, 120, "%d", ImGuiSliderFlags.AlwaysClamp))
+        if (global::XASlave.Localization.UiNative.SliderInt(global::XASlave.Localization.UiLocale.Native("S30B061793178B17F"), ref queueStepFrameDelay, 1, 120, "%d", ImGuiSliderFlags.AlwaysClamp))
         {
             logogramCreator.SetQueueStepFrameDelay(queueStepFrameDelay);
         }
 
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Minimum framework frames to wait between queue actions and shard-page scan clicks.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S0E5CB7E05B5F0A53"));
         }
 
         if (logogramCreator.HasActiveOrQueuedAutoLogoAction)
         {
-            if (ImGui.Button("Cancel Active Run", new Vector2(150 * fontScaling, 0)))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S8623BD5CBF768502"), new Vector2(150 * fontScaling, 0)))
             {
                 logogramCreator.CancelAutoLogoAction();
             }
 
             if (ImGui.IsItemHovered())
             {
-                ImGui.SetTooltip("Stops the current extraction run and clears all queued plates.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S395E68AC41D23215"));
             }
         }
 
@@ -196,25 +196,25 @@ public partial class SlaveWindow
             : logogramCreator.StaticCatalogLoadFailed
                 ? new Vector4(1.0f, 0.35f, 0.25f, 1.0f)
                 : new Vector4(1.0f, 0.6f, 0.2f, 1.0f);
-        ImGui.TextColored(staticCatalogColor, $"Static Catalog: {logogramCreator.StaticCatalogState}");
+        ImGui.TextColored(staticCatalogColor, global::XASlave.Localization.UiLocale.FormatKey("S57FAA3CEA4DF3D4A", logogramCreator.LocalizedStaticCatalogState));
         if (logogramCreator.StaticCatalogLoadFailed && !string.IsNullOrWhiteSpace(logogramCreator.StaticCatalogError))
         {
-            ImGui.TextColored(staticCatalogColor, logogramCreator.StaticCatalogError);
+            ImGui.TextColored(staticCatalogColor, logogramCreator.LocalizedStaticCatalogError);
         }
 
         var logosActionsColor = logogramCreator.IsMagiaBoardFull
             ? new Vector4(1.0f, 0.55f, 0.2f, 1.0f)
             : new Vector4(0.7f, 0.7f, 0.7f, 1.0f);
-        ImGui.TextColored(logosActionsColor, $"Logos Actions: {logogramCreator.LogosActionSlotsUsed}/{logogramCreator.LogosActionSlotCapacity}");
+        ImGui.TextColored(logosActionsColor, global::XASlave.Localization.UiLocale.FormatKey("S296EE6C8FD4AAA76", logogramCreator.LogosActionSlotsUsed, logogramCreator.LogosActionSlotCapacity));
 
         var cacheColor = logogramCreator.HasLogogramStockCache
             ? new Vector4(0.2f, 0.9f, 0.4f, 1.0f)
             : new Vector4(1.0f, 0.6f, 0.2f, 1.0f);
         ImGui.SameLine();
-        ImGui.TextColored(cacheColor, logogramCreator.HasLogogramStockCache ? "Live Stock Cache: Ready" : "Live Stock Cache: Missing");
+        ImGui.TextColored(cacheColor, logogramCreator.HasLogogramStockCache ? global::XASlave.Localization.UiLocale.Get("S6D60DD97B288C034") : global::XASlave.Localization.UiLocale.Get("S4F509AD0B1CDDE71"));
 
         ImGui.Separator();
-        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), logogramCreator.LastStatus);
+        ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), logogramCreator.LocalizedLastStatus);
         ImGui.Separator();
     }
 
@@ -223,58 +223,58 @@ public partial class SlaveWindow
         var color = logogramCreator.StaticCatalogLoadFailed
             ? new Vector4(1.0f, 0.35f, 0.25f, 1.0f)
             : new Vector4(1.0f, 0.6f, 0.2f, 1.0f);
-        ImGui.TextColored(color, $"Static Catalog: {logogramCreator.StaticCatalogState}");
+        ImGui.TextColored(color, global::XASlave.Localization.UiLocale.FormatKey("S57FAA3CEA4DF3D4A", logogramCreator.LocalizedStaticCatalogState));
         if (logogramCreator.StaticCatalogLoadFailed && !string.IsNullOrWhiteSpace(logogramCreator.StaticCatalogError))
         {
-            ImGui.TextColored(color, logogramCreator.StaticCatalogError);
+            ImGui.TextColored(color, logogramCreator.LocalizedStaticCatalogError);
         }
 
-        ImGui.TextDisabled("Use Retry Catalog Load above before viewing catalog-backed actions or recipes.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SE9CF78E301BBC4C0"));
     }
 
     private void DrawEurekaLogogramCreatorPlateBuilder(float fontScaling)
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
         var astralLabel = logogramCreator.PendingAstralActionId.HasValue
-            ? logogramCreator.GetActionName(logogramCreator.PendingAstralActionId.Value)
-            : "Empty";
+            ? logogramCreator.GetActionNameMessage(logogramCreator.PendingAstralActionId.Value).Display
+            : global::XASlave.Localization.UiLocale.Get("SC6C094BC0054F9CB");
         var umbralLabel = logogramCreator.PendingUmbralActionId.HasValue
-            ? logogramCreator.GetActionName(logogramCreator.PendingUmbralActionId.Value)
-            : "Empty";
+            ? logogramCreator.GetActionNameMessage(logogramCreator.PendingUmbralActionId.Value).Display
+            : global::XASlave.Localization.UiLocale.Get("SC6C094BC0054F9CB");
         var craftableCount = logogramCreator.GetPendingPlateCraftableCount();
-        var canStartPlate = logogramCreator.CanQueuePendingPlate(out var pendingPlateError);
+        var canStartPlate = logogramCreator.CanQueuePendingPlateMessage(out var pendingPlateError);
         var hasPendingSelection = logogramCreator.PendingAstralActionId.HasValue || logogramCreator.PendingUmbralActionId.HasValue;
         var craftableColor = craftableCount > 0
             ? new Vector4(0.0f, 1.0f, 0.0f, 1.0f)
             : new Vector4(1.0f, 0.6f, 0.2f, 1.0f);
         var pendingPlateBareMinimumLabel = hasPendingSelection && logogramCreator.TryGetPendingPlateBareMinimumGilCost(out var pendingPlateBareMinimumCost)
-            ? logogramCreator.FormatGilCost(pendingPlateBareMinimumCost)
-            : "0 gil";
+            ? logogramCreator.FormatGilCostMessage(pendingPlateBareMinimumCost).Display
+            : global::XASlave.Localization.UiLocale.Get("SDC73E2ECC2FB8601");
         var pendingPlateRecipeCostLabel = hasPendingSelection && logogramCreator.TryGetPendingPlateRecipeGilCost(out var pendingPlateRecipeCost)
-            ? logogramCreator.FormatGilCost(pendingPlateRecipeCost)
-            : "0 gil";
+            ? logogramCreator.FormatGilCostMessage(pendingPlateRecipeCost).Display
+            : global::XASlave.Localization.UiLocale.Get("SDC73E2ECC2FB8601");
 
-        ImGui.Text($"Astral: {astralLabel}");
-        ImGui.Text($"Umbral: {umbralLabel}");
-        ImGui.TextColored(craftableColor, $"Current Plate: {logogramCreator.GetPendingPlateDescription()} | Craftable: {craftableCount}");
-        ImGui.TextColored(new Vector4(0.9f, 0.8f, 0.45f, 1.0f), $"Current Plate Costs: Bare Minimum {pendingPlateBareMinimumLabel} | Recipe Cost {pendingPlateRecipeCostLabel}");
+        ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("S4221E2B5824676A3", astralLabel));
+        ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("SB96BE368012A30BB", umbralLabel));
+        ImGui.TextColored(craftableColor, global::XASlave.Localization.UiLocale.FormatKey("S329F870BCF04ACCF", logogramCreator.GetPendingPlateDescriptionMessage().Display, craftableCount));
+        ImGui.TextColored(new Vector4(0.9f, 0.8f, 0.45f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S2270A582A32B7F0B", pendingPlateBareMinimumLabel, pendingPlateRecipeCostLabel));
 
         using (ImRaii.Disabled(!canStartPlate))
         {
-            if (ImGui.Button("Start", new Vector2(90 * fontScaling, 0)))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SE4BB9F1ECE9AF926"), new Vector2(90 * fontScaling, 0)))
             {
                 logogramCreator.QueuePendingPlate();
             }
         }
 
         ImGui.SameLine();
-        if (ImGui.Button("Clear Selection", new Vector2(130 * fontScaling, 0)))
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SC52FF5EA803D5775"), new Vector2(130 * fontScaling, 0)))
         {
             logogramCreator.ClearPendingPlateSelection();
         }
 
         ImGui.SameLine();
-        if (ImGui.Button("Add Selection To Fav Bar", new Vector2(170 * fontScaling, 0)))
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S8C37EDD405BBEF75"), new Vector2(170 * fontScaling, 0)))
         {
             var plateName = string.IsNullOrWhiteSpace(eurekaLogogramCreatorFavoritePlateName)
                 ? logogramCreator.GetPendingPlateDescription()
@@ -282,9 +282,9 @@ public partial class SlaveWindow
             logogramCreator.SaveCurrentQueueAsFavoritePlate(plateName);
         }
 
-        if (!canStartPlate && hasPendingSelection && !string.IsNullOrWhiteSpace(pendingPlateError))
+        if (!canStartPlate && hasPendingSelection && !string.IsNullOrWhiteSpace(pendingPlateError.Original))
         {
-            ImGui.TextColored(new Vector4(1.0f, 0.35f, 0.35f, 1.0f), pendingPlateError);
+            ImGui.TextColored(new Vector4(1.0f, 0.35f, 0.35f, 1.0f), pendingPlateError.Display);
         }
 
         ImGui.Separator();
@@ -294,16 +294,16 @@ public partial class SlaveWindow
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
 
-        ImGui.TextDisabled("Favorite plates save one Astral / Umbral build so they can be queued directly from the manipulator.");
-        ImGui.TextDisabled("Recipe Cost matches the higher gil basis shown in the Recipes tab. Bare Minimum assumes the fastest successful appraisals.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S4A44316D969469A5"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S43E40BC1C006AE53"));
 
         using (ImRaii.ItemWidth(300 * fontScaling))
         {
-            ImGui.InputTextWithHint("##EurekaLogogramCreatorFavoritePlateName", "Favorite plate name...", ref eurekaLogogramCreatorFavoritePlateName, 100);
+            ImGui.InputTextWithHint("##EurekaLogogramCreatorFavoritePlateName", global::XASlave.Localization.UiLocale.Get("S1C72B0FF9D03B59A"), ref eurekaLogogramCreatorFavoritePlateName, 100);
         }
 
         ImGui.SameLine();
-        if (ImGui.Button("Add Current Selection"))
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S544359EA913DFB34")))
         {
             var plateName = string.IsNullOrWhiteSpace(eurekaLogogramCreatorFavoritePlateName)
                 ? logogramCreator.GetPendingPlateDescription()
@@ -317,7 +317,7 @@ public partial class SlaveWindow
 
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Saves the currently selected Astral / Umbral plate.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SACFA8C5011FB2519"));
         }
 
         ImGui.Separator();
@@ -325,7 +325,7 @@ public partial class SlaveWindow
 
         if (logogramCreator.Configuration.FavoritePlates.Count == 0)
         {
-            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), "No favorite plates saved yet.");
+            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), global::XASlave.Localization.UiLocale.Get("S08C996E454DA4EFC"));
             return;
         }
 
@@ -336,35 +336,35 @@ public partial class SlaveWindow
             {
                 var plate = logogramCreator.Configuration.FavoritePlates[i];
                 var (astralActionId, umbralActionId) = GetEurekaLogogramCreatorFavoriteActionIds(plate);
-                var plateLabel = logogramCreator.DescribeFavoritePlate(plate);
-                var astralSummary = astralActionId.HasValue ? logogramCreator.GetActionName(astralActionId.Value) : "Empty";
-                var umbralSummary = umbralActionId.HasValue ? logogramCreator.GetActionName(umbralActionId.Value) : "Empty";
+                var plateLabel = logogramCreator.DescribeFavoritePlateMessage(plate).Display;
+                var astralSummary = astralActionId.HasValue ? logogramCreator.GetActionNameMessage(astralActionId.Value).Display : global::XASlave.Localization.UiLocale.Get("SC6C094BC0054F9CB");
+                var umbralSummary = umbralActionId.HasValue ? logogramCreator.GetActionNameMessage(umbralActionId.Value).Display : global::XASlave.Localization.UiLocale.Get("SC6C094BC0054F9CB");
                 var astralBareMinimumLabel = !astralActionId.HasValue
-                    ? "0 gil"
+                    ? global::XASlave.Localization.UiLocale.Get("SDC73E2ECC2FB8601")
                     : logogramCreator.TryGetActionBareMinimumGilCost(astralActionId.Value, out var astralBareMinimumCost)
-                        ? logogramCreator.FormatGilCost(astralBareMinimumCost)
-                        : "Cost N/A";
+                        ? logogramCreator.FormatGilCostMessage(astralBareMinimumCost).Display
+                        : global::XASlave.Localization.UiLocale.Get("SF3F276560015EA0D");
                 var astralRecipeCostLabel = !astralActionId.HasValue
-                    ? "0 gil"
+                    ? global::XASlave.Localization.UiLocale.Get("SDC73E2ECC2FB8601")
                     : logogramCreator.TryGetActionRecipeGilCost(astralActionId.Value, out var astralRecipeCost)
-                        ? logogramCreator.FormatGilCost(astralRecipeCost)
-                        : "Cost N/A";
+                        ? logogramCreator.FormatGilCostMessage(astralRecipeCost).Display
+                        : global::XASlave.Localization.UiLocale.Get("SF3F276560015EA0D");
                 var umbralBareMinimumLabel = !umbralActionId.HasValue
-                    ? "0 gil"
+                    ? global::XASlave.Localization.UiLocale.Get("SDC73E2ECC2FB8601")
                     : logogramCreator.TryGetActionBareMinimumGilCost(umbralActionId.Value, out var umbralBareMinimumCost)
-                        ? logogramCreator.FormatGilCost(umbralBareMinimumCost)
-                        : "Cost N/A";
+                        ? logogramCreator.FormatGilCostMessage(umbralBareMinimumCost).Display
+                        : global::XASlave.Localization.UiLocale.Get("SF3F276560015EA0D");
                 var umbralRecipeCostLabel = !umbralActionId.HasValue
-                    ? "0 gil"
+                    ? global::XASlave.Localization.UiLocale.Get("SDC73E2ECC2FB8601")
                     : logogramCreator.TryGetActionRecipeGilCost(umbralActionId.Value, out var umbralRecipeCost)
-                        ? logogramCreator.FormatGilCost(umbralRecipeCost)
-                        : "Cost N/A";
+                        ? logogramCreator.FormatGilCostMessage(umbralRecipeCost).Display
+                        : global::XASlave.Localization.UiLocale.Get("SF3F276560015EA0D");
                 var plateBareMinimumLabel = logogramCreator.TryGetFavoritePlateBareMinimumGilCost(plate, out var plateBareMinimumCost)
-                    ? logogramCreator.FormatGilCost(plateBareMinimumCost)
-                    : "Cost N/A";
+                    ? logogramCreator.FormatGilCostMessage(plateBareMinimumCost).Display
+                    : global::XASlave.Localization.UiLocale.Get("SF3F276560015EA0D");
                 var plateRecipeCostLabel = logogramCreator.TryGetFavoritePlateRecipeGilCost(plate, out var plateRecipeCost)
-                    ? logogramCreator.FormatGilCost(plateRecipeCost)
-                    : "Cost N/A";
+                    ? logogramCreator.FormatGilCostMessage(plateRecipeCost).Display
+                    : global::XASlave.Localization.UiLocale.Get("SF3F276560015EA0D");
                 if (!eurekaLogogramCreatorFavoritePlateRenameInputs.TryGetValue(plate, out var renameInput))
                 {
                     renameInput = plate.Name;
@@ -378,7 +378,7 @@ public partial class SlaveWindow
                     {
                         ImGui.SetDragDropPayload(EurekaLogogramCreatorFavoriteDragDropType, BitConverter.GetBytes(i));
 
-                        ImGui.TextUnformatted($"Move {plateLabel}");
+                        ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.FormatKey("S9353099143D0E13C", plateLabel));
 
                     }
 
@@ -404,14 +404,14 @@ public partial class SlaveWindow
 
                     }
 
-                    ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"Umbral: {umbralSummary} | Bare Minimum: {umbralBareMinimumLabel} | Recipe Cost: {umbralRecipeCostLabel}");
-                    ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"Astral: {astralSummary} | Bare Minimum: {astralBareMinimumLabel} | Recipe Cost: {astralRecipeCostLabel}");
-                    ImGui.TextColored(new Vector4(0.9f, 0.8f, 0.45f, 1.0f), $"Plate Costs: Bare Minimum {plateBareMinimumLabel} | Recipe Cost {plateRecipeCostLabel}");
-                    ImGui.TextDisabled("Drag this row to reorder it, or use Up / Down.");
+                    ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S92185F8AC481524C", umbralSummary, umbralBareMinimumLabel, umbralRecipeCostLabel));
+                    ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S01B9599587AF0BBC", astralSummary, astralBareMinimumLabel, astralRecipeCostLabel));
+                    ImGui.TextColored(new Vector4(0.9f, 0.8f, 0.45f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S1EBF1E7F12498FC1", plateBareMinimumLabel, plateRecipeCostLabel));
+                    ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S36BDFFF5E01C8F7B"));
 
                     using (ImRaii.ItemWidth(220 * fontScaling))
                     {
-                        if (ImGui.InputTextWithHint("##FavoriteRename", "Custom button name...", ref renameInput, 100, ImGuiInputTextFlags.EnterReturnsTrue))
+                        if (ImGui.InputTextWithHint("##FavoriteRename", global::XASlave.Localization.UiLocale.Get("S6082B0C0B2DDA0B0"), ref renameInput, 100, ImGuiInputTextFlags.EnterReturnsTrue))
                         {
                             logogramCreator.RenameFavoritePlate(i, renameInput);
                         }
@@ -419,7 +419,7 @@ public partial class SlaveWindow
                     }
 
                     ImGui.SameLine();
-                    if (ImGui.Button("Rename"))
+                    if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S3064D79A295CEFE4")))
                     {
                         logogramCreator.RenameFavoritePlate(i, renameInput);
                     }
@@ -427,7 +427,7 @@ public partial class SlaveWindow
                     ImGui.SameLine();
                     using (ImRaii.Disabled(i == 0))
                     {
-                        if (ImGui.Button("Up"))
+                        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S55490A4BF3A8E8CB")))
                         {
                             if (logogramCreator.MoveFavoritePlate(i, i - 1))
                             {
@@ -440,7 +440,7 @@ public partial class SlaveWindow
                     ImGui.SameLine();
                     using (ImRaii.Disabled(i >= logogramCreator.Configuration.FavoritePlates.Count - 1))
                     {
-                        if (ImGui.Button("Down"))
+                        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SB86D11AF79188E58")))
                         {
                             if (logogramCreator.MoveFavoritePlate(i, i + 1))
                             {
@@ -450,19 +450,19 @@ public partial class SlaveWindow
                         }
                     }
 
-                    if (ImGui.Button("Queue Plate"))
+                    if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S55CCDE2C285549DB")))
                     {
                         logogramCreator.QueueFavoritePlate(plate);
                     }
 
                     ImGui.SameLine();
-                    if (ImGui.Button("Update From Selection"))
+                    if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SB659EA7E03225B38")))
                     {
                         logogramCreator.UpsertFavoritePlate(plate.Name, logogramCreator.PendingAstralActionId, logogramCreator.PendingUmbralActionId);
                     }
 
                     ImGui.SameLine();
-                    if (ImGui.Button("Delete"))
+                    if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SE2D0A54968EAD24E")))
                     {
                         logogramCreator.DeleteFavoritePlate(i);
                         ResetEurekaLogogramCreatorFavoriteRenameInputs();
@@ -501,7 +501,7 @@ public partial class SlaveWindow
 
         using (ImRaii.ItemWidth(320 * fontScaling))
         {
-            ImGui.InputTextWithHint("##EurekaLogogramCreatorActionFilter", "Filter actions...", ref eurekaLogogramCreatorActionFilter, 64, ImGuiInputTextFlags.AutoSelectAll);
+            ImGui.InputTextWithHint("##EurekaLogogramCreatorActionFilter", global::XASlave.Localization.UiLocale.Get("SD27A9BA1268EE067"), ref eurekaLogogramCreatorActionFilter, 64, ImGuiInputTextFlags.AutoSelectAll);
         }
 
         ImGui.Separator();
@@ -512,9 +512,10 @@ public partial class SlaveWindow
 
             foreach (var action in logogramCreator.LogosActions)
             {
-                var actionName = actionSheet != null && actionSheet.TryGetRow(action.Id, out var actionRow)
-                    ? actionRow.Name.ExtractText()
-                    : $"Action {action.Id}";
+                var actionNameMessage = actionSheet != null && actionSheet.TryGetRow(action.Id, out var actionRow)
+                    ? global::XASlave.Localization.UiMessage.Raw(actionRow.Name.ExtractText())
+                    : global::XASlave.Localization.UiMessage.Format("S48D7DB9B2B65D27D" , action.Id);
+                var actionName = actionNameMessage.Original;
 
                 if (!string.IsNullOrEmpty(eurekaLogogramCreatorActionFilter) &&
                     !actionName.Contains(eurekaLogogramCreatorActionFilter, StringComparison.OrdinalIgnoreCase))
@@ -522,20 +523,20 @@ public partial class SlaveWindow
                     continue;
                 }
 
-                DrawEurekaLogogramCreatorActionRow(action, actionName, fontScaling);
+                DrawEurekaLogogramCreatorActionRow(action, actionNameMessage.Display, fontScaling);
             }
 
         }
 
         if (logogramCreator.IsProcessingQueue)
         {
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.0f, 1.0f), "Processing plate queue...");
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SC197A18603DB850F"));
         }
         else if (logogramCreator.SynthesisQueue.Count > 0)
         {
-            ImGui.Text($"Queue: {logogramCreator.SynthesisQueue.Count} plates pending");
+            ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("SB597383981989597", logogramCreator.SynthesisQueue.Count));
             ImGui.SameLine();
-            if (ImGui.Button("Process Queue"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S094D76E4C77C0B71")))
             {
                 logogramCreator.ProcessSynthesisQueue();
             }
@@ -552,8 +553,8 @@ public partial class SlaveWindow
         var canCraft = maxCraftable > 0;
         var isLockedRecipe = logogramCreator.GetPreferredRecipeIndex(action.Id) >= 0;
         var recipeMode = isLockedRecipe
-            ? $"Locked Recipe {recipeIndex + 1}"
-            : EurekaLogogramCreatorService.AutomaticRecipeModeLabel;
+            ? global::XASlave.Localization.UiLocale.FormatKey("S4C5408ED0EDB783E", recipeIndex + 1)
+            : global::XASlave.Localization.UiLocale.T(EurekaLogogramCreatorService.AutomaticRecipeModeLabel);
 
         var texture = Plugin.TextureProvider.GetFromGameIcon(action.IconID).GetWrapOrEmpty();
         ImGui.Image(texture.Handle, new Vector2(32, 32) * fontScaling);
@@ -563,22 +564,22 @@ public partial class SlaveWindow
         {
             ImGui.Text(actionName);
             ImGui.SameLine();
-            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), $"(Owned: {currentStock})");
+            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S1DC5403737E6AC2E", currentStock));
 
             if (resolvedRecipe != null)
             {
-                var recipeText = logogramCreator.FormatRecipe(resolvedRecipe);
+                var recipeText = logogramCreator.FormatRecipeMessage(resolvedRecipe).Display;
                 var bareMinimumCost = logogramCreator.TryGetRecipeBareMinimumGilCost(resolvedRecipe, out var bareMinimumGilCost)
-                    ? logogramCreator.FormatGilCost(bareMinimumGilCost)
-                    : "Cost N/A";
+                    ? logogramCreator.FormatGilCostMessage(bareMinimumGilCost).Display
+                    : global::XASlave.Localization.UiLocale.Get("SF3F276560015EA0D");
                 var recipeColor = canCraft
                     ? new Vector4(0.0f, 1.0f, 0.0f, 1.0f)
                     : new Vector4(1.0f, 0.2f, 0.2f, 1.0f);
-                ImGui.TextColored(recipeColor, $"{recipeMode}: {maxCraftable} | Bare Minimum {bareMinimumCost} | {recipeText}");
+                ImGui.TextColored(recipeColor, global::XASlave.Localization.UiLocale.FormatKey("S1F90A2843E3CD9BD", recipeMode, maxCraftable, bareMinimumCost, recipeText));
             }
             else
             {
-                ImGui.TextColored(new Vector4(1.0f, 0.2f, 0.2f, 1.0f), "No recipe data");
+                ImGui.TextColored(new Vector4(1.0f, 0.2f, 0.2f, 1.0f), global::XASlave.Localization.UiLocale.Get("S0513CA2BCB1E4E26"));
             }
 
         }
@@ -603,7 +604,7 @@ public partial class SlaveWindow
 
         if (canCraft)
         {
-            if (ImGui.Button($"{label}##{side}_{actionId}", new Vector2(buttonWidth, buttonHeight)))
+            if (global::XASlave.Localization.UiNative.Button($"{label}##{side}_{actionId}", new Vector2(buttonWidth, buttonHeight), display: EurekaLogogramCreatorService.GetPlateSideMessage(side).Display))
             {
                 logogramCreator.SetPendingPlateSelection(side, actionId);
             }
@@ -613,7 +614,7 @@ public partial class SlaveWindow
 
         using (ImRaii.PushStyle(ImGuiStyleVar.Alpha, 0.5f))
         {
-            ImGui.Button($"Need Mats##{side}_{actionId}", new Vector2(buttonWidth, buttonHeight));
+            global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S723C494DF58EF30B") + $"##{side}_{actionId}"), new Vector2(buttonWidth, buttonHeight));
         }
     }
 
@@ -623,7 +624,7 @@ public partial class SlaveWindow
 
         using (ImRaii.Disabled(!canCraft))
         {
-            if (ImGui.Button($"Solo##{actionId}", new Vector2(buttonWidth, buttonHeight)))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SA6DB480094950DB2") + $"##{actionId}"), new Vector2(buttonWidth, buttonHeight)))
             {
                 logogramCreator.QueueSynthesis(actionId);
             }
@@ -631,7 +632,7 @@ public partial class SlaveWindow
 
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Queues this action by itself into the Astral Array and starts immediately when possible.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S63253AFB3B0DCC44"));
         }
     }
 
@@ -646,10 +647,10 @@ public partial class SlaveWindow
             return;
         }
 
-        ImGui.TextDisabled("Lock a specific synthesis recipe per action. Automatic mode uses Cheapest By Gil and the source-logogram prices from the Costs tab.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S6EFBB9905D933B79"));
         using (ImRaii.ItemWidth(320 * fontScaling))
         {
-            ImGui.InputTextWithHint("##EurekaLogogramCreatorRecipeFilter", "Filter actions...", ref eurekaLogogramCreatorRecipeFilter, 64, ImGuiInputTextFlags.AutoSelectAll);
+            ImGui.InputTextWithHint("##EurekaLogogramCreatorRecipeFilter", global::XASlave.Localization.UiLocale.Get("SD27A9BA1268EE067"), ref eurekaLogogramCreatorRecipeFilter, 64, ImGuiInputTextFlags.AutoSelectAll);
         }
         ImGui.Separator();
 
@@ -659,9 +660,10 @@ public partial class SlaveWindow
 
             foreach (var action in logogramCreator.LogosActions)
             {
-                var actionName = actionSheet != null && actionSheet.TryGetRow(action.Id, out var actionRow)
-                    ? actionRow.Name.ExtractText()
-                    : $"Action {action.Id}";
+                var actionNameMessage = actionSheet != null && actionSheet.TryGetRow(action.Id, out var actionRow)
+                    ? global::XASlave.Localization.UiMessage.Raw(actionRow.Name.ExtractText())
+                    : global::XASlave.Localization.UiMessage.Format("S48D7DB9B2B65D27D" , action.Id);
+                var actionName = actionNameMessage.Original;
                 if (!string.IsNullOrEmpty(eurekaLogogramCreatorRecipeFilter) &&
                     !actionName.Contains(eurekaLogogramCreatorRecipeFilter, StringComparison.OrdinalIgnoreCase))
                 {
@@ -670,19 +672,19 @@ public partial class SlaveWindow
 
                 using (ImRaii.PushId((int)action.Id))
                 {
-                    ImGui.Text(actionName);
+                    ImGui.Text(actionNameMessage.Display);
 
                     var selectedRecipeIndex = logogramCreator.GetPreferredRecipeIndex(action.Id);
-                    var automaticRecipePreview = GetEurekaLogogramCreatorAutomaticRecipePreviewLabel(action, automaticRecipeModeLabel);
+                    var automaticRecipePreview = GetEurekaLogogramCreatorAutomaticRecipePreviewLabelMessage(action, automaticRecipeModeLabel);
                     var preview = selectedRecipeIndex >= 0 && selectedRecipeIndex < action.Recipes.Count
-                        ? GetEurekaLogogramCreatorRecipeChoiceLabel(selectedRecipeIndex, action.Recipes[selectedRecipeIndex], logogramCreator.GetCraftableCount(action.Recipes[selectedRecipeIndex]))
+                        ? GetEurekaLogogramCreatorRecipeChoiceLabelMessage(selectedRecipeIndex, action.Recipes[selectedRecipeIndex], logogramCreator.GetCraftableCount(action.Recipes[selectedRecipeIndex]))
                         : automaticRecipePreview;
 
-                    using (var imguiScope668 = ImRaii.Combo("##RecipeChoice", preview))
+                    using (var imguiScope668 = global::XASlave.Localization.UiNative.ComboScope("##RecipeChoice", preview.Display))
                     if (imguiScope668)
                     {
                         var automaticSelected = selectedRecipeIndex < 0;
-                        if (ImGui.Selectable(automaticRecipePreview, automaticSelected))
+                        if (global::XASlave.Localization.UiNative.Selectable(automaticRecipePreview.Original, automaticSelected, display: automaticRecipePreview.Display))
                         {
                             logogramCreator.SetPreferredRecipeIndex(action.Id, -1);
                         }
@@ -691,8 +693,8 @@ public partial class SlaveWindow
                         {
                             var recipe = action.Recipes[i];
                             var craftableCount = logogramCreator.GetCraftableCount(recipe);
-                            var itemLabel = GetEurekaLogogramCreatorRecipeChoiceLabel(i, recipe, craftableCount);
-                            if (ImGui.Selectable(itemLabel, selectedRecipeIndex == i))
+                            var itemLabel = GetEurekaLogogramCreatorRecipeChoiceLabelMessage(i, recipe, craftableCount);
+                            if (global::XASlave.Localization.UiNative.Selectable(itemLabel.Original, selectedRecipeIndex == i, display: itemLabel.Display))
                             {
                                 logogramCreator.SetPreferredRecipeIndex(action.Id, i);
                             }
@@ -705,14 +707,14 @@ public partial class SlaveWindow
                     if (resolvedRecipe != null)
                     {
                         var resolvedRecipeCostLabel = logogramCreator.TryGetRecipeGilCost(resolvedRecipe, out var resolvedRecipeCost)
-                            ? logogramCreator.FormatGilCost(resolvedRecipeCost)
-                            : "Cost N/A";
+                            ? logogramCreator.FormatGilCostMessage(resolvedRecipeCost).Display
+                            : global::XASlave.Localization.UiLocale.Get("SF3F276560015EA0D");
                         var recipeColor = logogramCreator.IsRecipeCraftable(resolvedRecipe)
                             ? new Vector4(0.0f, 1.0f, 0.0f, 1.0f)
                             : new Vector4(1.0f, 0.2f, 0.2f, 1.0f);
                         ImGui.TextColored(
                             recipeColor,
-                            $"{(logogramCreator.GetPreferredRecipeIndex(action.Id) >= 0 ? $"Locked Recipe {resolvedRecipeIndex + 1}" : automaticRecipeModeLabel)}: {resolvedRecipeCostLabel} | {logogramCreator.FormatRecipe(resolvedRecipe)}");
+                            global::XASlave.Localization.UiLocale.FormatKey("S322763E0264E3098", (logogramCreator.GetPreferredRecipeIndex(action.Id) >= 0 ? global::XASlave.Localization.UiLocale.FormatKey("S4C5408ED0EDB783E", resolvedRecipeIndex + 1) : global::XASlave.Localization.UiMessage.Authored(automaticRecipeModeLabel).Display), resolvedRecipeCostLabel, logogramCreator.FormatRecipeMessage(resolvedRecipe).Display));
                     }
 
                     ImGui.Separator();
@@ -726,20 +728,20 @@ public partial class SlaveWindow
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
 
-        ImGui.TextDisabled("Automatic recipe selection uses these source-logogram prices as its gil basis.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S0B4E36D6C917EBE2"));
 
-        if (ImGui.Button("Reset Costs To Defaults", new Vector2(180 * fontScaling, 0)))
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SC8EEB0EDB956AFB1"), new Vector2(180 * fontScaling, 0)))
         {
             logogramCreator.ResetLogogramSourceGilCosts();
         }
 
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Restores the default source-logogram prices used to seed the configuration.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SDA72E1DE93971C96"));
         }
 
         ImGui.Separator();
-        ImGui.TextDisabled("Expected specific mneme cost = source logogram cost x source pool size.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SDDD4788B8D795800"));
 
         using (ImRaii.Child("##EurekaLogogramCreatorCostsTab", new Vector2(0, 0), true))
         {
@@ -747,11 +749,11 @@ public partial class SlaveWindow
             using (var imguiScope732 = ImRaii.Table("##EurekaLogogramCreatorLogogramCosts", 4, ImGuiTableFlags.RowBg | ImGuiTableFlags.Borders | ImGuiTableFlags.Resizable | ImGuiTableFlags.SizingStretchProp))
             if (imguiScope732)
             {
-                ImGui.TableSetupColumn("Source");
-                ImGui.TableSetupColumn("Pool");
-                ImGui.TableSetupColumn("Cost Each");
-                ImGui.TableSetupColumn("Specific Mneme Cost");
-                ImGui.TableHeadersRow();
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S0E570CA6FABE24F9"));
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SF13024272C385F73"));
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SAFC4B9BB152423C8"));
+                global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S4018BB445F30CCCF"));
+                global::XASlave.Localization.UiNative.TableHeadersRow();
 
                 foreach (var source in logogramCreator.GetLogogramSourceDefinitions())
                 {
@@ -762,7 +764,7 @@ public partial class SlaveWindow
                     ImGui.TableNextRow();
 
                     ImGui.TableNextColumn();
-                    ImGui.Text(source.Name);
+                    ImGui.Text(global::XASlave.Localization.UiMessage.Authored(source.Name).Display);
 
                     ImGui.TableNextColumn();
                     ImGui.Text(poolSize > 0 ? poolSize.ToString() : "?");
@@ -775,7 +777,7 @@ public partial class SlaveWindow
                     }
 
                     ImGui.TableNextColumn();
-                    ImGui.Text(poolSize > 0 ? logogramCreator.FormatGilCost(specificMnemeCost) : "N/A");
+                    ImGui.Text(poolSize > 0 ? logogramCreator.FormatGilCostMessage(specificMnemeCost).Display : global::XASlave.Localization.UiLocale.Get("SE2F79E5B60330BBA"));
                 }
 
 
@@ -788,10 +790,10 @@ public partial class SlaveWindow
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
 
-        ImGui.Text($"Known Logogram Stock ({logogramCreator.LogogramStock.Count}/28):");
+        ImGui.Text(global::XASlave.Localization.UiLocale.FormatKey("S85BABA1C069F622E", logogramCreator.LogogramStock.Count));
         if (!logogramCreator.HasLogogramStockCache)
         {
-            ImGui.TextColored(new Vector4(1.0f, 0.6f, 0.2f, 1.0f), "Run Refresh All Pages once to build the cache.");
+            ImGui.TextColored(new Vector4(1.0f, 0.6f, 0.2f, 1.0f), global::XASlave.Localization.UiLocale.Get("SB59DA6061DDD4E87"));
         }
 
         ImGui.Separator();
@@ -828,12 +830,12 @@ public partial class SlaveWindow
 
         DrawEurekaLogogramCreatorPlateBuilder(fontScaling);
 
-        ImGui.Text("Queued Plates:");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("S4D349B4A69C4CC67"));
         ImGui.Separator();
 
         if (logogramCreator.SynthesisQueue.Count == 0)
         {
-            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), "Queue is empty");
+            ImGui.TextColored(new Vector4(0.7f, 0.7f, 0.7f, 1.0f), global::XASlave.Localization.UiLocale.Get("SC501C695157F1E2C"));
             return;
         }
 
@@ -844,19 +846,19 @@ public partial class SlaveWindow
             for (var i = 0; i < queueList.Count; i++)
             {
                 var request = queueList[i];
-                ImGui.Text($"{i + 1}. {request.Label}");
+                ImGui.Text($"{i + 1}. {logogramCreator.GetPlateRequestLabelMessage(request).Display}");
                 if (request.Astral != null)
                 {
                     ImGui.TextColored(
                         new Vector4(0.7f, 0.7f, 0.7f, 1.0f),
-                        $"Astral: {request.Astral.ActionName} (Recipe {request.Astral.RecipeIndex + 1}: {logogramCreator.FormatRecipe(request.Astral.Recipe)})");
+                        global::XASlave.Localization.UiLocale.FormatKey("S94A6770AB4C113F3", logogramCreator.GetPlateSelectionNameMessage(request.Astral).Display, request.Astral.RecipeIndex + 1, logogramCreator.FormatRecipeMessage(request.Astral.Recipe).Display));
                 }
 
                 if (request.Umbral != null)
                 {
                     ImGui.TextColored(
                         new Vector4(0.7f, 0.7f, 0.7f, 1.0f),
-                        $"Umbral: {request.Umbral.ActionName} (Recipe {request.Umbral.RecipeIndex + 1}: {logogramCreator.FormatRecipe(request.Umbral.Recipe)})");
+                        global::XASlave.Localization.UiLocale.FormatKey("SA90409E060221D6E", logogramCreator.GetPlateSelectionNameMessage(request.Umbral).Display, request.Umbral.RecipeIndex + 1, logogramCreator.FormatRecipeMessage(request.Umbral.Recipe).Display));
                 }
 
                 ImGui.Separator();
@@ -864,13 +866,13 @@ public partial class SlaveWindow
 
         }
 
-        if (ImGui.Button("Clear Queue", new Vector2(110 * fontScaling, 0)))
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S3FDA72E584598F73"), new Vector2(110 * fontScaling, 0)))
         {
             logogramCreator.SynthesisQueue.Clear();
         }
 
         ImGui.SameLine();
-        if (ImGui.Button("Process Queue", new Vector2(120 * fontScaling, 0)))
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S094D76E4C77C0B71"), new Vector2(120 * fontScaling, 0)))
         {
             logogramCreator.ProcessSynthesisQueue();
         }
@@ -894,25 +896,29 @@ public partial class SlaveWindow
         return (astralActionId, umbralActionId);
     }
 
-    private string GetEurekaLogogramCreatorAutomaticRecipePreviewLabel(LogosAction action, string automaticRecipeModeLabel)
+    private string GetEurekaLogogramCreatorAutomaticRecipePreviewLabel(LogosAction action, string automaticRecipeModeLabel) => GetEurekaLogogramCreatorAutomaticRecipePreviewLabelMessage(action, automaticRecipeModeLabel).Original;
+
+    private global::XASlave.Localization.UiMessage GetEurekaLogogramCreatorAutomaticRecipePreviewLabelMessage(LogosAction action, string automaticRecipeModeLabel)
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
         var resolvedRecipe = logogramCreator.GetResolvedRecipe(action, out _);
         if (resolvedRecipe == null || !logogramCreator.TryGetRecipeGilCost(resolvedRecipe, out var gilCost))
         {
-            return $"Automatic ({automaticRecipeModeLabel})";
+            return global::XASlave.Localization.UiMessage.Format("S3E9C7F031E63DEF8" , global::XASlave.Localization.UiMessage.Authored(automaticRecipeModeLabel));
         }
 
-        return $"Automatic ({automaticRecipeModeLabel}) - {logogramCreator.FormatGilCost(gilCost)}";
+        return global::XASlave.Localization.UiMessage.Format("S59F0EFBE8AE4EC48" , global::XASlave.Localization.UiMessage.Authored(automaticRecipeModeLabel), logogramCreator.FormatGilCostMessage(gilCost));
     }
 
-    private string GetEurekaLogogramCreatorRecipeChoiceLabel(int recipeIndex, IReadOnlyList<Recipe> recipe, int craftableCount)
+    private string GetEurekaLogogramCreatorRecipeChoiceLabel(int recipeIndex, IReadOnlyList<Recipe> recipe, int craftableCount) => GetEurekaLogogramCreatorRecipeChoiceLabelMessage(recipeIndex, recipe, craftableCount).Original;
+
+    private global::XASlave.Localization.UiMessage GetEurekaLogogramCreatorRecipeChoiceLabelMessage(int recipeIndex, IReadOnlyList<Recipe> recipe, int craftableCount)
     {
         var logogramCreator = plugin.EurekaLogogramCreator;
         var gilCostLabel = logogramCreator.TryGetRecipeGilCost(recipe, out var gilCost)
-            ? logogramCreator.FormatGilCost(gilCost)
-            : "Cost N/A";
+            ? logogramCreator.FormatGilCostMessage(gilCost)
+            : global::XASlave.Localization.UiMessage.Key("SF3F276560015EA0D");
 
-        return $"Recipe {recipeIndex + 1} [{craftableCount} | {gilCostLabel}] - {logogramCreator.FormatRecipe(recipe)}";
+        return global::XASlave.Localization.UiMessage.Format("SE8FCAE4004CC1D17" , recipeIndex + 1, craftableCount, gilCostLabel, logogramCreator.FormatRecipeMessage(recipe));
     }
 }

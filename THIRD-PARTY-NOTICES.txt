@@ -61,6 +61,13 @@ Source-included native UI dependency (2026-09-13):
   existing private source backup/recovery workflow. No separate toolkit DLL is
   added to the package.
 
+Localized native-control adaptations (2026-10-22):
+- Dear ImGui 1.88: MIT. Copyright (c) 2014-2022 Omar Cornut.
+  https://github.com/ocornut/imgui/tree/v1.88
+  XASlave/Localization/UiNative.Scopes.cs adapts the documented table-header
+  helper and authored-choice combo flow to preserve existing native identities
+  while using editable captions. The native host library is not bundled.
+
 Host-supplied references are not bundled by this release profile: Dalamud,
 FFXIVClientStructs, InteropGenerator.Runtime, Lumina/Lumina.Excel and host
 framework libraries. They retain their upstream licenses and notices. Review

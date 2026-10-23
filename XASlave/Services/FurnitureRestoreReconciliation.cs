@@ -14,7 +14,7 @@ internal sealed class FurnitureRestoreInventorySnapshot
         foreach (var source in occupied)
         {
             if (source.Quantity <= 0 || source.State.FullId == 0 || source.State.BaseId == 0 || !slots.TryAdd((source.Container, source.Slot), source))
-                throw new ArgumentException("Invalid or duplicate furniture inventory descriptor.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S85E67738060FCD52"), originalMessageText => new ArgumentException(originalMessageText));
             quantities.TryGetValue(source.State, out var existing);
             quantities[source.State] = checked(existing + source.Quantity);
         }
@@ -94,7 +94,7 @@ internal sealed class FurnitureRestoreReconciliation
         if (!beforeSource.ContainsExact(selected) || removedQuantity <= 0 || removedQuantity > selected.Quantity || returnedQuantity < 0
             || (returnedQuantity == 0) != !returnedState.HasValue || (returnedQuantity == 0 && !needsOwnedDecision)
             || (returnedState.HasValue && (returnedState.Value.FullId == 0 || returnedState.Value.BaseId == 0)))
-            throw new ArgumentException("The furniture result expectation is incomplete or does not match its owned source.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S27730B645383ED4F"), originalMessageText => new ArgumentException(originalMessageText));
         this.beforeSource = beforeSource; this.beforeDestination = beforeDestination; this.selected = selected;
         this.removedQuantity = removedQuantity; this.returnedState = returnedState; this.returnedQuantity = returnedQuantity;
         this.needsOwnedDecision = needsOwnedDecision;

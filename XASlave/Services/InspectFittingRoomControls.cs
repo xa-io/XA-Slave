@@ -31,7 +31,7 @@ internal sealed unsafe class InspectFittingRoomControls : IDisposable
     internal InspectFittingRoomControls(Action clear)
     {
         var current = Resolve();
-        if (current == null) throw new InvalidOperationException("The fitting room is not ready for its Clear button.");
+        if (current == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SA138BA61D909AF8C"), originalMessage => new InvalidOperationException(originalMessage));
         addon = (nint)current; root = (nint)current->RootNode; id = current->Id;
         button = new TextButtonNode();
         try

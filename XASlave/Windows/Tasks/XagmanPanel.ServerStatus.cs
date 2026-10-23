@@ -13,6 +13,7 @@ public partial class SlaveWindow
 {
     private bool xagmanServerStatusPending;
     private string xagmanServerStatusMessage = string.Empty;
+    private global::XASlave.Localization.UiMessage? xagmanServerStatusMessageUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
     private bool xagmanServerStatusWarning;
 
     private bool CanApplyXagmanServerStatus()
@@ -27,16 +28,16 @@ public partial class SlaveWindow
     {
         using (ImRaii.Disabled(xagmanServerStatusPending || !CanApplyXagmanServerStatus()))
         {
-            if (ImGui.Button("Ping Aethertek Server Status##xagmanServerStatus"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S93D63FA3A4D5ABA9") + "##xagmanServerStatus")))
                 BeginXagmanServerStatusRequest();
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip("Fetch current Aethertek world status and select the first eligible world alphabetically in each data center: online, not congested, and open to character creation. If none qualify, keep the current valid world or use the first world alphabetically as a marked fallback. Every data center stays configured. Available while idle; history is ignored.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S5BE5C0ECB9214380"));
         if (!string.IsNullOrWhiteSpace(xagmanServerStatusMessage))
         {
             using var color = ImRaii.PushColor(ImGuiCol.Text, xagmanServerStatusWarning
                 ? new Vector4(1f, 0.8f, 0.3f, 1f) : new Vector4(0.4f, 0.8f, 1f, 1f));
-            ImGui.TextWrapped(xagmanServerStatusMessage);
+            ImGui.TextWrapped(global::XASlave.Localization.UiMessage.Resolve(ref xagmanServerStatusMessageUiMessage, xagmanServerStatusMessage));
         }
     }
 
@@ -46,7 +47,7 @@ public partial class SlaveWindow
         var setupKey = GetXagmanServerStatusSetupKey();
         xagmanServerStatusPending = true;
         xagmanServerStatusWarning = false;
-        xagmanServerStatusMessage = "Checking Aethertek server status...";
+        xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Key("SB65CDB4C841A9FAD"));
         if (!RunWorker("Xagman Aethertek server status", async cancellationToken =>
         {
             try
@@ -59,7 +60,7 @@ public partial class SlaveWindow
                     if (!CanApplyXagmanServerStatus() || GetXagmanServerStatusSetupKey() != setupKey)
                     {
                         xagmanServerStatusWarning = true;
-                        xagmanServerStatusMessage = "Run or world selections changed during the check. Ping again while idle to apply fresh choices.";
+                        xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Key("S18C83A541EDBFFB6"));
                         return;
                     }
                     var cfg = plugin.Configuration;
@@ -74,12 +75,12 @@ public partial class SlaveWindow
                         cfg.XagmanServerMeetWorlds = previousWorlds;
                         throw;
                     }
-                    StopXagmanTonyAutoSelection("Auto: meet worlds changed. Run Auto again to check coverage.");
+                    StopXagmanTonyAutoSelection(global::XASlave.Localization.UiMessage.Key("SA63D8F44280EEA54"));
                     InvalidateXagmanTradeCapacityForecast();
                     xagmanServerStatusWarning = result.UnavailableDataCenters.Count > 0;
-                    xagmanServerStatusMessage = $"Configured {cfg.XagmanServerMeetWorlds.Count} data centers; {result.Worlds.Count} meet the status filters. Status checked {result.CheckedAt.ToLocalTime():HH:mm:ss}.";
+                    xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Format("S4A5338EC8808717F", cfg.XagmanServerMeetWorlds.Count, result.Worlds.Count, result.CheckedAt.ToLocalTime()));
                     if (result.UnavailableDataCenters.Count > 0)
-                        xagmanServerStatusMessage += $" No eligible world; fallback selections: {string.Join(", ", result.UnavailableDataCenters.Select(dc => $"{dc}: {cfg.XagmanServerMeetWorlds[dc]}"))}.";
+                        xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref xagmanServerStatusMessageUiMessage, xagmanServerStatusMessage), global::XASlave.Localization.UiMessage.Format("SEA155AC43E3DF353", string.Join(", ", result.UnavailableDataCenters.Select(dc => $"{dc}: {cfg.XagmanServerMeetWorlds[dc]}")))));
                     plugin.TaskRunner.AddLog($"Xagman: Aethertek server status: {xagmanServerStatusMessage}");
                 }).ConfigureAwait(false);
             }
@@ -94,7 +95,7 @@ public partial class SlaveWindow
                     if (isDisposed || cancellationToken.IsCancellationRequested) return;
                     xagmanServerStatusPending = false;
                     xagmanServerStatusWarning = true;
-                    xagmanServerStatusMessage = $"Server status check failed; existing selections kept. {ex.Message}";
+                    xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Format("S87EA370F2252E86E", ex.Message));
                     plugin.TaskRunner.AddLog($"Xagman: {xagmanServerStatusMessage}");
                 }).ConfigureAwait(false);
             }
@@ -102,7 +103,7 @@ public partial class SlaveWindow
         {
             xagmanServerStatusPending = false;
             xagmanServerStatusWarning = true;
-            xagmanServerStatusMessage = "Could not start the server status check. Existing selections kept.";
+            xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Key("SE4DC3BCBB1763DF0"));
         }
     }
 }

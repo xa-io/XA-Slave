@@ -31,7 +31,10 @@ public sealed class PlayerSearchContextMenuService : IDisposable
 
     public bool IsEnabled => enabled;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public void ApplyConfiguration(bool ffLogsEnabled, bool lodestoneEnabled, bool lalachievementsEnabled, bool openAllEnabled)
     {
@@ -51,7 +54,7 @@ public sealed class PlayerSearchContextMenuService : IDisposable
         {
             enabled = false;
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -89,14 +92,12 @@ public sealed class PlayerSearchContextMenuService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         var providerCount = CountEnabledProviders();
-        StatusText = providerCount == 0
-            ? "Enabled - no player search providers are selected."
-            : $"Enabled - {providerCount} player search provider(s) available{(openAllEnabled && providerCount > 1 ? " with Open All." : ".")}";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (providerCount == 0 ? global::XASlave.Localization.UiMessage.Key("SF86CFB55E26EAE9E") : global::XASlave.Localization.UiMessage.Format("SC191A02A73FE033C", providerCount, ((openAllEnabled && providerCount > 1 ? global::XASlave.Localization.UiMessage.Key("S55BEDA298C396769") : global::XASlave.Localization.UiMessage.Raw("."))))));
     }
 
     private int CountEnabledProviders()

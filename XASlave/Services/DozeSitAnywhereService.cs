@@ -47,7 +47,10 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public void ApplyConfiguration(bool allowDoze, bool allowSit)
     {
@@ -69,7 +72,7 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
             enabled = false;
             ResetTemporaryState();
             UpdateHookStates();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -84,7 +87,7 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
             enabled = false;
             ResetTemporaryState();
             UpdateHookStates();
-            StatusText = "Unavailable - failed to enable Doze & Sit Anywhere.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S8F2E6D1D7EC13406"));
             log.Warning(ex, "[XASlave] Failed to enable Doze & Sit Anywhere.");
             return false;
         }
@@ -170,7 +173,7 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
         DisposeHook(ref shouldSnapHook);
         DisposeHook(ref shouldSnapUnsitHook);
         useEmote = null;
-        StatusText = "Disabled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
     }
 
     private void EnsureInitialized()
@@ -201,17 +204,17 @@ public unsafe sealed class DozeSitAnywhereService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (!initialized)
         {
-            StatusText = "Ready - `/xa sit`, `/xa doze`, panel buttons, and titlebar favourites will arm local emote hooks on first use.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SBA53E5712EA56D21"));
             return;
         }
 
-        StatusText = "Enabled - `/xa sit`, `/xa doze`, panel buttons, and titlebar favourites can trigger unsnapped Sit/Doze emotes.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SA32A17D652E4ED37"));
     }
 
     private void ResetTemporaryState()

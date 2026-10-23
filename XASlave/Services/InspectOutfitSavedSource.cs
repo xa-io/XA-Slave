@@ -20,7 +20,7 @@ internal sealed class InspectOutfitSavedSource : IInspectOutfitSource
     internal InspectOutfitSavedSource(InspectOutfitHistoryEntry entry, long generation, Func<long> frame)
     {
         if (!InspectOutfitHistory.TryGetEquipment(entry, out var captured))
-            throw new InvalidOperationException("This saved outfit has incomplete equipment data.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC7699E581D2616DF"), originalMessageText => new InvalidOperationException(originalMessageText));
         equipment = captured; // Detached from configuration and subsequent removals.
         this.frame = frame;
         EntryId = entry.Id;

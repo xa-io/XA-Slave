@@ -31,8 +31,8 @@ public partial class SlaveWindow
             windowRenamerTitleInput = plugin.Configuration.WindowRenamerTitle;
         }
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Window Renamer");
-        ImGui.TextDisabled("Renames the FFXIV game window title. Takes effect on plugin load when enabled.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S05F3A5D5B4F5775C"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SAEA7841BB44EB701"));
         if (plugin.WindowRenamer.IsXIVWindowResizerCompatibilityActive)
         {
             ImGui.Spacing();
@@ -40,16 +40,16 @@ public partial class SlaveWindow
             {
                 ImGui.TextColored(
                     new Vector4(0.4f, 1.0f, 0.4f, 1.0f),
-                    "XIVWindowResizer compatibility bridge is active; the custom title remains live.");
-                ImGui.TextDisabled(plugin.WindowRenamer.XIVWindowResizerCompatibilityStatusText);
+                    global::XASlave.Localization.UiLocale.Get("SF34937B96ABE78E4"));
+                ImGui.TextDisabled(plugin.WindowRenamer.LocalizedXIVWindowResizerCompatibilityStatusText);
             }
             else
             {
                 ImGui.TextColored(
                     new Vector4(1.0f, 0.35f, 0.25f, 1.0f),
-                    "XIVWindowResizer compatibility could not be confirmed; the custom title remains live.");
-                ImGui.TextDisabled(plugin.WindowRenamer.XIVWindowResizerCompatibilityStatusText);
-                ImGui.TextDisabled("Use Apply Now to retry. XIVWindowResizer's first resize may fail until its handle is ready.");
+                    global::XASlave.Localization.UiLocale.Get("SB64BF3E794F96751"));
+                ImGui.TextDisabled(plugin.WindowRenamer.LocalizedXIVWindowResizerCompatibilityStatusText);
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S7E3910F9D848BFD2"));
             }
         }
         else if (plugin.WindowRenamer.HasXIVWindowResizerCompatibilityError)
@@ -57,9 +57,9 @@ public partial class SlaveWindow
             ImGui.Spacing();
             ImGui.TextColored(
                 new Vector4(1.0f, 0.35f, 0.25f, 1.0f),
-                "XA could not confirm the loaded-plugin state; the custom title remains live.");
-            ImGui.TextDisabled(plugin.WindowRenamer.XIVWindowResizerCompatibilityStatusText);
-            ImGui.TextDisabled("Use Apply Now to retry the compatibility check.");
+                global::XASlave.Localization.UiLocale.Get("SA9674899392125C3"));
+            ImGui.TextDisabled(plugin.WindowRenamer.LocalizedXIVWindowResizerCompatibilityStatusText);
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SB6F61AF9F826AAC2"));
         }
         ImGui.Spacing();
         ImGui.Separator();
@@ -67,7 +67,7 @@ public partial class SlaveWindow
 
         // -- Enable / Disable --
         var enabled = plugin.Configuration.WindowRenamerEnabled;
-        if (ImGui.Checkbox("Enable Window Renamer", ref enabled))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SD98E6BF2D57101E2"), ref enabled))
         {
             plugin.Configuration.WindowRenamerEnabled = enabled;
             plugin.Configuration.Save();
@@ -79,36 +79,36 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Settings (always visible so user can configure before enabling) --
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Settings");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S74A883A037BC227F"));
         ImGui.Spacing();
 
         // Use Process ID checkbox
         var usePid = plugin.Configuration.WindowRenamerUseProcessId;
-        if (ImGui.Checkbox("Use Process ID prefix", ref usePid))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SF9CD25E170D20C06"), ref usePid))
         {
             plugin.Configuration.WindowRenamerUseProcessId = usePid;
             plugin.Configuration.Save();
             if (enabled)
                 plugin.WindowRenamer.ApplyFromConfig(plugin.Configuration);
         }
-        ImGui.TextDisabled($"Prepends \"{Environment.ProcessId} - \" to the window title.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S3488A6481F68EB25", Environment.ProcessId));
 
         ImGui.Spacing();
 
         var showCurrentCharacter = plugin.Configuration.WindowRenamerShowCurrentCharacter;
-        if (ImGui.Checkbox("Show Current Character", ref showCurrentCharacter))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SB3A1A7911657A677"), ref showCurrentCharacter))
         {
             plugin.Configuration.WindowRenamerShowCurrentCharacter = showCurrentCharacter;
             plugin.Configuration.Save();
             if (enabled)
                 plugin.WindowRenamer.ApplyFromConfig(plugin.Configuration);
         }
-        ImGui.TextDisabled("Appends the currently logged-in character name after the title and refreshes on login/logout.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S45C1218E4775EC6E"));
 
         ImGui.Spacing();
 
         // Custom title text box
-        ImGui.Text("Window Title:");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("SB824A6F02CADB68E"));
         ImGui.SetNextItemWidth(Scale(300f));
         if (ImGui.InputText("##WindowTitle", ref windowRenamerTitleInput, 256))
             plugin.Configuration.WindowRenamerTitle = windowRenamerTitleInput;
@@ -118,24 +118,24 @@ public partial class SlaveWindow
             if (enabled)
                 plugin.WindowRenamer.ApplyFromConfig(plugin.Configuration);
         }
-        ImGui.TextDisabled("Leave blank to use the default \"FINAL FANTASY XIV\".");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S84EDAC856391C21A"));
 
         ImGui.Spacing();
 
         // Apply button (manual re-apply)
         if (enabled)
         {
-            if (ImGui.Button("Apply Now"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S7F4B7731284A3909")))
             {
                 plugin.WindowRenamer.ApplyFromConfig(plugin.Configuration);
             }
             ImGui.SameLine();
-            if (ImGui.Button("Restore Default"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SCB73E9ACE1C62F02")))
             {
                 plugin.WindowRenamer.Restore();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Temporarily restores \"FINAL FANTASY XIV\". Use Apply Now or reload XA to reapply the saved title.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S144C25F25BA41346"));
         }
 
         ImGui.Spacing();
@@ -143,7 +143,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Preview --
-        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), "Preview");
+        ImGui.TextColored(new Vector4(0.6f, 0.6f, 0.6f, 1.0f), global::XASlave.Localization.UiLocale.Get("S324B134F57C70C72"));
         ImGui.Spacing();
 
         var previewTitle = string.IsNullOrWhiteSpace(windowRenamerTitleInput)
@@ -165,12 +165,12 @@ public partial class SlaveWindow
         ImGui.TextColored(previewColor, $"\"{previewTitle}\"");
 
         if (!enabled)
-            ImGui.TextDisabled("(disabled - enable to apply)");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SC4D45EE54EAEBDFF"));
         else if (!plugin.WindowRenamer.IsCustomTitleApplied)
-            ImGui.TextDisabled("(saved preview - live title is temporarily restored; use Apply Now to reapply)");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S4777C62735D82D8E"));
         else if (compatibilityError)
-            ImGui.TextDisabled("(live custom title - XIVWindowResizer compatibility needs attention)");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S142135E1D1A483BD"));
         else if (compatibilityActive && plugin.WindowRenamer.IsXIVWindowResizerHandleReady)
-            ImGui.TextDisabled("(live custom title - XIVWindowResizer handle ready)");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S2A4AB99DFA5A6DBD"));
     }
 }

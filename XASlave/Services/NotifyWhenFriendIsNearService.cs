@@ -25,6 +25,7 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNo
     private long loginGeneration, nextScan;
     private uint scanTerritory;
     private string configurationError = string.Empty;
+    private global::XASlave.Localization.UiMessage? configurationErrorMessage;
 
     public NotifyWhenFriendIsNearService(IFramework framework, IClientState clientState, IObjectTable objectTable,
         IToastGui toastGui, IChatGui chatGui, IPluginLog log, Func<string, bool>? speak = null)
@@ -34,10 +35,21 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNo
         dispatcher = new NearbyPlayerActionDispatcher(this);
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
-    public string LastMatchedPlayer { get; private set; } = "None";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
+    public string LastMatchedPlayer { get; private set; } = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5").Original;
+    private global::XASlave.Localization.UiMessage? uiLastMatchedPlayer = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5");
+    internal global::XASlave.Localization.UiMessage LastMatchedPlayerMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastMatchedPlayer, LastMatchedPlayer);
+    internal string LocalizedLastMatchedPlayer => global::XASlave.Localization.UiMessage.Resolve(ref uiLastMatchedPlayer, LastMatchedPlayer);
     public string SpeechStatus { get { lock (sync) return dispatcher.SpeechStatus; } }
+    internal global::XASlave.Localization.UiMessage SpeechStatusMessage { get { lock (sync) return dispatcher.SpeechStatusMessage; } }
+    internal string LocalizedSpeechStatus => SpeechStatusMessage.Display;
     public int PatternCount { get { lock (sync) return rules.Rules.Count(rule => rule.LegacyGroup); } }
     public int RuleCount { get { lock (sync) return rules.Rules.Count; } }
     public static int NormalizeCooldownSeconds(int value) => Math.Clamp(value, 10, 3600);
@@ -56,13 +68,15 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNo
             if (changedRule.HasValue) { dispatcher.CancelRule(changedRule.Value); scanner.ChangeRule(changedRule.Value); }
             else { dispatcher.Cancel(); scanner.CancelPass(); }
             rules = validated; nextScan = 0; configurationError = string.Empty;
-            StatusText = enabled ? $"Enabled: {rules.Rules.Count} player notification rule(s)." : "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (enabled ? global::XASlave.Localization.UiMessage.Format("S5C29F50D3E75F8B9", rules.Rules.Count) : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")));
         }
     }
 
-    internal void ReportConfigurationError(string text)
+    internal void ReportConfigurationError(string text) => ReportConfigurationError(global::XASlave.Localization.UiMessage.Raw(text));
+
+    internal void ReportConfigurationError(global::XASlave.Localization.UiMessage text)
     {
-        lock (sync) { configurationError = "Configuration rejected: " + (text.Length <= 256 ? text : text[..256]); StatusText = configurationError; }
+        lock (sync) { configurationError = global::XASlave.Localization.UiMessage.Store(ref configurationErrorMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S915244494A4076B6"), global::XASlave.Localization.UiMessage.Truncate(text, 256))); StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Capture(ref configurationErrorMessage, configurationError)); }
     }
 
     public bool SetEnabled(bool value)
@@ -73,7 +87,7 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNo
             if (value == enabled) return enabled;
             enabled = value; ClearSession();
             if (value) Subscribe(); else Unsubscribe();
-            StatusText = value ? $"Enabled: {rules.Rules.Count} player notification rule(s)." : "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (value ? global::XASlave.Localization.UiMessage.Format("S5C29F50D3E75F8B9", rules.Rules.Count) : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")));
             return value;
         }
     }
@@ -99,10 +113,10 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNo
     private void ClearSession()
     {
         dispatcher.Cancel(); scanner.Reset(++loginGeneration); nextScan = 0;
-        LastMatchedPlayer = "None"; LastActionText = "No actions yet.";
+        LastMatchedPlayer = global::XASlave.Localization.UiMessage.Store(ref uiLastMatchedPlayer, global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5")); LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC"));
     }
     private void OnLogin() { lock (sync) { if (!disposed) ClearSession(); } }
-    private void OnLogout(int _, int __) { lock (sync) { if (!disposed) { ClearSession(); StatusText = enabled ? "Waiting for login" : "Disabled"; } } }
+    private void OnLogout(int _, int __) { lock (sync) { if (!disposed) { ClearSession(); StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (enabled ? global::XASlave.Localization.UiMessage.Key("SCD1C385A747ED625") : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"))); } } }
     private void OnTerritoryChanged(uint _)
     {
         lock (sync)
@@ -120,7 +134,7 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNo
             if (!clientState.IsLoggedIn || objectTable.LocalPlayer == null)
             {
                 // A missing/aborted snapshot is not an unmatched scan.
-                dispatcher.Cancel(); scanner.CancelPass(); StatusText = "Waiting for a valid local player"; return;
+                dispatcher.Cancel(); scanner.CancelPass(); StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S0513F63EE1E68EE4")); return;
             }
             try
             {
@@ -135,21 +149,21 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNo
                 var completed = scanner.Advance(Now);
                 if (completed != null)
                 {
-                    if (completed.Count != 0) LastMatchedPlayer = completed[^1].Player.Name;
+                    if (completed.Count != 0) LastMatchedPlayer = global::XASlave.Localization.UiMessage.Store(ref uiLastMatchedPlayer, global::XASlave.Localization.UiMessage.Raw(completed[^1].Player.Name));
                     dispatcher.Enqueue(completed, Now());
                 }
                 var admittedLogin = loginGeneration;
                 dispatcher.Drain(Now());
                 if (disposed || !enabled || loginGeneration != admittedLogin) return;
-                var regexIssue = rules.Rules.FirstOrDefault(rule => rule.Diagnostic.Length != 0)?.Diagnostic;
-                StatusText = scanner.Status.Length != 0 ? scanner.Status : regexIssue ?? (scanner.Pending ? "Scanning nearby players..." : $"Enabled: {rules.Rules.Count} player notification rule(s).");
-                if (configurationError.Length != 0) StatusText = configurationError;
-                if (dispatcher.Status.Length != 0) LastActionText = dispatcher.Status;
+                var regexIssue = rules.Rules.FirstOrDefault(rule => rule.Diagnostic.Length != 0)?.DiagnosticMessage;
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (scanner.Status.Length != 0 ? scanner.StatusMessage : (regexIssue is { } currentRegexIssue ? currentRegexIssue : (scanner.Pending ? global::XASlave.Localization.UiMessage.Key("S187AF308D5C142CE") : global::XASlave.Localization.UiMessage.Format("S5C29F50D3E75F8B9", rules.Rules.Count)))));
+                if (configurationError.Length != 0) StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Capture(ref configurationErrorMessage, configurationError));
+                if (dispatcher.Status.Length != 0) LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, dispatcher.StatusMessage);
             }
             catch (Exception error)
             {
                 dispatcher.Cancel(); scanner.CancelPass(); nextScan = Now() + 2000;
-                StatusText = "Scan failed; waiting for the next complete snapshot.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S6B7D2BD501FC6076"));
                 log.Warning(error, "[XASlave] Player notification scan failed.");
             }
         }
@@ -179,7 +193,7 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNo
     void INearbyPlayerNotificationOutput.LocalChat(string text) => chatGui.Print("[XASlave] " + text);
     void INearbyPlayerNotificationOutput.Toast(string text) => toastGui.ShowNormal(text);
     void INearbyPlayerNotificationOutput.Notification(string text) => Plugin.NotificationManager.AddNotification(new Notification
-        { Title = "Nearby players", Content = text, Type = NotificationType.Info });
+        { Title = global::XASlave.Localization.UiLocale.Native("S67DA8BCD8F0CF5A6"), Content = text, Type = NotificationType.Info });
     bool INearbyPlayerNotificationOutput.Speech(string text) => speak?.Invoke(text) == true;
     bool INearbyPlayerNotificationOutput.SendEntry(string text) => ChatHelper.TrySend(text);
 
@@ -188,7 +202,7 @@ public sealed class NotifyWhenFriendIsNearService : IDisposable, INearbyPlayerNo
         lock (sync)
         {
             if (disposed) return;
-            disposed = true; enabled = false; ClearSession(); Unsubscribe(); StatusText = "Disabled";
+            disposed = true; enabled = false; ClearSession(); Unsubscribe(); StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
         }
     }
 }

@@ -45,7 +45,10 @@ public sealed class AutoLeaveDutyService : IDisposable
         UpdateStatusText();
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public static int ClampDelaySeconds(int value)
     {
@@ -262,19 +265,19 @@ public sealed class AutoLeaveDutyService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (!pendingLeave)
         {
-            StatusText = $"Enabled - waits for duty completion, then leaves after {delaySeconds} sec once combat and blocking states end.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S4779ADE95D63BE22", delaySeconds));
             return;
         }
 
         if (!condition[ConditionFlag.BoundByDuty])
         {
-            StatusText = "Enabled - pending leave cleared because the character is no longer in duty.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD85B9EF966510A41"));
             return;
         }
 
@@ -282,19 +285,19 @@ public sealed class AutoLeaveDutyService : IDisposable
         if (delayRemainingMs > 0)
         {
             var delayRemainingSeconds = Math.Max(1, (int)Math.Ceiling(delayRemainingMs / 1000d));
-            StatusText = $"Enabled - duty complete detected; waiting {delayRemainingSeconds} more sec before opening the duty menu.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S0757E98B8E5319A0", delayRemainingSeconds));
             return;
         }
 
         if (condition[ConditionFlag.InCombat])
         {
-            StatusText = "Enabled - duty complete detected; waiting for combat to end before leaving.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S652D7AE525358252"));
             return;
         }
 
         if (!CanLeaveDutyNow())
         {
-            StatusText = "Enabled - duty complete detected; waiting for blocking duty UI or cutscene state to clear.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S09575AC542720001"));
             return;
         }
 
@@ -302,15 +305,15 @@ public sealed class AutoLeaveDutyService : IDisposable
         {
             if (!AddonHelper.IsAddonReady("SelectYesno"))
             {
-                StatusText = "Enabled - duty complete detected; waiting for the leave confirmation dialog.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S2BC086538753B11F"));
             }
             else if (AddonHelper.IsLeaveDutyConfirmationPrompt())
             {
-                StatusText = "Enabled - duty complete detected; confirming the validated Leave Duty prompt.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S2A84934CD17A2280"));
             }
             else
             {
-                StatusText = "Enabled - unrelated or unreadable confirmation is open; leaving it untouched.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S87414C392E0F97B2"));
             }
 
             return;
@@ -318,12 +321,10 @@ public sealed class AutoLeaveDutyService : IDisposable
 
         if (AddonHelper.IsAddonVisible("ContentsFinderMenu"))
         {
-            StatusText = AddonHelper.IsAddonReady("ContentsFinderMenu")
-                ? "Enabled - duty complete detected; sending the controller-safe Leave Duty request."
-                : "Enabled - duty complete detected; waiting for the duty menu to finish opening.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (AddonHelper.IsAddonReady("ContentsFinderMenu") ? global::XASlave.Localization.UiMessage.Key("SC4EFF0CC5C9CD51F") : global::XASlave.Localization.UiMessage.Key("S90E2A39B47071BF8")));
             return;
         }
 
-        StatusText = "Enabled - duty complete detected; opening the game-owned duty menu without keyboard input.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S728C125EB5B5F804"));
     }
 }

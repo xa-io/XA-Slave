@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Plugin.Services;
 
@@ -14,7 +14,8 @@ public sealed class AutoLockGameWindowService : IDisposable
     private readonly WindowLockCoordinator coordinator;
     private bool enabled, disposed, subscribed;
     private long nextReconcile;
-    private string lastAction = "No actions yet.";
+    private global::XASlave.Localization.UiMessage? lastActionMessage = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    private string lastAction = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
 
     public AutoLockGameWindowService(ICondition condition, IPluginLog log)
     {
@@ -27,6 +28,10 @@ public sealed class AutoLockGameWindowService : IDisposable
 
     public string StatusText { get { lock (sync) return coordinator.Status; } }
     public string LastActionText { get { lock (sync) return lastAction; } }
+    internal global::XASlave.Localization.UiMessage StatusMessage { get { lock (sync) return coordinator.StatusMessage; } }
+    internal global::XASlave.Localization.UiMessage LastActionMessage { get { lock (sync) return global::XASlave.Localization.UiMessage.Capture(lastActionMessage, lastAction); } }
+    public string LocalizedStatusText { get { lock (sync) return coordinator.StatusMessage.Display; } }
+    public string LocalizedLastActionText { get { lock (sync) return global::XASlave.Localization.UiMessage.Resolve(lastActionMessage, lastAction); } }
     public bool IsLocked { get { lock (sync) return coordinator.IsLocked; } }
 
     public bool SetEnabled(bool value)
@@ -96,7 +101,7 @@ public sealed class AutoLockGameWindowService : IDisposable
 
     private void Publish()
     {
-        if (lastAction != coordinator.Status) lastAction = coordinator.Status;
+        if (lastAction != coordinator.Status) lastAction = global::XASlave.Localization.UiMessage.Store(ref lastActionMessage, coordinator.StatusMessage);
         var diagnostic = platform.TakeDiagnostic();
         if (diagnostic != null) log.Warning("[XASlave] Window position lock: {Diagnostic}", diagnostic);
     }

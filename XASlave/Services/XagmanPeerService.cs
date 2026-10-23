@@ -1303,7 +1303,7 @@ public sealed class XagmanPeerService : IDisposable
                 ? new List<XagmanTradeRequestEntry>()
                 : state.PendingGiveItems.Select(CloneTradeRequest).ToList(),
             CharacterNameWorld = state?.CharacterNameWorld ?? string.Empty,
-            Reason = state?.Reason ?? string.Empty,
+            ReasonMessage = state?.ReasonMessage ?? global::XASlave.Localization.UiMessage.Raw(string.Empty),
             RequestedItems = state?.RequestedItems == null
                 ? new List<XagmanTradeRequestEntry> { CloneTradeRequest(null) }
                 : state.RequestedItems.Select(CloneTradeRequest).ToList(),
@@ -1319,7 +1319,7 @@ public sealed class XagmanPeerService : IDisposable
                 SelectorKind = (XagmanItemSelectorKind)(-1),
                 Mode = (XagmanItemMode)(-1),
                 GreenScanComplete = false,
-                GreenScanError = "Malformed null request entry.",
+                GreenScanErrorMessage = global::XASlave.Localization.UiMessage.Key("S44A8ABCE3C1A9557"),
             };
         }
 
@@ -1338,7 +1338,7 @@ public sealed class XagmanPeerService : IDisposable
             CurrentValueScaled2 = entry.CurrentValueScaled2,
             ValueDeficitScaled2 = entry.ValueDeficitScaled2,
             GreenScanComplete = entry.GreenScanComplete,
-            GreenScanError = entry.GreenScanError,
+            GreenScanErrorMessage = entry.GreenScanErrorMessage,
         };
     }
 

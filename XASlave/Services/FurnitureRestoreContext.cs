@@ -16,6 +16,7 @@ internal sealed unsafe class FurnitureRestoreContext : IDisposable
     private static readonly string[] Names = ["HousingGoods", "SelectYesno"];
     private readonly IAddonLifecycle lifecycle;
     private readonly Action<string> revoked;
+    internal Action<global::XASlave.Localization.UiMessage>? MessageRevoked { get; set; }
     private readonly Dictionary<string, FurnitureAddonStamp> observed = new(StringComparer.Ordinal);
     private FurnitureAddonStamp? host;
     private Func<bool>? currentSession;
@@ -45,7 +46,7 @@ internal sealed unsafe class FurnitureRestoreContext : IDisposable
         if (disposed) return;
         var address = kind == AddonEvent.PostSetup ? args.Addon.Address : 0;
         observed[args.AddonName] = new(args.AddonName, ++Epoch, address, address == 0 ? 0u : ((AtkUnitBase*)address)->Id);
-        if (args.AddonName == "HousingGoods" && host != null) Revoke("The housing furniture interface was replaced or finalized.");
+        if (args.AddonName == "HousingGoods" && host != null) Revoke(global::XASlave.Localization.UiMessage.Key("SA3E8EA798F6164CE"));
     }
 
     internal FurnitureAddonStamp? Fresh(string name)
@@ -69,8 +70,8 @@ internal sealed unsafe class FurnitureRestoreContext : IDisposable
     internal FurnitureAddonStamp ClaimHost()
     {
         ObjectDisposedException.ThrowIf(disposed, this);
-        if (host != null) throw new InvalidOperationException("The furniture interface already owns a batch.");
-        host = Fresh("HousingGoods") ?? throw new InvalidOperationException("Open the native HousingGoods editing interface first.");
+        if (host != null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S15F8A7104A955DDB"), originalMessageText => new InvalidOperationException(originalMessageText));
+        host = Fresh("HousingGoods") ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD4CBC9B9101FC5A7"), originalMessageText => new InvalidOperationException(originalMessageText));
         return host.Value;
     }
 
@@ -83,7 +84,7 @@ internal sealed unsafe class FurnitureRestoreContext : IDisposable
     internal FurnitureAddonStamp RequireHost()
     {
         if (disposed || host is not { } stamp || Fresh("HousingGoods") != stamp)
-            throw new InvalidOperationException("The owned furniture interface is hidden, closed or replaced.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC6A644796BC80BAB"), originalMessageText => new InvalidOperationException(originalMessageText));
         return stamp;
     }
 
@@ -98,19 +99,25 @@ internal sealed unsafe class FurnitureRestoreContext : IDisposable
         {
             RequireHost();
             if (!Plugin.PlayerState.IsLoaded || (currentSession?.Invoke() == false))
-                Revoke("The character, estate or housing edit session changed.");
+                Revoke(global::XASlave.Localization.UiMessage.Key("S9B401FBE55233B89"));
         }
-        catch (Exception error) { if (host != null) Revoke(error.Message); }
+        catch (Exception error) { if (host != null) Revoke(global::XASlave.Localization.UiMessage.FromException(error)); }
     }
 
-    private void Revoke(string reason) { End(); revoked(reason); }
+    private void Revoke(global::XASlave.Localization.UiMessage reason) { End(); NotifyRevoked(reason); }
+
+    private void NotifyRevoked(global::XASlave.Localization.UiMessage reason)
+    {
+        if (MessageRevoked is { } presentation) presentation(reason);
+        else revoked(reason.Original);
+    }
 
     public void Dispose()
     {
         if (disposed) return;
         disposed = true;
         var active = host != null; End();
-        try { if (active) revoked("Furniture interface observation disposed."); }
+        try { if (active) NotifyRevoked(global::XASlave.Localization.UiMessage.Key("SEF207C8162DBF815")); }
         finally { lifecycle.UnregisterListener(Observe); Plugin.Framework.Update -= Update; }
     }
 }

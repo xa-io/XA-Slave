@@ -83,7 +83,10 @@ public unsafe sealed class DialogueSkipService : IDisposable
 
     public bool IsEnabled => enabled;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -99,7 +102,7 @@ public unsafe sealed class DialogueSkipService : IDisposable
             enabled = false;
             UpdateHookState(false);
             UpdateSubscription(talkLease != null);
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -169,21 +172,17 @@ public unsafe sealed class DialogueSkipService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (!initialized)
         {
-            StatusText = "Ready - Talk auto-advance is active and native dialogue hooks will arm on first dialogue.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S4AB3D546C53B5EC0"));
             return;
         }
 
-        StatusText = availableHookSurfaces > 0
-            ? availableHookSurfaces < TotalNativeHookSurfaces
-                ? $"Partially enabled - Talk addon auto-advance plus {availableHookSurfaces}/{TotalNativeHookSurfaces} native dialogue surfaces are active locally."
-                : $"Enabled - Talk addon auto-advance plus all {TotalNativeHookSurfaces} native dialogue surfaces are active locally."
-            : "Enabled - Talk addon auto-advance is active locally.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (availableHookSurfaces > 0 ? (availableHookSurfaces < TotalNativeHookSurfaces ? global::XASlave.Localization.UiMessage.Format("SCAE40C09C3C8930F", availableHookSurfaces, TotalNativeHookSurfaces) : global::XASlave.Localization.UiMessage.Format("SC300124D6BF18FD3", TotalNativeHookSurfaces)) : global::XASlave.Localization.UiMessage.Key("SF8AAD81F365C3184")));
     }
 
     private int CountHookSurfaces()

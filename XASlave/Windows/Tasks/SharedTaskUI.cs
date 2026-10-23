@@ -34,18 +34,18 @@ public partial class SlaveWindow
         var allRequired = arOk && lsOk && taOk && vnavOk && (!requiresXaDb || xaDbOk);
 
         if (allRequired)
-            ImGui.TextColored(green, "All required plugins loaded.");
+            ImGui.TextColored(green, global::XASlave.Localization.UiLocale.Get("SCB98E3ED3C5CB275"));
         else
-            ImGui.TextColored(red, "WARNING: Missing required plugins.");
+            ImGui.TextColored(red, global::XASlave.Localization.UiLocale.Get("SEBA5BEF6412F53DD"));
 
-        ImGui.Text("Required: ");
-        ImGui.SameLine(); ImGui.TextColored(arOk ? green : red, arOk ? "[AutoRetainer]" : "[AutoRetainer \u2717]");
-        ImGui.SameLine(); ImGui.TextColored(lsOk ? green : red, lsOk ? "[Lifestream]" : "[Lifestream \u2717]");
-        ImGui.SameLine(); ImGui.TextColored(taOk ? green : red, taOk ? "[TextAdvance]" : "[TextAdvance \u2717]");
-        ImGui.SameLine(); ImGui.TextColored(vnavOk ? green : red, vnavOk ? "[vnavmesh]" : "[vnavmesh \u2717]");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("S4588EB2A8F8AB239"));
+        ImGui.SameLine(); ImGui.TextColored(arOk ? green : red, arOk ? global::XASlave.Localization.UiLocale.Get("S4BD2C435DD24A0CE") : global::XASlave.Localization.UiLocale.Get("S62CBEBFD43D7680D"));
+        ImGui.SameLine(); ImGui.TextColored(lsOk ? green : red, lsOk ? global::XASlave.Localization.UiLocale.Get("S3D7411ED3FFD4E68") : global::XASlave.Localization.UiLocale.Get("S3C1330608BBB5379"));
+        ImGui.SameLine(); ImGui.TextColored(taOk ? green : red, taOk ? global::XASlave.Localization.UiLocale.Get("S777A45C0AF0AA9B1") : global::XASlave.Localization.UiLocale.Get("S89DC3A6CA0FA1D6F"));
+        ImGui.SameLine(); ImGui.TextColored(vnavOk ? green : red, vnavOk ? global::XASlave.Localization.UiLocale.Get("S4782008340817630") : global::XASlave.Localization.UiLocale.Get("SF2557AFFFD77B87D"));
         if (requiresXaDb)
         {
-            ImGui.SameLine(); ImGui.TextColored(xaDbOk ? green : red, xaDbOk ? "[XA Database]" : "[XA Database \u2717]");
+            ImGui.SameLine(); ImGui.TextColored(xaDbOk ? green : red, xaDbOk ? global::XASlave.Localization.UiLocale.Get("S5D509E9600642D79") : global::XASlave.Localization.UiLocale.Get("S15B7BFFF1B64CBC0"));
         }
 
         var optional = new (string Name, bool Available)[]
@@ -55,8 +55,8 @@ public partial class SlaveWindow
         };
         if (!requiresXaDb)
         {
-            ImGui.Text("Optional: ");
-            ImGui.SameLine(); ImGui.TextColored(xaDbOk ? green : dim, xaDbOk ? "[XA Database]" : "[XA Database -]");
+            ImGui.Text(global::XASlave.Localization.UiLocale.Get("S36B1A941DF5FFC4F"));
+            ImGui.SameLine(); ImGui.TextColored(xaDbOk ? green : dim, xaDbOk ? global::XASlave.Localization.UiLocale.Get("S5D509E9600642D79") : global::XASlave.Localization.UiLocale.Get("S02260938526E839B"));
             foreach (var p in optional)
             {
                 ImGui.SameLine(); ImGui.TextColored(p.Available ? green : dim, p.Available ? $"[{p.Name}]" : $"[{p.Name} -]");
@@ -64,7 +64,7 @@ public partial class SlaveWindow
         }
         else
         {
-            ImGui.Text("Optional: ");
+            ImGui.Text(global::XASlave.Localization.UiLocale.Get("S36B1A941DF5FFC4F"));
             foreach (var p in optional)
             {
                 ImGui.SameLine(); ImGui.TextColored(p.Available ? green : dim, p.Available ? $"[{p.Name}]" : $"[{p.Name} -]");
@@ -88,21 +88,21 @@ public partial class SlaveWindow
     private void DrawTaskLog(string id, ref bool showLog, IReadOnlyList<string> logMessages, Action clearLog)
     {
         ImGui.Spacing();
-        if (ImGui.Checkbox($"Show Log##{id}", ref showLog)) { }
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S2B57EB9069991494") + $"##{id}"), ref showLog)) { }
         if (showLog)
         {
             ImGui.SameLine();
-            if (ImGui.SmallButton($"Copy Log##{id}"))
+            if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("SDBA23F14C1094CBD") + $"##{id}")))
             {
                 if (logMessages.Count > 0)
                 {
                     ImGui.SetClipboardText(string.Join("\n", logMessages));
-                    arImportStatus = $"Copied {logMessages.Count} log lines to clipboard";
+                    arImportStatus = global::XASlave.Localization.UiMessage.Store(ref arImportStatusUiMessage, global::XASlave.Localization.UiMessage.Format("S4F2FF305D4E6CC44", logMessages.Count));
                     arImportStatusExpiry = DateTime.UtcNow.AddSeconds(5);
                 }
             }
             ImGui.SameLine();
-            if (ImGui.SmallButton($"Clear Log##{id}"))
+            if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S533E26BDCCDDF82C") + $"##{id}")))
                 clearLog();
 
             if (logMessages.Count > 0)
@@ -135,15 +135,15 @@ public partial class SlaveWindow
         var changed = false;
 
         ImGui.Separator();
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Task Options on Complete");
-        if (ImGui.Checkbox($"Logout on completion##{optionId}", ref logoutOnComplete))
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S9FB365AACE6A8E0D"));
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SB41DF0D656590B9A") + $"##{optionId}"), ref logoutOnComplete))
         {
             if (logoutOnComplete)
                 killGameOnComplete = false;
             changed = true;
         }
 
-        if (ImGui.Checkbox($"Kill Game on completion##{optionId}", ref killGameOnComplete))
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S0E5E994288B71CE3") + $"##{optionId}"), ref killGameOnComplete))
         {
             if (killGameOnComplete)
             {
@@ -154,9 +154,9 @@ public partial class SlaveWindow
             changed = true;
         }
         if (ImGui.IsItemHovered())
-            ImGui.SetTooltip("Forces XA's hard logout + close-client flow even if Instant Logout is disabled in XA Mods.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S1C870EEBFD9A0137"));
 
-        if (ImGui.Checkbox($"Enable AR Multi Mode on completion##{optionId}", ref enableArMultiOnComplete))
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S1EFB09E1AC9C8CAD") + $"##{optionId}"), ref enableArMultiOnComplete))
         {
             if (enableArMultiOnComplete)
                 killGameOnComplete = false;
@@ -169,14 +169,13 @@ public partial class SlaveWindow
         return changed;
     }
 
-    private bool DrawPriorityTaskActionButton(SlaveTask task, string buttonLabel, bool canStart, Action startAction, string disabledTooltip = "")
+    private bool DrawPriorityTaskActionButton(SlaveTask task, string buttonLabel, bool canStart, Action startAction, string disabledTooltip = "", string? displayButtonLabel = null)
     {
         if (TryGetActivePriorityTask(out var activeTask, out var activeLabel))
         {
-            var stopLabel = activeTask == task
-                ? $"Stop {GetPriorityTaskLabel(task)} Task##priorityStop{task}"
-                : $"Stop {activeLabel} Task##priorityStop{task}";
-            if (ImGui.Button(stopLabel))
+            var taskLabel = activeTask == task ? GetPriorityTaskLabel(task) : activeLabel;
+            var stopLabel = string.Format(global::XASlave.Localization.UiLocale.Native("S9E2B5ED901CBBCF6"), taskLabel) + $"##priorityStop{task}";
+            if (global::XASlave.Localization.UiNative.Button(stopLabel, display: global::XASlave.Localization.UiLocale.FormatKey("S9E2B5ED901CBBCF6", global::XASlave.Localization.UiLocale.T(taskLabel))))
                 StopPriorityTask(activeTask);
             return false;
         }
@@ -184,7 +183,7 @@ public partial class SlaveWindow
         bool clicked;
         using (ImRaii.Disabled(!canStart))
         {
-            clicked = ImGui.Button(buttonLabel);
+            clicked = global::XASlave.Localization.UiNative.Button(buttonLabel, display: displayButtonLabel);
             if (clicked)
                 startAction();
         }
@@ -230,7 +229,7 @@ public partial class SlaveWindow
             return;
 
         var safeCompleted = Math.Clamp(completed, 0, runList.Count);
-        ImGui.TextDisabled($"Processing Order ({safeCompleted}/{runList.Count}):");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("SB249930E113A2F8A", safeCompleted, runList.Count));
         for (int ci = 0; ci < runList.Count; ci++)
         {
             var ch = runList[ci];
@@ -253,7 +252,7 @@ public partial class SlaveWindow
             if (IsReloggerCharNotFoundInAr(ch))
             {
                 ImGui.SameLine();
-                ImGui.TextColored(ProcessingFailedColor, "(not found in AR)");
+                ImGui.TextColored(ProcessingFailedColor, global::XASlave.Localization.UiLocale.Get("S029F15BB9567E1F5"));
             }
         }
     }
@@ -283,14 +282,14 @@ public partial class SlaveWindow
     {
         var total = (int)Math.Round(Math.Max(0, seconds));
         if (total < 60)
-            return $"{total}s";
+            return global::XASlave.Localization.UiLocale.FormatKey("SC4C041F888329C4F", total);
         var minutes = total / 60;
         var secs = total % 60;
         if (minutes < 60)
-            return $"{minutes}m {secs:00}s";
+            return global::XASlave.Localization.UiLocale.FormatKey("SD8E33CB74C7EE10B", minutes, secs);
         var hours = minutes / 60;
         minutes %= 60;
-        return $"{hours}h {minutes:00}m";
+        return global::XASlave.Localization.UiLocale.FormatKey("S85AE847670C7E847", hours, minutes);
     }
 
     /// <summary>
@@ -306,8 +305,8 @@ public partial class SlaveWindow
         var processed = durations.Count;
         var remaining = Math.Max(0, runList.Count - processed);
         if (remaining == 0)
-            return $"Avg {FormatReloggerDuration(avg)}/char.";
-        return $"Avg {FormatReloggerDuration(avg)}/char, {remaining} remaining, ETA ~{FormatReloggerDuration(avg * remaining)}.";
+            return global::XASlave.Localization.UiLocale.FormatKey("S701D777BF761312B", FormatReloggerDuration(avg));
+        return global::XASlave.Localization.UiLocale.FormatKey("SF8DE09C2B6F95A9B", FormatReloggerDuration(avg), remaining, FormatReloggerDuration(avg * remaining));
     }
 
     /// <summary>
@@ -315,7 +314,7 @@ public partial class SlaveWindow
     /// Reused by CheckDuplicatePlots, ReturnAltsToHomeworlds, and any future task.
     /// </summary>
     private void StartTaskWithConfig(
-        string taskName,
+        global::XASlave.Localization.UiMessage taskName,
         List<string> characters,
         IReadOnlyList<(string CharName, ReloggerCharacterData Info)> backingList,
         HashSet<int> selectedIndices,
@@ -364,7 +363,7 @@ public partial class SlaveWindow
             return;
         }
 
-        HaltAutoCollectionForPriorityTask(taskName);
+        HaltAutoCollectionForPriorityTask(taskName.Original);
     }
 
     /// <summary>Helper: extract world from "Name@World" key.</summary>
@@ -385,7 +384,7 @@ public partial class SlaveWindow
         ImGui.TextDisabled(countLabel);
         ImGui.SameLine();
         var anonymize = plugin.Configuration.GlobalCharacterListAnonymizeEnabled;
-        if (ImGui.Checkbox($"Anonymize##{checkboxId}", ref anonymize))
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S03A849641AF34070") + $"##{checkboxId}"), ref anonymize))
         {
             plugin.Configuration.GlobalCharacterListAnonymizeEnabled = anonymize;
             plugin.Configuration.Save();
@@ -393,7 +392,7 @@ public partial class SlaveWindow
 
         if (ImGui.IsItemHovered())
         {
-            ImGui.SetTooltip("Hide character names and worlds locally with deterministic aliases for screenshot-safe tables. This checkbox is shared across every XA Slave task list.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SCB3F4F9D613E59B5"));
         }
     }
 
@@ -425,7 +424,7 @@ public partial class SlaveWindow
             : CharacterAliasHelper.GetWorldFromKey(characterNameWorld);
     }
 
-    private static readonly string[] RegionFilterOptions = { "All", "NA", "EU", "JP", "OCE" };
+    private static readonly string[] RegionFilterOptions = { global::XASlave.Localization.UiLocale.Native("SA52ACE420F2175D0"), global::XASlave.Localization.UiLocale.Native("S20EF0F0C8D0EEA98"), global::XASlave.Localization.UiLocale.Native("S9170A8B2FB3234BA"), global::XASlave.Localization.UiLocale.Native("S569EC6135D377E8A"), global::XASlave.Localization.UiLocale.Native("S79F53E6930DDF3F9") };
 
     private bool DrawRegionFilterCombo(string label, ref string regionFilter, float width = 80f)
     {
@@ -434,7 +433,7 @@ public partial class SlaveWindow
             regionIdx = 0;
 
         ImGui.SetNextItemWidth(Scale(width));
-        if (!ImGui.Combo(label, ref regionIdx, RegionFilterOptions, RegionFilterOptions.Length))
+        if (!global::XASlave.Localization.UiNative.Combo(label, ref regionIdx, RegionFilterOptions, RegionFilterOptions.Length))
             return false;
 
         regionFilter = RegionFilterOptions[regionIdx];
@@ -466,17 +465,17 @@ public partial class SlaveWindow
         return info.FcMemberRankSort == 0;
     }
 
-    private static string GetFcMemberRankLabel(ReloggerCharacterData? info)
+    private static string GetFcMemberRankLabel(ReloggerCharacterData? info) => GetFcMemberRankLabelMessage(info).Original;
+
+    private static global::XASlave.Localization.UiMessage GetFcMemberRankLabelMessage(ReloggerCharacterData? info)
     {
         if (info == null || info.FCID == 0)
-            return string.Empty;
+            return global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
         if (!string.IsNullOrWhiteSpace(info.FcMemberRankName))
-            return info.FcMemberRankName;
+            return global::XASlave.Localization.UiMessage.Raw(info.FcMemberRankName);
 
-        return info.FcMemberRankSort != int.MaxValue
-            ? $"Rank {info.FcMemberRankSort + 1}"
-            : string.Empty;
+        return (info.FcMemberRankSort != int.MaxValue ? global::XASlave.Localization.UiMessage.Format("S1DC73B9111CCDC2F", info.FcMemberRankSort + 1) : global::XASlave.Localization.UiMessage.Raw(string.Empty));
     }
 
     private static string GetFreeCompanyRankLabel(ReloggerCharacterData? info)

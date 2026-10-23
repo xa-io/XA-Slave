@@ -66,7 +66,7 @@ internal sealed unsafe class FurnitureRestoreNativeGate : IDisposable
 
     internal void SetOriginal(nint original)
     {
-        if (retired || original == 0 || Marshal.ReadIntPtr(state, 8) != 0) throw new InvalidOperationException("Initialize the furniture observer Original once before exposure.");
+        if (retired || original == 0 || Marshal.ReadIntPtr(state, 8) != 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE40EAC8F19A067A7"), originalMessageText => new InvalidOperationException(originalMessageText));
         Marshal.WriteIntPtr(state, 8, original);
     }
 
@@ -74,14 +74,14 @@ internal sealed unsafe class FurnitureRestoreNativeGate : IDisposable
     internal void RedirectInactiveOriginal(nint original)
     {
         if (retired || original == 0 || Volatile.Read(ref Unsafe.AsRef<int>((void*)state)) != 0)
-            throw new InvalidOperationException("Redirect only an inactive furniture observer relay.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9CEE806F59ADB312"), originalMessageText => new InvalidOperationException(originalMessageText));
         Interlocked.Exchange(ref Unsafe.AsRef<nint>((void*)(state + 8)), original);
     }
 
     internal void Activate()
     {
         ObjectDisposedException.ThrowIf(retired, this);
-        if (Marshal.ReadIntPtr(state, 8) == 0) throw new InvalidOperationException("furniture Original is unavailable.");
+        if (Marshal.ReadIntPtr(state, 8) == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0F2FCBEFEBFB43CF"), originalMessageText => new InvalidOperationException(originalMessageText));
         Volatile.Write(ref Unsafe.AsRef<int>((void*)state), 1);
     }
 
@@ -117,13 +117,13 @@ internal sealed unsafe class FurnitureRestoreNativeGate : IDisposable
         BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(tableAt + 4), (uint)code.Length);
         BinaryPrimitives.WriteUInt32LittleEndian(image.AsSpan(tableAt + 8), (uint)unwindAt);
         var address = VirtualAlloc(0, (nuint)image.Length, 0x3000, 4);
-        if (address == 0) throw new InvalidOperationException("Cannot allocate furniture observer relay.");
+        if (address == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2CE5609C014A1A81"), originalMessageText => new InvalidOperationException(originalMessageText));
         try
         {
             Marshal.Copy(image, 0, address, image.Length);
             if (!VirtualProtect(address, (nuint)image.Length, 0x20, out _) || !FlushInstructionCache(GetCurrentProcess(), address, (nuint)image.Length))
-                throw new InvalidOperationException("Cannot publish furniture observer relay code.");
-            if (!RtlAddFunctionTable(address + tableAt, 1, (ulong)address)) throw new InvalidOperationException("Cannot register furniture observer relay unwind data.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S52C1DECE6665102A"), originalMessageText => new InvalidOperationException(originalMessageText));
+            if (!RtlAddFunctionTable(address + tableAt, 1, (ulong)address)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S5B349F167BD4158D"), originalMessageText => new InvalidOperationException(originalMessageText));
             return address;
         }
         catch { VirtualFree(address, 0, 0x8000); throw; }

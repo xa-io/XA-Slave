@@ -17,7 +17,7 @@ public sealed class XAPeepHistoryWindow : Window
     private bool sortDescending = true;
 
     public XAPeepHistoryWindow(Plugin plugin)
-        : base("XA Peep History###XAPeepHistoryWindow", ImGuiWindowFlags.None)
+        : base(global::XASlave.Localization.UiLocale.Get("SE949F21FF0757958") + "###XAPeepHistoryWindow", ImGuiWindowFlags.None)
     {
         this.plugin = plugin;
         Size = ScaledVector(520f, 320f);
@@ -27,6 +27,7 @@ public sealed class XAPeepHistoryWindow : Window
 
     public override void PreDraw()
     {
+        WindowName = global::XASlave.Localization.UiLocale.Get("SE949F21FF0757958") + "###XAPeepHistoryWindow";
         UpdateSizeConstraints(UiScale);
     }
 
@@ -55,13 +56,13 @@ public sealed class XAPeepHistoryWindow : Window
         var clearHistoryModifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
         using (ImRaii.Disabled(!clearHistoryModifierHeld))
         {
-            if (ImGui.SmallButton("Clear"))
+            if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S83B12C2216EFB4FD")))
                 plugin.XAPeep.ClearHistory();
         }
         if (!clearHistoryModifierHeld)
         {
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Press and hold CTRL + SHIFT to allow clearing.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SB5788021233F3E54"));
         }
 
         ImGui.Spacing();
@@ -69,7 +70,7 @@ public sealed class XAPeepHistoryWindow : Window
         var trackedPlayers = plugin.XAPeep.GetTrackedPlayers(500);
         if (trackedPlayers.Count == 0)
         {
-            ImGui.TextDisabled("No XA Peep history recorded yet.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SD453C4060D278247"));
             return;
         }
 
@@ -82,11 +83,11 @@ public sealed class XAPeepHistoryWindow : Window
             return;
 
         ImGui.TableSetupScrollFreeze(0, 1);
-        ImGui.TableSetupColumn("Count", ImGuiTableColumnFlags.WidthFixed, Scale(56f));
-        ImGui.TableSetupColumn("Player", ImGuiTableColumnFlags.WidthStretch, 1.7f);
-        ImGui.TableSetupColumn("Last Seen", ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.PreferSortDescending, Scale(125f));
-        ImGui.TableSetupColumn("Total", ImGuiTableColumnFlags.WidthFixed, Scale(80f));
-        ImGui.TableHeadersRow();
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S37BAC4952BECF21A"), ImGuiTableColumnFlags.WidthFixed, Scale(56f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S64AEE8C6CBD026D9"), ImGuiTableColumnFlags.WidthStretch, 1.7f);
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SA0F7892F5D452CA2"), ImGuiTableColumnFlags.WidthFixed | ImGuiTableColumnFlags.DefaultSort | ImGuiTableColumnFlags.PreferSortDescending, Scale(125f));
+        global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SC9B3C38247F744E1"), ImGuiTableColumnFlags.WidthFixed, Scale(80f));
+        global::XASlave.Localization.UiNative.TableHeadersRow();
 
         ApplyTableSortSpecs();
         var sortedPlayers = SortTrackedPlayers(trackedPlayers);

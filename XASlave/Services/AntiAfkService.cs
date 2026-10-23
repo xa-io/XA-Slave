@@ -27,7 +27,10 @@ public unsafe sealed class AntiAfkService : IDisposable
         RefreshStatusText();
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -79,7 +82,7 @@ public unsafe sealed class AntiAfkService : IDisposable
             var inputTimer = InputTimerModule.Instance();
             if (inputTimer == null)
             {
-                StatusText = "Enabled - waiting for the local AFK timer module.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S776293309FCD2937"));
                 return;
             }
 
@@ -99,8 +102,6 @@ public unsafe sealed class AntiAfkService : IDisposable
 
     private void RefreshStatusText()
     {
-        StatusText = enabled
-            ? "Enabled - resets the local AFK timer every 2 min."
-            : "Disabled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (enabled ? global::XASlave.Localization.UiMessage.Key("SA01612A647A35A8F") : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")));
     }
 }

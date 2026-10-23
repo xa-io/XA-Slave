@@ -34,7 +34,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         {
             var saved = domain.GetData(key);
             if (saved is Dictionary<nint, Dictionary<nint, byte[]>> existing) return existing;
-            if (saved != null) throw new InvalidOperationException("Furniture inactive observer path registry has an incompatible format.");
+            if (saved != null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0BC2A3BE236B6660"), originalMessageText => new InvalidOperationException(originalMessageText));
             var created = new Dictionary<nint, Dictionary<nint, byte[]>>();
             domain.SetData(key, created);
             return created;
@@ -52,7 +52,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         {
             var saved = domain.GetData(key);
             if (saved is Dictionary<nint, byte[]> existing) return existing;
-            if (saved != null) throw new InvalidOperationException("Furniture inactive observer registry has an incompatible format.");
+            if (saved != null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCBE7DDB34EFB9E53"), originalMessageText => new InvalidOperationException(originalMessageText));
             var created = new Dictionary<nint, byte[]>();
             domain.SetData(key, created);
             return created;
@@ -88,7 +88,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         Prepare();
         // Never block Draw/Update on disk hashing or signature scanning.
         if (!preparation!.IsCompleted)
-            throw new InvalidOperationException("Furniture native checks are preparing in the background. Try again shortly.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S64F99FF98B4B7C29"), originalMessageText => new InvalidOperationException(originalMessageText));
         var source = preparation.GetAwaiter().GetResult();
         var result = new FurnitureRestoreNativeBinding(source);
         result.Validate();
@@ -108,15 +108,15 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
     {
         if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(sdkPath)))
             is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2" or "F5A2C68CCECD3E199BDA572050E98902B2E7594066C95DC7826C2D4297CD0564"))
-            throw new InvalidOperationException("Furniture restoration requires revalidated client structures.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0625ED9E9FD24A0D"), originalMessageText => new InvalidOperationException(originalMessageText));
         var bytes = File.ReadAllBytes(fileName);
         if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)
-            throw new InvalidOperationException("Furniture restoration requires a revalidated game build.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6F84A5B869A10CBD"), originalMessageText => new InvalidOperationException(originalMessageText));
         using var stream = new MemoryStream(bytes, false);
         using var pe = new PEReader(stream);
         ModuleBase = moduleBase;
         if (pe.PEHeaders.PEHeader?.SizeOfImage != moduleSize)
-            throw new InvalidOperationException("Furniture executable image identity changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S95ECACEAEAC1B26A"), originalMessageText => new InvalidOperationException(originalMessageText));
         Resolve(pe, Sigs.FurnitureRestoreInventoryRestoreProof);
         Resolve(pe, Sigs.FurnitureRestoreStorageRestoreProof);
         Resolve(pe, Sigs.FurnitureRestoreIndoorInventoryProof);
@@ -138,11 +138,11 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         var constructor = Function("AgentConstructor");
         var lea = pe.GetSectionData(checked((int)(constructor - ModuleBase)) + 0x2B).GetContent(0, 7).ToArray();
         if (!lea.AsSpan(0, 3).SequenceEqual(new byte[] { 0x48, 0x8D, 0x05 }))
-            throw new InvalidOperationException("Housing agent constructor layout changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S61E6DF14B71A38CD"), originalMessageText => new InvalidOperationException(originalMessageText));
         AgentTable = constructor + 0x32 + BinaryPrimitives.ReadInt32LittleEndian(lea.AsSpan(3));
-        if (AgentTable - ModuleBase != 0x22CF978) throw new InvalidOperationException("Housing agent vtable changed.");
+        if (AgentTable - ModuleBase != 0x22CF978) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SFF0D897FD78DA6E4"), originalMessageText => new InvalidOperationException(originalMessageText));
         var updater = ResolveTableEntry(pe, AgentTable, 7);
-        if (updater - ModuleBase != 0x1721240) throw new InvalidOperationException("Housing agent updater changed.");
+        if (updater - ModuleBase != 0x1721240) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S53FA04E3B57CF133"), originalMessageText => new InvalidOperationException(originalMessageText));
         Pin(pe, checked((int)(updater - ModuleBase)), 0x33);
         RequireBranch(pe, updater + 0x2E, 1, 5, Function("CountProducer"));
         IndoorListenerTable = FindReceiverTable(pe, Function("IndoorDecision"), 0x21CFEC0);
@@ -158,7 +158,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         RequireOffset<IndoorTerritory.IndoorTerritoryUIEventListener>(nameof(IndoorTerritory.IndoorTerritoryUIEventListener.AddonId), 32);
         RequireOffset<AgentInterface>(nameof(AgentInterface.AddonId), 32);
         if ((int)AgentId.Housing != 120 || sizeof(HousingManager) != 232 || sizeof(InventoryItem) != 72)
-            throw new InvalidOperationException("Furniture native size/identity metadata changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S24A616B021D226A3"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     private static void RequireOffset<T>(string field, int expected) where T : struct
@@ -170,7 +170,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         var offset = type.GetField(field, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic)
             ?.GetCustomAttribute<FieldOffsetAttribute>();
         if (type.StructLayoutAttribute?.Value != LayoutKind.Explicit || offset == null || offset.Value != expected)
-            throw new InvalidOperationException("Furniture native field layout changed: " + type.Name + "." + field);
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S1BD8C401C5004293" , type.Name, field), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     private void Resolve(PEReader pe, FurnitureNativeProof definition)
@@ -190,13 +190,13 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
                     for (var index = 0; index < pattern.Length; index++)
                         if (mask[index] != 0 && pattern[index] != data[offset + index]) { equal = false; break; }
                     if (!equal) continue;
-                    if (match >= 0) throw new InvalidOperationException("Ambiguous furniture signature: " + definition.Name);
+                    if (match >= 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S0B9292BAC73409D4" , definition.Name), originalMessageText => new InvalidOperationException(originalMessageText));
                     match = section.VirtualAddress + offset;
                 }
             }
         }
         finally { CryptographicOperations.ZeroMemory(pattern); CryptographicOperations.ZeroMemory(mask); }
-        if (match != definition.Rva) throw new InvalidOperationException("Furniture signature mismatch: " + definition.Name);
+        if (match != definition.Rva) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S4111CA47135C2D24" , definition.Name), originalMessageText => new InvalidOperationException(originalMessageText));
         functions.Add(definition.Name, ModuleBase + match);
         var directory = pe.PEHeaders.PEHeader!.ExceptionTableDirectory;
         var records = pe.GetSectionData(directory.RelativeVirtualAddress).GetContent(0, directory.Size).ToArray();
@@ -212,7 +212,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
                     found = true;
             }
             if (begin < match || end <= begin || end - begin > 65536 || (unwind == 0 ? overlapping : !found))
-                throw new InvalidOperationException("Furniture function extent changed: " + definition.Name);
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SE8327069E4BD992A" , definition.Name), originalMessageText => new InvalidOperationException(originalMessageText));
             Pin(pe, begin, end - begin);
         }
     }
@@ -221,7 +221,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
     {
         if (!pe.PEHeaders.SectionHeaders.Any(section => (section.SectionCharacteristics & SectionCharacteristics.MemExecute) != 0
             && begin >= section.VirtualAddress && (long)begin + length <= (long)section.VirtualAddress + Math.Min(section.VirtualSize, section.SizeOfRawData)))
-            throw new InvalidOperationException("Furniture function is outside backed executable code.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S54E3CDBFACB47359"), originalMessageText => new InvalidOperationException(originalMessageText));
         proofs.Add(ModuleBase + begin, pe.GetSectionData(begin).GetContent(0, length).ToArray());
     }
 
@@ -230,7 +230,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         var data = pe.GetSectionData(checked((int)(instruction - ModuleBase))).GetContent(0, length).ToArray();
         if ((displacementOffset == 1 ? data[0] is not (0xE8 or 0xE9) : data[0] != 0x0F || data[1] != 0x85)
             || instruction + length + BinaryPrimitives.ReadInt32LittleEndian(data.AsSpan(displacementOffset)) != expected)
-            throw new InvalidOperationException("Furniture native dispatch branch changed.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6B280B5D327A7E4F"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     private nint ResolveTableEntry(PEReader pe, nint table, int slot)
@@ -252,11 +252,11 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
             for (var offset = 0; offset <= data.Length - 8; offset += 8)
             {
                 if (BinaryPrimitives.ReadUInt64LittleEndian(data.AsSpan(offset)) != expected) continue;
-                if (match >= 0) throw new InvalidOperationException("Ambiguous furniture listener table.");
+                if (match >= 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9608BEDE1EDD4753"), originalMessageText => new InvalidOperationException(originalMessageText));
                 match = section.VirtualAddress + offset;
             }
         }
-        if (match != reviewedRva) throw new InvalidOperationException("Furniture listener table changed.");
+        if (match != reviewedRva) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S43C998D34C0361E3"), originalMessageText => new InvalidOperationException(originalMessageText));
         tables.Add((ModuleBase + match, receiver)); return ModuleBase + match;
     }
 
@@ -269,25 +269,25 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
             if (installed.TryGetValue(address, out var prefix))
             {
                 if (!actual.AsSpan(0, prefix.Length).SequenceEqual(prefix) || !actual.AsSpan(prefix.Length).SequenceEqual(proof.AsSpan(prefix.Length)))
-                    throw new InvalidOperationException("Furniture observer or surrounding native function changed.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2FB6C5A7D6D8E25E"), originalMessageText => new InvalidOperationException(originalMessageText));
                 if (installedPaths.TryGetValue(address, out var dependencies))
                     foreach (var (location, expected) in dependencies)
                         if (!NearbyZoneNativeBinding.Read(location, expected.Length).AsSpan().SequenceEqual(expected))
-                            throw new InvalidOperationException("Furniture inherited forwarding path changed while observing.");
+                            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9BC2B8BF9DB5F678"), originalMessageText => new InvalidOperationException(originalMessageText));
             }
             else if (!actual.AsSpan().SequenceEqual(proof)
                 && !HasVerifiedRetirement(address, actual, proof)
                 && !HasVerifiedForwarding(address, proof))
-                throw new InvalidOperationException($"Furniture native entry at RVA 0x{address - ModuleBase:X} has an unrecognised or active modification; it does not match an owned observer or a verified inactive forwarding path.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S66009413CD962CD6" , address - ModuleBase), originalMessageText => new InvalidOperationException(originalMessageText));
         }
         foreach (var (address, expected) in tables)
-            if (ReadPointer(address) != expected) throw new InvalidOperationException("Furniture live vtable changed.");
+            if (ReadPointer(address) != expected) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE06E94728B7118FD"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     internal void RecordInstalled(string name)
     {
         var address = Function(name);
-        if (installed.ContainsKey(address)) throw new InvalidOperationException("Furniture observer prefix already owned.");
+        if (installed.ContainsKey(address)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2F38ED8BD96C3B63"), originalMessageText => new InvalidOperationException(originalMessageText));
         var previous = forwarding.GetValueOrDefault(address) ?? retiredPaths.GetValueOrDefault(address);
         var dependencies = new Dictionary<nint, byte[]>();
         if (previous != null)
@@ -295,7 +295,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
             foreach (var entry in previous)
                 if (entry.Key != address) dependencies.Add(entry.Key, entry.Value);
         }
-        if (!originals.TryGetValue(address, out var originalProof)) throw new InvalidOperationException("Furniture Original was not verified before activation.");
+        if (!originals.TryGetValue(address, out var originalProof)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SBF81FDAB3D3FBC81"), originalMessageText => new InvalidOperationException(originalMessageText));
         foreach (var entry in originalProof) dependencies[entry.Key] = entry.Value;
         installedPaths.Add(address, dependencies);
         installed.Add(address, NearbyZoneNativeBinding.Read(address, Math.Min(32, proofs[address].Length)));
@@ -308,7 +308,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         NearbyZoneNativeBinding.RequireFramework();
         var address = Function(name);
         if (!FurnitureRestoreForwardingProof.TryCaptureOriginal(address, NearbyZoneNativeBinding.Read(address, Math.Min(32, proofs[address].Length)), original, out var snapshot))
-            throw new InvalidOperationException("Furniture Original trampoline could not be verified before activation: " + name);
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S6494624BE339E7AB" , name), originalMessageText => new InvalidOperationException(originalMessageText));
         originals.Add(address, snapshot);
     }
 
@@ -350,7 +350,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         var proof = proofs[address];
         var actual = NearbyZoneNativeBinding.Read(address, proof.Length);
         if (!actual.AsSpan().SequenceEqual(proof) && !MatchesPrefix(actual, proof, prefix))
-            throw new InvalidOperationException("Furniture observer changed during retirement: " + name);
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S228382111C5B434F" , name), originalMessageText => new InvalidOperationException(originalMessageText));
         if (actual.AsSpan().SequenceEqual(proof))
         {
             retired.Remove(address); retiredPaths.Remove(address);
@@ -359,13 +359,13 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         }
         if (!originals.TryGetValue(address, out var originalProof)
             || !FurnitureRestoreForwardingProof.TryCaptureDisabledWrapper(address, prefix, originalProof.Keys.Single(), out var snapshots))
-            throw new InvalidOperationException("Furniture disabled observer path could not be verified: " + name);
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SE6F73B82EC46B55C" , name), originalMessageText => new InvalidOperationException(originalMessageText));
         if (installedPaths.TryGetValue(address, out var dependencies))
         {
             foreach (var (location, expected) in dependencies)
             {
                 if (!NearbyZoneNativeBinding.Read(location, expected.Length).AsSpan().SequenceEqual(expected))
-                    throw new InvalidOperationException("Furniture inherited forwarding path changed during retirement: " + name);
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S5F83F79AF7AF14F9" , name), originalMessageText => new InvalidOperationException(originalMessageText));
                 snapshots[location] = expected;
             }
         }

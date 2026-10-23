@@ -28,6 +28,7 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
     private Vector2 sourceUv;
     private float duration, position, playOrigin;
     private double interval, nextSample;
+    private global::XASlave.Localization.UiMessage? failureMessage;
     private string status = string.Empty, failure = string.Empty;
 
     private sealed record Frame(float Time, IDalamudTextureWrap Image, long Bytes);
@@ -47,6 +48,9 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
     internal int FrameIndex { get { lock (sync) return frames.Count == 0 ? -1 : SelectedFrameCore(); } }
     internal long Revision { get { lock (sync) return revision; } }
     internal float Duration { get { lock (sync) return duration; } }
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    internal global::XASlave.Localization.UiMessage StatusMessage { get { lock (sync) return global::XASlave.Localization.UiMessage.Capture(statusMessage, status); } }
+    internal string LocalizedStatus => StatusMessage.Display;
     internal string Status { get { lock (sync) return status; } }
     internal bool Playing { get { lock (sync) return recording || playing; } set => SetPlaying(value); }
     internal float Position { get { lock (sync) return position; } set => Seek(value); }
@@ -61,8 +65,7 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
             duration = float.IsFinite(durationSeconds) && durationSeconds > 0
                 ? Math.Clamp(durationSeconds, 0.1f, MaximumSeconds) : 5;
             recording = true;
-            status = durationCapped ? "Recording the first 30 seconds of this longer animation..."
-                : "Preparing to record one animation cycle...";
+            status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (durationCapped ? global::XASlave.Localization.UiMessage.Key("S9FF4B37E967BD308") : global::XASlave.Localization.UiMessage.Key("SF861C0B0815255C2")));
         }
     }
 
@@ -75,7 +78,7 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
             if (sourceAssigned && sourceGeneration != generation)
             {
                 ResetCore();
-                status = "Recording cleared because the preview changed.";
+                status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S8B6414C194D7962E"));
                 return;
             }
             UpdateCore();
@@ -83,9 +86,9 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
             try
             {
                 if (!float.IsFinite(uv.X) || !float.IsFinite(uv.Y) || uv.X <= 0 || uv.Y <= 0 || uv.X > 1 || uv.Y > 1)
-                    throw new InvalidOperationException("The preview image crop is invalid.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF47B52FFF519A2AB"), originalMessageText => new InvalidOperationException(originalMessageText));
                 if (!float.IsFinite(pixelSize.X) || !float.IsFinite(pixelSize.Y))
-                    throw new InvalidOperationException("The preview image dimensions are invalid.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S83CE1EA44596057D"), originalMessageText => new InvalidOperationException(originalMessageText));
                 // The borrowed wrap can describe ActualWidth/Height while its
                 // SRV is allocated larger. UV crops that SRV; multiplying the
                 // wrap's dimensions by UV again would shrink the image twice.
@@ -93,11 +96,11 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
                 var copyHeight = checked((int)MathF.Round(pixelSize.Y));
                 var bytes = ImageBytes(copyWidth, copyHeight);
                 if (bytes <= 0 || bytes > MaximumBytes)
-                    throw new InvalidOperationException("This preview image exceeds the recording memory limit.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCB4423F8EE9F6824"), originalMessageText => new InvalidOperationException(originalMessageText));
                 if (sourceAssigned && (width != copyWidth || height != copyHeight || sourceUv != uv))
                 {
                     ResetCore();
-                    status = "Recording cleared because the preview size changed.";
+                    status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SD58A6D8CADDA13AA"));
                     return;
                 }
                 // A canceled copy keeps the only pending slot until it settles,
@@ -117,7 +120,7 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
                 if (elapsed >= duration) { FinishRecordingCore(true); return; }
                 if (frames.Count >= frameBudget || elapsed < nextSample) return;
                 if (retainedBytes + bytes > MaximumBytes)
-                    throw new InvalidOperationException("The recording memory limit was reached.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD8D5CDC849860605"), originalMessageText => new InvalidOperationException(originalMessageText));
 
                 var retainedSource = source.CreateWrapSharingLowLevelResource();
                 var cancellation = new CancellationTokenSource();
@@ -134,8 +137,7 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
                     pending = new(revision, generation, (float)elapsed, copyWidth, copyHeight, bytes,
                         retainedSource, cancellation, task);
                     nextSample = elapsed + interval;
-                    status = $"Recording: {elapsed:0.0} / {duration:0.0} seconds ({frames.Count} frames)."
-                        + (durationCapped ? " The animation is longer than the 30-second recording limit." : string.Empty);
+                    status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S8391DA809DD9CA6B" , global::XASlave.Localization.UiMessage.Format("SD67DAA039C77A4F9" , elapsed, duration, frames.Count), ((durationCapped ? global::XASlave.Localization.UiMessage.Key("SBC1C0913D32885D2") : global::XASlave.Localization.UiMessage.Raw(string.Empty)))));
                 }
                 catch
                 {
@@ -146,9 +148,9 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
             }
             catch (Exception error)
             {
-                failure = "Recording stopped: " + error.Message;
+                failure = global::XASlave.Localization.UiMessage.Store(ref failureMessage, global::XASlave.Localization.UiMessage.Format("S76D13A9C9F726447" , global::XASlave.Localization.UiMessage.FromException(error)));
                 FinishRecordingCore(false);
-                status = failure;
+                status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Capture(failureMessage, failure));
             }
         }
     }
@@ -180,7 +182,7 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
                         || frames.Count >= MaximumFrames || retainedBytes + copy.Bytes > MaximumBytes)
                     {
                         DisposeTexture(image);
-                        failure = "Recording stopped: the copied image exceeded its reserved size.";
+                        failure = global::XASlave.Localization.UiMessage.Store(ref failureMessage, global::XASlave.Localization.UiMessage.Key("SED4C6A2B5ABCA064"));
                         finishPlaying = false;
                         FinishRecordingCore(false);
                     }
@@ -195,7 +197,7 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
                     var error = copy.Task.Exception?.GetBaseException(); // Observe failures, including stale copies.
                     if (copy.Revision == revision && copy.Generation == sourceGeneration)
                     {
-                        failure = error == null ? "Recording canceled." : "Recording stopped: " + error.Message;
+                        failure = global::XASlave.Localization.UiMessage.Store(ref failureMessage, (error == null ? global::XASlave.Localization.UiMessage.Key("S8BB4C3F851567B91") : global::XASlave.Localization.UiMessage.Format("S76D13A9C9F726447" , global::XASlave.Localization.UiMessage.FromException(error))));
                         finishPlaying = false;
                         FinishRecordingCore(false);
                     }
@@ -234,7 +236,7 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
         recordClock.Stop();
         position = duration;
         if (pending == null) BeginFinishedPlaybackCore();
-        else status = "Finishing the recorded frame...";
+        else status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SDD950AAE0E9F53CD"));
     }
 
     private void BeginFinishedPlaybackCore()
@@ -246,11 +248,10 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
             playClock.Restart();
         }
         finishPlaying = false;
-        if (!string.IsNullOrEmpty(failure)) status = failure + (frames.Count != 0 ? " Recorded frames remain available." : string.Empty);
-        else if (frames.Count == 0) status = "No animation frames were recorded.";
-        else if (frames.Count == 1) status = "One frame recorded. Play again to record an animation.";
-        else status = durationCapped ? $"Recorded {duration:0.0} seconds of a longer animation ({frames.Count} frames)."
-            : $"Recorded {duration:0.0} seconds ({frames.Count} frames).";
+        if (!string.IsNullOrEmpty(failure)) status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S8391DA809DD9CA6B" , global::XASlave.Localization.UiMessage.Capture(failureMessage, failure), ((frames.Count != 0 ? global::XASlave.Localization.UiMessage.Key("S81D0F18853062B4D") : global::XASlave.Localization.UiMessage.Raw(string.Empty)))));
+        else if (frames.Count == 0) status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S1CC36782F4EF4969"));
+        else if (frames.Count == 1) status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SEAAEC8ED7D13EB0D"));
+        else status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, (durationCapped ? global::XASlave.Localization.UiMessage.Format("SC4B1352043CCC3E2" , duration, frames.Count) : global::XASlave.Localization.UiMessage.Format("SF47F54892D271F88" , duration, frames.Count)));
     }
 
     internal void SetPlaying(bool value)
@@ -343,7 +344,7 @@ internal sealed class ViewSingleItemAnimationClip : IDisposable
         sourceGeneration = 0; sourceUv = Vector2.Zero;
         duration = position = playOrigin = 0;
         interval = nextSample = 0;
-        status = failure = string.Empty;
+        failure = global::XASlave.Localization.UiMessage.Store(ref failureMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty)); status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
     }
 
     private static long ImageBytes(int imageWidth, int imageHeight)

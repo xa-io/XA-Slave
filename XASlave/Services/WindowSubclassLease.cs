@@ -32,7 +32,7 @@ internal sealed class WindowSubclassLease : IWindowSubclassLease
         WindowSubclassApi.RequireOwnerThread(target);
         Target = target;
         id = unchecked((nuint)Interlocked.Increment(ref nextId));
-        if (id == 0) throw new InvalidOperationException("Window subclass identity exhausted.");
+        if (id == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S94908A0274FC31C7"), original => new InvalidOperationException(original));
         cleanupMessage = WindowSubclassApi.CleanupMessage;
         root = GCHandle.Alloc(this);
         token = unchecked((nuint)GCHandle.ToIntPtr(root));
@@ -74,7 +74,7 @@ internal sealed class WindowSubclassLease : IWindowSubclassLease
     {
         WindowSubclassApi.RequireOwnerThread(Target);
         if (!Registered || Destroyed || Volatile.Read(ref cleanupRequested) != 0)
-            throw new InvalidOperationException("Window subclass cannot be activated after cleanup.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1E6DE9C8E4124DCF"), original => new InvalidOperationException(original));
         Volatile.Write(ref blocks, 1);
     }
     public void Deactivate() => Interlocked.Exchange(ref blocks, 0);
@@ -220,18 +220,18 @@ internal static class WindowSubclassApi
     internal static uint CleanupMessage => EntryPoints.Value.Message;
     internal static void RequireOwnerThread(WindowLockTarget target)
     {
-        if (target.Handle == 0 || !IsWindow(target.Handle)) throw new InvalidOperationException("Waiting for game window");
+        if (target.Handle == 0 || !IsWindow(target.Handle)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF6E79B4DC7B09CBE"), original => new InvalidOperationException(original));
         var thread = GetWindowThreadProcessId(target.Handle, out var process);
-        if (process != (uint)Environment.ProcessId || process != target.Process) throw new InvalidOperationException("Unsupported game window process");
-        if (thread == 0 || thread != target.Thread || thread != GetCurrentThreadId()) throw new InvalidOperationException("Unsupported window thread");
+        if (process != (uint)Environment.ProcessId || process != target.Process) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S88686A1159D7E5D2"), original => new InvalidOperationException(original));
+        if (thread == 0 || thread != target.Thread || thread != GetCurrentThreadId()) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0828430226AAD1B3"), original => new InvalidOperationException(original));
     }
     internal static void RequireWritableWindowPos(nint address)
     {
         if (VirtualQuery(address, out var region, (nuint)Marshal.SizeOf<MemoryRegion>()) == 0 || region.State != 0x1000
             || (region.Protect & 0x100) != 0 || (region.Protect & 0xFF & 0xCC) == 0)
-            throw new InvalidOperationException("WINDOWPOS buffer is not writable committed memory.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCAE08A3D697A1C52"), original => new InvalidOperationException(original));
         var start = unchecked((ulong)address); var begin = unchecked((ulong)region.Base);
-        if (start < begin || checked(start + 40) > checked(begin + (ulong)region.Size)) throw new InvalidOperationException("WINDOWPOS buffer crosses its memory region.");
+        if (start < begin || checked(start + 40) > checked(begin + (ulong)region.Size)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF90D4F77FC8C5BB5"), original => new InvalidOperationException(original));
     }
     [StructLayout(LayoutKind.Sequential)] private struct WindowPos { public nint Window, InsertAfter; public int X, Y, Width, Height; public uint Flags; }
     [StructLayout(LayoutKind.Sequential)] private struct MemoryRegion { public nint Base, AllocationBase; public uint AllocationProtect; public nuint Size; public uint State, Protect, Type; }

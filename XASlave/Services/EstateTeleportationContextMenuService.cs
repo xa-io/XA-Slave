@@ -23,7 +23,10 @@ public sealed unsafe class EstateTeleportationContextMenuService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -32,7 +35,7 @@ public sealed unsafe class EstateTeleportationContextMenuService : IDisposable
 
         if (value && AgentFriendlist.MemberFunctionPointers.OpenFriendEstateTeleportation == null)
         {
-            StatusText = "Unavailable - the game's estate teleportation function could not be resolved.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD7F70A058769E109"));
             return false;
         }
 
@@ -50,7 +53,7 @@ public sealed unsafe class EstateTeleportationContextMenuService : IDisposable
             Plugin.ClientState.Logout -= OnLogout;
             Plugin.ClientState.TerritoryChanged -= OnTerritoryChanged;
         }
-        StatusText = value ? "Enabled - eligible friends on your current world." : "Disabled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (value ? global::XASlave.Localization.UiMessage.Key("S25B46B8F3BDCE38B") : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")));
         return enabled;
     }
 
@@ -144,23 +147,23 @@ public sealed unsafe class EstateTeleportationContextMenuService : IDisposable
         {
             if (ResolveFriend(contentId, name, world) != contentId)
             {
-                StatusText = "The friend or current world changed. Reopen the player context menu.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD35C79FEA4D80AA1"));
                 return;
             }
 
             var agent = AgentFriendlist.Instance();
             if (agent == null || AgentFriendlist.MemberFunctionPointers.OpenFriendEstateTeleportation == null)
             {
-                StatusText = "Unavailable - the game's friend estate selector is not ready.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S57772730036E2D48"));
                 return;
             }
 
             agent->OpenFriendEstateTeleportation(contentId);
-            StatusText = "Estate window requested. Available destinations and permissions are controlled by the game.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SDB5BAD4B7E0D862A"));
         }
         catch (Exception ex)
         {
-            StatusText = "Could not open estate teleportation; see the plugin log.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SB3B569FBC38B7A76"));
             log.Warning(ex, "[EstateTeleportation] Could not open the friend estate selector.");
         }
     }

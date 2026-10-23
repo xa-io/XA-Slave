@@ -9,23 +9,23 @@ internal sealed partial class ViewItemWindow
 {
     private static void DrawFurniture(ViewSingleItemFurniturePreview preview)
     {
-        if (ImGui.Button("Rotate Left")) preview.Camera(-0.15f, 0, 0, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S1E8977C24EE39B44"))) preview.Camera(-0.15f, 0, 0, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Rotate Right")) preview.Camera(0.15f, 0, 0, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SD2F1321248875601"))) preview.Camera(0.15f, 0, 0, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Above")) preview.Camera(0, -0.15f, 0, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S80792346CA2D714D"))) preview.Camera(0, -0.15f, 0, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Below")) preview.Camera(0, 0.15f, 0, 0, 0);
-        if (ImGui.Button("Roll Counterclockwise")) preview.Camera(0, 0, 0, 0, 0, -0.15f);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SA53DFFFFB7E57BB6"))) preview.Camera(0, 0.15f, 0, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SC90B88F3B2622C2E"))) preview.Camera(0, 0, 0, 0, 0, -0.15f);
         ImGui.SameLine();
-        if (ImGui.Button("Roll Clockwise")) preview.Camera(0, 0, 0, 0, 0, 0.15f);
-        if (ImGui.Button("Zoom Out")) preview.Camera(0, 0, 1, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S1B353379EAB6ED41"))) preview.Camera(0, 0, 0, 0, 0, 0.15f);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S24649EE0C7A92FD8"))) preview.Camera(0, 0, 1, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Zoom In")) preview.Camera(0, 0, -1, 0, 0);
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S5A982CF9DC11B4EC"))) preview.Camera(0, 0, -1, 0, 0);
         ImGui.SameLine();
-        if (ImGui.Button("Reset View")) preview.ResetCamera();
-        ImGui.TextDisabled("Drag: rotate / tilt | Shift + drag: roll | Right-drag: pan | Wheel: zoom");
-        ImGui.TextDisabled("Static model and textures; housing animations, dyes and effects are not included.");
+        if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S7F19F60F9123C6BD"))) preview.ResetCamera();
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S9CCF0E8137768B84"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S49405AA6678140E8"));
 
         var size = ImGui.GetContentRegionAvail();
         if (!float.IsFinite(size.X) || !float.IsFinite(size.Y) || size.X <= 0 || size.Y <= 0) return;

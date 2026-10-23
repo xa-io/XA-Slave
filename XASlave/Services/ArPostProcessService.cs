@@ -74,6 +74,9 @@ public sealed class ArPostProcessService : IDisposable
     public bool IsRunning => running;
     public bool IsRegistered => registered;
     public string StatusText { get; private set; } = string.Empty;
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     // Log messages for UI display
     private readonly List<string> logMessages = new();
@@ -554,7 +557,7 @@ public sealed class ArPostProcessService : IDisposable
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: Open Inventory",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SC7FF21395251C0EA"),
                 OnEnter = () =>
                 {
                     AddLog("Opening Inventory...");
@@ -563,7 +566,7 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: Inventory Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S2B32DD1DCBCC0767"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         // Open Armoury Chest
@@ -571,7 +574,7 @@ public sealed class ArPostProcessService : IDisposable
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: Open Armoury Chest",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SE75C2DC2A47D626C"),
                 OnEnter = () =>
                 {
                     AddLog("Opening Armoury Chest...");
@@ -580,7 +583,7 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: Armoury Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S1CD860CA81C6A52B"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         // Open Saddlebags
@@ -588,7 +591,7 @@ public sealed class ArPostProcessService : IDisposable
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: Open Saddlebags",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SB70BA749C312866D"),
                 OnEnter = () =>
                 {
                     AddLog("Opening Saddlebags...");
@@ -597,22 +600,22 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => IsAddonReady("InventoryBuddy"),
                 TimeoutSec = 3f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: Saddlebag Read Delay", IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S0F9D5C3AB8D13BF3"), IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: Close Saddlebags",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S962859EECFFA731B"),
                 OnEnter = () => CloseAddon("InventoryBuddy"),
                 IsComplete = () => !IsAddonReady("InventoryBuddy"),
                 TimeoutSec = 3f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: Saddlebag Close Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SAFEE87A27450666E"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         if (config.ArPreProcessOpenJournal)
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: Open Journal",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S42952B8EE3D90261"),
                 OnEnter = () =>
                 {
                     AddLog("Opening Journal...");
@@ -621,12 +624,12 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => IsAddonReady("Journal") || DelayComplete(2.0f),
                 TimeoutSec = 3f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: Journal Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SDC6DD8D3F54B5DE1"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
             if (config.ArPreProcessSaveToXaDatabase)
             {
                 steps.Add(new PostProcessStep
                 {
-                    Name = "Pre: Save Journal to XA Database",
+                    NameMessage = global::XASlave.Localization.UiMessage.Key("S7AD8C00EA43925B3"),
                     ShouldSkip = () => !IsAddonReady("Journal"),
                     OnEnter = () =>
                     {
@@ -639,7 +642,7 @@ public sealed class ArPostProcessService : IDisposable
                     IsComplete = () => true,
                     TimeoutSec = 3f,
                 });
-                steps.Add(new PostProcessStep { Name = "Pre: Journal Save Delay", ShouldSkip = () => !IsAddonReady("Journal"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+                steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S5AE387D92E217A25"), ShouldSkip = () => !IsAddonReady("Journal"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
             }
         }
 
@@ -655,7 +658,7 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: FC Check Eligibility",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SCBFB8FB76CFC1FDB"),
                 OnEnter = () =>
                 {
                     if (!IsOnHomeWorld())
@@ -679,43 +682,43 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: FC Open Window",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S7A20F7B0AAC92A36"),
                 OnEnter = () => { if (!skipFc) OpenAgentWindow(AgentId.FreeCompany, "FreeCompany"); },
                 IsComplete = () => skipFc || IsAddonReady("FreeCompany"),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: FC Load Delay", IsComplete = () => skipFc || DelayComplete(1.0f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S12D843D05140CB07"), IsComplete = () => skipFc || DelayComplete(1.0f), TimeoutSec = 2f });
 
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: FC Members Tab",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S5A5C3A06D293B83E"),
                 OnEnter = () => { if (!skipFc) { FireAddonCallback("FreeCompany", 1); ClickAddonNode("FreeCompany", 8); } },
                 IsComplete = () => skipFc || IsAddonReady("FreeCompanyMember") || DelayComplete(3.0f),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: FC Members Load", IsComplete = () => skipFc || DelayComplete(1.5f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S5AEE3FD94D541173"), IsComplete = () => skipFc || DelayComplete(1.5f), TimeoutSec = 2f });
 
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: FC Info Tab",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S2B372E7DF983C403"),
                 OnEnter = () => { if (!skipFc) { FireAddonCallback("FreeCompany", 3); ClickAddonNode("FreeCompany", 4); } },
                 IsComplete = () => skipFc || IsAddonReady("FreeCompanyStatus") || DelayComplete(3.0f),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: FC Status Load", IsComplete = () => skipFc || DelayComplete(1.0f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S09C153AB85A02BB3"), IsComplete = () => skipFc || DelayComplete(1.0f), TimeoutSec = 2f });
 
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: FC Housing Search",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S1D3056BC354F4AFE"),
                 OnEnter = () => { if (!skipFc && IsAddonReady("FreeCompanyStatus")) ClickAddonNode("FreeCompanyStatus", 12); },
                 IsComplete = () => skipFc || IsAddonReady("HousingSignBoard") || DelayComplete(3.0f),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: FC Housing Load", IsComplete = () => skipFc || DelayComplete(1.5f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SE637486611114C37"), IsComplete = () => skipFc || DelayComplete(1.5f), TimeoutSec = 2f });
 
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: FC Close Sub-Addons",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S5F9637C8E24BA18F"),
                 OnEnter = () => { if (!skipFc) { CloseAddon("HousingSignBoard"); CloseAddon("FreeCompanyStatus"); CloseAddon("FreeCompanyMember"); } },
                 IsComplete = () => skipFc || DelayComplete(0.5f),
                 TimeoutSec = 2f,
@@ -723,12 +726,12 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: FC Close Window",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S8C213CCDABC6F915"),
                 OnEnter = () => { if (!skipFc) CloseAddon("FreeCompany"); },
                 IsComplete = () => skipFc || !IsAddonReady("FreeCompany"),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: FC Cooldown", IsComplete = () => skipFc || DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SEB3122D7EE44F3BD"), IsComplete = () => skipFc || DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         // Save to XA Database
@@ -736,7 +739,7 @@ public sealed class ArPostProcessService : IDisposable
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Pre: Save to XA Database",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SA33BFD04E27F5E26"),
                 OnEnter = () =>
                 {
                     AddLog("Saving to XA Database...");
@@ -748,7 +751,7 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => true,
                 TimeoutSec = 3f,
             });
-            steps.Add(new PostProcessStep { Name = "Pre: Save Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S8904459590B865CF"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
     }
 
@@ -758,7 +761,7 @@ public sealed class ArPostProcessService : IDisposable
 
         steps.Add(new PostProcessStep
         {
-            Name = "Ship Bailout: Suppress AutoRetainer",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S4795510F39271A1A"),
             OnEnter = () =>
             {
                 AddLog("[Ship Bailout] Suppressing AutoRetainer before ESC bailout...");
@@ -768,11 +771,11 @@ public sealed class ArPostProcessService : IDisposable
             TimeoutSec = 2f,
         });
 
-        steps.Add(BuildEscapeBailoutStep("Ship Bailout: Close Menus With ESC", 30f));
-        steps.Add(BuildCharacterSafeWaitStep("Ship Bailout: SafeWait After Menus", 20f));
+        steps.Add(BuildEscapeBailoutStep(global::XASlave.Localization.UiMessage.Key("S84861B0BE07F095E"), 30f));
+        steps.Add(BuildCharacterSafeWaitStep(global::XASlave.Localization.UiMessage.Key("S59399339FA6B6BC5"), 20f));
         steps.Add(new PostProcessStep
         {
-            Name = "Ship Bailout: Reset AutoRetainer",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S13191C92CE7E1AAB"),
             OnEnter = () =>
             {
                 AddLog("[Ship Bailout] Sending /ays reset to clear AutoRetainer task state...");
@@ -783,11 +786,11 @@ public sealed class ArPostProcessService : IDisposable
         });
     }
 
-    private PostProcessStep BuildCharacterSafeWaitStep(string name, float timeoutSec)
+    private PostProcessStep BuildCharacterSafeWaitStep(global::XASlave.Localization.UiMessage name, float timeoutSec)
     {
         return new PostProcessStep
         {
-            Name = name,
+            NameMessage = name,
             IsComplete = () => CharacterSafetyHelper.IsCharacterSafeWaitReady(),
             TimeoutSec = timeoutSec,
         };
@@ -804,13 +807,13 @@ public sealed class ArPostProcessService : IDisposable
         return false;
     }
 
-    private PostProcessStep BuildEscapeBailoutStep(string name, float timeoutSec)
+    private PostProcessStep BuildEscapeBailoutStep(global::XASlave.Localization.UiMessage name, float timeoutSec)
     {
         DateTime lastEscapeAt = DateTime.MinValue;
 
         return new PostProcessStep
         {
-            Name = name,
+            NameMessage = name,
             OnEnter = () =>
             {
                 if (AreAnyShipBailoutMenusVisible())
@@ -873,7 +876,7 @@ public sealed class ArPostProcessService : IDisposable
         // Small initial delay to let AR finish closing retainer windows
         steps.Add(new PostProcessStep
         {
-            Name = "AR Settle Delay",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S9621DBBFF3B8F967"),
             IsComplete = () => DelayComplete(1.5f),
             TimeoutSec = 3f,
         });
@@ -883,7 +886,7 @@ public sealed class ArPostProcessService : IDisposable
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Open Inventory",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S166DBD737506990A"),
                 OnEnter = () =>
                 {
                     AddLog("Opening Inventory...");
@@ -892,7 +895,7 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(new PostProcessStep { Name = "Inventory Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S6DBBFE874CDD2B41"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         // Open Armoury Chest
@@ -900,7 +903,7 @@ public sealed class ArPostProcessService : IDisposable
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Open Armoury Chest",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S53649CACF2611F56"),
                 OnEnter = () =>
                 {
                     AddLog("Opening Armoury Chest...");
@@ -909,7 +912,7 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(new PostProcessStep { Name = "Armoury Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SEBED4948042CC39B"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         // Open Saddlebags
@@ -917,7 +920,7 @@ public sealed class ArPostProcessService : IDisposable
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Open Saddlebags",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S04135E2D90F4F408"),
                 OnEnter = () =>
                 {
                     AddLog("Opening Saddlebags...");
@@ -926,22 +929,22 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => IsAddonReady("InventoryBuddy"),
                 TimeoutSec = 3f,
             });
-            steps.Add(new PostProcessStep { Name = "Saddlebag Read Delay", IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S9B48CF413C7C067D"), IsComplete = () => DelayComplete(1.0f), TimeoutSec = 2f });
             steps.Add(new PostProcessStep
             {
-                Name = "Close Saddlebags",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S10EB23994A2CCBEB"),
                 OnEnter = () => CloseAddon("InventoryBuddy"),
                 IsComplete = () => !IsAddonReady("InventoryBuddy"),
                 TimeoutSec = 3f,
             });
-            steps.Add(new PostProcessStep { Name = "Saddlebag Close Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SAA140C717DFF03A3"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         if (config.ArPostProcessOpenJournal)
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Open Journal",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SF7B51D61398CF038"),
                 OnEnter = () =>
                 {
                     AddLog("Opening Journal...");
@@ -950,12 +953,12 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => IsAddonReady("Journal") || DelayComplete(2.0f),
                 TimeoutSec = 3f,
             });
-            steps.Add(new PostProcessStep { Name = "Journal Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S1DDC420FB47362A0"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
             if (config.ArPostProcessSaveToXaDatabase)
             {
                 steps.Add(new PostProcessStep
                 {
-                    Name = "Save Journal to XA Database",
+                    NameMessage = global::XASlave.Localization.UiMessage.Key("S9D2F50E1F9F85EA6"),
                     ShouldSkip = () => !IsAddonReady("Journal"),
                     OnEnter = () =>
                     {
@@ -968,7 +971,7 @@ public sealed class ArPostProcessService : IDisposable
                     IsComplete = () => true,
                     TimeoutSec = 3f,
                 });
-                steps.Add(new PostProcessStep { Name = "Journal Save Delay", ShouldSkip = () => !IsAddonReady("Journal"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+                steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S1972610E01FD0B9A"), ShouldSkip = () => !IsAddonReady("Journal"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
             }
         }
 
@@ -985,7 +988,7 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "FC: Check Eligibility",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S40EB17AAAB0BC7ED"),
                 OnEnter = () =>
                 {
                     if (!IsOnHomeWorld())
@@ -1010,17 +1013,17 @@ public sealed class ArPostProcessService : IDisposable
             // Open FC Window
             steps.Add(new PostProcessStep
             {
-                Name = "FC: Open Window",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S3A6F28B44A935A84"),
                 OnEnter = () => { if (!skipFc) OpenAgentWindow(AgentId.FreeCompany, "FreeCompany"); },
                 IsComplete = () => skipFc || IsAddonReady("FreeCompany"),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "FC: Load Delay", IsComplete = () => skipFc || DelayComplete(1.0f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S15385559490D86CA"), IsComplete = () => skipFc || DelayComplete(1.0f), TimeoutSec = 2f });
 
             // Click Members Tab
             steps.Add(new PostProcessStep
             {
-                Name = "FC: Members Tab",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SE56CDE3BA194A71D"),
                 OnEnter = () =>
                 {
                     if (!skipFc)
@@ -1032,12 +1035,12 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => skipFc || IsAddonReady("FreeCompanyMember") || DelayComplete(3.0f),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "FC: Members Load", IsComplete = () => skipFc || DelayComplete(1.5f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S6F10528383DCDE0A"), IsComplete = () => skipFc || DelayComplete(1.5f), TimeoutSec = 2f });
 
             // Click Info Tab
             steps.Add(new PostProcessStep
             {
-                Name = "FC: Info Tab",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S5715EB980579D341"),
                 OnEnter = () =>
                 {
                     if (!skipFc)
@@ -1049,12 +1052,12 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => skipFc || IsAddonReady("FreeCompanyStatus") || DelayComplete(3.0f),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "FC: Status Load", IsComplete = () => skipFc || DelayComplete(1.0f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("S7CF4563E61EF2FF6"), IsComplete = () => skipFc || DelayComplete(1.0f), TimeoutSec = 2f });
 
             // Click Housing Search
             steps.Add(new PostProcessStep
             {
-                Name = "FC: Housing Search",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SBC0632E5191418C8"),
                 OnEnter = () =>
                 {
                     if (!skipFc && IsAddonReady("FreeCompanyStatus"))
@@ -1063,12 +1066,12 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => skipFc || IsAddonReady("HousingSignBoard") || DelayComplete(3.0f),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "FC: Housing Load", IsComplete = () => skipFc || DelayComplete(1.5f), TimeoutSec = 2f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SDFBCD1A66DB3D9D3"), IsComplete = () => skipFc || DelayComplete(1.5f), TimeoutSec = 2f });
 
             // Close all FC sub-addons
             steps.Add(new PostProcessStep
             {
-                Name = "FC: Close Sub-Addons",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SB1FE324DD01A588B"),
                 OnEnter = () =>
                 {
                     if (!skipFc)
@@ -1085,12 +1088,12 @@ public sealed class ArPostProcessService : IDisposable
             // Close FC Window
             steps.Add(new PostProcessStep
             {
-                Name = "FC: Close Window",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SCE8A65A6D9850888"),
                 OnEnter = () => { if (!skipFc) CloseAddon("FreeCompany"); },
                 IsComplete = () => skipFc || !IsAddonReady("FreeCompany"),
                 TimeoutSec = 5f,
             });
-            steps.Add(new PostProcessStep { Name = "FC: Cooldown", IsComplete = () => skipFc || DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SE8A651AAC9580665"), IsComplete = () => skipFc || DelayComplete(0.5f), TimeoutSec = 1f });
         }
 
         if (config.ArPostProcessCheckFcChestForGil)
@@ -1108,7 +1111,7 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "FC Chest: Check Eligibility",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SA1FF6A0635CC56DE"),
                 OnEnter = () =>
                 {
                     var zoneName = AddonHelper.GetCurrentZoneName();
@@ -1138,7 +1141,7 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "FC Chest: Target",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SFD90F8D6D7330EA8"),
                 ShouldSkip = () => skipFcChest,
                 OnEnter = () =>
                 {
@@ -1150,7 +1153,7 @@ public sealed class ArPostProcessService : IDisposable
             });
             steps.Add(new PostProcessStep
             {
-                Name = "FC Chest: Target Delay",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SA78481C269F521D3"),
                 ShouldSkip = () => skipFcChest,
                 IsComplete = () => DelayComplete(0.5f),
                 TimeoutSec = 1f,
@@ -1158,7 +1161,7 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "FC Chest: Path Into Range",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S8B3B861ABBB6EA07"),
                 ShouldSkip = () => skipFcChest,
                 OnEnter = () =>
                 {
@@ -1177,7 +1180,7 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "FC Chest: Interact",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S7D96E71CBEC6FC18"),
                 ShouldSkip = () => skipFcChest,
                 OnEnter = () =>
                 {
@@ -1263,7 +1266,7 @@ public sealed class ArPostProcessService : IDisposable
             });
             steps.Add(new PostProcessStep
             {
-                Name = "FC Chest: Load Delay",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S55335E0FD7F3DC8B"),
                 ShouldSkip = () => skipFcChest || !IsAddonReady("FreeCompanyChest"),
                 IsComplete = () => DelayComplete(0.5f),
                 TimeoutSec = 1f,
@@ -1271,7 +1274,7 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "FC Chest: Save to XA Database",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S455880F27824D1F3"),
                 ShouldSkip = () => skipFcChest || !IsAddonReady("FreeCompanyChest"),
                 OnEnter = () =>
                 {
@@ -1286,7 +1289,7 @@ public sealed class ArPostProcessService : IDisposable
             });
             steps.Add(new PostProcessStep
             {
-                Name = "FC Chest: Save Delay",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S771A28F18238BEA5"),
                 ShouldSkip = () => skipFcChest || !IsAddonReady("FreeCompanyChest"),
                 IsComplete = () => DelayComplete(0.5f),
                 TimeoutSec = 1f,
@@ -1294,7 +1297,7 @@ public sealed class ArPostProcessService : IDisposable
 
             steps.Add(new PostProcessStep
             {
-                Name = "FC Chest: Close Window",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SB1F9871C1CB27CCA"),
                 ShouldSkip = () => skipFcChest || !IsAddonReady("FreeCompanyChest"),
                 OnEnter = () =>
                 {
@@ -1329,7 +1332,7 @@ public sealed class ArPostProcessService : IDisposable
         {
             steps.Add(new PostProcessStep
             {
-                Name = "Save to XA Database",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S0AED21970EED8844"),
                 OnEnter = () =>
                 {
                     AddLog("Saving to XA Database...");
@@ -1341,7 +1344,7 @@ public sealed class ArPostProcessService : IDisposable
                 IsComplete = () => true,
                 TimeoutSec = 3f,
             });
-            steps.Add(new PostProcessStep { Name = "Save Delay", IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
+            steps.Add(new PostProcessStep { NameMessage = global::XASlave.Localization.UiMessage.Key("SE16AD8ACFFC8F598"), IsComplete = () => DelayComplete(0.5f), TimeoutSec = 1f });
         }
     }
 
@@ -1357,7 +1360,7 @@ public sealed class ArPostProcessService : IDisposable
         stepStart = DateTime.UtcNow;
         stepActionDone = false;
         running = true;
-        StatusText = steps[0].Name;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, steps[0].NameMessage);
         framework.Update += OnTick;
         UpdateArDtr();
         if (isShipExplorationBailout)
@@ -1372,7 +1375,7 @@ public sealed class ArPostProcessService : IDisposable
         running = false;
         framework.Update -= OnTick;
         stepIndex = -1;
-        StatusText = "Cancelled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD353A99EB4556847"));
         ClearArDtr();
         if (isShipExplorationBailout)
         {
@@ -1417,7 +1420,7 @@ public sealed class ArPostProcessService : IDisposable
 
             stepStart = DateTime.UtcNow;
             stepActionDone = false;
-            StatusText = steps[stepIndex].Name;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, steps[stepIndex].NameMessage);
         }
 
         if (!running || stepIndex < 0 || stepIndex >= steps.Count)
@@ -1476,7 +1479,7 @@ public sealed class ArPostProcessService : IDisposable
         if (stepIndex >= steps.Count) { Finish(); return; }
         stepStart = DateTime.UtcNow;
         stepActionDone = false;
-        StatusText = steps[stepIndex].Name;
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, steps[stepIndex].NameMessage);
     }
 
     private void Finish()
@@ -1484,7 +1487,7 @@ public sealed class ArPostProcessService : IDisposable
         running = false;
         framework.Update -= OnTick;
         stepIndex = -1;
-        StatusText = "Complete";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S143B270A32602D41"));
         ClearArDtr();
 
         if (isShipExplorationBailout)
@@ -1571,7 +1574,7 @@ public sealed class ArPostProcessService : IDisposable
         try
         {
             dtrEntry ??= dtrBar.Get("XA Slave");
-            dtrEntry.Text = isShipExplorationBailout ? "XA:AR-Bail" : isPreProcessing ? "XA:Pre-AR" : "XA:Post-AR";
+            dtrEntry.Text = (isShipExplorationBailout ? global::XASlave.Localization.UiMessage.Key("S1AC7A75D0568827E") : (isPreProcessing ? global::XASlave.Localization.UiMessage.Key("SEBEFED6ED2AD970D") : global::XASlave.Localization.UiMessage.Key("S03F80680B3B37577"))).Original;
             dtrEntry.Shown = true;
         }
         catch { /* DTR bar may not be available */ }
@@ -1584,7 +1587,7 @@ public sealed class ArPostProcessService : IDisposable
             if (dtrEntry != null)
             {
                 // Restore to idle - TaskRunner owns the DTR entry with the same name
-                dtrEntry.Text = "XA: Idle";
+                dtrEntry.Text = global::XASlave.Localization.UiMessage.Key("S49769DA1ABED9346").Original;
                 dtrEntry.Shown = true;
             }
         }

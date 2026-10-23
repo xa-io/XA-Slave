@@ -113,7 +113,7 @@ public partial class SlaveWindow
         if (!TryGetXagmanLiveLocalMainInventoryFreeSlots(out var freeSlots)
             || !TryGetXagmanLiveGil(out var currentGil))
         {
-            FailXagmanCapacityRecovery($"Tony {xagmanActiveCharacter}'s receiving capacity could not be verified; collection recovery was withheld.");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Format("S8F2ADDFFB08E1BD7", xagmanActiveCharacter));
             return true;
         }
         var fullInventory = freeSlots == 0;
@@ -121,12 +121,12 @@ public partial class SlaveWindow
         if (!fullInventory && !gilCap) return false;
         if (xagmanExpectedFranchiseOwnerInstanceIds.Count == 0)
         {
-            FailXagmanCapacityRecovery("Collection capacity recovery has no frozen Franchise Owner cohort; no supply pass was started.");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("S836191359954C547"));
             return true;
         }
         if (xagmanCapacityRecoveryEpoch >= int.MaxValue - 1)
         {
-            FailXagmanCapacityRecovery("Collection capacity recovery exhausted its transition generation; restart the run explicitly.");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("SFE70DE8E5EF1E214"));
             return true;
         }
         xagmanCapacityCollectionTonyRemainder = xagmanTonyRunList.ToList();
@@ -149,7 +149,7 @@ public partial class SlaveWindow
         xagmanSupplyOwnerCohort.Clear();
         xagmanSupplyOwnerCohort.UnionWith(xagmanExpectedFranchiseOwnerInstanceIds);
         xagmanStatus = XagmanStatus.Paused;
-        xagmanStatusText = $"Collection capacity exhausted in {region}; waiting for owners to safely save collection progress before stocked Tonys deliver supplies.";
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SBE72E1B4D8307830", region));
         plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
         PublishXagmanPresence();
         return true;
@@ -172,7 +172,7 @@ public partial class SlaveWindow
         var peers = GetXagmanCapacityOwnerPeers();
         if (peers.Any(peer => peer.Status == XagmanStatus.Error))
         {
-            FailXagmanCapacityRecovery("A frozen owner client reported an error during collection capacity recovery; saved work remains pending.");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("SCEA3571D7359D053"));
             return true;
         }
         var expectedPresent = xagmanExpectedFranchiseOwnerInstanceIds.All(id => peers.Any(peer => peer.InstanceId == id));
@@ -184,10 +184,10 @@ public partial class SlaveWindow
                 : peer.CapacityDrainId == xagmanCapacityDrainId && peer.CapacityDrainReady));
         if (!acknowledged || !IsXagmanCapacityTransitionSafe())
         {
-            CheckXagmanCapacityTransitionTimeout(restoring ? "restore their saved collection cursors" : "safely pause collection");
+            CheckXagmanCapacityTransitionTimeout((restoring ? global::XASlave.Localization.UiMessage.Key("S63FB6DFF795383E0") : global::XASlave.Localization.UiMessage.Key("SE2E0D7D5777A6713")));
             return true;
         }
-        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, "collection capacity transition")) return true;
+        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("S5615C78D7A789209"))) return true;
         ClearXagmanDropbox();
         xagmanActiveTradePartner = xagmanActiveTradePartnerInstanceId = string.Empty;
         xagmanObservedDropboxBusy = false;
@@ -198,7 +198,7 @@ public partial class SlaveWindow
             xagmanCapacityCollectionRestored = true;
             xagmanCapacityRecoveryStage = XagmanCapacityRecoveryStage.None;
             xagmanStatus = XagmanStatus.Paused;
-            xagmanStatusText = "All owners restored collection progress; resuming collection with a Tony that recovered capacity.";
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("SBDF35D34F2541B9C"));
             plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
             PublishXagmanPresence();
             StartXagmanCapacityTony(xagmanTonyRunList.First(key => GetXagmanRegionOfChar(key)
@@ -216,7 +216,7 @@ public partial class SlaveWindow
                 && GetXagmanRegionOfChar(key).Equals(xagmanCapacityRecoveryRegion, StringComparison.OrdinalIgnoreCase)).ToList();
         if (xagmanTonyRunList.Count == 0)
         {
-            FailXagmanCapacityRecovery($"No nonfailed stocked Tony remains in {xagmanCapacityRecoveryRegion} for capacity recovery.");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Format("S121DC367824A2423", xagmanCapacityRecoveryRegion));
             return true;
         }
         xagmanTonyCompletedCharacters = 0;
@@ -251,19 +251,19 @@ public partial class SlaveWindow
             if (xagmanCapacityRecoveryStage == XagmanCapacityRecoveryStage.None) return false;
             if (xagmanCapacityMissingPeerSinceUtc == DateTime.MinValue) xagmanCapacityMissingPeerSinceUtc = DateTime.UtcNow;
             if ((DateTime.UtcNow - xagmanCapacityMissingPeerSinceUtc).TotalSeconds > 120)
-                FailXagmanCapacityRecovery("The bound capacity-recovery Tony disconnected; saved collection and partial supply work remain pending.");
+                FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("S6AFF9C46C0634276"));
             return true;
         }
         xagmanCapacityMissingPeerSinceUtc = DateTime.MinValue;
         if (xagmanCapacityRecoveryStage != XagmanCapacityRecoveryStage.None
             && tony.CapacityRecoveryRegion != xagmanCapacityRecoveryRegion)
         {
-            FailXagmanCapacityRecovery("Tony changed the capacity-recovery region without a new saved collection checkpoint.");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("S58CB228C1622EE5C"));
             return true;
         }
         if (tony.Status == XagmanStatus.Error && xagmanCapacityRecoveryStage != XagmanCapacityRecoveryStage.None)
         {
-            FailXagmanCapacityRecovery($"Tony capacity recovery stopped: {tony.StatusText}");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Format("S49E22C831C74C3DF", tony.StatusText));
             return true;
         }
         if (xagmanCapacityRecoveryStage == XagmanCapacityRecoveryStage.None)
@@ -281,15 +281,15 @@ public partial class SlaveWindow
             {
                 if (string.IsNullOrWhiteSpace(tony.CapacityDrainId) || tony.CapacityRecoveryEpoch <= xagmanCapacityRecoveryEpoch)
                 {
-                    FailXagmanCapacityRecovery("Tony changed the capacity-recovery directive before this owner saved collection progress.");
+                    FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("S1A50D3D6B3F4C5F5"));
                     return true;
                 }
                 if (!IsXagmanCapacityTransitionSafe())
                 {
-                    CheckXagmanCapacityTransitionTimeout("reach a safe native-action boundary before pausing collection");
+                    CheckXagmanCapacityTransitionTimeout(global::XASlave.Localization.UiMessage.Key("S81601B39866A7817"));
                     return true;
                 }
-                if (!TrySetXagmanDropboxAutoAcceptOrStop(false, "save collection before capacity drain")) return true;
+                if (!TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("S727C6C431761A2DD"))) return true;
                 // Reconcile the last outgoing inventory delta before a drain can add stock
                 // to this same owner and obscure progress against its original Give goal.
                 if (IsXagmanCurrentLocalCharacter(xagmanActiveCharacter))
@@ -315,14 +315,14 @@ public partial class SlaveWindow
                 xagmanPhaseComplete = false;
                 xagmanOwnerSweepPendingDataCenter = xagmanOwnerRunPlan.Select(GetXagmanDataCenterOfChar).FirstOrDefault() ?? string.Empty;
                 xagmanStatus = XagmanStatus.Paused;
-                xagmanStatusText = $"Collection progress saved; preparing {xagmanOwnerRunPlan.Count} owner(s) to receive supplies from stocked Tonys.";
+                xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SCB8F69D923E01982", xagmanOwnerRunPlan.Count));
                 plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
                 PublishXagmanPresence();
             }
             if (tony.CapacityDrainId != xagmanCapacityDrainId || tony.CapacityRecoveryEpoch != xagmanCapacityRecoveryEpoch
                 || !tony.CapacityDrainReady || string.IsNullOrWhiteSpace(tony.SupplyPassId))
             {
-                CheckXagmanCapacityTransitionTimeout("receive the acknowledged temporary supplier pass");
+                CheckXagmanCapacityTransitionTimeout(global::XASlave.Localization.UiMessage.Key("S70AF8E5D393C1454"));
                 return true;
             }
             xagmanCapacityRecoveryStage = XagmanCapacityRecoveryStage.OwnerDraining;
@@ -347,7 +347,7 @@ public partial class SlaveWindow
                 || tony.SupplyPassId != xagmanOwnerSupplyPassId
                 || !xagmanOwnerSupplyPassComplete || !xagmanOwnerSupplyAtMenu)
             {
-                FailXagmanCapacityRecovery("Tony attempted to restore collection without this owner's exact completed supplier pass.");
+                FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("SDE04EDB87DCF7754"));
                 return true;
             }
             if (xagmanCapacityRestoreRequestedEpoch != tony.CapacityRecoveryEpoch)
@@ -358,7 +358,7 @@ public partial class SlaveWindow
             }
             if (!IsXagmanCapacityTransitionSafe() || plugin.TaskRunner.IsRunning)
             {
-                CheckXagmanCapacityTransitionTimeout("finish the supplier pass safely before restoring collection");
+                CheckXagmanCapacityTransitionTimeout(global::XASlave.Localization.UiMessage.Key("S89D4CBD7B3D32D67"));
                 return true;
             }
             if (!RestoreXagmanCapacityOwnerCheckpoint()) return true;
@@ -369,7 +369,7 @@ public partial class SlaveWindow
             xagmanCapacityRecoveryStage = XagmanCapacityRecoveryStage.OwnerWaitingForCollectionRelease;
             xagmanCapacityTransitionStartedUtc = DateTime.UtcNow;
             xagmanStatus = XagmanStatus.Paused;
-            xagmanStatusText = "Collection cursor restored; waiting for every owner acknowledgement before collection resumes.";
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("SAEFDAF19A7FEC044"));
             PublishXagmanPresence();
             return true;
         }
@@ -378,7 +378,7 @@ public partial class SlaveWindow
             if (!string.IsNullOrWhiteSpace(tony.CapacityDrainId) || tony.CapacityRecoveryEpoch != xagmanCapacityRecoveryEpoch
                 || !tony.CapacityCollectionRestored)
             {
-                CheckXagmanCapacityTransitionTimeout("receive the collection-resume acknowledgement");
+                CheckXagmanCapacityTransitionTimeout(global::XASlave.Localization.UiMessage.Key("S7F52C9EC1C99D659"));
                 return true;
             }
             xagmanCapacityRecoveryStage = XagmanCapacityRecoveryStage.None;
@@ -411,7 +411,7 @@ public partial class SlaveWindow
     private bool RestoreXagmanCapacityOwnerCheckpoint()
     {
         var checkpoint = xagmanCapacityOwnerCheckpoint;
-        if (checkpoint == null) { FailXagmanCapacityRecovery("Saved collection cursor is missing; automatic resume was withheld."); return false; }
+        if (checkpoint == null) { FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("S7874342D25CDF641")); return false; }
         ClearXagmanCapacityOwnerTraversal();
         xagmanOwnerRunPlan = checkpoint.Plan.ToList();
         xagmanOwnerRunList = checkpoint.RunList.ToList();
@@ -451,7 +451,7 @@ public partial class SlaveWindow
     private void StartXagmanCapacityOwnerSteps(IReadOnlyList<string> owners, int index)
     {
         var steps = BuildXagmanFranchiseSteps(owners.ToList(), index);
-        plugin.TaskRunner.Start("Xagman", steps, onFinished: OnXagmanFranchiseTaskFinished,
+        plugin.TaskRunner.Start(global::XASlave.Localization.UiMessage.Key("S0A1690A11A18319C"), steps, onFinished: OnXagmanFranchiseTaskFinished,
             onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"), preserveRunHistory: true);
         plugin.TaskRunner.TotalItems = GetXagmanLocalOwnerTotalCharacters();
         plugin.TaskRunner.CompletedItems = GetXagmanLocalOwnerCompletedCharacters();
@@ -478,10 +478,10 @@ public partial class SlaveWindow
         return (DateTime.UtcNow - xagmanCapacitySafeSinceUtc).TotalSeconds >= 2;
     }
 
-    private void CheckXagmanCapacityTransitionTimeout(string action)
+    private void CheckXagmanCapacityTransitionTimeout(global::XASlave.Localization.UiMessage action)
     {
         if ((DateTime.UtcNow - xagmanCapacityTransitionStartedUtc).TotalSeconds > XagmanCapacityTransitionTimeoutSeconds)
-            FailXagmanCapacityRecovery($"Collection capacity recovery timed out waiting for the frozen owner clients to {action}; saved work remains pending.");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Format("S193E0007DF65BDF8", action));
     }
 
     private void CaptureXagmanCapacityInitialStock()
@@ -507,7 +507,7 @@ public partial class SlaveWindow
             || !TryCaptureXagmanSupplyInventory(out var stock)
             || !TryGetXagmanLiveGil(out var currentGil))
         {
-            FailXagmanCapacityRecovery($"Tony {xagmanActiveCharacter}'s inventory could not be verified after its capacity drain; collection was not resumed.");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Format("S7DEEF3C9683B4790", xagmanActiveCharacter));
             return true;
         }
         var after = CaptureXagmanSupplyStock(stock);
@@ -555,13 +555,13 @@ public partial class SlaveWindow
         xagmanCapacityTransitionStartedUtc = DateTime.UtcNow;
         xagmanCapacitySafeSinceUtc = DateTime.MinValue;
         xagmanStatus = XagmanStatus.Paused;
-        xagmanStatusText = $"Supply deliveries recovered capacity on {xagmanCapacityRecoveredTonys.Count} Tony(s); waiting for saved collection cursors to be restored.";
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SD4C1C42D63F94A45", xagmanCapacityRecoveredTonys.Count));
         plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
         PublishXagmanPresence();
         return true;
     }
 
-    private void FailXagmanCapacityRecovery(string reason)
+    private void FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage reason)
     {
         xagmanCapacityRecoveryStage = XagmanCapacityRecoveryStage.Failed;
         xagmanCapacityDrainReady = false;
@@ -593,7 +593,7 @@ public partial class SlaveWindow
         var checkpoint = xagmanCapacityOwnerCheckpoint;
         if (checkpoint == null)
         {
-            FailXagmanCapacityRecovery("Capacity warning cleanup cannot find the saved collection plan; incomplete work was not marked complete.");
+            FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("S2555841CF1E84283"));
             return false;
         }
         // A Give-only owner may never appear in the temporary receiver traversal. Preserve
@@ -611,7 +611,7 @@ public partial class SlaveWindow
             if (owner.Equals(checkpoint.Character, StringComparison.OrdinalIgnoreCase)
                 && state.PendingGiveItems.Count == 0)
                 state.PendingGiveItems = CloneXagmanTradeRequests(checkpoint.ActivePendingGiveItems);
-            state.Reason = "collection unfinished because the selected Tonys could not recover receiving capacity";
+            state.ReasonMessage = global::XASlave.Localization.UiMessage.Key("S6C9C9EB470B90DC4");
             plugin.TaskRunner.AddLog($"Xagman: completion warning: {owner}: {GetXagmanPartialOwnerDetail(state)}");
         }
         xagmanOwnerRunPlan = xagmanCollectionFirstOwnerFullPlan.ToList();

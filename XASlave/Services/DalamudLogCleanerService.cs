@@ -18,39 +18,55 @@ public sealed class DalamudLogCleanerService : IDisposable
     private const int ArchiveLimit = 10 * 1024 * 1024;
     private int cleaning;
     private long nextAllowedTick;
-    private string statusText = "Ready. Keeps up to 10 MiB of recent output in the old log.";
-    private string sizeStatusText = "Size has not been checked yet.";
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("S8473DC4901505577");
+    private string statusText = global::XASlave.Localization.UiLocale.Native("S8473DC4901505577");
+    private global::XASlave.Localization.UiMessage? sizeMessage = global::XASlave.Localization.UiMessage.Key("SA7B3F3A064EBA40D");
+    private string sizeStatusText = global::XASlave.Localization.UiLocale.Native("SA7B3F3A064EBA40D");
     private readonly object automaticGate = new();
     private Timer? automaticTimer;
     private bool automaticEnabled;
     private bool disposed;
     private int checkIntervalMinutes = DefaultCheckIntervalMinutes;
     private long nextAutomaticCheckTick;
-    private string automaticStatusText = "Automatic cleanup is off.";
+    private global::XASlave.Localization.UiMessage? automaticMessage = global::XASlave.Localization.UiMessage.Key("SD4875C62452086CF");
+    private string automaticStatusText = global::XASlave.Localization.UiLocale.Native("SD4875C62452086CF");
 
     public string StatusText => Volatile.Read(ref statusText);
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(Volatile.Read(ref statusMessage), StatusText);
+    public string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(Volatile.Read(ref statusMessage), StatusText);
     public string SizeStatusText => Volatile.Read(ref sizeStatusText);
+    internal global::XASlave.Localization.UiMessage SizeStatusMessage => global::XASlave.Localization.UiMessage.Capture(Volatile.Read(ref sizeMessage), SizeStatusText);
+    public string LocalizedSizeStatusText => global::XASlave.Localization.UiMessage.Resolve(Volatile.Read(ref sizeMessage), SizeStatusText);
     public string AutomaticStatusText => Volatile.Read(ref automaticStatusText);
+    internal global::XASlave.Localization.UiMessage AutomaticStatusMessage => global::XASlave.Localization.UiMessage.Capture(Volatile.Read(ref automaticMessage), AutomaticStatusText);
+    public string LocalizedAutomaticStatusText => global::XASlave.Localization.UiMessage.Resolve(Volatile.Read(ref automaticMessage), AutomaticStatusText);
     public bool IsCleaning => Volatile.Read(ref cleaning) != 0;
 
     public bool TryCheckSize(out string message)
     {
+        var success = TryCheckSizeMessage(out var presentation);
+        message = presentation.Original;
+        return success;
+    }
+
+    internal bool TryCheckSizeMessage(out global::XASlave.Localization.UiMessage message)
+    {
         try
         {
             if (Volatile.Read(ref disposed))
-                throw new InvalidOperationException("Dalamud Log Cleaner has stopped.");
+                throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S3A4AC4FE967FE1A5")), global::XASlave.Localization.UiMessage.Key("S3A4AC4FE967FE1A5"));
 
             // Metadata only: do not flush, archive, clear, or reschedule automatic cleanup.
             var file = new FileInfo(ResolveLogPath());
             var bytes = file.Length;
-            message = $"Checked {DateTime.Now:HH:mm:ss}: {file.Name} - {bytes / (1024d * 1024d):F2} MiB ({bytes:N0} bytes).";
-            Volatile.Write(ref sizeStatusText, message);
+            message = global::XASlave.Localization.UiMessage.Format("S5970C488ED89EB61" , DateTime.Now, file.Name, bytes / (1024d * 1024d), bytes);
+            Volatile.Write(ref sizeStatusText, global::XASlave.Localization.UiMessage.Store(ref sizeMessage, message));
             return true;
         }
         catch (Exception ex)
         {
-            message = $"Could not check the log size: {ex.GetBaseException().Message}";
-            Volatile.Write(ref sizeStatusText, message);
+            message = global::XASlave.Localization.UiMessage.Format("S004F4701B32A46E3" , global::XASlave.Localization.UiMessage.FromException(ex.GetBaseException()));
+            Volatile.Write(ref sizeStatusText, global::XASlave.Localization.UiMessage.Store(ref sizeMessage, message));
             return false;
         }
     }
@@ -70,13 +86,13 @@ public sealed class DalamudLogCleanerService : IDisposable
             if (!enabled)
             {
                 automaticTimer?.Change(Timeout.Infinite, Timeout.Infinite);
-                Volatile.Write(ref automaticStatusText, "Automatic cleanup is off.");
+                Volatile.Write(ref automaticStatusText, global::XASlave.Localization.UiMessage.Store(ref automaticMessage, global::XASlave.Localization.UiMessage.Key("SD4875C62452086CF")));
                 return false;
             }
 
             automaticTimer ??= new Timer(CheckAutomatic, null, Timeout.Infinite, Timeout.Infinite);
             ScheduleNextAutomaticCheck();
-            Volatile.Write(ref automaticStatusText, $"Checks every {checkIntervalMinutes} minutes; clears at 90 MiB. First check in {checkIntervalMinutes} minutes.");
+            Volatile.Write(ref automaticStatusText, global::XASlave.Localization.UiMessage.Store(ref automaticMessage, global::XASlave.Localization.UiMessage.Format("S062B8458A8D2B9B2" , checkIntervalMinutes, checkIntervalMinutes)));
             return true;
         }
     }
@@ -119,17 +135,17 @@ public sealed class DalamudLogCleanerService : IDisposable
             try
             {
                 var length = new FileInfo(ResolveLogPath()).Length;
-                var result = $"Last check {DateTime.Now:HH:mm:ss}: {length / (1024d * 1024d):F2} MiB; below 90 MiB.";
+                var result = global::XASlave.Localization.UiMessage.Format("S9B67AF314D1D9AAC" , DateTime.Now, length / (1024d * 1024d));
                 if (length >= AutomaticThresholdBytes)
                 {
                     var success = TryCleanCore(string.Empty, AutomaticThresholdBytes, out var message);
-                    result = $"Last check {DateTime.Now:HH:mm:ss}: {length / (1024d * 1024d):F2} MiB. {(success ? message : "Cleanup deferred: " + message)}";
+                    result = global::XASlave.Localization.UiMessage.Format("S123BB8F31A07D428" , DateTime.Now, length / (1024d * 1024d), (success ? message : global::XASlave.Localization.UiMessage.Format("S60495CD51621FD02" , message)));
                 }
-                Volatile.Write(ref automaticStatusText, result);
+                Volatile.Write(ref automaticStatusText, global::XASlave.Localization.UiMessage.Store(ref automaticMessage, result));
             }
             catch (Exception ex)
             {
-                Volatile.Write(ref automaticStatusText, $"Automatic log size check failed: {ex.GetBaseException().Message}");
+                Volatile.Write(ref automaticStatusText, global::XASlave.Localization.UiMessage.Store(ref automaticMessage, global::XASlave.Localization.UiMessage.Format("S92178A74DFAD0002" , global::XASlave.Localization.UiMessage.FromException(ex.GetBaseException()))));
             }
             finally
             {
@@ -140,25 +156,32 @@ public sealed class DalamudLogCleanerService : IDisposable
     }
 
     public bool TryClean(string arguments, out string message)
+    {
+        var success = TryCleanMessage(arguments, out var presentation);
+        message = presentation.Original;
+        return success;
+    }
+
+    internal bool TryCleanMessage(string arguments, out global::XASlave.Localization.UiMessage message)
         => TryCleanCore(arguments, 0, out message);
 
-    private bool TryCleanCore(string arguments, long minimumBytes, out string message)
+    private bool TryCleanCore(string arguments, long minimumBytes, out global::XASlave.Localization.UiMessage message)
     {
         if (Volatile.Read(ref disposed))
         {
-            message = "Dalamud Log Cleaner has stopped.";
+            message = global::XASlave.Localization.UiMessage.Key("S3A4AC4FE967FE1A5");
             return false;
         }
 
         if (!string.IsNullOrWhiteSpace(arguments))
         {
-            message = "Usage: /xa clearlog";
+            message = global::XASlave.Localization.UiMessage.Key("SDAA65B877E0E4911");
             return false;
         }
 
         if (Interlocked.CompareExchange(ref cleaning, 1, 0) != 0)
         {
-            message = "Dalamud Log Cleaner is already running.";
+            message = global::XASlave.Localization.UiMessage.Key("S0FD13E9FF31D3942");
             return false;
         }
 
@@ -167,7 +190,7 @@ public sealed class DalamudLogCleanerService : IDisposable
         {
             if (Environment.TickCount64 < nextAllowedTick)
             {
-                message = "Wait five seconds between log cleanups.";
+                message = global::XASlave.Localization.UiMessage.Key("S2903B310F5B72000");
                 return false;
             }
 
@@ -177,7 +200,7 @@ public sealed class DalamudLogCleanerService : IDisposable
             // This private contract is verified against the Serilog 7.0 sink shipped with Dalamud 15.0.3.5.
             // Reject other versions/layouts before flushing, archiving or changing the file.
             if (sink.GetType().Assembly.GetName().Version != new Version(7, 0, 0, 0))
-                throw new NotSupportedException("This Serilog file-sink version has not been verified.");
+                throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("SCFB128D201B24A35")), global::XASlave.Localization.UiMessage.Key("SCFB128D201B24A35"));
 
             var syncRoot = ReadField(sink, "_syncRoot");
             var output = ReadField(sink, "_output") as StreamWriter;
@@ -189,30 +212,30 @@ public sealed class DalamudLogCleanerService : IDisposable
                 || !ReferenceEquals(output.BaseStream, counted)
                 || !ReferenceEquals(ReadField(counted, "_stream"), stream)
                 || !string.Equals(Path.GetFullPath(stream.Name), expectedPath, OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
-                throw new NotSupportedException("The active Dalamud log writer does not match the supported layout.");
+                throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("SEFF1215D8BF80AF3")), global::XASlave.Localization.UiMessage.Key("SEFF1215D8BF80AF3"));
 
             var countedLength = counted.GetType().GetProperty("CountedLength", InstanceFlags);
             if (countedLength == null || countedLength.PropertyType != typeof(long))
-                throw new NotSupportedException("The log size counter is unavailable.");
+                throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("SFD668BD50AAAC1FA")), global::XASlave.Localization.UiMessage.Key("SFD668BD50AAAC1FA"));
 
             if (!Monitor.TryEnter(syncRoot, millisecondsTimeout: 250))
-                throw new IOException("The log writer is busy; try again later.");
+                throw global::XASlave.Localization.UiMessage.Attach(new IOException(global::XASlave.Localization.UiLocale.Native("S28FA03030071F9CF")), global::XASlave.Localization.UiMessage.Key("S28FA03030071F9CF"));
 
             long bytesBefore;
             try
             {
                 if (!ReferenceEquals(logger, Serilog.Log.Logger) || !stream.CanWrite || !stream.CanSeek)
-                    throw new IOException("The active logger changed or closed; no cleanup was performed.");
+                    throw global::XASlave.Localization.UiMessage.Attach(new IOException(global::XASlave.Localization.UiLocale.Native("S821AFFAB46B8A93D")), global::XASlave.Localization.UiMessage.Key("S821AFFAB46B8A93D"));
 
                 output.Flush();
                 bytesBefore = stream.Length;
                 if (stream.Position != bytesBefore || countedLength.GetValue(counted) is not long count || count != bytesBefore)
-                    throw new NotSupportedException("The log position and byte counter disagree; no cleanup was performed.");
+                    throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("S6823CB162659ACE8")), global::XASlave.Localization.UiMessage.Key("S6823CB162659ACE8"));
 
                 // A manual cleanup may have won the race after the timer read the size. Check again under the writer lock.
                 if (bytesBefore < minimumBytes)
                 {
-                    message = "The active log is now below 90 MiB; automatic cleanup was skipped.";
+                    message = global::XASlave.Localization.UiMessage.Key("S62E185F666942F53");
                     return true;
                 }
 
@@ -227,7 +250,7 @@ public sealed class DalamudLogCleanerService : IDisposable
                     stream.Position = 0;
                     stream.Flush();
                     if (stream.Length != 0 || countedLength.GetValue(counted) is not long remaining || remaining != 0)
-                        throw new IOException("The log reset could not be verified.");
+                        throw global::XASlave.Localization.UiMessage.Attach(new IOException(global::XASlave.Localization.UiLocale.Native("SF6D8CFEAEB329C56")), global::XASlave.Localization.UiMessage.Key("SF6D8CFEAEB329C56"));
                 }
             }
             finally
@@ -236,18 +259,14 @@ public sealed class DalamudLogCleanerService : IDisposable
             }
 
             nextAllowedTick = Environment.TickCount64 + 5000;
-            message = bytesBefore == 0
-                ? "The active Dalamud log is already empty. The old log was preserved."
-                : $"Cleared {bytesBefore:N0} bytes from {Path.GetFileName(expectedPath)}; kept up to 10 MiB in {Path.GetFileName(Path.ChangeExtension(expectedPath, "old.log"))}. New entries continue normally.";
-            Volatile.Write(ref statusText, message);
+            message = (bytesBefore == 0 ? global::XASlave.Localization.UiMessage.Key("SE730DD19D7571B9F") : global::XASlave.Localization.UiMessage.Format("SBCCCCDFA33A14365" , bytesBefore, Path.GetFileName(expectedPath), Path.GetFileName(Path.ChangeExtension(expectedPath, "old.log"))));
+            Volatile.Write(ref statusText, global::XASlave.Localization.UiMessage.Store(ref statusMessage, message));
             return true;
         }
         catch (Exception ex)
         {
-            message = resetStarted
-                ? $"Log cleanup could not finish; recent output was archived but the active file may already be cleared. {ex.GetBaseException().Message}"
-                : $"Log cleanup did not clear the active file. {ex.GetBaseException().Message}";
-            Volatile.Write(ref statusText, message);
+            message = (resetStarted ? global::XASlave.Localization.UiMessage.Format("S21B98CB13F1024F7" , global::XASlave.Localization.UiMessage.FromException(ex.GetBaseException())) : global::XASlave.Localization.UiMessage.Format("S901F85387F359442" , global::XASlave.Localization.UiMessage.FromException(ex.GetBaseException())));
+            Volatile.Write(ref statusText, global::XASlave.Localization.UiMessage.Store(ref statusMessage, message));
             return false;
         }
         finally
@@ -262,27 +281,27 @@ public sealed class DalamudLogCleanerService : IDisposable
         var serviceType = assembly.GetType("Dalamud.Service`1", throwOnError: true)!;
         var dalamudType = assembly.GetType("Dalamud.Dalamud", throwOnError: true)!;
         var getNullable = serviceType.MakeGenericType(dalamudType).GetMethod("GetNullable", StaticFlags)
-            ?? throw new NotSupportedException("Dalamud's current startup information is unavailable.");
+            ?? throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("S6FCD2FB92805C1EC")), global::XASlave.Localization.UiMessage.Key("S6FCD2FB92805C1EC"));
         var parameters = getNullable.GetParameters();
         object?[] args = parameters.Length switch
         {
             0 => [],
             1 when parameters[0].ParameterType.IsEnum => [Enum.Parse(parameters[0].ParameterType, "None")],
-            _ => throw new NotSupportedException("Dalamud's service lookup has changed."),
+            _ => throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("S4EB854E690509A1D")), global::XASlave.Localization.UiMessage.Key("S4EB854E690509A1D")),
         };
         var dalamud = getNullable.Invoke(null, args)
-            ?? throw new InvalidOperationException("Dalamud is starting or shutting down.");
+            ?? throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S3740B925D1519816")), global::XASlave.Localization.UiMessage.Key("S3740B925D1519816"));
         var info = dalamudType.GetProperty("StartInfo", InstanceFlags)?.GetValue(dalamud)
-            ?? throw new NotSupportedException("Dalamud's startup information is unavailable.");
+            ?? throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("S5C456F3F752713FD")), global::XASlave.Localization.UiMessage.Key("S5C456F3F752713FD"));
         var logPath = info.GetType().GetProperty("LogPath", InstanceFlags)?.GetValue(info) as string;
         var nameProperty = info.GetType().GetProperty("LogName", InstanceFlags)
-            ?? throw new NotSupportedException("Dalamud's log name is unavailable.");
+            ?? throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("SF539E52519A6DF85")), global::XASlave.Localization.UiMessage.Key("SF539E52519A6DF85"));
         if (nameProperty.PropertyType != typeof(string))
-            throw new NotSupportedException("Dalamud's log name layout has changed.");
+            throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("S2645572ED5E1E174")), global::XASlave.Localization.UiMessage.Key("S2645572ED5E1E174"));
         var logName = nameProperty.GetValue(info) as string;
         if (string.IsNullOrWhiteSpace(logPath) || !Path.IsPathFullyQualified(logPath)
             || (!string.IsNullOrEmpty(logName) && logName.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0))
-            throw new NotSupportedException("Dalamud's active log path is invalid.");
+            throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("SC9FEE97B2076ECA3")), global::XASlave.Localization.UiMessage.Key("SC9FEE97B2076ECA3"));
 
         return Path.GetFullPath(Path.Combine(logPath, string.IsNullOrEmpty(logName) ? "dalamud.log" : $"dalamud-{logName}.log"));
     }
@@ -298,27 +317,27 @@ public sealed class DalamudLogCleanerService : IDisposable
             if (!visited.Add(current))
                 continue;
             if (visited.Count > 32)
-                throw new NotSupportedException("The logging pipeline is larger than the supported layout.");
+                throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("SB0E0BC81C7CF9B55")), global::XASlave.Localization.UiMessage.Key("SB0E0BC81C7CF9B55"));
 
             switch (current.GetType().FullName)
             {
                 case "Serilog.Sinks.File.FileSink":
                     if (found != null)
-                        throw new NotSupportedException("Multiple log files are active; cleanup cannot select one safely.");
+                        throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("S4693D6143BC09D87")), global::XASlave.Localization.UiMessage.Key("S4693D6143BC09D87"));
                     found = current;
                     break;
                 case "Serilog.Core.Logger":
                 case "Serilog.Core.Sinks.OptionalInterfaceForwardingSink":
                 case "Serilog.Sinks.File.PeriodicFlushToDiskSink":
-                    pending.Push(ReadField(current, "_sink") ?? throw new NotSupportedException("The log sink layout has changed."));
+                    pending.Push(ReadField(current, "_sink") ?? throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("S27CA81CCA2126058")), global::XASlave.Localization.UiMessage.Key("S27CA81CCA2126058")));
                     break;
                 case "Serilog.Sinks.Async.BackgroundWorkerSink":
-                    pending.Push(ReadField(current, "_wrappedSink") ?? throw new NotSupportedException("The async log sink layout has changed."));
+                    pending.Push(ReadField(current, "_wrappedSink") ?? throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("S01E9BF61EED37BEF")), global::XASlave.Localization.UiMessage.Key("S01E9BF61EED37BEF")));
                     break;
                 case "Serilog.Core.Sinks.SafeAggregateSink":
                 case "Serilog.Core.Sinks.AggregateSink":
                     if (ReadField(current, "_sinks") is not Array sinks || sinks.Length > 32)
-                        throw new NotSupportedException("The aggregate log sink layout has changed.");
+                        throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("SAC045B9A910A74DF")), global::XASlave.Localization.UiMessage.Key("SAC045B9A910A74DF"));
                     foreach (var child in sinks)
                         if (child != null)
                             pending.Push(child);
@@ -326,7 +345,7 @@ public sealed class DalamudLogCleanerService : IDisposable
             }
         }
 
-        return found ?? throw new NotSupportedException("No supported active Dalamud file writer was found.");
+        return found ?? throw global::XASlave.Localization.UiMessage.Attach(new NotSupportedException(global::XASlave.Localization.UiLocale.Native("SDA2EEF42C9A6E4F9")), global::XASlave.Localization.UiMessage.Key("SDA2EEF42C9A6E4F9"));
     }
 
     private static object? ReadField(object instance, string name)
@@ -357,7 +376,7 @@ public sealed class DalamudLogCleanerService : IDisposable
                 using (var current = new FileStream(logPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
                 {
                     if (current.Length != logLength)
-                        throw new IOException("The active log changed while preparing its archive.");
+                        throw global::XASlave.Localization.UiMessage.Attach(new IOException(global::XASlave.Localization.UiLocale.Native("SE9B72AF210FFA56D")), global::XASlave.Localization.UiMessage.Key("SE9B72AF210FFA56D"));
                     CopyTail(current, archive, currentBytes);
                 }
                 archive.Flush(flushToDisk: true);
@@ -383,7 +402,7 @@ public sealed class DalamudLogCleanerService : IDisposable
         {
             var read = source.Read(buffer, 0, Math.Min(buffer.Length, remaining));
             if (read == 0)
-                throw new EndOfStreamException("A log changed while its archive was being prepared.");
+                throw global::XASlave.Localization.UiMessage.Attach(new EndOfStreamException(global::XASlave.Localization.UiLocale.Native("S27866FAAC3CB2482")), global::XASlave.Localization.UiMessage.Key("S27866FAAC3CB2482"));
             destination.Write(buffer, 0, read);
             remaining -= read;
         }

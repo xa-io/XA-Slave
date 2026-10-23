@@ -21,9 +21,9 @@ internal sealed class NearbyPlayerRuleSnapshot
     internal static NearbyPlayerRuleSnapshot Create(int? schema, IEnumerable<NearbyPlayerNotificationRule>? configured,
         IEnumerable<string> legacyPatterns, int legacyCooldown, bool explicitApply)
     {
-        if (schema.HasValue && schema.Value != SchemaVersion) throw new ArgumentException("Unsupported player-notification schema; existing rules are retained.");
+        if (schema.HasValue && schema.Value != SchemaVersion) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD58F89FCFAF0157F"), originalMessageText => new ArgumentException(originalMessageText));
         var migrated = !schema.HasValue;
-        if (!migrated && configured == null) throw new ArgumentException("Versioned player-notification rules are missing.");
+        if (!migrated && configured == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S60B63F41C9578ABB"), originalMessageText => new ArgumentException(originalMessageText));
         var source = migrated ? Migrate(legacyPatterns, legacyCooldown) : configured!;
         var result = new List<NearbyPlayerCompiledRule>();
         var ids = new HashSet<Guid>();
@@ -31,14 +31,14 @@ internal sealed class NearbyPlayerRuleSnapshot
         int? legacyGroupCooldown = null;
         foreach (var input in source)
         {
-            if (input == null) throw new ArgumentException("Player-notification rule cannot be null.");
+            if (input == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SA54C82BF53C9779F"), originalMessageText => new ArgumentException(originalMessageText));
             var rule = Clone(input);
             if (rule.RuleId == Guid.Empty) rule.RuleId = Guid.NewGuid();
-            if (rule.RuleId == LegacyGroupId || !ids.Add(rule.RuleId)) throw new ArgumentException("Player-notification rule IDs must be unique.");
+            if (rule.RuleId == LegacyGroupId || !ids.Add(rule.RuleId)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SDF684075FDFE8270"), originalMessageText => new ArgumentException(originalMessageText));
             if (!Enum.IsDefined(rule.NameMode) || !Enum.IsDefined(rule.TriggerMode) || !Enum.IsDefined(rule.EntryMode))
-                throw new ArgumentException("Unknown player-notification rule mode.");
-            if (rule.Pattern.Length > 512) throw new ArgumentException("Player pattern exceeds 512 characters.");
-            if (rule.NameMode != NearbyPlayerNameMode.Any && string.IsNullOrWhiteSpace(rule.Pattern)) throw new ArgumentException("Exact/regex player patterns cannot be empty.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2BF4F1BDE17A7317"), originalMessageText => new ArgumentException(originalMessageText));
+            if (rule.Pattern.Length > 512) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S314808D55EB5F8F1"), originalMessageText => new ArgumentException(originalMessageText));
+            if (rule.NameMode != NearbyPlayerNameMode.Any && string.IsNullOrWhiteSpace(rule.Pattern)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S21A226E3AB1952CE"), originalMessageText => new ArgumentException(originalMessageText));
             rule.CooldownSeconds = Math.Clamp(rule.CooldownSeconds, 10, 3600);
             rule.HomeWorldIds = rule.HomeWorldIds.Distinct().OrderBy(x => x).ToList();
             rule.TerritoryIds = rule.TerritoryIds.Distinct().OrderBy(x => x).ToList();
@@ -48,13 +48,13 @@ internal sealed class NearbyPlayerRuleSnapshot
             if (rule.LegacyGroup)
             {
                 if (legacyGroupCooldown.HasValue && legacyGroupCooldown.Value != rule.CooldownSeconds)
-                    throw new ArgumentException("Legacy notification patterns must share one cooldown.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SB3482DE10BE678FC"), originalMessageText => new ArgumentException(originalMessageText));
                 legacyGroupCooldown = rule.CooldownSeconds;
                 // Group membership is the compatibility contract. Independent filters/
                 // actions require the explicit UI operation that clears LegacyGroup.
                 if (rule.NameMode == NearbyPlayerNameMode.Any || rule.HomeWorldIds.Count != 0 || rule.TerritoryIds.Count != 0 || rule.OnlineStatusIds.Count != 0
                     || rule.TriggerMode != NearbyPlayerTriggerMode.Periodic || !rule.LocalChat || !rule.Toast || rule.Notification || rule.Speech || rule.CommandsEnabled == true || rule.Commands.Count != 0)
-                    throw new ArgumentException("Convert a legacy pattern to an independent rule before adding advanced filters/actions.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S49ECADBFA5B52498"), originalMessageText => new ArgumentException(originalMessageText));
                 var key = rule.NameMode + "\0" + rule.Pattern + "\0" + rule.Enabled + "\0" + rule.CooldownSeconds;
                 if (!legacyKeys.Add(key)) continue;
             }
@@ -84,11 +84,15 @@ internal sealed class NearbyPlayerRuleSnapshot
                     _ = new Regex(pattern[1..^1], RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(5));
                     rule.NameMode = NearbyPlayerNameMode.Regex; rule.Pattern = pattern[1..^1];
                 }
-                catch (ArgumentException) { rule.MigrationNote = "Invalid legacy regex preserved as an exact literal pattern."; }
+                catch (ArgumentException) { rule.MigrationNote = global::XASlave.Localization.UiLocale.Native("S199489C29C81F655"); }
             }
             yield return rule;
         }
     }
+
+    internal static global::XASlave.Localization.UiMessage MigrationNoteMessage(NearbyPlayerNotificationRule rule)
+        => string.Equals(rule.MigrationNote, global::XASlave.Localization.UiLocale.Native("S199489C29C81F655"), StringComparison.Ordinal)
+            ? global::XASlave.Localization.UiMessage.Key("S199489C29C81F655") : global::XASlave.Localization.UiMessage.Raw(rule.MigrationNote ?? string.Empty);
 
     internal static NearbyPlayerNotificationRule Clone(NearbyPlayerNotificationRule rule) => new()
     {
@@ -123,7 +127,10 @@ internal sealed class NearbyPlayerCompiledRule
     internal bool Notification => rule.Notification;
     internal bool Speech => rule.Speech;
     internal bool CommandsEnabled => rule.CommandsEnabled == true;
-    internal string Diagnostic { get; private set; } = string.Empty;
+    internal string Diagnostic { get; private set; } = global::XASlave.Localization.UiMessage.Raw(string.Empty).Original;
+    private global::XASlave.Localization.UiMessage? uiDiagnostic = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+    internal global::XASlave.Localization.UiMessage DiagnosticMessage => global::XASlave.Localization.UiMessage.Capture(ref uiDiagnostic, Diagnostic);
+    internal string LocalizedDiagnostic => global::XASlave.Localization.UiMessage.Resolve(ref uiDiagnostic, Diagnostic);
 
     internal NearbyPlayerCompiledRule(NearbyPlayerNotificationRule rule)
     {
@@ -150,7 +157,7 @@ internal sealed class NearbyPlayerCompiledRule
         catch (RegexMatchTimeoutException)
         {
             suspended = true;
-            Diagnostic = "Regex matching timed out; this rule is suspended until configuration is reapplied.";
+            Diagnostic = global::XASlave.Localization.UiMessage.Store(ref uiDiagnostic, global::XASlave.Localization.UiMessage.Key("S95B864D8F0892F1C"));
             return false;
         }
     }

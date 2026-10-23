@@ -26,9 +26,8 @@ public sealed class AutoRetainerConfigReader
     public int LastExcludedCharacterCount { get; private set; }
     internal AutoRetainerExclusionSnapshot? LastExclusionSnapshot { get; private set; }
 
-    public string ExclusionStatusSuffix => LastExcludedCharacterCount > 0
-        ? $" ({LastExcludedCharacterCount} excluded by AutoRetainer)"
-        : string.Empty;
+    public string ExclusionStatusSuffix => ExclusionStatusMessage.Original;
+    internal global::XASlave.Localization.UiMessage ExclusionStatusMessage => (LastExcludedCharacterCount > 0 ? global::XASlave.Localization.UiMessage.Format("S994F4F0826881744", LastExcludedCharacterCount) : global::XASlave.Localization.UiMessage.Raw(string.Empty));
 
     /// <summary>Character data extracted from AutoRetainer config.</summary>
     public record ArCharacterInfo(

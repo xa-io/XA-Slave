@@ -47,11 +47,25 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         entries = BuildEntryDefinitions();
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
-    public string PendingEntryText => pendingEntry == null ? "Idle" : pendingEntry.Definition.DisplayName;
-    public string LastTeleportCommand { get; private set; } = "None";
-    public string LastSuggestedZone { get; private set; } = "None";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage PendingEntryTextMessage => pendingEntry == null ? global::XASlave.Localization.UiMessage.Key("SAB0171CA0494D441") : global::XASlave.Localization.UiMessage.Raw(pendingEntry.Definition.DisplayName);
+    public string PendingEntryText => PendingEntryTextMessage.Original;
+    internal string LocalizedPendingEntryText => PendingEntryTextMessage.Display;
+    public string LastTeleportCommand { get; private set; } = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5").Original;
+    private global::XASlave.Localization.UiMessage? uiLastTeleportCommand = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5");
+    internal global::XASlave.Localization.UiMessage LastTeleportCommandMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastTeleportCommand, LastTeleportCommand);
+    internal string LocalizedLastTeleportCommand => global::XASlave.Localization.UiMessage.Resolve(ref uiLastTeleportCommand, LastTeleportCommand);
+    public string LastSuggestedZone { get; private set; } = global::XASlave.Localization.UiLocale.Native("SDC937B59892604F5");
+    private global::XASlave.Localization.UiMessage? uiLastSuggestedZone = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5");
+    internal global::XASlave.Localization.UiMessage LastSuggestedZoneMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastSuggestedZone, LastSuggestedZone);
+    internal string LocalizedLastSuggestedZone => global::XASlave.Localization.UiMessage.Resolve(ref uiLastSuggestedZone, LastSuggestedZone);
     public int SupportedEntryCount => entries.Count;
     public IReadOnlyList<string> SupportedKeys => entries.Select(entry => entry.Key).ToList();
 
@@ -65,13 +79,13 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
             enabled = false;
             pendingEntry = null;
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         enabled = true;
         Subscribe();
-        StatusText = "Enabled - /xa fe can resolve supported aliases, travel to staging areas, route to known entry points, and auto-confirm known entry dialogs.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S26C2A50D627B39B4"));
         return true;
     }
 
@@ -82,17 +96,19 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         Unsubscribe();
     }
 
-    public string BuildUsageText()
+    internal global::XASlave.Localization.UiMessage BuildUsageMessage()
     {
         var keys = string.Join(", ", entries.Select(entry => entry.Key));
-        return $"[XASlave] Usage: /xa fe <entry>. Supported entries: {keys}.";
+        return global::XASlave.Localization.UiMessage.Format("SDF9AB30DAA1AC705", keys);
     }
+    public string BuildUsageText() => BuildUsageMessage().Original;
+    internal string BuildLocalizedUsageText() => BuildUsageMessage().Display;
 
     public bool TryStart(string query)
     {
         if (!enabled)
         {
-            StatusText = "Unavailable - enable Field Operations Entry Command before using it.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SEA596324727471BC"));
             return false;
         }
 
@@ -103,12 +119,12 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         var entry = ResolveEntry(trimmed);
         if (entry == null)
         {
-            LastActionText = $"Last action: no field-operation entry matched '{trimmed}' at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S9429F60E083E4C2F", trimmed, DateTime.Now));
             return false;
         }
 
         pendingEntry = new PendingFieldEntry(entry);
-        LastActionText = $"Last action: queued field-entry flow for {entry.DisplayName} at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SD81B2229F25FDACA", entry.DisplayName, DateTime.Now));
         TryAdvancePendingEntry(forceImmediate: true);
         return true;
     }
@@ -166,14 +182,14 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
                     {
                         pendingEntry.TravelRequested = true;
                         pendingEntry.StagingAethernetRequested = !string.IsNullOrWhiteSpace(definition.TravelCommand);
-                        LastTeleportCommand = travelCommand;
-                        LastSuggestedZone = definition.StagingZoneName;
-                        LastActionText = $"Last action: requested travel to {definition.StagingZoneName} for {definition.DisplayName} at {DateTime.Now:HH:mm:ss}.";
+                        LastTeleportCommand = global::XASlave.Localization.UiMessage.Store(ref uiLastTeleportCommand, global::XASlave.Localization.UiMessage.Raw(travelCommand));
+                        LastSuggestedZone = global::XASlave.Localization.UiMessage.Store(ref uiLastSuggestedZone, global::XASlave.Localization.UiMessage.Raw(definition.StagingZoneName));
+                        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SCF063750D79657B4", definition.StagingZoneName, definition.DisplayName, DateTime.Now));
                     }
                     else
                     {
-                        LastSuggestedZone = definition.StagingZoneName;
-                        LastActionText = $"Last action: travel manually to {definition.StagingZoneName} for {definition.DisplayName}; XA Slave will continue once you arrive.";
+                        LastSuggestedZone = global::XASlave.Localization.UiMessage.Store(ref uiLastSuggestedZone, global::XASlave.Localization.UiMessage.Raw(definition.StagingZoneName));
+                        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S6293BC88A25A9781", definition.StagingZoneName, definition.DisplayName));
                     }
                 }
 
@@ -278,7 +294,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
 
         if (!TryRequestTravel(definition, out var travelCommand))
         {
-            LastActionText = $"Last action: {definition.TargetName} is not visible within {EntryNpcAethernetDistance:0} yalms; travel to {definition.StagingZoneName} Pier #1 manually for {definition.DisplayName}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S13A75E4B8572BEA1", definition.TargetName, EntryNpcAethernetDistance, definition.StagingZoneName, definition.DisplayName));
             entry.NextActionAtUtc = DateTime.UtcNow.AddSeconds(1);
             return false;
         }
@@ -293,9 +309,9 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         entry.EntryInteractionRequested = false;
         entry.TargetSearchAttempts = 0;
         entry.NextActionAtUtc = DateTime.UtcNow.AddSeconds(1);
-        LastTeleportCommand = travelCommand;
-        LastSuggestedZone = definition.StagingZoneName;
-        LastActionText = $"Last action: {definition.TargetName} was not locally reachable, so XA requested {travelCommand} before entering {definition.DisplayName} at {DateTime.Now:HH:mm:ss}.";
+        LastTeleportCommand = global::XASlave.Localization.UiMessage.Store(ref uiLastTeleportCommand, global::XASlave.Localization.UiMessage.Raw(travelCommand));
+        LastSuggestedZone = global::XASlave.Localization.UiMessage.Store(ref uiLastSuggestedZone, global::XASlave.Localization.UiMessage.Raw(definition.StagingZoneName));
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S5817AB3B23308E32", definition.TargetName, travelCommand, definition.DisplayName, DateTime.Now));
         return false;
     }
 
@@ -322,7 +338,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
 
         entry.StepIndex++;
         entry.NextActionAtUtc = DateTime.UtcNow.AddMilliseconds(500);
-        LastActionText = $"Last action: advanced the {definition.DisplayName} entry flow with step {entry.StepIndex}/{definition.Steps.Count} at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SC798CA85E920F6A8", definition.DisplayName, entry.StepIndex, definition.Steps.Count, DateTime.Now));
         return true;
     }
 
@@ -341,9 +357,9 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
     private void AbortEntryUnavailable(PendingFieldEntry entry)
     {
         var definition = entry.Definition;
-        var message = $"[XASlave] Player does not have access to {definition.DisplayName}; no matching entry option was found.";
+        var message = global::XASlave.Localization.UiMessage.Format("S9525984A91439092", definition.DisplayName);
         ChatHelper.TrySend($"/echo {message}");
-        LastActionText = $"Last action: {message} at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S0B42A0AB4428C05D", message, DateTime.Now));
         pendingEntry = null;
     }
 
@@ -356,7 +372,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         {
             entry.PostTravelSafeWaitPassCount = 0;
             entry.NextSafeWaitCheckUtc = DateTime.UtcNow.AddMilliseconds(500);
-            LastActionText = $"Last action: waiting for character-safe state before targeting {entry.Definition.TargetName ?? entry.Definition.DisplayName} at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S79368658565E6AE8", entry.Definition.TargetName ?? entry.Definition.DisplayName, DateTime.Now));
             return false;
         }
 
@@ -364,7 +380,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         if (entry.PostTravelSafeWaitPassCount >= PostTravelCharacterSafeWaitPasses)
         {
             entry.PostTravelSafeWaitComplete = true;
-            LastActionText = $"Last action: completed post-travel character-safe wait for {entry.Definition.DisplayName} at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S6F5235A177EC4D5F", entry.Definition.DisplayName, DateTime.Now));
             return true;
         }
 
@@ -382,8 +398,8 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
             return false;
         }
 
-        LastSuggestedZone = definition.DisplayName;
-        LastActionText = $"Last action: entered {definition.DisplayName}; field-entry flow stopped successfully at {DateTime.Now:HH:mm:ss}.";
+        LastSuggestedZone = global::XASlave.Localization.UiMessage.Store(ref uiLastSuggestedZone, global::XASlave.Localization.UiMessage.Raw(definition.DisplayName));
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S761AA452B9523C69", definition.DisplayName, DateTime.Now));
         pendingEntry = null;
         return true;
     }
@@ -393,7 +409,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         var definition = entry.Definition;
         if (definition.DestinationTerritoryId == 0)
         {
-            LastActionText = $"Last action: submitted the known {definition.DisplayName} entry flow at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S23C30CED6F85F3D3", definition.DisplayName, DateTime.Now));
             pendingEntry = null;
             return;
         }
@@ -401,12 +417,12 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         entry.EntryFlowSubmittedAtUtc ??= DateTime.UtcNow;
         if (DateTime.UtcNow - entry.EntryFlowSubmittedAtUtc.Value > TimeSpan.FromSeconds(DestinationWaitTimeoutSeconds))
         {
-            LastActionText = $"Last action: submitted {definition.DisplayName}, but the destination did not load before timeout at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SFA7908C296FE3314", definition.DisplayName, DateTime.Now));
             pendingEntry = null;
             return;
         }
 
-        LastActionText = $"Last action: submitted the known {definition.DisplayName} entry flow; waiting for destination zone at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S47E5AC41BAA64DB9", definition.DisplayName, DateTime.Now));
         entry.NextActionAtUtc = DateTime.UtcNow.AddSeconds(1);
     }
 
@@ -427,7 +443,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
 
                 entry.EntryInteractionRequested = true;
                 entry.NextActionAtUtc = DateTime.UtcNow.AddMilliseconds(300);
-                LastActionText = $"Last action: waiting for {definition.DisplayName} entry dialogs at {DateTime.Now:HH:mm:ss}.";
+                LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SBD52A4D602EB6E70", definition.DisplayName, DateTime.Now));
                 return;
             }
 
@@ -439,7 +455,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
 
             entry.EntryInteractionRequested = true;
             entry.NextActionAtUtc = DateTime.UtcNow.AddMilliseconds(300);
-            LastActionText = $"Last action: reached the {definition.DisplayName} entry point; waiting for entry dialogs at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S13CD0C99748BE35C", definition.DisplayName, DateTime.Now));
             return;
         }
 
@@ -453,7 +469,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
 
             if (entry.TargetSearchAttempts >= MaxTargetSearchAttempts)
             {
-                LastActionText = $"Last action: could not target {definition.TargetName} for {definition.DisplayName} after routing to {definition.StagingZoneName} at {DateTime.Now:HH:mm:ss}.";
+                LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SC4022B646FEE6719", definition.TargetName, definition.DisplayName, definition.StagingZoneName, DateTime.Now));
                 pendingEntry = null;
                 return;
             }
@@ -466,7 +482,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         if (!AddonHelper.IsCurrentTargetWithinStopDistanceAndStopped(definition.TargetName, EntryNpcStopDistance))
         {
             entry.NextActionAtUtc = DateTime.UtcNow.AddMilliseconds(500);
-            LastActionText = $"Last action: routing to {definition.TargetName} for {definition.DisplayName} at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S78B012721A821E23", definition.TargetName, definition.DisplayName, DateTime.Now));
             return;
         }
 
@@ -474,7 +490,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         {
             entry.EntryInteractionRequested = true;
             entry.NextActionAtUtc = DateTime.UtcNow.AddMilliseconds(700);
-            LastActionText = $"Last action: interacted with {definition.TargetName} for {definition.DisplayName} at {DateTime.Now:HH:mm:ss}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S3BBB7A9731BD0DFE", definition.TargetName, definition.DisplayName, DateTime.Now));
             return;
         }
 
@@ -489,7 +505,7 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
         if (!ipcClient.VnavPathfindAndMoveCloseTo(definition.FlagPosition, false, EntryRouteStopDistance))
             return false;
 
-        LastActionText = $"Last action: routing to the {definition.DisplayName} entry point in {definition.StagingZoneName} at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SD44CDE311CB1E39C", definition.DisplayName, definition.StagingZoneName, DateTime.Now));
         return true;
     }
 
@@ -553,8 +569,8 @@ public unsafe sealed class FieldEntryCommandService : IDisposable
                 return;
 
             agentMap->SetFlagMapMarker(definition.StagingTerritoryId, mapId, definition.FlagPosition);
-            LastSuggestedZone = definition.StagingZoneName;
-            LastActionText = $"Last action: prepared the {definition.DisplayName} entry route point in {definition.StagingZoneName} at {DateTime.Now:HH:mm:ss}.";
+            LastSuggestedZone = global::XASlave.Localization.UiMessage.Store(ref uiLastSuggestedZone, global::XASlave.Localization.UiMessage.Raw(definition.StagingZoneName));
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S18878D2CC9689C57", definition.DisplayName, definition.StagingZoneName, DateTime.Now));
         }
         catch (Exception ex)
         {

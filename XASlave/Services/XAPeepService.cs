@@ -48,6 +48,7 @@ public sealed class XAPeepService : IDisposable
     private DateTime lastSoundAtUtc = DateTime.MinValue;
     private DateTime centerNotificationUntilUtc = DateTime.MinValue;
     private string centerNotificationText = string.Empty;
+    private global::XASlave.Localization.UiMessage? centerNotificationMessage;
 
     public XAPeepService(
         IFramework framework,
@@ -88,7 +89,10 @@ public sealed class XAPeepService : IDisposable
     internal bool HasTargeterVisual(ulong id) => enabled && clientState.IsLoggedIn && activeTargeters.ContainsKey(id)
         && (configuration.XAPeepShowTargeterLine || configuration.XAPeepShowTargeterDot || configuration.XAPeepShowTargetersCard);
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -108,9 +112,7 @@ public sealed class XAPeepService : IDisposable
         {
             pollTimer.Restart();
             RefreshHistoryCache();
-            StatusText = recentPlayers.Count > 0
-                ? $"Enabled - starting. {recentPlayers.Count} tracked players cached in history."
-                : "Enabled - starting.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (recentPlayers.Count > 0 ? global::XASlave.Localization.UiMessage.Format("S14374C5C18DC9DF8", recentPlayers.Count) : global::XASlave.Localization.UiMessage.Key("SC564E24ACEB433CA")));
         }
         else
         {
@@ -188,7 +190,7 @@ public sealed class XAPeepService : IDisposable
         recentPlayers = new();
         recentSessions = new();
         playerSummaryCache.Clear();
-        centerNotificationText = string.Empty;
+        centerNotificationText = global::XASlave.Localization.UiMessage.Store(ref centerNotificationMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         centerNotificationUntilUtc = DateTime.MinValue;
 
         foreach (var state in activeTargeters.Values)
@@ -219,7 +221,7 @@ public sealed class XAPeepService : IDisposable
         var outlineColor = ImGui.GetColorU32(new Vector4(0f, 0f, 0f, 0.65f));
 
         if (showCenterNotification)
-            DrawCenteredOverlayTag(drawList, viewport.Pos + (viewport.Size * 0.5f), centerNotificationText, headerColor, boxColor, outlineColor);
+            DrawCenteredOverlayTag(drawList, viewport.Pos + (viewport.Size * 0.5f), global::XASlave.Localization.UiMessage.Resolve(ref centerNotificationMessage, centerNotificationText), headerColor, boxColor, outlineColor);
 
         if (!enabled || activeTargeters.Count == 0 || !clientState.IsLoggedIn)
             return;
@@ -318,7 +320,7 @@ public sealed class XAPeepService : IDisposable
     {
         observations.Invalidate();
         FinalizeAllActiveTargeters(DateTime.UtcNow);
-        centerNotificationText = string.Empty;
+        centerNotificationText = global::XASlave.Localization.UiMessage.Store(ref centerNotificationMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
         centerNotificationUntilUtc = DateTime.MinValue;
         UpdateStatusText();
     }
@@ -490,15 +492,13 @@ public sealed class XAPeepService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (!clientState.IsLoggedIn)
         {
-            StatusText = recentPlayers.Count > 0
-                ? $"Enabled - logged out. {recentPlayers.Count} tracked players cached in history."
-                : "Enabled - waiting for a character.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (recentPlayers.Count > 0 ? global::XASlave.Localization.UiMessage.Format("S6ED1F01969FF2CAF", recentPlayers.Count) : global::XASlave.Localization.UiMessage.Key("SC6BC2777CFA89751")));
             return;
         }
 
@@ -506,39 +506,29 @@ public sealed class XAPeepService : IDisposable
         {
             if (objectTable.LocalPlayer == null)
             {
-                StatusText = recentPlayers.Count > 0
-                    ? $"Enabled - waiting for a character. {recentPlayers.Count} tracked players cached in history."
-                    : "Enabled - waiting for a character.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (recentPlayers.Count > 0 ? global::XASlave.Localization.UiMessage.Format("S437F719B2D2DDE94", recentPlayers.Count) : global::XASlave.Localization.UiMessage.Key("SC6BC2777CFA89751")));
                 return;
             }
         }
         catch (InvalidOperationException ex) when (IsNotOnMainThreadException(ex))
         {
-            StatusText = recentPlayers.Count > 0
-                ? $"Enabled - starting. {recentPlayers.Count} tracked players cached in history."
-                : "Enabled - starting.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (recentPlayers.Count > 0 ? global::XASlave.Localization.UiMessage.Format("S14374C5C18DC9DF8", recentPlayers.Count) : global::XASlave.Localization.UiMessage.Key("SC564E24ACEB433CA")));
             return;
         }
 
         if (IsDutyLoggingPaused())
         {
-            StatusText = recentPlayers.Count > 0
-                ? $"Enabled - duty logging paused. {recentPlayers.Count} tracked players in history."
-                : "Enabled - duty logging paused.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (recentPlayers.Count > 0 ? global::XASlave.Localization.UiMessage.Format("SA1123C5BD29386AF", recentPlayers.Count) : global::XASlave.Localization.UiMessage.Key("SE2F3D1055204DB92")));
             return;
         }
 
         if (activeTargeters.Count == 0)
         {
-            StatusText = recentPlayers.Count > 0
-                ? $"Enabled - watching for targeters. {recentPlayers.Count} tracked players in history."
-                : "Enabled - watching for targeters.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (recentPlayers.Count > 0 ? global::XASlave.Localization.UiMessage.Format("SFEEAA7C8374D5E0B", recentPlayers.Count) : global::XASlave.Localization.UiMessage.Key("S2C3211B08AC84677")));
             return;
         }
 
-        StatusText = activeTargeters.Count == 1
-            ? "Enabled - 1 player is targeting you."
-            : $"Enabled - {activeTargeters.Count} players are targeting you.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (activeTargeters.Count == 1 ? global::XASlave.Localization.UiMessage.Key("S30A5292B8ACB7F10") : global::XASlave.Localization.UiMessage.Format("SF04A845C74A68A1A", activeTargeters.Count)));
     }
 
     private void ShowCenterNotification(ActiveTargeterState state, DateTime nowUtc)
@@ -548,9 +538,7 @@ public sealed class XAPeepService : IDisposable
 
         var compactName = XAPeepData.FormatCompactName(state.Name);
         var totalTargetCount = state.PriorTargetCount + 1;
-        centerNotificationText = totalTargetCount <= 1
-            ? $"{compactName} is targeting you"
-            : $"{compactName} is targeting you x{totalTargetCount}";
+        centerNotificationText = global::XASlave.Localization.UiMessage.Store(ref centerNotificationMessage, (totalTargetCount <= 1 ? global::XASlave.Localization.UiMessage.Format("S0990EE586BA239C4", compactName) : global::XASlave.Localization.UiMessage.Format("SBAEAA3477796949B", compactName, totalTargetCount)));
         centerNotificationUntilUtc = nowUtc + CenterNotificationDuration;
     }
 
@@ -561,10 +549,8 @@ public sealed class XAPeepService : IDisposable
 
         var compactName = XAPeepData.FormatCompactName(state.Name);
         var totalTargetCount = state.PriorTargetCount + 1;
-        var message = totalTargetCount <= 1
-            ? $"{compactName} is targeting you."
-            : $"{compactName} is targeting you x{totalTargetCount}.";
-        Plugin.ChatGui.Print($"[XASlave] {message}");
+        var message = (totalTargetCount <= 1 ? global::XASlave.Localization.UiMessage.Format("S696EF2E39633FB72", compactName) : global::XASlave.Localization.UiMessage.Format("SB3631B731483A677", compactName, totalTargetCount));
+        Plugin.ChatGui.Print("[XASlave] " + message.Original);
     }
 
     private void TryPlayTargetSound(DateTime nowUtc)

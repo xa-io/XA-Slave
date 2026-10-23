@@ -29,7 +29,7 @@ internal sealed class FurnitureRestoreEffects
         if (row.Item == 0) return;
         var key = (exterior, row.Item);
         if (rows.TryGetValue(key, out var previous) && previous != row)
-            throw new InvalidOperationException("Furniture effect mapping is ambiguous for item " + row.Item);
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S9660C1749763F1A1" , row.Item), originalMessageText => new InvalidOperationException(originalMessageText));
         rows[key] = row;
     }
 
@@ -62,14 +62,14 @@ internal sealed class FurnitureRestoreEffects
     {
         if (item.ReturnedQuantity == 0) return item.NeedsNativeDecision;
         if (item.ReturnedState is not { } returned || !data.GetExcelSheet<SheetItem>().TryGetRow(returned.BaseId, out var row))
-            throw new InvalidOperationException("The expected furniture inventory result is not mapped.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S77D6530AF5689297"), originalMessageText => new InvalidOperationException(originalMessageText));
         return Fits(bags, returned, item.ReturnedQuantity, checked((int)row.StackSize), row.IsUnique);
     }
 
     internal static bool Fits(FurniturePageSnapshot bags, InventoryShuttleItemState returned, int quantity, int stackSize, bool unique)
     {
         if (bags.NominalSlots != 140 || bags.EmptySlots < 0 || bags.EmptySlots > 140 || bags.Occupied.Length + bags.EmptySlots != 140
-            || quantity <= 0 || stackSize <= 0) throw new InvalidOperationException("Complete four-bag capacity is unavailable.");
+            || quantity <= 0 || stackSize <= 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S7AA76259BA21FBB4"), originalMessageText => new InvalidOperationException(originalMessageText));
         if (unique && (quantity > 1 || bags.Occupied.Any(item => item.State.BaseId == returned.BaseId))) return false;
         var perSlot = returned.Flags.HasFlag(InventoryItem.ItemFlags.Collectable) ? 1 : stackSize;
         long available = (long)bags.EmptySlots * perSlot;
@@ -77,7 +77,7 @@ internal sealed class FurnitureRestoreEffects
             foreach (var item in bags.Occupied)
                 if (item.State == returned)
                 {
-                    if (item.Quantity <= 0 || item.Quantity > perSlot) throw new InvalidOperationException("A matching inventory stack has an invalid quantity.");
+                    if (item.Quantity <= 0 || item.Quantity > perSlot) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S7B537A59F45B8B1F"), originalMessageText => new InvalidOperationException(originalMessageText));
                     available += perSlot - item.Quantity;
                 }
         return available >= quantity;

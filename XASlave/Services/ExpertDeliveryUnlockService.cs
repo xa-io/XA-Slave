@@ -12,26 +12,26 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
     public const int DefaultForcedRankFloor = 11;
     private static readonly string[] ForcedRankFloorLabels =
     {
-        "0 - No Spoof / Real Rank",
-        "1 - Storm Private Third Class",
-        "2 - Storm Private Second Class",
-        "3 - Storm Private First Class",
-        "4 - Storm Corporal",
-        "5 - Storm Sergeant Third Class",
-        "6 - Storm Sergeant Second Class",
-        "7 - Storm Sergeant First Class",
-        "8 - Chief Storm Sergeant",
-        "9 - Second Storm Lieutenant",
-        "10 - First Storm Lieutenant",
-        "11 - Storm Captain",
-        "12 - Second Storm Commander",
-        "13 - First Storm Commander",
-        "14 - High Storm Commander",
-        "15 - Rear Storm Marshal",
-        "16 - Vice Storm Marshal",
-        "17 - Storm Marshal",
-        "18 - Grand Storm Marshal",
-        "19 - Storm Champion",
+        global::XASlave.Localization.UiLocale.Native("S68A7FA263FC63161"),
+        global::XASlave.Localization.UiLocale.Native("SB36AA5F78E53C088"),
+        global::XASlave.Localization.UiLocale.Native("S366E0E4B39D020FF"),
+        global::XASlave.Localization.UiLocale.Native("S014C904878830A10"),
+        global::XASlave.Localization.UiLocale.Native("SA7A3C05E6969509F"),
+        global::XASlave.Localization.UiLocale.Native("S7C41EA963B4BE208"),
+        global::XASlave.Localization.UiLocale.Native("SD1B983921043AB2C"),
+        global::XASlave.Localization.UiLocale.Native("S654348BA1CECB6B1"),
+        global::XASlave.Localization.UiLocale.Native("S06BF74E4617D4D72"),
+        global::XASlave.Localization.UiLocale.Native("S622279ADC465EFAF"),
+        global::XASlave.Localization.UiLocale.Native("SDBB51ABCD33BE406"),
+        global::XASlave.Localization.UiLocale.Native("S280AB693835179C8"),
+        global::XASlave.Localization.UiLocale.Native("S6A06BE7E16762BC2"),
+        global::XASlave.Localization.UiLocale.Native("S5007C185811F2F5E"),
+        global::XASlave.Localization.UiLocale.Native("SB2324A8D1EED6559"),
+        global::XASlave.Localization.UiLocale.Native("SE6BD86C77011F88C"),
+        global::XASlave.Localization.UiLocale.Native("S3D160C166BFEC580"),
+        global::XASlave.Localization.UiLocale.Native("S1FCC64972D49F7A5"),
+        global::XASlave.Localization.UiLocale.Native("SAC472E4FA952FFDA"),
+        global::XASlave.Localization.UiLocale.Native("SFD96D8E3B1B46F4F"),
     };
 
     private readonly IGameInteropProvider interopProvider;
@@ -53,7 +53,10 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
     public bool IsEnabled => enabled;
     public int ForcedRankFloor => forcedRankFloor;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public static int NormalizeForcedRankFloor(int value)
     {
@@ -81,14 +84,14 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
         {
             enabled = false;
             DisableHook();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         EnsureInitialized();
         if (getGrandCompanyRankHook == null)
         {
-            StatusText = "Unavailable - PlayerState.GetGrandCompanyRank hook is missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S5181AABFBD73D3CC"));
             return false;
         }
 
@@ -107,7 +110,7 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
             getGrandCompanyRankHook.Dispose();
 
         getGrandCompanyRankHook = null;
-        StatusText = "Disabled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
     }
 
     private void EnsureInitialized()
@@ -141,11 +144,11 @@ public unsafe sealed class ExpertDeliveryUnlockService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
-        StatusText = $"Enabled - local GC rank floor is {GetForcedRankFloorLabel(forcedRankFloor)}.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S10B081F9BE0AE879", global::XASlave.Localization.UiMessage.Authored(GetForcedRankFloorLabel(forcedRankFloor))));
     }
 
     private byte GetGrandCompanyRankDetour(PlayerState* playerState)

@@ -22,11 +22,11 @@ internal static unsafe class NearbyZoneRequestAdapter
     internal static void Request(NearbyZoneNativeBinding binding, NearbyZoneMode mode, long generation, Func<long> currentGeneration, ushort place)
     {
         NearbyZoneNativeBinding.RequireFramework();
-        if (!ScreenReady()) throw new InvalidOperationException("The game screen is not ready for a zone refresh.");
+        if (!ScreenReady()) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S5259C0E5737B6EAE"), originalMessageText => new InvalidOperationException(originalMessageText));
         var proxy = binding.CurrentProxy(mode);
         var agent = binding.Agent(mode);
-        if (agent->IsAgentActive()) throw new InvalidOperationException("The player-search window is active.");
-        if (currentGeneration() != generation) throw new InvalidOperationException("Zone request generation changed.");
+        if (agent->IsAgentActive()) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCB021F7F02DBE431"), originalMessageText => new InvalidOperationException(originalMessageText));
+        if (currentGeneration() != generation) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SDC6462AA597F11F2"), originalMessageText => new InvalidOperationException(originalMessageText));
         if (mode == NearbyZoneMode.ContentMember)
         {
             AtkValue returned = default;
@@ -41,7 +41,7 @@ internal static unsafe class NearbyZoneRequestAdapter
 
     private static void RequestSearch(NearbyZoneNativeBinding binding, InfoProxySearch* proxy, long generation, Func<long> currentGeneration, ushort place)
     {
-        if (place == 0) throw new InvalidOperationException("Player-search location is unavailable.");
+        if (place == 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S134D4361DDE9595E"), originalMessageText => new InvalidOperationException(originalMessageText));
         NearbyZoneNativeBinding.RequireWritable((nint)proxy, 400);
         // Save precisely the fields owned by this request. Arrays are restored as whole fields.
         var jobs = proxy->JobMask;
@@ -51,7 +51,7 @@ internal static unsafe class NearbyZoneRequestAdapter
         var count = proxy->LocationCount;
         var locations = proxy->LocationIDs.ToArray();
         var name = proxy->Name.ToArray();
-        if (locations.Length != 50 || name.Length != 32) throw new InvalidOperationException("Player-search filter layout changed.");
+        if (locations.Length != 50 || name.Length != 32) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE5781CE0D03F60E0"), originalMessageText => new InvalidOperationException(originalMessageText));
         Span<ushort> writtenLocations = stackalloc ushort[50]; writtenLocations.Clear(); writtenLocations[0] = place;
         Span<byte> writtenName = stackalloc byte[32]; writtenName.Clear();
         var wantedOnline = (ulong)InfoProxyCommonList.CharacterData.OnlineStatus.Online;

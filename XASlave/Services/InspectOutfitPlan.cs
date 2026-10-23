@@ -41,11 +41,11 @@ internal static class InspectOutfitPlan
         foreach (var slot in Slots)
         {
             var matching = captured.Where(item => item.Slot == slot).ToArray();
-            if (matching.Length != 1) throw new InvalidOperationException("The inspected equipment snapshot is incomplete or has duplicate slots.");
+            if (matching.Length != 1) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S903852E8F8184781"), originalMessageText => new InvalidOperationException(originalMessageText));
             var item = matching[0];
             if (item.BaseId == 0)
             {
-                if (item.GlamourId != 0) throw new InvalidOperationException("An empty inspected slot contains conflicting glamour data.");
+                if (item.GlamourId != 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S35878DCB0FA03A8D"), originalMessageText => new InvalidOperationException(originalMessageText));
                 continue;
             }
             result.Add(item);
@@ -83,7 +83,7 @@ internal static class InspectOutfitPlan
 
     internal static bool HasCapacity(IReadOnlyList<InspectPreviewRecord> preview)
     {
-        if (preview.Count != 14) throw new InvalidOperationException("The fitting-room preview collection changed size.");
+        if (preview.Count != 14) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SBF7B15222A68527A"), originalMessageText => new InvalidOperationException(originalMessageText));
         foreach (var record in preview) if (record.Item == 0) return true;
         return false;
     }

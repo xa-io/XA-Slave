@@ -39,10 +39,12 @@ public static class XAPeepData
         return clamped == 0 ? 0u : 0x24u + (uint)clamped;
     }
 
-    public static string GetSoundEffectLabel(int soundEffectId)
+    public static string GetSoundEffectLabel(int soundEffectId) => GetSoundEffectLabelMessage(soundEffectId).Original;
+
+    internal static global::XASlave.Localization.UiMessage GetSoundEffectLabelMessage(int soundEffectId)
     {
         var clamped = ClampSoundEffectId(soundEffectId);
-        return clamped == 0 ? "None" : $"Alert {clamped}";
+        return (clamped == 0 ? global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5") : global::XASlave.Localization.UiMessage.Format("S013F1183B2AA600C", clamped));
     }
 }
 

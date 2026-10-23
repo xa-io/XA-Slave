@@ -10,6 +10,7 @@ namespace XASlave.Windows;
 public partial class SlaveWindow
 {
     private string eurekaHunterStatus = string.Empty;
+    private global::XASlave.Localization.UiMessage? eurekaHunterStatusUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
     private DateTime eurekaHunterStatusExpiryUtc = DateTime.MinValue;
     private bool eurekaHunterStatusIsError;
     private bool eurekaHunterHowToUseExpanded = true;
@@ -92,7 +93,7 @@ public partial class SlaveWindow
         return count;
     }
 
-    private string BuildEnabledEurekaInstanceIdZoneSummary()
+    private global::XASlave.Localization.UiMessage BuildEnabledEurekaInstanceIdZoneSummary()
     {
         var enabledZones = new System.Collections.Generic.List<string>();
         foreach (var zone in EurekaZoneOptions)
@@ -102,35 +103,35 @@ public partial class SlaveWindow
         }
 
         return enabledZones.Count == 0
-            ? "no zones selected"
-            : string.Join(", ", enabledZones);
+            ? global::XASlave.Localization.UiMessage.Key("S59DB20B35F330517")
+            : global::XASlave.Localization.UiMessage.Raw(string.Join(", ", enabledZones));
     }
 
     private void DrawEurekaInstanceIdSharedDisplayOptions(string idSuffix)
     {
         var configuration = plugin.Configuration;
         var fieldEnabled = configuration.FieldOperationsInstanceDisplayEnabled;
-        if (ImGui.Checkbox($"Field Operations server ID (Eureka / Bozja / Occult)##{idSuffix}", ref fieldEnabled))
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SDC6048FDB55CF1EA") + $"##{idSuffix}"), ref fieldEnabled))
         {
             configuration.FieldOperationsInstanceDisplayEnabled = fieldEnabled;
             plugin.FieldOperationsInstanceDisplay.ApplyConfiguration(); configuration.SaveDeferred();
         }
         var fieldDtr = configuration.FieldOperationsInstanceDisplayShowInDtr;
-        if (ImGui.Checkbox($"Show composite server ID in shared DTR##{idSuffix}", ref fieldDtr))
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S56136AAE41846A10") + $"##{idSuffix}"), ref fieldDtr))
         {
             configuration.FieldOperationsInstanceDisplayShowInDtr = fieldDtr;
             plugin.FieldOperationsInstanceDisplay.ApplyConfiguration(); configuration.SaveDeferred();
         }
         var fieldChat = configuration.FieldOperationsInstanceDisplayChat;
-        if (ImGui.Checkbox($"Announce live Field Operations entry##{idSuffix}", ref fieldChat))
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S5F0272767E255D6B") + $"##{idSuffix}"), ref fieldChat))
         {
             configuration.FieldOperationsInstanceDisplayChat = fieldChat;
             plugin.FieldOperationsInstanceDisplay.ApplyConfiguration(); configuration.SaveDeferred();
         }
-        ImGui.TextWrapped(plugin.FieldOperationsInstanceDisplay.StatusText);
-        ImGui.TextDisabled("Composite server ID is separate from Eureka farming baselines. DTR: left click copies; right click opens the external crowdsource page.");
+        ImGui.TextWrapped(plugin.FieldOperationsInstanceDisplay.LocalizedStatusText);
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S1D2EA963CDECE235"));
         var showInDtr = configuration.EurekaInstanceIdShowInDtr;
-        if (ImGui.Checkbox($"Show live instance in DTR##{idSuffix}", ref showInDtr))
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S262A4A0D72C008E6") + $"##{idSuffix}"), ref showInDtr))
         {
             configuration.EurekaInstanceIdShowInDtr = showInDtr;
             ApplyEurekaInstanceIdConfiguration();
@@ -138,9 +139,10 @@ public partial class SlaveWindow
         }
     }
 
-    private void SetEurekaInstanceHunterStatus(string message, bool isError = false)
+    private void SetEurekaInstanceHunterStatus(global::XASlave.Localization.UiMessage messagePresentation, bool isError = false)
     {
-        eurekaHunterStatus = message;
+        var message = messagePresentation.Original;
+        eurekaHunterStatus = global::XASlave.Localization.UiMessage.Store(ref eurekaHunterStatusUiMessage, messagePresentation);
         eurekaHunterStatusIsError = isError;
         eurekaHunterStatusExpiryUtc = DateTime.UtcNow.AddSeconds(8);
     }
@@ -196,19 +198,17 @@ public partial class SlaveWindow
         var configuration = plugin.Configuration;
         var isScanning = plugin.EurekaInstanceId.IsScanning;
 
-        ImGui.TextColored(new Vector4(0.82f, 1.0f, 0.55f, 1.0f), "Eureka Instance Hunter");
-        ImGui.TextDisabled("Field Operations task for Eureka re-entry scanning. The Instance ID toggle here is shared with XA Mods.");
+        ImGui.TextColored(new Vector4(0.82f, 1.0f, 0.55f, 1.0f), global::XASlave.Localization.UiLocale.Get("S5578C356136F70AA"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S570B57F704C4A056"));
         ImGui.Spacing();
 
         var enabled = configuration.EurekaInstanceIdEnabled;
-        if (ImGui.Checkbox("Instance ID##EurekaInstanceHunterEnabled", ref enabled))
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S0DC49FB52EF24934") + "##EurekaInstanceHunterEnabled"), ref enabled))
         {
             configuration.EurekaInstanceIdEnabled = plugin.EurekaInstanceId.SetEnabled(enabled);
             configuration.SaveDeferred();
             SetEurekaInstanceHunterStatus(
-                configuration.EurekaInstanceIdEnabled
-                    ? "Enabled live Eureka instance display."
-                    : "Disabled live Eureka instance display.");
+                (configuration.EurekaInstanceIdEnabled ? global::XASlave.Localization.UiMessage.Key("SE8D21CA573B146E2") : global::XASlave.Localization.UiMessage.Key("SD9C9FDB4345A538C")));
         }
 
         ImGui.SameLine();
@@ -222,15 +222,15 @@ public partial class SlaveWindow
             : configuration.EurekaInstanceIdEnabled
                 ? new Vector4(1.0f, 0.85f, 0.35f, 1.0f)
                 : new Vector4(1.0f, 0.45f, 0.45f, 1.0f);
-        ImGui.TextColored(stateColor, $"Status: {stateLabel}");
+        ImGui.TextColored(stateColor, global::XASlave.Localization.UiLocale.FormatKey("S390591EA8DC1971A", stateLabel));
 
         using (ImRaii.TextWrapPos(0f))
         {
-            ImGui.TextUnformatted(plugin.EurekaInstanceId.StatusText);
+            ImGui.TextUnformatted(plugin.EurekaInstanceId.LocalizedStatusText);
         }
 
         if (!string.IsNullOrEmpty(eurekaHunterStatus) && DateTime.UtcNow < eurekaHunterStatusExpiryUtc)
-            ImGui.TextColored(eurekaHunterStatusIsError ? new Vector4(1.0f, 0.4f, 0.4f, 1.0f) : new Vector4(0.4f, 1.0f, 0.4f, 1.0f), eurekaHunterStatus);
+            ImGui.TextColored(eurekaHunterStatusIsError ? new Vector4(1.0f, 0.4f, 0.4f, 1.0f) : new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiMessage.Resolve(ref eurekaHunterStatusUiMessage, eurekaHunterStatus));
 
         ImGui.Spacing();
         using (var imguiScope215 = ImRaii.Table(
@@ -239,10 +239,10 @@ public partial class SlaveWindow
                 ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.SizingFixedFit))
         if (imguiScope215)
         {
-            ImGui.TableSetupColumn("Zone", ImGuiTableColumnFlags.WidthFixed, Scale(110f));
-            ImGui.TableSetupColumn("Use", ImGuiTableColumnFlags.WidthFixed, Scale(70f));
-            ImGui.TableSetupColumn("Baseline", ImGuiTableColumnFlags.WidthFixed, Scale(120f));
-            ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SA8A06E4A5695553C"), ImGuiTableColumnFlags.WidthFixed, Scale(110f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SC36D819E7BC6D2B7"), ImGuiTableColumnFlags.WidthFixed, Scale(70f));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SCC9EA7F7C64E772C"), ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+            global::XASlave.Localization.UiNative.TableHeadersRow();
 
             foreach (var zone in EurekaZoneOptions)
             {
@@ -274,9 +274,9 @@ public partial class SlaveWindow
 
         }
 
-        if (ImGui.Button("Use Current Zone##EurekaInstanceHunter"))
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S3604E68D3953A4C5") + "##EurekaInstanceHunter")))
         {
-            if (plugin.EurekaInstanceId.RequestUseCurrentInstance((success, currentZone, currentInstanceId, resultMessage) =>
+            if (plugin.EurekaInstanceId.RequestUseCurrentInstanceMessage((success, currentZone, currentInstanceId, resultMessage) =>
             {
                 if (!success)
                 {
@@ -307,11 +307,11 @@ public partial class SlaveWindow
             {
                 using (ImRaii.PushColor(ImGuiCol.ButtonActive, BrightenButtonColor(startColor, 0.16f)))
                 {
-                    if (ImGui.Button("Start##EurekaInstanceHunter"))
+                    if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SE4BB9F1ECE9AF926") + "##EurekaInstanceHunter")))
                     {
                         if (isScanning)
                         {
-                            SetEurekaInstanceHunterStatus("Eureka instance scanning is already running.");
+                            SetEurekaInstanceHunterStatus(global::XASlave.Localization.UiMessage.Key("S93F7881C1498AA1B"));
                         }
                         else
                         {
@@ -324,15 +324,13 @@ public partial class SlaveWindow
 
                             if (GetEnabledEurekaInstanceIdZoneCount() <= 0)
                             {
-                                SetEurekaInstanceHunterStatus("Enable at least one Eureka zone row before starting the scanner.", true);
+                                SetEurekaInstanceHunterStatus(global::XASlave.Localization.UiMessage.Key("S98957C786565E712"), true);
                             }
                             else
                             {
                                 var applied = plugin.EurekaInstanceId.StartScanning();
                                 SetEurekaInstanceHunterStatus(
-                                    applied
-                                        ? $"Started Eureka instance scanning across {BuildEnabledEurekaInstanceIdZoneSummary()}."
-                                        : plugin.EurekaInstanceId.StatusText,
+                                    (applied ? global::XASlave.Localization.UiMessage.Format("SBEF0165C4DD69269", BuildEnabledEurekaInstanceIdZoneSummary()) : plugin.EurekaInstanceId.StatusTextMessage),
                                     !applied);
                             }
                         }
@@ -349,13 +347,11 @@ public partial class SlaveWindow
             {
                 using (ImRaii.PushColor(ImGuiCol.ButtonActive, BrightenButtonColor(stopColor, 0.16f)))
                 {
-                    if (ImGui.Button("Stop##EurekaInstanceHunter"))
+                    if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SCAE7D57BC067A514") + "##EurekaInstanceHunter")))
                     {
                         plugin.EurekaInstanceId.StopScanning();
                         SetEurekaInstanceHunterStatus(
-                            configuration.EurekaInstanceIdEnabled
-                                ? "Stopped Eureka instance scanning. Live instance display remains enabled."
-                                : "Stopped Eureka instance scanning.");
+                            (configuration.EurekaInstanceIdEnabled ? global::XASlave.Localization.UiMessage.Key("S9DDDFD8314AFF7A6") : global::XASlave.Localization.UiMessage.Key("S45A982666E032799")));
                     }
 
                 }
@@ -366,8 +362,8 @@ public partial class SlaveWindow
         DrawEurekaInstanceIdSharedDisplayOptions("EurekaInstanceHunter");
 
         var leaveDutyDelaySeconds = configuration.EurekaInstanceIdLeaveDutyDelaySeconds;
-        if (ImGui.SliderInt(
-                "Leave duty delay##EurekaInstanceHunter",
+        if (global::XASlave.Localization.UiNative.SliderInt(
+                (global::XASlave.Localization.UiLocale.Native("SEEB77B78CFD41517") + "##EurekaInstanceHunter"),
                 ref leaveDutyDelaySeconds,
                 EurekaInstanceIdService.LeaveDutyDelaySecondsMinimum,
                 EurekaInstanceIdService.LeaveDutyDelaySecondsMaximum,
@@ -380,7 +376,7 @@ public partial class SlaveWindow
         }
 
         var playSound = configuration.EurekaInstanceIdPlaySound;
-        if (ImGui.Checkbox("Beep on new instance##EurekaInstanceHunter", ref playSound))
+        if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S87CF7C0A97033581") + "##EurekaInstanceHunter"), ref playSound))
         {
             configuration.EurekaInstanceIdPlaySound = playSound;
             ApplyEurekaInstanceIdConfiguration();
@@ -390,13 +386,13 @@ public partial class SlaveWindow
         using (ImRaii.Disabled(!configuration.EurekaInstanceIdPlaySound))
         {
             var soundEffectId = configuration.EurekaInstanceIdSoundEffectId;
-            using (var imguiScope360 = ImRaii.Combo("Sound##EurekaInstanceHunter", XAPeepData.GetSoundEffectLabel(soundEffectId)))
+            using (var imguiScope360 = global::XASlave.Localization.UiNative.ComboScope((global::XASlave.Localization.UiLocale.Native("S46124E023603420F") + "##EurekaInstanceHunter"), XAPeepData.GetSoundEffectLabelMessage(soundEffectId).Display))
             if (imguiScope360)
             {
                 for (var id = 0; id <= XAPeepData.MaxSoundEffectId; id++)
                 {
                     var isSelected = soundEffectId == id;
-                    if (ImGui.Selectable(XAPeepData.GetSoundEffectLabel(id), isSelected))
+                    if (global::XASlave.Localization.UiNative.Selectable(XAPeepData.GetSoundEffectLabel(id), isSelected, display: XAPeepData.GetSoundEffectLabelMessage(id).Display))
                     {
                         configuration.EurekaInstanceIdSoundEffectId = id;
                         ApplyEurekaInstanceIdConfiguration();
@@ -415,7 +411,7 @@ public partial class SlaveWindow
             }
 
             var soundVolumePercent = configuration.EurekaInstanceIdSoundVolume * 100f;
-            if (ImGui.SliderFloat("Alert volume##EurekaInstanceHunter", ref soundVolumePercent, 0f, 100f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
+            if (global::XASlave.Localization.UiNative.SliderFloat((global::XASlave.Localization.UiLocale.Native("S1525C9B4ECFB8C7F") + "##EurekaInstanceHunter"), ref soundVolumePercent, 0f, 100f, "%.0f%%", ImGuiSliderFlags.AlwaysClamp))
             {
                 configuration.EurekaInstanceIdSoundVolume = soundVolumePercent / 100f;
                 ApplyEurekaInstanceIdConfiguration();
@@ -428,17 +424,17 @@ public partial class SlaveWindow
         }
 
         ImGui.Spacing();
-        if (ImGui.Button(eurekaHunterHowToUseExpanded ? "How to use [-]##EurekaInstanceHunterHowToUse" : "How to use [+]##EurekaInstanceHunterHowToUse"))
+        if (global::XASlave.Localization.UiNative.Button(eurekaHunterHowToUseExpanded ? (global::XASlave.Localization.UiLocale.Native("S6A4DC3ABD4C219BA") + "##EurekaInstanceHunterHowToUse") : (global::XASlave.Localization.UiLocale.Native("S91F1A47CACCC47B8") + "##EurekaInstanceHunterHowToUse")))
             eurekaHunterHowToUseExpanded = !eurekaHunterHowToUseExpanded;
 
         if (eurekaHunterHowToUseExpanded)
         {
-            ImGui.TextWrapped("The Instance ID toggle is shared with XA Mods and only controls the live Eureka ID for the zone in the server bar DTR entry.");
-            ImGui.TextWrapped("Start and Stop buttons control the instance farming loop. When Slave finds a new instance, it updates that zone's baseline to the new ID before stopping.");
-            ImGui.TextWrapped("You can edit any row baseline manually or use Use Current Zone to overwrite the currently loaded Eureka row with the live instance.");
-            ImGui.TextWrapped("If an enabled row baseline is 0, Slave stores the first observed instance for that zone and keeps scanning instead of treating that first read as a hit.");
-            ImGui.TextWrapped("Scan order always follows the enabled rows in order: Anemos -> Pagos -> Pyros -> Hydatos. After each duplicate or baseline capture Slave leaves duty, wait for Kugane to load, then talks to Rodney again.");
-            ImGui.TextWrapped("You can select to farm a single or multiple zones.");
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S63FD6B945E54C926"));
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SA39FA2335C01B6B3"));
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SF85C4EE810AE852F"));
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S0049AE60B5E6BBBA"));
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S8C24AD117521F9BA"));
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S7F2B17797E4DE7D1"));
         }
     }
 }

@@ -62,7 +62,7 @@ public partial class SlaveWindow
         }
         xagmanOwnerCompletedCharacters = xagmanOwnerCompletedKeys.Count;
         xagmanStatus = XagmanStatus.Paused;
-        xagmanStatusText = "All local owners completed; waiting for Tony to acknowledge this client's completion before disconnecting.";
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("S59CB84DDB5932A39"));
         plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
         PublishXagmanPresence();
         return true;
@@ -90,10 +90,10 @@ public partial class SlaveWindow
             // Relay receipt before a hub-hosting FO stops its listener. The other local
             // clients can re-elect a hub without losing the coordinator's completion ledger.
             if ((DateTime.UtcNow - xagmanOwnerCompletionReceivedAtUtc).TotalSeconds >= 2.5)
-                StartXagmanFranchiseCompletionTask("Xagman: all local owners completed successfully.", localOwnersFinished: true);
+                StartXagmanFranchiseCompletionTask(global::XASlave.Localization.UiMessage.Key("S8F84F7C95FFD38CD"), localOwnersFinished: true);
         }
         else if ((DateTime.UtcNow - xagmanOwnerCompletionRequestedAtUtc).TotalSeconds > 120)
-            FailXagmanSupplyCycle("Tony did not acknowledge this client's completed owner run; kept the connection and withheld Task Completion.");
+            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("S713E025CD6061AA9"));
         return true;
     }
 
@@ -146,7 +146,7 @@ public partial class SlaveWindow
             var elapsed = (DateTime.UtcNow - entry.Value).TotalSeconds;
             // Missing peers can mean hub reconnection, never proof that an ack arrived.
             if (elapsed > 60)
-                FailXagmanSupplyCycle("Tony could not confirm delivery of a completed owner's acknowledgement; Tony remains connected for recovery.");
+                FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("SFAA0707609D361A0"));
             return true;
         }
         return false;

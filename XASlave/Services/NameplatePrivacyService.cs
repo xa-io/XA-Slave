@@ -16,7 +16,7 @@ public sealed class NameplatePrivacyService : IDisposable
 {
     private sealed record StatusIconMapping(uint TextureIcon, BitmapFontIcon[] BitmapIcons, bool BitmapMappingUnavailable);
 
-    private const string RemoteVisitorLabels = "wanderer, traveler, and voyager";
+    private static global::XASlave.Localization.UiMessage RemoteVisitorLabels => global::XASlave.Localization.UiMessage.Key("S1A34C840BFE878F0");
 
     private readonly INamePlateGui namePlateGui;
     private readonly IpcClient ipcClient;
@@ -54,19 +54,13 @@ public sealed class NameplatePrivacyService : IDisposable
     public bool IsShowTitlesAsPlayernamesEnabled => showTitlesAsPlayernamesEnabled;
     public IReadOnlyList<NameplateStatusOption> StatusOptions { get; private set; } = Array.Empty<NameplateStatusOption>();
 
-    public string HideStatusIconsStatusText => !hideStatusIconsEnabled
-        ? statusOptionsAvailable ? "Disabled" : "Disabled - status options unavailable; refresh to retry."
-        : !statusOptionsAvailable
-            ? "Enabled - status mappings unavailable; icons remain unchanged. Refresh to retry."
-            : hiddenStatusIds.Count == 0
-                ? "Enabled - no status icons selected."
-                : selectedStatusMappingUnavailable
-                    ? "Enabled - some selected icon mappings are unavailable; unrecognized icons remain visible."
-                    : "Enabled - selected status icons are hidden on player nameplates.";
+    internal global::XASlave.Localization.UiMessage HideStatusIconsStatusTextMessage => (!hideStatusIconsEnabled ? (statusOptionsAvailable ? global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E") : global::XASlave.Localization.UiMessage.Key("S28C33BF21750720C")) : (!statusOptionsAvailable ? global::XASlave.Localization.UiMessage.Key("S90F6F01C7484B514") : (hiddenStatusIds.Count == 0 ? global::XASlave.Localization.UiMessage.Key("SEE7DF9D2A85856FB") : (selectedStatusMappingUnavailable ? global::XASlave.Localization.UiMessage.Key("SCC9FA231989B6BA8") : global::XASlave.Localization.UiMessage.Key("SD73492FD470B21C2")))));
+    public string HideStatusIconsStatusText => HideStatusIconsStatusTextMessage.Original;
+    internal string LocalizedHideStatusIconsStatusText => HideStatusIconsStatusTextMessage.Display;
 
-    public string RemoveFcTagStatusText => removeFcTagEnabled
-        ? "Enabled - FC tags and visitor labels in the same nameplate field are hidden locally."
-        : "Disabled";
+    internal global::XASlave.Localization.UiMessage RemoveFcTagStatusTextMessage => (removeFcTagEnabled ? global::XASlave.Localization.UiMessage.Key("S346133B04F48A91C") : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
+    public string RemoveFcTagStatusText => RemoveFcTagStatusTextMessage.Original;
+    internal string LocalizedRemoveFcTagStatusText => RemoveFcTagStatusTextMessage.Display;
 
     public bool SetHideStatusIconsEnabled(bool value)
     {
@@ -193,47 +187,47 @@ public sealed class NameplatePrivacyService : IDisposable
         selectedStatusMappingUnavailable = unavailable;
     }
 
-    private string TravelerWorldNamesFormatLabel => showTravelerWorldNamesAddSpacer ? "Name @ HomeWorld" : "Name@HomeWorld";
+    private global::XASlave.Localization.UiMessage TravelerWorldNamesFormatLabel => showTravelerWorldNamesAddSpacer ? global::XASlave.Localization.UiMessage.Key("S25D798623D5A2E60") : global::XASlave.Localization.UiMessage.Key("S5F57806B2C7B48E8");
 
-    public string AnonymousModeStatusText =>
-        anonymousModeEnabled
-            ? "Enabled - visible player nameplates are masked locally with deterministic Firstname Lastname aliases."
-            : "Disabled";
+    internal global::XASlave.Localization.UiMessage AnonymousModeStatusTextMessage =>
+        (anonymousModeEnabled ? global::XASlave.Localization.UiMessage.Key("S832819D8A9627B22") : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
+    public string AnonymousModeStatusText => AnonymousModeStatusTextMessage.Original;
+    internal string LocalizedAnonymousModeStatusText => AnonymousModeStatusTextMessage.Display;
 
-    public string ShowTravelerWorldNamesStatusText
+    internal global::XASlave.Localization.UiMessage ShowTravelerWorldNamesStatusTextMessage
     {
         get
         {
             if (!showTravelerWorldNamesEnabled)
-                return "Disabled";
+                return global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
 
             if (anonymousModeEnabled)
-                return "Enabled - hidden while Anonymous Mode is masking names and removing FC tags.";
+                return global::XASlave.Localization.UiMessage.Key("S48BF5CB2AB59E8D7");
 
             if (IsTravelerWorldNamesDisabledInDuty())
-                return "Enabled - disabled while in duty content.";
+                return global::XASlave.Localization.UiMessage.Key("S534404BE95E9A660");
 
-            return showTravelerWorldNamesDisableInDuties
-                ? $"Enabled - visible {RemoteVisitorLabels} nameplates show {TravelerWorldNamesFormatLabel} and hide the FC/travel tag; disabled in duties."
-                : $"Enabled - visible {RemoteVisitorLabels} nameplates show {TravelerWorldNamesFormatLabel} and hide the FC/travel tag.";
+            return (showTravelerWorldNamesDisableInDuties ? global::XASlave.Localization.UiMessage.Format("S24F3CEEA1A538AC7", RemoteVisitorLabels, TravelerWorldNamesFormatLabel) : global::XASlave.Localization.UiMessage.Format("S210C85CC8112DC92", RemoteVisitorLabels, TravelerWorldNamesFormatLabel));
         }
     }
+    public string ShowTravelerWorldNamesStatusText => ShowTravelerWorldNamesStatusTextMessage.Original;
+    internal string LocalizedShowTravelerWorldNamesStatusText => ShowTravelerWorldNamesStatusTextMessage.Display;
 
-    public string ShowTitlesAsPlayernamesStatusText
+    internal global::XASlave.Localization.UiMessage ShowTitlesAsPlayernamesStatusTextMessage
     {
         get
         {
             if (!showTitlesAsPlayernamesEnabled)
-                return "Disabled";
+                return global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
 
             if (anonymousModeEnabled)
-                return "Enabled - hidden while Anonymous Mode is masking names and removing titles.";
+                return global::XASlave.Localization.UiMessage.Key("S45971F8FF496F37E");
 
-            return showTitlesAsPlayernamesHonorificSupportEnabled
-                ? "Enabled - Honorific custom titles are used when available, with native title fallback."
-                : "Enabled - prefix titles move before the player name and suffix titles move after it.";
+            return (showTitlesAsPlayernamesHonorificSupportEnabled ? global::XASlave.Localization.UiMessage.Key("SA9910C94EB05F26F") : global::XASlave.Localization.UiMessage.Key("S778657960563A3D2"));
         }
     }
+    public string ShowTitlesAsPlayernamesStatusText => ShowTitlesAsPlayernamesStatusTextMessage.Original;
+    internal string LocalizedShowTitlesAsPlayernamesStatusText => ShowTitlesAsPlayernamesStatusTextMessage.Display;
 
     public bool SetAnonymousModeEnabled(bool value)
     {

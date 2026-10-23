@@ -25,7 +25,10 @@ public sealed class EscMenuBailoutService : IDisposable
 
     public static int[] TimeoutOptions { get; } = { 1, 2, 3, 4, 5, 10, 15};
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public void ApplyConfiguration(int seconds)
     {
@@ -126,8 +129,6 @@ public sealed class EscMenuBailoutService : IDisposable
 
     private void UpdateStatusText()
     {
-        StatusText = enabled
-            ? $"Enabled - monitors addon:SystemMenu and closes it after {timeoutSeconds}s."
-            : "Disabled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (enabled ? global::XASlave.Localization.UiMessage.Format("SF74935C447A21F54", timeoutSeconds) : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")));
     }
 }

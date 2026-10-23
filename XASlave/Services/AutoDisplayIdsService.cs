@@ -53,8 +53,14 @@ public unsafe sealed class AutoDisplayIdsService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
     public uint CurrentZoneId { get; private set; }
     public uint CurrentMapId { get; private set; }
     public uint CurrentWeatherId { get; private set; }
@@ -77,7 +83,7 @@ public unsafe sealed class AutoDisplayIdsService : IDisposable
         UpdateDtrEntry();
 
         if (enabled)
-            StatusText = BuildStatusText();
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
     }
 
     public bool SetEnabled(bool value)
@@ -91,13 +97,13 @@ public unsafe sealed class AutoDisplayIdsService : IDisposable
             Unsubscribe();
             RestoreTargetName();
             SetDtrState(string.Empty, false);
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         Subscribe();
         enabled = true;
-        StatusText = BuildStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
         return true;
     }
 
@@ -109,23 +115,21 @@ public unsafe sealed class AutoDisplayIdsService : IDisposable
         RemoveDtrEntry();
     }
 
-    private string BuildStatusText()
+    private global::XASlave.Localization.UiMessage BuildStatusText()
     {
-        var enabledSurfaces = new List<string>();
+        var enabledSurfaces = new List<global::XASlave.Localization.UiMessage>();
         if (showItemId)
-            enabledSurfaces.Add("item");
+            enabledSurfaces.Add(global::XASlave.Localization.UiMessage.Key("S4A33EACD5FA65F2B"));
         if (showActionId)
-            enabledSurfaces.Add("action");
+            enabledSurfaces.Add(global::XASlave.Localization.UiMessage.Key("SBD938C688F49B77C"));
         if (showTargetDataId)
-            enabledSurfaces.Add("target");
+            enabledSurfaces.Add(global::XASlave.Localization.UiMessage.Key("S34A04005BCAF206E"));
         if (showWeatherId)
-            enabledSurfaces.Add("weather");
+            enabledSurfaces.Add(global::XASlave.Localization.UiMessage.Key("SE5E72BEB4E3C6926"));
         if (showZoneInfoInDtr)
-            enabledSurfaces.Add("zone/map DTR");
+            enabledSurfaces.Add(global::XASlave.Localization.UiMessage.Key("S21C39E1A1576EB3F"));
 
-        return enabledSurfaces.Count == 0
-            ? "Enabled - all ID subsettings are currently off."
-            : $"Enabled - {string.Join(", ", enabledSurfaces)} ID surfaces are active.";
+        return (enabledSurfaces.Count == 0 ? global::XASlave.Localization.UiMessage.Key("S343A9025DEBBFBC5") : global::XASlave.Localization.UiMessage.Format("S6C73BC83F88B28E7", global::XASlave.Localization.UiMessage.Join(", ", enabledSurfaces)));
     }
 
     private void Subscribe()
@@ -238,7 +242,7 @@ public unsafe sealed class AutoDisplayIdsService : IDisposable
                 return;
 
             AppendMarker(textNode, marker);
-            LastActionText = $"Last action: updated action detail tooltip at {DateTime.Now:HH:mm:ss} with {marker}.";
+            LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S7B1312F613D64039", DateTime.Now, marker));
         }
         catch (Exception ex)
         {
@@ -313,7 +317,7 @@ public unsafe sealed class AutoDisplayIdsService : IDisposable
 
                 if (TryAppendWeatherMarker(node, weatherName, CurrentWeatherId))
                 {
-                    LastActionText = $"Last action: updated weather tooltip with weather ID {CurrentWeatherId} at {DateTime.Now:HH:mm:ss}.";
+                    LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S3AB01A1641C0C0E6", CurrentWeatherId, DateTime.Now));
                     return;
                 }
             }
@@ -490,7 +494,7 @@ public unsafe sealed class AutoDisplayIdsService : IDisposable
             return;
         }
 
-        SetDtrState($"Region: {CurrentZoneId} / Map: {CurrentMapId}", true);
+        SetDtrState(global::XASlave.Localization.UiMessage.Format("S6A8D499AD0AA0BC9", CurrentZoneId, CurrentMapId).Original, true);
     }
 
     private void SetDtrState(string text, bool shown)

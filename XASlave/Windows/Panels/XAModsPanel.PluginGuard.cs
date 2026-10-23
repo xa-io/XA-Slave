@@ -27,12 +27,12 @@ public partial class SlaveWindow
     {
         var cfg = plugin.Configuration;
         cfg.PluginGuardAdditionalPlugins ??= new();
-        ImGui.TextWrapped("Check any installed plugin to protect it. Built-in protections stay selected. Changes apply immediately while Plugin Guard is enabled and are saved for next time.");
-        ImGui.TextDisabled($"Additional protected plugins: {cfg.PluginGuardAdditionalPlugins.Count}");
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SF39CA49AAD50294C"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("SF7DF33D1750BB553", cfg.PluginGuardAdditionalPlugins.Count));
         ImGui.SetNextItemWidth(Scale(260f));
-        ImGui.InputTextWithHint("##PluginGuardFilter", "Filter plugins...", ref pluginGuardFilter, 128);
+        ImGui.InputTextWithHint("##PluginGuardFilter", global::XASlave.Localization.UiLocale.Get("SFC791C78AD23347B"), ref pluginGuardFilter, 128);
         ImGui.SameLine();
-        if (ImGui.SmallButton("Refresh##PluginGuard"))
+        if (global::XASlave.Localization.UiNative.SmallButton((global::XASlave.Localization.UiLocale.Native("S0E91610117029A62") + "##PluginGuard")))
             pluginGuardRefreshAt = 0;
 
         if (Environment.TickCount64 >= pluginGuardRefreshAt)
@@ -57,7 +57,7 @@ public partial class SlaveWindow
         }
 
         if (pluginGuardListUnavailable)
-            ImGui.TextWrapped("Installed plugin list is temporarily unavailable. Saved selections are retained; refresh to retry.");
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SC38F212D3C71CF5A"));
 
         var selected = new HashSet<string>(cfg.PluginGuardAdditionalPlugins, StringComparer.OrdinalIgnoreCase);
         using var child = ImRaii.Child("##PluginGuardPluginList", new Vector2(0f, Scale(240f)), true);
@@ -89,7 +89,7 @@ public partial class SlaveWindow
             if (builtIn)
             {
                 ImGui.SameLine();
-                ImGui.TextDisabled("(built-in)");
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S711606EB29D7026B"));
             }
         }
 
@@ -108,8 +108,8 @@ public partial class SlaveWindow
             ImGui.SameLine();
             ImGui.TextUnformatted(name);
             ImGui.SameLine();
-            ImGui.TextDisabled(pluginGuardListUnavailable ? "(saved)" : "(not installed)");
+            ImGui.TextDisabled(pluginGuardListUnavailable ? global::XASlave.Localization.UiLocale.Get("S7FA4EBDE64BB063C") : global::XASlave.Localization.UiLocale.Get("S57C74A8A4F4791EE"));
         }
-        if (visible == 0) ImGui.TextDisabled("No matching plugins.");
+        if (visible == 0) ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SA78C7366AD44DC8B"));
     }
 }

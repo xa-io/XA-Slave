@@ -31,7 +31,10 @@ public unsafe sealed class BlacklistedPartyNameService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -40,13 +43,13 @@ public unsafe sealed class BlacklistedPartyNameService : IDisposable
             enabled = false;
             RestoreTouchedNodes();
             UpdateFrameworkSubscription();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         enabled = true;
         UpdateFrameworkSubscription();
-        StatusText = "Enabled - waiting for _PartyList and blacklist data.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD524CD48FB0AD14D"));
         TryUpdatePartyList();
         return true;
     }
@@ -93,7 +96,7 @@ public unsafe sealed class BlacklistedPartyNameService : IDisposable
         }
         catch (Exception ex)
         {
-            StatusText = "Enabled - failed to update _PartyList name text.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SBB0CCB89DE1BDA1F"));
             var now = DateTime.UtcNow;
             if (now - lastWarningUtc > TimeSpan.FromSeconds(10))
             {
@@ -109,7 +112,7 @@ public unsafe sealed class BlacklistedPartyNameService : IDisposable
         if (aliases.Count == 0)
         {
             RestoreTouchedNodes();
-            StatusText = "Enabled - no blacklisted party members detected.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S8FF7F767019F6516"));
             return;
         }
 
@@ -117,7 +120,7 @@ public unsafe sealed class BlacklistedPartyNameService : IDisposable
         if (addon == null || !addon->IsVisible)
         {
             RestoreTouchedNodes();
-            StatusText = $"Enabled - found {aliases.Count} blocked party member(s); {PartyListAddonName} is not visible.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S21CD6ADB3A8DE8A0", aliases.Count, PartyListAddonName));
             return;
         }
 
@@ -138,9 +141,7 @@ public unsafe sealed class BlacklistedPartyNameService : IDisposable
         }
 
         RestoreInactiveNodes(activeNodes);
-        StatusText = replacedCount == 0
-            ? $"Enabled - found {aliases.Count} blocked party member(s); waiting for Unknown row text in {PartyListAddonName}."
-            : $"Enabled - showing {replacedCount} blocked party-list name(s) in red.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (replacedCount == 0 ? global::XASlave.Localization.UiMessage.Format("S987A5E2EB701D62C", aliases.Count, PartyListAddonName) : global::XASlave.Localization.UiMessage.Format("S2B9FE1CC397F29DC", replacedCount)));
     }
 
     private static Dictionary<string, string> CollectBlacklistedPartyAliases()

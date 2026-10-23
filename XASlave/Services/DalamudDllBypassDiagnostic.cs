@@ -22,6 +22,11 @@ internal readonly record struct ReviewedLauncherArtifact(
     string PatchFamily,
     string StaticPatchResult)
 {
+    internal global::XASlave.Localization.UiMessage StateLabelMessage => AutoRetainerUiMessagePresentation.Get(StateLabel);
+    internal global::XASlave.Localization.UiMessage DisplayLabelMessage => AutoRetainerUiMessagePresentation.Get(DisplayLabel);
+    internal global::XASlave.Localization.UiMessage PatchFamilyMessage => AutoRetainerUiMessagePresentation.Get(PatchFamily);
+    internal global::XASlave.Localization.UiMessage StaticPatchResultMessage => AutoRetainerUiMessagePresentation.Get(StaticPatchResult);
+
     internal bool BypassInstalled => State == ReviewedLauncherArtifactState.KnownPatched;
     internal bool StaticPatchValid => BypassInstalled
         && string.Equals(PatchFamily, DalamudDllBypassDiagnostic.ReviewedPatchFamily, StringComparison.Ordinal);
@@ -39,7 +44,13 @@ internal readonly record struct DalamudDllBypassDiagnosticSnapshot(
     ReviewedLauncherArtifact Classification,
     bool? PresentBeforeGameStart,
     string OperatorVerdict,
-    string Detail);
+    string Detail)
+{
+    internal global::XASlave.Localization.UiMessage GameVersionMessage => AutoRetainerUiMessagePresentation.Get(GameVersion);
+    internal global::XASlave.Localization.UiMessage SupportedGameVersionMessage => AutoRetainerUiMessagePresentation.Get(SupportedGameVersion);
+    internal global::XASlave.Localization.UiMessage OperatorVerdictMessage => AutoRetainerUiMessagePresentation.Get(OperatorVerdict);
+    internal global::XASlave.Localization.UiMessage DetailMessage => AutoRetainerUiMessagePresentation.Get(Detail);
+}
 
 /// <summary>
 /// Performs inert local inspection only: path lookup, file metadata, SHA-256, and
@@ -87,7 +98,7 @@ internal static class DalamudDllBypassDiagnostic
             }
             catch (Exception ex)
             {
-                inspectionError = $"Launcher DLL inspection failed: {ex.GetType().Name}: {ex.Message}";
+                inspectionError = AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Format("S0A009681A88CBD01", ex.GetType().Name, global::XASlave.Localization.UiMessage.FromException(ex)));
                 classification = ClassifySha256(string.Empty);
                 presentBeforeGameStart = null;
             }
@@ -128,40 +139,40 @@ internal static class DalamudDllBypassDiagnostic
         {
             OriginalDefaultSha256 => new(
                 ReviewedLauncherArtifactState.KnownDefault,
-                "known-default",
-                "Original official/default launcher DLL",
-                "none",
-                "NOT PRESENT - exact SHA-256 matches a reviewed default artifact."),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S10952D1479CE14AE")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SB81096BD59B5381D")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S140BEDBF9C3F6D56")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SDFD33BF55B25FB15"))),
             CurrentDefaultSha256 => new(
                 ReviewedLauncherArtifactState.KnownDefault,
-                "known-default",
-                "Current official/default launcher DLL",
-                "none",
-                "NOT PRESENT - exact SHA-256 matches a reviewed default artifact."),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S10952D1479CE14AE")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S4F73B1D23D3B6AB5")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S140BEDBF9C3F6D56")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SDFD33BF55B25FB15"))),
             LegacyPatchedSha256 => new(
                 ReviewedLauncherArtifactState.KnownPatched,
-                "known-patched",
-                "Reviewed legacy five-method bypass",
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S207E6240C5390362")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S3F266A095BE33CA5")),
                 ReviewedPatchFamily,
-                "PASS - exact SHA-256 matches a reviewed five-method-v1 patched artifact."),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S2356DB58DEE6E995"))),
             SupersededPatchedSha256 => new(
                 ReviewedLauncherArtifactState.KnownPatched,
-                "known-patched",
-                "Superseded current-derived bypass with builder self-reference",
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S207E6240C5390362")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S84A80DE31B811B8A")),
                 ReviewedPatchFamily,
-                "PASS - exact SHA-256 matches a reviewed five-method-v1 patched artifact."),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S2356DB58DEE6E995"))),
             CurrentPatchedSha256 => new(
                 ReviewedLauncherArtifactState.KnownPatched,
-                "known-patched",
-                "Current-derived five-method bypass with preserved assembly references",
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S207E6240C5390362")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SDD64171F7D427666")),
                 ReviewedPatchFamily,
-                "PASS - exact SHA-256 matches a reviewed five-method-v1 patched artifact."),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S2356DB58DEE6E995"))),
             _ => new(
                 ReviewedLauncherArtifactState.Unknown,
-                "unknown",
-                "Unknown or newer launcher DLL",
-                "unknown",
-                "UNRESOLVED - SHA-256 is not in the reviewed catalog; static comparison is required."),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SB23A6A8439C0DDE5")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S91B32D76482E102F")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SB23A6A8439C0DDE5")),
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S8E572576DCDAC73F"))),
         };
     }
 
@@ -172,29 +183,29 @@ internal static class DalamudDllBypassDiagnostic
         bool? versionMismatch)
     {
         if (!launcherDllFound)
-            return "NO - XIVLauncher.Common.dll was not found.";
+            return AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SE09B548D1B8BBEC5"));
         if (classification.State == ReviewedLauncherArtifactState.Unknown)
-            return "UNRESOLVED - the installed DLL hash requires static comparison.";
+            return AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SD708950AFC669960"));
         if (classification.State == ReviewedLauncherArtifactState.KnownDefault)
         {
-            return versionMismatch switch
+            return AutoRetainerUiMessagePresentation.Store(versionMismatch switch
             {
-                true => "NO - versions differ and a reviewed bypass is not installed.",
-                false => "NOT NEEDED TODAY - versions match and the reviewed default DLL is installed.",
-                null => "UNKNOWN NEED - the default DLL is installed but the version comparison is unavailable.",
-            };
+                true => global::XASlave.Localization.UiMessage.Key("S12359A92493012C7"),
+                false => global::XASlave.Localization.UiMessage.Key("SF4F57B3115FB6DCF"),
+                null => global::XASlave.Localization.UiMessage.Key("SC19EBB37901E233B"),
+            });
         }
         if (presentBeforeGameStart == false)
-            return "RESTART REQUIRED - the reviewed bypass file is newer than the running game process.";
+            return AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S5BB445C3888DAB41"));
         if (presentBeforeGameStart is null)
-            return "PASS (static only) - the reviewed bypass is installed; pre-launch timing is unavailable.";
+            return AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SD11ED7C3A251DED8"));
 
-        return versionMismatch switch
+        return AutoRetainerUiMessagePresentation.Store(versionMismatch switch
         {
-            true => "PASS (runtime mismatch observed) - XA Slave is loaded while game and supported versions differ.",
-            false => "PASS (static) - the reviewed bypass is installed; the version gate is not needed today.",
-            null => "PASS (static) - the reviewed bypass is installed; version comparison is unavailable.",
-        };
+            true => global::XASlave.Localization.UiMessage.Key("S195F326868BDB2DF"),
+            false => global::XASlave.Localization.UiMessage.Key("SBFE7105D5B9DCCC0"),
+            null => global::XASlave.Localization.UiMessage.Key("SB05417EAC2924C93"),
+        });
     }
 
     internal static string ComputeSha256(string path)
@@ -213,10 +224,10 @@ internal static class DalamudDllBypassDiagnostic
         if (!string.IsNullOrWhiteSpace(metadataError))
             return metadataError;
         if (classification.StaticPatchValid)
-            return "The exact file hash matches an artifact whose five reviewed patch seams passed static comparison. This is not launcher or game acceptance proof.";
+            return AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SE18C663820B7DE38"));
         if (classification.State == ReviewedLauncherArtifactState.KnownDefault)
-            return "The exact file hash matches a reviewed official/default artifact and does not contain the reviewed bypass.";
-        return "Unknown hashes remain unresolved until the DLL research workflow performs a fresh static comparison.";
+            return AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S2C260A52995C307F"));
+        return AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SCC43BB4A90FDA969"));
     }
 
     private static unsafe string ReadRunningGameVersion()
@@ -224,13 +235,11 @@ internal static class DalamudDllBypassDiagnostic
         try
         {
             var framework = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
-            return framework == null || string.IsNullOrWhiteSpace(framework->GameVersionString)
-                ? "Unavailable"
-                : framework->GameVersionString;
+            return AutoRetainerUiMessagePresentation.Store((framework == null || string.IsNullOrWhiteSpace(framework->GameVersionString) ? global::XASlave.Localization.UiMessage.Key("SCA184496974204A0") : global::XASlave.Localization.UiMessage.Raw(framework->GameVersionString)));
         }
         catch
         {
-            return "Unavailable";
+            return AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SCA184496974204A0"));
         }
     }
 
@@ -284,9 +293,9 @@ internal static class DalamudDllBypassDiagnostic
         if (string.IsNullOrWhiteSpace(metadataPath) || !File.Exists(metadataPath))
         {
             return (
-                "Unavailable",
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SCA184496974204A0")),
                 metadataPath,
-                "Loaded Dalamud version metadata was not found beside the loaded Dalamud assembly, so version-mismatch need cannot be compared.");
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S894733AA9DFCFB8D")));
         }
 
         try
@@ -300,16 +309,16 @@ internal static class DalamudDllBypassDiagnostic
             }
 
             return (
-                "Unavailable",
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SCA184496974204A0")),
                 metadataPath,
-                "Loaded Dalamud version metadata does not contain a SupportedGameVer value.");
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("S9FA68850CBC6C627")));
         }
         catch (Exception ex)
         {
             return (
-                "Unavailable",
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Key("SCA184496974204A0")),
                 metadataPath,
-                $"Loaded Dalamud version metadata could not be read: {ex.GetType().Name}: {ex.Message}");
+                AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Format("S4559A93AD87CFBC2", ex.GetType().Name, global::XASlave.Localization.UiMessage.FromException(ex))));
         }
     }
 }

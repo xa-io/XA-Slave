@@ -22,13 +22,20 @@ public partial class SlaveWindow
         bool BoolValue,
         string Display);
 
-    internal static bool TryParseDebugCallbackValues(
+    internal static bool TryParseDebugCallbackValues(string rawValues, out List<DebugCallbackValue> values, out string error)
+    {
+        var result = TryParseDebugCallbackValuesMessage(rawValues, out values, out var presentation);
+        error = presentation.Original;
+        return result;
+    }
+
+    internal static bool TryParseDebugCallbackValuesMessage(
         string rawValues,
         out List<DebugCallbackValue> values,
-        out string error)
+        out global::XASlave.Localization.UiMessage error)
     {
         values = [];
-        error = string.Empty;
+        error = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
         if (string.IsNullOrWhiteSpace(rawValues))
             return true;
@@ -38,7 +45,7 @@ public partial class SlaveWindow
             StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         if (tokens.Length > MaxDebugCallbackValues)
         {
-            error = $"At most {MaxDebugCallbackValues} callback values are allowed.";
+            error = global::XASlave.Localization.UiMessage.Format("S0E700CF790B177F8", MaxDebugCallbackValues);
             return false;
         }
 
@@ -77,7 +84,7 @@ public partial class SlaveWindow
                     continue;
                 }
 
-                error = $"'{token}' is not a valid uint token.";
+                error = global::XASlave.Localization.UiMessage.Format("S105551758F444AD5", token);
                 return false;
             }
 
@@ -92,7 +99,7 @@ public partial class SlaveWindow
                 continue;
             }
 
-            error = $"Unsupported token '{token}'. Use signed integers, true/false, null, or uint:<value>.";
+            error = global::XASlave.Localization.UiMessage.Format("S61BE915B70B08176", token);
             return false;
         }
 

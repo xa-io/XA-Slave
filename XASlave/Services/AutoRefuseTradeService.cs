@@ -19,7 +19,7 @@ public enum XagmanTradeRefusalOverride
 
 public unsafe sealed class AutoRefuseTradeService : IDisposable
 {
-    private const string RefusedTradeMessage = "XA Slave: Refused incoming trade request.";
+    private static string RefusedTradeMessage => global::XASlave.Localization.UiLocale.Native("SD8180BF6C0373F95");
     private const string UnknownTraderName = "the trader";
     private const int IncomingTraderEntityIdTtlMs = 5000;
 
@@ -85,7 +85,10 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
     public XagmanTradeRefusalOverride XagmanOverride => xagmanOverride;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public void ApplyConfiguration(bool showNotification, bool sendEcho, string extraCommands)
     {
@@ -105,7 +108,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
                 manualEnabled = false;
                 enabled = false;
                 DisableHooks();
-                StatusText = "Unavailable - trade refusal hooks are missing.";
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SF1C9B6A39E4D6F72"));
                 return false;
             }
         }
@@ -179,7 +182,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         {
             enabled = false;
             DisableHooks();
-            StatusText = "Unavailable - trade refusal hooks are missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SF1C9B6A39E4D6F72"));
             return false;
         }
 
@@ -196,7 +199,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         {
             enabled = false;
             DisableHooks();
-            StatusText = "Unavailable - trade refusal hooks could not be enabled.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S41E563CC963EDDA0"));
             log.Warning(ex, "[XASlave] Auto Refuse Trade failed to enable its hooks.");
             return false;
         }
@@ -348,29 +351,27 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     {
         if (onhTradeAdmission != null)
         {
-            StatusText = "ONH partner filter active - only the selected trade partner is admitted.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SBCC80D9C43821C5F"));
             return;
         }
         if (xagmanOverride == XagmanTradeRefusalOverride.DropboxAutoAcceptSuppression)
         {
-            StatusText = "Temporarily suspended by Xagman - Dropbox auto-accept may be active; the saved manual preference is unchanged.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S23A4F6EDA10358C1"));
             return;
         }
 
         if (!enabled)
         {
-            StatusText = xagmanOverride == XagmanTradeRefusalOverride.IdleDemand
-                ? "Unavailable - Xagman idle refusal could not enable the required trade hooks."
-                : "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (xagmanOverride == XagmanTradeRefusalOverride.IdleDemand ? global::XASlave.Localization.UiMessage.Key("SE80082F7C2F129B3") : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")));
             return;
         }
 
         var feedbackMode = showNotification switch
         {
-            true when sendEcho => "notification + /e",
-            true => "notification only",
-            _ when sendEcho => "/e only",
-            _ => "silent"
+            true when sendEcho => global::XASlave.Localization.UiMessage.Key("S8E52945D5B35C5C0"),
+            true => global::XASlave.Localization.UiMessage.Key("S3F6ECB3C8E303037"),
+            _ when sendEcho => global::XASlave.Localization.UiMessage.Key("S77459FE4E6F41A88"),
+            _ => global::XASlave.Localization.UiMessage.Key("S5A9B9FC8E986CC2F")
         };
 
         var surfaceCount = 1;
@@ -378,19 +379,19 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         surfaceCount += tradeStatusUpdateHook != null ? 1 : 0;
         var extraCommandLabel = CountExtraCommands() switch
         {
-            0 => "no extra messages",
-            1 => "1 extra message/command",
-            var count => $"{count} extra messages/commands"
+            0 => global::XASlave.Localization.UiMessage.Key("S2FDF8CB3F14EFE96"),
+            1 => global::XASlave.Localization.UiMessage.Key("S588446A6B4D53BED"),
+            var count => global::XASlave.Localization.UiMessage.Format("S0199763351E02A50", count)
         };
         var ownerLabel = (manualEnabled, xagmanOverride == XagmanTradeRefusalOverride.IdleDemand) switch
         {
-            (true, true) => "manual + Xagman idle",
-            (false, true) => "Xagman idle",
-            _ => "manual",
+            (true, true) => global::XASlave.Localization.UiMessage.Key("S547B33DD8CA7CADA"),
+            (false, true) => global::XASlave.Localization.UiMessage.Key("S24D1769AFCD7D430"),
+            _ => global::XASlave.Localization.UiMessage.Key("S36BDE66F289A3568"),
         };
 
-        var availabilityLabel = surfaceCount < 3 ? "Partially enabled" : "Enabled";
-        StatusText = $"{availabilityLabel} - incoming trades are refused automatically ({ownerLabel}; {feedbackMode}, {surfaceCount}/3 surfaces, {extraCommandLabel}).";
+        var availabilityLabel = (surfaceCount < 3 ? global::XASlave.Localization.UiMessage.Key("S14F862A9FCF680A8") : global::XASlave.Localization.UiMessage.Key("S92C1CDFDF4CB9CF6"));
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("SF0691375F9521277", availabilityLabel, ownerLabel, feedbackMode, surfaceCount, extraCommandLabel));
     }
 
     private void SendTradeRequestDetour(InventoryManager* manager, uint entityId)

@@ -10,7 +10,18 @@ internal readonly record struct FurnitureRestoreSession(long Generation, nint Ho
     nint Agent, nint Manager, nint Territory, bool Exterior, ulong Estate, byte NativeSize, byte NativeListMode,
     ulong Character, uint TerritoryType);
 internal readonly record struct FurnitureRestoreSource(uint Container, ushort Slot, int Quantity, InventoryShuttleItemState State);
-internal sealed record FurnitureRestoreItemResult(FurnitureRestoreSource Source, FurnitureRestoreOutcome Outcome, string Detail);
+internal sealed record FurnitureRestoreItemResult(FurnitureRestoreSource Source, FurnitureRestoreOutcome Outcome, string Detail)
+{
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<FurnitureRestoreItemResult, global::XASlave.Localization.UiMessage> Messages = new();
+    internal global::XASlave.Localization.UiMessage DetailMessage => Messages.TryGetValue(this, out var message) ? global::XASlave.Localization.UiMessage.Capture(message, Detail) : global::XASlave.Localization.UiMessage.Raw(Detail);
+    internal string LocalizedDetail => DetailMessage.Display;
+    internal static FurnitureRestoreItemResult Create(FurnitureRestoreSource source, FurnitureRestoreOutcome outcome, global::XASlave.Localization.UiMessage detail)
+    {
+        var result = new FurnitureRestoreItemResult(source, outcome, detail.Original);
+        Messages.Add(result, detail);
+        return result;
+    }
+}
 
 // Physical pages establish coverage, not permission or effective estate capacity.
 internal static class FurnitureRestoreCapacity
@@ -21,7 +32,7 @@ internal static class FurnitureRestoreCapacity
         if (nativeSize == 1) return exterior ? 60 : 450;
         if (nativeSize == 2) return exterior ? 80 : 600;
         if (!exterior && (nativeSize == 3 || nativeSize == 5)) return 150;
-        throw new InvalidOperationException("Unsupported or unavailable estate size.");
+        throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE63E7CC63DBE33C1"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     internal static uint[] Pages(bool exterior, bool stored, byte nativeSize)
@@ -45,10 +56,10 @@ internal static class FurnitureRestoreCapacity
         int snapshotOrdinaryOccupancy, int nativeOrdinaryCount, int nativeLimit, bool allPagesLoaded, bool exclusionsReconciled)
     {
         var limit = Limit(exterior, nativeSize);
-        if (!allPagesLoaded || !exclusionsReconciled) throw new InvalidOperationException("Furniture capacity is unresolved; refresh the native UI and wait for all pages.");
+        if (!allPagesLoaded || !exclusionsReconciled) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S48E08749244C5284"), originalMessageText => new InvalidOperationException(originalMessageText));
         if (nominalSlots != (exterior ? 80 : 600) || emptySlots < 0 || emptySlots > nominalSlots
             || snapshotOrdinaryOccupancy < 0 || snapshotOrdinaryOccupancy > nominalSlots - emptySlots || nativeOrdinaryCount != snapshotOrdinaryOccupancy || nativeLimit != limit)
-            throw new InvalidOperationException("Displayed estate capacity and the complete inventory snapshot disagree.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SC1D88307477C015C"), originalMessageText => new InvalidOperationException(originalMessageText));
         var physicalUsable = Math.Max(0, emptySlots - Math.Max(0, nominalSlots - limit));
         var estateUsable = Math.Max(0, limit - nativeOrdinaryCount);
         return Math.Min(physicalUsable, estateUsable);
@@ -56,6 +67,6 @@ internal static class FurnitureRestoreCapacity
 
     internal static void ValidateMode(FurnitureRestoreMode mode)
     {
-        if (!Enum.IsDefined(mode)) throw new ArgumentException("Unknown furniture restore mode.");
+        if (!Enum.IsDefined(mode)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S7E682E28A9C2FE9F"), originalMessageText => new ArgumentException(originalMessageText));
     }
 }

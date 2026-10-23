@@ -25,10 +25,14 @@ public sealed class NearbyPlayersService : IDisposable
     private long nextZoneScan;
     private string lastDtr = string.Empty;
     private string? dtrError;
+    private global::XASlave.Localization.UiMessage? dtrErrorMessage;
     private bool inContent;
     private bool disposed;
     public bool Enabled { get; private set; }
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
     public NearbyPlayersSettings Settings => plugin.Configuration.NearbyPlayers;
     public PlayerObservationSnapshot Snapshot { get; private set; } = new(0, 0, null, Array.Empty<PlayerObservation>());
     public bool WindowOpen
@@ -114,7 +118,7 @@ public sealed class NearbyPlayersService : IDisposable
             {
                 if (!Enabled || plugin.TaskRunner.IsRunning)
                 {
-                    Plugin.ChatGui.PrintError("[XA Nearby] Player actions are unavailable while disabled or a task is running.");
+                    Plugin.ChatGui.PrintError(global::XASlave.Localization.UiMessage.Key("SEC092D2CD1261897").Original);
                     return;
                 }
                 var current = observations.CaptureNearby();
@@ -128,12 +132,12 @@ public sealed class NearbyPlayersService : IDisposable
                         return;
                     }
                 }
-                Plugin.ChatGui.PrintError("[XA Nearby] That player is no longer loaded here.");
+                Plugin.ChatGui.PrintError(global::XASlave.Localization.UiMessage.Key("S37A2A3D8578FA6E4").Original);
             }
             catch (Exception error)
             {
                 Plugin.Log.Error(error, "[XA Nearby] Player action failed.");
-                Plugin.ChatGui.PrintError("[XA Nearby] Could not perform that player action.");
+                Plugin.ChatGui.PrintError(global::XASlave.Localization.UiMessage.Key("S1AE009CF528AB4E4").Original);
             }
         });
     }
@@ -170,7 +174,7 @@ public sealed class NearbyPlayersService : IDisposable
                 if (invite == null || character->ContentId == 0 || selected.HomeWorldId > ushort.MaxValue)
                     throw new InvalidOperationException("Party invite is unavailable.");
                 if (!invite->InviteToParty(character->ContentId, selected.Name, (ushort)selected.HomeWorldId))
-                    Plugin.ChatGui.PrintError("[XA Nearby] The game did not accept the party invite request.");
+                    Plugin.ChatGui.PrintError(global::XASlave.Localization.UiMessage.Key("SE6487497F30E2E14").Original);
                 return;
         }
     }
@@ -195,9 +199,9 @@ public sealed class NearbyPlayersService : IDisposable
                 dtr.Shown = false;
                 dtrError = null;
             }
-            catch (Exception error) { dtrError = "DTR unavailable: " + error.Message; }
+            catch (Exception error) { dtrError = global::XASlave.Localization.UiMessage.Store(ref dtrErrorMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S6C18F8E7C3F5BCD1"), global::XASlave.Localization.UiMessage.FromException(error))); }
         }
-        else StatusText = "Disabled";
+        else StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
         plugin.Configuration.Save();
     }
 
@@ -220,9 +224,9 @@ public sealed class NearbyPlayersService : IDisposable
                 // Local observations need no server-side player-search refresh or native zone hooks.
             }
             try { UpdateDtr(); }
-            catch (Exception error) { dtrError = "DTR unavailable: " + error.Message; }
-            StatusText = Snapshot.LocalPlayer == null ? "Waiting for a character" : $"{Snapshot.Players.Count} loaded nearby";
-            if (dtrError != null) StatusText += "; " + dtrError;
+            catch (Exception error) { dtrError = global::XASlave.Localization.UiMessage.Store(ref dtrErrorMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S6C18F8E7C3F5BCD1"), global::XASlave.Localization.UiMessage.FromException(error))); }
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (Snapshot.LocalPlayer == null ? global::XASlave.Localization.UiMessage.Key("S5D4925392A9D22AB") : global::XASlave.Localization.UiMessage.Format("S2304CB6375A18EB1", Snapshot.Players.Count)));
+            if (dtrError != null) StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(uiStatusText, StatusText), global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Raw("; "), global::XASlave.Localization.UiMessage.Capture(ref dtrErrorMessage, dtrError))));
         }
         catch (Exception error)
         {
@@ -230,7 +234,7 @@ public sealed class NearbyPlayersService : IDisposable
             Enabled = false;
             Settings.Enabled = false;
             plugin.Configuration.Save();
-            StatusText = "Unavailable: " + error.Message;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SF5646BBF5EE343C7"), global::XASlave.Localization.UiMessage.Value(error.Message)));
             Plugin.Log.Warning(error, "[XASlave] Nearby Players update failed.");
         }
     }
@@ -260,7 +264,7 @@ public sealed class NearbyPlayersService : IDisposable
     {
         if (dtr == null) return;
         var text = "\uE033 " + Snapshot.Players.Count;
-        if (text != lastDtr) { dtr.Text = text; dtr.Tooltip = $"{Snapshot.Players.Count} nearby players"; lastDtr = text; }
+        if (text != lastDtr) { dtr.Text = text; dtr.Tooltip = global::XASlave.Localization.UiMessage.Format("SD8B1658C0F4190F4", Snapshot.Players.Count).Original; lastDtr = text; }
         dtr.Shown = Settings.ShowDtr && DisplayAvailable;
     }
 

@@ -54,8 +54,14 @@ public sealed class AlertWhenTypingInCombatService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No alerts yet.";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S512584869DF41B6F");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S512584869DF41B6F");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
     public bool IsInCombat { get; private set; }
     public bool IsChatLogFocused { get; private set; }
 
@@ -101,7 +107,7 @@ public sealed class AlertWhenTypingInCombatService : IDisposable
             nextAlertUtc = lastAlertUtc.AddSeconds(this.cooldownSeconds);
 
         if (enabled)
-            StatusText = BuildStatusText();
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
     }
 
     public bool SetEnabled(bool value)
@@ -116,14 +122,14 @@ public sealed class AlertWhenTypingInCombatService : IDisposable
             soundPlaybackGeneration++;
             XAPeepSoundPlayer.StopTonePlayback();
             ResetRuntimeState();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         enabled = true;
         ResetRuntimeState();
         Subscribe();
-        StatusText = BuildStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, BuildStatusText());
         return true;
     }
 
@@ -147,9 +153,9 @@ public sealed class AlertWhenTypingInCombatService : IDisposable
         ResetRuntimeState();
     }
 
-    private string BuildStatusText()
+    private global::XASlave.Localization.UiMessage BuildStatusText()
     {
-        return $"Enabled - watching for InCombat + ChatLog focus with a {cooldownSeconds}s cooldown.";
+        return global::XASlave.Localization.UiMessage.Format("S23FF8679F3328533", cooldownSeconds);
     }
 
     private void Subscribe()
@@ -252,10 +258,10 @@ public sealed class AlertWhenTypingInCombatService : IDisposable
 
     private void ShowAlert(bool isPreview)
     {
-        const string message = "You are typing in ChatLog while in combat!";
+        var message = global::XASlave.Localization.UiMessage.Key("S9D12C65000511B0B");
         try
         {
-            toastGui.ShowNormal(isPreview ? $"Preview: {message}" : message);
+            toastGui.ShowNormal(((isPreview ? global::XASlave.Localization.UiMessage.Format("S7A199109136A1ADC", message) : message)).Original);
         }
         catch (Exception ex)
         {
@@ -264,9 +270,7 @@ public sealed class AlertWhenTypingInCombatService : IDisposable
 
         PlayConfiguredSound();
 
-        LastActionText = isPreview
-            ? $"Preview played at {DateTime.Now:HH:mm:ss}."
-            : $"Last alert: ChatLog was focused in combat at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, (isPreview ? global::XASlave.Localization.UiMessage.Format("S0551BB441B00CC0B", DateTime.Now) : global::XASlave.Localization.UiMessage.Format("SCFEB115948D71D01", DateTime.Now)));
 
         if (!isPreview)
             log.Information($"[XASlave] Alert When Typing In Combat fired with tone {toneId}, {beepCount} beep(s), and a {cooldownSeconds}s cooldown.");

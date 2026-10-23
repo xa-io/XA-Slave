@@ -34,20 +34,35 @@ internal sealed class InventoryShuttleSequence
     internal int? NativeCode { get; private set; }
     internal bool Terminal { get; private set; }
     internal InventoryShuttleOutcome Outcome { get; private set; } = InventoryShuttleOutcome.Requested;
-    internal string Detail { get; private set; } = "Waiting for a verified inventory chunk.";
+
+    internal global::XASlave.Localization.UiMessage OutcomeMessage => Outcome switch
+    {
+        InventoryShuttleOutcome.Requested => global::XASlave.Localization.UiMessage.Key("S2D9E28289FACAB94"),
+        InventoryShuttleOutcome.ClientUpdated => global::XASlave.Localization.UiMessage.Key("SFE7CD02BF86D6503"),
+        InventoryShuttleOutcome.Partial => global::XASlave.Localization.UiMessage.Key("SA4D50FB854036548"),
+        InventoryShuttleOutcome.Failed => global::XASlave.Localization.UiMessage.Key("S031A8F0F659DF890"),
+        InventoryShuttleOutcome.Unconfirmed => global::XASlave.Localization.UiMessage.Key("S3229D16CA643CB86"),
+        _ => global::XASlave.Localization.UiMessage.Value(Outcome),
+    };
+    internal string Detail { get; private set; } = global::XASlave.Localization.UiMessage.Key("SA0BC29B0748C1B4D").Original;
+    private global::XASlave.Localization.UiMessage? uiDetail = global::XASlave.Localization.UiMessage.Key("SA0BC29B0748C1B4D");
+    internal global::XASlave.Localization.UiMessage DetailMessage => global::XASlave.Localization.UiMessage.Capture(ref uiDetail, Detail);
+    internal string LocalizedDetail => global::XASlave.Localization.UiMessage.Resolve(ref uiDetail, Detail);
 
     internal InventoryShuttleSequence(IInventoryShuttleAdapter adapter, InventoryShuttleSource original, long now)
     {
-        if (original.Quantity <= 0) throw new ArgumentException("The selected stack is empty.");
+        if (original.Quantity <= 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S474E68B737127F26"), originalMessage => new ArgumentException(originalMessage));
         this.adapter = adapter; this.original = original; expectedSource = original; started = now;
     }
 
-    internal void Cancel(string reason)
+    internal void Cancel(string reason) => Cancel(global::XASlave.Localization.UiMessage.Raw(reason));
+
+    internal void Cancel(global::XASlave.Localization.UiMessage reason)
     {
         if (stopped) return;
         stopped = true; Terminal = true; pending = null;
         Outcome = submitted ? InventoryShuttleOutcome.Unconfirmed : InventoryShuttleOutcome.Failed;
-        Detail = reason;
+        Detail = global::XASlave.Localization.UiMessage.Store(ref uiDetail, reason);
     }
 
     internal void Tick(long now)
@@ -64,7 +79,7 @@ internal sealed class InventoryShuttleSequence
                 if (now - started >= 10000) stopped = true;
                 return;
             }
-            if (now - started >= 10000) { Cancel("Transfer deadline reached; no chunk was replayed."); return; }
+            if (now - started >= 10000) { Cancel(global::XASlave.Localization.UiMessage.Key("S5B654E18FF938E91")); return; }
             if (pending is { } target)
             {
                 var source = adapter.Read(original.Inventory, original.Slot);
@@ -72,7 +87,7 @@ internal sealed class InventoryShuttleSequence
                 var sourceQuantity = expectedSource.Quantity - expectedDelta;
                 if (source.Quantity != sourceQuantity || (sourceQuantity == 0 ? source.State.FullId != 0 : source.State != original.State)
                     || destination.Quantity != target.Before.Quantity + expectedDelta || destination.State != original.State)
-                { Cancel("Native processing did not produce the exact expected local inventory delta."); return; }
+                { Cancel(global::XASlave.Localization.UiMessage.Key("SA4EA888B9F5A22BC")); return; }
                 expectedSource = source;
                 expectedDestinations[(destination.Inventory, destination.Slot)] = destination;
                 Moved += expectedDelta; pending = null;
@@ -80,9 +95,9 @@ internal sealed class InventoryShuttleSequence
                 if (Remaining == 0)
                 {
                     Terminal = true; Outcome = InventoryShuttleOutcome.ClientUpdated;
-                    Detail = "The full selected quantity was observed locally; server acceptance is not confirmed.";
+                    Detail = global::XASlave.Localization.UiMessage.Store(ref uiDetail, global::XASlave.Localization.UiMessage.Key("S43B79AA11B30E61F"));
                 }
-                else Detail = "Chunk observed locally; waiting before the next distinct chunk.";
+                else Detail = global::XASlave.Localization.UiMessage.Store(ref uiDetail, global::XASlave.Localization.UiMessage.Key("S7A7700AD99400BCC"));
                 return;
             }
             ValidateObserved();
@@ -91,18 +106,18 @@ internal sealed class InventoryShuttleSequence
             if (next == null)
             {
                 Terminal = true; Outcome = Moved > 0 ? InventoryShuttleOutcome.Partial : InventoryShuttleOutcome.Failed;
-                Detail = "No further admitted capacity is available in the selected destination family.";
+                Detail = global::XASlave.Localization.UiMessage.Store(ref uiDetail, global::XASlave.Localization.UiMessage.Key("SFD57E2C19FE3F363"));
                 return;
             }
             var candidate = next.Value;
             if (candidate.Before.Inventory == original.Inventory && candidate.Before.Slot == original.Slot)
-                throw new InvalidOperationException("Source and destination cannot be the same slot.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF8B423EAB2E33383"), originalMessage => new InvalidOperationException(originalMessage));
             expectedDelta = Math.Min(expectedSource.Quantity, candidate.Capacity - candidate.Before.Quantity);
-            if (expectedDelta <= 0 || expectedDelta > Remaining) throw new InvalidOperationException("Invalid transfer quota or capacity.");
+            if (expectedDelta <= 0 || expectedDelta > Remaining) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S04BE5F3F8C219D2F"), originalMessage => new InvalidOperationException(originalMessage));
             adapter.Validate();
             ValidateObserved();
             if (adapter.Read(candidate.Before.Inventory, candidate.Before.Slot) != candidate.Before)
-                throw new InvalidOperationException("The selected destination changed before submission.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S81C4621B7C31E86E"), originalMessage => new InvalidOperationException(originalMessage));
             if (stopped) return;
             pending = candidate; submitted = true; lastSubmission = now;
             NativeCode = adapter.Submit(expectedSource, candidate);
@@ -110,23 +125,23 @@ internal sealed class InventoryShuttleSequence
             if (NativeCode != 0)
             {
                 pending = null; stopped = true; Terminal = true; Outcome = InventoryShuttleOutcome.Failed;
-                Detail = $"Native result {NativeCode}; no retry was made.";
+                Detail = global::XASlave.Localization.UiMessage.Store(ref uiDetail, global::XASlave.Localization.UiMessage.Format("S1F2A6F460BAA3A82", NativeCode));
                 return;
             }
             adapter.Validate();
             if (stopped) return;
             if (!menuClosed) { menuClosed = true; adapter.CloseOwnedMenu(); }
-            Detail = "Native processing returned zero; awaiting a separate local inventory observation.";
+            Detail = global::XASlave.Localization.UiMessage.Store(ref uiDetail, global::XASlave.Localization.UiMessage.Key("S12F0FC9917301EA6"));
         }
-        catch (Exception error) { Cancel(error.Message); }
+        catch (Exception error) { Cancel(global::XASlave.Localization.UiMessage.FromException(error)); }
     }
 
     private void ValidateObserved()
     {
         if (adapter.Read(original.Inventory, original.Slot) != expectedSource)
-            throw new InvalidOperationException("The source changed or was corrected outside the expected transfer.");
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD1C0CDB5AEBFB20E"), originalMessage => new InvalidOperationException(originalMessage));
         foreach (var entry in expectedDestinations.Values)
             if (adapter.Read(entry.Inventory, entry.Slot) != entry)
-                throw new InvalidOperationException("A previously observed destination changed or was corrected.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SEEBA71F1266B4624"), originalMessage => new InvalidOperationException(originalMessage));
     }
 }

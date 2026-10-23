@@ -60,9 +60,15 @@ public unsafe sealed class PlayerModsService : IDisposable
         this.log = log;
     }
 
-    public string InfiniteSprintStatusText { get; private set; } = "Disabled";
+    public string InfiniteSprintStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiInfiniteSprintStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedInfiniteSprintStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiInfiniteSprintStatusText, InfiniteSprintStatusText);
+    internal global::XASlave.Localization.UiMessage InfiniteSprintStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiInfiniteSprintStatusText, InfiniteSprintStatusText);
 
-    public string MoveableAfterDeathStatusText { get; private set; } = "Disabled";
+    public string MoveableAfterDeathStatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiMoveableAfterDeathStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedMoveableAfterDeathStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiMoveableAfterDeathStatusText, MoveableAfterDeathStatusText);
+    internal global::XASlave.Localization.UiMessage MoveableAfterDeathStatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiMoveableAfterDeathStatusText, MoveableAfterDeathStatusText);
 
     public static float ClampInfiniteSprintDelaySeconds(float value)
     {
@@ -96,7 +102,7 @@ public unsafe sealed class PlayerModsService : IDisposable
             moveableAfterDeathEnablePending = false;
             UpdateMovePermissionHookState();
             UpdateFrameworkSubscription();
-            MoveableAfterDeathStatusText = "Disabled";
+            MoveableAfterDeathStatusText = global::XASlave.Localization.UiMessage.Store(ref uiMoveableAfterDeathStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -105,20 +111,20 @@ public unsafe sealed class PlayerModsService : IDisposable
             moveableAfterDeathEnabled = false;
             moveableAfterDeathEnablePending = true;
             UpdateFrameworkSubscription();
-            MoveableAfterDeathStatusText = pendingStatusText;
+            MoveableAfterDeathStatusText = global::XASlave.Localization.UiMessage.Store(ref uiMoveableAfterDeathStatusText, pendingStatusText);
             return true;
         }
 
         moveableAfterDeathEnablePending = false;
         if (movePermissionHook == null)
         {
-            MoveableAfterDeathStatusText = "Unavailable - movement permission hook missing.";
+            MoveableAfterDeathStatusText = global::XASlave.Localization.UiMessage.Store(ref uiMoveableAfterDeathStatusText, global::XASlave.Localization.UiMessage.Key("SFA8A3F4AB942CA79"));
             return false;
         }
 
         moveableAfterDeathEnabled = true;
         UpdateMovePermissionHookState();
-        MoveableAfterDeathStatusText = "Enabled - local movement permission stays open after death.";
+        MoveableAfterDeathStatusText = global::XASlave.Localization.UiMessage.Store(ref uiMoveableAfterDeathStatusText, global::XASlave.Localization.UiMessage.Key("SDE4C4ECEEE338CD0"));
         return true;
     }
 
@@ -134,22 +140,22 @@ public unsafe sealed class PlayerModsService : IDisposable
         DisposeHook(ref movePermissionHook);
     }
 
-    private bool TryEnsureMovePermissionHookReady(bool retryMissing, out string statusText)
+    private bool TryEnsureMovePermissionHookReady(bool retryMissing, out global::XASlave.Localization.UiMessage statusText)
     {
-        statusText = string.Empty;
+        statusText = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         if (movePermissionHook is { IsDisposed: false })
             return true;
 
         var guardRemainingSeconds = (movePermissionHookCreationAllowedAtUtc - DateTime.UtcNow).TotalSeconds;
         if (guardRemainingSeconds > 0)
         {
-            statusText = $"Pending - waiting {guardRemainingSeconds:0.0}s after reload before arming the movement permission hook.";
+            statusText = global::XASlave.Localization.UiMessage.Format("S01F7A74C148AB932", guardRemainingSeconds);
             return false;
         }
 
         if (initialized && !retryMissing)
         {
-            statusText = "Unavailable - movement permission hook missing.";
+            statusText = global::XASlave.Localization.UiMessage.Key("SFA8A3F4AB942CA79");
             return false;
         }
 
@@ -158,7 +164,7 @@ public unsafe sealed class PlayerModsService : IDisposable
         if (movePermissionHook != null)
             return true;
 
-        statusText = "Unavailable - movement permission hook missing.";
+        statusText = global::XASlave.Localization.UiMessage.Key("SFA8A3F4AB942CA79");
         return false;
     }
 
@@ -245,7 +251,7 @@ public unsafe sealed class PlayerModsService : IDisposable
 
         if (!TryEnsureMovePermissionHookReady(retryMissing: false, statusText: out var pendingStatusText))
         {
-            MoveableAfterDeathStatusText = pendingStatusText;
+            MoveableAfterDeathStatusText = global::XASlave.Localization.UiMessage.Store(ref uiMoveableAfterDeathStatusText, pendingStatusText);
             return;
         }
 
@@ -253,14 +259,12 @@ public unsafe sealed class PlayerModsService : IDisposable
         moveableAfterDeathEnabled = true;
         UpdateMovePermissionHookState();
         UpdateFrameworkSubscription();
-        MoveableAfterDeathStatusText = "Enabled - local movement permission stays open after death.";
+        MoveableAfterDeathStatusText = global::XASlave.Localization.UiMessage.Store(ref uiMoveableAfterDeathStatusText, global::XASlave.Localization.UiMessage.Key("SDE4C4ECEEE338CD0"));
     }
 
     private void RefreshInfiniteSprintStatusText()
     {
-        InfiniteSprintStatusText = infiniteSprintEnabled
-            ? $"Enabled - Sprint is reapplied only after movement continues for {infiniteSprintDelaySeconds:0.0}s."
-            : "Disabled";
+        InfiniteSprintStatusText = global::XASlave.Localization.UiMessage.Store(ref uiInfiniteSprintStatusText, (infiniteSprintEnabled ? global::XASlave.Localization.UiMessage.Format("SF3DDAF65B414286E", infiniteSprintDelaySeconds) : global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E")));
     }
 
     private void TryApplySprint()

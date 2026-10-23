@@ -62,15 +62,15 @@ namespace XASlave.Services
         private static readonly int[] StockCategoryButtons = [13, 12, 11, 10, 9, 8];
         private static readonly IReadOnlyList<LogogramSourceDefinition> DefaultLogogramSourceDefinitions =
         [
-            new(24007, "Conceptual", 1300),
-            new(24008, "Fundamental", 500),
-            new(24010, "Offensive", 9000),
-            new(24011, "Protective", 120000),
-            new(24009, "Curative", 30000),
-            new(24012, "Tactical", 2500),
-            new(24014, "Inimical", 2500),
-            new(24013, "Mitigative", 5000),
-            new(24809, "Obscure", 13000),
+            new(24007, global::XASlave.Localization.UiLocale.Native("S4C4F1BF4958A984F"), 1300),
+            new(24008, global::XASlave.Localization.UiLocale.Native("SA7B5EB2BB921A284"), 500),
+            new(24010, global::XASlave.Localization.UiLocale.Native("S6076629B56D9C3F0"), 9000),
+            new(24011, global::XASlave.Localization.UiLocale.Native("S194EB9C38CC07F39"), 120000),
+            new(24009, global::XASlave.Localization.UiLocale.Native("SE25D0B08B41F82C2"), 30000),
+            new(24012, global::XASlave.Localization.UiLocale.Native("S91C56707ADFDFADD"), 2500),
+            new(24014, global::XASlave.Localization.UiLocale.Native("S02EA7F5A08BB3C51"), 2500),
+            new(24013, global::XASlave.Localization.UiLocale.Native("SEE58CC9D0BF359C8"), 5000),
+            new(24809, global::XASlave.Localization.UiLocale.Native("S9A89539BF213FB09"), 13000),
         ];
         private static readonly IReadOnlyDictionary<ulong, LogogramSourceDefinition> LogogramSourceDefinitionsById =
             DefaultLogogramSourceDefinitions.ToDictionary(source => source.ItemId);
@@ -96,12 +96,19 @@ namespace XASlave.Services
         internal Dictionary<uint, int> LogosActionStock = [];
         internal Queue<PlateQueueRequest> SynthesisQueue = new();
         internal bool IsProcessingQueue = false;
+        private global::XASlave.Localization.UiMessage lastStatusMessage = global::XASlave.Localization.UiMessage.Key("SAB0171CA0494D441");
         internal string LastStatus { get; private set; } = "Idle";
+        internal global::XASlave.Localization.UiMessage LastStatusMessage => global::XASlave.Localization.UiMessage.Capture(lastStatusMessage, LastStatus);
+        internal string LocalizedLastStatus => LastStatusMessage.Display;
+        private global::XASlave.Localization.UiMessage? staticCatalogErrorMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+        internal string LocalizedStaticCatalogError => global::XASlave.Localization.UiMessage.Resolve(staticCatalogErrorMessage, StaticCatalogError);
+        private readonly System.Runtime.CompilerServices.ConditionalWeakTable<PlateQueueRequest, global::XASlave.Localization.UiMessage> plateLabels = new();
+        private readonly System.Runtime.CompilerServices.ConditionalWeakTable<PlateActionSelection, global::XASlave.Localization.UiMessage> selectionNames = new();
         internal bool IsStaticCatalogReady => dataLoaded;
         internal bool StaticCatalogLoadFailed => dataLoadAttempted && !dataLoaded;
-        internal string StaticCatalogState => dataLoaded
-            ? $"Ready ({Logograms.Count} logograms / {LogosActions.Count} actions)"
-            : dataLoadAttempted ? "Failed" : "Not loaded";
+        internal string StaticCatalogState => StaticCatalogStateMessage.Original;
+        internal string LocalizedStaticCatalogState => StaticCatalogStateMessage.Display;
+        internal global::XASlave.Localization.UiMessage StaticCatalogStateMessage => (dataLoaded ? global::XASlave.Localization.UiMessage.Format("S010A6318426CB8EA" , Logograms.Count, LogosActions.Count) : (dataLoadAttempted ? global::XASlave.Localization.UiMessage.Key("S031A8F0F659DF890") : global::XASlave.Localization.UiMessage.Key("S9B41BA20B8A3C870")));
         internal string StaticCatalogError { get; private set; } = string.Empty;
         internal int LogosActionSlotCapacity { get; private set; } = 3;
         internal int LogosActionSlotsUsed { get; private set; }
@@ -191,7 +198,7 @@ namespace XASlave.Services
             AddonLifecycle.RegisterListener(AddonEvent.PostSetup, "EurekaMagiciteItemAtherList", OnAtherListSetup);
             AddonLifecycle.RegisterListener(AddonEvent.PostSetup, "EurekaMagiciteItemSynthesis", OnSynthesisSetup);
 
-            SetStatus("Initialized");
+            SetStatus(global::XASlave.Localization.UiMessage.Key("S974C71CD9D1FB701"));
             Log.Information("[XASlave] Eureka Logogram Creator initialized; static data load deferred.");
         }
 
@@ -237,7 +244,7 @@ namespace XASlave.Services
         private void OnShardListSetup(AddonEvent type, AddonArgs args)
         {
             EnsureDataLoaded();
-            SetStatus("Shard list opened");
+            SetStatus(global::XASlave.Localization.UiMessage.Key("SEE91C6DEB808288C"));
             if (Configuration.AutoRefreshAllPagesOnOpen || !HasLogogramStockCache)
             {
                 ScheduleFullStockScan();
@@ -247,14 +254,14 @@ namespace XASlave.Services
         private void OnAtherListSetup(AddonEvent type, AddonArgs args)
         {
             EnsureDataLoaded();
-            SetStatus("Logos actions opened");
+            SetStatus(global::XASlave.Localization.UiMessage.Key("S896AC2A0C28C39D2"));
             ScheduleLogosActionRefresh(LogosActionRefreshDelayFrames, resetAttempts: true);
         }
 
         private void OnSynthesisSetup(AddonEvent type, AddonArgs args)
         {
             EnsureDataLoaded();
-            SetStatus("Synthesis opened");
+            SetStatus(global::XASlave.Localization.UiMessage.Key("SCE346C6075C1A2E4"));
             if (SynthesisQueue.Count > 0 && !IsProcessingQueue)
             {
                 StartNextQueuedSynthesis();
@@ -339,7 +346,7 @@ namespace XASlave.Services
 
             Configuration.QueueStepFrameDelay = clampedFrames;
             Configuration.Save();
-            SetStatus($"Set automation delay to {clampedFrames} frame(s)");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("S0EEFC3C3650F3334" , clampedFrames));
         }
 
         internal int GetPreferredRecipeIndex(uint actionId)
@@ -366,7 +373,7 @@ namespace XASlave.Services
             pendingFullStockScan = true;
             stockScanCategoryIndex = -1;
             nextStockScanFrame = 0;
-            SetStatus("Scheduled full logogram stock scan");
+            SetStatus(global::XASlave.Localization.UiMessage.Key("SE72B80EF701CDFCC"));
         }
 
         private void ClearCachedEurekaData()
@@ -424,7 +431,7 @@ namespace XASlave.Services
                 if (!ClickAddonButton("EurekaMagiciteItemShardList", StockCategoryButtons[stockScanCategoryIndex]))
                 {
                     pendingFullStockScan = false;
-                    SetStatus("Could not start logogram stock scan");
+                    SetStatus(global::XASlave.Localization.UiMessage.Key("SEDAD6D1ED19CBBDB"));
                     return;
                 }
 
@@ -444,7 +451,7 @@ namespace XASlave.Services
                 stockScanCategoryIndex = -1;
                 HasLogogramStockCache = true;
                 cachedLogogramTerritoryId = ClientState.TerritoryType;
-                SetStatus($"Logogram stock refreshed ({LogogramStock.Count} entries)");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("SC3687DEC8682C694" , LogogramStock.Count));
                 return;
             }
 
@@ -468,17 +475,17 @@ namespace XASlave.Services
             {
                 pendingLogosActionRefreshAttempts++;
                 ScheduleLogosActionRefresh(LogosActionRefreshDelayFrames, resetAttempts: false);
-                SetStatus($"Waiting for visible Logos Action rows ({pendingLogosActionRefreshAttempts}/{MaxDeferredLogosActionRefreshAttempts})");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("S0D8978A5069F8188" , pendingLogosActionRefreshAttempts, MaxDeferredLogosActionRefreshAttempts));
                 Log.Debug($"Visible Logos Action rows were not ready yet; scheduled retry {pendingLogosActionRefreshAttempts}/{MaxDeferredLogosActionRefreshAttempts}");
             }
             else if (usedVisibleRows)
             {
                 pendingLogosActionRefreshAttempts = 0;
-                SetStatus($"Logos Actions refreshed ({LogosActionSlotsUsed}/{LogosActionSlotCapacity} slots used)");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("SBC2E972E069129E8" , LogosActionSlotsUsed, LogosActionSlotCapacity));
             }
             else
             {
-                SetStatus("Could not refresh visible Logos Action rows");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S93AADEE60E041763"));
             }
         }
 
@@ -535,8 +542,8 @@ namespace XASlave.Services
                 LogosActions = parsedLogosActions;
                 RebuildLogogramGilCosts();
                 dataLoaded = true;
-                StaticCatalogError = string.Empty;
-                SetStatus("Static catalog loaded");
+                StaticCatalogError = global::XASlave.Localization.UiMessage.Store(ref staticCatalogErrorMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S51693B4F0046EF3A"));
                 Log.Information($"Loaded {Logograms.Count} logograms, {LogosActions.Count} logos actions, and {logogramGilCostById.Count} gil-cost mappings");
                 return true;
             }
@@ -544,8 +551,8 @@ namespace XASlave.Services
             {
                 dataLoaded = false;
                 ClearStaticCatalogData();
-                StaticCatalogError = GetSanitizedCatalogLoadError(ex);
-                SetStatus("Data load failed");
+                StaticCatalogError = global::XASlave.Localization.UiMessage.Store(ref staticCatalogErrorMessage, GetSanitizedCatalogLoadErrorMessage(ex));
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S86626499655D9DCB"));
                 Log.Error(ex, "[XASlave] Failed to load Eureka Logogram Creator static catalog.");
                 return false;
             }
@@ -558,7 +565,7 @@ namespace XASlave.Services
         {
             if (logograms.Count == 0)
             {
-                throw new InvalidDataException("logograms.json contains no entries.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF9DC1F9F8700DF42"), originalMessageText => new InvalidDataException(originalMessageText));
             }
 
             var knownLogogramIds = new HashSet<int>();
@@ -567,28 +574,28 @@ namespace XASlave.Services
                 var logogram = logograms[logogramIndex];
                 if (logogram is null)
                 {
-                    throw new InvalidDataException($"logograms.json entry {logogramIndex + 1} is null.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SE6E68E261D36EF20" , logogramIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (logogram.Id <= 0)
                 {
-                    throw new InvalidDataException($"logograms.json entry {logogramIndex + 1} has a non-positive ID.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S8859C8B528C1505C" , logogramIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (!knownLogogramIds.Add(logogram.Id))
                 {
-                    throw new InvalidDataException($"logograms.json contains duplicate logogram ID {logogram.Id}.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S68A8C9F09C169882" , logogram.Id), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (string.IsNullOrWhiteSpace(logogram.Name))
                 {
-                    throw new InvalidDataException($"logograms.json logogram {logogram.Id} has an empty name.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SB7EE36041E62F35F" , logogram.Id), originalMessageText => new InvalidDataException(originalMessageText));
                 }
             }
 
             if (items.Count == 0)
             {
-                throw new InvalidDataException("itemContents.json contains no entries.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCB4D65CDE6D06E64"), originalMessageText => new InvalidDataException(originalMessageText));
             }
 
             var knownSourceItemIds = new HashSet<ulong>();
@@ -597,22 +604,22 @@ namespace XASlave.Services
                 var item = items[itemIndex];
                 if (item is null)
                 {
-                    throw new InvalidDataException($"itemContents.json entry {itemIndex + 1} is null.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SEBCBB686D98C3ECD" , itemIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (item.Id == 0)
                 {
-                    throw new InvalidDataException($"itemContents.json entry {itemIndex + 1} has a non-positive source item ID.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S9F72DAF5781EE2BF" , itemIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (!knownSourceItemIds.Add(item.Id))
                 {
-                    throw new InvalidDataException($"itemContents.json contains duplicate source item ID {item.Id}.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S0FA4B84F6483AFD2" , item.Id), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (item.Contents == null || item.Contents.Count == 0)
                 {
-                    throw new InvalidDataException($"itemContents.json source item {item.Id} has no contents.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S6C5C62AF65FD91EA" , item.Id), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 for (var contentIndex = 0; contentIndex < item.Contents.Count; contentIndex++)
@@ -620,19 +627,19 @@ namespace XASlave.Services
                     var logogramId = item.Contents[contentIndex];
                     if (logogramId <= 0)
                     {
-                        throw new InvalidDataException($"itemContents.json source item {item.Id} content {contentIndex + 1} has a non-positive logogram ID.");
+                        throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S7255B27AE735A86D" , item.Id, contentIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                     }
 
                     if (!knownLogogramIds.Contains(logogramId))
                     {
-                        throw new InvalidDataException($"itemContents.json source item {item.Id} references unknown logogram ID {logogramId}.");
+                        throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S6F728B27929CABEC" , item.Id, logogramId), originalMessageText => new InvalidDataException(originalMessageText));
                     }
                 }
             }
 
             if (logosActions.Count == 0)
             {
-                throw new InvalidDataException("logosActions.json contains no entries.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S3EA2838D57A325E1"), originalMessageText => new InvalidDataException(originalMessageText));
             }
 
             var knownLogosActionIds = new HashSet<uint>();
@@ -641,27 +648,27 @@ namespace XASlave.Services
                 var action = logosActions[actionIndex];
                 if (action is null)
                 {
-                    throw new InvalidDataException($"logosActions.json entry {actionIndex + 1} is null.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S214DBCC3AAE1081E" , actionIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (action.Id == 0)
                 {
-                    throw new InvalidDataException($"logosActions.json entry {actionIndex + 1} has a non-positive action ID.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S989910EF7821AF2D" , actionIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (!knownLogosActionIds.Add(action.Id))
                 {
-                    throw new InvalidDataException($"logosActions.json contains duplicate action ID {action.Id}.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SF34DA04C9ACD816B" , action.Id), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (action.IconID == 0)
                 {
-                    throw new InvalidDataException($"logosActions.json action {action.Id} has a non-positive icon ID.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S48D0870BC089DABC" , action.Id), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 if (action.Recipes == null || action.Recipes.Count == 0)
                 {
-                    throw new InvalidDataException($"logosActions.json action {action.Id} has no recipes.");
+                    throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S2A08A38424E4D580" , action.Id), originalMessageText => new InvalidDataException(originalMessageText));
                 }
 
                 for (var recipeIndex = 0; recipeIndex < action.Recipes.Count; recipeIndex++)
@@ -669,7 +676,7 @@ namespace XASlave.Services
                     var recipe = action.Recipes[recipeIndex];
                     if (recipe == null || recipe.Count == 0)
                     {
-                        throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} has no ingredients.");
+                        throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S6CC449BB22CB154C" , action.Id, recipeIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                     }
 
                     for (var ingredientIndex = 0; ingredientIndex < recipe.Count; ingredientIndex++)
@@ -677,22 +684,22 @@ namespace XASlave.Services
                         var ingredient = recipe[ingredientIndex];
                         if (ingredient is null)
                         {
-                            throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} ingredient {ingredientIndex + 1} is null.");
+                            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SB5E47036D587E897" , action.Id, recipeIndex + 1, ingredientIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                         }
 
                         if (ingredient.LogogramID <= 0)
                         {
-                            throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} ingredient {ingredientIndex + 1} has a non-positive logogram ID.");
+                            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S172E8CB5A40CE35E" , action.Id, recipeIndex + 1, ingredientIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                         }
 
                         if (!knownLogogramIds.Contains(ingredient.LogogramID))
                         {
-                            throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} references unknown logogram ID {ingredient.LogogramID}.");
+                            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S5BA35EF1E9FA7198" , action.Id, recipeIndex + 1, ingredient.LogogramID), originalMessageText => new InvalidDataException(originalMessageText));
                         }
 
                         if (ingredient.Quantity <= 0)
                         {
-                            throw new InvalidDataException($"logosActions.json action {action.Id} recipe {recipeIndex + 1} ingredient {ingredientIndex + 1} has a non-positive quantity.");
+                            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S7228F9739274EF1D" , action.Id, recipeIndex + 1, ingredientIndex + 1), originalMessageText => new InvalidDataException(originalMessageText));
                         }
                     }
                 }
@@ -708,32 +715,32 @@ namespace XASlave.Services
             logogramSourceItemIdByLogogramId.Clear();
         }
 
-        private static string GetSanitizedCatalogLoadError(Exception exception)
+        private static string GetSanitizedCatalogLoadError(Exception exception) => GetSanitizedCatalogLoadErrorMessage(exception).Original;
+
+        private static global::XASlave.Localization.UiMessage GetSanitizedCatalogLoadErrorMessage(Exception exception)
         {
             if (exception is DirectoryNotFoundException)
             {
-                return "Data/EurekaLogogramCreator folder is missing.";
+                return global::XASlave.Localization.UiMessage.Key("SB7DB1B0568A3E9CC");
             }
 
             if (exception is FileNotFoundException fileNotFoundException)
             {
                 var fileName = Path.GetFileName(fileNotFoundException.FileName);
-                return string.IsNullOrWhiteSpace(fileName)
-                    ? "A required catalog file is missing."
-                    : $"Missing required catalog file: {fileName}.";
+                return (string.IsNullOrWhiteSpace(fileName) ? global::XASlave.Localization.UiMessage.Key("S5DDAFF55B381B142") : global::XASlave.Localization.UiMessage.Format("SAAA79F906ED4F4B0" , fileName));
             }
 
             if (exception is JsonException)
             {
-                return "A static catalog JSON file is invalid.";
+                return global::XASlave.Localization.UiMessage.Key("SD8F2EDE36B3E5CDE");
             }
 
             if (exception is InvalidDataException invalidDataException)
             {
-                return invalidDataException.Message;
+                return global::XASlave.Localization.UiMessage.FromException(invalidDataException);
             }
 
-            return "Static catalog files could not be loaded. See /xllog for details.";
+            return global::XASlave.Localization.UiMessage.Key("SBA0BF07716052976");
         }
 
         private void EnsureLogogramSourceCostsConfigured()
@@ -989,7 +996,7 @@ namespace XASlave.Services
 
             Configuration.Save();
             RebuildLogogramGilCosts();
-            SetStatus("Reset source logogram costs to defaults");
+            SetStatus(global::XASlave.Localization.UiMessage.Key("S07088CDCA4677369"));
         }
 
         internal bool TryGetRecipeGilCost(IReadOnlyList<Recipe>? recipe, out long gilCost)
@@ -1082,9 +1089,11 @@ namespace XASlave.Services
             return TryGetRecipeGilCost(recipe, out var gilCost) ? gilCost : long.MaxValue;
         }
 
-        internal string FormatGilCost(long gilCost)
+        internal string FormatGilCost(long gilCost) => FormatGilCostMessage(gilCost).Original;
+
+        internal global::XASlave.Localization.UiMessage FormatGilCostMessage(long gilCost)
         {
-            return $"{gilCost:N0} gil";
+            return global::XASlave.Localization.UiMessage.Format("S2AD4BFDE1FBAE731" , gilCost);
         }
 
         internal List<Recipe>? GetResolvedRecipe(LogosAction action, out int recipeIndex)
@@ -1134,15 +1143,16 @@ namespace XASlave.Services
             return GetCraftableCount(recipe) > 0;
         }
 
-        internal string FormatRecipe(IReadOnlyList<Recipe>? recipe)
+        internal string FormatRecipe(IReadOnlyList<Recipe>? recipe) => FormatRecipeMessage(recipe).Original;
+
+        internal global::XASlave.Localization.UiMessage FormatRecipeMessage(IReadOnlyList<Recipe>? recipe)
         {
             if (recipe == null || recipe.Count == 0)
             {
-                return "No recipe";
+                return global::XASlave.Localization.UiMessage.Key("S284FEBDC751705D0");
             }
 
-            return string.Join(" + ", recipe.Select(r =>
-                $"{r.Quantity}x {Logograms.GetValueOrDefault(r.LogogramID)?.Name ?? "Unknown"}"));
+            return global::XASlave.Localization.UiMessage.Join(" + ", recipe.Select(r => global::XASlave.Localization.UiMessage.Format("SB07213A80A5FE5A5" , r.Quantity, Logograms.GetValueOrDefault(r.LogogramID)?.Name is { } name ? global::XASlave.Localization.UiMessage.Raw(name) : global::XASlave.Localization.UiMessage.Key("SB764CDC0EAB71374"))));
         }
 
         internal int GetPlateCraftableCount(uint? astralActionId, uint? umbralActionId)
@@ -1177,9 +1187,11 @@ namespace XASlave.Services
             return GetCombinedPlateCraftableCount(selections);
         }
 
-        internal string GetPendingPlateDescription()
+        internal string GetPendingPlateDescription() => GetPendingPlateDescriptionMessage().Original;
+
+        internal global::XASlave.Localization.UiMessage GetPendingPlateDescriptionMessage()
         {
-            return FormatPlateLabel(PendingAstralActionId, PendingUmbralActionId);
+            return FormatPlateLabelMessage(PendingAstralActionId, PendingUmbralActionId);
         }
 
         internal int GetPendingPlateCraftableCount()
@@ -1198,7 +1210,7 @@ namespace XASlave.Services
                 PendingUmbralActionId = actionId;
             }
 
-            SetStatus($"Set {GetActionName(actionId)} for the {side} Array");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("S97C997602032C3CE" , GetActionNameMessage(actionId), GetPlateSideMessage(side)));
         }
 
         internal void ClearPendingPlateSelection(PlateSide? side = null)
@@ -1213,7 +1225,7 @@ namespace XASlave.Services
                 PendingUmbralActionId = null;
             }
 
-            SetStatus("Cleared pending plate selection");
+            SetStatus(global::XASlave.Localization.UiMessage.Key("SAA846CFDCC7F311F"));
         }
 
         internal bool QueuePendingPlate()
@@ -1223,20 +1235,27 @@ namespace XASlave.Services
 
         internal bool CanQueuePendingPlate(out string error)
         {
-            return TryBuildPlateRequest(PendingAstralActionId, PendingUmbralActionId, out _, out error);
+            var result = CanQueuePendingPlateMessage(out var presentation);
+            error = presentation.Original;
+            return result;
+        }
+
+        internal bool CanQueuePendingPlateMessage(out global::XASlave.Localization.UiMessage error)
+        {
+            return TryBuildPlateRequestMessage(PendingAstralActionId, PendingUmbralActionId, out _, out error);
         }
 
         internal bool QueuePlate(uint? astralActionId, uint? umbralActionId, bool allowImmediateProcessing)
         {
-            if (!TryBuildPlateRequest(astralActionId, umbralActionId, out var request, out var error))
+            if (!TryBuildPlateRequestMessage(astralActionId, umbralActionId, out var request, out var error))
             {
-                Log.Warning(error);
+                Log.Warning(error.Original);
                 SetStatus(error);
                 return false;
             }
 
             SynthesisQueue.Enqueue(request);
-            SetStatus($"Queued plate: {request.Label}");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("SDAF648100F4E6D0D" , GetPlateRequestLabelMessage(request)));
             Log.Information($"Queued plate: {request.Label}");
 
             if (!IsProcessingQueue && allowImmediateProcessing && IsManipulatorVisible())
@@ -1278,13 +1297,13 @@ namespace XASlave.Services
             var trimmedName = plateName.Trim();
             if (string.IsNullOrWhiteSpace(trimmedName))
             {
-                SetStatus("Favorite plate name cannot be empty");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S618B466CD5B3066E"));
                 return;
             }
 
             if (!astralActionId.HasValue && !umbralActionId.HasValue)
             {
-                SetStatus("Favorite plate needs at least one action");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S7BF6C128020869E4"));
                 return;
             }
 
@@ -1318,7 +1337,7 @@ namespace XASlave.Services
             }
 
             Configuration.Save();
-            SetStatus($"Saved favorite plate '{trimmedName}'");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("SA745E0DED9D94038" , trimmedName));
         }
 
         internal void UpsertFavoritePlate(string plateName, IEnumerable<uint> actionIds)
@@ -1344,7 +1363,7 @@ namespace XASlave.Services
             var plateName = Configuration.FavoritePlates[plateIndex].Name;
             Configuration.FavoritePlates.RemoveAt(plateIndex);
             Configuration.Save();
-            SetStatus($"Removed favorite plate '{plateName}'");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("S4E73EE99203813D1" , plateName));
         }
 
         internal void RenameFavoritePlate(int plateIndex, string newName)
@@ -1357,14 +1376,14 @@ namespace XASlave.Services
             var trimmedName = newName.Trim();
             if (string.IsNullOrWhiteSpace(trimmedName))
             {
-                SetStatus("Favorite plate name cannot be empty");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S618B466CD5B3066E"));
                 return;
             }
 
             var duplicateIndex = Configuration.FavoritePlates.FindIndex(x => x.Name.Equals(trimmedName, StringComparison.OrdinalIgnoreCase));
             if (duplicateIndex >= 0 && duplicateIndex != plateIndex)
             {
-                SetStatus($"A favorite plate named '{trimmedName}' already exists");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("S25EEC3BC0EE9569F" , trimmedName));
                 return;
             }
 
@@ -1377,7 +1396,7 @@ namespace XASlave.Services
 
             plate.Name = trimmedName;
             Configuration.Save();
-            SetStatus($"Renamed favorite plate '{oldName}' to '{trimmedName}'");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("SE0CB54849169235D" , oldName, trimmedName));
         }
 
         internal bool MoveFavoritePlate(int plateIndex, int targetIndex)
@@ -1402,7 +1421,7 @@ namespace XASlave.Services
 
             Configuration.FavoritePlates.Insert(targetIndex, plate);
             Configuration.Save();
-            SetStatus($"Moved favorite plate '{DescribeFavoritePlate(plate)}' to slot {targetIndex + 1}");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("S5AABAEBD5584C430" , DescribeFavoritePlateMessage(plate), targetIndex + 1));
             return true;
         }
 
@@ -1428,7 +1447,7 @@ namespace XASlave.Services
 
             Configuration.FavoritePlates.Insert(insertIndex, plate);
             Configuration.Save();
-            SetStatus($"Moved favorite plate '{DescribeFavoritePlate(plate)}' to slot {insertIndex + 1}");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("S5AABAEBD5584C430" , DescribeFavoritePlateMessage(plate), insertIndex + 1));
             return true;
         }
 
@@ -1436,19 +1455,18 @@ namespace XASlave.Services
         {
             if (!HasActiveOrQueuedAutoLogoAction)
             {
-                SetStatus("No active Auto Logo Action to cancel");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S7E557FDFA7310872"));
                 return false;
             }
 
             var cancelledLabel = currentPlateRequest?.Label;
+            var cancelledLabelMessage = GetPlateRequestLabelMessage(currentPlateRequest);
             var clearedPlateCount = Math.Max(SynthesisQueue.Count, currentPlateRequest != null ? 1 : 0);
             SynthesisQueue.Clear();
             queueBlockReason = QueueBlockReason.None;
             ScheduleLogosActionRefresh(LogosActionRefreshDelayFrames, resetAttempts: true);
 
-            var status = string.IsNullOrWhiteSpace(cancelledLabel)
-                ? "Cancelled Auto Logo Action and cleared the queue"
-                : $"Cancelled Auto Logo Action ({cancelledLabel}) and cleared the queue";
+            var status = (string.IsNullOrWhiteSpace(cancelledLabel) ? global::XASlave.Localization.UiMessage.Key("S2B51230225D9571F") : global::XASlave.Localization.UiMessage.Format("SD6F2B199A4A5013F" , cancelledLabelMessage));
             Log.Information($"Force-stopped Auto Logo Action; cleared {clearedPlateCount} plate(s) from the active/queued run.");
             ResetQueueState(status);
             return true;
@@ -1462,13 +1480,13 @@ namespace XASlave.Services
                 queueStep = QueueStep.Idle;
                 currentPlateRequest = null;
                 currentQueuedSelections.Clear();
-                SetStatus("Queue complete");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("S379D8EABCC766FBA"));
                 return;
             }
 
             if (GetAddon("EurekaMagiciteItemShardList") == null || GetAddon("EurekaMagiciteItemSynthesis") == null)
             {
-                SetStatus("Open the Logos Manipulator to process the queue");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("SDDB11B894BAA4FEA"));
                 return;
             }
 
@@ -1477,7 +1495,7 @@ namespace XASlave.Services
             if (currentQueuedSelections.Count == 0)
             {
                 SynthesisQueue.Dequeue();
-                ResetQueueState("Skipped an empty plate request");
+                ResetQueueState(global::XASlave.Localization.UiMessage.Key("S71A734E8E5249267"));
                 return;
             }
 
@@ -1493,7 +1511,7 @@ namespace XASlave.Services
             nextQueueActionFrame = 0;
             pendingDestroyConfirmation = false;
             IsProcessingQueue = true;
-            SetStatus($"Processing plate: {currentPlateRequest.Label}");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("SE9EBBC04E832FC29" , GetPlateRequestLabelMessage(currentPlateRequest)));
         }
 
         private bool CanStartNextQueuedSynthesis()
@@ -1520,7 +1538,7 @@ namespace XASlave.Services
 
                     queueBlockReason = QueueBlockReason.None;
                     ScheduleLogosActionRefresh(LogosActionRefreshDelayFrames, resetAttempts: true);
-                    SetStatus("Queue block cleared");
+                    SetStatus(global::XASlave.Localization.UiMessage.Key("S0EDB1BEFD964FB70"));
                     return true;
                 case QueueBlockReason.PendingManualMnemePrompt:
                     if (IsMagiaBoardFullWarningVisible() || IsSelectYesNoVisible())
@@ -1530,7 +1548,7 @@ namespace XASlave.Services
 
                     queueBlockReason = QueueBlockReason.None;
                     ScheduleLogosActionRefresh(LogosActionRefreshDelayFrames, resetAttempts: true);
-                    SetStatus("Manual Logos prompt cleared");
+                    SetStatus(global::XASlave.Localization.UiMessage.Key("SC249CCD3DF811B64"));
                     return true;
                 default:
                     return false;
@@ -1551,7 +1569,7 @@ namespace XASlave.Services
         {
             if (currentPlateRequest == null || currentQueuedSelections.Count == 0)
             {
-                ResetQueueState("Queue reset");
+                ResetQueueState(global::XASlave.Localization.UiMessage.Key("S5081992AC02FC291"));
                 return;
             }
 
@@ -1646,7 +1664,7 @@ namespace XASlave.Services
                 {
                     waitingForPreviousExtractionPromptToClear = true;
                     ScheduleQueueAfterFrames();
-                    SetStatus("Waiting for previous extraction result prompt to clear");
+                    SetStatus(global::XASlave.Localization.UiMessage.Key("S4D9A522BAB363144"));
                     return;
                 }
 
@@ -1663,11 +1681,11 @@ namespace XASlave.Services
             if (TryClickVisibleAddonButton("EurekaMagiciteItemSynthesis", 3, "Destroy current selection"))
             {
                 ScheduleQueueAfterFrames();
-                SetStatus("Clearing previous manipulator selection");
+                SetStatus(global::XASlave.Localization.UiMessage.Key("SE46C0A3A8CDA8715"));
                 return;
             }
 
-            FailCurrentRequest("Manipulator already had a selection and Destroy could not be clicked");
+            FailCurrentRequest(global::XASlave.Localization.UiMessage.Key("S99CCC2D680917C03"));
         }
 
         private void TickSelectArray()
@@ -1675,7 +1693,7 @@ namespace XASlave.Services
             var selection = GetCurrentQueuedSelection();
             if (selection == null)
             {
-                FailCurrentRequest("No current plate side was available");
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Key("S19388F16F690CC8E"));
                 return;
             }
 
@@ -1690,7 +1708,7 @@ namespace XASlave.Services
                 currentPlacementAttempt = 0;
                 queueStep = QueueStep.SelectCategory;
                 ScheduleQueueAfterFrames();
-                SetStatus($"Focused the {selection.Side} Array for {selection.ActionName}");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("S9C47308326A7DAFC" , GetPlateSideMessage(selection.Side), GetPlateSelectionNameMessage(selection)));
                 return;
             }
 
@@ -1698,14 +1716,14 @@ namespace XASlave.Services
             if (currentArrayFocusAttempt > MaxManipulatorFocusAttempts)
             {
                 var promptNodeText = GetManipulatorArrayPromptText(GetManipulatorArrayNodeListIndex(selection.Side));
-                var focusStateText = GetManipulatorArrayFocusStateText();
-                FailCurrentRequest($"Could not focus the {selection.Side} Array (node prompt: '{promptNodeText}', focus state: {focusStateText})");
+                var focusStateText = GetManipulatorArrayFocusStateTextMessage();
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Format("S9EABD297D46BA1E6" , GetPlateSideMessage(selection.Side), promptNodeText, focusStateText));
                 return;
             }
 
             TryFocusManipulatorArray(selection.Side);
             ScheduleQueueAfterFrames();
-            SetStatus($"Waiting for the {selection.Side} Array to accept logograms for {selection.ActionName} ({currentArrayFocusAttempt}/{MaxManipulatorFocusAttempts})");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("SFDD258D2A27E8DFC" , GetPlateSideMessage(selection.Side), GetPlateSelectionNameMessage(selection), currentArrayFocusAttempt, MaxManipulatorFocusAttempts));
         }
 
         private void TickSelectCategory()
@@ -1720,7 +1738,7 @@ namespace XASlave.Services
             var requiredCategory = GetCategoryButtonIndexForLogogram(ingredient.LogogramID);
             if (requiredCategory == 0)
             {
-                FailCurrentRequest($"Unknown category for {Logograms.GetValueOrDefault(ingredient.LogogramID)?.Name ?? ingredient.LogogramID.ToString()}");
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Format("S53B25AE4BCC8C101" , Logograms.GetValueOrDefault(ingredient.LogogramID)?.Name ?? ingredient.LogogramID.ToString()));
                 return;
             }
 
@@ -1728,13 +1746,13 @@ namespace XASlave.Services
             {
                 if (!ClickAddonButton("EurekaMagiciteItemShardList", requiredCategory))
                 {
-                    FailCurrentRequest($"Could not open shard category for {Logograms.GetValueOrDefault(ingredient.LogogramID)?.Name ?? ingredient.LogogramID.ToString()}");
+                    FailCurrentRequest(global::XASlave.Localization.UiMessage.Format("S7DC30C293EEA4010" , Logograms.GetValueOrDefault(ingredient.LogogramID)?.Name ?? ingredient.LogogramID.ToString()));
                     return;
                 }
 
                 currentCategoryNodeIndex = requiredCategory;
                 ScheduleQueueAfterFrames();
-                SetStatus($"Waiting for shard category {requiredCategory} to load");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("S9F9B0609F079FED1" , requiredCategory));
                 return;
             }
 
@@ -1754,14 +1772,14 @@ namespace XASlave.Services
             var logogramName = Logograms.GetValueOrDefault(ingredient.LogogramID)?.Name;
             if (string.IsNullOrWhiteSpace(logogramName))
             {
-                FailCurrentRequest($"Could not resolve a name for logogram {ingredient.LogogramID}");
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Format("S1C306E185163D1DC" , ingredient.LogogramID));
                 return;
             }
 
             var visibleIndex = GetLogogramIndexInShardList(ingredient.LogogramID);
             if (visibleIndex < 0)
             {
-                FailCurrentRequest($"Could not find visible shard entry for logogram {ingredient.LogogramID}");
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Format("S817FA39E9FF7B7CB" , ingredient.LogogramID));
                 return;
             }
 
@@ -1771,13 +1789,13 @@ namespace XASlave.Services
 
             if (!TrySelectVisibleShardListEntry(visibleIndex, logogramName, currentPlacementAttempt))
             {
-                FailCurrentRequest($"Could not click shard entry for logogram {ingredient.LogogramID}");
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Format("S9DB4B11BD3F9C499" , ingredient.LogogramID));
                 return;
             }
 
             ScheduleQueueAfterFrames();
             queueStep = QueueStep.VerifyPlacement;
-            SetStatus($"Waiting for {logogramName} to appear in the {selection.Side} Array");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("S80AE97F93FC2AD83" , logogramName, GetPlateSideMessage(selection.Side)));
         }
 
         private void TickVerifyPlacement()
@@ -1807,7 +1825,7 @@ namespace XASlave.Services
                     currentRecipeIndex++;
                 }
 
-                SetStatus($"Placed {logogramName} into the {selection.Side} Array");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("SF4B40AF2231D7BF4" , logogramName, GetPlateSideMessage(selection.Side)));
                 if (currentRecipeIndex >= selection.Recipe.Count)
                 {
                     currentSelectionIndex++;
@@ -1835,14 +1853,14 @@ namespace XASlave.Services
                     return;
                 }
 
-                FailCurrentRequest($"Selected {logogramName} from the shard list but it populated the {oppositeSide} Array instead of the {selection.Side} Array");
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Format("SC359BD16F97D099D" , logogramName, GetPlateSideMessage(oppositeSide), GetPlateSideMessage(selection.Side)));
                 return;
             }
 
             currentPlacementAttempt++;
             if (currentPlacementAttempt >= MaxShardSelectionAttempts)
             {
-                FailCurrentRequest($"Selected {logogramName} from the shard list but it never appeared in the {selection.Side} Array");
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Format("S994120854CD875A4" , logogramName, GetPlateSideMessage(selection.Side)));
                 return;
             }
 
@@ -1855,7 +1873,7 @@ namespace XASlave.Services
         {
             if (!Configuration.AutoDestroyWhenMagiaBoardFull && IsMagiaBoardFull)
             {
-                BlockCurrentQueue("Logos Actions are full; enable Auto Destroy When Full or free a Logos Action slot", QueueBlockReason.MagiaBoardFull, dequeueCurrentRequest: false);
+                BlockCurrentQueue(global::XASlave.Localization.UiMessage.Key("S7204328E7EB3C1D3"), QueueBlockReason.MagiaBoardFull, dequeueCurrentRequest: false);
                 return;
             }
 
@@ -1873,20 +1891,20 @@ namespace XASlave.Services
                 queueStep = QueueStep.WaitForSuccess;
                 queueStepStartedAt = DateTime.UtcNow;
                 ScheduleQueueAfterFrames();
-                SetStatus($"Waiting for extraction result for {currentPlateRequest?.Label}");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("SE170E5D36806A2AF" , GetPlateRequestLabelMessage(currentPlateRequest)));
                 return;
             }
 
             currentExtractionResultBaselineSignature = string.Empty;
             currentExtractionResultClearedSinceStart = true;
-            FailCurrentRequest("Could not click Extract Mneme");
+            FailCurrentRequest(global::XASlave.Localization.UiMessage.Key("SF1195821C3D39BEC"));
         }
 
         private void TickWaitForSuccess()
         {
             if (DateTime.UtcNow - queueStepStartedAt > SuccessTimeout)
             {
-                FailCurrentRequest("Timed out waiting for Mneme extraction");
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Key("S52947A3C9F56B641"));
                 return;
             }
 
@@ -1916,23 +1934,23 @@ namespace XASlave.Services
             switch (extractionResult)
             {
                 case MnemeExtractionResult.Failed:
-                    SetStatus($"Extraction failed for {currentPlateRequest?.Label}; acknowledging");
+                    SetStatus(global::XASlave.Localization.UiMessage.Format("S14488C07EFAEC98D" , GetPlateRequestLabelMessage(currentPlateRequest)));
                     break;
                 case MnemeExtractionResult.SuccessMagiaBoardFull:
-                    SetStatus($"Mneme extracted for {currentPlateRequest?.Label}; Logos Actions are full");
+                    SetStatus(global::XASlave.Localization.UiMessage.Format("S40CF633203CF0E39" , GetPlateRequestLabelMessage(currentPlateRequest)));
                     break;
                 default:
-                    SetStatus($"Mneme extracted for {currentPlateRequest?.Label}; acknowledging");
+                    SetStatus(global::XASlave.Localization.UiMessage.Format("SD5CA4E0D0FABD49F" , GetPlateRequestLabelMessage(currentPlateRequest)));
                     break;
             }
         }
 
         private void TickWaitForRetryReady()
         {
-            var label = currentPlateRequest?.Label ?? "current plate";
+            var label = currentPlateRequest == null ? global::XASlave.Localization.UiMessage.Key("S6C9C7826C9297CC5") : GetPlateRequestLabelMessage(currentPlateRequest);
             if (DateTime.UtcNow - queueStepStartedAt > SuccessTimeout)
             {
-                FailCurrentRequest($"Timed out waiting to retry failed extraction for {label}");
+                FailCurrentRequest(global::XASlave.Localization.UiMessage.Format("SCEBD225C66C1439B" , label));
                 return;
             }
 
@@ -1949,23 +1967,21 @@ namespace XASlave.Services
                 queueStep = QueueStep.PrepareManipulator;
                 queueStepStartedAt = DateTime.UtcNow;
                 ScheduleQueueAfterFrames();
-                SetStatus($"Retry prompt cleared for {label}; rebuilding the plate");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("S5EECC2A34AD1BCCC" , label));
                 return;
             }
 
             queueStep = QueueStep.ExtractMneme;
             queueStepStartedAt = DateTime.UtcNow;
             ScheduleQueueAfterFrames();
-            SetStatus($"Retrying failed extraction for {label}");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("SE3F8D3003F8FE6E9" , label));
         }
 
         private void TickAcknowledgeSuccess()
         {
             if (DateTime.UtcNow - queueStepStartedAt > SuccessTimeout)
             {
-                var timeoutMessage = pendingMnemeExtractionResult == MnemeExtractionResult.Failed
-                    ? "Timed out waiting to acknowledge failed Mneme extraction"
-                    : "Timed out waiting to confirm Mneme extraction";
+                var timeoutMessage = (pendingMnemeExtractionResult == MnemeExtractionResult.Failed ? global::XASlave.Localization.UiMessage.Key("S498A801E9E70377E") : global::XASlave.Localization.UiMessage.Key("S80CE72082ED3CC03"));
                 FailCurrentRequest(timeoutMessage);
                 return;
             }
@@ -1982,7 +1998,7 @@ namespace XASlave.Services
                 {
                     queueStepStartedAt = DateTime.UtcNow;
                     ScheduleQueueAfterFrames();
-                    SetStatus("Confirmed destruction of extracted mneme");
+                    SetStatus(global::XASlave.Localization.UiMessage.Key("S3A2958C9657EB111"));
                     return;
                 }
 
@@ -2006,7 +2022,7 @@ namespace XASlave.Services
                         pendingDestroyConfirmation = true;
                         queueStepStartedAt = DateTime.UtcNow;
                         ScheduleQueueAfterFrames();
-                        SetStatus("Confirming destruction of extracted mneme");
+                        SetStatus(global::XASlave.Localization.UiMessage.Key("S25F8079554615ECF"));
                         return;
                     }
 
@@ -2014,7 +2030,7 @@ namespace XASlave.Services
                     return;
                 }
 
-                BlockCurrentQueue("Mneme extracted but Logos Actions are full; use Destroy or Replace manually", QueueBlockReason.PendingManualMnemePrompt, dequeueCurrentRequest: true);
+                BlockCurrentQueue(global::XASlave.Localization.UiMessage.Key("SC19E105850C5110E"), QueueBlockReason.PendingManualMnemePrompt, dequeueCurrentRequest: true);
                 return;
             }
 
@@ -2029,7 +2045,7 @@ namespace XASlave.Services
 
         private void TickAcknowledgeFailedExtraction()
         {
-            var label = currentPlateRequest?.Label ?? "current plate";
+            var label = currentPlateRequest == null ? global::XASlave.Localization.UiMessage.Key("S6C9C7826C9297CC5") : GetPlateRequestLabelMessage(currentPlateRequest);
 
             if (!TryAcknowledgeMnemeExtraction())
             {
@@ -2045,13 +2061,11 @@ namespace XASlave.Services
                 queueStep = QueueStep.WaitForRetryReady;
                 queueStepStartedAt = DateTime.UtcNow;
                 ScheduleQueueAfterFrames();
-                SetStatus($"Waiting to retry failed extraction for {label}");
+                SetStatus(global::XASlave.Localization.UiMessage.Format("S6EA182027E2B73A2" , label));
                 return;
             }
 
-            var failureMessage = Configuration.AutoRetryFailedExtraction
-                ? $"Mneme extraction failed for {label}; not enough logograms remain to retry the same plate"
-                : $"Mneme extraction failed for {label}";
+            var failureMessage = (Configuration.AutoRetryFailedExtraction ? global::XASlave.Localization.UiMessage.Format("SDEF2451B68B5B6BA" , label) : global::XASlave.Localization.UiMessage.Format("SD761818C693C41B3" , label));
             FailCurrentRequest(failureMessage);
         }
 
@@ -2066,12 +2080,14 @@ namespace XASlave.Services
             Log.Information($"Synthesis completed: {currentPlateRequest.Label}");
             SynthesisQueue.Dequeue();
             ScheduleLogosActionRefresh(LogosActionRefreshDelayFrames, resetAttempts: true);
-            ResetQueueState($"Completed {currentPlateRequest.Label}");
+            ResetQueueState(global::XASlave.Localization.UiMessage.Format("SDEAD8B2E91968926" , GetPlateRequestLabelMessage(currentPlateRequest)));
         }
 
-        private void FailCurrentRequest(string message)
+        private void FailCurrentRequest(string message) => FailCurrentRequest(global::XASlave.Localization.UiMessage.Raw(message));
+
+        private void FailCurrentRequest(global::XASlave.Localization.UiMessage message)
         {
-            Log.Error(message);
+            Log.Error(message.Original);
             if (SynthesisQueue.Count > 0)
             {
                 SynthesisQueue.Dequeue();
@@ -2080,9 +2096,11 @@ namespace XASlave.Services
             ResetQueueState(message);
         }
 
-        private void BlockCurrentQueue(string message, QueueBlockReason blockReason, bool dequeueCurrentRequest)
+        private void BlockCurrentQueue(string message, QueueBlockReason blockReason, bool dequeueCurrentRequest) => BlockCurrentQueue(global::XASlave.Localization.UiMessage.Raw(message), blockReason, dequeueCurrentRequest);
+
+        private void BlockCurrentQueue(global::XASlave.Localization.UiMessage message, QueueBlockReason blockReason, bool dequeueCurrentRequest)
         {
-            Log.Warning(message);
+            Log.Warning(message.Original);
 
             if (dequeueCurrentRequest && SynthesisQueue.Count > 0)
             {
@@ -2093,7 +2111,9 @@ namespace XASlave.Services
             ResetQueueState(message);
         }
 
-        private void ResetQueueState(string status)
+        private void ResetQueueState(string status) => ResetQueueState(global::XASlave.Localization.UiMessage.Raw(status));
+
+        private void ResetQueueState(global::XASlave.Localization.UiMessage status)
         {
             currentPlateRequest = null;
             currentQueuedSelections.Clear();
@@ -2112,10 +2132,13 @@ namespace XASlave.Services
             SetStatus(status);
         }
 
-        private void SetStatus(string status)
+        private void SetStatus(string status) => SetStatus(global::XASlave.Localization.UiMessage.Raw(status));
+
+        private void SetStatus(global::XASlave.Localization.UiMessage status)
         {
-            LastStatus = status;
-            Log.Debug(status);
+            lastStatusMessage = status;
+            LastStatus = status.Original;
+            Log.Debug(status.Original);
         }
 
         private void ConsumePlateRequestStock(PlateQueueRequest request)
@@ -2185,62 +2208,80 @@ namespace XASlave.Services
             }
         }
 
-        internal string GetActionName(uint actionId)
+        internal string GetActionName(uint actionId) => GetActionNameMessage(actionId).Original;
+
+        internal global::XASlave.Localization.UiMessage GetActionNameMessage(uint actionId)
         {
             var row = DataManager.GetExcelSheet<Lumina.Excel.Sheets.Action>().GetRow(actionId);
             if (row.RowId != 0)
             {
-                return ExtractText(row.Name);
+                return global::XASlave.Localization.UiMessage.Raw(ExtractText(row.Name));
             }
 
-            return $"Action {actionId}";
+            return global::XASlave.Localization.UiMessage.Format("S48D7DB9B2B65D27D" , actionId);
         }
 
         private bool TryBuildPlateSelection(PlateSide side, uint actionId, out PlateActionSelection selection, out string error)
         {
+            var result = TryBuildPlateSelectionMessage(side, actionId, out selection, out var presentation);
+            error = presentation.Original;
+            return result;
+        }
+
+        private bool TryBuildPlateSelectionMessage(PlateSide side, uint actionId, out PlateActionSelection selection, out global::XASlave.Localization.UiMessage error)
+        {
             selection = new PlateActionSelection();
-            error = string.Empty;
+            error = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
             var action = GetLogosAction(actionId);
             if (action == null)
             {
-                error = $"Unknown action {actionId}";
+                error = global::XASlave.Localization.UiMessage.Format("S7AB8B7E99CD45F65" , actionId);
                 return false;
             }
 
             var recipe = GetResolvedRecipe(action, out var recipeIndex);
             if (recipe == null)
             {
-                error = $"No recipe data for {GetActionName(actionId)}";
+                error = global::XASlave.Localization.UiMessage.Format("S75F9D0725BF3ED90" , GetActionNameMessage(actionId));
                 return false;
             }
 
+            var actionName = GetActionNameMessage(actionId);
             selection = new PlateActionSelection
             {
                 Side = side,
                 ActionId = actionId,
-                ActionName = GetActionName(actionId),
+                ActionName = actionName.Original,
                 Recipe = recipe,
                 RecipeIndex = recipeIndex,
             };
+            selectionNames.AddOrUpdate(selection, actionName);
             return true;
         }
 
         private bool TryBuildPlateRequest(uint? astralActionId, uint? umbralActionId, out PlateQueueRequest request, out string error)
         {
+            var result = TryBuildPlateRequestMessage(astralActionId, umbralActionId, out request, out var presentation);
+            error = presentation.Original;
+            return result;
+        }
+
+        private bool TryBuildPlateRequestMessage(uint? astralActionId, uint? umbralActionId, out PlateQueueRequest request, out global::XASlave.Localization.UiMessage error)
+        {
             request = new PlateQueueRequest();
-            error = string.Empty;
+            error = global::XASlave.Localization.UiMessage.Raw(string.Empty);
             PlateActionSelection? astralSelection = null;
             PlateActionSelection? umbralSelection = null;
             PlateActionSelection builtAstralSelection = new();
             PlateActionSelection builtUmbralSelection = new();
 
-            if (!TryValidatePlateLayout(astralActionId, umbralActionId, out error))
+            if (!TryValidatePlateLayoutMessage(astralActionId, umbralActionId, out error))
             {
                 return false;
             }
 
-            if (astralActionId.HasValue && !TryBuildPlateSelection(PlateSide.Astral, astralActionId.Value, out builtAstralSelection, out error))
+            if (astralActionId.HasValue && !TryBuildPlateSelectionMessage(PlateSide.Astral, astralActionId.Value, out builtAstralSelection, out error))
             {
                 return false;
             }
@@ -2249,7 +2290,7 @@ namespace XASlave.Services
                 astralSelection = builtAstralSelection;
             }
 
-            if (umbralActionId.HasValue && !TryBuildPlateSelection(PlateSide.Umbral, umbralActionId.Value, out builtUmbralSelection, out error))
+            if (umbralActionId.HasValue && !TryBuildPlateSelectionMessage(PlateSide.Umbral, umbralActionId.Value, out builtUmbralSelection, out error))
             {
                 return false;
             }
@@ -2271,32 +2312,41 @@ namespace XASlave.Services
 
             if (!HasEnoughLogogramsForPlate(selections))
             {
-                error = PlateInsufficientLogogramsError;
+                error = global::XASlave.Localization.UiMessage.Key("S052857B9FE63FB2D");
                 return false;
             }
 
+            var label = FormatPlateLabelMessage(astralActionId, umbralActionId);
             request = new PlateQueueRequest
             {
                 Astral = astralSelection,
                 Umbral = umbralSelection,
-                Label = FormatPlateLabel(astralActionId, umbralActionId),
+                Label = label.Original,
             };
+            plateLabels.AddOrUpdate(request, label);
             return true;
         }
 
         private static bool TryValidatePlateLayout(uint? astralActionId, uint? umbralActionId, out string error)
         {
-            error = string.Empty;
+            var result = TryValidatePlateLayoutMessage(astralActionId, umbralActionId, out var presentation);
+            error = presentation.Original;
+            return result;
+        }
+
+        private static bool TryValidatePlateLayoutMessage(uint? astralActionId, uint? umbralActionId, out global::XASlave.Localization.UiMessage error)
+        {
+            error = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
             if (!astralActionId.HasValue && !umbralActionId.HasValue)
             {
-                error = PlateNoActionsSelectedError;
+                error = global::XASlave.Localization.UiMessage.Key("SCB7AB85114EC8C50");
                 return false;
             }
 
             if (!astralActionId.HasValue && umbralActionId.HasValue)
             {
-                error = PlateRequiresAstralError;
+                error = global::XASlave.Localization.UiMessage.Key("SB58805CA9ECDBC22");
                 return false;
             }
 
@@ -2443,20 +2493,22 @@ namespace XASlave.Services
             return (astralActionId, umbralActionId);
         }
 
-        private string FormatPlateLabel(uint? astralActionId, uint? umbralActionId)
+        private string FormatPlateLabel(uint? astralActionId, uint? umbralActionId) => FormatPlateLabelMessage(astralActionId, umbralActionId).Original;
+
+        private global::XASlave.Localization.UiMessage FormatPlateLabelMessage(uint? astralActionId, uint? umbralActionId)
         {
-            var labels = new List<string>();
+            var labels = new List<global::XASlave.Localization.UiMessage>();
             if (umbralActionId.HasValue)
             {
-                labels.Add(GetActionName(umbralActionId.Value));
+                labels.Add(GetActionNameMessage(umbralActionId.Value));
             }
 
             if (astralActionId.HasValue)
             {
-                labels.Add(GetActionName(astralActionId.Value));
+                labels.Add(GetActionNameMessage(astralActionId.Value));
             }
 
-            return labels.Count == 0 ? "Empty Plate" : string.Join(" / ", labels);
+            return labels.Count == 0 ? global::XASlave.Localization.UiMessage.Key("S72071AB76202C305") : global::XASlave.Localization.UiMessage.Join(" / ", labels);
         }
 
         private static string GetCompactActionLabel(string actionName)
@@ -2467,56 +2519,83 @@ namespace XASlave.Services
                 : actionName;
         }
 
-        private string FormatCompactPlateLabel(uint? astralActionId, uint? umbralActionId)
+        private static global::XASlave.Localization.UiMessage GetCompactActionLabelMessage(global::XASlave.Localization.UiMessage actionName)
         {
-            var labels = new List<string>();
+            var compact = GetCompactActionLabel(actionName.Original);
+            return compact == actionName.Original ? actionName : global::XASlave.Localization.UiMessage.Raw(compact);
+        }
+
+        internal global::XASlave.Localization.UiMessage GetPlateRequestLabelMessage(PlateQueueRequest? request)
+            => request == null ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Capture(plateLabels.TryGetValue(request, out var label) ? label : null, request.Label);
+
+        internal global::XASlave.Localization.UiMessage GetPlateSelectionNameMessage(PlateActionSelection selection)
+            => global::XASlave.Localization.UiMessage.Capture(selectionNames.TryGetValue(selection, out var name) ? name : null, selection.ActionName);
+
+        internal static global::XASlave.Localization.UiMessage GetPlateSideMessage(PlateSide side) => side switch
+        {
+            PlateSide.Astral => global::XASlave.Localization.UiMessage.Key("SF3FC0CC1D0F6E4BD"),
+            PlateSide.Umbral => global::XASlave.Localization.UiMessage.Key("SE01F7BF79E0EFE9D"),
+            _ => global::XASlave.Localization.UiMessage.Raw(side.ToString()),
+        };
+
+        private string FormatCompactPlateLabel(uint? astralActionId, uint? umbralActionId) => FormatCompactPlateLabelMessage(astralActionId, umbralActionId).Original;
+
+        private global::XASlave.Localization.UiMessage FormatCompactPlateLabelMessage(uint? astralActionId, uint? umbralActionId)
+        {
+            var labels = new List<global::XASlave.Localization.UiMessage>();
             if (umbralActionId.HasValue)
             {
-                labels.Add(GetCompactActionLabel(GetActionName(umbralActionId.Value)));
+                labels.Add(GetCompactActionLabelMessage(GetActionNameMessage(umbralActionId.Value)));
             }
 
             if (astralActionId.HasValue)
             {
-                labels.Add(GetCompactActionLabel(GetActionName(astralActionId.Value)));
+                labels.Add(GetCompactActionLabelMessage(GetActionNameMessage(astralActionId.Value)));
             }
 
-            return labels.Count == 0 ? "Empty Plate" : string.Join(" / ", labels);
+            return labels.Count == 0 ? global::XASlave.Localization.UiMessage.Key("S72071AB76202C305") : global::XASlave.Localization.UiMessage.Join(" / ", labels);
         }
 
-        internal string DescribeFavoritePlate(FavoritePlate plate)
+        internal string DescribeFavoritePlate(FavoritePlate plate) => DescribeFavoritePlateMessage(plate).Original;
+
+        internal global::XASlave.Localization.UiMessage DescribeFavoritePlateMessage(FavoritePlate plate)
         {
             if (!string.IsNullOrWhiteSpace(plate.Name))
             {
-                return plate.Name;
+                return global::XASlave.Localization.UiMessage.Raw(plate.Name);
             }
 
             var (astralActionId, umbralActionId) = GetFavoritePlateActions(plate);
-            return FormatPlateLabel(astralActionId, umbralActionId);
+            return FormatPlateLabelMessage(astralActionId, umbralActionId);
         }
 
-        internal string DescribeFavoritePlateCompact(FavoritePlate plate)
+        internal string DescribeFavoritePlateCompact(FavoritePlate plate) => DescribeFavoritePlateCompactMessage(plate).Original;
+
+        internal global::XASlave.Localization.UiMessage DescribeFavoritePlateCompactMessage(FavoritePlate plate)
         {
             if (!string.IsNullOrWhiteSpace(plate.Name))
             {
-                return plate.Name;
+                return global::XASlave.Localization.UiMessage.Raw(plate.Name);
             }
 
             var (astralActionId, umbralActionId) = GetFavoritePlateActions(plate);
-            return FormatCompactPlateLabel(astralActionId, umbralActionId);
+            return FormatCompactPlateLabelMessage(astralActionId, umbralActionId);
         }
 
-        internal List<string> GetFavoritePlateActionNames(FavoritePlate plate)
+        internal List<string> GetFavoritePlateActionNames(FavoritePlate plate) => GetFavoritePlateActionNamesMessage(plate).Select(message => message.Original).ToList();
+
+        internal List<global::XASlave.Localization.UiMessage> GetFavoritePlateActionNamesMessage(FavoritePlate plate)
         {
             var (astralActionId, umbralActionId) = GetFavoritePlateActions(plate);
-            var names = new List<string>();
+            var names = new List<global::XASlave.Localization.UiMessage>();
             if (umbralActionId.HasValue)
             {
-                names.Add(GetActionName(umbralActionId.Value));
+                names.Add(GetActionNameMessage(umbralActionId.Value));
             }
 
             if (astralActionId.HasValue)
             {
-                names.Add(GetActionName(astralActionId.Value));
+                names.Add(GetActionNameMessage(astralActionId.Value));
             }
 
             return names;
@@ -2891,17 +2970,19 @@ namespace XASlave.Services
             }
         }
 
-        private unsafe string GetManipulatorArrayFocusStateText()
+        private unsafe string GetManipulatorArrayFocusStateText() => GetManipulatorArrayFocusStateTextMessage().Original;
+
+        private unsafe global::XASlave.Localization.UiMessage GetManipulatorArrayFocusStateTextMessage()
         {
             var addon = GetAddon("EurekaMagiciteItemSynthesis");
             if (addon == null || !addon->IsVisible)
             {
-                return "unavailable";
+                return global::XASlave.Localization.UiMessage.Key("SBA691BA042BCEDD9");
             }
 
             var astralValue = GetAddonAtkValueAsInt(addon, ManipulatorAstralFocusValueIndex);
             var umbralValue = GetAddonAtkValueAsInt(addon, ManipulatorUmbralFocusValueIndex);
-            return $"atk[{ManipulatorAstralFocusValueIndex}]={astralValue}, atk[{ManipulatorUmbralFocusValueIndex}]={umbralValue}";
+            return global::XASlave.Localization.UiMessage.Raw($"atk[{ManipulatorAstralFocusValueIndex}]={astralValue}, atk[{ManipulatorUmbralFocusValueIndex}]={umbralValue}");
         }
 
         private unsafe bool IsManipulatorArrayInputVisible(PlateSide side)
@@ -3151,7 +3232,7 @@ namespace XASlave.Services
             ResetCurrentPlateBuildProgress();
             queueStep = QueueStep.PrepareManipulator;
             ScheduleQueueAfterFrames();
-            SetStatus($"Retrying plate after {actualSide} focus failure");
+            SetStatus(global::XASlave.Localization.UiMessage.Format("S7A6CB97E04555D4E" , GetPlateSideMessage(actualSide)));
             return true;
         }
 

@@ -45,7 +45,7 @@ internal static class SimpleTweaksDutyFinderIntegration
             ImGui.BeginDisabled(pending);
             try
             {
-                if (ImGui.Button("Disable Simple Tweaks' Improved Duty Finder Settings"))
+                if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("SC050B7223E69A9A4")))
                 {
                     pending = true;
                     result = "Disabling Simple Tweaks' Improved Duty Finder Settings...";

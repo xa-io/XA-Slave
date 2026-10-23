@@ -69,7 +69,7 @@ public partial class SlaveWindow
         if (xagmanRunning && !plugin.Configuration.XagmanOutsideNetworkHelper && liveOwner
             && !TryReadXagmanGiveQuantity(item, out current))
         {
-            FailXagmanSupplyCycle($"Cannot reconcile Give/Balance work for {owner}: live inventory is not readable.");
+            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Format("S5121A5E34ED5E581", owner));
             return 0;
         }
         if (item.Mode == XagmanItemMode.Balance)
@@ -175,7 +175,7 @@ public partial class SlaveWindow
             if (xagmanRunning && !plugin.Configuration.XagmanOutsideNetworkHelper && IsXagmanCurrentLocalCharacter(owner)
                 && !TryReadXagmanGiveQuantity(item, out current))
             {
-                FailXagmanSupplyCycle($"Cannot preserve pending Give/Balance work for {owner}: live inventory is not readable.");
+                FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Format("S92EA9D0178930A4F", owner));
                 return pending;
             }
             var quantity = GetXagmanPendingGiveQuantity(owner, item, current);
@@ -359,7 +359,7 @@ public partial class SlaveWindow
             return false;
         if (!gilReadable)
         {
-            FailXagmanSupplyCycle("Tony gil could not be read at the capacity-drain boundary; unfinished owner work was preserved.");
+            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("S8D31EEE0693E86A3"));
             return true;
         }
 
@@ -368,10 +368,10 @@ public partial class SlaveWindow
             if (xagmanSupplyReceivingPolicyWaitSinceUtc == DateTime.MinValue)
                 xagmanSupplyReceivingPolicyWaitSinceUtc = DateTime.UtcNow;
             xagmanStatus = XagmanStatus.Paused;
-            xagmanStatusText = "Tony is at receiving capacity; waiting for every owner client's receiving-policy information before choosing distribution or rotation.";
-            TrySetXagmanDropboxAutoAcceptOrStop(false, "Tony receiving-policy check");
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("S4A2A2B5FCA25890B"));
+            TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("S548C9BE83D399EBA"));
             if ((DateTime.UtcNow - xagmanSupplyReceivingPolicyWaitSinceUtc).TotalSeconds >= 60)
-                FailXagmanSupplyCycle("Owner receiving-policy information remained unknown at Tony capacity; unfinished owners were preserved.");
+                FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("SCD80531916DA34FF"));
             PublishXagmanPresence();
             return true;
         }
@@ -398,9 +398,7 @@ public partial class SlaveWindow
         xagmanSupplyDrainNextPollAtUtc = xagmanSupplyDrainQuietSinceUtc = DateTime.MinValue;
         if (hasUsefulSupply) xagmanTonyRotationRequestedByOwnerStandby = false;
         if (xagmanSupplyCapacityRotationPending) xagmanStatus = XagmanStatus.Paused;
-        xagmanStatusText = hasUsefulSupply
-            ? $"Tony {xagmanActiveCharacter} reached {(fullInventory ? "inventory capacity" : "the selling gil limit")}; closing the receiving trade before distributing remaining useful stock."
-            : $"Tony {xagmanActiveCharacter} reached receiving capacity with no useful future supply {(hasReceivingPolicies ? "in the remaining-owner forecast" : "policies in this region")}; closing the trade before checking sell recovery or rotating. Unfinished owners will wait on their current character.";
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, (hasUsefulSupply ? global::XASlave.Localization.UiMessage.Format("SAC67BE743661F524", xagmanActiveCharacter, ((fullInventory ? global::XASlave.Localization.UiMessage.Key("SD88A381E9CB39AA3") : global::XASlave.Localization.UiMessage.Key("SAA97BE7758A54A01")))) : global::XASlave.Localization.UiMessage.Format("S971D6129CCDEC01C", xagmanActiveCharacter, ((hasReceivingPolicies ? global::XASlave.Localization.UiMessage.Key("S3CF7B7747CBCF64A") : global::XASlave.Localization.UiMessage.Key("SD13FD0FDF77479C3"))))));
         plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
         // Keep the active owner lock while the receiver queue and native Trade window settle.
         // The presence flag lets that owner preserve its unfinished Give work immediately.
@@ -420,27 +418,27 @@ public partial class SlaveWindow
         if (!IsXagmanCurrentLocalCharacter(xagmanSupplyDrainCharacter)
             || !xagmanActiveCharacter.Equals(xagmanSupplyDrainCharacter, StringComparison.OrdinalIgnoreCase))
         {
-            FailXagmanSupplyCycle("Tony changed before the receiving trade was safely closed; partial owner work remains preserved.");
+            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("S0243E018D3068E07"));
             return true;
         }
         if ((now - xagmanSupplyDrainStartedAtUtc).TotalSeconds >= 15)
         {
-            FailXagmanSupplyCycle("Tony's capacity handoff did not reach a closed trade and safe owner acknowledgement within 15 seconds; unfinished owner work remains preserved.");
+            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("SF8DBCD3A5717DF23"));
             return true;
         }
         if (now < xagmanSupplyDrainNextPollAtUtc)
             return true;
         xagmanSupplyDrainNextPollAtUtc = now.AddMilliseconds(500);
-        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, "Tony capacity supply drain"))
+        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("S9491632AAD1F80D5")))
             return true;
         if (!TryStopXagmanDropboxTradeQueue())
         {
-            FailXagmanSupplyCycle("Could not confirm Dropbox's receiving queue was stopped before Tony supply drain.");
+            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("S618C7A8EED9621D4"));
             return true;
         }
         if (!TryClearXagmanDropbox(out var failure))
         {
-            FailXagmanSupplyCycle($"Could not clear Dropbox's receiving queue before Tony supply drain: {failure}");
+            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Format("S1E3872F91C353973", failure));
             return true;
         }
         if (AddonHelper.IsAddonVisible("Trade"))
@@ -472,7 +470,7 @@ public partial class SlaveWindow
                 ResetXagmanTonySupplyDrain();
                 xagmanTonyRotationRequestedByOwnerStandby = false;
                 xagmanStatus = XagmanStatus.AtMeetSpot;
-                xagmanStatusText = "Tony is waiting for owner completion acknowledgements.";
+                xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("S3CA8E26B0FB33A0E"));
                 PublishXagmanPresence();
                 return true;
             }
@@ -525,7 +523,7 @@ public partial class SlaveWindow
         xagmanSupplyInventoryCachedAtUtc = DateTime.MinValue;
         ClearXagmanFocusTarget();
         xagmanStatus = XagmanStatus.AtMeetSpot;
-        xagmanStatusText = $"Tony {xagmanActiveCharacter} is distributing useful stock; unfinished owner Give work remains pending until receiving capacity is available.";
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S2F5AA998F51B57C6", xagmanActiveCharacter));
         plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
         PublishXagmanPresence();
         return true;
@@ -549,7 +547,7 @@ public partial class SlaveWindow
             || !TryGetXagmanLiveLocalMainInventoryFreeSlots(out var freeSlots)
             || !TryGetXagmanLiveGil(out var currentGil))
         {
-            FailXagmanSupplyCycle("Tony receiving capacity could not be verified after supply drain; pending Give work was preserved.");
+            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("S9EE8DE97783E40D1"));
             return true;
         }
         var currentStock = CaptureXagmanSupplyStock(availableStock);
@@ -559,7 +557,7 @@ public partial class SlaveWindow
             && (!xagmanSupplyDrainBlockedOnGil || currentGil < XagmanTonySellGilLimit);
         if (!deliveredSupply || !recoveredCapacity)
             return false;
-        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, "resume Tony receiving after useful supply drain"))
+        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("S32F32B578323F741")))
             return true;
         ResetXagmanTonySupplyDrain();
         if (xagmanServerMatchingActive)
@@ -578,7 +576,7 @@ public partial class SlaveWindow
         BeginXagmanTonySupplyPass();
         xagmanLastTonyActionAtUtc = DateTime.UtcNow;
         xagmanStatus = XagmanStatus.AtMeetSpot;
-        xagmanStatusText = $"Tony {xagmanActiveCharacter} recovered receiving capacity through supply deliveries; starting another pass for unfinished owner Give work.";
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S38119162C4558E22", xagmanActiveCharacter));
         plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
         PublishXagmanPresence();
         return true;

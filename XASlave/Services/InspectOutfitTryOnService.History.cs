@@ -18,12 +18,12 @@ internal sealed partial class InspectOutfitTryOnService
     {
         if (!CanTryHistory) return;
         pendingHistoryId = id;
-        StatusText = "Preparing saved outfit.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S0ADB7C39D89C1D1A"));
     }
 
     internal void RemoveHistory(Guid id)
     {
-        if (savedSource?.EntryId == id || pendingHistoryId == id) Stop("Saved outfit removed; try-on stopped.");
+        if (savedSource?.EntryId == id || pendingHistoryId == id) Stop(global::XASlave.Localization.UiMessage.Key("SAECB7EB32440A7DD"));
         History.Remove(id);
         // Keep recordedHistory until this inspection changes, so deleting the
         // currently inspected outfit cannot immediately record it again.
@@ -35,7 +35,7 @@ internal sealed partial class InspectOutfitTryOnService
         pendingHistoryId = null;
         if (!CanTryHistory) return;
         var entry = History.Find(id);
-        if (entry == null) { StatusText = "This saved outfit was removed."; return; }
+        if (entry == null) { StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SF70EB456A90EC6F0")); return; }
         try
         {
             binding ??= new InspectOutfitNativeBinding();
@@ -53,11 +53,11 @@ internal sealed partial class InspectOutfitTryOnService
             var adapter = new InspectOutfitNativeAdapter(source, access);
             savedSource = source;
             queue = new InspectOutfitSequence(adapter, source.Host, source.Identity, owner, Environment.TickCount64);
-            StatusText = queue.Status;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, queue.StatusMessage);
         }
         catch (Exception error)
         {
-            Stop("Saved outfit unavailable: " + error.Message);
+            Stop(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SA6B6DCBAD898FEC6"), global::XASlave.Localization.UiMessage.FromException(error)));
             Plugin.Log.Warning(error, "Saved outfit try-on could not start.");
         }
     }

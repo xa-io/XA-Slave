@@ -68,7 +68,7 @@ public sealed class MonthlyReloggerTask
         // Must happen before pre-flight to prevent AR from relogging during checks
         steps.Add(new TaskStep
         {
-            Name = "Disable AR Multi Mode",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S22C41FFCBA42741B"),
             OnEnter = () =>
             {
                 runner.AddLog("Disabling AutoRetainer Multi Mode...");
@@ -78,7 +78,7 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 3f,
         });
 
-        steps.Add(MakeDelay("AR Disable Cooldown", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("SC4B6369ECA28F664"), 1.0f));
 
         // ═══════════════════════════════════════════════════════
         //  PRE-FLIGHT SEQUENCE
@@ -97,7 +97,7 @@ public sealed class MonthlyReloggerTask
             // Label update
             steps.Add(new TaskStep
             {
-                Name = $"[{charIndex}/{charTotal}] {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S5FB6F2415218C668", charIndex, charTotal, charName),
                 OnEnter = () =>
                 {
                     runner.RecordItemStart(charName); // begin active-processing timer for this character
@@ -131,7 +131,7 @@ public sealed class MonthlyReloggerTask
                 var origMaxRetries = action.MaxRetries;
                 steps.Add(new TaskStep
                 {
-                    Name = action.Name,
+                    NameMessage = action.NameMessage,
                     ShouldSkip = () => relogState.ShouldHalt || (origSkip?.Invoke() ?? false),
                     OnEnter = () =>
                     {
@@ -154,7 +154,7 @@ public sealed class MonthlyReloggerTask
             var capturedCharIndex = charIndex;
             steps.Add(new TaskStep
             {
-                Name = $"Complete: {capturedCharName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SB5063DC812CCDD2B", capturedCharName),
                 OnEnter = () =>
                 {
                     runner.RecordItemEnd(capturedCharName); // stop the active-processing timer (any outcome)
@@ -195,7 +195,7 @@ public sealed class MonthlyReloggerTask
         // -- Summary: Report any failed characters --
         steps.Add(new TaskStep
         {
-            Name = "Relogger Summary",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SD6BD177EDBD6AEDC"),
             OnEnter = () =>
             {
                 if (!ShouldKeepLogoutCancelSuppressed(DoLogoutOnComplete, DoKillGameOnComplete))
@@ -219,7 +219,7 @@ public sealed class MonthlyReloggerTask
         AddSharedCompletionSteps(steps, runner, DoLogoutOnComplete, DoKillGameOnComplete, DoEnableArMultiOnComplete);
 
         // -- Optional: Re-enable AR Multi Mode after all characters processed --
-        steps.Add(MakeDelay("Final Cooldown", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("SB4678F98BF3E7AA8"), 1.0f));
 
         return steps;
     }
@@ -246,7 +246,7 @@ public sealed class MonthlyReloggerTask
 
             steps.Add(new TaskStep
             {
-                Name = $"Relog Attempt {capturedAttempt}: {charName}",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SDFA21DAC50BD5A52", capturedAttempt, charName),
                 ShouldSkip = skipAttempt,
                 OnEnter = () =>
                 {
@@ -277,14 +277,14 @@ public sealed class MonthlyReloggerTask
                 TimeoutSec = 3f,
             });
 
-            steps.Add(MakeDelay($"Relog Init ({charName}) [attempt {capturedAttempt}/{MaxRelogAttempts}]", 2.0f, skipAttempt));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S235EA4C48A13CB35", charName, capturedAttempt, MaxRelogAttempts), 2.0f, skipAttempt));
 
             bool? lastRelogPlayerLoaded = null;
             bool? lastRelogBusy = null;
             bool? lastRelogSawTransition = null;
             steps.Add(new TaskStep
             {
-                Name = $"Relog Wait Lifestream ({charName}) [attempt {capturedAttempt}/{MaxRelogAttempts}]",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S1591BECE0E1EB42F", charName, capturedAttempt, MaxRelogAttempts),
                 ShouldSkip = skipAttempt,
                 OnEnter = () =>
                 {
@@ -352,14 +352,14 @@ public sealed class MonthlyReloggerTask
 
             AddLoggedCharacterSafeWait3Pass(
                 steps,
-                $"Relog SafeWait ({charName}) [attempt {capturedAttempt}/{MaxRelogAttempts}]",
+                global::XASlave.Localization.UiMessage.Format("S5306268DF5518984", charName, capturedAttempt, MaxRelogAttempts),
                 30f,
                 runner,
                 skipAttempt);
 
             steps.Add(new TaskStep
             {
-                Name = $"Relog Verify ({charName}) [attempt {capturedAttempt}/{MaxRelogAttempts}]",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SDB620FF87BA96C68", charName, capturedAttempt, MaxRelogAttempts),
                 ShouldSkip = skipAttempt,
                 OnEnter = () =>
                 {
@@ -483,7 +483,7 @@ public sealed class MonthlyReloggerTask
         // Re-run the pre-flight state detection (same checks as the initial pre-flight).
         steps.Add(new TaskStep
         {
-            Name = $"Recovery: Detect State ({charName})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SB1348588F426DBB7", charName),
             ShouldSkip = skip,
             OnEnter = () =>
             {
@@ -524,7 +524,7 @@ public sealed class MonthlyReloggerTask
         // Exit character select back to the main menu.
         steps.Add(new TaskStep
         {
-            Name = $"Recovery: Exit CharaSelect ({charName})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S84A7E6ACB4C5C32F", charName),
             ShouldSkip = () => skip() || !recovery.OnCharaSelect,
             OnEnter = () =>
             {
@@ -539,7 +539,7 @@ public sealed class MonthlyReloggerTask
         // Skip the main menu movie if one started playing.
         steps.Add(new TaskStep
         {
-            Name = $"Recovery: ESC Movie ({charName})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SBB87811BAF4516AA", charName),
             ShouldSkip = () => skip() || !recovery.OnMovie,
             OnEnter = () =>
             {
@@ -551,7 +551,7 @@ public sealed class MonthlyReloggerTask
             OnTimeout = () => runner.AddLog("Recovery: timeout waiting for title screen after ESC - proceeding anyway."),
         });
 
-        steps.Add(MakeDelay($"Recovery: Settle ({charName})", 1.0f, skip));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S3E4C3E759FD8CC8C", charName), 1.0f, skip));
 
         return steps;
     }
@@ -590,7 +590,10 @@ public sealed class MonthlyReloggerTask
     {
         AutoRetainerInventoryOperation? operation = null;
         var previousLogoutSuppression = false;
-        var label = kind == AutoRetainerInventoryOperation.Kind.Discard ? "Discard Items" : "Expert Delivery";
+        var labelMessage = kind == AutoRetainerInventoryOperation.Kind.Discard
+            ? global::XASlave.Localization.UiMessage.Key("S827FBC7D11E4A520")
+            : global::XASlave.Localization.UiMessage.Key("S13887C7442815B2B");
+        var label = labelMessage.Original;
 
         void Halt(string reason)
         {
@@ -601,7 +604,7 @@ public sealed class MonthlyReloggerTask
 
         return new TaskStep
         {
-            Name = label,
+            NameMessage = labelMessage,
             OnEnter = () =>
             {
                 previousLogoutSuppression = runner.SuppressLogoutCancel;
@@ -647,7 +650,7 @@ public sealed class MonthlyReloggerTask
         {
             steps.Add(new TaskStep
             {
-                Name = "Enable TextAdvance",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SA99EFDCC05A20738"),
                 OnEnter = () =>
                 {
                     runner.AddLog("Enabling TextAdvance...");
@@ -656,7 +659,7 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(MakeDelay("TextAdvance Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S4F82758AF63CDF43"), 0.5f));
         }
 
         // RemoveSproutXA() → /nastatus off
@@ -664,7 +667,7 @@ public sealed class MonthlyReloggerTask
         {
             steps.Add(new TaskStep
             {
-                Name = "Remove Sprout",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S738F6706366C8B8B"),
                 OnEnter = () =>
                 {
                     runner.AddLog("Removing New Adventurer Status...");
@@ -673,7 +676,7 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(MakeDelay("Sprout Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("SFBFF6DA4476610CB"), 0.5f));
         }
 
         // OpenInventoryXA() → /inventory
@@ -681,7 +684,7 @@ public sealed class MonthlyReloggerTask
         {
             steps.Add(new TaskStep
             {
-                Name = "Open Inventory",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S166DBD737506990A"),
                 OnEnter = () =>
                 {
                     runner.AddLog("Opening Inventory...");
@@ -690,7 +693,7 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(MakeDelay("Inventory Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S6DBBFE874CDD2B41"), 0.5f));
         }
 
         // OpenArmouryChestXA() → /armourychest
@@ -698,7 +701,7 @@ public sealed class MonthlyReloggerTask
         {
             steps.Add(new TaskStep
             {
-                Name = "Open Armoury Chest",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S53649CACF2611F56"),
                 OnEnter = () =>
                 {
                     runner.AddLog("Opening Armoury Chest...");
@@ -707,7 +710,7 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(MakeDelay("Armoury Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("SEBED4948042CC39B"), 0.5f));
         }
 
         // OpenSaddlebagsXA() → /saddlebag
@@ -716,7 +719,7 @@ public sealed class MonthlyReloggerTask
         {
             steps.Add(new TaskStep
             {
-                Name = "Open Saddlebags",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S04135E2D90F4F408"),
                 OnEnter = () =>
                 {
                     runner.AddLog("Opening Saddlebags...");
@@ -725,14 +728,14 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => AddonHelper.IsAddonVisible("InventoryBuddy"),
                 TimeoutSec = 3f, // Short timeout - if saddlebag not unlocked, skip gracefully
             });
-            steps.Add(MakeDelay("Saddlebag Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S2DFAECE897A22861"), 0.5f));
         }
 
         if (DoOpenJournal)
         {
             steps.Add(new TaskStep
             {
-                Name = "Open Journal",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SF7B51D61398CF038"),
                 OnEnter = () =>
                 {
                     runner.AddLog("Opening Journal...");
@@ -741,12 +744,12 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => AddonHelper.IsAddonVisible("Journal"),
                 TimeoutSec = 3f,
             });
-            steps.Add(MakeDelay("Journal Read Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S85732DC4FA199321"), 0.5f));
             if (plugin.IpcClient.IsXaDatabaseAvailable())
             {
                 steps.Add(new TaskStep
                 {
-                    Name = "Journal Save",
+                    NameMessage = global::XASlave.Localization.UiMessage.Key("SE8299921A6AE18A8"),
                     ShouldSkip = () => !AddonHelper.IsAddonVisible("Journal"),
                     OnEnter = () =>
                     {
@@ -759,7 +762,7 @@ public sealed class MonthlyReloggerTask
                     IsComplete = () => true,
                     TimeoutSec = 3f,
                 });
-                steps.Add(MakeDelay("Journal Save Delay", 0.5f, () => !AddonHelper.IsAddonVisible("Journal")));
+                steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S1972610E01FD0B9A"), 0.5f, () => !AddonHelper.IsAddonVisible("Journal")));
             }
         }
 
@@ -797,7 +800,7 @@ public sealed class MonthlyReloggerTask
 
             steps.Add(new TaskStep
             {
-                Name = "Parse XA: FC Check",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SF66C0CB29C6C1952"),
                 OnEnter = () =>
                 {
                     var local = Plugin.ObjectTable.LocalPlayer;
@@ -821,12 +824,12 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => skipFc || AddonHelper.IsAddonVisible("FreeCompany"),
                 TimeoutSec = 5f,
             });
-            steps.Add(MakeDelay("Parse XA: FC Load", 1.0f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S5265D8FD4D903B59"), 1.0f));
 
             // Click Members tab (callback 1, node 8)
             steps.Add(new TaskStep
             {
-                Name = "Parse XA: Members Tab",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S848666A9D221CF64"),
                 OnEnter = () =>
                 {
                     if (skipFc) return;
@@ -837,12 +840,12 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => skipFc || AddonHelper.IsAddonVisible("FreeCompanyMember"),
                 TimeoutSec = 5f,
             });
-            steps.Add(MakeDelay("Parse XA: Members Load", 1.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S7E32BB2B81398E3B"), 1.5f));
 
             // Save after members (XA Database addon watcher also triggers on close)
             steps.Add(new TaskStep
             {
-                Name = "Parse XA: Save Members",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S34084C03124F43D7"),
                 OnEnter = () =>
                 {
                     if (skipFc) return;
@@ -852,12 +855,12 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => true,
                 TimeoutSec = 3f,
             });
-            steps.Add(MakeDelay("Parse XA: Members Save Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S92232E222F4C75A9"), 0.5f));
 
             // Click Info tab (callback 3, node 4) → FreeCompanyStatus
             steps.Add(new TaskStep
             {
-                Name = "Parse XA: Info Tab",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S9600DF2B75A19613"),
                 OnEnter = () =>
                 {
                     if (skipFc) return;
@@ -868,12 +871,12 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => skipFc || AddonHelper.IsAddonVisible("FreeCompanyStatus"),
                 TimeoutSec = 5f,
             });
-            steps.Add(MakeDelay("Parse XA: Status Load", 1.0f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S65FF3ACEF20CA9A2"), 1.0f));
 
             // Click Housing search button (FreeCompanyStatus node 12) → HousingSignBoard
             steps.Add(new TaskStep
             {
-                Name = "Parse XA: Housing Search",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SF8E78520366FB775"),
                 OnEnter = () =>
                 {
                     if (skipFc) return;
@@ -886,12 +889,12 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => skipFc || AddonHelper.IsAddonVisible("HousingSignBoard"),
                 TimeoutSec = 5f,
             });
-            steps.Add(MakeDelay("Parse XA: Housing Load", 1.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("SADC6533DAE63E8A1"), 1.5f));
 
             // Close sub-addons
             steps.Add(new TaskStep
             {
-                Name = "Parse XA: Close FC Sub-Addons",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S92EA906BF0CDF1EC"),
                 OnEnter = () =>
                 {
                     if (skipFc) return;
@@ -903,12 +906,12 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => true,
                 TimeoutSec = 2f,
             });
-            steps.Add(MakeDelay("Parse XA: Close Sub Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S339878A675435940"), 0.5f));
 
             // Close FC window
             steps.Add(new TaskStep
             {
-                Name = "Parse XA: Close FC Window",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S80872F61AD680ACB"),
                 OnEnter = () =>
                 {
                     if (skipFc) return;
@@ -917,12 +920,12 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => skipFc || !AddonHelper.IsAddonVisible("FreeCompany"),
                 TimeoutSec = 5f,
             });
-            steps.Add(MakeDelay("Parse XA: FC Close Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S7D55C434DB6843F5"), 0.5f));
 
             // Final save to XA Database - all collected data (inventory, armoury, saddlebag, FC, housing)
             steps.Add(new TaskStep
             {
-                Name = "Parse XA: Save to Database",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("S7C7B1E0817035D6B"),
                 OnEnter = () =>
                 {
                     runner.AddLog("Saving to XA Database (all collected data)...");
@@ -931,7 +934,7 @@ public sealed class MonthlyReloggerTask
                 IsComplete = () => true,
                 TimeoutSec = 3f,
             });
-            steps.Add(MakeDelay("Parse XA: Save Delay", 0.5f));
+            steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S9658C562B6505E71"), 0.5f));
         }
 
         return steps;
@@ -964,7 +967,7 @@ public sealed class MonthlyReloggerTask
 
         steps.Add(new TaskStep
         {
-            Name = $"Plot Info: Open Housing ({label})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S317321A9575862F2", label),
             OnEnter = () =>
             {
                 housingUiVisible = false;
@@ -977,11 +980,11 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 2f,
         });
 
-        steps.Add(MakeDelay($"Plot Info: Housing Init ({label})", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("SAD6637FBE082E7B4", label), 1.0f));
 
         steps.Add(new TaskStep
         {
-            Name = $"Plot Info: Estate Settings ({label})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S898FBA2C4D91A124", label),
             OnEnter = () =>
             {
                 housingUiVisible = AddonHelper.IsAddonVisible("HousingMenu")
@@ -1008,11 +1011,11 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 3f,
         });
 
-        steps.Add(MakeDelay($"Plot Info: Estate Settings Wait ({label})", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S4C307C65598A892A", label), 1.0f));
 
         steps.Add(new TaskStep
         {
-            Name = $"Plot Info: Select {label}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SECE487A4481E6547", label),
             OnEnter = () =>
             {
                 canCollect = false;
@@ -1051,11 +1054,11 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 5f,
         });
 
-        steps.Add(MakeDelay($"Plot Info: Submenu Wait ({label})", 0.75f, () => !canCollect));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S425CBCF383E81A39", label), 0.75f, () => !canCollect));
 
         steps.Add(new TaskStep
         {
-            Name = $"Plot Info: View Details ({label})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SF580EF4066175BAB", label),
             ShouldSkip = () => !canCollect,
             OnEnter = () =>
             {
@@ -1076,11 +1079,11 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 5f,
         });
 
-        steps.Add(MakeDelay($"Plot Info: SignBoard Wait ({label})", 1.0f, () => !canCollect));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("SE72D9F4EAD6A5A33", label), 1.0f, () => !canCollect));
 
         steps.Add(new TaskStep
         {
-            Name = $"Plot Info: Save {label}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SAB553F7F96585DDF", label),
             ShouldSkip = () => !canCollect,
             OnEnter = () =>
             {
@@ -1103,7 +1106,7 @@ public sealed class MonthlyReloggerTask
 
         steps.Add(new TaskStep
         {
-            Name = $"Plot Info: Close Addons ({label})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S3EC4F8A8AE0D473B", label),
             OnEnter = () =>
             {
                 AddonHelper.CloseAddon("HousingSignBoard");
@@ -1115,7 +1118,7 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 2f,
         });
 
-        steps.Add(MakeDelay($"Plot Info: Close Wait ({label})", 0.5f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S4EDB428E20C0F3F7", label), 0.5f));
 
         return steps;
     }
@@ -1141,7 +1144,7 @@ public sealed class MonthlyReloggerTask
         // 1. Issue the command
         steps.Add(new TaskStep
         {
-            Name = $"Teleport {label}: Command",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SD3EA11B7C41DD852", label),
             OnEnter = () =>
             {
                 runner.AddLog($"Teleporting to {label} (/li {command})...");
@@ -1152,13 +1155,13 @@ public sealed class MonthlyReloggerTask
         });
 
         // 2. Wait 1 second for Lifestream to register the command
-        steps.Add(MakeDelay($"Teleport {label}: Init Wait", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S844C63D9A936CDFD", label), 1.0f));
 
         // 3. Wait for Lifestream to become busy (start the teleport)
         //    Short timeout - if it never becomes busy, the teleport destination doesn't exist
         steps.Add(new TaskStep
         {
-            Name = $"Teleport {label}: Wait Start",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SFDAECBF3FCB181C8", label),
             IsComplete = () =>
             {
                 try { return plugin.IpcClient.LifestreamIsBusy(); }
@@ -1171,7 +1174,7 @@ public sealed class MonthlyReloggerTask
         {
             steps.Add(new TaskStep
             {
-                Name = $"Teleport {label}: Wait Complete",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SB85F840A267646C5", label),
                 IsComplete = () =>
                 {
                     try { return !plugin.IpcClient.LifestreamIsBusy(); }
@@ -1188,7 +1191,7 @@ public sealed class MonthlyReloggerTask
             DateTime lastCheck = DateTime.MinValue;
             steps.Add(new TaskStep
             {
-                Name = $"Teleport {label}: Confirm (3x)",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("SC117A4810C7BC8F5", label),
                 OnEnter = () => { confirmCount = 0; lastCheck = DateTime.UtcNow; },
                 IsComplete = () =>
                 {
@@ -1219,10 +1222,10 @@ public sealed class MonthlyReloggerTask
         }
 
         // 6. CharacterSafeWait after teleport
-        steps.Add(BuildCharacterSafeWait($"Teleport {label}: SafeWait", 15f));
+        steps.Add(BuildCharacterSafeWait(global::XASlave.Localization.UiMessage.Format("S4533F4ADA9AEFC30", label), 15f));
 
         // 7. Final settle
-        steps.Add(MakeDelay($"Teleport {label}: Settle", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S169669DB1966224F", label), 1.0f));
 
         return steps;
     }
@@ -1249,7 +1252,7 @@ public sealed class MonthlyReloggerTask
         // Step 1: Detect current game state
         steps.Add(new TaskStep
         {
-            Name = "Pre-Flight: Detect State",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S96CA66E22BA27937"),
             OnEnter = () =>
             {
                 runner.AddLog("Pre-flight: detecting game state...");
@@ -1299,7 +1302,7 @@ public sealed class MonthlyReloggerTask
         // Step 2: Handle CharaSelect - exit to main menu
         steps.Add(new TaskStep
         {
-            Name = "Pre-Flight: Exit CharaSelect",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SFAB2D899BC0E99F8"),
             OnEnter = () =>
             {
                 if (!preFlightState.OnCharaSelect) return;
@@ -1324,7 +1327,7 @@ public sealed class MonthlyReloggerTask
         // Step 3: Handle MovieStaffList - press ESC and wait for title screen
         steps.Add(new TaskStep
         {
-            Name = "Pre-Flight: ESC Movie",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S1DC007A68D4CACC4"),
             OnEnter = () =>
             {
                 if (!preFlightState.OnMovie) return;
@@ -1344,12 +1347,12 @@ public sealed class MonthlyReloggerTask
             },
         });
 
-        steps.Add(MakeDelay("Pre-Flight: Settle", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("SAC301590CB101166"), 1.0f));
 
         // Step 4: If logged in, check for duty
         steps.Add(new TaskStep
         {
-            Name = "Pre-Flight: Duty Check",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S20DF65F360FB6B80"),
             OnEnter = () =>
             {
                 if (!preFlightState.IsLoggedIn) return;
@@ -1369,12 +1372,12 @@ public sealed class MonthlyReloggerTask
             steps.Add(dutyStep);
         }
 
-        AddLoggedCharacterSafeWait3Pass(steps, "Pre-Flight SafeWait", 30f, runner, () => !preFlightState.IsLoggedIn);
+        AddLoggedCharacterSafeWait3Pass(steps, global::XASlave.Localization.UiMessage.Key("SB41E20AE630FF68E"), 30f, runner, () => !preFlightState.IsLoggedIn);
 
         // Step 6: Reorder character list - move currently-logged-in character to position 0
         steps.Add(new TaskStep
         {
-            Name = "Pre-Flight: Reorder Characters",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S1F845D49BB1DF162"),
             OnEnter = () =>
             {
                 if (!preFlightState.IsLoggedIn || string.IsNullOrEmpty(preFlightState.LoggedInAs)) return;
@@ -1402,7 +1405,7 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 3f,
         });
 
-        steps.Add(MakeDelay("Pre-Flight: Complete", 0.5f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S732158A9E86F28C9"), 0.5f));
 
         return steps;
     }
@@ -1433,7 +1436,7 @@ public sealed class MonthlyReloggerTask
             DateTime? combatStart = null;
             steps.Add(new TaskStep
             {
-                Name = $"{label}: Wait Combat End",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S67A730102734D9BB", label),
                 OnEnter = () =>
                 {
                     if (!state.InDuty) return;
@@ -1458,7 +1461,7 @@ public sealed class MonthlyReloggerTask
         // Press U to open duty finder menu
         steps.Add(new TaskStep
         {
-            Name = $"{label}: Open Duty Menu",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S9744A45D97860DEF", label),
             OnEnter = () =>
             {
                 if (!state.InDuty) return;
@@ -1473,12 +1476,12 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 5f,
         });
 
-        steps.Add(MakeDelay($"{label}: Duty Menu Wait", 0.5f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("SD46393846FAB0658", label), 0.5f));
 
         // Click Leave button
         steps.Add(new TaskStep
         {
-            Name = $"{label}: Click Leave",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S0352EA7FD037DC1D", label),
             OnEnter = () =>
             {
                 if (!state.InDuty) return;
@@ -1501,12 +1504,12 @@ public sealed class MonthlyReloggerTask
                 "the Leave duty action could not be dispatched; refusing to continue the relog sequence"),
         });
 
-        steps.Add(MakeDelay($"{label}: Leave Confirm Wait", 0.5f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S50925147147A152E", label), 0.5f));
 
         // Click Yes on confirmation
         steps.Add(new TaskStep
         {
-            Name = $"{label}: Confirm Leave",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S01FBF9BE3E48B0A4", label),
             OnEnter = () =>
             {
                 if (!state.InDuty) return;
@@ -1566,12 +1569,12 @@ public sealed class MonthlyReloggerTask
         var needsReturn = false;
         var worldReturnDispatched = false;
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Homeworld Pre-SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt);
+        AddLoggedCharacterSafeWait3Pass(steps, global::XASlave.Localization.UiMessage.Format("S13E3F6F51A3AC32E", charName), 30f, runner, () => relogState.ShouldHalt);
 
         // Check if on homeworld
         steps.Add(new TaskStep
         {
-            Name = $"Homeworld Check: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S838A91DD0A92C138", charName),
             OnEnter = () =>
             {
                 if (relogState.ShouldHalt) return;
@@ -1606,7 +1609,7 @@ public sealed class MonthlyReloggerTask
         // If not on homeworld, use Lifestream ChangeWorld IPC to return
         steps.Add(new TaskStep
         {
-            Name = $"Homeworld Return: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S74EDBB48FD6D6FAD", charName),
             OnEnter = () =>
             {
                 if (relogState.ShouldHalt || !needsReturn) return;
@@ -1635,11 +1638,11 @@ public sealed class MonthlyReloggerTask
         });
 
         // Wait for Lifestream to start (if returning) - 2s init delay then poll
-        steps.Add(MakeDelay($"Homeworld Return: Init ({charName})", 2.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S4D6D0D5ACA309575", charName), 2.0f));
 
         steps.Add(new TaskStep
         {
-            Name = $"Homeworld Return: Wait Start ({charName})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S29EDC5CE021CEED3", charName),
             IsComplete = () =>
             {
                 if (relogState.ShouldHalt || !needsReturn) return true;
@@ -1652,7 +1655,7 @@ public sealed class MonthlyReloggerTask
         // Wait for Lifestream to finish
         steps.Add(new TaskStep
         {
-            Name = $"Homeworld Return: Wait Complete ({charName})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S3C0F44A75B48E99C", charName),
             IsComplete = () =>
             {
                 if (relogState.ShouldHalt || !needsReturn) return true;
@@ -1668,7 +1671,7 @@ public sealed class MonthlyReloggerTask
             DateTime lastCheck = DateTime.MinValue;
             steps.Add(new TaskStep
             {
-                Name = $"Homeworld Return: Confirm ({charName})",
+                NameMessage = global::XASlave.Localization.UiMessage.Format("S9878D002D1F16790", charName),
                 OnEnter = () => { confirmCount = 0; lastCheck = DateTime.UtcNow; },
                 IsComplete = () =>
                 {
@@ -1691,12 +1694,12 @@ public sealed class MonthlyReloggerTask
             });
         }
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Homeworld Return: SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt || !needsReturn);
+        AddLoggedCharacterSafeWait3Pass(steps, global::XASlave.Localization.UiMessage.Format("SB47137A92473035E", charName), 30f, runner, () => relogState.ShouldHalt || !needsReturn);
 
         // Verify we're on homeworld now
         steps.Add(new TaskStep
         {
-            Name = $"Homeworld Verify: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S5E0ED19746F32830", charName),
             OnEnter = () =>
             {
                 if (relogState.ShouldHalt || !needsReturn) return;
@@ -1737,12 +1740,12 @@ public sealed class MonthlyReloggerTask
         var dutyDetected = false;
         var leaveClickDispatched = false;
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Pre-SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt);
+        AddLoggedCharacterSafeWait3Pass(steps, global::XASlave.Localization.UiMessage.Format("SAD41C255BDB39486", charName), 30f, runner, () => relogState.ShouldHalt);
 
         // Check if in duty
         steps.Add(new TaskStep
         {
-            Name = $"Duty Check: {charName}",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S0BE84DF1AC4F6624", charName),
             OnEnter = () =>
             {
                 if (relogState.ShouldHalt) return;
@@ -1756,12 +1759,12 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 3f,
         });
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Duty SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt || !dutyDetected);
+        AddLoggedCharacterSafeWait3Pass(steps, global::XASlave.Localization.UiMessage.Format("S6038E676B92574BE", charName), 30f, runner, () => relogState.ShouldHalt || !dutyDetected);
 
         // Wait for combat to end
         steps.Add(new TaskStep
         {
-            Name = $"Duty Guard: Wait Combat ({charName})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S99BB759E656AA9D7", charName),
             OnEnter = () =>
             {
                 if (relogState.ShouldHalt || !dutyDetected) return;
@@ -1777,7 +1780,7 @@ public sealed class MonthlyReloggerTask
         // Press U to open duty finder menu
         steps.Add(new TaskStep
         {
-            Name = $"Duty Guard: Open Menu ({charName})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SAD6115DDDFB33D02", charName),
             OnEnter = () =>
             {
                 if (relogState.ShouldHalt || !dutyDetected) return;
@@ -1789,12 +1792,12 @@ public sealed class MonthlyReloggerTask
             MaxRetries = 5,
         });
 
-        steps.Add(MakeDelay($"Duty Guard: Menu Wait ({charName})", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("SF97DDAE926F5A775", charName), 1.0f));
 
         // Click Leave
         steps.Add(new TaskStep
         {
-            Name = $"Duty Guard: Click Leave ({charName})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("S6CD08D13D601F9A2", charName),
             OnEnter = () =>
             {
                 if (relogState.ShouldHalt || !dutyDetected) return;
@@ -1818,12 +1821,12 @@ public sealed class MonthlyReloggerTask
                 $"INCOMPLETE: {charName} - the Leave duty action could not be dispatched."),
         });
 
-        steps.Add(MakeDelay($"Duty Guard: Confirm Wait ({charName})", 0.5f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("SE4944A845C53D464", charName), 0.5f));
 
         // Click Yes
         steps.Add(new TaskStep
         {
-            Name = $"Duty Guard: Confirm Leave ({charName})",
+            NameMessage = global::XASlave.Localization.UiMessage.Format("SC422480545A52666", charName),
             OnEnter = () =>
             {
                 if (relogState.ShouldHalt || !dutyDetected) return;
@@ -1843,7 +1846,7 @@ public sealed class MonthlyReloggerTask
             },
         });
 
-        AddLoggedCharacterSafeWait3Pass(steps, $"Duty Guard: Post-SafeWait ({charName})", 30f, runner, () => relogState.ShouldHalt || !dutyDetected);
+        AddLoggedCharacterSafeWait3Pass(steps, global::XASlave.Localization.UiMessage.Format("SD380BDE945E2BC4D", charName), 30f, runner, () => relogState.ShouldHalt || !dutyDetected);
 
         return steps;
     }
@@ -1852,19 +1855,21 @@ public sealed class MonthlyReloggerTask
     //  Helper step builders
     // ═══════════════════════════════════════════════════════
 
-    private static void AddLoggedCharacterSafeWait3Pass(List<TaskStep> steps, string label, float timeoutSec, TaskRunner runner, Func<bool>? skip = null)
+    private static void AddLoggedCharacterSafeWait3Pass(List<TaskStep> steps, global::XASlave.Localization.UiMessage labelMessage, float timeoutSec, TaskRunner runner, Func<bool>? skip = null)
     {
+        var label = labelMessage.Original;
         skip ??= () => false;
         var verboseLogging = IsVerboseTaskLoggingEnabledStatic();
 
         for (var pass = 1; pass <= 3; pass++)
         {
-            var passLabel = $"{label} [pass {pass}/3]";
+            var passLabelMessage = global::XASlave.Localization.UiMessage.Format("S875056E7E8F940D0", labelMessage, pass);
+            var passLabel = passLabelMessage.Original;
             string? lastMessage = null;
 
             steps.Add(new TaskStep
             {
-                Name = passLabel,
+                NameMessage = passLabelMessage,
                 ShouldSkip = skip,
                 OnEnter = () =>
                 {
@@ -1894,7 +1899,7 @@ public sealed class MonthlyReloggerTask
             });
 
             if (pass < 3)
-                steps.Add(MakeDelay($"{label} [wait 1s]", 1.0f, skip));
+                steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Format("S7C3F1B2AFBC8134E", labelMessage), 1.0f, skip));
         }
     }
 
@@ -1948,11 +1953,14 @@ public sealed class MonthlyReloggerTask
 
     /// <summary>Creates a simple delay step.</summary>
     public static TaskStep MakeDelay(string name, float seconds, Func<bool>? shouldSkip = null)
+        => MakeDelay(global::XASlave.Localization.UiMessage.Raw(name), seconds, shouldSkip);
+
+    internal static TaskStep MakeDelay(global::XASlave.Localization.UiMessage name, float seconds, Func<bool>? shouldSkip = null)
     {
         DateTime? start = null;
         return new TaskStep
         {
-            Name = name,
+            NameMessage = name,
             ShouldSkip = shouldSkip,
             OnEnter = () => start = DateTime.UtcNow,
             IsComplete = () => start.HasValue && (DateTime.UtcNow - start.Value).TotalSeconds >= seconds,
@@ -1964,10 +1972,13 @@ public sealed class MonthlyReloggerTask
     /// CharacterSafeWait equivalent - waits for NamePlate addon + player available + not zoning or casting.
     /// </summary>
     public static TaskStep BuildCharacterSafeWait(string name, float timeoutSec)
+        => BuildCharacterSafeWait(global::XASlave.Localization.UiMessage.Raw(name), timeoutSec);
+
+    internal static TaskStep BuildCharacterSafeWait(global::XASlave.Localization.UiMessage name, float timeoutSec)
     {
         return new TaskStep
         {
-            Name = name,
+            NameMessage = name,
             IsComplete = () => CharacterSafetyHelper.IsCharacterSafeWaitReady(),
             TimeoutSec = timeoutSec,
         };
@@ -1984,14 +1995,17 @@ public sealed class MonthlyReloggerTask
     ///   "Confirm not-busy 3 consecutive times with 1s intervals"
     /// </summary>
     public static List<TaskStep> BuildCharacterSafeWait3Pass(string label, float perPassTimeoutSec = 15f)
+        => BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Raw(label), perPassTimeoutSec);
+
+    internal static List<TaskStep> BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage label, float perPassTimeoutSec = 15f)
     {
         return new List<TaskStep>
         {
-            BuildCharacterSafeWait($"{label} [pass 1/3]", perPassTimeoutSec),
-            MakeDelay($"{label} [wait 1s]", 1.0f),
-            BuildCharacterSafeWait($"{label} [pass 2/3]", perPassTimeoutSec),
-            MakeDelay($"{label} [wait 1s]", 1.0f),
-            BuildCharacterSafeWait($"{label} [pass 3/3]", perPassTimeoutSec),
+            BuildCharacterSafeWait(global::XASlave.Localization.UiMessage.Format("SB3F40EA2A257FFEC", label), perPassTimeoutSec),
+            MakeDelay(global::XASlave.Localization.UiMessage.Format("S7C3F1B2AFBC8134E", label), 1.0f),
+            BuildCharacterSafeWait(global::XASlave.Localization.UiMessage.Format("S66C5C9BBEF71F6AD", label), perPassTimeoutSec),
+            MakeDelay(global::XASlave.Localization.UiMessage.Format("S7C3F1B2AFBC8134E", label), 1.0f),
+            BuildCharacterSafeWait(global::XASlave.Localization.UiMessage.Format("SC62613467DDC5727", label), perPassTimeoutSec),
         };
     }
 
@@ -2003,7 +2017,7 @@ public sealed class MonthlyReloggerTask
         {
             steps.Add(new TaskStep
             {
-                Name = "Pre-flight: Disable AR Multi",
+                NameMessage = global::XASlave.Localization.UiMessage.Key("SBE2A61D79FD0A373"),
                 OnEnter = () =>
                 {
                     runner.AddLog("Pre-flight: disabling and verifying AutoRetainer Multi before game-state detection...");
@@ -2025,7 +2039,7 @@ public sealed class MonthlyReloggerTask
 
         steps.Add(new TaskStep
         {
-            Name = "Logout",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SD0527E4B3D658351"),
             OnEnter = () =>
             {
                 runner.AddLog("Sending /logout...");
@@ -2035,11 +2049,11 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 2f,
         });
 
-        steps.Add(MakeDelay("Logout Dialog Wait", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("SD17EDD86126E945D"), 1.0f));
 
         steps.Add(new TaskStep
         {
-            Name = "Logout Confirm",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S48B20A0A432071AD"),
             OnEnter = () =>
             {
                 logoutConfirmStart = DateTime.UtcNow;
@@ -2069,7 +2083,7 @@ public sealed class MonthlyReloggerTask
     {
         steps.Add(new TaskStep
         {
-            Name = "Kill Game",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S5D2B1F638AB308C4"),
             OnEnter = () =>
             {
                 runner.AddLog("Triggering XA kill-game flow...");
@@ -2082,7 +2096,7 @@ public sealed class MonthlyReloggerTask
             TimeoutSec = 2f,
         });
 
-        steps.Add(MakeDelay("Kill Game Request Cooldown", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S69FC887A64107DA0"), 1.0f));
     }
 
     public static void AddSharedCompletionSteps(List<TaskStep> steps, TaskRunner runner, bool logoutOnComplete, bool killGameOnComplete, bool enableArMultiOnComplete)
@@ -2097,7 +2111,7 @@ public sealed class MonthlyReloggerTask
 
         steps.Add(new TaskStep
         {
-            Name = "Enable AR Multi Mode",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SC1B0164CD7BEF29C"),
             OnEnter = () =>
             {
                 runner.AddLog("Re-enabling AutoRetainer Multi Mode...");
@@ -2106,7 +2120,7 @@ public sealed class MonthlyReloggerTask
             IsComplete = () => true,
             TimeoutSec = 3f,
         });
-        steps.Add(MakeDelay("AR Enable Cooldown", 1.0f));
+        steps.Add(MakeDelay(global::XASlave.Localization.UiMessage.Key("S064DC935888F00D5"), 1.0f));
     }
 
     public static bool ShouldKeepLogoutCancelSuppressed(bool logoutOnComplete, bool killGameOnComplete)
@@ -2119,10 +2133,13 @@ public sealed class MonthlyReloggerTask
     /// Usable as a template for future tasks that involve movement.
     /// </summary>
     public static TaskStep BuildMountUp(string name = "Mount Up")
+        => BuildMountUp(global::XASlave.Localization.UiMessage.Raw(name));
+
+    internal static TaskStep BuildMountUp(global::XASlave.Localization.UiMessage name)
     {
         return new TaskStep
         {
-            Name = name,
+            NameMessage = name,
             OnEnter = () => ChatHelper.SendMessage("/gaction \"Mount Roulette\""),
             IsComplete = () => true,
             TimeoutSec = 3f,
@@ -2163,7 +2180,7 @@ public sealed class MonthlyReloggerTask
         var inner = step.ShouldSkip;
         return new TaskStep
         {
-            Name = step.Name,
+            NameMessage = step.NameMessage,
             OnEnter = step.OnEnter,
             IsComplete = step.IsComplete,
             ShouldSkip = inner == null ? extraSkip : () => extraSkip() || inner(),

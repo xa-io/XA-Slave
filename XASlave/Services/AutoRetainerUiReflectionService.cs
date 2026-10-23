@@ -5,6 +5,7 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using System.Runtime.Loader;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Plugin;
@@ -14,7 +15,13 @@ namespace XASlave.Services;
 internal readonly record struct AutoRetainerUiReflectionResult(
     bool Success,
     int CharacterCount,
-    string Message);
+    string Message)
+{
+    internal AutoRetainerUiReflectionResult(bool success, int characterCount, global::XASlave.Localization.UiMessage message)
+        : this(success, characterCount, AutoRetainerUiMessagePresentation.Store(message)) { }
+
+    internal global::XASlave.Localization.UiMessage MessagePresentation => AutoRetainerUiMessagePresentation.Get(Message);
+}
 
 internal enum AutoRetainerRelogTargetStatus
 {
@@ -25,7 +32,13 @@ internal enum AutoRetainerRelogTargetStatus
 
 internal readonly record struct AutoRetainerRelogTargetResult(
     AutoRetainerRelogTargetStatus Status,
-    string Message);
+    string Message)
+{
+    internal AutoRetainerRelogTargetResult(AutoRetainerRelogTargetStatus status, global::XASlave.Localization.UiMessage message)
+        : this(status, AutoRetainerUiMessagePresentation.Store(message)) { }
+
+    internal global::XASlave.Localization.UiMessage MessagePresentation => AutoRetainerUiMessagePresentation.Get(Message);
+}
 
 /// <summary>
 /// Reflection bridge for AutoRetainer's character UI and read-only live relog roster diagnostics.
@@ -55,12 +68,14 @@ internal static class AutoRetainerUiReflectionService
 
     // Read the effective plan (including additions), never the plan selected in AR's editor.
     // GetIMSettings is an extension method, exposed as a static method on Utils at runtime.
-    public static string InspectNpcSellSettings()
+    public static string InspectNpcSellSettings() => InspectNpcSellSettingsMessage().Original;
+
+    internal static global::XASlave.Localization.UiMessage InspectNpcSellSettingsMessage()
     {
         try
         {
             var instance = TryGetAutoRetainerPluginInstance();
-            if (instance == null) return "AR sell settings unavailable: runtime instance not found.";
+            if (instance == null) return global::XASlave.Localization.UiMessage.Key("S1A9A138C423FF781");
             var type = instance.GetType();
             var data = type.GetProperty("Data", StaticBindings)?.GetValue(null);
             var utils = type.Assembly.GetType("AutoRetainer.Helpers.Utils");
@@ -69,15 +84,15 @@ internal static class AutoRetainerUiReflectionService
                 && data != null && m.GetParameters()[0].ParameterType.IsInstanceOfType(data)
                 && m.GetParameters()[1].ParameterType == typeof(bool));
             var plan = method?.Invoke(null, new object?[] { data, false });
-            if (plan == null) return "AR effective sell plan unavailable: runtime contract not recognized.";
-            string Value(string name) => GetMemberValue(plan, name)?.ToString() ?? "unknown";
-            string Ids(string name) => GetMemberValue(plan, name) is IEnumerable values
-                ? string.Join(",", values.Cast<object>().Take(256).Select(v => v.ToString())) : "unknown";
-            return $"AR effective NPC sell plan: enabled={Value("IMEnableNpcSell")}, maximum stack limit={Value("IMAutoVendorHardStackLimit")} (quantity must be strictly below limit unless exempt), hard sell IDs=[{Ids("IMAutoVendorHard")}], protected IDs=[{Ids("IMProtectList")}], stack-exempt IDs=[{Ids("IMAutoVendorHardIgnoreStack")}].";
+            if (plan == null) return global::XASlave.Localization.UiMessage.Key("SDABF2D6C0E5E37C4");
+            global::XASlave.Localization.UiMessage Value(string name) => GetMemberValue(plan, name)?.ToString() is { } value ? global::XASlave.Localization.UiMessage.Raw(value) : global::XASlave.Localization.UiMessage.Key("SB23A6A8439C0DDE5");
+            global::XASlave.Localization.UiMessage Ids(string name) => GetMemberValue(plan, name) is IEnumerable values
+                ? global::XASlave.Localization.UiMessage.Raw(string.Join(",", values.Cast<object>().Take(256).Select(v => v.ToString()))) : global::XASlave.Localization.UiMessage.Key("SB23A6A8439C0DDE5");
+            return global::XASlave.Localization.UiMessage.Format("S7E4D146EE744FC1D", Value("IMEnableNpcSell"), Value("IMAutoVendorHardStackLimit"), Ids("IMAutoVendorHard"), Ids("IMProtectList"), Ids("IMAutoVendorHardIgnoreStack"));
         }
         catch (Exception ex)
         {
-            return $"AR sell settings unavailable ({ex.GetType().Name}); inventory recovery must still be verified.";
+            return global::XASlave.Localization.UiMessage.Format("SF2601F71DE2809CE", ex.GetType().Name);
         }
     }
 
@@ -91,24 +106,24 @@ internal static class AutoRetainerUiReflectionService
         {
             var pluginInstance = TryGetAutoRetainerPluginInstance();
             if (pluginInstance == null)
-                return RelogTargetUnknown("AutoRetainer is not loaded or its runtime instance could not be reflected.");
+                return RelogTargetUnknown(global::XASlave.Localization.UiMessage.Key("S4F0739113FA9DEA9"));
 
             var config = GetMemberValue(pluginInstance, "config");
             if (config == null)
-                return RelogTargetUnknown("AutoRetainer's live configuration could not be reflected.");
+                return RelogTargetUnknown(global::XASlave.Localization.UiMessage.Key("SB2117390E22CC8CC"));
 
             return EvaluateRelogTargetRoster(GetMemberValue(config, "OfflineData"), characterNameWorld);
         }
         catch (Exception ex)
         {
-            return RelogTargetUnknown($"AutoRetainer live relog roster could not be inspected ({ex.GetType().Name}).");
+            return RelogTargetUnknown(global::XASlave.Localization.UiMessage.Format("S1C667130ECAEC830", ex.GetType().Name));
         }
     }
 
     internal static AutoRetainerRelogTargetResult EvaluateRelogTargetRoster(object? rawRoster, string characterNameWorld)
     {
         if (string.IsNullOrWhiteSpace(characterNameWorld))
-            return RelogTargetUnknown("The relog target is blank.");
+            return RelogTargetUnknown(global::XASlave.Localization.UiMessage.Key("S5EAD45ACE949A5DF"));
 
         var separator = characterNameWorld.IndexOf('@');
         if (separator <= 0 || separator != characterNameWorld.LastIndexOf('@')
@@ -116,11 +131,11 @@ internal static class AutoRetainerUiReflectionService
             || string.IsNullOrWhiteSpace(characterNameWorld[..separator])
             || string.IsNullOrWhiteSpace(characterNameWorld[(separator + 1)..]))
         {
-            return RelogTargetUnknown("The relog target does not contain one complete Name@World identity.");
+            return RelogTargetUnknown(global::XASlave.Localization.UiMessage.Key("S718C1838268C9825"));
         }
 
         if (rawRoster is not IList roster)
-            return RelogTargetUnknown("AutoRetainer did not expose a readable live OfflineData list.");
+            return RelogTargetUnknown(global::XASlave.Localization.UiMessage.Key("SEDA92C778D2B012C"));
 
         try
         {
@@ -136,7 +151,7 @@ internal static class AutoRetainerUiReflectionService
                     || world.Equals("Unknown", StringComparison.OrdinalIgnoreCase)
                     || name.Contains('@') || world.Contains('@'))
                 {
-                    return RelogTargetUnknown("AutoRetainer's live OfflineData list contains an unreadable or incomplete character identity.");
+                    return RelogTargetUnknown(global::XASlave.Localization.UiMessage.Key("S9EC24C729F1F5A48"));
                 }
 
                 // AutoRetainer's command handler uses exact, case-sensitive Name@World equality.
@@ -145,16 +160,16 @@ internal static class AutoRetainerUiReflectionService
             }
 
             return found
-                ? new(AutoRetainerRelogTargetStatus.Found, "The exact relog target exists in AutoRetainer's live OfflineData list.")
-                : new(AutoRetainerRelogTargetStatus.Missing, "The exact relog target is absent from AutoRetainer's live OfflineData list.");
+                ? new(AutoRetainerRelogTargetStatus.Found, global::XASlave.Localization.UiMessage.Key("SA392A9B0FC637670"))
+                : new(AutoRetainerRelogTargetStatus.Missing, global::XASlave.Localization.UiMessage.Key("S4EAD70158DB1C070"));
         }
         catch (Exception ex)
         {
-            return RelogTargetUnknown($"AutoRetainer's live OfflineData list could not be read completely ({ex.GetType().Name}).");
+            return RelogTargetUnknown(global::XASlave.Localization.UiMessage.Format("SF3C5098B448BE9D4", ex.GetType().Name));
         }
     }
 
-    private static AutoRetainerRelogTargetResult RelogTargetUnknown(string message)
+    private static AutoRetainerRelogTargetResult RelogTargetUnknown(global::XASlave.Localization.UiMessage message)
         => new(AutoRetainerRelogTargetStatus.Unknown, message);
 
     public static unsafe AutoRetainerUiReflectionResult SetAllCharacterHeaders(
@@ -165,15 +180,15 @@ internal static class AutoRetainerUiReflectionService
         {
             var pluginInstance = TryGetAutoRetainerPluginInstance();
             if (pluginInstance == null)
-                return Failure("AutoRetainer is not loaded or its runtime instance could not be reflected.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("S4F0739113FA9DEA9"));
 
             var config = GetMemberValue(pluginInstance, "config");
             if (config == null)
-                return Failure("AutoRetainer's live configuration could not be reflected.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("SB2117390E22CC8CC"));
 
             var characterIds = GetCharacterIds(config);
             if (characterIds.Count == 0)
-                return Failure("AutoRetainer did not expose any offline character IDs.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("SC7810BAEA57F4870"));
 
             var windowObject = GetMemberValue(pluginInstance, "AutoRetainerWindow");
             var reflectedWindowName = windowObject == null
@@ -188,7 +203,7 @@ internal static class AutoRetainerUiReflectionService
                 mainWindow = ImGuiP.FindWindowByName(AutoRetainerWindowFallbackName);
 
             if (mainWindow.IsNull)
-                return Failure("AutoRetainer's main window has not been drawn yet. Open it once, then retry.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("S923698004892A5DF"));
 
             var nativeWindowName = Marshal.PtrToStringUTF8((nint)mainWindow.Name);
             if (!string.IsNullOrWhiteSpace(nativeWindowName))
@@ -198,7 +213,7 @@ internal static class AutoRetainerUiReflectionService
             if (sectionWindow.IsNull)
             {
                 var tabName = GetTabName(section);
-                return Failure($"AutoRetainer's {tabName} tab has not been drawn yet. Open that tab once, then retry.");
+                return Failure(global::XASlave.Localization.UiMessage.Format("S2C0C2B581A3E7B50", tabName));
             }
 
             var storage = new ImGuiStoragePtr(&sectionWindow.Handle->StateStorage);
@@ -229,15 +244,15 @@ internal static class AutoRetainerUiReflectionService
                 storage.SetInt(headerId, expanded ? 1 : 0);
             }
 
-            var action = expanded ? "Expanded" : "Collapsed";
+            var action = (expanded ? global::XASlave.Localization.UiMessage.Key("SE72D5D8D0B167D21") : global::XASlave.Localization.UiMessage.Key("SB322B65227BC3EC9"));
             return new AutoRetainerUiReflectionResult(
                 true,
                 characterIds.Count,
-                $"AutoRetainer: {action} {characterIds.Count} {GetTabName(section).ToLowerInvariant()} character row(s).");
+                global::XASlave.Localization.UiMessage.Format("S18EFD0A3CB0B93C3", action, characterIds.Count, GetTabDescriptionMessage(section)));
         }
         catch (Exception ex)
         {
-            return Failure($"AutoRetainer UI reflection failed: {ex.Message}");
+            return Failure(global::XASlave.Localization.UiMessage.Format("S5DD4197EFDA84833", global::XASlave.Localization.UiMessage.FromException(ex)));
         }
     }
 
@@ -256,19 +271,19 @@ internal static class AutoRetainerUiReflectionService
                 return new AutoRetainerUiReflectionResult(
                     true,
                     0,
-                    "AutoRetainer: Showing all character rows again.");
+                    global::XASlave.Localization.UiMessage.Key("SC8813EAEB0C53A52"));
             }
 
             var pluginInstance = TryGetAutoRetainerPluginInstance();
             if (pluginInstance == null)
-                return Failure("AutoRetainer is not loaded or its runtime instance could not be reflected.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("S4F0739113FA9DEA9"));
 
             var config = GetMemberValue(pluginInstance, "config");
             if (config == null)
-                return Failure("AutoRetainer's live configuration could not be reflected.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("SB2117390E22CC8CC"));
 
             if (GetMemberValue(config, "OfflineData") is not IList offlineData)
-                return Failure("AutoRetainer did not expose its offline character list.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("SE6916743F6EE93FF"));
 
             HashSet<ulong>? registeredFcAddressCids = null;
             if (mode == AutoRetainerCharacterFilterMode.MissingLifestreamFcAddress
@@ -294,7 +309,7 @@ internal static class AutoRetainerUiReflectionService
             if (deployablesPreview == null
                 || (AutoRetainerCharacterFilterPolicy.IsMultiModeFilter(mode) && retainersPreview == null))
             {
-                return Failure("AutoRetainer's filtered character list could not be created.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("S6AB141464A8B8402"));
             }
 
             RemoveCharacterFilter();
@@ -302,23 +317,23 @@ internal static class AutoRetainerUiReflectionService
             var uiBuilder = TryGetAutoRetainerUiBuilder(pluginInstance);
             var windowSystem = GetMemberValue(pluginInstance, "WindowSystem");
             if (uiBuilder == null || windowSystem == null)
-                return Failure("AutoRetainer's UI draw surface could not be reflected.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("SD25FA79F26DEF957"));
 
             var drawField = uiBuilder.GetType().GetField("Draw", InstanceBindings);
             if (drawField?.GetValue(uiBuilder) is not Action currentDraw)
-                return Failure("AutoRetainer's UI draw callbacks could not be reflected.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("S92B3235395ECD78F"));
 
             var windowSystemDraw = currentDraw.GetInvocationList()
                 .OfType<Action>()
                 .FirstOrDefault(x => ReferenceEquals(x.Target, windowSystem)
                     && string.Equals(x.Method.Name, "Draw", StringComparison.Ordinal));
             if (windowSystemDraw == null)
-                return Failure("AutoRetainer's WindowSystem draw callback could not be identified.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("SD4B707E99A809A89"));
 
             Action filteredDraw = () => DrawAutoRetainerWithCharacterFilter(pluginInstance, windowSystemDraw);
             var replacedDraw = ReplaceAction(currentDraw, windowSystemDraw, filteredDraw);
             if (replacedDraw == null)
-                return Failure("AutoRetainer's WindowSystem draw callback could not be wrapped.");
+                return Failure(global::XASlave.Localization.UiMessage.Key("S2DD77719D81ECCD4"));
 
             filteredUiBuilder = uiBuilder;
             filteredUiBuilderDrawField = drawField;
@@ -333,19 +348,18 @@ internal static class AutoRetainerUiReflectionService
                 return new AutoRetainerUiReflectionResult(
                     true,
                     retainersPreview.Value.CharacterCount + deployablesPreview.Value.CharacterCount,
-                    $"AutoRetainer: Showing {retainersPreview.Value.CharacterCount} Retainers and "
-                    + $"{deployablesPreview.Value.CharacterCount} Deployables {GetFilterResultLabel(mode)} character row(s) only.");
+                    global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("S80960BEC14214BF4", retainersPreview.Value.CharacterCount), global::XASlave.Localization.UiMessage.Format("S3238015CF41D9620", deployablesPreview.Value.CharacterCount, GetFilterResultLabel(mode))));
             }
 
             return new AutoRetainerUiReflectionResult(
                 true,
                 deployablesPreview.Value.CharacterCount,
-                $"AutoRetainer: Showing {deployablesPreview.Value.CharacterCount} {GetFilterResultLabel(mode)} Deployables character row(s) only.");
+                global::XASlave.Localization.UiMessage.Format("S118C343C23F9290C", deployablesPreview.Value.CharacterCount, GetFilterResultLabel(mode)));
         }
         catch (Exception ex)
         {
             RemoveCharacterFilter();
-            return Failure($"AutoRetainer character filter failed: {ex.Message}");
+            return Failure(global::XASlave.Localization.UiMessage.Format("SA2190922A5A9E012", global::XASlave.Localization.UiMessage.FromException(ex)));
         }
     }
 
@@ -698,28 +712,28 @@ internal static class AutoRetainerUiReflectionService
 
     private static bool TryGetRegisteredLifestreamFcAddressCids(
         out HashSet<ulong>? registeredFcAddressCids,
-        out string error)
+        out global::XASlave.Localization.UiMessage error)
     {
         registeredFcAddressCids = null;
-        error = string.Empty;
+        error = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
         var pluginInstance = TryGetPluginInstance(LifestreamInternalName, LifestreamPluginTypeName);
         if (pluginInstance == null)
         {
-            error = "Lifestream is not loaded or its runtime instance could not be reflected.";
+            error = global::XASlave.Localization.UiMessage.Key("S2233D8B4FB0BA515");
             return false;
         }
 
         var config = GetMemberValue(pluginInstance, "Config");
         if (config == null)
         {
-            error = "Lifestream's live configuration could not be reflected.";
+            error = global::XASlave.Localization.UiMessage.Key("SD188A9EDBDB40578");
             return false;
         }
 
         if (GetMemberValue(config, "HousePathDatas") is not IEnumerable housePathDatas)
         {
-            error = "Lifestream did not expose its registered house-address list.";
+            error = global::XASlave.Localization.UiMessage.Key("SE93849ABE77975CA");
             return false;
         }
 
@@ -865,7 +879,7 @@ internal static class AutoRetainerUiReflectionService
             var pluginManagerServiceType = typeof(IDalamudPluginInterface).Assembly.GetType("Dalamud.Service`1");
             var pluginManagerType = typeof(IDalamudPluginInterface).Assembly.GetType("Dalamud.Plugin.Internal.PluginManager");
             if (pluginManagerServiceType == null || pluginManagerType == null)
-                throw new InvalidOperationException("Dalamud plugin-manager reflection types were not found.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S8CD722880916685E"), originalMessage => new InvalidOperationException(originalMessage));
 
             var pluginManager = pluginManagerServiceType
                 .MakeGenericType(pluginManagerType)
@@ -942,19 +956,39 @@ internal static class AutoRetainerUiReflectionService
             ?? type.GetField(memberName, InstanceBindings)?.GetValue(source);
     }
 
+
+    private static global::XASlave.Localization.UiMessage GetTabDescriptionMessage(AutoRetainerUiSection section)
+        => section == AutoRetainerUiSection.Retainers ? global::XASlave.Localization.UiMessage.Key("S17642A16F49FEE36") : global::XASlave.Localization.UiMessage.Key("SEC184B4F9A67F4C6");
+
     private static string GetTabName(AutoRetainerUiSection section)
         => section == AutoRetainerUiSection.Retainers ? "Retainers" : "Deployables";
 
-    private static string GetFilterResultLabel(AutoRetainerCharacterFilterMode mode)
+    private static global::XASlave.Localization.UiMessage GetFilterResultLabel(AutoRetainerCharacterFilterMode mode)
         => mode switch
         {
-            AutoRetainerCharacterFilterMode.Attention => "alert",
-            AutoRetainerCharacterFilterMode.MultiEnabled => "multi-enabled",
-            AutoRetainerCharacterFilterMode.MultiDisabled => "multi-disabled",
-            AutoRetainerCharacterFilterMode.MissingLifestreamFcAddress => "missing-FC-address",
-            _ => "filtered",
+            AutoRetainerCharacterFilterMode.Attention => global::XASlave.Localization.UiMessage.Key("SDF905058DD67A409"),
+            AutoRetainerCharacterFilterMode.MultiEnabled => global::XASlave.Localization.UiMessage.Key("SF4E6CBA1503247A9"),
+            AutoRetainerCharacterFilterMode.MultiDisabled => global::XASlave.Localization.UiMessage.Key("S6400D2AB61C3B09F"),
+            AutoRetainerCharacterFilterMode.MissingLifestreamFcAddress => global::XASlave.Localization.UiMessage.Key("S99366CA2A74B57C7"),
+            _ => global::XASlave.Localization.UiMessage.Key("S13A30363EB940C6C"),
         };
 
-    private static AutoRetainerUiReflectionResult Failure(string message)
+    private static AutoRetainerUiReflectionResult Failure(global::XASlave.Localization.UiMessage message)
         => new(false, 0, message);
+}
+
+/// <summary>Associates metadata only with a fresh producer-owned string identity; raw values are never matched by text.</summary>
+internal static class AutoRetainerUiMessagePresentation
+{
+    private static readonly ConditionalWeakTable<string, global::XASlave.Localization.UiMessage> Messages = new();
+
+    internal static string Store(global::XASlave.Localization.UiMessage message)
+    {
+        var original = new string(message.Original.AsSpan());
+        Messages.AddOrUpdate(original, message);
+        return original;
+    }
+
+    internal static global::XASlave.Localization.UiMessage Get(string original)
+        => original != null && Messages.TryGetValue(original, out var message) ? message : global::XASlave.Localization.UiMessage.Raw(original ?? string.Empty);
 }

@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using System.Numerics;
 using System.Runtime.InteropServices;
+using XASlave.Localization;
 using Dalamud.Game.Chat;
 using Dalamud.Game.ClientState.Conditions;
 using Dalamud.Game.ClientState.Objects.SubKinds;
@@ -57,7 +58,8 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
     private int castActionsSuppressed;
     private bool? lastTriggerResult;
     private string lastLoggedState = string.Empty;
-    private string status = "Disabled";
+    private string status = UiLocale.Native("S75081B593D15CF6E");
+    private UiMessage? statusMessage = UiMessage.Key("S75081B593D15CF6E");
 
     public InstantTeleportService(Configuration configuration, IGameInteropProvider interop, ISigScanner scanner,
         IFramework framework, IClientState client, ICondition condition, IObjectTable objects,
@@ -86,11 +88,25 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
         chat.LogMessage += OnLogMessage;
     }
 
-    public string StatusText { get { lock (gate) return RecoveryRequired ? "Recovery required: waiting for an accepted ordinary position update or a new area connection." : enabled ? !PeersPermitted ? "Paused: " + (!peer.Permitted ? peer.Reason : otherTeleportPeer.Reason) : workflow?.Status ?? status : status; } }
-    public string LastActionText { get { lock (gate) return $"Requests: {workflow?.Requests ?? 0}; dispatched: {workflow?.Dispatched ?? 0}; area transports: {workflow?.TransportsObserved ?? 0}; failures: {workflow?.Failures ?? 0}; native cancels blocked: {workflow?.NativeCancelsSuppressed ?? 0}."; } }
-    public string ReadinessText { get { lock (gate) return !enabled ? "Disabled" : workflow?.Active == true ? "Teleport pending" : workflow?.GetStartBlockReason(frame, sample, Environment.TickCount64) ?? "Ready to bypass the next teleport."; } }
-    public string DiagnosticsText { get { lock (gate) return $"Position opcode: {opcode}; teleport commands seen: {commandsSeen}; position packets seen: {positionPacketsSeen}; prepared positions: {workflow?.PreparedPositions ?? 0}; current movement state: {(movementStateAddress != 0 ? "resolved" : "unavailable")}; cast actions blocked: {castActionsSuppressed}; last Teleport action result: {lastTriggerResult?.ToString() ?? "none"}."; } }
-    public string ProximityText { get { lock (gate) return $"Players inside {TeleportProximity.ClampDistance(configuration.InstantTeleportSafeDistanceYalms):0.#} yalms: {playersInsideSafeDistance}."; } }
+    public string StatusText { get { lock (gate) return GetStatusMessage().Original; } }
+    public string StatusTextDisplay { get { lock (gate) return GetStatusMessage().Display; } }
+    internal UiMessage StatusMessage { get { lock (gate) return GetStatusMessage(); } }
+    public string LastActionText { get { lock (gate) return GetLastActionMessage().Original; } }
+    public string LastActionTextDisplay { get { lock (gate) return GetLastActionMessage().Display; } }
+    public string ReadinessText { get { lock (gate) return GetReadinessMessage().Original; } }
+    public string ReadinessTextDisplay { get { lock (gate) return GetReadinessMessage().Display; } }
+    public string DiagnosticsText { get { lock (gate) return GetDiagnosticsMessage().Original; } }
+    public string DiagnosticsTextDisplay { get { lock (gate) return GetDiagnosticsMessage().Display; } }
+    public string ProximityText { get { lock (gate) return GetProximityMessage().Original; } }
+    public string ProximityTextDisplay { get { lock (gate) return GetProximityMessage().Display; } }
+
+    // These snapshots are evaluated under gate; operational strings retain their original culture/text.
+    private UiMessage GetStatusMessage() => RecoveryRequired ? UiMessage.Key("SECFE95A0B0FF924C") : enabled ? !PeersPermitted ? UiMessage.Format("SCC5DC8D369D8D14C", UiMessage.Authored(!peer.Permitted ? peer.Reason : otherTeleportPeer.Reason)) : workflow?.StatusMessage ?? statusMessage ?? UiMessage.Raw(status) : statusMessage ?? UiMessage.Raw(status);
+    private UiMessage GetLastActionMessage() => UiMessage.Format("S98984401FDC21498", workflow?.Requests ?? 0, workflow?.Dispatched ?? 0, workflow?.TransportsObserved ?? 0, workflow?.Failures ?? 0, workflow?.NativeCancelsSuppressed ?? 0);
+    private UiMessage GetReadinessMessage() => !enabled ? UiMessage.Key("S75081B593D15CF6E") : workflow?.Active == true ? UiMessage.Key("S621D978C6232CEA0") : workflow?.GetStartBlockMessage(frame, sample, Environment.TickCount64) ?? UiMessage.Key("SF063CBAFB3BC2758");
+    private UiMessage GetDiagnosticsMessage() => UiMessage.Format("SC8BDE5D63318156C", opcode, commandsSeen, positionPacketsSeen, workflow?.PreparedPositions ?? 0, movementStateAddress != 0 ? UiMessage.Key("SDC676B42859915C8") : UiMessage.Key("SBA691BA042BCEDD9"), castActionsSuppressed, lastTriggerResult.HasValue ? UiMessage.Raw(lastTriggerResult.Value.ToString()) : UiMessage.Key("S140BEDBF9C3F6D56"));
+    private UiMessage GetProximityMessage() => UiMessage.Format("S7D299064194C33CE", TeleportProximity.ClampDistance(configuration.InstantTeleportSafeDistanceYalms), playersInsideSafeDistance);
+
     public bool IsTeleporting { get { lock (gate) return workflow?.Active == true; } }
     public int TeleportsProcessed { get { lock (gate) return workflow?.Dispatched ?? 0; } }
     public bool IsEnabled { get { lock (gate) return enabled; } }
@@ -105,7 +121,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
             requestedEnabled = value;
             preferencePending = true;
             if (initialized && framework.IsInFrameworkUpdateThread) ApplyPreference();
-            else status = "Waiting for the framework thread.";
+            else status = UiMessage.Store(ref statusMessage, UiMessage.Key("S89F5714C5B66D729"));
             return preferencePending ? requestedEnabled : enabled;
         }
     }
@@ -137,7 +153,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
             if (requestedEnabled)
             {
                 var applied = conflict.Publication.TryEnable(ReadPeers, () => SetEnabledCore(true), ConflictActivity);
-                if (!applied) status = "Unavailable: " + conflict.Publication.LastReason;
+                if (!applied) status = UiMessage.Store(ref statusMessage, UiMessage.Format("S5367AFABD2DAF74F", UiMessage.Authored(conflict.Publication.LastReason)));
             }
             else
             {
@@ -156,19 +172,19 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
             if (!value)
             {
                 enabled = false;
-                try { workflow?.Abort("Disabled.", CurrentFrame(), Environment.TickCount64, false); }
+                try { workflow?.Abort(UiMessage.Key("SFE05FA4611220685"), CurrentFrame(), Environment.TickCount64, false); }
                 finally
                 {
-                    workflow?.Abort("Disabled.", default, Environment.TickCount64, false);
+                    workflow?.Abort(UiMessage.Key("SFE05FA4611220685"), default, Environment.TickCount64, false);
                     sample = null;
                     executeHook?.Disable();
                     actionHook?.Disable();
                     sendHook?.Disable();
-                    status = "Disabled";
+                    status = UiMessage.Store(ref statusMessage, UiMessage.Key("S75081B593D15CF6E"));
                 }
                 return false;
             }
-            if (RecoveryRequired) { status = "Unavailable: teleport recovery is outstanding."; return false; }
+            if (RecoveryRequired) { status = UiMessage.Store(ref statusMessage, UiMessage.Key("SE312D58F8007CB47")); return false; }
             try
             {
                 EnsureHooks();
@@ -184,7 +200,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
             catch (Exception ex)
             {
                 CleanupHooks();
-                status = "Unavailable: native teleport contracts could not be resolved.";
+                status = UiMessage.Store(ref statusMessage, UiMessage.Key("S6CE216BA015F0B4F"));
                 log.Warning(ex, "[XASlave] Instant Teleport initialization failed.");
                 return false;
             }
@@ -318,7 +334,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
                 workflow!.SoloOnly = configuration.InstantTeleportSoloOnly;
                 if (cancelRequested)
                 {
-                    workflow.Abort("Cancelled by user.", frame, now, false);
+                    workflow.Abort(UiMessage.Key("S739FE2374C00D6A0"), frame, now, false);
                     cancelRequested = false;
                     sample = null;
                 }
@@ -328,7 +344,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
             }
             catch (Exception ex)
             {
-                workflow?.Abort("Stopped: unable to read game state.", default, now, true);
+                workflow?.Abort(UiMessage.Key("SE1977AC6E34F52CE"), default, now, true);
                 sample = null;
                 frame = default;
                 log.Warning(ex, "[XASlave] Instant Teleport update failed.");
@@ -350,7 +366,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
                     {
                         if (cancelRequested)
                         {
-                            workflow!.Abort("Cancelled by user.", CurrentFrame(), Environment.TickCount64, false, cancelNative: false);
+                            workflow!.Abort(UiMessage.Key("S739FE2374C00D6A0"), CurrentFrame(), Environment.TickCount64, false, cancelNative: false);
                             cancelRequested = false;
                         }
                         else if (workflow!.PreventNativeCancel(CurrentFrame(), Environment.TickCount64)) return false;
@@ -361,7 +377,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
                         commandsSeen++;
                         if (cancelRequested)
                         {
-                            workflow!.Abort("Cancelled by user.", CurrentFrame(), Environment.TickCount64, false);
+                            workflow!.Abort(UiMessage.Key("S739FE2374C00D6A0"), CurrentFrame(), Environment.TickCount64, false);
                             sample = null;
                             cancelRequested = false;
                             return executeHook!.Original(command, p1, p2, p3, p4);
@@ -376,7 +392,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
                 }
                 catch (Exception ex)
                 {
-                    workflow?.Abort("Stopped: teleport hook failed.", default, Environment.TickCount64, true);
+                    workflow?.Abort(UiMessage.Key("S6839EBBFCFAEB660"), default, Environment.TickCount64, true);
                     sample = null;
                     log.Warning(ex, "[XASlave] Instant Teleport command callback failed.");
                 }
@@ -402,7 +418,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
                     if (validLength && current.Owner.Zone == (nint)zone && workflow!.CanSuppress(current, now)) return false;
                     // Let this genuine packet restore normal movement. Never resume suppression after passing one through.
                     if (workflow!.Active)
-                        workflow.Abort("Stopped: position state or packet layout changed.", validLength ? current : default, now, true);
+                        workflow.Abort(UiMessage.Key("SBD49DBDD68EF7A55"), validLength ? current : default, now, true);
                     if (validLength && current.CanRestore && current.Owner.Valid && current.Owner.Zone == (nint)zone &&
                         now >= current.At && now - current.At <= InstantTeleportWorkflow.FrameMaxAgeMs)
                     {
@@ -423,7 +439,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
             }
             catch (Exception ex)
             {
-                workflow?.Abort("Stopped: position callback failed.", default, Environment.TickCount64, true);
+                workflow?.Abort(UiMessage.Key("SEDB60B13BF090156"), default, Environment.TickCount64, true);
                 sample = null;
                 log.Warning(ex, "[XASlave] Instant Teleport position callback failed.");
             }
@@ -446,7 +462,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
                     return false;
                 }
             }
-            catch { workflow?.Abort("Stopped: action callback failed.", default, Environment.TickCount64, true); }
+            catch { workflow?.Abort(UiMessage.Key("S0B3AC69BE3622375"), default, Environment.TickCount64, true); }
             return actionHook!.Original(manager, type, id, target, location, extra, a7);
         }
     }

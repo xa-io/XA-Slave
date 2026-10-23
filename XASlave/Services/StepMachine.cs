@@ -32,6 +32,9 @@ internal sealed class StepMachine
     // their historical log-and-continue policy.
     public bool HaltOnError { get; set; }
     public string? LastError { get; private set; }
+    private global::XASlave.Localization.UiMessage? lastErrorMessage;
+    internal global::XASlave.Localization.UiMessage? LastErrorMessage => LastError == null
+        ? null : global::XASlave.Localization.UiMessage.Capture(ref lastErrorMessage, LastError);
 
     public StepMachine(IPluginLog log, string ownerLabel, Action<string>? activityLog = null)
         : this(
@@ -60,11 +63,15 @@ internal sealed class StepMachine
     public string CurrentStepName => IsRunning && (uint)stepIndex < (uint)steps.Count
         ? steps[stepIndex].Name
         : string.Empty;
+    internal global::XASlave.Localization.UiMessage CurrentStepNameMessage => IsRunning && (uint)stepIndex < (uint)steps.Count
+        ? steps[stepIndex].NameMessage
+        : global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
     public void Start(IEnumerable<TaskStep> source)
     {
         generation++;
         LastError = null;
+        lastErrorMessage = null;
         steps.Clear();
         steps.AddRange(source);
         foreach (var step in steps)
@@ -126,7 +133,7 @@ internal sealed class StepMachine
             }
             catch (Exception ex)
             {
-                ReportError($"step '{pendingStep.Name}' ShouldSkip", ex, $"Skip-check error in '{pendingStep.Name}': {ex.Message}");
+                ReportError(global::XASlave.Localization.UiMessage.Format("SBCB3CAB92B9BBD73", pendingStep.NameMessage), ex, $"Skip-check error in '{pendingStep.Name}': {ex.Message}");
                 shouldSkip = false;
             }
 
@@ -158,7 +165,7 @@ internal sealed class StepMachine
                 }
                 catch (Exception ex)
                 {
-                    ReportError($"step '{step.Name}' action", ex, $"Error in '{step.Name}': {ex.Message}");
+                    ReportError(global::XASlave.Localization.UiMessage.Format("SF2F7E27F7FB6B22A", step.NameMessage), ex, $"Error in '{step.Name}': {ex.Message}");
                 }
             }
 
@@ -183,7 +190,7 @@ internal sealed class StepMachine
         }
         catch (Exception ex)
         {
-            ReportError($"step '{step.Name}' check", ex, $"Check error in '{step.Name}': {ex.Message}");
+            ReportError(global::XASlave.Localization.UiMessage.Format("S980DF56051E02256", step.NameMessage), ex, $"Check error in '{step.Name}': {ex.Message}");
         }
 
         if (!IsRunning || generation != tickGeneration)
@@ -209,7 +216,7 @@ internal sealed class StepMachine
         }
         catch (Exception ex)
         {
-            ReportError($"step '{step.Name}' timeout handler", ex, $"Timeout-handler error in '{step.Name}': {ex.Message}");
+            ReportError(global::XASlave.Localization.UiMessage.Format("SC3E4F849336B4EE5", step.NameMessage), ex, $"Timeout-handler error in '{step.Name}': {ex.Message}");
         }
 
         if (!IsRunning || generation != tickGeneration)
@@ -238,14 +245,14 @@ internal sealed class StepMachine
         return StepMachineTickResult.Completed;
     }
 
-    private void ReportError(string context, Exception exception, string activity)
+    private void ReportError(global::XASlave.Localization.UiMessage context, Exception exception, string activity)
     {
         if (HaltOnError)
         {
-            LastError = $"{context}: {exception.Message}";
+            LastError = global::XASlave.Localization.UiMessage.Store(ref lastErrorMessage, global::XASlave.Localization.UiMessage.Format("SFB62FE2AE6B2AE6C", context, global::XASlave.Localization.UiMessage.FromException(exception)));
             Stop();
         }
-        logError(context, exception);
+        logError(context.Original, exception);
         activityLog?.Invoke(activity);
     }
 }

@@ -60,7 +60,10 @@ public unsafe sealed class AutoMergeService : IDisposable
         RefreshStatusText();
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetEnabled(bool value)
     {
@@ -283,12 +286,10 @@ public unsafe sealed class AutoMergeService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
-        StatusText = pendingMerge
-            ? "Enabled - inventory opened; merging incomplete main-bag stacks."
-            : "Enabled - merges incomplete main-bag stacks when inventory opens.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (pendingMerge ? global::XASlave.Localization.UiMessage.Key("S94294604B2F26A7D") : global::XASlave.Localization.UiMessage.Key("S7E0C59174D35320B")));
     }
 }

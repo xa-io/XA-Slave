@@ -67,27 +67,27 @@ internal static class PluginBuilderBindingRules
     internal static object? ParseArgument(PluginBuilderArgument argument, Type type)
     {
         var value = argument.Value ?? string.Empty;
-        if (value.Length > 2048) throw new InvalidOperationException("Argument exceeds 2048 characters.");
-        if (argument.UseCurrentCharacterId && argument.UseCurrentCharacterName) throw new InvalidOperationException("Choose one character binding.");
+        if (value.Length > 2048) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SF4CA3435DA5FCC59")), global::XASlave.Localization.UiMessage.Key("SF4CA3435DA5FCC59"));
+        if (argument.UseCurrentCharacterId && argument.UseCurrentCharacterName) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S5CD957EF9F25D19E")), global::XASlave.Localization.UiMessage.Key("S5CD957EF9F25D19E"));
         if (argument.UseCurrentCharacterId)
         {
             if (type != typeof(ulong) || !Plugin.PlayerState.IsLoaded || Plugin.PlayerState.ContentId == 0)
-                throw new InvalidOperationException("Current character ID requires a loaded character and UInt64 parameter.");
+                throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S6E0787FD7ABD1066")), global::XASlave.Localization.UiMessage.Key("S6E0787FD7ABD1066"));
             return Plugin.PlayerState.ContentId;
         }
         if (argument.UseCurrentCharacterName)
         {
-            if (type != typeof(string) || !Plugin.PlayerState.IsLoaded) throw new InvalidOperationException("Current name requires a loaded character and String parameter.");
+            if (type != typeof(string) || !Plugin.PlayerState.IsLoaded) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S80B4E29F9F62C856")), global::XASlave.Localization.UiMessage.Key("S80B4E29F9F62C856"));
             return Plugin.PlayerState.CharacterName.ToString();
         }
         var underlying = Nullable.GetUnderlyingType(type);
         if (underlying != null && value == "null") return null;
         type = underlying ?? type;
-        if (!SupportsArgument(type)) throw new InvalidOperationException("Unsupported argument type.");
+        if (!SupportsArgument(type)) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S38FEC93A455D0ECC")), global::XASlave.Localization.UiMessage.Key("S38FEC93A455D0ECC"));
         if (type == typeof(string)) return value;
         if (type.IsEnum)
         {
-            if (!Enum.TryParse(type, value, ignoreCase: false, out var parsed)) throw new InvalidOperationException("Invalid enum argument.");
+            if (!Enum.TryParse(type, value, ignoreCase: false, out var parsed)) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SA4D7340B845859D6")), global::XASlave.Localization.UiMessage.Key("SA4D7340B845859D6"));
             return parsed;
         }
         return Convert.ChangeType(value, type, CultureInfo.InvariantCulture);

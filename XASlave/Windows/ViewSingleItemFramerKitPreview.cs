@@ -14,6 +14,7 @@ internal sealed class ViewSingleItemFramerKitPreview
     private IReadOnlyList<ViewSingleItemKitArtwork> artwork = Array.Empty<ViewSingleItemKitArtwork>();
     private int selected;
     private string loadError = string.Empty;
+    private global::XASlave.Localization.UiMessage? loadErrorUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
     private uint? failedIcon;
     private float zoom = 1;
     private Vector2 pan;
@@ -47,22 +48,22 @@ internal sealed class ViewSingleItemFramerKitPreview
             loadedKit = kitId;
             Reset();
             artwork = Array.Empty<ViewSingleItemKitArtwork>();
-            loadError = string.Empty;
+            loadError = global::XASlave.Localization.UiMessage.Store(ref loadErrorUiMessage, global::XASlave.Localization.UiMessage.Raw(string.Empty));
             try { artwork = ViewSingleItemFramerKit.Load(kitId); }
             catch (Exception error)
             {
-                loadError = "The Framer's Kit artwork could not be loaded. See /xllog for details.";
+                loadError = global::XASlave.Localization.UiMessage.Store(ref loadErrorUiMessage, global::XASlave.Localization.UiMessage.Key("SE3A6385E025C57C4"));
                 Plugin.Log.Warning(error, "[View Item] Framer's Kit artwork lookup failed; kit={Kit}.", kitId);
             }
         }
         if (loadError.Length != 0)
         {
-            ImGui.TextWrapped(loadError);
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.T(global::XASlave.Localization.UiMessage.Resolve(ref loadErrorUiMessage, loadError)));
             return;
         }
         if (artwork.Count == 0)
         {
-            ImGui.TextWrapped("This kit has no adventurer plate or portrait artwork available to preview.");
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S468466CF040F03C0"));
             return;
         }
 
@@ -93,15 +94,15 @@ internal sealed class ViewSingleItemFramerKitPreview
         }
         var item = artwork[selected];
         ImGui.TextWrapped(item.Label);
-        if (ImGui.Button("Zoom Out##KitArtwork")) ZoomAt(-1, Vector2.Zero);
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S24649EE0C7A92FD8") + "##KitArtwork"))) ZoomAt(-1, Vector2.Zero);
         ImGui.SameLine();
-        if (ImGui.Button("Zoom In##KitArtwork")) ZoomAt(1, Vector2.Zero);
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S5A982CF9DC11B4EC") + "##KitArtwork"))) ZoomAt(1, Vector2.Zero);
         ImGui.SameLine();
-        if (ImGui.Button("Reset View##KitArtwork")) ResetView();
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S7F19F60F9123C6BD") + "##KitArtwork"))) ResetView();
         ImGui.SameLine();
-        ImGui.TextUnformatted($"{zoom * 100:0}% of fit");
-        ImGui.TextDisabled("Wheel: zoom | Left or right drag: pan");
-        ImGui.TextDisabled("Drag the title bar to move the window.");
+        ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.FormatKey("S5DFE199DF00E1B0E", zoom * 100));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S172669DF3486E3AB"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S96816A794BD3C3EA"));
         var shared = Plugin.TextureProvider.GetFromGameIcon(item.IconId);
         if (!shared.TryGetWrap(out var texture, out var failure))
         {
@@ -110,7 +111,7 @@ internal sealed class ViewSingleItemFramerKitPreview
                 failedIcon = item.IconId;
                 Plugin.Log.Warning(failure, "[View Item] Framer's Kit artwork texture failed; kit={Kit}; icon={Icon}.", kitId, item.IconId);
             }
-            ImGui.TextWrapped(failure == null ? "Loading artwork..." : "The artwork texture could not be loaded. See /xllog for details.");
+            ImGui.TextWrapped(failure == null ? global::XASlave.Localization.UiLocale.Get("S169FB7F091158A67") : global::XASlave.Localization.UiLocale.Get("SD90409EF7708F4FC"));
             return;
         }
         var available = ImGui.GetContentRegionAvail();

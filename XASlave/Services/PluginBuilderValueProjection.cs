@@ -5,7 +5,6 @@ using System.Globalization;
 using System.Linq;
 using System.Reflection;
 using System.Runtime.CompilerServices;
-using System.Text;
 using System.Text.Json;
 
 namespace XASlave.Services;
@@ -20,43 +19,45 @@ internal static class PluginBuilderValueProjection
     private const int MaxPathSegments = 8;
     private const int MaxDictionarySearch = 256;
 
-    internal static string Format(object? value, string memberPath)
+    internal static string Format(object? value, string memberPath) => FormatMessage(value, memberPath).Original;
+
+    internal static global::XASlave.Localization.UiMessage FormatMessage(object? value, string memberPath)
     {
         memberPath = memberPath?.Trim() ?? string.Empty;
-        if (memberPath.Length > 1024) throw new InvalidOperationException("The value path is too long.");
+        if (memberPath.Length > 1024) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S40426ABA6F001B57")), global::XASlave.Localization.UiMessage.Key("S40426ABA6F001B57"));
         var segments = memberPath.Length == 0 ? Array.Empty<string>() : memberPath.Split('.');
         if (segments.Length > MaxPathSegments || segments.Any(s => s.Length is 0 or > 128))
-            throw new InvalidOperationException("Use up to eight field, key or index segments separated by dots.");
+            throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SEA70D931C5A2C27B")), global::XASlave.Localization.UiMessage.Key("SEA70D931C5A2C27B"));
         if (value is string json && json.Length <= MaxJson && (json.TrimStart().StartsWith('{') || json.TrimStart().StartsWith('[')))
         {
             JsonDocument document;
             try { document = JsonDocument.Parse(json, new JsonDocumentOptions { MaxDepth = 16 }); }
             catch (JsonException)
             {
-                if (segments.Length != 0) throw new InvalidOperationException("The returned text is not supported JSON.");
-                return Truncate(json);
+                if (segments.Length != 0) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S9262D17647A44692")), global::XASlave.Localization.UiMessage.Key("S9262D17647A44692"));
+                return global::XASlave.Localization.UiMessage.Raw(Truncate(json));
             }
             using (document) return Project(document.RootElement, segments);
         }
         return Project(value, segments);
     }
 
-    private static string Project(object? value, string[] segments)
+    private static global::XASlave.Localization.UiMessage Project(object? value, string[] segments)
     {
         foreach (var segment in segments) value = Select(value, segment);
-        var result = new StringBuilder();
+        var result = new ProjectionOutput();
         Append(result, value, 0, new HashSet<object>(ReferenceEqualityComparer.Instance));
-        return result.ToString();
+        return result.Message;
     }
 
     private static object? Select(object? value, string segment)
     {
-        if (value is null) throw new InvalidOperationException("The selected path passes through null.");
+        if (value is null) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SDD055D7284EB3A9E")), global::XASlave.Localization.UiMessage.Key("SDD055D7284EB3A9E"));
         if (value is JsonElement json)
         {
             if (json.ValueKind == JsonValueKind.Object && json.TryGetProperty(segment, out var property)) return property;
             if (json.ValueKind == JsonValueKind.Array && TryIndex(segment, json.GetArrayLength(), out var jsonIndex)) return json[jsonIndex];
-            throw new InvalidOperationException("The selected JSON field or index is unavailable.");
+            throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SBD2AD79719410542")), global::XASlave.Localization.UiMessage.Key("SBD2AD79719410542"));
         }
         if (value is Array array && array.Rank == 1 && array.GetLowerBound(0) == 0 && TryIndex(segment, array.Length, out var arrayIndex))
             return array.GetValue(arrayIndex);
@@ -70,11 +71,11 @@ internal static class PluginBuilderValueProjection
                 if (count++ >= MaxDictionarySearch) break;
                 if (Scalar(entry.Key) is { } key && string.Equals(key, segment, StringComparison.Ordinal)) return entry.Value;
             }
-            throw new InvalidOperationException("The dictionary key was not found within the first 256 entries.");
+            throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SC27D537B2F7500D6")), global::XASlave.Localization.UiMessage.Key("SC27D537B2F7500D6"));
         }
         var field = ReadableFields(type).FirstOrDefault(f => f.Name == segment);
         if (field.Field != null) return field.Field.GetValue(value);
-        throw new InvalidOperationException("The selected public field or automatic property is unavailable.");
+        throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S3B225C53659B9D57")), global::XASlave.Localization.UiMessage.Key("S3B225C53659B9D57"));
     }
 
     private static bool TryIndex(string value, int count, out int index)
@@ -108,7 +109,7 @@ internal static class PluginBuilderValueProjection
         _ => null,
     };
 
-    private static void Append(StringBuilder output, object? value, int depth, HashSet<object> seen)
+    private static void Append(ProjectionOutput output, object? value, int depth, HashSet<object> seen)
     {
         if (output.Length >= MaxText) return;
         if (Scalar(value) is { } scalar) { Write(output, scalar); return; }
@@ -116,14 +117,14 @@ internal static class PluginBuilderValueProjection
         if (value == null) return;
         var type = value.GetType();
         if (depth >= MaxDepth) { Write(output, "<" + type.Name + ">"); return; }
-        if (!type.IsValueType && !seen.Add(value)) { Write(output, "<already shown>"); return; }
+        if (!type.IsValueType && !seen.Add(value)) { Write(output, global::XASlave.Localization.UiMessage.Key("SDA1C655DAF1F74FF")); return; }
         if (value is Array array && array.Rank == 1 && array.GetLowerBound(0) == 0)
         {
             for (var i = 0; i < Math.Min(array.Length, MaxEntries) && output.Length < MaxText; i++)
             {
                 Entry(output, i.ToString(CultureInfo.InvariantCulture), array.GetValue(i), depth, seen);
             }
-            if (array.Length > MaxEntries) Write(output, "\n… more entries");
+            if (array.Length > MaxEntries) Write(output, global::XASlave.Localization.UiMessage.Key("S1F3B5F0B42A18F88"));
             if (array.Length == 0) Write(output, "[]");
             return;
         }
@@ -131,7 +132,7 @@ internal static class PluginBuilderValueProjection
         {
             for (var i = 0; i < Math.Min(list.Count, MaxEntries) && output.Length < MaxText; i++)
                 Entry(output, i.ToString(CultureInfo.InvariantCulture), list[i], depth, seen);
-            if (list.Count > MaxEntries) Write(output, "\n… more entries");
+            if (list.Count > MaxEntries) Write(output, global::XASlave.Localization.UiMessage.Key("S1F3B5F0B42A18F88"));
             if (list.Count == 0) Write(output, "[]");
             return;
         }
@@ -141,9 +142,9 @@ internal static class PluginBuilderValueProjection
             foreach (DictionaryEntry entry in dictionary)
             {
                 if (count++ >= MaxEntries || output.Length >= MaxText) break;
-                Entry(output, Scalar(entry.Key) ?? "<key>", entry.Value, depth, seen);
+                EntryMessage(output, Scalar(entry.Key) is { } entryKey ? global::XASlave.Localization.UiMessage.Raw(entryKey) : global::XASlave.Localization.UiMessage.Key("S8ADBD890B68A0061"), entry.Value, depth, seen);
             }
-            if (dictionary.Count > MaxEntries) Write(output, "\n… more entries");
+            if (dictionary.Count > MaxEntries) Write(output, global::XASlave.Localization.UiMessage.Key("S1F3B5F0B42A18F88"));
             if (dictionary.Count == 0) Write(output, "{}");
             return;
         }
@@ -153,8 +154,8 @@ internal static class PluginBuilderValueProjection
             if (output.Length >= MaxText) break;
             Entry(output, field.Name, field.Field.GetValue(value), depth, seen);
         }
-        if (fields.Length > MaxEntries) Write(output, "\n… more fields");
-        if (fields.Length == 0) Write(output, "<" + type.Name + ": select a readable field>");
+        if (fields.Length > MaxEntries) Write(output, global::XASlave.Localization.UiMessage.Key("SE6C4B2AB03DE6B1B"));
+        if (fields.Length == 0) Write(output, global::XASlave.Localization.UiMessage.Format("S558D34FFD9869B9F" , type.Name));
     }
 
     private static IEnumerable<(string Name, FieldInfo Field)> ReadableFields(Type type)
@@ -178,7 +179,7 @@ internal static class PluginBuilderValueProjection
         }
     }
 
-    private static void AppendJson(StringBuilder output, JsonElement json, int depth, HashSet<object> seen)
+    private static void AppendJson(ProjectionOutput output, JsonElement json, int depth, HashSet<object> seen)
     {
         if (json.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
         {
@@ -201,26 +202,43 @@ internal static class PluginBuilderValueProjection
                 }
                 if (json.GetArrayLength() > MaxEntries) count = MaxEntries + 1;
             }
-            if (count > MaxEntries) Write(output, "\n… more entries");
+            if (count > MaxEntries) Write(output, global::XASlave.Localization.UiMessage.Key("S1F3B5F0B42A18F88"));
             if (count == 0) Write(output, json.ValueKind == JsonValueKind.Object ? "{}" : "[]");
         }
         else Write(output, json.ValueKind == JsonValueKind.String ? json.GetString() ?? "null" : json.GetRawText());
     }
 
-    private static void Entry(StringBuilder output, string name, object? value, int depth, HashSet<object> seen)
+    private static void Entry(ProjectionOutput output, string name, object? value, int depth, HashSet<object> seen)
+        => EntryMessage(output, global::XASlave.Localization.UiMessage.Raw(name), value, depth, seen);
+
+    private static void EntryMessage(ProjectionOutput output, global::XASlave.Localization.UiMessage name, object? value, int depth, HashSet<object> seen)
     {
         if (output.Length > 0) Write(output, "\n");
-        Write(output, new string(' ', depth * 2) + name + ": ");
+        Write(output, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Raw(new string(' ', depth * 2)), name, global::XASlave.Localization.UiMessage.Raw(": ")));
         Append(output, value, depth + 1, seen);
     }
 
     private static string Truncate(string text) => text.Length <= MaxText ? text : text[..(MaxText - 1)] + "…";
 
-    private static void Write(StringBuilder output, string text)
+    // Only captured text is retained. Drawing never reflects provider objects again.
+    private sealed class ProjectionOutput
+    {
+        private readonly List<global::XASlave.Localization.UiMessage> pieces = new();
+        internal int Length { get; private set; }
+        internal global::XASlave.Localization.UiMessage Message => global::XASlave.Localization.UiMessage.Truncate(global::XASlave.Localization.UiMessage.Concat(pieces.ToArray()), MaxText, ellipsis: true);
+        internal void Add(global::XASlave.Localization.UiMessage text)
+        {
+            pieces.Add(text);
+            Length += text.Original.Length;
+        }
+    }
+
+    private static void Write(ProjectionOutput output, string text) => Write(output, global::XASlave.Localization.UiMessage.Raw(text));
+
+    private static void Write(ProjectionOutput output, global::XASlave.Localization.UiMessage text)
     {
         var remaining = MaxText - output.Length;
         if (remaining <= 0) return;
-        if (text.Length <= remaining) output.Append(text);
-        else { output.Append(text.AsSpan(0, remaining - 1)); output.Append('…'); }
+        output.Add(global::XASlave.Localization.UiMessage.Truncate(text, remaining, ellipsis: true));
     }
 }

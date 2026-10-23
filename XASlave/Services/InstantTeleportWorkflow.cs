@@ -1,6 +1,7 @@
 using System;
 using System.Buffers.Binary;
 using System.Numerics;
+using XASlave.Localization;
 
 namespace XASlave.Services;
 
@@ -111,12 +112,16 @@ internal sealed class InstantTeleportWorkflow(IInstantTeleportRuntime runtime, i
         public readonly long Deadline = now + TimeoutMs;
         public bool Dispatched;
         public string? Failure;
+        public UiMessage? FailureMessage;
     }
 
     private Transaction? active;
     public bool SoloOnly { get; set; } = true;
     public bool Active => active != null;
-    public string Status { get; private set; } = "Ready; waiting for a recent position update.";
+    private UiMessage? statusMessage = UiMessage.Key("S48D5CE005BEC6EA8");
+    public string Status { get; private set; } = UiLocale.Native("S48D5CE005BEC6EA8");
+    internal UiMessage StatusMessage => statusMessage ?? UiMessage.Raw(Status);
+    public string StatusDisplay => UiMessage.Resolve(statusMessage, Status);
     public int Requests { get; private set; }
     public int Dispatched { get; private set; }
     public int TransportsObserved { get; private set; }
@@ -129,30 +134,36 @@ internal sealed class InstantTeleportWorkflow(IInstantTeleportRuntime runtime, i
     private static bool Fresh(long at, long now, int maxAge) => now >= at && now - at <= maxAge;
 
     public string? GetStartBlockReason(TeleportFrame frame, TeleportSample? sample, long now)
+        => GetStartBlockMessage(frame, sample, now)?.Original;
+
+    internal UiMessage? GetStartBlockMessage(TeleportFrame frame, TeleportSample? sample, long now)
     {
-        if (!frame.Owner.Valid || frame.EntityId is 0 or 0xE0000000) return "No current player/area connection.";
-        if (!frame.Usable) return "Player state prevents bypass (mount, movement, combat, duty or Invulnerable Mode).";
-        if (!frame.CanStart) return "Player is busy or already casting.";
-        if (SoloOnly && !frame.Solo) return "Only when alone is enabled: party membership or a player inside the safe distance.";
-        if (!Fresh(frame.At, now, FrameMaxAgeMs)) return "Waiting for a current game frame.";
-        if (!TeleportPositionPacket.Finite(frame.Position) || !float.IsFinite(frame.Rotation)) return "Invalid current player coordinates.";
+        if (!frame.Owner.Valid || frame.EntityId is 0 or 0xE0000000) return UiMessage.Key("SFFBE4947BF60CA65");
+        if (!frame.Usable) return UiMessage.Key("S3BBA2A350C8FA042");
+        if (!frame.CanStart) return UiMessage.Key("S501EFD8CF6686632");
+        if (SoloOnly && !frame.Solo) return UiMessage.Key("SA5C7F8499822934D");
+        if (!Fresh(frame.At, now, FrameMaxAgeMs)) return UiMessage.Key("SFD32F0E8224F2D5F");
+        if (!TeleportPositionPacket.Finite(frame.Position) || !float.IsFinite(frame.Rotation)) return UiMessage.Key("S4F9CB353002DB8A8");
         if (frame.MovementVariant is <= 3) return null;
-        return GetSampleBlockReason(frame, sample, now);
+        return GetSampleBlockMessage(frame, sample, now);
     }
 
     private string? GetSampleBlockReason(TeleportFrame frame, TeleportSample? sample, long now)
+        => GetSampleBlockMessage(frame, sample, now)?.Original;
+
+    private UiMessage? GetSampleBlockMessage(TeleportFrame frame, TeleportSample? sample, long now)
     {
-        if (sample == null) return "Current movement state unavailable; move once for a position sample.";
-        if (sample.Owner != frame.Owner) return "Position sample belongs to another area or connection.";
-        if (!TeleportPositionPacket.Valid(sample.Bytes, opcode)) return "Position packet layout did not validate.";
-        if (!TeleportPositionPacket.Grounded(sample.Bytes)) return "Last position update was not grounded movement.";
+        if (sample == null) return UiMessage.Key("S3DA79791A46D7068");
+        if (sample.Owner != frame.Owner) return UiMessage.Key("S0E689F23D4B05298");
+        if (!TeleportPositionPacket.Valid(sample.Bytes, opcode)) return UiMessage.Key("S4DFF89E59E094DDB");
+        if (!TeleportPositionPacket.Grounded(sample.Bytes)) return UiMessage.Key("SC53EF8410E234B03");
         if (frame.MovementVariant is <= 3 && (BinaryPrimitives.ReadUInt32LittleEndian(sample.Bytes.AsSpan(36)) >> 16) != frame.MovementVariant)
-            return "Movement variant changed since the last position sample.";
+            return UiMessage.Key("S9ED0A10162CCA8A0");
         var distanceSquared = Vector3.DistanceSquared(TeleportPositionPacket.Position(sample.Bytes), frame.Position);
         // A stationary player does not emit periodic position updates. An unchanged position remains current.
         if (sample.At > now || (!Fresh(sample.At, now, SampleMaxAgeMs) && distanceSquared > 0.0025f))
-            return "Player moved since the last position update; waiting for a new sample.";
-        if (distanceSquared > 9) return "Position sample is too far from the current player.";
+            return UiMessage.Key("S396FD9B8AB16B484");
+        if (distanceSquared > 9) return UiMessage.Key("S68E0FDD6191E447B");
         return null;
     }
 
@@ -162,12 +173,12 @@ internal sealed class InstantTeleportWorkflow(IInstantTeleportRuntime runtime, i
         if (active != null)
         {
             if (CanSuppress(frame, now)) return true; // Preserve the pending destination.
-            Abort("Previous teleport stopped before a new request.", frame, now, true);
+            Abort(UiMessage.Key("SF8F1CCBD08BA549A"), frame, now, true);
             return false;
         }
-        if (GetStartBlockReason(frame, sample, now) is { } reason)
+        if (GetStartBlockMessage(frame, sample, now) is { } reason)
         {
-            Status = $"Normal teleport: {reason}";
+            Status = UiMessage.Store(ref statusMessage, UiMessage.Format("S4E46DFC0288E9630", reason));
             return false;
         }
 
@@ -181,7 +192,7 @@ internal sealed class InstantTeleportWorkflow(IInstantTeleportRuntime runtime, i
         var transaction = new Transaction(frame, command, sample!, now);
         active = transaction;
         Requests++;
-        Status = "Preparing instant teleport.";
+        Status = UiMessage.Store(ref statusMessage, UiMessage.Key("S39738B7B1E79848D"));
         try
         {
             var bytes = TeleportPositionPacket.Rewrite(sample!.Bytes, opcode, frame.Position - new Vector3(0, 100, 0), frame.Rotation);
@@ -192,7 +203,7 @@ internal sealed class InstantTeleportWorkflow(IInstantTeleportRuntime runtime, i
         }
         catch { /* Fall through to bounded cleanup and ordinary teleport. */ }
         if (active != transaction) return true;
-        Abort("Position send failed; using normal teleport.", frame, now, true);
+        Abort(UiMessage.Key("SFE0D2019DF9E8F61"), frame, now, true);
         return false;
     }
 
@@ -209,7 +220,7 @@ internal sealed class InstantTeleportWorkflow(IInstantTeleportRuntime runtime, i
         // Explicit Testbench cancellation uses Abort and the original command function, bypassing this gate.
         if (!CanSuppress(frame, now))
         {
-            if (active != null) Abort("Teleport cancelled after bypass state expired.", frame, now, true, cancelNative: false);
+            if (active != null) Abort(UiMessage.Key("SEEDF22045E7987E8"), frame, now, true, cancelNative: false);
             return false;
         }
         NativeCancelsSuppressed++;
@@ -222,25 +233,25 @@ internal sealed class InstantTeleportWorkflow(IInstantTeleportRuntime runtime, i
         if (transaction == null) return;
         if (!CanSuppress(frame, now))
         {
-            Abort(transaction.Failure ?? (now >= transaction.Deadline ? "Teleport timed out." : "Teleport stopped: player or area state changed."), frame, now, true);
+            Abort(transaction.Failure != null ? transaction.FailureMessage ?? UiMessage.Raw(transaction.Failure) : (now >= transaction.Deadline ? UiMessage.Key("SB84172BD08C78478") : UiMessage.Key("S3A8DC620A94C4712")), frame, now, true);
             return;
         }
         if (transaction.Dispatched || now < transaction.Due) return;
         transaction.Dispatched = true;
         Dispatched++;
-        Status = "Teleport requested; waiting for area transport.";
+        Status = UiMessage.Store(ref statusMessage, UiMessage.Key("S11E32605FFD8D156"));
         try
         {
             var sent = runtime.Execute(transaction.Command);
             if (active != transaction) return;
             if (transaction.Failure != null)
             {
-                Abort(transaction.Failure, frame, now, true);
+                Abort(transaction.FailureMessage ?? UiMessage.Raw(transaction.Failure), frame, now, true);
                 return;
             }
             if (!sent)
             {
-                Abort("Teleport command failed.", frame, now, true);
+                Abort(UiMessage.Key("S0C168ED63AB1546F"), frame, now, true);
                 return;
             }
             runtime.TriggerTeleport(frame.EntityId);
@@ -249,7 +260,7 @@ internal sealed class InstantTeleportWorkflow(IInstantTeleportRuntime runtime, i
         }
         catch
         {
-            if (active == transaction) Abort("Teleport dispatch failed.", frame, now, true);
+            if (active == transaction) Abort(UiMessage.Key("SFF19F009D1B512C4"), frame, now, true);
         }
     }
 
@@ -258,34 +269,37 @@ internal sealed class InstantTeleportWorkflow(IInstantTeleportRuntime runtime, i
         if (active == null) return;
         active = null;
         TransportsObserved++;
-        Status = "Area transport observed; suppression released.";
+        Status = UiMessage.Store(ref statusMessage, UiMessage.Key("S53D120C68025B860"));
     }
 
     public void NotifyFailure(uint logId)
     {
-        if (active != null && IsFailureLog(logId)) active.Failure = $"Teleport failed (game message {logId}).";
+        if (active != null && IsFailureLog(logId)) active.Failure = UiMessage.Store(ref active.FailureMessage, UiMessage.Format("SC593B470059B9D61", logId));
     }
 
     public void Abort(string reason, TeleportFrame frame, long now, bool failure, bool cancelNative = true)
+        => Abort(UiMessage.Raw(reason), frame, now, failure, cancelNative);
+
+    internal void Abort(UiMessage reason, TeleportFrame frame, long now, bool failure, bool cancelNative = true)
     {
         var transaction = active;
         active = null; // Invalidate deferred work before calling any reentrant native function.
         if (transaction == null) return;
-        Status = reason;
+        Status = UiMessage.Store(ref statusMessage, reason);
         if (failure) Failures++;
         if (!frame.Owner.Valid || frame.Owner != transaction.Start.Owner || !frame.CanRestore ||
             !Fresh(frame.At, now, FrameMaxAgeMs)) return;
         if (cancelNative && transaction.Dispatched)
         {
             try { runtime.Execute(new TeleportCommand(204, 0, 0, 0, 0)); }
-            catch { Status += " Native cancellation failed."; }
+            catch { Status = UiMessage.Store(ref statusMessage, UiMessage.Format("S167D3A38EEA08664", StatusMessage)); }
         }
         try
         {
             var sample = transaction.Sample;
             var bytes = TeleportPositionPacket.Rewrite(sample.Bytes, opcode, frame.Position, frame.Rotation);
-            if (!runtime.SendPosition(frame.Owner, bytes, sample.A3, sample.A4)) Status += " Position restore was not accepted.";
+            if (!runtime.SendPosition(frame.Owner, bytes, sample.A3, sample.A4)) Status = UiMessage.Store(ref statusMessage, UiMessage.Format("SB8D39BBD97628E01", StatusMessage));
         }
-        catch { Status += " Position restore failed."; }
+        catch { Status = UiMessage.Store(ref statusMessage, UiMessage.Format("S94B1695F35C40850", StatusMessage)); }
     }
 }

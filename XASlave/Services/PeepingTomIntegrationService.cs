@@ -32,7 +32,10 @@ public sealed class PeepingTomIntegrationService : IDisposable
 
     public bool IsForceEnabled => forceEnabled;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool SetForceEnabled(bool value)
     {
@@ -46,7 +49,7 @@ public sealed class PeepingTomIntegrationService : IDisposable
     {
         forceEnabled = false;
         UpdateSubscriptions();
-        StatusText = "Disabled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
     }
 
     private void UpdateSubscriptions()
@@ -80,20 +83,18 @@ public sealed class PeepingTomIntegrationService : IDisposable
     {
         if (!forceEnabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (!TryGetPeepingTomInstance(out var pluginInstance) || pluginInstance == null)
         {
-            StatusText = "Enabled - waiting for Peeping Tom to load.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S39C43C76B87678E8"));
             return;
         }
 
         ForcePvpGateOff(pluginInstance);
-        StatusText = ReadConfigBool(pluginInstance, "KeepHistory")
-            ? "Enabled - Peeping Tom PvP tracking is forced on."
-            : "Enabled - Peeping Tom PvP tracking is forced on. Peeping Tom history is disabled in its own config.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (ReadConfigBool(pluginInstance, "KeepHistory") ? global::XASlave.Localization.UiMessage.Key("S2108E48FE47DA561") : global::XASlave.Localization.UiMessage.Key("SD9073CA04EB88128")));
     }
 
     private static bool ReadConfigBool(object pluginInstance, string propertyName)

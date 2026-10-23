@@ -72,7 +72,7 @@ public sealed class EurekaLogogramCreatorFavoritesOverlayWindow : Window
             for (var i = rowStart; i < rowEndExclusive; i++)
             {
                 var plate = plugin.Configuration.FavoritePlates[i];
-                var label = plugin.EurekaLogogramCreator.DescribeFavoritePlateCompact(plate);
+                var label = plugin.EurekaLogogramCreator.DescribeFavoritePlateCompactMessage(plate).Display;
 
                 if (i > rowStart)
                 {
@@ -117,7 +117,7 @@ public sealed class EurekaLogogramCreatorFavoritesOverlayWindow : Window
 
                 if (ImGui.IsItemHovered())
                 {
-                    ImGui.SetTooltip(string.Join(" / ", plugin.EurekaLogogramCreator.GetFavoritePlateActionNames(plate)));
+                    ImGui.SetTooltip(global::XASlave.Localization.UiMessage.Join(" / ", plugin.EurekaLogogramCreator.GetFavoritePlateActionNamesMessage(plate)).Display);
                 }
             }
         }

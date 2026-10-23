@@ -41,7 +41,10 @@ internal sealed class PluginBuilderService : IDisposable
     private DateTime nextIdentityCheck;
     public event Action? WindowsChanged;
     internal IReadOnlyList<string> PluginNames { get; private set; } = Array.Empty<string>();
-    internal string Status { get; private set; } = "Select a loaded plugin and scan its available sources.";
+    private global::XASlave.Localization.UiMessage? statusMessage = global::XASlave.Localization.UiMessage.Key("S379ACB78A66CA5E0");
+    internal string Status { get; private set; } = global::XASlave.Localization.UiLocale.Native("S379ACB78A66CA5E0");
+    internal string LocalizedStatus => global::XASlave.Localization.UiMessage.Resolve(statusMessage, Status);
+    internal global::XASlave.Localization.UiMessage StatusMessage => global::XASlave.Localization.UiMessage.Capture(statusMessage, Status);
     internal bool IsScanning => scanTask != null || pendingScan != null;
     internal PluginBuilderCatalog? Catalog { get; private set; }
     internal List<PluginBuilderWindowDefinition> Windows => plugin.Configuration.PluginBuilderWindows;
@@ -77,23 +80,23 @@ internal sealed class PluginBuilderService : IDisposable
                 .Select(item => item.InternalName).Append("XASlave").Distinct(StringComparer.Ordinal)
                 .OrderBy(name => name, StringComparer.Ordinal).Take(1024).ToArray();
         }
-        catch { PluginNames = Array.Empty<string>(); Status = "Loaded plugin list unavailable."; }
+        catch { PluginNames = Array.Empty<string>(); Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SB785D4945AE5F2A6")); }
     }
 
     internal void Scan(string pluginName)
     {
         if (disposed || IsScanning || string.IsNullOrWhiteSpace(pluginName)) return;
         pendingScan = Bound(pluginName, 256);
-        Status = "Scan queued.";
+        Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S0B47813F815EE3A6"));
     }
 
     private void StartScanNow(string pluginName)
     {
         try
         {
-            if (!PluginNames.Contains(pluginName, StringComparer.Ordinal)) throw new InvalidOperationException("Refresh the loaded plugin list.");
+            if (!PluginNames.Contains(pluginName, StringComparer.Ordinal)) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S9F51C235ADAB652F")), global::XASlave.Localization.UiMessage.Key("S9F51C235ADAB652F"));
             var instance = PluginBuilderBindingRules.ResolveLoadedPlugin(plugin, pluginName)
-                ?? throw new InvalidOperationException("The selected plugin is unavailable.");
+                ?? throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S6296D7786871A6C6")), global::XASlave.Localization.UiMessage.Key("S6296D7786871A6C6"));
             var weak = new WeakReference<object>(instance);
             var assembly = instance.GetType().Assembly;
             var rootType = instance.GetType();
@@ -107,9 +110,9 @@ internal sealed class PluginBuilderService : IDisposable
             scanTask = Task.Run(() => BuildCatalog(pluginName, moduleId, rootType, weak, commands, expectedGeneration, token), token);
             _ = scanTask.ContinueWith(task => { _ = task.Exception; }, CancellationToken.None,
                 TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously, TaskScheduler.Default);
-            Status = "Scanning IPC, commands and reflection metadata...";
+            Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S52322879BA2DAAD1"));
         }
-        catch (Exception error) { Status = "Scan unavailable: " + error.GetType().Name; }
+        catch (Exception error) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("SD20930363DA9A400" , error.GetType().Name)); }
     }
 
     internal PluginBuilderWindowDefinition? CreateWindow(string title)
@@ -187,7 +190,7 @@ internal sealed class PluginBuilderService : IDisposable
         => selectedPages.TryGetValue(window.Id, out var selectedPage) && selectedPage == control.PageId;
 
     internal PluginBuilderSample GetSample(Guid windowId, Guid controlId)
-        => samples.TryGetValue((windowId, controlId), out var sample) ? sample : new("Not read", string.Empty, null);
+        => samples.TryGetValue((windowId, controlId), out var sample) ? sample : CreateSample(global::XASlave.Localization.UiMessage.Key("S63977A321B390170"), global::XASlave.Localization.UiMessage.Raw(string.Empty), null);
     internal void QueueRead(Guid windowId, Guid controlId) => Queue(windowId, controlId, action: false);
     internal void QueueAction(Guid windowId, Guid controlId) => Queue(windowId, controlId, action: true);
 
@@ -199,7 +202,7 @@ internal sealed class PluginBuilderService : IDisposable
         if (window == null || control == null) return;
         if (requests.Any(item => item.WindowId == windowId && item.ControlId == controlId)) return;
         requests.Enqueue(new(windowId, controlId, action, CopyControl(control), Volatile.Read(ref generation), lastContentId, manual));
-        if (manual) samples[(windowId, controlId)] = new("Queued", string.Empty, null);
+        if (manual) samples[(windowId, controlId)] = CreateSample(global::XASlave.Localization.UiMessage.Key("S661FF40A07E037BB"), global::XASlave.Localization.UiMessage.Raw(string.Empty), null);
     }
 
     private void OnPluginsChanged(IActivePluginsChangedEventArgs _)
@@ -238,7 +241,7 @@ internal sealed class PluginBuilderService : IDisposable
             // One target call per frame. A synchronous target cannot be interrupted; slow/error controls stop polling.
             if (requests.Count > 0 && Volatile.Read(ref invalidated) == 0) Execute(requests.Dequeue());
         }
-        catch (Exception error) { Status = "Builder update unavailable: " + error.GetType().Name; }
+        catch (Exception error) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S9FD0402498245C6E" , error.GetType().Name)); }
     }
 
     private void PublishScan()
@@ -247,10 +250,10 @@ internal sealed class PluginBuilderService : IDisposable
         scanTask = null;
         var canceled = scanCancellation?.IsCancellationRequested == true;
         scanCancellation?.Dispose(); scanCancellation = null;
-        if (canceled || task.IsCanceled || scanGeneration != Volatile.Read(ref generation)) { Status = "Scan canceled by a lifecycle change."; return; }
-        if (task.IsFaulted) { Status = "Scan failed: " + task.Exception?.GetBaseException().GetType().Name; return; }
+        if (canceled || task.IsCanceled || scanGeneration != Volatile.Read(ref generation)) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("SC9B50B925F98B050")); return; }
+        if (task.IsFaulted) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("SCABF54762A15A5ED" , task.Exception?.GetBaseException().GetType().Name)); return; }
         var result = task.Result;
-        if (!IsCurrent(result)) { Status = "Selected plugin changed during scan. Scan again."; return; }
+        if (!IsCurrent(result)) { Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S0228552E63995F48")); return; }
         // A rescan must not retarget an already queued action to newly captured providers.
         var keep = requests.Where(request => request.Definition.Source.PluginName != result.Public.PluginName).ToArray();
         requests.Clear(); foreach (var request in keep) requests.Enqueue(request);
@@ -262,7 +265,7 @@ internal sealed class PluginBuilderService : IDisposable
                 var key = (window.Id, control.Id);
                 samples.Remove(key); suspended.Remove(key); nextReads.Remove(key);
             }
-        Status = $"Scanned {Catalog.PluginName}: {Catalog.Sources.Count} sources{(result.Partial ? " (partial scan)" : string.Empty)}. Select each control explicitly; functions are not assumed read-only.";
+        Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S9E7DB682B4284CF4" , Catalog.PluginName, Catalog.Sources.Count, ((result.Partial ? global::XASlave.Localization.UiMessage.Key("S072CDE4712FB3D9E") : global::XASlave.Localization.UiMessage.Raw(string.Empty)))));
     }
 
     private bool IsCurrent(LoadedCatalog catalog)
@@ -290,11 +293,11 @@ internal sealed class PluginBuilderService : IDisposable
         var controlKeys = Windows.Take(MaxWindows).SelectMany(window => window.Controls.Take(MaxControls)
             .Where(control => control.Source.PluginName == pluginName).Select(control => (window.Id, control.Id))).ToHashSet();
         foreach (var key in samples.Keys.Where(key => controlKeys.Contains(key)).ToArray())
-            samples[key] = new("Plugin unavailable", "Scan again to bind the current instance.", DateTime.UtcNow);
+            samples[key] = CreateSample(global::XASlave.Localization.UiMessage.Key("S0F3F35C866DCF3EB"), global::XASlave.Localization.UiMessage.Key("S38CDA2DE51E9DE62"), DateTime.UtcNow);
         foreach (var key in nextReads.Keys.Where(key => controlKeys.Contains(key)).ToArray()) nextReads.Remove(key);
         var keep = requests.Where(request => request.Definition.Source.PluginName != pluginName).ToArray();
         requests.Clear(); foreach (var request in keep) requests.Enqueue(request);
-        Status = pluginName + " changed or unloaded. Scan it again before using saved controls.";
+        Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S832A930A538DB74B" , pluginName));
         RefreshPlugins();
     }
 
@@ -325,28 +328,28 @@ internal sealed class PluginBuilderService : IDisposable
         var deferred = false;
         try
         {
-            if (request.Generation != Volatile.Read(ref generation)) throw new InvalidOperationException("Plugin lifecycle changed.");
-            if (CurrentContentId() != request.ContentId) throw new InvalidOperationException("Character changed after this request was queued.");
-            var window = Windows.FirstOrDefault(item => item.Id == request.WindowId) ?? throw new InvalidOperationException("Window was removed.");
-            var current = window.Controls.FirstOrDefault(item => item.Id == request.ControlId) ?? throw new InvalidOperationException("Control was removed.");
+            if (request.Generation != Volatile.Read(ref generation)) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S85DAC3C47E881E4F")), global::XASlave.Localization.UiMessage.Key("S85DAC3C47E881E4F"));
+            if (CurrentContentId() != request.ContentId) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S0E7256578DCDE925")), global::XASlave.Localization.UiMessage.Key("S0E7256578DCDE925"));
+            var window = Windows.FirstOrDefault(item => item.Id == request.WindowId) ?? throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S2C5AE62685F06A7A")), global::XASlave.Localization.UiMessage.Key("S2C5AE62685F06A7A"));
+            var current = window.Controls.FirstOrDefault(item => item.Id == request.ControlId) ?? throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S111606D2E799B48A")), global::XASlave.Localization.UiMessage.Key("S111606D2E799B48A"));
             var control = request.Definition;
-            if (!ControlMatches(current, control)) throw new InvalidOperationException("Control changed after it was queued.");
+            if (!ControlMatches(current, control)) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SFE07EC149DB627C9")), global::XASlave.Localization.UiMessage.Key("SFE07EC149DB627C9"));
             if (!request.Manual && !IsSelectedPage(window, current)) return;
             if (!IsAvailable(control.Source) || !catalogs.TryGetValue(control.Source.PluginName, out var catalog) || !IsCurrent(catalog))
             {
                 // A host event can arrive after dequeue. Retain unaffected work until its instance has been reconciled.
                 if (Volatile.Read(ref invalidated) != 0) { deferred = true; requests.Enqueue(request); return; }
-                throw new InvalidOperationException("Scan this plugin again before using saved controls.");
+                throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SA08BF060655D02B0")), global::XASlave.Localization.UiMessage.Key("SA08BF060655D02B0"));
             }
             if (!catalog.Bindings.TryGetValue(control.Source.Id, out var binding) || !PluginBuilderBindingRules.Matches(control.Source, binding.Source))
-                throw new InvalidOperationException("Source no longer matches its scanned contract.");
+                throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S059F56C764D2F8CE")), global::XASlave.Localization.UiMessage.Key("S059F56C764D2F8CE"));
             if (request.Action ? !binding.Source.CanExecute : !binding.Source.CanRead)
-                throw new InvalidOperationException(binding.Source.UnsupportedReason.Length > 0 ? binding.Source.UnsupportedReason : "Unsupported operation.");
+                throw global::XASlave.Localization.UiMessage.CreateException((binding.Source.UnsupportedReason.Length > 0 ? binding.Source.UnsupportedPresentation : global::XASlave.Localization.UiMessage.Key("SFC3D545602C2F5A1")), originalMessageText => new InvalidOperationException(originalMessageText));
             if (binding.Source.RequiresReflectionConfirmation && !control.ReflectionReadConfirmed)
-                throw new InvalidOperationException("Explicit reflection confirmation is required for this selected source.");
-            if (control.Arguments.Count != binding.Parameters.Length) throw new InvalidOperationException("Argument count does not match the source.");
+                throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S98F34556E74F4426")), global::XASlave.Localization.UiMessage.Key("S98F34556E74F4426"));
+            if (control.Arguments.Count != binding.Parameters.Length) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S04320C890A1C6CBA")), global::XASlave.Localization.UiMessage.Key("S04320C890A1C6CBA"));
             var arguments = control.Arguments.Select((argument, index) => PluginBuilderBindingRules.ParseArgument(argument, binding.Parameters[index])).ToArray();
-            if (!catalog.Instance.TryGetTarget(out var instance)) throw new InvalidOperationException("Plugin instance unavailable.");
+            if (!catalog.Instance.TryGetTarget(out var instance)) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S21CE3F15BD8D18F7")), global::XASlave.Localization.UiMessage.Key("S21CE3F15BD8D18F7"));
             object? value;
             switch (binding.Source.Kind)
             {
@@ -355,34 +358,33 @@ internal sealed class PluginBuilderService : IDisposable
                     value = InvokeIpc(binding, arguments, instance.GetType().Assembly);
                     break;
                 case PluginBuilderSourceKind.Command:
-                    if (!request.Action || arguments.Length != 1) throw new InvalidOperationException("Commands require an explicit action.");
+                    if (!request.Action || arguments.Length != 1) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SE80C3D59F55D3D0E")), global::XASlave.Localization.UiMessage.Key("SE80C3D59F55D3D0E"));
                     if (!Plugin.CommandManager.Commands.TryGetValue(binding.Source.Channel, out var command)
                         || command.Handler.Method != binding.ProviderMethod || binding.ProviderIdentity == null
                         || !binding.ProviderIdentity.TryGetTarget(out var scannedCommand) || !ReferenceEquals(command.Handler, scannedCommand))
-                        throw new InvalidOperationException("Command registration changed.");
+                        throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S50FE00AC0A29B58A")), global::XASlave.Localization.UiMessage.Key("S50FE00AC0A29B58A"));
                     var commandArguments = (string?)arguments[0] ?? string.Empty;
-                    if (commandArguments.Any(character => character is '\r' or '\n' or '\0')) throw new InvalidOperationException("Command arguments must be one line.");
+                    if (commandArguments.Any(character => character is '\r' or '\n' or '\0')) throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S6EEF98921B331BA8")), global::XASlave.Localization.UiMessage.Key("S6EEF98921B331BA8"));
                     value = Plugin.CommandManager.ProcessCommand(binding.Source.Channel + (commandArguments.Length > 0 ? " " + commandArguments : string.Empty));
                     break;
                 default:
                     object? target = instance;
                     foreach (var field in binding.OwnerPath)
                     {
-                        target = field.GetValue(field.IsStatic ? null : target ?? throw new InvalidOperationException("A selected owner field is null."));
+                        target = field.GetValue(field.IsStatic ? null : target ?? throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SA5FC215E869B1BA3")), global::XASlave.Localization.UiMessage.Key("SA5FC215E869B1BA3")));
                     }
                     value = binding.Member switch
                     {
                         FieldInfo field => field.GetValue(field.IsStatic ? null : target),
                         PropertyInfo property => property.GetValue(property.GetMethod!.IsStatic ? null : target),
                         MethodInfo method => method.Invoke(method.IsStatic ? null : target, arguments),
-                        _ => throw new InvalidOperationException("Unsupported reflection member."),
+                        _ => throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S7DABF432715B3476")), global::XASlave.Localization.UiMessage.Key("S7DABF432715B3476")),
                     };
                     break;
             }
             if (request.Generation != Volatile.Read(ref generation) || !IsCurrent(catalog) || CurrentContentId() != request.ContentId)
-                throw new InvalidOperationException("Plugin or character changed during the call; result discarded.");
-            samples[key] = new(request.Action ? "Invoked" : "Observed",
-                binding.ResultType == typeof(void) ? "Request sent." : PluginBuilderValueProjection.Format(value, control.MemberPath), DateTime.UtcNow);
+                throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S4E712A66D6D84EDA")), global::XASlave.Localization.UiMessage.Key("S4E712A66D6D84EDA"));
+            samples[key] = CreateSample((request.Action ? global::XASlave.Localization.UiMessage.Key("S7B6A092DEAA34831") : global::XASlave.Localization.UiMessage.Key("S64FA8A14A90FEEF5")), (binding.ResultType == typeof(void) ? global::XASlave.Localization.UiMessage.Key("S7AB7A20ABED16FA9") : PluginBuilderValueProjection.FormatMessage(value, control.MemberPath)), DateTime.UtcNow);
             if (request.Manual && !request.Action)
             {
                 suspended.Remove(key);
@@ -392,7 +394,7 @@ internal sealed class PluginBuilderService : IDisposable
         catch (Exception error)
         {
             var reason = error is TargetInvocationException { InnerException: not null } wrapped ? wrapped.InnerException : error;
-            samples[key] = new("Unavailable", Bound(reason?.Message ?? "Call failed.", 512), DateTime.UtcNow);
+            samples[key] = CreateSample(global::XASlave.Localization.UiMessage.Key("SCA184496974204A0"), (reason == null ? global::XASlave.Localization.UiMessage.Key("SF7781A7D9C5FEF82") : global::XASlave.Localization.UiMessage.FromException(reason)), DateTime.UtcNow, 512);
             nextReads[key] = DateTime.MaxValue;
             suspended.Add(key);
         }
@@ -402,11 +404,21 @@ internal sealed class PluginBuilderService : IDisposable
             {
                 nextReads[key] = DateTime.MaxValue;
                 suspended.Add(key);
-                Status = "A selected source took more than 50 ms. Its automatic polling is paused; manual reads remain available.";
+                Status = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Key("S2CF16CD4E2B63303"));
                 if (samples.TryGetValue(key, out var sampled))
-                    samples[key] = sampled with { Status = "Automatic refresh paused: slow source" };
+                    samples[key] = sampled with { Status = global::XASlave.Localization.UiLocale.Native("S9125C718C32D8C45"), StatusMessage = global::XASlave.Localization.UiMessage.Key("S9125C718C32D8C45") };
             }
         }
+    }
+
+    private static PluginBuilderSample CreateSample(global::XASlave.Localization.UiMessage status, global::XASlave.Localization.UiMessage value, DateTime? timestamp, int maximumText = int.MaxValue)
+    {
+        var bounded = maximumText == int.MaxValue ? value : global::XASlave.Localization.UiMessage.Truncate(value, maximumText);
+        return new PluginBuilderSample(status.Original, bounded.Original, timestamp)
+        {
+            StatusMessage = status,
+            TextMessage = bounded,
+        };
     }
 
     private static object? InvokeIpc(PluginBuilderBinding binding, object?[] arguments, Assembly assembly)
@@ -415,19 +427,19 @@ internal sealed class PluginBuilderService : IDisposable
         var current = PluginInspectionIpcRegistry.FindProvider(binding.Source.Channel, action, assembly, Plugin.PluginInterface);
         if (current == null || current.Method != binding.ProviderMethod || binding.ProviderIdentity == null
             || !binding.ProviderIdentity.TryGetTarget(out var scannedProvider) || !ReferenceEquals(current, scannedProvider))
-            throw new InvalidOperationException("IPC provider registration changed.");
-        var invokeShape = current.GetType().GetMethod("Invoke") ?? throw new InvalidOperationException("IPC signature unavailable.");
+            throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S88F30058F87A71EF")), global::XASlave.Localization.UiMessage.Key("S88F30058F87A71EF"));
+        var invokeShape = current.GetType().GetMethod("Invoke") ?? throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S09A56E7CEBCCC3BB")), global::XASlave.Localization.UiMessage.Key("S09A56E7CEBCCC3BB"));
         if (invokeShape.ReturnType != binding.ResultType || !invokeShape.GetParameters().Select(parameter => parameter.ParameterType).SequenceEqual(binding.Parameters))
-            throw new InvalidOperationException("IPC signature changed.");
+            throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SE62E0EE633C0E838")), global::XASlave.Localization.UiMessage.Key("SE62E0EE633C0E838"));
         var types = binding.Parameters.Append(action ? typeof(object) : binding.ResultType).ToArray();
         var factory = typeof(IDalamudPluginInterface).GetMethods().Single(method => method.Name == "GetIpcSubscriber"
             && method.IsGenericMethodDefinition && method.GetGenericArguments().Length == types.Length);
         var closedFactory = factory.MakeGenericMethod(types);
         var subscriber = closedFactory.Invoke(Plugin.PluginInterface, new object[] { binding.Source.Channel });
         if (subscriber is not ICallGateSubscriber gate || (action ? !gate.HasAction : !gate.HasFunction))
-            throw new InvalidOperationException("IPC provider unavailable.");
+            throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("SD5664DEC27E1ED48")), global::XASlave.Localization.UiMessage.Key("SD5664DEC27E1ED48"));
         var call = closedFactory.ReturnType.GetMethod(action ? "InvokeAction" : "InvokeFunc", binding.Parameters)
-            ?? throw new InvalidOperationException("Official subscriber signature unavailable.");
+            ?? throw global::XASlave.Localization.UiMessage.Attach(new InvalidOperationException(global::XASlave.Localization.UiLocale.Native("S9B7794F99B09EBA1")), global::XASlave.Localization.UiMessage.Key("S9B7794F99B09EBA1"));
         return call.Invoke(subscriber, arguments);
     }
 
@@ -486,7 +498,7 @@ internal sealed class PluginBuilderService : IDisposable
                 ParameterTypes = parameters.Select(parameter => PluginBuilderBindingRules.TypeKey(parameter.ParameterType)).ToList(),
                 ParameterNames = parameters.Select(parameter => parameter.Name ?? "argument").ToList(),
                 ReturnType = PluginBuilderBindingRules.TypeKey(shape.ReturnType), CanRead = supported && !action,
-                CanExecute = supported, UnsupportedReason = supported ? string.Empty : "Only up to eight scalar arguments and managed synchronous results are supported.",
+                CanExecute = supported, UnsupportedReason = ((supported ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Key("SB0BE4CAF9B033D68"))).Original, UnsupportedMessage = (supported ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Key("SB0BE4CAF9B033D68")),
             };
             bindings.TryAdd(source.Id, new(source, parameters.Select(parameter => parameter.ParameterType).ToArray(), shape.ReturnType, null, Array.Empty<FieldInfo>(), provider.Method, new(provider)));
         }
@@ -530,7 +542,7 @@ internal sealed class PluginBuilderService : IDisposable
                     ParameterNames = parameters.Select(parameter => parameter.Name ?? "argument").ToList(),
                     ReturnType = PluginBuilderBindingRules.TypeKey(result), CanRead = supported && result != typeof(void),
                     CanExecute = supported && kind == PluginBuilderSourceKind.ReflectionMethod,
-                    UnsupportedReason = supported ? string.Empty : "Only scalar arguments and managed synchronous results are supported.",
+                    UnsupportedReason = ((supported ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Key("S43349362B24EC01D"))).Original, UnsupportedMessage = (supported ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Key("S43349362B24EC01D")),
                 };
                 bindings.TryAdd(source.Id, new(source, parameters.Select(parameter => parameter.ParameterType).ToArray(), result, member, path, null, null));
                 if (member is FieldInfo child && depth < 3 && child.FieldType.Assembly == assembly
@@ -627,7 +639,7 @@ internal sealed class PluginBuilderService : IDisposable
         Channel = source.Channel, DeclaringType = source.DeclaringType, MetadataToken = source.MetadataToken, Static = source.Static,
         FieldPath = new(source.FieldPath ?? new()), ParameterTypes = new(source.ParameterTypes ?? new()),
         ParameterNames = new(source.ParameterNames ?? new()), ReturnType = source.ReturnType, CanRead = source.CanRead,
-        CanExecute = source.CanExecute, UnsupportedReason = source.UnsupportedReason,
+        CanExecute = source.CanExecute, UnsupportedReason = source.UnsupportedReason, UnsupportedMessage = source.UnsupportedMessage,
     };
     private static PluginBuilderControlDefinition CopyControl(PluginBuilderControlDefinition value) => new()
     {

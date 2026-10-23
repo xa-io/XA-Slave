@@ -65,19 +65,19 @@ public partial class SlaveWindow
     private void DrawPluginBuilderPanel()
     {
         var service = pluginBuilderService;
-        ImGui.TextUnformatted("Plugin Builder");
-        ImGui.TextWrapped("Build your own windows with pages, information panels and buttons from your favourite plugins.");
-        ImGui.TextWrapped("VERY EARLY ACCES, THIS MIGHT CRASH, ERROR, LOOK SUPER UGLY");
+        ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.Get("SA20967C40751B062"));
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S83FD048BBFA99826"));
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SFEAD473AE8EBA5E6"));
         if (service == null)
         {
-            ImGui.TextDisabled("Plugin Builder is unavailable.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S92579352A7A5A716"));
             return;
         }
 
-        ImGui.InputText("Window title##builder", ref pluginBuilderWindowTitle, 128);
+        global::XASlave.Localization.UiNative.InputText((global::XASlave.Localization.UiLocale.Native("S534837B3B824387D") + "##builder"), ref pluginBuilderWindowTitle, 128);
         using (ImRaii.Disabled(string.IsNullOrWhiteSpace(pluginBuilderWindowTitle) || service.Windows.Count >= 32))
         {
-            if (ImGui.Button("Create saved window##builder"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S936DA9031E57F86C") + "##builder")))
             {
                 var created = service.CreateWindow(pluginBuilderWindowTitle.Trim());
                 if (created != null) pluginBuilderPendingOpen[created.Id] = (true, true);
@@ -85,10 +85,10 @@ public partial class SlaveWindow
         }
 
         ImGui.Separator();
-        ImGui.TextUnformatted("Saved windows");
+        ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.Get("S43F6D8B75F3A5502"));
         if (service.Windows.Count == 0)
         {
-            ImGui.TextDisabled("Create a window, then add panels and buttons in its editor.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S018EFD8108A881C7"));
             return;
         }
         Guid? remove = null;
@@ -96,29 +96,29 @@ public partial class SlaveWindow
             ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.SizingStretchProp))
         {
             if (!table) return;
-            ImGui.TableSetupColumn("Window");
-            ImGui.TableSetupColumn("Plugins");
-            ImGui.TableSetupColumn("Commands");
-            ImGui.TableSetupColumn("Controls", ImGuiTableColumnFlags.WidthFixed, 190 * ImGuiHelpers.GlobalScale);
-            ImGui.TableHeadersRow();
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S19734A1B58CABC22"));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S9514B7FF4860EAD7"));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SB269DC4E81A528A4"));
+            global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S799C269135742A36"), ImGuiTableColumnFlags.WidthFixed, 190 * ImGuiHelpers.GlobalScale);
+            global::XASlave.Localization.UiNative.TableHeadersRow();
             foreach (var definition in service.Windows)
             {
                 using var id = ImRaii.PushId(definition.Id.ToString("N"));
                 ImGui.TableNextRow();
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(definition.Title);
-                ImGui.TextDisabled($"{definition.Controls.Count} widgets");
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S68E8ADBDF4A4E147", definition.Controls.Count));
                 ImGui.TableNextColumn();
                 var names = service.GetWindowPluginNames(definition);
-                ImGui.TextWrapped(names.Count == 0 ? "Add sources in Edit" : string.Join(", ", names));
+                ImGui.TextWrapped(names.Count == 0 ? global::XASlave.Localization.UiLocale.Get("S2B340EB0584EB63A") : string.Join(", ", names));
                 ImGui.TableNextColumn();
                 DrawPluginBuilderCommand(definition, service);
                 ImGui.TableNextColumn();
-                if (ImGui.SmallButton("Open")) OpenPluginBuilderWindow(definition, edit: false);
+                if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("SED077F3D8125D60D"))) OpenPluginBuilderWindow(definition, edit: false);
                 ImGui.SameLine();
-                if (ImGui.SmallButton("Edit")) OpenPluginBuilderWindow(definition, edit: true);
+                if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("S464C4FFD019E1E96"))) OpenPluginBuilderWindow(definition, edit: true);
                 ImGui.SameLine();
-                if (ImGui.SmallButton("Delete")) remove = definition.Id;
+                if (global::XASlave.Localization.UiNative.SmallButton(global::XASlave.Localization.UiLocale.Native("SE2D0A54968EAD24E"))) remove = definition.Id;
             }
         }
         if (remove is { } removed)
@@ -142,7 +142,7 @@ public partial class SlaveWindow
     {
         if (!pluginBuilderCommandDrafts.TryGetValue(definition.Id, out var command)) command = definition.CommandName;
         ImGui.SetNextItemWidth(-1);
-        if (ImGui.InputTextWithHint("##windowCommand", "Optional name", ref command, 64))
+        if (ImGui.InputTextWithHint("##windowCommand", global::XASlave.Localization.UiLocale.Get("S46552C124B636373"), ref command, 64))
         {
             pluginBuilderCommandDrafts[definition.Id] = command;
             if (PluginBuilderCommandRules.ValidateName(service.Windows, definition.Id, command, out _))
@@ -155,7 +155,7 @@ public partial class SlaveWindow
             ImGui.TextWrapped(error);
         else if (definition.CommandName.Length > 0)
             ImGui.TextDisabled("/xa win " + definition.CommandName);
-        else ImGui.TextDisabled("Letters, numbers, _ or -; no spaces.");
+        else ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SAEAD32C74BC13651"));
     }
 
     internal bool TryTogglePluginBuilderWindow(string name, out string error)

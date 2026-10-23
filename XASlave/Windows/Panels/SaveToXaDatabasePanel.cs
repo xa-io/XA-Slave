@@ -14,8 +14,10 @@ public partial class SlaveWindow
     private float autoCollectScheduledDelaySeconds;
     private bool autoCollectSkipPending;
     private string autoCollectSkipMessage = string.Empty;
+    private global::XASlave.Localization.UiMessage? autoCollectSkipMessageUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
     private bool autoCollectResumeArOnCompletion;
     private string lastIpcResult = string.Empty;
+    private global::XASlave.Localization.UiMessage? lastIpcResultMessage;
     private DateTime lastIpcResultExpiry = DateTime.MinValue;
     private bool saveToXaDatabaseShowLog;
     private DateTime saveToXaDatabaseStatusExpiry = DateTime.MinValue;
@@ -31,8 +33,8 @@ public partial class SlaveWindow
     {
         RefreshSaveToXaDatabaseStatusCache();
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Save to XA Database");
-        ImGui.TextDisabled("Collects data from game windows and saves to XA Database via IPC.");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S0AED21970EED8844"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S613A081ED445687C"));
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
@@ -40,12 +42,12 @@ public partial class SlaveWindow
         // -- Connection status --
         if (cachedSaveToXaDatabaseReady)
         {
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), $"XA Database: Connected (v{cachedSaveToXaDatabaseVersion})");
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S75A5F65875FB62FB", cachedSaveToXaDatabaseVersion));
         }
         else
         {
-            ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), "XA Database: Not available");
-            ImGui.TextDisabled("Make sure XA Database plugin is loaded.");
+            ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), global::XASlave.Localization.UiLocale.Get("SE01EBEC9914E6284"));
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S5E95DAD388A7F6A4"));
         }
 
         ImGui.Spacing();
@@ -53,89 +55,89 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         // -- Manual actions --
-        ImGui.Text("Manual Actions");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("S948121DE103E905A"));
         ImGui.Spacing();
 
         if (plugin.AutoCollector.IsRunning)
         {
-            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), $"Collecting: {plugin.AutoCollector.StatusText}");
-            if (ImGui.Button("Cancel"))
+            ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), global::XASlave.Localization.UiLocale.FormatKey("S2072F33472A7C562", plugin.AutoCollector.LocalizedStatusText));
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S19766ED6CCB2F4A3")))
                 plugin.AutoCollector.Cancel();
         }
         else
         {
-            if (ImGui.Button("Collect Now"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S1BB88EF61843E357")))
             {
                 AutoOpenTaskLogIfVerbose(ref saveToXaDatabaseShowLog);
                 RunAutoCollection();
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Runs the checked Collection Options below, then saves to XA Database via IPC.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S1D8C1740DA1523A6"));
 
             ImGui.SameLine();
-            if (ImGui.Button("IPC Save"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S4A46E0B800579CFE")))
             {
                 AutoOpenTaskLogIfVerbose(ref saveToXaDatabaseShowLog);
                 plugin.AutoCollector.AddLog("Manual IPC save requested.");
                 if (plugin.SaveToXaDatabaseAndRecordSync())
-                    SetIpcResult("Save sent to XA Database");
+                    SetIpcResult(global::XASlave.Localization.UiMessage.Key("SEECE95D745C5522F"));
                 else
-                    SetIpcResult("Save failed - XA Database not available");
+                    SetIpcResult(global::XASlave.Localization.UiMessage.Key("S314235448D911BDF"));
             }
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Send a save command to XA Database without opening any game windows.");
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S42D2790AF452B523"));
         }
 
         // IPC result feedback
         if (!string.IsNullOrEmpty(lastIpcResult) && DateTime.UtcNow < lastIpcResultExpiry)
         {
             ImGui.Spacing();
-            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), lastIpcResult);
+            ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f), global::XASlave.Localization.UiMessage.Resolve(ref lastIpcResultMessage, lastIpcResult));
         }
 
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Collection Options");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SC15208046CEBA251"));
         ImGui.Spacing();
 
         var collectArmoury = plugin.Configuration.AutoCollectArmouryChest;
-        if (ImGui.Checkbox("Collect Armoury Chest", ref collectArmoury))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SA23D031A2A2F4E2D"), ref collectArmoury))
         {
             plugin.Configuration.AutoCollectArmouryChest = collectArmoury;
             plugin.Configuration.Save();
         }
 
         var collectSaddlebag = plugin.Configuration.AutoCollectSaddlebag;
-        if (ImGui.Checkbox("Collect Saddlebag", ref collectSaddlebag))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S8FF45013F7B656B8"), ref collectSaddlebag))
         {
             plugin.Configuration.AutoCollectSaddlebag = collectSaddlebag;
             plugin.Configuration.Save();
         }
 
         var collectJournal = plugin.Configuration.AutoCollectJournal;
-        if (ImGui.Checkbox("Collect Journal", ref collectJournal))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SDEB8BF5B1FFBF2D9"), ref collectJournal))
         {
             plugin.Configuration.AutoCollectJournal = collectJournal;
             plugin.Configuration.Save();
         }
 
         var collectPlot = plugin.Configuration.AutoCollectPersonalPlotInfo;
-        if (ImGui.Checkbox("Collect Personal Plot Info", ref collectPlot))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SFF3C7116AEE8239B"), ref collectPlot))
         {
             plugin.Configuration.AutoCollectPersonalPlotInfo = collectPlot;
             plugin.Configuration.Save();
         }
 
         var collectFc = plugin.Configuration.AutoCollectFc;
-        if (ImGui.Checkbox("Collect FC Data (Members, Info, Housing)", ref collectFc))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S71A8253EB3D38EC9"), ref collectFc))
         {
             plugin.Configuration.AutoCollectFc = collectFc;
             plugin.Configuration.Save();
         }
 
-        ImGui.TextDisabled("Collect Now and Auto-Collection on Login both use these options.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S5D9DFDEFB941CD4C"));
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -144,28 +146,28 @@ public partial class SlaveWindow
         if (Plugin.PlayerState.IsLoaded)
         {
             ImGui.TextDisabled(cachedCurrentCharacterLastSyncUtc.HasValue
-                ? $"Last synced to XA DB: {cachedCurrentCharacterLastSyncUtc.Value.ToLocalTime():yyyy-MM-dd HH:mm:ss}"
-                : "Last synced to XA DB: Never");
+                ? global::XASlave.Localization.UiLocale.FormatKey("SF9F3A8D3D3734D72", cachedCurrentCharacterLastSyncUtc.Value.ToLocalTime())
+                : global::XASlave.Localization.UiLocale.Get("SB064842D1302A053"));
             ImGui.Spacing();
         }
 
         // -- Auto-Collection on Login settings --
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Auto-Collection on Login");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SBA40CB42F6BC104A"));
         ImGui.Spacing();
 
         var autoCollect = plugin.Configuration.AutoCollectOnLogin;
-        if (ImGui.Checkbox("Enable Auto-Collection on Login", ref autoCollect))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SB85AC9455324B6C2"), ref autoCollect))
         {
             plugin.Configuration.AutoCollectOnLogin = autoCollect;
             plugin.Configuration.Save();
         }
-        ImGui.TextDisabled("Automatically runs the selected Collection Options after login.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S0AA484FD6530172D"));
 
         if (autoCollect)
         {
             ImGui.Spacing();
             var disableOnArMulti = plugin.Configuration.AutoCollectDisableWhenArMultiEnabled;
-            if (ImGui.Checkbox("  Disable if AR Multi is enabled", ref disableOnArMulti))
+            if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SF472EE8410FC2EC8"), ref disableOnArMulti))
             {
                 plugin.Configuration.AutoCollectDisableWhenArMultiEnabled = disableOnArMulti;
                 plugin.Configuration.Save();
@@ -173,8 +175,8 @@ public partial class SlaveWindow
 
             var cadenceIndex = GetCheckEveryIndex(plugin.Configuration.AutoCollectCheckEveryHours);
             ImGui.SetNextItemWidth(Scale(180f));
-            if (ImGui.SliderInt("Check Every##autoCollectEvery", ref cadenceIndex, 0, CheckEveryHourOptions.Length - 1,
-                    FormatCheckEveryHours(CheckEveryHourOptions[cadenceIndex]), ImGuiSliderFlags.AlwaysClamp))
+            if (global::XASlave.Localization.UiNative.SliderInt((global::XASlave.Localization.UiLocale.Native("S4415B9AB79ABEE43") + "##autoCollectEvery"), ref cadenceIndex, 0, CheckEveryHourOptions.Length - 1,
+                    FormatCheckEveryHoursMessage(CheckEveryHourOptions[cadenceIndex]).Display, ImGuiSliderFlags.AlwaysClamp))
             {
                 plugin.Configuration.AutoCollectCheckEveryHours = CheckEveryHourOptions[cadenceIndex];
                 plugin.Configuration.SaveDeferred();
@@ -183,14 +185,14 @@ public partial class SlaveWindow
             ImGui.Spacing();
             var delay = plugin.Configuration.AutoCollectDelaySeconds;
             ImGui.SetNextItemWidth(Scale(100f));
-            if (ImGui.InputFloat("Login Delay (seconds)", ref delay, 1f, 5f, "%.0f"))
+            if (global::XASlave.Localization.UiNative.InputFloat(global::XASlave.Localization.UiLocale.Native("S2B9474067408FB11"), ref delay, 1f, 5f, "%.0f"))
             {
                 if (delay < 3f) delay = 3f;
                 if (delay > 30f) delay = 30f;
                 plugin.Configuration.AutoCollectDelaySeconds = delay;
                 plugin.Configuration.SaveDeferred();
             }
-            ImGui.TextDisabled("Wait time after login before starting collection.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S5E64C33D1CAE5799"));
         }
 
         // Scheduled status
@@ -200,7 +202,7 @@ public partial class SlaveWindow
             if (remaining > 0)
             {
                 ImGui.Spacing();
-                ImGui.TextDisabled($"Auto-collection starting in ~{remaining:F0}s...");
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S9F20E331181A3226", remaining));
             }
         }
 
@@ -278,28 +280,27 @@ public partial class SlaveWindow
 
                 if (!completed)
                 {
-                    SetIpcResult(resumeArOnCompletion ? "Collection cancelled - AR resumed." : "Collection cancelled.");
+                    SetIpcResult((resumeArOnCompletion ? global::XASlave.Localization.UiMessage.Key("S5871C71604341E77") : global::XASlave.Localization.UiMessage.Key("S6C4571C7A55263C4")));
                     return;
                 }
 
                 if (!saveAttempted)
                 {
-                    SetIpcResult("Collection complete.");
+                    SetIpcResult(global::XASlave.Localization.UiMessage.Key("SA44D4B202013DB1A"));
                     return;
                 }
 
-                SetIpcResult(lastSaveOk
-                    ? "Collection complete - saved to XA Database"
-                    : "Collection complete - XA Database save failed");
+                SetIpcResult((lastSaveOk ? global::XASlave.Localization.UiMessage.Key("SA68889D2AF82E8F9") : global::XASlave.Localization.UiMessage.Key("S2006BA47A86E533F")));
             });
 
         if (resumeArOnCompletion)
             plugin.AutoCollector.AddLog("AutoRetainer will be resumed after collection.");
     }
 
-    private void SetIpcResult(string message)
+    private void SetIpcResult(global::XASlave.Localization.UiMessage presentation)
     {
-        lastIpcResult = message;
+        var message = presentation.Original;
+        lastIpcResult = global::XASlave.Localization.UiMessage.Store(ref lastIpcResultMessage, presentation);
         lastIpcResultExpiry = DateTime.UtcNow.AddSeconds(8);
         plugin.AutoCollector.AddLog(message);
     }

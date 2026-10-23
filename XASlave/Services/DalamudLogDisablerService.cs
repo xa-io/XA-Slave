@@ -65,28 +65,34 @@ public sealed class DalamudLogDisablerService : IDisposable
 
     public int MinimumKeptLevel => minimumKeptLevelInt;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     // Options for the UI: each kept-level threshold plus the full-mute sentinel, most-permissive first.
     public IReadOnlyList<(int Value, string Label, string Blocked)> GetLevelOptions()
+        => GetLevelOptionMessages().Select(option => (option.Value, option.Label.Original, option.Blocked.Original)).ToArray();
+
+    internal IReadOnlyList<(int Value, global::XASlave.Localization.UiMessage Label, global::XASlave.Localization.UiMessage Blocked)> GetLevelOptionMessages()
     {
         if (logEventLevelType is not { IsEnum: true })
-            return [(BlockAllLevel, "Block all logs", "everything")];
+            return [(BlockAllLevel, global::XASlave.Localization.UiMessage.Key("SFB180217165A7FC1"), global::XASlave.Localization.UiMessage.Key("SA0A44ED8CFC32B7E"))];
 
         var levels = Enumerable.Range(0, maxDefinedLevel + 1)
-            .Select(value => (Value: value, Name: Enum.GetName(logEventLevelType, Enum.ToObject(logEventLevelType, value)) ?? $"Level {value}"))
+            .Select(value => (Value: value, Name: Enum.GetName(logEventLevelType, Enum.ToObject(logEventLevelType, value)) is { } name ? global::XASlave.Localization.UiMessage.Raw(name) : global::XASlave.Localization.UiMessage.Format("S06ED7C0B2BB7A3AF", value)))
             .ToList();
 
-        var options = new List<(int Value, string Label, string Blocked)>();
+        var options = new List<(int Value, global::XASlave.Localization.UiMessage Label, global::XASlave.Localization.UiMessage Blocked)>();
         // Keep-from-level thresholds (skip Verbose=0, which would mute nothing).
         for (var value = 1; value <= maxDefinedLevel; value++)
         {
             var name = levels[value].Name;
             var blocked = levels.Where(l => l.Value < value).Select(l => l.Name);
-            options.Add((value, $"Allow {name} and above", string.Join(", ", blocked)));
+            options.Add((value, global::XASlave.Localization.UiMessage.Format("SA5CAD227D19BD90A", name), global::XASlave.Localization.UiMessage.Join(", ", blocked)));
         }
 
-        options.Add((BlockAllLevel, "Block all logs (full mute)", "everything"));
+        options.Add((BlockAllLevel, global::XASlave.Localization.UiMessage.Key("S598E2E9FA2E9C2AD"), global::XASlave.Localization.UiMessage.Key("SA0A44ED8CFC32B7E")));
         return options;
     }
 
@@ -156,14 +162,14 @@ public sealed class DalamudLogDisablerService : IDisposable
             enabled = false;
             RestoreAll();
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         if (minimumLogLevelProperty == null || suppressLevelValue == null)
         {
             enabled = false;
-            StatusText = "Unavailable - Dalamud's per-plugin log level could not be resolved.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SBA613C85370DFC58"));
             if (!reflectionUnavailableLogged)
             {
                 reflectionUnavailableLogged = true;
@@ -460,20 +466,18 @@ public sealed class DalamudLogDisablerService : IDisposable
     {
         if (!enabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (blockedNames.Count == 0)
         {
-            StatusText = "Enabled - no plugins selected. Tick a plugin below to filter its Dalamud logs.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SB56B93DC2B05B6ED"));
             return;
         }
 
-        var scope = minimumKeptLevelInt > maxDefinedLevel
-            ? "muting all levels"
-            : $"allowing {DescribeLevel(minimumKeptLevelInt)} and above";
-        StatusText = $"Enabled - {scope} for {blockedNames.Count} plugin(s); {lastSuppressedCount} currently loaded and filtered.";
+        var scope = (minimumKeptLevelInt > maxDefinedLevel ? global::XASlave.Localization.UiMessage.Key("SB795E4CBD05D5C3B") : global::XASlave.Localization.UiMessage.Format("S28800508464175F0", DescribeLevel(minimumKeptLevelInt)));
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S91F9346CBD138FB9", scope, blockedNames.Count, lastSuppressedCount));
     }
 
     private readonly record struct SuppressionRecord(WeakReference<object> Service, object? OriginalLevel);

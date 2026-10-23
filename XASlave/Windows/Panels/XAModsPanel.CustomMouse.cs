@@ -9,11 +9,12 @@ namespace XASlave.Windows;
 
 public partial class SlaveWindow
 {
-    private static readonly string[] CustomMouseRoleLabels = ["Normal", "Inventory", "Window mover", "Interaction", "Chat interaction", "Attack targeting"];
+    private static readonly string[] CustomMouseRoleLabels = [global::XASlave.Localization.UiLocale.Native("SA7248EEB45EB1CE2"), global::XASlave.Localization.UiLocale.Native("S758F487FE8E9FCC5"), global::XASlave.Localization.UiLocale.Native("SC1F079C379776C39"), global::XASlave.Localization.UiLocale.Native("SB7D2863247E0230F"), global::XASlave.Localization.UiLocale.Native("S22553D44C9DF8C9B"), global::XASlave.Localization.UiLocale.Native("S2ED84B34C15DCC02")];
     private readonly FileDialogManager customMouseFileDialog = new();
     private string customMouseFavoriteDraft = string.Empty;
     private string customMouseFavoriteSelection = string.Empty;
     private string customMouseFavoriteMessage = string.Empty;
+    private global::XASlave.Localization.UiMessage? customMouseFavoriteMessageUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
     private void DrawCustomMouseOptions()
     {
@@ -30,21 +31,21 @@ public partial class SlaveWindow
         var allowWindowsMouse = value.AllowWindowsMouse;
         var reloadArtwork = false;
         CustomMouseArtworkRole? reloadRole = null;
-        ImGui.TextWrapped("Custom Mouse restores your previous game cursor settings when disabled. Move onto the game scene to preview; plugin windows keep their own cursor.");
-        var changed = ImGui.Checkbox("Keep Active On Click##CustomMouse", ref keepActiveOnClick);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Keep the cursor visible while left- or right-dragging the camera. Camera controls remain unchanged.");
-        changed |= ImGui.Checkbox("Allow Windows Mouse##CustomMouse", ref allowWindowsMouse);
-        if (ImGui.IsItemHovered()) ImGui.SetTooltip("Use your Windows pointer in the game. Game cursor artwork, size, colors and trails are bypassed.");
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SAD763FBA35DA3235"));
+        var changed = global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SD0E16D81542F93DA") + "##CustomMouse"), ref keepActiveOnClick);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S8F7EF2872F54C697"));
+        changed |= global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("SF9663D6C8098968F") + "##CustomMouse"), ref allowWindowsMouse);
+        if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("SA81FADE0F378E8CE"));
         using (ImRaii.Disabled(allowWindowsMouse))
         {
-            ImGui.TextWrapped(useArtwork ? "Choose a favorite for each cursor role. Size is relative to each file's pixels." : "Size is relative to the game's Normal/Large cursor preset. Move the pointer onto the game scene to preview.");
-            ImGui.TextWrapped("Cursor movement is independent of game FPS. Animation follows game updates; optional trails use software rendering.");
-            changed |= ImGui.SliderFloat("Size ratio##CustomMouse", ref scale, 0.1f, 5f, "%.2fx");
-            changed |= ImGui.ColorEdit4("Base color##CustomMouse", ref baseColor);
-            changed |= ImGui.ColorEdit4("Outline color##CustomMouse", ref outlineColor);
-            changed |= ImGui.Checkbox("Cursor trails##CustomMouse", ref cursorTrails);
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip("Trails use software rendering and follow game FPS. Turn trails off for independent cursor movement.");
-            changed |= ImGui.Checkbox("Use custom artwork##CustomMouse", ref useArtwork);
+            ImGui.TextWrapped(useArtwork ? global::XASlave.Localization.UiLocale.Get("S1111241F38259CD3") : global::XASlave.Localization.UiLocale.Get("S1A1F27497F9F5D17"));
+            ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S60B67F21D699704F"));
+            changed |= global::XASlave.Localization.UiNative.SliderFloat((global::XASlave.Localization.UiLocale.Native("SA7E2C23E3C4D8FF9") + "##CustomMouse"), ref scale, 0.1f, 5f, "%.2fx");
+            changed |= global::XASlave.Localization.UiNative.ColorEdit4((global::XASlave.Localization.UiLocale.Native("S4144C7E4F13937A8") + "##CustomMouse"), ref baseColor);
+            changed |= global::XASlave.Localization.UiNative.ColorEdit4((global::XASlave.Localization.UiLocale.Native("S375B9BF724FC2783") + "##CustomMouse"), ref outlineColor);
+            changed |= global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S8294BD8E89BBB33B") + "##CustomMouse"), ref cursorTrails);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S229E6A768A697EC0"));
+            changed |= global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S5477D7869DBB1490") + "##CustomMouse"), ref useArtwork);
             if (useArtwork)
             {
                 for (var i = 0; i < CustomMouseRoleLabels.Length; i++)
@@ -52,16 +53,16 @@ public partial class SlaveWindow
                     var role = (CustomMouseArtworkRole)i;
                     using var roleId = ImRaii.PushId(i);
                     var path = value.GetArtworkPath(role);
-                    var emptyLabel = role == CustomMouseArtworkRole.Normal ? "Game cursor" : "Use Normal";
-                    var preview = string.IsNullOrEmpty(path) ? emptyLabel : CustomMouseFavoriteLabel(path);
-                    var reloadWidth = ImGui.CalcTextSize("Reload").X + ImGui.GetStyle().FramePadding.X * 2;
-                    var labelWidth = ImGui.CalcTextSize(CustomMouseRoleLabels[i]).X + ImGui.GetStyle().ItemInnerSpacing.X;
+                    var emptyLabel = role == CustomMouseArtworkRole.Normal ? global::XASlave.Localization.UiLocale.Native("S7A60713898D5EDDD") : global::XASlave.Localization.UiLocale.Native("SAFD5FF8E90DE9F65");
+                    var preview = string.IsNullOrEmpty(path) ? global::XASlave.Localization.UiLocale.T(emptyLabel) : CustomMouseFavoriteLabel(path);
+                    var reloadWidth = ImGui.CalcTextSize(global::XASlave.Localization.UiLocale.Get("SBDC090EC61E3FCFC")).X + ImGui.GetStyle().FramePadding.X * 2;
+                    var labelWidth = ImGui.CalcTextSize(global::XASlave.Localization.UiLocale.T(CustomMouseRoleLabels[i])).X + ImGui.GetStyle().ItemInnerSpacing.X;
                     ImGui.SetNextItemWidth(Math.Max(Scale(80f), ImGui.GetContentRegionAvail().X - reloadWidth - labelWidth - ImGui.GetStyle().ItemSpacing.X));
-                    using (var combo = ImRaii.Combo(CustomMouseRoleLabels[i] + "##CustomMouseAssignment", preview))
+                    using (var combo = global::XASlave.Localization.UiNative.ComboScope(CustomMouseRoleLabels[i] + "##CustomMouseAssignment", preview))
                     {
                         if (combo)
                         {
-                            if (ImGui.Selectable(emptyLabel + "##Default", string.IsNullOrEmpty(path)))
+                            if (global::XASlave.Localization.UiNative.Selectable(emptyLabel + "##Default", string.IsNullOrEmpty(path)))
                             {
                                 value.SetArtworkPath(role, string.Empty);
                                 changed = true;
@@ -84,19 +85,19 @@ public partial class SlaveWindow
                     if (ImGui.IsItemHovered())
                     {
                         var resolved = value.ResolveArtworkPath(role);
-                        ImGui.SetTooltip((string.IsNullOrEmpty(resolved) ? emptyLabel : resolved) + "\n" + plugin.CustomMouse.GetArtworkStatus(role));
+                        ImGui.SetTooltip((string.IsNullOrEmpty(resolved) ? global::XASlave.Localization.UiLocale.T(emptyLabel) : resolved) + "\n" + plugin.CustomMouse.GetLocalizedArtworkStatus(role));
                     }
                     ImGui.SameLine();
-                    if (ImGui.Button("Reload##CustomMouseRole"))
+                    if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SBDC090EC61E3FCFC") + "##CustomMouseRole")))
                     {
                         reloadArtwork = true;
                         reloadRole = role;
                         changed = true;
                     }
-                    if (ImGui.IsItemHovered()) ImGui.SetTooltip("Reload this role's file after changing its contents or restoring a missing file.");
+                    if (ImGui.IsItemHovered()) ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S91E1A87058F4895D"));
                 }
-                changed |= ImGui.Checkbox("Animate cursor##CustomMouse", ref animateArtwork);
-                ImGui.TextWrapped("Other roles use Normal until you choose a different favorite. Missing files keep the game cursor for that role. PNG files use a top-left click point; animation off uses the first ANI frame.");
+                changed |= global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S529A70E7F2F82AF6") + "##CustomMouse"), ref animateArtwork);
+                ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("S709507E34967ADBA"));
             }
         }
         ImGui.Separator();
@@ -104,7 +105,7 @@ public partial class SlaveWindow
         var resetAppearanceModifierHeld = ImGui.GetIO().KeyCtrl;
         using (ImRaii.Disabled(!resetAppearanceModifierHeld))
         {
-            if (ImGui.Button("Reset appearance##CustomMouse"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S54BA48B060D6C8ED") + "##CustomMouse")))
             {
                 value = new();
                 scale = value.Scale;
@@ -119,7 +120,7 @@ public partial class SlaveWindow
             }
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip("Hold CTRL and click to reset appearance and clear cursor assignments. Your favorites are kept.");
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S34C05ACEFC04241A"));
         if (changed)
         {
             value.Scale = scale;
@@ -138,11 +139,11 @@ public partial class SlaveWindow
 
     private void DrawCustomMouseFavorites(CustomMouseFavoriteLibrary favorites)
     {
-        ImGui.TextUnformatted("Cursor favorites");
-        ImGui.InputText("Favorite file##CustomMouse", ref customMouseFavoriteDraft, 1024);
-        if (ImGui.Button("Browse...##CustomMouseFavorite"))
+        ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.Get("S8DEB58B8A7AE9E85"));
+        global::XASlave.Localization.UiNative.InputText((global::XASlave.Localization.UiLocale.Native("SBCE68B9A619A6D95") + "##CustomMouse"), ref customMouseFavoriteDraft, 1024);
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("SC58A6BD402EFB06C") + "##CustomMouseFavorite")))
         {
-            customMouseFileDialog.OpenFileDialog("Add a cursor favorite", ".ani,.cur,.png", (accepted, path) =>
+            customMouseFileDialog.OpenFileDialog(global::XASlave.Localization.UiLocale.Get("S87DFC54F47A9D555"), ".ani,.cur,.png", (accepted, path) =>
             {
                 if (!accepted || isDisposed) return;
                 customMouseFavoriteDraft = path;
@@ -150,14 +151,14 @@ public partial class SlaveWindow
             });
         }
         ImGui.SameLine();
-        if (ImGui.Button("Add favorite##CustomMouse")) AddCustomMouseFavorite(customMouseFavoriteDraft);
+        if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S65B52E8C6521A21D") + "##CustomMouse"))) AddCustomMouseFavorite(customMouseFavoriteDraft);
         if (favorites.Paths.Count > 0)
         {
             if (!favorites.Paths.Contains(customMouseFavoriteSelection)) customMouseFavoriteSelection = favorites.Paths[0];
-            var removeWidth = ImGui.CalcTextSize("Remove favorite").X + ImGui.GetStyle().FramePadding.X * 2;
-            var labelWidth = ImGui.CalcTextSize("Favorites").X + ImGui.GetStyle().ItemInnerSpacing.X;
+            var removeWidth = ImGui.CalcTextSize(global::XASlave.Localization.UiLocale.Get("S5BC0AA08D678C50E")).X + ImGui.GetStyle().FramePadding.X * 2;
+            var labelWidth = ImGui.CalcTextSize(global::XASlave.Localization.UiLocale.Get("S7A1F2A83ACA9A081")).X + ImGui.GetStyle().ItemInnerSpacing.X;
             ImGui.SetNextItemWidth(Math.Max(Scale(80f), ImGui.GetContentRegionAvail().X - removeWidth - labelWidth - ImGui.GetStyle().ItemSpacing.X));
-            using (var combo = ImRaii.Combo("Favorites##CustomMouseLibrary", CustomMouseFavoriteLabel(customMouseFavoriteSelection)))
+            using (var combo = global::XASlave.Localization.UiNative.ComboScope((global::XASlave.Localization.UiLocale.Native("S7A1F2A83ACA9A081") + "##CustomMouseLibrary"), CustomMouseFavoriteLabel(customMouseFavoriteSelection)))
             {
                 if (combo)
                 {
@@ -173,16 +174,16 @@ public partial class SlaveWindow
             }
             if (ImGui.IsItemHovered()) ImGui.SetTooltip(customMouseFavoriteSelection);
             ImGui.SameLine();
-            if (ImGui.Button("Remove favorite##CustomMouse"))
+            if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S5BC0AA08D678C50E") + "##CustomMouse")))
             {
                 if (favorites.Remove(customMouseFavoriteSelection)) plugin.Configuration.Save();
                 customMouseFavoriteSelection = string.Empty;
-                customMouseFavoriteMessage = "Favorite removed. Current cursor assignments are unchanged.";
+                customMouseFavoriteMessage = global::XASlave.Localization.UiMessage.Store(ref customMouseFavoriteMessageUiMessage, global::XASlave.Localization.UiMessage.Key("SC625A7DE1EE0150B"));
             }
         }
-        else ImGui.TextDisabled("Add a cursor file, then select it for any role above.");
-        if (!string.IsNullOrEmpty(customMouseFavoriteMessage)) ImGui.TextWrapped(customMouseFavoriteMessage);
-        ImGui.TextWrapped("Favorites stay saved until you remove them, even if files move or go missing. Resetting appearance or applying a mod preset keeps this library. Removing a favorite keeps any current assignments.");
+        else ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SFF09D20E866D8BD6"));
+        if (!string.IsNullOrEmpty(customMouseFavoriteMessage)) ImGui.TextWrapped(global::XASlave.Localization.UiMessage.Resolve(ref customMouseFavoriteMessageUiMessage, customMouseFavoriteMessage));
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.Get("SB994EFFEEF5A5F08"));
     }
 
     private void AddCustomMouseFavorite(string path)
@@ -190,16 +191,16 @@ public partial class SlaveWindow
         var normalized = CustomMouseFavoriteLibrary.NormalizePath(path);
         if (string.IsNullOrEmpty(normalized))
         {
-            customMouseFavoriteMessage = "Choose a fully qualified local-drive .ani, .cur or .png path of at most 1024 characters.";
+            customMouseFavoriteMessage = global::XASlave.Localization.UiMessage.Store(ref customMouseFavoriteMessageUiMessage, global::XASlave.Localization.UiMessage.Key("S6BD31466FEB90B3A"));
             return;
         }
         var favorites = plugin.Configuration.CustomMouseFavorites ??= new() { ExistingAssignmentsImported = true };
         if (favorites.Add(normalized))
         {
             plugin.Configuration.Save();
-            customMouseFavoriteMessage = "Favorite added. Select it in a cursor role to use it.";
+            customMouseFavoriteMessage = global::XASlave.Localization.UiMessage.Store(ref customMouseFavoriteMessageUiMessage, global::XASlave.Localization.UiMessage.Key("SDC34AB1E4347596D"));
         }
-        else customMouseFavoriteMessage = "That file is already in your favorites.";
+        else customMouseFavoriteMessage = global::XASlave.Localization.UiMessage.Store(ref customMouseFavoriteMessageUiMessage, global::XASlave.Localization.UiMessage.Key("S398F1B65949D4F0D"));
         customMouseFavoriteSelection = normalized;
     }
 

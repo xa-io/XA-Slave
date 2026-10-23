@@ -31,9 +31,18 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
-    public string LastActionText { get; private set; } = "No actions yet.";
-    public string LastAddonName { get; private set; } = "None";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
+    public string LastActionText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S03F020CBB71754CC");
+    private global::XASlave.Localization.UiMessage? uiLastActionText = global::XASlave.Localization.UiMessage.Key("S03F020CBB71754CC");
+    internal string LocalizedLastActionText => global::XASlave.Localization.UiMessage.Resolve(ref uiLastActionText, LastActionText);
+    internal global::XASlave.Localization.UiMessage LastActionTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastActionText, LastActionText);
+    public string LastAddonName { get; private set; } = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5").Original;
+    private global::XASlave.Localization.UiMessage? uiLastAddonName = global::XASlave.Localization.UiMessage.Key("SDC937B59892604F5");
+    internal global::XASlave.Localization.UiMessage LastAddonNameMessage => global::XASlave.Localization.UiMessage.Capture(ref uiLastAddonName, LastAddonName);
+    internal string LocalizedLastAddonName => global::XASlave.Localization.UiMessage.Resolve(ref uiLastAddonName, LastAddonName);
     public int LastReplacementCount { get; private set; }
 
     public bool SetEnabled(bool value)
@@ -46,13 +55,13 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
             enabled = false;
             collectablesShopItemDatas.Clear();
             Unsubscribe();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         enabled = true;
         Subscribe();
-        StatusText = "Enabled - shop category icons are replaced with actual item icons across the supported shop add-ons.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SE0EDF2FA6A24BC55"));
         return true;
     }
 
@@ -192,7 +201,7 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
                         NormalizeText(itemRow.Name.ToString())));
                 }
 
-                LastAddonName = "CollectablesShop";
+                LastAddonName = global::XASlave.Localization.UiMessage.Store(ref uiLastAddonName, global::XASlave.Localization.UiMessage.Raw("CollectablesShop"));
                 return;
             }
 
@@ -439,9 +448,9 @@ public unsafe sealed class EnableItemIconInShopsService : IDisposable
 
     private void RecordReplacement(string addonName, int replacementCount)
     {
-        LastAddonName = addonName;
+        LastAddonName = global::XASlave.Localization.UiMessage.Store(ref uiLastAddonName, global::XASlave.Localization.UiMessage.Raw(addonName));
         LastReplacementCount = replacementCount;
-        LastActionText = $"Last action: replaced {replacementCount} shop icon(s) in {addonName} at {DateTime.Now:HH:mm:ss}.";
+        LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("SFF5719FBDB9F7FB8", replacementCount, addonName, DateTime.Now));
     }
 
     private static string NormalizeText(string value)

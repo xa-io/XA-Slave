@@ -86,7 +86,12 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
     private LiveState? cachedLiveState;
     private readonly Stopwatch liveStateTimer = Stopwatch.StartNew();
 
-    public readonly record struct SelectableContentType(uint Id, string Name, bool IsStock);
+    public readonly record struct SelectableContentType(uint Id, string Name, bool IsStock)
+{
+        internal SelectableContentType(uint id, global::XASlave.Localization.UiMessage name, bool isStock)
+            : this(id, AutoRetainerUiMessagePresentation.Store(name), isStock) { }
+        internal string LocalizedName => AutoRetainerUiMessagePresentation.Get(Name).Display;
+    }
 
     public sealed class LiveState
     {
@@ -98,8 +103,17 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
         public bool IsArmed { get; init; }
         public bool InPlayback { get; init; }
         public float RecordingTimeSeconds { get; init; } = -1f;
-        public string Description { get; init; } = string.Empty;
+        private string description = string.Empty;
+        private global::XASlave.Localization.UiMessage? descriptionMessage;
+        public string Description { get => description; init { description = value; descriptionMessage = null; } }
+        internal global::XASlave.Localization.UiMessage DescriptionMessage
+        {
+            get => global::XASlave.Localization.UiMessage.Capture(descriptionMessage, description);
+            init { descriptionMessage = value; description = value.Original; }
+        }
+        internal string LocalizedDescription => DescriptionMessage.Display;
         public string StatusBitsText { get; init; } = string.Empty;
+        internal string LocalizedStatusBitsText => StateAvailable && StatusByte == 0 ? global::XASlave.Localization.UiLocale.Get("S140BEDBF9C3F6D56") : StatusBitsText;
     }
 
     public ARealmRecordedIntegrationService(
@@ -120,9 +134,14 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
 
     public bool IsForceEnabled => forceEnabled;
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public string LastForceActionMessage { get; private set; } = string.Empty;
+    private global::XASlave.Localization.UiMessage? uiLastForceActionMessage;
+    internal string LocalizedLastForceActionMessage => global::XASlave.Localization.UiMessage.Resolve(ref uiLastForceActionMessage, LastForceActionMessage);
 
     public void ApplyConfiguration(bool allContentTypes, IEnumerable<uint>? selected)
     {
@@ -155,7 +174,7 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
 
                 var name = row.Name.ExtractText();
                 if (string.IsNullOrWhiteSpace(name))
-                    name = $"Type {row.RowId}";
+                    name = AutoRetainerUiMessagePresentation.Store(global::XASlave.Localization.UiMessage.Format("S4BE25F4F4EC2B09F", row.RowId));
 
                 entries.Add(new SelectableContentType(row.RowId, name, stock.Contains(row.RowId)));
             }
@@ -166,7 +185,7 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
         }
 
         if (entries.Count == 0)
-            entries.AddRange(GetAllContentTypeIds().Select(id => new SelectableContentType(id, $"Type {id}", stock.Contains(id))));
+            entries.AddRange(GetAllContentTypeIds().Select(id => new SelectableContentType(id, global::XASlave.Localization.UiMessage.Format("S4BE25F4F4EC2B09F", id), stock.Contains(id))));
 
         cachedSelectableContentTypes = entries;
         return cachedSelectableContentTypes;
@@ -226,7 +245,7 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
         forceEnabled = false;
         UpdateSubscriptions();
         RestorePatchedWhitelist();
-        StatusText = "Disabled";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
     }
 
     public LiveState GetLiveState()
@@ -244,7 +263,7 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
         framework.RunOnFrameworkThread(() =>
         {
             TryEndRecordingNow(force: true, out var message);
-            LastForceActionMessage = $"{DateTime.Now:HH:mm:ss} - {message}";
+            LastForceActionMessage = global::XASlave.Localization.UiMessage.Store(ref uiLastForceActionMessage, global::XASlave.Localization.UiMessage.Format("S6A2D789DF7E4416F", DateTime.Now, message));
             log.Information($"[XASlave] ARealmRecorded All Zones force stop: {message}");
             cachedLiveState = null;
         });
@@ -255,30 +274,30 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
         framework.RunOnFrameworkThread(() =>
         {
             TryForceStartRecordingNow(out var message);
-            LastForceActionMessage = $"{DateTime.Now:HH:mm:ss} - {message}";
+            LastForceActionMessage = global::XASlave.Localization.UiMessage.Store(ref uiLastForceActionMessage, global::XASlave.Localization.UiMessage.Format("S6A2D789DF7E4416F", DateTime.Now, message));
             log.Information($"[XASlave] ARealmRecorded All Zones force start: {message}");
             cachedLiveState = null;
         });
     }
 
-    private bool TryForceStartRecordingNow(out string message)
+    private bool TryForceStartRecordingNow(out global::XASlave.Localization.UiMessage message)
     {
         if (!TryGetPluginInstance(out var pluginInstance) || pluginInstance == null)
         {
-            message = "ARealmRecorded is not loaded.";
+            message = global::XASlave.Localization.UiMessage.Key("S1443F0C4E486D5AF");
             return false;
         }
 
         EnsureStatusReader(pluginInstance);
         if (statusReaderUnavailable || getReplayModuleAddress == null || replayModuleType == null)
         {
-            message = "The Duty Recorder module could not be resolved.";
+            message = global::XASlave.Localization.UiMessage.Key("SEDA45F25D4E170DC");
             return false;
         }
 
         if (condition[ConditionFlag.BetweenAreas] || condition[ConditionFlag.BetweenAreas51])
         {
-            message = "Cannot force start while zoning; wait until the zone has fully loaded.";
+            message = global::XASlave.Localization.UiMessage.Key("S3675C7D20175E743");
             return false;
         }
 
@@ -287,7 +306,7 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
             var address = getReplayModuleAddress();
             if (address == nint.Zero)
             {
-                message = "The Duty Recorder module pointer is null.";
+                message = global::XASlave.Localization.UiMessage.Key("SD10AF168763B8E43");
                 return false;
             }
 
@@ -295,32 +314,32 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
             var playback = replayModulePlaybackControlsOffset >= 0 ? *(byte*)(address + replayModulePlaybackControlsOffset) : (byte)0;
             if ((before & ReplayStatusRecordingMask) == ReplayStatusRecordingMask)
             {
-                message = $"Already recording (status 0x{before:X2}).";
+                message = global::XASlave.Localization.UiMessage.Format("S4040880BD8490B4C", before);
                 return false;
             }
 
             if ((playback & PlaybackControlsInPlaybackBit) != 0)
             {
-                message = "Cannot force start during replay playback.";
+                message = global::XASlave.Localization.UiMessage.Key("SD6F09129D9092898");
                 return false;
             }
 
             if (replayModuleInitZoneCfcOffset < 0)
             {
-                message = "The InitZone ContentFinderCondition offset could not be resolved.";
+                message = global::XASlave.Localization.UiMessage.Key("S5E58AAC9F8221DC8");
                 return false;
             }
 
             TryGetWhitelist(out var whitelist, out _);
 
-            var spoofNote = string.Empty;
+            var spoofNote = global::XASlave.Localization.UiMessage.Raw(string.Empty);
             var contentFinderCondition = *(ushort*)(address + replayModuleInitZoneCfcOffset);
             if (contentFinderCondition == 0)
             {
                 var spoof = FindSpoofCfc(whitelist);
                 if (spoof == null)
                 {
-                    message = "This zone has no ContentFinderCondition and no whitelisted duty could be found to spoof; cannot force start.";
+                    message = global::XASlave.Localization.UiMessage.Key("SF630D0E7DC54C92A");
                     return false;
                 }
 
@@ -328,15 +347,13 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
                 // the CFC only drives the replay header/labeling, so a spoof lets the recorder arm here.
                 *(ushort*)(address + replayModuleInitZoneCfcOffset) = spoof.Value.Id;
                 contentFinderCondition = spoof.Value.Id;
-                spoofNote = spoof.Value.TerritoryMatched
-                    ? $" This zone had no CFC; spoofed {spoof.Value.Id} ('{spoof.Value.Name}'), which matches this territory."
-                    : $" This zone had no CFC and no duty exists for this territory; spoofed {spoof.Value.Id} ('{spoof.Value.Name}') - the replay will show a FALSE location and may be unplayable. Experimental.";
+                spoofNote = (spoof.Value.TerritoryMatched ? global::XASlave.Localization.UiMessage.Format("SF3298072863FA2D7", spoof.Value.Id, spoof.Value.Name) : global::XASlave.Localization.UiMessage.Format("S98F7373914C52765", spoof.Value.Id, spoof.Value.Name));
             }
 
             var contentTypeId = GetContentTypeIdForCfc(contentFinderCondition);
             if (contentTypeId != 0 && whitelist != null && !whitelist.Contains(contentTypeId))
             {
-                message = $"Content type {contentTypeId} is not whitelisted right now - enable the mod and tick it (or Record all content types) first.";
+                message = global::XASlave.Localization.UiMessage.Format("S79F120062FD38AD3", contentTypeId);
                 return false;
             }
 
@@ -344,7 +361,7 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
             var detour = gameType?.GetMethod(InitializeRecordingDetourMethodName, StaticBindings);
             if (detour == null)
             {
-                message = "ARealmRecorded's InitializeRecordingDetour could not be resolved (unsupported plugin version).";
+                message = global::XASlave.Localization.UiMessage.Key("S76CBCFDA01671026");
                 return false;
             }
 
@@ -360,15 +377,13 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
             }
 
             var recording = (after & ReplayStatusRecordingMask) == ReplayStatusRecordingMask;
-            message = recording
-                ? $"Recording force-started for CFC {contentFinderCondition} (status 0x{before:X2} -> 0x{after:X2}).{spoofNote} The replay starts from this moment; earlier events are not included. Force-started recordings can carry a false location and may fail to play back."
-                : $"InitializeRecording invoked (status 0x{before:X2} -> 0x{after:X2}) but recording did not arm - ARealmRecorded declined it (check whitelist/CFC).{spoofNote}";
+            message = (recording ? global::XASlave.Localization.UiMessage.Format("S60018E0A3E0811AC", contentFinderCondition, before, after, spoofNote) : global::XASlave.Localization.UiMessage.Format("S24C49FC4A4CE4484", before, after, spoofNote));
             return recording;
         }
         catch (Exception ex)
         {
             log.Warning(ex, "[XASlave] ARealmRecorded All Zones failed to force start a recording.");
-            message = $"Force start failed: {ex.InnerException?.Message ?? ex.Message}";
+            message = global::XASlave.Localization.UiMessage.Format("SC7D818350A3075C3", global::XASlave.Localization.UiMessage.FromException(ex.InnerException ?? ex));
             return false;
         }
     }
@@ -454,13 +469,13 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
     {
         if (!forceEnabled)
         {
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return;
         }
 
         if (!TryGetWhitelist(out var whitelist, out var pluginInstance) || whitelist == null || pluginInstance == null)
         {
-            StatusText = "Enabled - waiting for ARealmRecorded to load.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S9303F7B8444B37B5"));
             return;
         }
 
@@ -507,9 +522,7 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
             MaybeAutoCleanStaleRecorder(statusByte, isRecording, inPlayback);
         }
 
-        StatusText = injectAllContentTypes
-            ? $"Enabled - ARealmRecorded records every content type ({whitelist.Count} whitelisted, {originalWhitelist.Length} stock)."
-            : $"Enabled - ARealmRecorded records {selectedContentTypes.Count} selected content type(s) plus its stock whitelist ({whitelist.Count} whitelisted, {originalWhitelist.Length} stock).";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (injectAllContentTypes ? global::XASlave.Localization.UiMessage.Format("S42E04C4B26E87B4A", whitelist.Count, originalWhitelist.Length) : global::XASlave.Localization.UiMessage.Format("SA7F495125742BAF1", selectedContentTypes.Count, whitelist.Count, originalWhitelist.Length)));
     }
 
     private void MaybeAutoCleanStaleRecorder(byte statusByte, bool isRecording, bool inPlayback)
@@ -566,18 +579,18 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
         return true;
     }
 
-    private bool TryEndRecordingNow(bool force, out string message)
+    private bool TryEndRecordingNow(bool force, out global::XASlave.Localization.UiMessage message)
     {
         if (!TryGetPluginInstance(out var pluginInstance) || pluginInstance == null)
         {
-            message = "ARealmRecorded is not loaded.";
+            message = global::XASlave.Localization.UiMessage.Key("S1443F0C4E486D5AF");
             return false;
         }
 
         EnsureStatusReader(pluginInstance);
         if (statusReaderUnavailable || getReplayModuleAddress == null || replayModuleType == null || endRecordingGameFunction == null)
         {
-            message = "The Duty Recorder endRecording function could not be resolved.";
+            message = global::XASlave.Localization.UiMessage.Key("SDCCF191BF344F14F");
             return false;
         }
 
@@ -586,14 +599,14 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
             var address = getReplayModuleAddress();
             if (address == nint.Zero)
             {
-                message = "The Duty Recorder module pointer is null.";
+                message = global::XASlave.Localization.UiMessage.Key("SD10AF168763B8E43");
                 return false;
             }
 
             var before = *(byte*)(address + replayModuleStatusOffset);
             if (!force && (before & (ReplayStatusRecordingMask | ReplayStatusArmedMask)) == 0)
             {
-                message = $"Recorder already idle (status 0x{before:X2}); nothing to stop.";
+                message = global::XASlave.Localization.UiMessage.Format("SE0D7836148B30E5B", before);
                 return false;
             }
 
@@ -602,19 +615,19 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
                 ?.GetValue(endRecordingGameFunction) as Delegate;
             if (invokeDelegate == null)
             {
-                message = "The endRecording game function is not available (signature unresolved).";
+                message = global::XASlave.Localization.UiMessage.Key("SD92D1BEC476DC007");
                 return false;
             }
 
             invokeDelegate.DynamicInvoke(Pointer.Box((void*)address, replayModuleType.MakePointerType()));
             var after = *(byte*)(address + replayModuleStatusOffset);
-            message = $"EndRecording invoked (status 0x{before:X2} -> 0x{after:X2}).";
+            message = global::XASlave.Localization.UiMessage.Format("S585AE7A10650F3C3", before, after);
             return true;
         }
         catch (Exception ex)
         {
             log.Warning(ex, "[XASlave] ARealmRecorded All Zones failed to invoke endRecording.");
-            message = $"EndRecording failed: {ex.InnerException?.Message ?? ex.Message}";
+            message = global::XASlave.Localization.UiMessage.Format("S6992A392FCC9104B", global::XASlave.Localization.UiMessage.FromException(ex.InnerException ?? ex));
             return false;
         }
     }
@@ -622,22 +635,16 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
     private LiveState BuildLiveState()
     {
         if (!TryGetPluginInstance(out var pluginInstance) || pluginInstance == null)
-            return new LiveState { Description = "ARealmRecorded is not loaded." };
+            return new LiveState { DescriptionMessage = global::XASlave.Localization.UiMessage.Key("S1443F0C4E486D5AF") };
 
         EnsureStatusReader(pluginInstance);
         if (!TryReadModuleBytes(out var statusByte, out var playbackControls, out var recordingTime))
-            return new LiveState { PluginLoaded = true, Description = "Loaded - Duty Recorder state unavailable." };
+            return new LiveState { PluginLoaded = true, DescriptionMessage = global::XASlave.Localization.UiMessage.Key("S0988D9A2F12A899C") };
 
         var isRecording = (statusByte & ReplayStatusRecordingMask) == ReplayStatusRecordingMask;
         var inPlayback = (playbackControls & PlaybackControlsInPlaybackBit) != 0;
         var isArmed = !isRecording && (statusByte & ReplayStatusArmedMask) != 0;
-        var description = isRecording
-            ? $"RECORDING - {FormatRecordingTime(recordingTime)} elapsed."
-            : inPlayback
-                ? "Playing back a replay."
-                : isArmed
-                    ? "Armed - recorder initialized but not actively recording (stale after leaving a zone)."
-                    : "Idle - not recording.";
+        var description = (isRecording ? global::XASlave.Localization.UiMessage.Format("SD7BA27EA6F06B7C8", FormatRecordingTime(recordingTime)) : (inPlayback ? global::XASlave.Localization.UiMessage.Key("S4E8DB4BBDA72FBC7") : (isArmed ? global::XASlave.Localization.UiMessage.Key("S772035AD5F8F47C3") : global::XASlave.Localization.UiMessage.Key("S5ACAFD8B00009041"))));
 
         return new LiveState
         {
@@ -649,7 +656,7 @@ public unsafe sealed class ARealmRecordedIntegrationService : IDisposable
             IsArmed = isArmed,
             InPlayback = inPlayback,
             RecordingTimeSeconds = recordingTime,
-            Description = description,
+            DescriptionMessage = description,
             StatusBitsText = DescribeStatusBits(statusByte),
         };
     }

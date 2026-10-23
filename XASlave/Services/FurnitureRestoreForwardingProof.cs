@@ -157,13 +157,13 @@ internal static class FurnitureRestoreForwardingProof
 
     private static byte[] Read(nint address, int length, Dictionary<nint, byte[]> reads)
     {
-        if (address <= 0 || length is < 1 or > 4096) throw new InvalidOperationException("Invalid furniture forwarding proof range.");
+        if (address <= 0 || length is < 1 or > 4096) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S51CC8A91BF212259"), originalMessageText => new InvalidOperationException(originalMessageText));
         var bytes = NearbyZoneNativeBinding.Read(address, length);
         if (reads.TryGetValue(address, out var previous))
         {
             var common = Math.Min(previous.Length, bytes.Length);
             if (!previous.AsSpan(0, common).SequenceEqual(bytes.AsSpan(0, common)))
-                throw new InvalidOperationException("Furniture forwarding proof changed during capture.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1104EC5C2106E19A"), originalMessageText => new InvalidOperationException(originalMessageText));
             if (previous.Length >= bytes.Length) return bytes;
         }
         reads[address] = bytes;

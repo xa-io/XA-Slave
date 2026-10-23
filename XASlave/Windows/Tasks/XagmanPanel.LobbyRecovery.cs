@@ -17,7 +17,8 @@ public partial class SlaveWindow
         public string Command = string.Empty;
         public string Character = string.Empty;
         public string World = string.Empty;
-        public string Label = string.Empty;
+        public global::XASlave.Localization.UiMessage LabelMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+        public string Label => LabelMessage.Original;
         public bool DirectLogin;
         public bool ExpectedTravelLogout;
         public Action? BeforeReplay;
@@ -43,26 +44,31 @@ public partial class SlaveWindow
     // Shared by the debug button and automatic recovery. Success means dispatch, not idle.
     private bool CancelLifestreamTask(out string message)
     {
+        var result = CancelLifestreamTaskMessage(out var presentation);
+        message = presentation.Original;
+        return result;
+    }
+
+    private bool CancelLifestreamTaskMessage(out global::XASlave.Localization.UiMessage message)
+    {
         var sent = plugin.IpcClient.LifestreamAbort();
-        message = sent
-            ? "Lifestream cancellation requested; wait for Busy = false before sending another command."
-            : "Lifestream cancellation IPC failed; no replacement command was sent.";
+        message = (sent ? global::XASlave.Localization.UiMessage.Key("S40EE21D3FC50EAE8") : global::XASlave.Localization.UiMessage.Key("S61BA55A63CF4B368"));
         return sent;
     }
 
-    private void BeginXagmanLobbyOperation(string command, string character, string label,
+    private void BeginXagmanLobbyOperation(string command, string character, global::XASlave.Localization.UiMessage label,
         bool directLogin, bool expectedTravelLogout, Action? beforeReplay = null, Func<bool>? completed = null)
     {
         var runner = plugin.TaskRunner;
         if (xagmanLobbyOperation is { } existing && existing.RunId == runner.CurrentRunId
             && existing.RunnerOwned == runner.IsRunning && existing.Command == command
-            && existing.Character == character && existing.Label == label)
+            && existing.Character == character && existing.Label == label.Original)
             return; // A dropped-command reissue must not replenish the recovery budget.
         EndXagmanLobbyOperation();
         xagmanLobbyOperation = new XagmanLobbyOperation
         {
             RunId = runner.CurrentRunId, RunnerOwned = runner.IsRunning,
-            Command = command, Character = character, World = GetCurrentWorldName(), Label = label,
+            Command = command, Character = character, World = GetCurrentWorldName(), LabelMessage = label,
             DirectLogin = directLogin, ExpectedTravelLogout = expectedTravelLogout,
             BeforeReplay = beforeReplay, Completed = completed,
             ErrorSequence = plugin.LobbyErrorAutoClose.ErrorSequence,
@@ -91,14 +97,14 @@ public partial class SlaveWindow
                 ? name + ":" + string.Join("/", AddonHelper.GetAddonTextEntries(name)) : string.Empty));
     }
 
-    private void FailXagmanLobbyRecovery(string reason)
+    private void FailXagmanLobbyRecovery(global::XASlave.Localization.UiMessage reason)
     {
         plugin.TaskRunner.AddLog($"Xagman: lobby recovery stopped: {reason}");
         CancelLifestreamTask(out _);
         EndXagmanLobbyOperation();
         StopXagmanTask();
         xagmanStatus = XagmanStatus.Error;
-        xagmanStatusText = $"Lobby recovery: {reason}";
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S88126A18D9F37BA4", reason));
     }
 
     private bool PollXagmanLobbyRecovery()
@@ -106,7 +112,7 @@ public partial class SlaveWindow
         try { return PollXagmanLobbyRecoveryCore(); }
         catch (Exception ex)
         {
-            FailXagmanLobbyRecovery($"recovery check failed: {ex.Message}");
+            FailXagmanLobbyRecovery(global::XASlave.Localization.UiMessage.Format("SEB65187AD81298A8", ex.Message));
             return true;
         }
     }
@@ -133,7 +139,7 @@ public partial class SlaveWindow
             op.Recovery = null;
             op.QuietSince = now;
             op.Activity = GetXagmanLobbyActivity();
-            xagmanStatusText = $"Lobby recovery: waiting for 30 seconds without activity during {op.Label}.";
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S3EE49510147783F5", op.LabelMessage));
             runner.AddLog($"Xagman: lobby error during {op.Label}, '/li {op.Command}': {errors.LastErrorText}. Waiting for closure and 30 seconds without activity.");
         }
         if (!op.Pending)
@@ -146,15 +152,15 @@ public partial class SlaveWindow
         op.NextPoll = now.AddMilliseconds(250);
         if ((now - op.RecoveryStarted).TotalMinutes >= 20)
         {
-            FailXagmanLobbyRecovery("the interrupted operation exceeded its 20-minute recovery limit");
+            FailXagmanLobbyRecovery(global::XASlave.Localization.UiMessage.Key("S6D4A4F1BC6DDC674"));
             return true;
         }
         if (op.Recovery != null)
         {
             if (errors.HasSupportedError) return true;
-            xagmanStatusText = $"Lobby recovery {op.Attempts}/2: {op.Recovery.CurrentStepName}.";
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SD4CA6A0A5CA51DEA", op.Attempts, op.Recovery.CurrentStepNameMessage));
             op.Recovery.Tick();
-            if (ReferenceEquals(op, xagmanLobbyOperation) && op.Recovery?.LastError is { } error)
+            if (ReferenceEquals(op, xagmanLobbyOperation) && op.Recovery?.LastErrorMessage is { } error)
                 FailXagmanLobbyRecovery(error);
             return true;
         }
@@ -176,7 +182,7 @@ public partial class SlaveWindow
         if ((now - op.QuietSince).TotalSeconds < 30) return true;
         if (++op.Attempts > 2)
         {
-            FailXagmanLobbyRecovery($"two recovery attempts exhausted for '/li {op.Command}'");
+            FailXagmanLobbyRecovery(global::XASlave.Localization.UiMessage.Format("S88C39650B79047D4", op.Command));
             return true;
         }
         BuildXagmanLobbyRecovery(op);
@@ -194,32 +200,32 @@ public partial class SlaveWindow
         var runner = plugin.TaskRunner;
         runner.AddLog($"Xagman: lobby recovery {op.Attempts}/2 for {op.Label}; saved character '{op.Character}', saved command '/li {op.Command}'.");
         var steps = new List<TaskStep>();
-        void Fail(string reason) => FailXagmanLobbyRecovery(reason);
+        void Fail(global::XASlave.Localization.UiMessage reason) => FailXagmanLobbyRecovery(reason);
         bool Live() => ReferenceEquals(op, xagmanLobbyOperation) && xagmanRunning;
         steps.Add(new TaskStep
         {
-            Name = "Lobby recovery: Cancel Lifestream",
-            OnEnter = () => { if (!CancelLifestreamTask(out var message)) Fail(message); else runner.AddLog(message); },
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SDBBAD43E3296FB4F"),
+            OnEnter = () => { if (!CancelLifestreamTaskMessage(out var message)) Fail(message); else runner.AddLog(message.Original); },
             IsComplete = () => true, TimeoutSec = 1,
         });
         steps.Add(new TaskStep
         {
-            Name = "Lobby recovery: Verify Lifestream idle",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S6A35927E4B173122"),
             IsComplete = () => plugin.IpcClient.TryGetLifestreamBusy(out var busy) && !busy,
-            TimeoutSec = 30, OnTimeout = () => Fail("Lifestream remained busy or unreadable after cancellation"),
+            TimeoutSec = 30, OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key("SEA7B11495698DDD2")),
         });
         // Relative commands belong to the outgoing character, never the next roster entry.
         var reuseLoggedCharacter = false;
         var needsLogout = false;
         steps.Add(new TaskStep
         {
-            Name = "Lobby recovery: Capture normalization state",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S6DAB349A84ED854F"),
             OnEnter = () =>
             {
                 reuseLoggedCharacter = !op.DirectLogin && IsXagmanLobbyCharacterReady(op.Character);
                 needsLogout = !reuseLoggedCharacter && !string.IsNullOrWhiteSpace(MonthlyReloggerTask.GetCurrentCharacterNameWorld());
                 if (needsLogout && (!CharacterSafetyHelper.IsCharacterSafeWaitReady() || AddonHelper.IsAddonVisible("SelectYesno")))
-                    Fail("cannot safely normalize the logged-in character or an unrelated confirmation is open");
+                    Fail(global::XASlave.Localization.UiMessage.Key("SC067D4966B1EC44B"));
                 if (needsLogout) xagmanExpectedLogout = true;
             },
             IsComplete = () => true, TimeoutSec = 1,
@@ -235,27 +241,27 @@ public partial class SlaveWindow
             }
             steps.Add(new TaskStep
             {
-                Name = step.Name, OnEnter = step.OnEnter, TimeoutSec = step.TimeoutSec,
+                NameMessage = step.NameMessage, OnEnter = step.OnEnter, TimeoutSec = step.TimeoutSec,
                 ShouldSkip = () => !needsLogout,
-                OnTimeout = () => Fail("logout confirmation timed out"),
+                OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key("S43F43F564D05FB01")),
                 IsComplete = () =>
                 {
                     if (AddonHelper.IsAddonReady("SelectYesno")
                         && (!AddonHelper.TryGetSelectYesnoText(out var prompt)
                             || (!prompt.Contains("log out", StringComparison.OrdinalIgnoreCase)
                                 && !prompt.Contains("logout", StringComparison.OrdinalIgnoreCase))))
-                    { Fail("the confirmation is not a recognized logout prompt"); return false; }
+                    { Fail(global::XASlave.Localization.UiMessage.Key("SC3336E90A3F84884")); return false; }
                     return step.IsComplete();
                 },
             });
         }
         steps.Add(new TaskStep
         {
-            Name = "Lobby recovery: Wait for logout",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SA2141EA78E666D86"),
             ShouldSkip = () => !needsLogout,
             IsComplete = () => !Plugin.ClientState.IsLoggedIn
                 && (AddonHelper.IsAddonVisible("_TitleMenu") || AddonHelper.IsAddonVisible("CharaSelect") || AddonHelper.IsAddonVisible("_CharaSelectListMenu")),
-            TimeoutSec = 60, OnTimeout = () => Fail("logout did not reach the lobby"),
+            TimeoutSec = 60, OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key("S00B9628E44E452F1")),
         });
         var helper = new MonthlyReloggerTask(plugin);
         foreach (var step in helper.BuildPreFlightOnlySteps(new List<string> { op.Character }, runner, RunXagmanPreflightArMultiGuard))
@@ -263,7 +269,7 @@ public partial class SlaveWindow
         var nextNavigation = DateTime.MinValue;
         steps.Add(new TaskStep
         {
-            Name = "Lobby recovery: Verify main menu",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S680F543E099730F6"),
             ShouldSkip = () => reuseLoggedCharacter,
             IsComplete = () =>
             {
@@ -280,7 +286,7 @@ public partial class SlaveWindow
                 }
                 return false;
             },
-            TimeoutSec = 30, OnTimeout = () => Fail("pre-flight did not reach the main menu; replay blocked"),
+            TimeoutSec = 30, OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key("S79E19584A111B368")),
         });
         bool errorsVisible() => AddonHelper.IsAddonVisible("Dialogue") || AddonHelper.IsAddonVisible("SelectOk") || AddonHelper.IsAddonVisible("SelectYesno");
         var safePasses = 0;
@@ -289,14 +295,14 @@ public partial class SlaveWindow
             ? op.Character : $"{op.Character} {op.World}";
         steps.Add(new TaskStep
         {
-            Name = "Lobby recovery: Restore outgoing character",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("SD284B9384D29A4FF"),
             ShouldSkip = () => op.DirectLogin || reuseLoggedCharacter,
             OnEnter = () =>
             {
                 if (!op.Character.Contains('@') || op.Character.EndsWith("@Unknown", StringComparison.OrdinalIgnoreCase))
-                { Fail("the interrupted command has no reliable outgoing character"); return; }
+                { Fail(global::XASlave.Localization.UiMessage.Key("S59D5B5157A3F3D36")); return; }
                 if (!plugin.IpcClient.TryGetLifestreamBusy(out var busy) || busy || !plugin.IpcClient.LifestreamExecuteCommand(relativeLogin))
-                    Fail("could not restore the outgoing character; replay blocked");
+                    Fail(global::XASlave.Localization.UiMessage.Key("S720B75C6377FBBE6"));
                 else runner.AddLog($"Xagman: restoring outgoing character with /li {relativeLogin} before /li {op.Command}.");
             },
             IsComplete = () =>
@@ -308,24 +314,24 @@ public partial class SlaveWindow
                 nextPass = DateTime.UtcNow.AddSeconds(1);
                 return ++safePasses >= 3;
             },
-            TimeoutSec = 600, OnTimeout = () => Fail("outgoing character could not be restored safely"),
+            TimeoutSec = 600, OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key("S5CD8F0B1AD6EB4B1")),
         });
         steps.Add(new TaskStep
         {
-            Name = "Lobby recovery: Replay saved command",
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S9BD0D35FEED1D471"),
             OnEnter = () =>
             {
                 if (!Live()) return;
                 if (!plugin.IpcClient.TryGetLifestreamBusy(out var busy) || busy || errorsVisible()
                     || (!op.DirectLogin && !IsXagmanLobbyCharacterReady(op.Character)))
-                { Fail("replay safety checks failed"); return; }
+                { Fail(global::XASlave.Localization.UiMessage.Key("S259453F4D193F053")); return; }
                 op.BeforeReplay?.Invoke();
                 if (!Live()) return;
                 xagmanExpectedLogout = op.DirectLogin && Plugin.ClientState.IsLoggedIn;
                 var sent = op.ExpectedTravelLogout
                     ? ExecuteXagmanTravelCommandWithExpectedLogout(op.Command, op.Label)
                     : plugin.IpcClient.LifestreamExecuteCommand(op.Command);
-                if (!sent) { Fail("Lifestream rejected the saved command"); return; }
+                if (!sent) { Fail(global::XASlave.Localization.UiMessage.Key("S64769DB1A90B01C0")); return; }
                 op.Pending = false;
                 op.Recovery = null;
                 runner.AddLog($"Xagman: replayed /li {op.Command}; resuming original completion checks.");

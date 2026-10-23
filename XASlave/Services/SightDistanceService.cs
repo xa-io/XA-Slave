@@ -57,7 +57,10 @@ public unsafe sealed class SightDistanceService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public bool IsStartupArmingPending => startupArmingPending;
 
@@ -74,7 +77,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         startupArmingStep = 0;
         StartStartupHookCreation();
         SubscribeStartupArming();
-        StatusText = "Arming - camera hooks and patch surfaces are initializing on the framework thread.";
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S02C0CE0A7F94BCF7"));
         return true;
     }
 
@@ -103,7 +106,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         if (enabled && !startupArmingPending)
         {
             if (!TryUpdateActiveCamera())
-                StatusText = GetEnabledStatusText(activeCameraReady: false);
+                StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText(activeCameraReady: false));
 
             UpdateCollisionPatch();
         }
@@ -113,7 +116,7 @@ public unsafe sealed class SightDistanceService : IDisposable
     {
         if (disposed)
         {
-            StatusText = "Unavailable - Custom Sight Distance has been disposed.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SA241C24F92460F48"));
             return false;
         }
 
@@ -131,7 +134,7 @@ public unsafe sealed class SightDistanceService : IDisposable
             ToggleHook(cameraCurrentSightDistanceHook, false, "CameraCurrentSightDistance");
             RestoreCollisionPatch();
             RestoreCapturedCamera();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
@@ -139,7 +142,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         CancelStartupArming(disposeCompletedResult: true);
         if (setActiveCameraHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
         {
-            StatusText = "Unavailable - camera hooks and patch surfaces are missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S157BA4903D952EC1"));
             return false;
         }
 
@@ -147,7 +150,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         ToggleHook(setActiveCameraHook, true, "SetActiveCamera");
         ToggleHook(cameraCurrentSightDistanceHook, true, "CameraCurrentSightDistance");
         UpdateCollisionPatch();
-        StatusText = GetEnabledStatusText(TryUpdateActiveCamera());
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText(TryUpdateActiveCamera()));
         return true;
     }
 
@@ -460,7 +463,7 @@ public unsafe sealed class SightDistanceService : IDisposable
                     if (setActiveCameraHook == null && cameraCurrentSightDistanceHook == null && cameraCollisionPatchAddress == nint.Zero)
                     {
                         enabled = false;
-                        StatusText = "Unavailable - camera hooks and patch surfaces are missing.";
+                        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S157BA4903D952EC1"));
                         CancelStartupArming();
                         return;
                     }
@@ -476,7 +479,7 @@ public unsafe sealed class SightDistanceService : IDisposable
                     UpdateCollisionPatch();
                     break;
                 default:
-                    StatusText = GetEnabledStatusText(TryUpdateActiveCamera());
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText(TryUpdateActiveCamera()));
                     CancelStartupArming();
                     return;
             }
@@ -486,7 +489,7 @@ public unsafe sealed class SightDistanceService : IDisposable
         catch (Exception ex)
         {
             enabled = false;
-            StatusText = $"Unavailable - startup arming failed at {label}.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Format("S2E54038976201657", label));
             CancelStartupArming();
             log.Warning(ex, $"[XASlave] Custom Sight Distance startup arming failed at {label}.");
         }
@@ -570,15 +573,13 @@ public unsafe sealed class SightDistanceService : IDisposable
         log.Debug($"[XASlave] Custom Sight Distance startup arming step '{label}' took {elapsedMilliseconds:F1}ms.");
     }
 
-    private string GetEnabledStatusText(bool activeCameraReady)
+    private global::XASlave.Localization.UiMessage GetEnabledStatusText(bool activeCameraReady)
     {
         var resolvedSurfaces = (setActiveCameraHook != null ? 1 : 0)
             + (cameraCurrentSightDistanceHook != null ? 1 : 0)
             + (cameraCollisionPatchAddress != nint.Zero ? 1 : 0);
-        var availabilityLabel = resolvedSurfaces < 3 ? "Partially enabled" : "Enabled";
-        return activeCameraReady
-            ? $"{availabilityLabel} - camera overrides are active on {resolvedSurfaces}/3 native surfaces."
-            : $"{availabilityLabel} - {resolvedSurfaces}/3 native surfaces are ready; waiting for an active camera after a transition.";
+        var availabilityLabel = (resolvedSurfaces < 3 ? global::XASlave.Localization.UiMessage.Key("S14F862A9FCF680A8") : global::XASlave.Localization.UiMessage.Key("S92C1CDFDF4CB9CF6"));
+        return (activeCameraReady ? global::XASlave.Localization.UiMessage.Format("SA5516457090D850D", availabilityLabel, resolvedSurfaces) : global::XASlave.Localization.UiMessage.Format("SCC48016C4ADF34BD", availabilityLabel, resolvedSurfaces));
     }
 
     private void SetActiveCameraDetour(CameraManager* manager, int cameraIndex, void* a3)

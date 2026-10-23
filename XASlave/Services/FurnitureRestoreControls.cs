@@ -20,7 +20,7 @@ internal sealed unsafe class FurnitureRestoreControls : IDisposable
     internal FurnitureRestoreControls(FurnitureAddonStamp host, Action<FurnitureRestoreMode> start, Action cancel, Action showResults, Func<bool> isCurrent)
     {
         Host = host; this.start = start; this.cancel = cancel; this.showResults = showResults; this.isCurrent = isCurrent;
-        if (!CanUseHost()) throw new InvalidOperationException("HousingGoods changed while creating furniture controls.");
+        if (!CanUseHost()) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SFC6BAC38BB0FD11F"), originalMessage => new InvalidOperationException(originalMessage));
     }
 
     private bool CanUseHost()
@@ -88,11 +88,11 @@ internal sealed unsafe class FurnitureRestoreControls : IDisposable
                 ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + contentWidth);
                 try { ImGui.TextUnformatted(status); }
                 finally { ImGui.PopTextWrapPos(); }
-                Button("Placed -> storeroom", 0, contentWidth, buttonHeight);
-                Button("Placed -> inventory", 1, contentWidth, buttonHeight);
-                Button("Stored -> inventory", 2, contentWidth, buttonHeight);
-                Button("Stop", 3, contentWidth, buttonHeight);
-                Button("Per-item results", 4, contentWidth, buttonHeight);
+                Button(global::XASlave.Localization.UiLocale.Native("SCCA438DDC858B4BC"), 0, contentWidth, buttonHeight);
+                Button(global::XASlave.Localization.UiLocale.Native("S615A5DD5C6B76455"), 1, contentWidth, buttonHeight);
+                Button(global::XASlave.Localization.UiLocale.Native("S62933956023C189F"), 2, contentWidth, buttonHeight);
+                Button(global::XASlave.Localization.UiLocale.Native("SCAE7D57BC067A514"), 3, contentWidth, buttonHeight);
+                Button(global::XASlave.Localization.UiLocale.Native("SD37890AACA8D8854"), 4, contentWidth, buttonHeight);
             }
             finally { ImGui.End(); }
         }
@@ -121,12 +121,13 @@ internal sealed unsafe class FurnitureRestoreControls : IDisposable
                 drawList.AddRectFilled(min, max, ImGui.ColorConvertFloat4ToU32(new Vector4(0, 0, 0, 0.12f * alpha)), rounding);
             else if (ImGui.IsItemHovered())
                 drawList.AddRectFilled(min, max, ImGui.ColorConvertFloat4ToU32(new Vector4(1, 1, 1, 0.08f * alpha)), rounding);
-            var textSize = ImGui.CalcTextSize(label);
+            var displayLabel = global::XASlave.Localization.UiLocale.T(label);
+            var textSize = ImGui.CalcTextSize(displayLabel);
             var textPos = new Vector2(min.X + Math.Max(6f, (width - textSize.X) * 0.5f), min.Y + Math.Max(0, (height - textSize.Y) * 0.5f));
             drawList.PushClipRect(min, max, true);
-            try { drawList.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), label); }
+            try { drawList.AddText(textPos, ImGui.GetColorU32(ImGuiCol.Text), displayLabel); }
             finally { drawList.PopClipRect(); }
-            if (ImGui.IsItemHovered()) ImGui.SetTooltip(label);
+            if (ImGui.IsItemHovered()) ImGui.SetTooltip(displayLabel);
         }
         finally { ImGui.EndDisabled(); }
     }

@@ -63,22 +63,22 @@ public partial class SlaveWindow
         };
     }
 
-    private string GetXagmanTonyEtaLabel()
+    private global::XASlave.Localization.UiMessage GetXagmanTonyEtaLabel()
     {
         var report = xagmanPublishedEta;
         var phase = IsXagmanCollectionFirstRunActive() ? xagmanRunPhase : XagmanRunPhase.Legacy;
         if (!XagmanEtaEstimator.IsUsable(report, DateTime.UtcNow, phase, plugin.InstanceId))
-            return "ETA: waiting for fresh timing reports from all owner clients";
-        var qualifier = report!.UsesDefaultRate ? "; includes assumed 2m/char" : string.Empty;
-        if (report.HasUnfinishedWork) qualifier += "; unfinished work may require more passes";
-        var scope = IsXagmanCollectionFirstRunActive() ? $"{phase} phase " : string.Empty;
-        return $"{scope}ETA ~{FormatXagmanDuration(report.RemainingSeconds)} (longest owner account{qualifier})";
+            return global::XASlave.Localization.UiMessage.Key("S3B91622B73DD4F4B");
+        var qualifier = (report!.UsesDefaultRate ? global::XASlave.Localization.UiMessage.Key("SEA0BE3C1D016B160") : global::XASlave.Localization.UiMessage.Raw(string.Empty));
+        if (report.HasUnfinishedWork) qualifier = global::XASlave.Localization.UiMessage.Concat(qualifier, global::XASlave.Localization.UiMessage.Key("S8953925348017BE6"));
+        var scope = (IsXagmanCollectionFirstRunActive() ? global::XASlave.Localization.UiMessage.Format("S948934D2F002791A", GetXagmanPhaseMessage(phase)) : global::XASlave.Localization.UiMessage.Raw(string.Empty));
+        return global::XASlave.Localization.UiMessage.Format("S17CBD879D3214D1D", scope, FormatXagmanDurationMessage(report.RemainingSeconds), qualifier);
     }
 
-    private bool TryGetXagmanOwnerRouteWait(out string state, out string estimate)
+    private bool TryGetXagmanOwnerRouteWait(out global::XASlave.Localization.UiMessage state, out global::XASlave.Localization.UiMessage estimate)
     {
-        state = string.Empty;
-        estimate = string.Empty;
+        state = global::XASlave.Localization.UiMessage.Raw(string.Empty);
+        estimate = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         if (!xagmanRunning || plugin.Configuration.XagmanOutsideNetworkHelper
             || xagmanActiveRole != XagmanRole.FranchiseOwner || xagmanStatus != XagmanStatus.Paused) return false;
         var tony = GetXagmanSupplyTonyPeer();
@@ -94,18 +94,18 @@ public partial class SlaveWindow
             || destination.Equals(tony.ServerMatchingActiveDataCenter, StringComparison.OrdinalIgnoreCase)) return false;
         var differentRegion = !string.Equals(WorldData.GetRegionOfDataCenter(destination),
             WorldData.GetRegionOfDataCenter(tony.ServerMatchingActiveDataCenter), StringComparison.OrdinalIgnoreCase);
-        state = differentRegion ? "Waiting for Tony to finish previous region..." : "Waiting for Tony to finish previous world...";
+        state = (differentRegion ? global::XASlave.Localization.UiMessage.Key("S049CBB216199D4F1") : global::XASlave.Localization.UiMessage.Key("S4B027EC29B7FFA92"));
         if (WorldData.GetSweepOrdinal(destination) < WorldData.GetSweepOrdinal(tony.ServerMatchingActiveDataCenter))
-            state = differentRegion ? "Waiting for Tony to return to this region..." : "Waiting for Tony to return to this world...";
+            state = (differentRegion ? global::XASlave.Localization.UiMessage.Key("SB0F0E82AA549083C") : global::XASlave.Localization.UiMessage.Key("SC3D9D0E4FBEF0D7D"));
         var phase = IsXagmanCollectionFirstRunActive() ? xagmanRunPhase : XagmanRunPhase.Legacy;
         if (!XagmanEtaEstimator.IsUsable(tony.Eta, DateTime.UtcNow, phase, tony.InstanceId))
-        { estimate = "Wait ETA: waiting for fresh timing reports from all owner clients"; return true; }
+        { estimate = global::XASlave.Localization.UiMessage.Key("SD7D120621FB5D60C"); return true; }
         if (!XagmanEtaEstimator.TryEstimateWait(tony.Eta!, destination, out var characters, out var seconds))
-        { estimate = "Wait ETA: unavailable until Tony schedules the next sweep"; return true; }
-        var rate = tony.Eta!.UsesDefaultRate ? "includes assumed 2m/char" : $"avg {FormatXagmanDuration(tony.Eta.AverageSecondsPerCharacter)}/char";
-        estimate = $"{characters} characters ahead; wait ~{FormatXagmanDuration(seconds)} ({rate}; parallel accounts)";
-        if (IsXagmanCollectionFirstRunActive()) estimate = $"{phase} phase: {estimate}";
-        if (tony.Eta.HasUnfinishedWork) estimate += "; additional supply passes may extend this";
+        { estimate = global::XASlave.Localization.UiMessage.Key("S57C09BEDE615CD7F"); return true; }
+        var rate = (tony.Eta!.UsesDefaultRate ? global::XASlave.Localization.UiMessage.Key("S4E40351AE461A631") : global::XASlave.Localization.UiMessage.Format("S77F0705495B5EC16", FormatXagmanDurationMessage(tony.Eta.AverageSecondsPerCharacter)));
+        estimate = global::XASlave.Localization.UiMessage.Format("SDB9AB18C4167FFD5", characters, FormatXagmanDurationMessage(seconds), rate);
+        if (IsXagmanCollectionFirstRunActive()) estimate = global::XASlave.Localization.UiMessage.Format("S31DBC1ABDB977186", GetXagmanPhaseMessage(phase), estimate);
+        if (tony.Eta.HasUnfinishedWork) estimate = global::XASlave.Localization.UiMessage.Concat(estimate, global::XASlave.Localization.UiMessage.Key("S0E20B8F4457A8CDA"));
         return true;
     }
 }

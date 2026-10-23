@@ -26,7 +26,7 @@ public partial class SlaveWindow
     //  Export Data - constants
     // -----------------------------------------------
     private static readonly int[] ExportIntervalOptions = { 0, 6, 12, 24, 48, 72 };
-    private static readonly string[] ExportIntervalLabels = { "Always", "6 hours", "12 hours", "24 hours", "48 hours", "72 hours" };
+    private static readonly string[] ExportIntervalLabels = { global::XASlave.Localization.UiLocale.Native("SDE9F057A471CDB8D"), global::XASlave.Localization.UiLocale.Native("S4105AE3B8A605FB6"), global::XASlave.Localization.UiLocale.Native("SFF627200D1A38AF6"), global::XASlave.Localization.UiLocale.Native("SF0514E8DF84107F4"), global::XASlave.Localization.UiLocale.Native("S5EFF4CC6B116F56D"), global::XASlave.Localization.UiLocale.Native("SE82EA78E7A608A5F") };
     private const string ExportTaskName = "Export Data";
     private const string ExportTimestampToken = "{timestamp}";
     private const string ExportRuntimeStateFileName = "ExportData.runtime.json";
@@ -81,6 +81,7 @@ public partial class SlaveWindow
     };
 
     private string exportStatusMessage = string.Empty;
+    private global::XASlave.Localization.UiMessage? exportStatusMessageUiMessage = global::XASlave.Localization.UiMessage.Raw(string.Empty);
     private Vector4 exportStatusColor = new(0.4f, 1.0f, 0.4f, 1.0f);
     private DateTime exportStatusExpiryUtc = DateTime.MinValue;
     private DateTime exportNextAutomaticAttemptUtc = DateTime.MinValue;
@@ -260,22 +261,22 @@ public partial class SlaveWindow
         var xaDatabaseAvailable = dependencies.XaDatabaseAvailable;
 
         ImGui.TextColored(cyan, ExportTaskName);
-        ImGui.TextDisabled("Reference export panel for persisted character data.");
-        ImGui.TextDisabled("Writes a timestamped table file using AutoRetainer, Lifestream, and XA Database data when available.");
-        ImGui.TextDisabled("One row per AutoRetainer character; shared FC details are matched by FC ID.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S6A5EC5B7F82ABF59"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S638221ED89BDB6D5"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SF5D28B138A1D7778"));
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();
 
-        ImGui.Text("Required:");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("S5DE693B9430FF261"));
         ImGui.SameLine();
-        ImGui.TextColored(arConfigExists ? green : red, arConfigExists ? "[AutoRetainer Config]" : "[AutoRetainer Config ×]");
+        ImGui.TextColored(arConfigExists ? green : red, arConfigExists ? global::XASlave.Localization.UiLocale.Get("SF2B99CF553140BD7") : global::XASlave.Localization.UiLocale.Get("S9C7E996AD44730E5"));
         ImGui.SameLine();
-        ImGui.Text("Optional:");
+        ImGui.Text(global::XASlave.Localization.UiLocale.Get("SA7390DDEDD8E895F"));
         ImGui.SameLine();
-        ImGui.TextColored(lifestreamExists ? green : yellow, lifestreamExists ? "[Lifestream]" : "[Lifestream -]");
+        ImGui.TextColored(lifestreamExists ? green : yellow, lifestreamExists ? global::XASlave.Localization.UiLocale.Get("S3D7411ED3FFD4E68") : global::XASlave.Localization.UiLocale.Get("S59407F56A17BAD32"));
         ImGui.SameLine();
-        ImGui.TextColored(xaDatabaseAvailable ? green : yellow, xaDatabaseAvailable ? "[XA Database]" : "[XA Database -]");
+        ImGui.TextColored(xaDatabaseAvailable ? green : yellow, xaDatabaseAvailable ? global::XASlave.Localization.UiLocale.Get("S5D509E9600642D79") : global::XASlave.Localization.UiLocale.Get("S02260938526E839B"));
 
         ImGui.Spacing();
         ImGui.Separator();
@@ -284,7 +285,7 @@ public partial class SlaveWindow
         var cfg = plugin.Configuration;
 
         var alwaysOn = cfg.ExportDataAlwaysOn;
-        if (ImGui.Checkbox("Always On", ref alwaysOn))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("SE476AF44B933CB48"), ref alwaysOn))
         {
             cfg.ExportDataAlwaysOn = alwaysOn;
             cfg.Save();
@@ -293,7 +294,7 @@ public partial class SlaveWindow
 
         var intervalIndex = ExportGetIntervalIndex(cfg.ExportDataRunEveryHours);
         ImGui.SetNextItemWidth(Scale(220f));
-        if (ImGui.Combo("Run Every", ref intervalIndex, ExportIntervalLabels, ExportIntervalLabels.Length))
+        if (global::XASlave.Localization.UiNative.Combo(global::XASlave.Localization.UiLocale.Native("S97BA537C632B50B4"), ref intervalIndex, ExportIntervalLabels, ExportIntervalLabels.Length))
         {
             cfg.ExportDataRunEveryHours = ExportIntervalOptions[intervalIndex];
             cfg.Save();
@@ -302,7 +303,7 @@ public partial class SlaveWindow
 
         var outputPath = cfg.ExportDataOutputPath;
         ImGui.SetNextItemWidth(-1f);
-        if (ImGui.InputText("Folder / File To Write", ref outputPath, 512))
+        if (global::XASlave.Localization.UiNative.InputText(global::XASlave.Localization.UiLocale.Native("S84DC017A33275914"), ref outputPath, 512))
             cfg.ExportDataOutputPath = outputPath;
 
         if (ImGui.IsItemDeactivatedAfterEdit())
@@ -313,7 +314,7 @@ public partial class SlaveWindow
         }
 
         var overwriteFile = cfg.ExportDataOverwriteFile;
-        if (ImGui.Checkbox("Overwrite fixed file path when no {timestamp} token is used", ref overwriteFile))
+        if (global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S0874053B5B68D091"), ref overwriteFile))
         {
             cfg.ExportDataOverwriteFile = overwriteFile;
             if (!overwriteFile)
@@ -322,11 +323,11 @@ public partial class SlaveWindow
             ExportResetSchedulingState();
         }
 
-        ImGui.TextDisabled($"Folder path: creates ExportData_{ExportTimestampToken}.tsv.");
-        ImGui.TextDisabled($"File path with {ExportTimestampToken}: writes the exact token-resolved file name.");
-        ImGui.TextDisabled("File path without {timestamp}: appends a timestamp unless Overwrite fixed file path is enabled.");
-        ImGui.TextDisabled(@"Example: E:\gil\pre_{timestamp}_post.tsv");
-        ImGui.TextDisabled("Overwrite only applies to fixed file paths. Folder targets and tokenized names still create a new file.");
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("SBB040FD78AF11432", ExportTimestampToken));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S1EA1C465633BD44F", ExportTimestampToken));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SF63D4261459DEBA3"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S8D963094EACCBAA2"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S41A45EE97A8F1698"));
 
         var pluginConfigDirectory = Plugin.PluginInterface.GetPluginConfigDirectory();
         var pathIsValid = ExportTryResolveOutputFilePath(
@@ -344,14 +345,14 @@ public partial class SlaveWindow
         if (fixedOverwriteTarget && exportProbedTargetExists)
         {
             var confirmOverwrite = overwriteConfirmed;
-            if (ImGui.Checkbox($"I understand this overwrites {resolvedOutputFile}", ref confirmOverwrite))
+            if (global::XASlave.Localization.UiNative.Checkbox(string.Format(global::XASlave.Localization.UiLocale.Native("SFB0BD5DB649DB408"), resolvedOutputFile), ref confirmOverwrite, display: global::XASlave.Localization.UiLocale.FormatKey("SFB0BD5DB649DB408", resolvedOutputFile)))
             {
                 ExportSetOverwriteConfirmation(cfg, resolvedOutputFile, confirmOverwrite);
                 overwriteConfirmed = confirmOverwrite;
             }
 
             if (!overwriteConfirmed)
-                ImGui.TextColored(red, "This existing file will not be replaced until its exact path is confirmed.");
+                ImGui.TextColored(red, global::XASlave.Localization.UiLocale.Get("SADDAE1DCB828EEDF"));
         }
 
         var writeInProgress = ExportIsWriteInProgress();
@@ -359,7 +360,7 @@ public partial class SlaveWindow
                           (!fixedOverwriteTarget || !exportProbedTargetExists || overwriteConfirmed);
         using (ImRaii.Disabled(!canWriteNow))
         {
-            if (ImGui.Button("Write Export Now"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S959229D154081DF0")))
                 ExportTryQueueSnapshot("Manual");
         }
 
@@ -369,12 +370,12 @@ public partial class SlaveWindow
         var folderExists = pathIsValid && !string.IsNullOrWhiteSpace(folderToOpen) && exportProbedFolderExists;
         using (ImRaii.Disabled(!folderExists))
         {
-            if (ImGui.Button("Open Folder"))
+            if (global::XASlave.Localization.UiNative.Button(global::XASlave.Localization.UiLocale.Native("S68B3F4BFF6DE90AE")))
             {
                 try
                 {
                     if (!Directory.Exists(folderToOpen))
-                        throw new DirectoryNotFoundException($"The export folder no longer exists: {folderToOpen}");
+                        throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S2BB9334533037BF8", folderToOpen), original => new DirectoryNotFoundException(original));
 
                     System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                     {
@@ -384,7 +385,7 @@ public partial class SlaveWindow
                 }
                 catch (Exception ex)
                 {
-                    ExportSetStatus($"Could not open the export folder: {ex.Message}", red);
+                    ExportSetStatus(global::XASlave.Localization.UiMessage.Format("S753641852E235F2C", global::XASlave.Localization.UiMessage.FromException(ex)), red);
                     exportNextPathProbeUtc = DateTime.MinValue;
                 }
             }
@@ -394,37 +395,37 @@ public partial class SlaveWindow
 
         if (string.IsNullOrWhiteSpace(cfg.ExportDataOutputPath))
         {
-            ImGui.TextColored(red, "Enter folder location to save data.");
-            ImGui.TextDisabled($"You can also enter a full file path and place {ExportTimestampToken} in the file name.");
+            ImGui.TextColored(red, global::XASlave.Localization.UiLocale.Get("S86F8F43346FE73D0"));
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("SC5E0B144CE96FAC3", ExportTimestampToken));
         }
         else if (!pathIsValid)
         {
-            ImGui.TextColored(red, pathFailure);
+            ImGui.TextColored(red, pathFailure.Display);
         }
         else
-            ImGui.TextDisabled($"Resolved output: {resolvedOutputFile}");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S195CCBBCC8E2050D", resolvedOutputFile));
 
         if (!string.IsNullOrWhiteSpace(cfg.ExportDataLastSuccessfulRunUtc) && ExportParseUtc(cfg.ExportDataLastSuccessfulRunUtc).HasValue)
         {
             var lastRun = ExportParseUtc(cfg.ExportDataLastSuccessfulRunUtc)!.Value.ToLocalTime();
-            ImGui.TextDisabled($"Last successful write: {lastRun:yyyy-MM-dd HH:mm:ss}");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S01CC3F9A2C1A4E8E", lastRun));
         }
         else
         {
-            ImGui.TextDisabled("Last successful write: never");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S720C76722E024666"));
         }
 
         ImGui.TextDisabled(cfg.ExportDataRunEveryHours == 0
-            ? "Interval 0 behaves as an always-on login/session export instead of a repeating per-frame write."
-            : $"Automatic writes trigger when the last successful {ExportTaskName} export is older than {ExportFormatIntervalLabel(cfg.ExportDataRunEveryHours)}.");
+            ? global::XASlave.Localization.UiLocale.Get("SA00EC2E65CC6A03C")
+            : global::XASlave.Localization.UiLocale.FormatKey("S604001A129899882", ExportTaskName, ExportFormatIntervalLabel(cfg.ExportDataRunEveryHours)));
         if (writeInProgress)
-            ImGui.TextDisabled("Export write is running in the background.");
-        ImGui.TextDisabled("leveA prefers XA Database Journal data from currencies_json and falls back to persisted AutoRetainer fields.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SF6819FC130675F57"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S8C2D8674A65D93C2"));
 
         if (!string.IsNullOrEmpty(exportStatusMessage) && DateTime.UtcNow < exportStatusExpiryUtc)
         {
             ImGui.Spacing();
-            ImGui.TextColored(exportStatusColor, exportStatusMessage);
+            ImGui.TextColored(exportStatusColor, global::XASlave.Localization.UiMessage.Resolve(ref exportStatusMessageUiMessage, exportStatusMessage));
         }
     }
 
@@ -439,7 +440,7 @@ public partial class SlaveWindow
         {
             if (exportWriteInProgress)
             {
-                ExportSetStatus($"{ExportTaskName} is already writing in the background.", new Vector4(1.0f, 0.8f, 0.3f, 1.0f));
+                ExportSetStatus(global::XASlave.Localization.UiMessage.Format("S6A5FBEE82A0C8612", ExportTaskName), new Vector4(1.0f, 0.8f, 0.3f, 1.0f));
                 return false;
             }
         }
@@ -449,14 +450,14 @@ public partial class SlaveWindow
             var cfg = plugin.Configuration;
             if (string.IsNullOrWhiteSpace(cfg.ExportDataOutputPath))
             {
-                ExportSetStatus($"{ExportTaskName} could not start because the output path is blank.", new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
+                ExportSetStatus(global::XASlave.Localization.UiMessage.Format("SFBB43969A663BE53", ExportTaskName), new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
                 return false;
             }
 
             var autoRetainerConfigPath = GetExportAutoRetainerConfigPath();
             if (!File.Exists(autoRetainerConfigPath))
             {
-                ExportSetStatus($"{ExportTaskName} could not start because AutoRetainer DefaultConfig.json was not found.", new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
+                ExportSetStatus(global::XASlave.Localization.UiMessage.Format("S7A5BF3658B202E09", ExportTaskName), new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
                 return false;
             }
 
@@ -486,7 +487,7 @@ public partial class SlaveWindow
                 exportCompletedWrite = null;
             }
 
-            ExportSetStatus($"{ExportTaskName} {trigger} write started in the background.", new Vector4(0.4f, 0.8f, 1.0f, 1.0f));
+            ExportSetStatus(global::XASlave.Localization.UiMessage.Format("S7FDE4F95138C2A9A", ExportTaskName, trigger), new Vector4(0.4f, 0.8f, 1.0f, 1.0f));
             _ = Task.Run(() => ExportWriteSnapshotInBackground(request))
                 .ContinueWith(
                     task =>
@@ -495,7 +496,7 @@ public partial class SlaveWindow
                             ? new ExportWriteResult(
                                 request,
                                 false,
-                                $"{ExportTaskName} export failed: {task.Exception?.GetBaseException().Message ?? "Unknown error"}",
+                                global::XASlave.Localization.UiMessage.Format("SF14C2702DC2ADD2D", ExportTaskName, task.Exception?.GetBaseException().Message ?? "Unknown error"),
                                 new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
                                 DateTime.UtcNow)
                             : task.Result;
@@ -511,7 +512,7 @@ public partial class SlaveWindow
         }
         catch (Exception ex)
         {
-            ExportSetStatus($"{ExportTaskName} export failed: {ex.Message}", new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
+            ExportSetStatus(global::XASlave.Localization.UiMessage.Format("SF14C2702DC2ADD2D", ExportTaskName, global::XASlave.Localization.UiMessage.FromException(ex)), new Vector4(1.0f, 0.4f, 0.4f, 1.0f));
             lock (exportBackgroundLock)
             {
                 exportWriteInProgress = false;
@@ -532,7 +533,7 @@ public partial class SlaveWindow
                 return new ExportWriteResult(
                     request,
                     false,
-                    $"{ExportTaskName} found no characters to export from AutoRetainer DefaultConfig.json.",
+                    global::XASlave.Localization.UiMessage.Format("SBA16A3823C433D6F", ExportTaskName),
                     new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
                     DateTime.UtcNow);
             }
@@ -545,19 +546,19 @@ public partial class SlaveWindow
                     out var outputFilePath,
                     out var pathFailure))
             {
-                throw new InvalidOperationException(pathFailure);
+                throw global::XASlave.Localization.UiMessage.CreateException(pathFailure, original => new InvalidOperationException(original));
             }
 
             var outputDirectory = Path.GetDirectoryName(outputFilePath);
             if (string.IsNullOrWhiteSpace(outputDirectory))
-                throw new InvalidOperationException("The resolved export path has no parent directory.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SE9D751EDA8DD0096"), original => new InvalidOperationException(original));
 
             Directory.CreateDirectory(outputDirectory);
 
             var targetAlreadyExists = File.Exists(outputFilePath);
             var overwriteAuthorized = targetAlreadyExists && ExportIsOverwriteConfirmed(request.ConfirmedOverwritePaths, outputFilePath);
             if (targetAlreadyExists && !overwriteAuthorized)
-                throw new IOException($"'{outputFilePath}' already exists. Confirm that exact path in the Export Data panel before replacing it.");
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S5F122216EAC182BA", outputFilePath), original => new IOException(original));
 
             var extension = Path.GetExtension(outputFilePath);
             var payload = string.Equals(extension, ".json", StringComparison.OrdinalIgnoreCase)
@@ -578,14 +579,12 @@ public partial class SlaveWindow
             var completedUtc = DateTime.UtcNow;
             var runtimeStatePersisted = ExportPersistRuntimeState(request.PluginConfigDirectory, completedUtc);
             var databaseUnavailable = string.IsNullOrWhiteSpace(request.XaDatabasePath);
-            var databaseWarning = databaseUnavailable ? " XA Database unavailable; database-only fields may be blank." : string.Empty;
+            var databaseWarning = (databaseUnavailable ? global::XASlave.Localization.UiMessage.Key("SA94C9E1130115A60") : global::XASlave.Localization.UiMessage.Raw(string.Empty));
 
             return new ExportWriteResult(
                 request,
                 true,
-                runtimeStatePersisted
-                    ? $"{ExportTaskName} {request.Trigger} write complete: {rows.Count} character row(s) -> {outputFilePath}{databaseWarning}"
-                    : $"{ExportTaskName} wrote {rows.Count} row(s), but the schedule checkpoint could not be saved; it will retry.",
+                (runtimeStatePersisted ? global::XASlave.Localization.UiMessage.Format("S3CF4F79785A6C83B", ExportTaskName, request.Trigger, rows.Count, outputFilePath, databaseWarning) : global::XASlave.Localization.UiMessage.Format("S6FEFB20F2A7D8BD3", ExportTaskName, rows.Count)),
                 runtimeStatePersisted && !databaseUnavailable
                     ? new Vector4(0.4f, 1.0f, 0.4f, 1.0f)
                     : new Vector4(1.0f, 0.75f, 0.25f, 1.0f),
@@ -597,7 +596,7 @@ public partial class SlaveWindow
             return new ExportWriteResult(
                 request,
                 false,
-                $"{ExportTaskName} export failed: {ex.Message}",
+                global::XASlave.Localization.UiMessage.Format("SF14C2702DC2ADD2D", ExportTaskName, global::XASlave.Localization.UiMessage.FromException(ex)),
                 new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
                 DateTime.UtcNow);
         }
@@ -959,12 +958,12 @@ public partial class SlaveWindow
         // v1/v2 items_json is the combined list; v3 stores only unclassified
         // items there. Parse strictly so corrupt input cannot become a zero export.
         var legacy = JsonSerializer.Deserialize<List<ExportItemSnapshot>>(legacyJson, exportJsonOptions)
-            ?? throw new InvalidDataException("XA Database items_json is null.");
+            ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S9EE5343010CBA392"), original => new InvalidDataException(original));
         if (snapshotVersion < 3 && legacy.Count > 0)
             return legacyJson;
         var items = splitJson.SelectMany(json =>
             JsonSerializer.Deserialize<List<ExportItemSnapshot>>(json, exportJsonOptions)
-            ?? throw new InvalidDataException("XA Database item section is null.")).ToList();
+            ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SFAF75D80EA164AB7"), original => new InvalidDataException(original))).ToList();
         if (snapshotVersion >= 3)
             items.AddRange(legacy);
         return JsonSerializer.Serialize(items, exportJsonOptions);
@@ -1051,14 +1050,14 @@ public partial class SlaveWindow
         bool overwriteFixedFile,
         string fallbackDirectory,
         out string outputFilePath,
-        out string failure)
+        out global::XASlave.Localization.UiMessage failure)
     {
         outputFilePath = string.Empty;
-        failure = string.Empty;
+        failure = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         var trimmed = configuredPath.Trim();
         if (trimmed.Length == 0)
         {
-            failure = "Enter an output folder or file.";
+            failure = global::XASlave.Localization.UiMessage.Key("SB3FC500905FFD3CB");
             return false;
         }
 
@@ -1096,14 +1095,14 @@ public partial class SlaveWindow
         }
         catch (Exception ex)
         {
-            failure = $"Not a usable export path: {ex.Message}";
+            failure = global::XASlave.Localization.UiMessage.Format("S0AC98B3AA7E28C2A", global::XASlave.Localization.UiMessage.FromException(ex));
             return false;
         }
 
         var extensionToWrite = Path.GetExtension(candidate);
         if (!AllowedExportExtensions.Contains(extensionToWrite, StringComparer.OrdinalIgnoreCase))
         {
-            failure = $"Refusing to write '{extensionToWrite}'. Allowed: {string.Join(", ", AllowedExportExtensions)}.";
+            failure = global::XASlave.Localization.UiMessage.Format("S1F5527559C4B9BE4", extensionToWrite, string.Join(", ", AllowedExportExtensions));
             return false;
         }
 
@@ -1159,9 +1158,10 @@ public partial class SlaveWindow
         exportNextAutomaticAttemptUtc = DateTime.UtcNow.AddSeconds(5);
     }
 
-    private void ExportSetStatus(string message, Vector4 color)
+    private void ExportSetStatus(global::XASlave.Localization.UiMessage messagePresentation, Vector4 color)
     {
-        exportStatusMessage = message;
+        var message = messagePresentation.Original;
+        exportStatusMessage = global::XASlave.Localization.UiMessage.Store(ref exportStatusMessageUiMessage, messagePresentation);
         exportStatusColor = color;
         exportStatusExpiryUtc = DateTime.UtcNow.AddSeconds(10);
     }
@@ -1717,7 +1717,7 @@ public partial class SlaveWindow
     private sealed record ExportWriteResult(
         ExportWriteRequest Request,
         bool Success,
-        string Message,
+        global::XASlave.Localization.UiMessage Message,
         Vector4 Color,
         DateTime CompletedUtc,
         bool RuntimeStatePersisted = false);

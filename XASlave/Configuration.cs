@@ -135,6 +135,7 @@ public class Configuration : IPluginConfiguration
 
     private readonly DeferredSaveCoordinator deferredSaveCoordinator = new();
     public int Version { get; set; } = 0;
+    public string UiLanguage { get; set; } = "en";
     public bool OpenPluginOnLoad { get; set; } = false;
 
     // Custom layouts and source descriptions only; live plugin values are never persisted.

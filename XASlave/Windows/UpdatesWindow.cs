@@ -13,7 +13,7 @@ namespace XASlave.Windows;
 /// </summary>
 public sealed class UpdatesWindow : Window
 {
-    private const string UpdatesWindowTitle = "XA Slave - Updates";
+    private static string UpdatesWindowTitle => global::XASlave.Localization.UiLocale.Native("S4BB4AE05F054DA77");
     private static float UiScale => ImGuiHelpers.GlobalScale;
     private static float UiScaleSafe => ImGuiHelpers.GlobalScale;
 
@@ -23,7 +23,16 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
-            Header = "v0.0.0.55 - 2026-10-21",
+            Header = "v0.0.0.56 - 2026-10-23",
+            Lines =
+            [
+                "- Added Languages: Choose English, German, French, Spanish, Italian, Russian, Japanese, Korean, Chinese, Vietnamese, Brazilian Portuguese, Indonesian, Polish or Turkish after Update History on the splash screen or at the top of Plugin Operations. Both selectors share your saved choice; English is the default and the existing theme is retained.",
+                "- Updated Interface Text: Language selection applies to built-in controls, task progress, service status and validation messages. Archived Update History and game-native chat, toasts and the top status bar remain English.",
+            ],
+        },
+        new VersionEntry
+        {
+            Header = "v0.0.0.55 - 2026-10-22",
             Lines =
             [
                 "- Updated Dalamud 15.0.3.9 Compatibility: Updated October 16 game support for XA Nearby, Auto Sort Items, Better Inventory Mover, Auto Restore Furniture, Inspect Outfit Try-on and View Single Item. Recapture saved item previews from older game builds.",
@@ -934,7 +943,7 @@ public sealed class UpdatesWindow : Window
     {
         if (versions.Count == 0)
         {
-            ImGui.TextDisabled("No version history available.");
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S3B788EC818D426C8"));
             return;
         }
 
@@ -943,9 +952,9 @@ public sealed class UpdatesWindow : Window
             currentVersionIndex = 0;
         var currentVersionHeader = versions[currentVersionIndex].Header;
 
-        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), "Version History");
-        ImGui.TextDisabled($"Installed build: XA Slave v{BuildInfo.Version}");
-        ImGui.TextDisabled($"Current version notes: {currentVersionHeader}");
+        ImGui.TextColored(new Vector4(0.4f, 0.8f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S2EBA52C01705B144"));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("S2A2DF8F0D412B9FA", BuildInfo.Version));
+        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.FormatKey("SBB428FD99F281CCF", currentVersionHeader));
         ImGui.Spacing();
         ImGui.Separator();
         ImGui.Spacing();

@@ -79,7 +79,10 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         this.log = log;
     }
 
-    public string StatusText { get; private set; } = "Disabled";
+    public string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
+    private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
+    internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
+    internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
 
     public void ApplyConfiguration(
         bool hidePlayer,
@@ -124,7 +127,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         ResetAllObjects();
         zoneRefreshPassesRemaining = 3;
         UpdateAllObjects(GameObjectManager.Instance());
-        StatusText = GetEnabledStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText());
     }
 
     public bool SetEnabled(bool value)
@@ -138,14 +141,14 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
             UpdateHookState();
             UpdateSubscriptions(false);
             ResetAllObjects();
-            StatusText = "Disabled";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E"));
             return false;
         }
 
         EnsureInitialized();
         if (updateObjectArraysHook == null)
         {
-            StatusText = "Unavailable - object update hook missing.";
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S2764068E098B9677"));
             return false;
         }
 
@@ -154,7 +157,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         UpdateHookState();
         UpdateSubscriptions(true);
         UpdateAllObjects(GameObjectManager.Instance());
-        StatusText = GetEnabledStatusText();
+        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText());
         return true;
     }
 
@@ -167,46 +170,42 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
         DisposeHook(ref updateObjectArraysHook);
     }
 
-    private string GetEnabledStatusText()
+    private global::XASlave.Localization.UiMessage GetEnabledStatusText()
     {
-        var categories = new List<string>(9);
+        var categories = new List<global::XASlave.Localization.UiMessage>(9);
         if (hideFriends)
-            categories.Add("friends");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S2E4B9CC2428BEB7B"));
         if (hidePartyAllianceMembers)
-            categories.Add("party and alliance members");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S38E5BB99EABDAE7B"));
         if (hidePlayer)
-            categories.Add("non-friends");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S0018B9E22FDDF3CB"));
         if (hideUnimportantEnpc)
-            categories.Add("unimportant NPCs");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S4971327C9B99F06D"));
         if (hidePet)
-            categories.Add("pets");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S3BE1D422A46085E1"));
         if (hideChocobo)
-            categories.Add("chocobos");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("S9B469817E8601DCD"));
         if (hideBeasts)
-            categories.Add(beastmasterJobId != 0 ? "other players' beasts" : "beasts (waiting for BST game data)");
+            categories.Add((beastmasterJobId != 0 ? global::XASlave.Localization.UiMessage.Key("S2C58A3188494004D") : global::XASlave.Localization.UiMessage.Key("SBAB2E68D1A8F35C4")));
         if (hideOwnBeast)
-            categories.Add(beastmasterJobId != 0 ? "your beast" : "your beast (waiting for BST game data)");
+            categories.Add((beastmasterJobId != 0 ? global::XASlave.Localization.UiMessage.Key("S76D9893B13CCEC25") : global::XASlave.Localization.UiMessage.Key("S31ABBED1442378D9")));
         if (hideFashionAccessories)
-            categories.Add("fashion accessories");
+            categories.Add(global::XASlave.Localization.UiMessage.Key("SD8771D84DDB60932"));
 
         if (categories.Count == 0)
-            return "Enabled - hook is armed, but no hide categories are selected.";
+            return global::XASlave.Localization.UiMessage.Key("S742500AAD5DC6823");
 
-        var protections = new List<string>(3);
+        var protections = new List<global::XASlave.Localization.UiMessage>(3);
         if (disableInDuties)
-            protections.Add("duty guard");
+            protections.Add(global::XASlave.Localization.UiMessage.Key("S7644693902D409AD"));
         if (disableInIslandSanctuary)
-            protections.Add("island guard");
+            protections.Add(global::XASlave.Localization.UiMessage.Key("S109D7293A44B2C0F"));
         if (useOccultCrescentRules)
-            protections.Add("Occult Crescent rules");
+            protections.Add(global::XASlave.Localization.UiMessage.Key("S0C118C5B4214893A"));
 
-        var status = protections.Count > 0
-            ? $"Enabled - hiding {string.Join(", ", categories)} locally with {string.Join(", ", protections)}."
-            : $"Enabled - hiding {string.Join(", ", categories)} locally.";
+        var status = (protections.Count > 0 ? global::XASlave.Localization.UiMessage.Format("SAE3A617D2BF45BE5", global::XASlave.Localization.UiMessage.Join(", ", categories), global::XASlave.Localization.UiMessage.Join(", ", protections)) : global::XASlave.Localization.UiMessage.Format("SED9F1A9AAF5640F2", global::XASlave.Localization.UiMessage.Join(", ", categories)));
         if (usePlayerDistance && (hidePlayer || hideFriends || hidePartyAllianceMembers))
-            status += honorSanctuaryMinimums
-                ? $" Selected players: beyond {sanctuaryDistance:0.#} yalms in sanctuaries, {maxDistance:0.#} elsewhere."
-                : $" Selected players: beyond {maxDistance:0.#} yalms.";
+            status = global::XASlave.Localization.UiMessage.Concat(status, (honorSanctuaryMinimums ? global::XASlave.Localization.UiMessage.Format("S5657DDE279332879", sanctuaryDistance, maxDistance) : global::XASlave.Localization.UiMessage.Format("SDBD9B1315AD25D6A", maxDistance)));
         return status;
     }
 
@@ -436,7 +435,7 @@ public unsafe sealed class AutoHideGameObjectsService : IDisposable
                         continue;
 
                     beastmasterJobId = job.RowId;
-                    StatusText = GetEnabledStatusText();
+                    StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, GetEnabledStatusText());
                     break;
                 }
             }
