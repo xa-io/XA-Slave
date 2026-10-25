@@ -23,6 +23,15 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.58 - 2026-10-24",
+            Lines =
+            [
+                "- Fixed Language Fonts: Removed the misleading multiple-font warning while preserving the existing appearance and language characters.",
+                "- Fixed Debug / Test: Restored /xa debug in Release builds, including the full menu, Plugin Inspector and JSON exports. Visibility is saved across reloads; repeat the command to hide it.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.57 - 2026-10-23",
             Lines =
             [

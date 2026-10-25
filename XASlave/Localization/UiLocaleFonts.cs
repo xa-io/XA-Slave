@@ -17,11 +17,14 @@ internal sealed class UiLocaleFonts : IDisposable
     private readonly IUiBuilder uiBuilder;
     private readonly IFontAtlas atlas;
     private IFontHandle? handle;
+    private IFontHandle? regionalHandle;
     private int revision = -1;
     private bool disposed;
     private string? constructionError;
 
-    internal bool IsReady => UiLocale.Error == null && constructionError == null && handle is { Available: true, LoadException: null };
+    internal bool IsReady => UiLocale.Error == null && constructionError == null
+        && handle is { Available: true, LoadException: null }
+        && regionalHandle is { Available: true, LoadException: null };
 
     internal UiLocaleFonts(IUiBuilder uiBuilder)
     {
@@ -36,13 +39,16 @@ internal sealed class UiLocaleFonts : IDisposable
         UiLocale.BeginFrame();
         if (revision != UiLocale.Revision)
         {
+            using var rebuild = atlas.SuppressAutoRebuild();
             revision = UiLocale.Revision;
             constructionError = null;
             handle?.Dispose();
             handle = null;
+            regionalHandle?.Dispose();
+            regionalHandle = null;
             try
             {
-                handle = CreateHandle(UiLocale.RequiredText(), UiLocale.LanguageCode);
+                (handle, regionalHandle) = CreateHandles(UiLocale.RequiredText(), UiLocale.LanguageCode);
             }
             catch (Exception exception)
             {
@@ -91,7 +97,7 @@ internal sealed class UiLocaleFonts : IDisposable
         ImGui.SetNextWindowSize(new Vector2(ImGui.GetFontSize() * 30, 0), ImGuiCond.Always);
         if (ImGui.Begin("XA Slave - Language###XASlaveLanguageStatus", ImGuiWindowFlags.AlwaysAutoResize | ImGuiWindowFlags.NoCollapse))
         {
-            var error = UiLocale.Error ?? constructionError ?? handle?.LoadException?.Message;
+            var error = UiLocale.Error ?? constructionError ?? handle?.LoadException?.Message ?? regionalHandle?.LoadException?.Message;
             ImGui.TextWrapped(error == null
                 ? "Loading XA Slave language fonts..."
                 : "The selected XA Slave language could not load. Choose English to recover, or check the Dalamud log.");
@@ -111,59 +117,77 @@ internal sealed class UiLocaleFonts : IDisposable
             return;
         disposed = true;
         handle?.Dispose();
+        regionalHandle?.Dispose();
         atlas.Dispose();
     }
 
-    private unsafe IFontHandle CreateHandle(string requiredText, string language)
+    private unsafe (IFontHandle Body, IFontHandle Regional) CreateHandles(string requiredText, string language)
     {
         // Every dropdown's native name is included even in English; only the selected catalog is baked.
         var required = requiredText.Where(character => !char.IsControl(character) && !char.IsSurrogate(character)).Distinct().Order().ToArray();
         var ranges = FontAtlasBuildToolkitUtilities.ToGlyphRange(required.AsSpan(), true, true);
         var cjk = required.Where(IsCjk).ToArray();
         var cjkRanges = FontAtlasBuildToolkitUtilities.ToGlyphRange(cjk.AsSpan(), true, true);
-        var regionalFont = default(ImFontPtr);
         var face = language switch { "ko" => 1, "zh-Hans" => 2, _ => 0 };
         var fontsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
         var textFont = Path.Combine(fontsDirectory, "segoeui.ttf");
         var symbolFont = Path.Combine(fontsDirectory, "seguisym.ttf");
 
-        return atlas.NewDelegateFontHandle(step =>
+        // One font per managed registration avoids Dalamud's multiple-font warning.
+        // Keep this handle local to the pair so asynchronous rebuilds use the same language.
+        var regional = atlas.NewDelegateFontHandle(step => step.OnPreBuild(build =>
         {
-            step.OnPreBuild(build =>
+            build.Font = build.AddDalamudAssetFont(DalamudAsset.NotoSansCjkRegular,
+                new SafeFontConfig { SizePx = uiBuilder.DefaultFontSpec.SizePx, GlyphRanges = cjkRanges, FontNo = face });
+        }));
+
+        try
+        {
+            var body = atlas.NewDelegateFontHandle(step =>
             {
-                build.NewImAtlas.TexDesiredWidth = 4096;
-                build.NewImAtlas.TexDesiredHeight = 4096;
-                var size = uiBuilder.DefaultFontSpec.SizePx;
-                var font = build.AddDalamudDefaultFont(-1);
-                build.Font = font;
-
-                // Merge mode fills missing glyphs, preserving the user's existing Latin body face.
-                var supplement = new SafeFontConfig { SizePx = size, MergeFont = font, GlyphRanges = ranges };
-                if (File.Exists(textFont))
-                    build.AddFontFromFile(textFont, supplement);
-                if (File.Exists(symbolFont))
-                    build.AddFontFromFile(symbolFont, supplement);
-                build.AttachExtraGlyphsForDalamudLanguage(supplement);
-
-                // Host-language fallback can already include CJK. A separate regional source permits
-                // replacing only those glyphs after baking without replacing Latin text or UI styling.
-                regionalFont = build.AddDalamudAssetFont(DalamudAsset.NotoSansCjkRegular,
-                    new SafeFontConfig { SizePx = size, GlyphRanges = cjkRanges, FontNo = face });
-            });
-
-            step.OnPostBuild(build =>
-            {
-                for (var index = 0; index + 1 < cjkRanges.Length && cjkRanges[index] != 0; index += 2)
+                step.OnPreBuild(build =>
                 {
-                    if (IsCjk((char)cjkRanges[index]))
-                        build.CopyGlyphsAcrossFonts(regionalFont, build.Font, false, false, (char)cjkRanges[index], (char)cjkRanges[index + 1]);
-                }
-                build.BuildLookupTable(build.Font);
-                var missing = required.Where(character => build.Font.FindGlyphNoFallback(character) == null).Take(12).ToArray();
-                if (missing.Length != 0)
-                    throw new InvalidOperationException("XA Slave " + language + " font is missing " + string.Join(", ", missing.Select(character => "U+" + ((int)character).ToString("X4"))));
+                    build.NewImAtlas.TexDesiredWidth = 4096;
+                    build.NewImAtlas.TexDesiredHeight = 4096;
+                    var size = uiBuilder.DefaultFontSpec.SizePx;
+                    var font = build.AddDalamudDefaultFont(-1);
+                    build.Font = font;
+
+                    // Merge mode fills missing glyphs, preserving the user's existing Latin body face.
+                    var supplement = new SafeFontConfig { SizePx = size, MergeFont = font, GlyphRanges = ranges };
+                    if (File.Exists(textFont))
+                        build.AddFontFromFile(textFont, supplement);
+                    if (File.Exists(symbolFont))
+                        build.AddFontFromFile(symbolFont, supplement);
+                    build.AttachExtraGlyphsForDalamudLanguage(supplement);
+                });
+
+                step.OnPostBuild(build =>
+                {
+                    // Resolve the donor from this build's atlas, never a retained native pointer.
+                    var regionalFont = build.GetFont(regional);
+                    if (regionalFont.IsNull)
+                        throw new InvalidOperationException("XA Slave " + language + " regional font could not load.");
+
+                    // Replace host CJK fallback glyphs with the selected region's shapes only.
+                    for (var index = 0; index + 1 < cjkRanges.Length && cjkRanges[index] != 0; index += 2)
+                    {
+                        if (IsCjk((char)cjkRanges[index]))
+                            build.CopyGlyphsAcrossFonts(regionalFont, build.Font, false, false, (char)cjkRanges[index], (char)cjkRanges[index + 1]);
+                    }
+                    build.BuildLookupTable(build.Font);
+                    var missing = required.Where(character => build.Font.FindGlyphNoFallback(character) == null).Take(12).ToArray();
+                    if (missing.Length != 0)
+                        throw new InvalidOperationException("XA Slave " + language + " font is missing " + string.Join(", ", missing.Select(character => "U+" + ((int)character).ToString("X4"))));
+                });
             });
-        });
+            return (body, regional);
+        }
+        catch
+        {
+            regional.Dispose();
+            throw;
+        }
     }
 
     private static bool IsCjk(char character) => character is >= '\u2E80' and <= '\uA4CF'

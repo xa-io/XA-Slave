@@ -131,9 +131,7 @@ public partial class SlaveWindow : Window, IDisposable
 
     private static readonly (SlaveTask Task, string Label)[] ReferenceItems =
     {
-#if DEBUG
         (SlaveTask.DebugCommands, UiLocale.Native("S5B74822E75E008EF")),
-#endif
         (SlaveTask.ExportData, UiLocale.Native("S2ED227401538531A")),
         (SlaveTask.RepoList, UiLocale.Native("S273D7A925BD20F8A")),
         (SlaveTask.IpcCallsAvailable, UiLocale.Native("S03BD054B237A0FA2")),
@@ -156,17 +154,15 @@ public partial class SlaveWindow : Window, IDisposable
 #if DEBUG
         debugMenuVisible = true;
 #else
-        debugMenuVisible = false;
+        debugMenuVisible = plugin.Configuration.DebugMenuVisible;
 #endif
         UpdateSizeConstraints(UiScaleSafe);
         RestoreLastSelectedTaskSelection();
         Plugin.Framework.Update += OnFrameworkUpdate;
         Plugin.ClientState.Login += OnExportDataLogin;
         Plugin.ClientState.Logout += OnExportDataLogoutHandler;
-#if DEBUG
         Plugin.NamePlateGui.OnDataUpdate += OnXaAbuseNamePlateUpdate;
         Plugin.PluginInterface.UiBuilder.Draw += DrawXaAbuseOverlay;
-#endif
 
         // Initialize Xagman peer event handlers for TCP task control
         InitializeXagmanPeerEventHandlers();
@@ -957,17 +953,6 @@ public partial class SlaveWindow : Window, IDisposable
     private bool ToggleDebugMenuLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, out string message)
     {
         replyPresentation = null;
-#if !DEBUG
-        debugMenuVisible = false;
-        if (plugin.Configuration.DebugMenuVisible)
-        {
-            plugin.Configuration.DebugMenuVisible = false;
-            plugin.Configuration.SaveDeferred();
-        }
-
-        message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S21B510C0C190BDEB"));
-        return false;
-#else
         debugMenuVisible = !debugMenuVisible;
         if (plugin.Configuration.DebugMenuVisible != debugMenuVisible)
         {
@@ -978,6 +963,8 @@ public partial class SlaveWindow : Window, IDisposable
         if (debugMenuVisible)
         {
             IsOpen = true;
+            revealCommandPanel = true;
+            BringToFront();
             SetMenuSectionExpanded(MenuSection.Reference, true);
             SelectBuiltInTask(SlaveTask.DebugCommands);
             message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S66341C96B4C32540"));
@@ -989,7 +976,6 @@ public partial class SlaveWindow : Window, IDisposable
 
         message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S506C365B678AF61F"));
         return true;
-#endif
     }
 
     private void SetDebugResult(global::XASlave.Localization.UiMessage msg)
@@ -1012,7 +998,6 @@ public partial class SlaveWindow : Window, IDisposable
         DetachDuringDispose("Framework.Update", () => Plugin.Framework.Update -= OnFrameworkUpdate);
         DetachDuringDispose("ClientState.Login", () => Plugin.ClientState.Login -= OnExportDataLogin);
         DetachDuringDispose("ClientState.Logout", () => Plugin.ClientState.Logout -= OnExportDataLogoutHandler);
-#if DEBUG
         DetachDuringDispose(UiLocale.Native("SE9D93BD5231580C6"), DisposePluginInspector);
         DetachDuringDispose("NamePlateGui.OnDataUpdate", () => Plugin.NamePlateGui.OnDataUpdate -= OnXaAbuseNamePlateUpdate);
         DetachDuringDispose("UiBuilder.Draw", () => Plugin.PluginInterface.UiBuilder.Draw -= DrawXaAbuseOverlay);
@@ -1020,16 +1005,13 @@ public partial class SlaveWindow : Window, IDisposable
         DetachDuringDispose("AR RetainerAdditionalTask", () => plugin.IpcClient.AutoRetainerUnsubscribeRetainerAdditionalTask(OnDebugAutoRetainerDepositGilAdditionalTask));
         DetachDuringDispose("AR RetainerPostProcess", () => plugin.IpcClient.AutoRetainerUnsubscribeRetainerPostProcess(OnDebugAutoRetainerDepositGilReadyForPostprocess));
         debugAutoRetainerDepositGilSubscribed = false;
-#endif
 
         DetachDuringDispose("CancelScheduledAutoCollection", () => CancelScheduledAutoCollection(true));
         DetachDuringDispose("ReleaseRefreshSubsArSuppression", ReleaseRefreshSubsArSuppression);
         DetachDuringDispose("StopXagmanTask", StopXagmanTask);
 
-#if DEBUG
         xaAbuseEnabled = false;
         DetachDuringDispose("NamePlateGui.RequestRedraw", Plugin.NamePlateGui.RequestRedraw);
-#endif
         DetachDuringDispose("Worker cancellation source", workerCts.Dispose);
     }
 
@@ -1264,9 +1246,7 @@ public partial class SlaveWindow : Window, IDisposable
     {
         if (isDisposed) return;
         UpdatePluginBuilderWindows();
-#if DEBUG
         UpdateDebugNotificationTests();
-#endif
         var totalStopwatch = plugin.Configuration.VerboseTaskLogging
             ? Stopwatch.StartNew()
             : null;
@@ -1557,9 +1537,7 @@ public partial class SlaveWindow : Window, IDisposable
                                 DrawXAModsTask();
                                 break;
                             case SlaveTask.DebugCommands:
-#if DEBUG
                                 DrawDebugCommands();
-#endif
                                 break;
                             case SlaveTask.ExportData:
                                 DrawExportData();

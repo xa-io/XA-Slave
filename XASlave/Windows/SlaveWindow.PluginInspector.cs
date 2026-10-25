@@ -1,11 +1,9 @@
-#if DEBUG
 using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Reflection;
 using System.Text;
-using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 using Dalamud.Bindings.ImGui;
@@ -165,11 +163,7 @@ public partial class SlaveWindow
                 report.HasConfigUi = hasConfigUi;
                 report.AssemblyVersion = assemblyVersion;
                 token.ThrowIfCancellationRequested();
-                var json = JsonSerializer.Serialize(report, new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                    PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-                });
+                var json = PluginInspectionJson.Serialize(report);
                 token.ThrowIfCancellationRequested();
                 if (Encoding.UTF8.GetByteCount(json) > InspectorMaxJsonBytes)
                     throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S100D0FDC945D07C6"), originalMessage => new InvalidOperationException(originalMessage));
@@ -309,4 +303,3 @@ public partial class SlaveWindow
         inspectorPlugins = [];
     }
 }
-#endif

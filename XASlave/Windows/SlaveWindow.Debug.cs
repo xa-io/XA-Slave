@@ -1774,9 +1774,7 @@ public partial class SlaveWindow
         if (imguiScope1827)
         {
 
-#if DEBUG
         DrawPluginInspector();
-#endif
 
         if (global::XASlave.Localization.UiNative.CollapsingHeader((global::XASlave.Localization.UiLocale.Native("SA8D85371E852AE36") + "##xaAbuse")))
         {
