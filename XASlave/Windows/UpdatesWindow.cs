@@ -23,6 +23,15 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.59 - 2026-10-27",
+            Lines =
+            [
+                "- Fixed Xagman Tony Rotation: Full collectors switch to the next Tony while item collection remains, even when they still hold gil. Top-ups use only the current Tony's gil above the configured minimum.",
+                "- Fixed City Chat Flooder: Continue through cross-data-center travel, allow longer transfers, and verify safe arrival before sending announcements. Stop when travel or arrival checks fail.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.58 - 2026-10-24",
             Lines =
             [

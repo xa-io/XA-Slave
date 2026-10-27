@@ -28857,4 +28857,8 @@ NamePlate готов + PlayerAvailable + не применяет действи�
     <value>подлодки</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>У Tony {0} заполнены сумки, а сбор предметов ещё не завершён или не проверен; обмен закрывается для смены Tony. Имеющиеся гилы не задержат смену.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

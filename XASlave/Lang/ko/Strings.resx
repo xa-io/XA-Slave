@@ -28857,4 +28857,8 @@ xafunc의 DoNavFlySequenceXA 논리와 같습니다(Player.CanFly 확인).</valu
     <value>잠수함</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tony {0}의 가방이 가득 찼으며 아이템 수집이 남아 있거나 확인되지 않았습니다. 교대를 위해 거래를 종료합니다. 보유 길 때문에 교대가 지연되지는 않습니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

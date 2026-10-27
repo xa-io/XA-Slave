@@ -14292,6 +14292,15 @@ public partial class SlaveWindow
 
      private int GetXagmanCharacterTradableQuantity(string characterNameWorld, uint itemId, bool isHq, string itemName, int? gilMinimumOverride = null)
     {
+        // A running supplier can spend only the logged-in character's current gil.
+        // Never fall back to a previous Tony's peer/database balance during relog.
+        if (IsXagmanGilItem(itemId) && xagmanRunning && xagmanActiveRole == XagmanRole.Tony)
+        {
+            if (!characterNameWorld.Equals(xagmanActiveCharacter, StringComparison.OrdinalIgnoreCase)
+                || !IsXagmanCurrentLocalCharacter(characterNameWorld) || !TryGetXagmanLiveGil(out var liveGil))
+                return 0;
+            return Math.Max(0, liveGil - Math.Max(0, gilMinimumOverride ?? GetXagmanTonyGilMinimum()));
+        }
         var availableQuantity = GetXagmanCharacterItemQuantity(characterNameWorld, itemId, isHq, itemName);
         if (!IsXagmanGilItem(itemId))
             return availableQuantity;
@@ -15847,7 +15856,8 @@ public partial class SlaveWindow
 
         // Preserve collected stock for the later supply phase; another selected receiver
         // is tried before capacity recovery recalls these stocked Tonys.
-        if (!IsXagmanCollectionFirstRunActive() && TryStartXagmanTonySellWhenInventoryFull(activePartner))
+        if (!IsXagmanCollectionFirstRunActive() && !CanRotateXagmanTonyInCurrentScope()
+            && TryStartXagmanTonySellWhenInventoryFull(activePartner))
             return true;
 
         StartXagmanTonyFullInventoryFallback(activePartner);

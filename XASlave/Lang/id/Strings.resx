@@ -28857,4 +28857,8 @@ Sebaiknya lakukan saat pangkat Anda 6+ agar memiliki akses penawaran plot.</valu
     <value>kapal selam</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tas Tony {0} penuh dan pengumpulan item masih tertunda atau belum diverifikasi; perdagangan ditutup untuk mengganti Tony. Gil yang dimiliki tidak akan menunda pergantian.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

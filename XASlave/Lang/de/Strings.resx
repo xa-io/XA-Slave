@@ -28857,4 +28857,8 @@ Am besten erfolgt dies ab FG-Rang 6, damit Grundstücksgebote verfügbar sind.</
     <value>Tauchboote</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tonys ({0}) Taschen sind voll, und die Gegenstandssammlung ist noch offen oder ungeprüft; der Handel wird für einen Ersatz geschlossen. Vorhandenes Gil verzögert den Wechsel nicht.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

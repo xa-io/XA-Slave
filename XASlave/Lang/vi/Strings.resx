@@ -28857,4 +28857,8 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
     <value>tàu ngầm</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Túi của Tony {0} đã đầy và việc thu thập vật phẩm vẫn đang chờ hoặc chưa được xác minh; đóng giao dịch để đổi Tony. Số gil đang có sẽ không trì hoãn việc đổi Tony.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

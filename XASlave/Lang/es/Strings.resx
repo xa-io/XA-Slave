@@ -28857,4 +28857,8 @@ Es mejor hacerlo a partir del rango 6 para tener acceso a las pujas por parcelas
     <value>submarinos</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tony {0} tiene las bolsas llenas y la recogida de objetos sigue pendiente o sin verificar; se cerrará el intercambio para cambiar de Tony. El gil que tenga no retrasará el cambio.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

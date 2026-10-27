@@ -485,121 +485,190 @@ public partial class SlaveWindow
         catch { /* proceed if check fails */ }
 
         var steps = new List<TaskStep>();
+        var runContentId = Plugin.PlayerState.ContentId;
+        if (runContentId == 0 || !Plugin.PlayerState.IsLoaded)
+        {
+            runner.AddLog("City Chat Flooder: log into a character before starting.");
+            return;
+        }
+
+        void StopTravel(string reason)
+        {
+            runner.AddLog($"City Chat Flooder stopped: {reason}. No further announcements will be sent.");
+            runner.Cancel();
+        }
+
+        bool IsAt(string world, string? city = null)
+        {
+            if (!Plugin.PlayerState.IsLoaded || Plugin.PlayerState.ContentId != runContentId)
+                return false;
+            var currentWorld = Plugin.ObjectTable.LocalPlayer?.CurrentWorld.ValueNullable?.Name.ToString();
+            if (!string.Equals(currentWorld, world, StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (city == null) return true;
+            var sheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.TerritoryType>();
+            return sheet.TryGetRow(Plugin.ClientState.TerritoryType, out var row)
+                && row.PlaceName.Value.Name.ToString().Equals(city, StringComparison.OrdinalIgnoreCase);
+        }
+
+        bool IsReadyAt(string world, string? city = null)
+            => IsAt(world, city) && plugin.IpcClient.TryGetLifestreamBusy(out var busy) && !busy
+                && CharacterSafetyHelper.IsCharacterSafeWaitReady();
+
+        void AddSafeArrivalWait(string world, string? city = null)
+        {
+            var safePasses = 0;
+            var nextPassUtc = DateTime.MinValue;
+            steps.Add(new TaskStep
+            {
+                Name = $"Verify safe arrival: {world} / {city ?? "world"}",
+                IsComplete = () =>
+                {
+                    if (!IsReadyAt(world, city))
+                    {
+                        safePasses = 0;
+                        nextPassUtc = DateTime.MinValue;
+                        return false;
+                    }
+                    if (DateTime.UtcNow < nextPassUtc) return false;
+                    safePasses++;
+                    nextPassUtc = DateTime.UtcNow.AddSeconds(1);
+                    if (safePasses < 3) return false;
+                    runner.SuppressLogoutCancel = false;
+                    return safePasses >= 3;
+                },
+                TimeoutSec = 90f,
+                OnTimeout = () => StopTravel($"could not verify three safe checks at {world} / {city ?? "world"}"),
+            });
+        }
+
+        void AddTravel(string world, string? city = null)
+        {
+            var skipped = false;
+            var sawBusy = false;
+            var crossDc = false;
+            var completionTimeout = 120f;
+            var target = city ?? world;
+            var completionDeadlineUtc = DateTime.MaxValue;
+            steps.Add(new TaskStep
+            {
+                Name = $"Travel to: {target}",
+                OnEnter = () =>
+                {
+                    runner.CurrentItemLabel = $"{world} / {city ?? "world travel"}";
+                    if (!Plugin.PlayerState.IsLoaded || Plugin.PlayerState.ContentId != runContentId)
+                    {
+                        StopTravel("the original character is unavailable before travel");
+                        return;
+                    }
+                    if (!plugin.IpcClient.TryGetLifestreamBusy(out var busy) || busy)
+                    {
+                        StopTravel("Lifestream is unavailable or already busy before travel");
+                        return;
+                    }
+                    skipped = IsAt(world, city);
+                    if (skipped)
+                    {
+                        runner.AddLog($"Already at {target} on {world}; verifying arrival.");
+                        return;
+                    }
+                    var currentWorld = Plugin.ObjectTable.LocalPlayer?.CurrentWorld.ValueNullable?.Name.ToString() ?? "";
+                    var sourceInfo = WorldData.GetByName(currentWorld);
+                    var targetInfo = WorldData.GetByName(world);
+                    if (city == null && (sourceInfo == null || targetInfo == null))
+                    {
+                        StopTravel("cannot determine the source or destination data center");
+                        return;
+                    }
+                    crossDc = city == null && sourceInfo!.DataCenter != targetInfo!.DataCenter;
+                    completionTimeout = crossDc ? 600f : 120f;
+                    // Arm before /li: DC travel can log out before the next task tick.
+                    runner.SuppressLogoutCancel = crossDc;
+                    runner.AddLog($"Traveling to {target} on {world}; waiting up to {completionTimeout:0}s for completion.");
+                    ChatHelper.SendMessage($"/li {target}");
+                },
+                IsComplete = () => true,
+                TimeoutSec = 3f,
+            });
+            steps.Add(new TaskStep
+            {
+                Name = $"Observe travel start: {target}",
+                ShouldSkip = () => skipped,
+                IsComplete = () =>
+                {
+                    if (!plugin.IpcClient.TryGetLifestreamBusy(out var busy)) return false;
+                    if (busy)
+                    {
+                        sawBusy = true;
+                        runner.AddLog($"Lifestream travel started: {target}.");
+                        return true;
+                    }
+                    // Fast travel may finish between ticks; require the exact safe destination.
+                    return IsReadyAt(world, city);
+                },
+                TimeoutSec = 45f,
+                OnTimeout = () => StopTravel($"Lifestream did not start travel to {target} within 45s"),
+            });
+            steps.Add(new TaskStep
+            {
+                Name = $"Wait for travel completion: {target}",
+                ShouldSkip = () => skipped,
+                OnEnter = () => completionDeadlineUtc = DateTime.UtcNow.AddSeconds(completionTimeout),
+                IsComplete = () =>
+                {
+                    if (plugin.IpcClient.TryGetLifestreamBusy(out var busy) && !busy
+                        && (sawBusy || IsReadyAt(world, city)) && IsAt(world, city)) return true;
+                    if (DateTime.UtcNow >= completionDeadlineUtc)
+                        StopTravel($"travel to {target} did not finish at the intended destination within {completionTimeout:0}s");
+                    return false;
+                },
+                TimeoutSec = 600f,
+                OnTimeout = () => StopTravel($"travel to {target} did not finish at the intended destination within {completionTimeout:0}s"),
+            });
+            AddSafeArrivalWait(world, city);
+        }
+
         // -- Pre-flight: CharacterSafeWait --
         foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Key("S80D1F3CAE51EBF31"), 30f))
-            steps.Add(sw);
+        {
+            steps.Add(new TaskStep
+            {
+                NameMessage = sw.NameMessage,
+                OnEnter = sw.OnEnter,
+                IsComplete = sw.IsComplete,
+                TimeoutSec = sw.TimeoutSec,
+                OnTimeout = () => StopTravel("initial character safety wait timed out"),
+            });
+        }
 
         var visitIndex = 0;
         foreach (var world in orderedWorlds)
         {
             var capturedWorld = world;
 
-            // World travel - skip if already on this world
-            var worldSkipped = new bool[] { false };
-            steps.Add(new TaskStep
-            {
-                NameMessage = global::XASlave.Localization.UiMessage.Format("SAF39EBC16CD3813A", capturedWorld),
-                OnEnter = () =>
-                {
-                    runner.CurrentItemLabelMessage = global::XASlave.Localization.UiMessage.Format("S42E89DF618B3750F", capturedWorld);
-                    try
-                    {
-                        var local = Plugin.ObjectTable.LocalPlayer;
-                        var currentWorld = local?.CurrentWorld.ValueNullable?.Name.ToString() ?? "";
-                        if (currentWorld.Equals(capturedWorld, StringComparison.OrdinalIgnoreCase))
-                        {
-                            runner.AddLog($"==== Already on {capturedWorld} - skipping world travel ====");
-                            worldSkipped[0] = true;
-                            return;
-                        }
-                    }
-                    catch { /* proceed with travel */ }
-
-                    runner.AddLog($"==== Traveling to world: {capturedWorld} ====");
-                    ChatHelper.SendMessage($"/li {capturedWorld}");
-                },
-                IsComplete = () => true,
-                TimeoutSec = 3f,
-            });
-
-            steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SB3674300DBD8460D", capturedWorld), 2.0f));
-
-            steps.Add(new TaskStep
-            {
-                NameMessage = global::XASlave.Localization.UiMessage.Format("SD95670CDDBEDB70A", capturedWorld),
-                IsComplete = () =>
-                {
-                    if (worldSkipped[0]) return true;
-                    try { return !plugin.IpcClient.LifestreamIsBusy(); }
-                    catch { return false; }
-                },
-                TimeoutSec = 120f,
-            });
-
-            foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Format("SFA31CB70A88EB43A", capturedWorld), 30f))
-                steps.Add(sw);
+            AddTravel(capturedWorld);
 
             foreach (var city in cityList)
             {
                 var capturedCity = city;
                 var capturedIdx = visitIndex++;
 
-                // City travel - skip if already in this city
-                var citySkipped = new bool[] { false };
-                steps.Add(new TaskStep
-                {
-                    NameMessage = global::XASlave.Localization.UiMessage.Format("SCC596C340C7CB058", capturedCity, capturedWorld),
-                    OnEnter = () =>
-                    {
-                        runner.CurrentItemLabel = $"{capturedWorld} > {capturedCity}";
-                        try
-                        {
-                            var territoryId = Plugin.ClientState.TerritoryType;
-                            var sheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.TerritoryType>();
-                            if (sheet.TryGetRow(territoryId, out var row))
-                            {
-                                var zoneName = row.PlaceName.Value.Name.ToString();
-                                if (zoneName.Equals(capturedCity, StringComparison.OrdinalIgnoreCase))
-                                {
-                                    runner.AddLog($"  Already in {capturedCity} - skipping city travel");
-                                    citySkipped[0] = true;
-                                    return;
-                                }
-                            }
-                        }
-                        catch { /* proceed with travel */ }
-
-                        runner.AddLog($"  Traveling to {capturedCity}...");
-                        ChatHelper.SendMessage($"/li {capturedCity}");
-                    },
-                    IsComplete = () => true,
-                    TimeoutSec = 3f,
-                });
-
-                steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("SB3674300DBD8460D", capturedCity), 2.0f));
-
-                steps.Add(new TaskStep
-                {
-                    NameMessage = global::XASlave.Localization.UiMessage.Format("SD95670CDDBEDB70A", capturedCity),
-                    IsComplete = () =>
-                    {
-                        if (citySkipped[0]) return true;
-                        try { return !plugin.IpcClient.LifestreamIsBusy(); }
-                        catch { return false; }
-                    },
-                    TimeoutSec = 120f,
-                });
-
-                foreach (var sw in MonthlyReloggerTask.BuildCharacterSafeWait3Pass(global::XASlave.Localization.UiMessage.Format("SFA31CB70A88EB43A", capturedCity), 30f))
-                    steps.Add(sw);
+                AddTravel(capturedWorld, capturedCity);
 
                 steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Format("S1B4E6B2C881F9833", capturedCity), cfg.FloorderWaitBetweenCities));
+
+                AddSafeArrivalWait(capturedWorld, capturedCity);
 
                 steps.Add(new TaskStep
                 {
                     NameMessage = global::XASlave.Localization.UiMessage.Format("S6FAE5AEBB16DE272", capturedCity),
                     OnEnter = () =>
                     {
+                        if (!IsReadyAt(capturedWorld, capturedCity))
+                        {
+                            StopTravel("character, destination or Lifestream readiness changed before announcement");
+                            return;
+                        }
                         var announcements = cfg.FloorderAnnouncements;
                         if (announcements.Count == 0) return;
                         var msg = announcements[floorderRng.Next(announcements.Count)];
@@ -662,7 +731,7 @@ public partial class SlaveWindow
         if (!plugin.TaskRunner.Start(global::XASlave.Localization.UiMessage.Key("S5C5514B66531FC2E"), steps, onLog: (msg) =>
         {
             Plugin.Log.Information($"[TaskLogs] {msg}");
-        }, totalItems: totalCityVisits))
+        }, totalItems: totalCityVisits, suppressLogoutCancel: false, haltOnStepError: true))
             return;
 
         AutoOpenTaskLogIfVerbose(ref floorderShowLog);

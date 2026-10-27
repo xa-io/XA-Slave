@@ -19,6 +19,8 @@ AGENTS.md
 # Backups (local development history)
 backups/
 **/backups/
+.archive/
+/archive-config.json
 
 # Local changelog (not committed)
 changelog.txt

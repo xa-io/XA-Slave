@@ -28857,4 +28857,8 @@ NamePlate就绪 + PlayerAvailable + 未在咏唱 + 未在战斗。</value>
     <value>潜水艇</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tony {0} 的背包已满，物品收集尚未完成或未经确认；正在关闭交易以更换 Tony。持有的金币不会延迟轮换。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

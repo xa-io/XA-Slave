@@ -28857,4 +28857,8 @@ Il est préférable de le faire au rang 6 ou plus afin d’avoir accès aux ench
     <value>sous-marins</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Les sacs de Tony {0} sont pleins et la collecte d’objets reste en attente ou non vérifiée ; fermeture de l’échange pour changer de Tony. Les gils détenus ne retarderont pas le changement.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

@@ -28857,4 +28857,8 @@ e avvia i salvataggi XA Database dopo ogni passaggio abitativo.</value>
     <value>sottomarini</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tony {0} ha le borse piene e la raccolta degli oggetti è ancora in sospeso o non verificata; lo scambio verrà chiuso per cambiare Tony. I gil posseduti non ritarderanno il cambio.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

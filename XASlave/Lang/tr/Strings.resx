@@ -28857,4 +28857,8 @@ Arsa tekliflerine erişebilmek için bunu 6. rütbe ve üzerindeyken yapmak en i
     <value>denizaltılar</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tony {0} için çantalar dolu ve eşya toplama işlemi bekliyor veya doğrulanmadı; Tony değişimi için takas kapatılıyor. Eldeki gil değişimi geciktirmeyecek.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

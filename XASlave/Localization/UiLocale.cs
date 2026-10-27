@@ -372,7 +372,13 @@ internal static class UiLocale
                 if (entry.Key is not string key || entry.Value is not string value || !caseIndependentKeys.Add(key))
                     throw new InvalidOperationException("Invalid or duplicated original native-label key.");
                 if (Key(value) != key)
-                    throw new InvalidOperationException("Original native label differs from its immutable identity: " + key);
+                {
+                    // Windows RESX serialization can preserve CRLF where the original label used LF.
+                    // Recover only when that exact original identity matches; never accept edited text.
+                    value = value.Replace("\r\n", "\n", StringComparison.Ordinal);
+                    if (Key(value) != key)
+                        throw new InvalidOperationException("Original native label differs from its immutable identity: " + key);
+                }
                 nativeLabels.Add(key, value);
             }
             if (nativeLabels.Count == 0)

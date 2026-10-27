@@ -29,6 +29,7 @@ public partial class SlaveWindow
     private bool xagmanSupplyDrainOnly;
     private bool xagmanSupplyDrainCleanupPending;
     private bool xagmanSupplyCapacityRotationPending;
+    private bool xagmanSupplyCollectionRotationPending;
     private DateTime xagmanSupplyReceivingPolicyWaitSinceUtc = DateTime.MinValue;
     private bool xagmanSupplyDrainBlockedOnItems;
     private bool xagmanSupplyDrainBlockedOnGil;
@@ -43,6 +44,7 @@ public partial class SlaveWindow
     {
         xagmanSupplyDrainOnly = xagmanSupplyDrainCleanupPending = false;
         xagmanSupplyCapacityRotationPending = false;
+        xagmanSupplyCollectionRotationPending = false;
         xagmanSupplyReceivingPolicyWaitSinceUtc = DateTime.MinValue;
         xagmanSupplyDrainBlockedOnItems = xagmanSupplyDrainBlockedOnGil = false;
         xagmanSupplyDrainStartingStock.Clear();
@@ -339,6 +341,36 @@ public partial class SlaveWindow
         return useful;
     }
 
+    // Unknown forecasts cannot establish that collection is finished. This decision is
+    // only used after the bound cohort/run/policy checks; it never completes owner work.
+    private bool HasXagmanPendingItemCollection()
+    {
+        if (xagmanTonyRotationRequestedByOwnerStandby) return true;
+        var region = GetXagmanRegionOfChar(xagmanActiveCharacter);
+        var regionScoped = IsXagmanSupplyRegionScoped(xagmanServerMatchingActive);
+        foreach (var instanceId in xagmanSupplyOwnerCohort)
+        {
+            if (IsXagmanOwnerClientCompleted(instanceId)) continue;
+            var peer = plugin.XagmanPeers.Peers.FirstOrDefault(candidate => candidate.InstanceId == instanceId);
+            if (peer == null) return true;
+            if (peer.PartialOwners.Any(owner => (!regionScoped
+                    || GetXagmanRegionOfChar(owner.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase))
+                && owner.PendingGiveItems.Any(item => item.Quantity > 0 && !IsXagmanGilItem(item.ItemId))))
+                return true;
+            var forecast = peer.TradeCapacityForecast;
+            if (forecast == null || !IsXagmanTradeCapacityForecastFresh(forecast, DateTime.UtcNow)
+                || !forecast.SchedulingPoliciesComplete || forecast.IsTruncated || forecast.UnknownOwnerCount > 0
+                || forecast.KnownOwnerCount != forecast.SelectedOwnerCount
+                || forecast.SelectedOwnerKeys.Count != forecast.SelectedOwnerCount
+                || forecast.Items.Any(item => item.UnknownOwnerCount > 0 || item.GroupKey == "Unknown"))
+                return true;
+            if (forecast.Items.Any(item => (!regionScoped || item.GroupKey.Equals(region, StringComparison.OrdinalIgnoreCase))
+                && !IsXagmanGilItem(item.ItemId) && item.IncomingToTonyQuantity > 0))
+                return true;
+        }
+        return false;
+    }
+
     // True means this capacity fallback was handled, including a fail-closed outcome.
     // A missing requested item alone is never evidence of receiver capacity exhaustion.
     private bool TryBeginXagmanTonySupplyDrain()
@@ -378,8 +410,11 @@ public partial class SlaveWindow
         xagmanSupplyReceivingPolicyWaitSinceUtc = DateTime.MinValue;
         if (!hasRemainingWork) return false;
 
-        var hasUsefulSupply = hasReceivingPolicies;
-        if (hasReceivingPolicies && TryCaptureXagmanSupplyInventory(out var liveStock))
+        // Receiving items takes priority over paying out this Tony's gil or other stock.
+        // Latch through shutdown so the settled-stock check cannot undo the handoff.
+        xagmanSupplyCollectionRotationPending = fullInventory && HasXagmanPendingItemCollection();
+        var hasUsefulSupply = hasReceivingPolicies && !xagmanSupplyCollectionRotationPending;
+        if (hasUsefulSupply && TryCaptureXagmanSupplyInventory(out var liveStock))
         {
             var owners = plugin.XagmanPeers.Peers.Where(peer => xagmanSupplyOwnerCohort.Contains(peer.InstanceId)
                 && !IsXagmanOwnerClientCompleted(peer.InstanceId)).ToList();
@@ -399,6 +434,9 @@ public partial class SlaveWindow
         if (hasUsefulSupply) xagmanTonyRotationRequestedByOwnerStandby = false;
         if (xagmanSupplyCapacityRotationPending) xagmanStatus = XagmanStatus.Paused;
         xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, (hasUsefulSupply ? global::XASlave.Localization.UiMessage.Format("SAC67BE743661F524", xagmanActiveCharacter, ((fullInventory ? global::XASlave.Localization.UiMessage.Key("SD88A381E9CB39AA3") : global::XASlave.Localization.UiMessage.Key("SAA97BE7758A54A01")))) : global::XASlave.Localization.UiMessage.Format("S971D6129CCDEC01C", xagmanActiveCharacter, ((hasReceivingPolicies ? global::XASlave.Localization.UiMessage.Key("S3CF7B7747CBCF64A") : global::XASlave.Localization.UiMessage.Key("SD13FD0FDF77479C3"))))));
+        if (xagmanSupplyCollectionRotationPending)
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage,
+                global::XASlave.Localization.UiMessage.Format("S196ABC7735ED888F", xagmanActiveCharacter));
         plugin.TaskRunner.AddLog($"Xagman: {xagmanStatusText}");
         // Keep the active owner lock while the receiver queue and native Trade window settle.
         // The presence flag lets that owner preserve its unfinished Give work immediately.
@@ -474,7 +512,7 @@ public partial class SlaveWindow
                 PublishXagmanPresence();
                 return true;
             }
-            if (hasReceivingPolicies)
+            if (hasReceivingPolicies && !xagmanSupplyCollectionRotationPending)
             {
                 // A final incoming trade can add useful stock while shutdown settles.
                 // Re-evaluate after closure before permanently discarding revisit eligibility.
@@ -492,11 +530,12 @@ public partial class SlaveWindow
             if (xagmanSupplyCapacityRotationPending)
             {
                 xagmanSupplyDrainCleanupPending = false;
-                // The owner has acknowledged standby and the receiver is quiet. Legacy
-                // collection can recover space on this Tony before consuming a replacement.
+                // The owner has acknowledged standby and the receiver is quiet. Pending
+                // collection uses its replacement first; selling remains a last-Tony fallback.
                 // Keep the capacity latch until verified sell success so a failed seller
                 // falls back once rather than entering the same drain/sell cycle again.
                 if (xagmanSupplyDrainBlockedOnItems && !IsXagmanCollectionFirstRunActive()
+                    && (!xagmanSupplyCollectionRotationPending || !CanRotateXagmanTonyInCurrentScope())
                     && TryStartXagmanTonySellWhenInventoryFull(xagmanActiveTradePartner))
                     return true;
                 xagmanLegacyTonySupplySnapshots.Remove(xagmanActiveCharacter);

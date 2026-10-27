@@ -557,7 +557,8 @@ public partial class SlaveWindow
 
     private void StartXagmanOnhFullInventoryRecovery(bool hasOwner)
     {
-        if (!plugin.Configuration.XagmanSellWhenInventoryFull)
+        // Collection uses the next selected Tony before considering last-Tony selling.
+        if (xagmanOnhIndex + 1 < xagmanOnhRunList.Count || !plugin.Configuration.XagmanSellWhenInventoryFull)
         {
             if (hasOwner) StartXagmanOnhTonyRotationSignal();
             else AdvanceXagmanOnhCharacter(false, rotateForFull: true);

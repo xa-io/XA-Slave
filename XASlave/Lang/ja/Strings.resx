@@ -28857,4 +28857,8 @@ xafuncのDoNavFlySequenceXAのロジック（Player.CanFly確認）と同じで�
     <value>潜水艦</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tony {0} のバッグが満杯で、アイテム回収が未完了または未確認です。交代のためトレードを終了します。所持ギルを理由に交代を遅らせることはありません。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

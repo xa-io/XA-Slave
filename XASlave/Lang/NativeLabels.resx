@@ -29412,4 +29412,7 @@ It's best to do this when you're rank 6+ so you have access to plot bidding.</va
     <value>submarines</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tony {0} has full bags with item collection pending or unverified; closing the trade for a replacement. Held gil will not delay rotation.</value>
+  </data>
 </root>

@@ -28857,4 +28857,8 @@ Najlepiej zrobić to przy randze 6+, aby mieć dostęp do licytowania działek.<
     <value>okręty podwodne</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tony {0} ma pełne torby, a zbieranie przedmiotów nadal oczekuje lub nie zostało potwierdzone; wymiana zostanie zamknięta, aby zmienić Tony’ego. Posiadane gil nie opóźni zmiany.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>

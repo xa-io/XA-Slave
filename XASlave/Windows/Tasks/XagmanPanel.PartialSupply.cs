@@ -87,6 +87,8 @@ public partial class SlaveWindow
         xagmanSupplyPassId = Guid.NewGuid().ToString("N");
         xagmanSupplyRunPassIds.Add(xagmanSupplyPassId);
         xagmanSupplyInventoryCachedAtUtc = DateTime.MinValue;
+        xagmanSupplyInventoryCachedCharacter = string.Empty;
+        xagmanSupplyInventoryCache.Clear();
         xagmanSupplyDeferredStockByOwner.Clear();
         xagmanSupplyRecallSinceUtc = DateTime.MinValue;
         xagmanDeferredOwnerCharacter = xagmanDeferredOwnerInstanceId = string.Empty;

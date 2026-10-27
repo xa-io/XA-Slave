@@ -28857,4 +28857,8 @@ e aciona o salvamento no XA Database após cada etapa de moradia.</value>
     <value>submarinos</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; nested resource noun in selected-owner status.</comment>
   </data>
+  <data name="S196ABC7735ED888F" xml:space="preserve">
+    <value>Tony {0} está com as bolsas cheias e a coleta de itens continua pendente ou não verificada; a troca será encerrada para substituir o Tony. O gil disponível não atrasará a substituição.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
+  </data>
 </root>
