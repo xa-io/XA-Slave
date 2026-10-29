@@ -372,7 +372,10 @@ public partial class SlaveWindow
         if (tony == null)
         {
             if ((DateTime.UtcNow - xagmanOwnerSupplyWaitSinceUtc).TotalSeconds > 120)
-                FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("SC5F54F20B36CE839"));
+            {
+                if (!TryHoldXagmanOwnerForMissingTony())
+                    FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("SC5F54F20B36CE839"));
+            }
             return;
         }
         xagmanOwnerSupplyWaitSinceUtc = DateTime.UtcNow;
@@ -705,7 +708,9 @@ public partial class SlaveWindow
             && IsXagmanPeerFresh(peer) && peer.XagmanEnabled && IsXagmanPeerInCurrentRunPhase(peer)).ToList();
         if (owners.Any(peer => peer.Status == XagmanStatus.Error))
         {
-            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("S2D5061C49093093C"));
+            var failedOwner = owners.First(peer => peer.Status == XagmanStatus.Error);
+            FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Raw(
+                $"Owner client {failedOwner.InstanceId} ({failedOwner.ActiveCharacter}) reported an error: {failedOwner.StatusText}. Automatic rotation is held."));
             return true;
         }
         if (owners.Any(peer => peer.SupplyPassId != xagmanSupplyPassId || !peer.SupplyPassComplete))

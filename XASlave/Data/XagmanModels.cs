@@ -22,6 +22,26 @@ public enum XagmanRunPhase
     Restock = 2,
 }
 
+public enum XagmanNetworkRecoveryAction
+{
+    Prepare = 1,
+    Resume = 2,
+    ReportIncident = 3,
+}
+
+public sealed class XagmanNetworkRecoveryDirective
+{
+    public int Revision { get; set; } = 1;
+    public XagmanNetworkRecoveryAction Action { get; set; }
+    public string SessionId { get; set; } = string.Empty;
+    public string CoordinatorInstanceId { get; set; } = string.Empty;
+    public string IncidentId { get; set; } = string.Empty;
+    public int Epoch { get; set; }
+    public int FailureCount { get; set; }
+    public DateTime NotBeforeUtc { get; set; } = DateTime.MinValue;
+    public List<string> ParticipantInstanceIds { get; set; } = new();
+}
+
 public enum XagmanItemMode
 {
     Give = 0,
@@ -206,6 +226,29 @@ public sealed class XagmanPeerPresence
     public int CoordinationProtocolRevision { get; set; }
     public int GreenValueProtocolRevision { get; set; }
     public string RunId { get; set; } = string.Empty;
+    // Recovery identity is separate from collection-first phases and exists in legacy runs too.
+    public int NetworkRecoveryRevision { get; set; }
+    public string RecoverySessionId { get; set; } = string.Empty;
+    public string RecoveryCoordinatorInstanceId { get; set; } = string.Empty;
+    public int RecoveryEpoch { get; set; }
+    public int RecoveryReadyEpoch { get; set; }
+    public int RecoveryResumeAckEpoch { get; set; }
+    public string RecoveryIncidentId { get; set; } = string.Empty;
+    public int RecoveryFailureCount { get; set; }
+    public DateTime RecoveryNotBeforeUtc { get; set; } = DateTime.MinValue;
+    public DateTime RecoveryReadinessObservedAtUtc { get; set; } = DateTime.MinValue;
+    public bool RecoverySuspended { get; set; }
+    public bool HasRecoveryCheckpoint { get; set; }
+    public bool HasUnfinishedRecoveryWork { get; set; }
+    public bool RecoveryTaskRunning { get; set; }
+    public bool RecoveryLifestreamReadable { get; set; }
+    public bool RecoveryLifestreamBusy { get; set; }
+    public bool RecoveryDropboxReadable { get; set; }
+    public bool RecoveryDropboxBusy { get; set; }
+    public bool RecoveryTradeVisible { get; set; }
+    public bool RecoveryAtUsableTitle { get; set; }
+    public bool RecoverySafeIdle { get; set; }
+    public bool CanResumeRecovery { get; set; }
     public bool CollectionFirstEnabled { get; set; }
     public bool CollectionFirstRequested { get; set; }
     public bool HasConditionalItemPolicies { get; set; }
@@ -284,6 +327,8 @@ public sealed class XagmanPeerMessage
     public string SenderInstanceId { get; set; } = string.Empty;
     public string TargetInstanceId { get; set; } = string.Empty;
     public DateTime SentAtUtc { get; set; }
+    public string NetworkRecoverySessionId { get; set; } = string.Empty;
+    public XagmanNetworkRecoveryDirective? NetworkRecovery { get; set; }
     // Optional stop-task behavior. Keeping the established message type lets older clients
     // still stop safely even though they cannot perform the newer result clear.
     public bool ClearResults { get; set; }
@@ -309,4 +354,5 @@ public static class XagmanPeerMessageTypes
     public const string StopTask = "stop-task";
     public const string RecallTask = "recall-task";
     public const string CompleteTask = "complete-task";
+    public const string NetworkRecovery = "network-recovery";
 }

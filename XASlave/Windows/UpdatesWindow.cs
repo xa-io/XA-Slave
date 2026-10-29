@@ -23,6 +23,14 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.60 - 2026-10-29",
+            Lines =
+            [
+                "- Added Xagman Recovery: Resume unfinished work after 90002, with a five-minute delay, three-failure limit and manual retry.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.59 - 2026-10-27",
             Lines =
             [

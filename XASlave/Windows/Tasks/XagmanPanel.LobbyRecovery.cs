@@ -99,6 +99,11 @@ public partial class SlaveWindow
 
     private void FailXagmanLobbyRecovery(global::XASlave.Localization.UiMessage reason)
     {
+        if (IsXagmanNetworkRecoveryHolding)
+        {
+            HoldXagmanNetworkRecovery(reason.Original);
+            return;
+        }
         plugin.TaskRunner.AddLog($"Xagman: lobby recovery stopped: {reason}");
         CancelLifestreamTask(out _);
         EndXagmanLobbyOperation();

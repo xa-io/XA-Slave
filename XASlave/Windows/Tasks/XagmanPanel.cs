@@ -611,6 +611,7 @@ public partial class SlaveWindow
         var canStartOwners = !xagmanRunning && allRequired && selectedFranchiseChars.Count > 0
             && !(onh && hasGreenValueSelectors)
             && (onh ? hasOnhMeet : localXagmanPeerConnected);
+        DrawXagmanNetworkRecoveryControls();
         if (cfg.XagmanRole == XagmanRole.Tony)
         {
             var started = DrawPriorityTaskActionButton(
@@ -3533,6 +3534,11 @@ public partial class SlaveWindow
 
     private async System.Threading.Tasks.Task StartAllXagmanPeersAsync()
     {
+        var commandSession = xagmanNetworkSession;
+        var commandRecoveryEpoch = xagmanNetworkEpoch;
+        bool IsCurrentStartAttempt() => !isDisposed && !IsXagmanNetworkRecoveryHolding
+            && xagmanNetworkSession == commandSession && xagmanNetworkEpoch == commandRecoveryEpoch;
+        if (!IsCurrentStartAttempt()) return;
         if (xagmanRunning && IsXagmanCapacityRecoveryActive()) return;
         if (System.Threading.Interlocked.CompareExchange(ref xagmanStartAllInFlight, 1, 0) != 0)
         {
@@ -3547,6 +3553,7 @@ public partial class SlaveWindow
                 return;
 
             var peers = await WaitForXagmanCommandTargetPeersAsync(3.0).ConfigureAwait(false);
+            if (!IsCurrentStartAttempt()) return;
             if (peers.Count == 0)
             {
                 await AddXagmanPeerLogAsync("Xagman: No connected peers to send start command to").ConfigureAwait(false);
@@ -3580,8 +3587,11 @@ public partial class SlaveWindow
             if (xagmanRunning && xagmanActiveRole == XagmanRole.Tony
                 && franchisePeers.Any(peer => peer.SupplyCycleRevision != XagmanSupplyCycleRevision))
             {
-                await RunXagmanPeerUiActionAsync(() => FailXagmanSupplyCycle(
-                    global::XASlave.Localization.UiMessage.Key("S18EACC0161B3AF1F"))).ConfigureAwait(false);
+                await RunXagmanPeerUiActionAsync(() =>
+                {
+                    if (IsCurrentStartAttempt()) FailXagmanSupplyCycle(
+                        global::XASlave.Localization.UiMessage.Key("S18EACC0161B3AF1F"));
+                }).ConfigureAwait(false);
                 return;
             }
             var negotiateStartupMode = !collectionFirst
@@ -3671,6 +3681,7 @@ public partial class SlaveWindow
                 {
                     await RunXagmanPeerUiActionAsync(() =>
                     {
+                        if (!IsCurrentStartAttempt()) return;
                         xagmanCollectionFirstStartupModeNegotiated = true;
                         xagmanCollectionFirstActive = true;
                         xagmanRunId = Guid.NewGuid().ToString("N");
@@ -3688,6 +3699,7 @@ public partial class SlaveWindow
                 {
                     await RunXagmanPeerUiActionAsync(() =>
                     {
+                        if (!IsCurrentStartAttempt()) return;
                         xagmanCollectionFirstStartupModeNegotiated = true;
                         plugin.TaskRunner.AddLog(
                             $"Xagman: all {franchisePeers.Count} participating Franchise Owner client(s) have collection-first effectively disabled; starting the legacy flow. Tony's local Prioritize setting was ignored.");
@@ -3730,6 +3742,7 @@ public partial class SlaveWindow
                 {
                     await RunXagmanPeerUiActionAsync(() =>
                     {
+                        if (!IsCurrentStartAttempt()) return;
                         xagmanExpectedFranchiseOwnerInstanceIds.Clear();
                         xagmanExpectedFranchiseOwnerInstanceIds.UnionWith(
                             expectedFranchiseOwnerInstanceIds);
@@ -3748,20 +3761,30 @@ public partial class SlaveWindow
 
             if (IsXagmanSupplyCycleActive() && xagmanActiveRole == XagmanRole.Tony)
             {
-                await RunXagmanPeerUiActionAsync(() => xagmanSupplyOwnerCohort.UnionWith(
-                    franchisePeers.Select(peer => peer.InstanceId))).ConfigureAwait(false);
+                await RunXagmanPeerUiActionAsync(() =>
+                {
+                    if (IsCurrentStartAttempt()) xagmanSupplyOwnerCohort.UnionWith(
+                        franchisePeers.Select(peer => peer.InstanceId));
+                }).ConfigureAwait(false);
             }
+            await RunXagmanPeerUiActionAsync(() =>
+            {
+                if (IsCurrentStartAttempt()) RememberXagmanNetworkParticipants(franchisePeers);
+            }).ConfigureAwait(false);
+            if (!IsCurrentStartAttempt()) return;
             await AddXagmanPeerLogAsync(cohortAlreadyFrozen
                 ? $"Xagman: rebroadcasting the frozen run directive to {peers.Count} connected peer(s); the {expectedFranchiseOwnerInstanceIds.Count}-client cohort and acknowledgments are unchanged."
                 : $"Xagman: Sending start command to {peers.Count} connected peers...").ConfigureAwait(false);
 
+            if (!IsCurrentStartAttempt()) return;
             if (await plugin.XagmanPeers.SendStartTaskToAllPeersAsync(
                     collectionFirst ? xagmanRunId : string.Empty,
                     collectionFirst,
                     collectionFirst ? XagmanRunPhase.Collection : XagmanRunPhase.Legacy,
                     XagmanCollectionFirstCoordinationProtocolRevision,
                     greenValueEnabled ? XagmanGreenValueProtocolRevision : 0,
-                    collectionFirst ? expectedFranchiseOwnerInstanceIds : Array.Empty<string>())
+                    collectionFirst ? expectedFranchiseOwnerInstanceIds : Array.Empty<string>(),
+                    networkRecoverySessionId: commandSession)
                 .ConfigureAwait(false))
                 await AddXagmanPeerLogAsync("Xagman: Start command sent successfully").ConfigureAwait(false);
             else
@@ -4057,11 +4080,13 @@ public partial class SlaveWindow
         plugin.XagmanPeers.OnTaskStopAndClearResultsRequested -= HandlePeerTaskStopAndClearResultsRequest;
         plugin.XagmanPeers.OnTaskRecallRequested -= HandlePeerTaskRecallRequest;
         plugin.XagmanPeers.OnTaskCompleteRequested -= HandlePeerTaskCompleteRequest;
+        plugin.XagmanPeers.OnNetworkRecoveryRequested -= HandleXagmanNetworkRecoveryRequest;
         plugin.XagmanPeers.OnTaskStartRequested += HandlePeerTaskStartRequest;
         plugin.XagmanPeers.OnTaskStopRequested += HandlePeerTaskStopRequest;
         plugin.XagmanPeers.OnTaskStopAndClearResultsRequested += HandlePeerTaskStopAndClearResultsRequest;
         plugin.XagmanPeers.OnTaskRecallRequested += HandlePeerTaskRecallRequest;
         plugin.XagmanPeers.OnTaskCompleteRequested += HandlePeerTaskCompleteRequest;
+        plugin.XagmanPeers.OnNetworkRecoveryRequested += HandleXagmanNetworkRecoveryRequest;
     }
 
     private void HandlePeerTaskStartRequest(XagmanPeerMessage startDirective)
@@ -4073,6 +4098,7 @@ public partial class SlaveWindow
             {
                 try
                 {
+                    if (isDisposed || HandleXagmanNetworkStart(startDirective)) return;
                     if (xagmanRunning && IsXagmanCapacityRecoveryActive()) return;
                     // Check if this is a Franchise Owner and can start
                     if (plugin.Configuration.XagmanRole == XagmanRole.FranchiseOwner)
@@ -4226,6 +4252,7 @@ public partial class SlaveWindow
             {
                 try
                 {
+                    if (isDisposed || IsXagmanNetworkRecoveryHolding) return;
                     StartXagmanFailureRecallTask(global::XASlave.Localization.UiMessage.Key("SB9578B6ADEB600BB"), forceLogout: true);
                     plugin.TaskRunner.AddLog("Xagman: Started failure recall via peer command.");
                 }
@@ -4249,6 +4276,7 @@ public partial class SlaveWindow
             {
                 try
                 {
+                    if (isDisposed || IsXagmanNetworkRecoveryHolding) return;
                     if (!xagmanRunning || xagmanActiveRole != XagmanRole.FranchiseOwner)
                         return;
                     if (!string.IsNullOrWhiteSpace(xagmanOwnerCompletionToken)) return;
@@ -5644,6 +5672,7 @@ public partial class SlaveWindow
 
     private void StartXagmanTonyTask()
     {
+        if (IsXagmanNetworkRecoveryHolding) { RequestXagmanNetworkResume(); return; }
         var cfg = plugin.Configuration;
         var selected = GetSelectedXagmanTonyCharacters();
         ResetXagmanMeetRouteSnapshot();
@@ -5686,6 +5715,7 @@ public partial class SlaveWindow
                 return;
             }
         }
+        BeginXagmanNetworkSession();
         ClearXagmanRunSnapshot();
         ClearXagmanOwnerPolicyRunCapabilities();
         ResetXagmanFiniteTakeGoals();
@@ -5772,6 +5802,7 @@ public partial class SlaveWindow
         bool resumeFromStandby = false,
         XagmanPeerMessage? startDirective = null)
     {
+        if (isDisposed || IsXagmanNetworkRecoveryHolding) return false;
         var cfg = plugin.Configuration;
         var savedOwnerRunListCount = xagmanOwnerRunList.Count;
         var storedOwnerIndex = Math.Max(0, xagmanOwnerCurrentCharacterIndex);
@@ -6208,6 +6239,11 @@ public partial class SlaveWindow
                 return;
 
             startupFailed = true;
+            if (IsXagmanNetworkRecoveryHolding)
+            {
+                HoldXagmanNetworkRecovery(message);
+                return;
+            }
             ResetXagmanTonyMeetRetryState();
             xagmanStatus = XagmanStatus.Error;
             xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, messagePresentation);
@@ -6384,6 +6420,7 @@ public partial class SlaveWindow
 
     private void StopXagmanTask()
     {
+        ResetXagmanNetworkRecovery();
         xagmanNpcSell?.Abort("Xagman stopped");
         xagmanNpcSell = null;
         xagmanOwnerRelogLogoutFailure = null;
@@ -10506,6 +10543,11 @@ public partial class SlaveWindow
             EndXagmanLobbyOperation();
         // Completion receipts remain live even while lobby recovery owns task dispatch.
         ObserveXagmanOwnerClientCompletions();
+        if (UpdateXagmanNetworkRecovery())
+        {
+            UpdatePriorityTaskExternalStatus();
+            return;
+        }
         var lobbyRecoveryOwnsTick = xagmanLobbyOperation != null && !plugin.TaskRunner.IsRunning && PollXagmanLobbyRecovery();
         if (lobbyRecoveryOwnsTick || xagmanLobbyOperation?.Pending == true)
         {
@@ -12149,6 +12191,7 @@ public partial class SlaveWindow
 
     private void RotateXagmanTony()
     {
+        if (IsXagmanNetworkRecoveryHolding) return;
         if (!xagmanRunning || xagmanActiveRole != XagmanRole.Tony || plugin.TaskRunner.IsRunning)
             return;
         ResetXagmanTonyMeetRetryState();
@@ -12873,7 +12916,7 @@ public partial class SlaveWindow
 
         try
         {
-            plugin.XagmanPeers.PublishPresence(new XagmanPeerPresence
+            var presence = new XagmanPeerPresence
             {
                 InstanceId = plugin.InstanceId,
                 PluginVersion = BuildInfo.Version,
@@ -12991,7 +13034,9 @@ public partial class SlaveWindow
                 Eta = xagmanPublishedEta,
                 GreenValueSnapshot = greenValueSnapshot,
                 TradeCapacityForecast = GetXagmanLocalTradeCapacityForecastForPresence(),
-            });
+            };
+            ApplyXagmanNetworkPresence(presence);
+            plugin.XagmanPeers.PublishPresence(presence);
             xagmanLastPresencePublishUtc = DateTime.UtcNow;
         }
         catch (Exception ex)
@@ -13655,6 +13700,7 @@ public partial class SlaveWindow
 
     internal bool HandleUnexpectedXagmanLogout(ulong logoutContentId)
     {
+        if (TryHandleXagmanNetworkLogout()) return true;
         if (xagmanLobbyOperation is { } lobbyOperation && xagmanRunning
             && lobbyOperation.RunId == plugin.TaskRunner.CurrentRunId
             && (!lobbyOperation.RunnerOwned || plugin.TaskRunner.IsRunning)
@@ -15785,7 +15831,7 @@ public partial class SlaveWindow
                 await System.Threading.Tasks.Task.Delay(100).ConfigureAwait(false);
                 await Plugin.RunOnGameThread(() =>
                 {
-                    if (!xagmanRunning || xagmanActiveRole != XagmanRole.Tony || plugin.TaskRunner.IsRunning)
+                    if (!xagmanRunning || IsXagmanNetworkRecoveryHolding || xagmanActiveRole != XagmanRole.Tony || plugin.TaskRunner.IsRunning)
                         return;
                     StartXagmanTonyFullInventoryFallback(activePartner, fallbackReason);
                 }).ConfigureAwait(false);

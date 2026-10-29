@@ -43,6 +43,7 @@ public sealed class XagmanPeerService : IDisposable
     public event Action? OnTaskStopAndClearResultsRequested;
     public event Action? OnTaskRecallRequested;
     public event Action<XagmanPeerMessage>? OnTaskCompleteRequested;
+    public event Action<XagmanPeerMessage>? OnNetworkRecoveryRequested;
     // Transport callbacks run on the socket worker. Consumers must queue work on the game thread.
 
     // Sequential ping scheduling to prevent message overlap
@@ -609,6 +610,10 @@ public sealed class XagmanPeerService : IDisposable
                 await RouteHubControlMessageAsync(message, cancellationToken).ConfigureAwait(false);
                 break;
 
+            case XagmanPeerMessageTypes.NetworkRecovery:
+                await RouteHubNetworkRecoveryMessageAsync(session, message, cancellationToken).ConfigureAwait(false);
+                break;
+
 
         }
     }
@@ -651,6 +656,7 @@ public sealed class XagmanPeerService : IDisposable
                 CoordinationProtocolRevision = message.CoordinationProtocolRevision,
                 GreenValueProtocolRevision = message.GreenValueProtocolRevision,
                 RunId = message.RunId,
+                NetworkRecoverySessionId = message.NetworkRecoverySessionId ?? string.Empty,
                 CollectionFirstEnabled = message.CollectionFirstEnabled,
                 RunPhase = message.RunPhase,
                 ExpectedFranchiseOwnerInstanceIds = message.ExpectedFranchiseOwnerInstanceIds == null
@@ -658,6 +664,79 @@ public sealed class XagmanPeerService : IDisposable
                     : new List<string>(message.ExpectedFranchiseOwnerInstanceIds),
             }, cancellationToken).ConfigureAwait(false);
         }
+    }
+
+    private async Task RouteHubNetworkRecoveryMessageAsync(
+        HubClientSession senderSession,
+        XagmanPeerMessage message,
+        CancellationToken cancellationToken)
+    {
+        var directive = CloneNetworkRecoveryDirective(message.NetworkRecovery);
+        if (!IsValidNetworkRecoveryDirective(directive) || string.IsNullOrWhiteSpace(message.TargetInstanceId))
+            return;
+
+        HubClientSession targetSession;
+        string senderInstanceId;
+        lock (hubLock)
+        {
+            var sender = senderSession.Presence;
+            if (sender == null || !hubSessions.TryGetValue(sender.InstanceId, out var currentSender)
+                || !ReferenceEquals(currentSender, senderSession))
+                return;
+
+            // Bind recovery commands to the registered socket, never the caller-supplied JSON sender.
+            // The peer service is not an authenticated transport; run ownership is checked again by consumers.
+            senderInstanceId = sender.InstanceId;
+            if (!IsNetworkRecoveryRouteAllowed(directive!, senderInstanceId, message.TargetInstanceId)
+                || (directive!.Action == XagmanNetworkRecoveryAction.ReportIncident
+                    ? sender.Role != XagmanRole.FranchiseOwner
+                    : sender.Role != XagmanRole.Tony)
+                || !hubSessions.TryGetValue(message.TargetInstanceId, out var connectedTarget))
+                return;
+            targetSession = connectedTarget;
+        }
+
+        // Recovery must reach suspended/idle participants whose ordinary XagmanEnabled flag is false.
+        await SendToSessionAsync(targetSession, new XagmanPeerMessage
+        {
+            MessageType = XagmanPeerMessageTypes.NetworkRecovery,
+            SenderInstanceId = senderInstanceId,
+            TargetInstanceId = message.TargetInstanceId,
+            SentAtUtc = DateTime.UtcNow,
+            NetworkRecovery = directive,
+        }, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static bool IsValidNetworkRecoveryDirective(XagmanNetworkRecoveryDirective? directive)
+    {
+        if (directive == null || directive.Revision != 1
+            || string.IsNullOrWhiteSpace(directive.SessionId)
+            || string.IsNullOrWhiteSpace(directive.CoordinatorInstanceId)
+            || string.IsNullOrWhiteSpace(directive.IncidentId)
+            || directive.FailureCount < 0)
+            return false;
+        if (directive.Action == XagmanNetworkRecoveryAction.ReportIncident)
+            return directive.Epoch >= 0;
+        return (directive.Action is XagmanNetworkRecoveryAction.Prepare or XagmanNetworkRecoveryAction.Resume)
+            && directive.Epoch >= 1
+            && directive.NotBeforeUtc > DateTime.MinValue
+            && directive.ParticipantInstanceIds != null
+            && directive.ParticipantInstanceIds.Count > 0
+            && directive.ParticipantInstanceIds.All(id => !string.IsNullOrWhiteSpace(id));
+    }
+
+    private static bool IsNetworkRecoveryRouteAllowed(
+        XagmanNetworkRecoveryDirective directive,
+        string senderInstanceId,
+        string targetInstanceId)
+    {
+        if (string.IsNullOrWhiteSpace(senderInstanceId) || string.IsNullOrWhiteSpace(targetInstanceId)
+            || senderInstanceId.Equals(targetInstanceId, StringComparison.OrdinalIgnoreCase))
+            return false;
+        if (directive.Action == XagmanNetworkRecoveryAction.ReportIncident)
+            return directive.CoordinatorInstanceId.Equals(targetInstanceId, StringComparison.OrdinalIgnoreCase);
+        return directive.CoordinatorInstanceId.Equals(senderInstanceId, StringComparison.OrdinalIgnoreCase)
+            && directive.ParticipantInstanceIds.Contains(targetInstanceId, StringComparer.OrdinalIgnoreCase);
     }
 
     private async Task BroadcastPeerListsAsync(CancellationToken cancellationToken)
@@ -932,6 +1011,13 @@ public sealed class XagmanPeerService : IDisposable
                 Plugin.Log.Information($"[XagmanPeerService] Received complete task command from {message.SenderInstanceId}");
                 TriggerXagmanTaskComplete(message);
                 break;
+
+            case XagmanPeerMessageTypes.NetworkRecovery:
+                if (string.Equals(message.TargetInstanceId, localInstanceId, StringComparison.OrdinalIgnoreCase)
+                    && IsValidNetworkRecoveryDirective(message.NetworkRecovery)
+                    && IsNetworkRecoveryRouteAllowed(message.NetworkRecovery!, message.SenderInstanceId, localInstanceId))
+                    OnNetworkRecoveryRequested?.Invoke(message);
+                break;
         }
     }
 
@@ -1197,6 +1283,28 @@ public sealed class XagmanPeerService : IDisposable
             CoordinationProtocolRevision = record.CoordinationProtocolRevision,
             GreenValueProtocolRevision = record.GreenValueProtocolRevision,
             RunId = record.RunId,
+            NetworkRecoveryRevision = record.NetworkRecoveryRevision,
+            RecoverySessionId = record.RecoverySessionId ?? string.Empty,
+            RecoveryCoordinatorInstanceId = record.RecoveryCoordinatorInstanceId ?? string.Empty,
+            RecoveryEpoch = record.RecoveryEpoch,
+            RecoveryReadyEpoch = record.RecoveryReadyEpoch,
+            RecoveryResumeAckEpoch = record.RecoveryResumeAckEpoch,
+            RecoveryIncidentId = record.RecoveryIncidentId ?? string.Empty,
+            RecoveryFailureCount = record.RecoveryFailureCount,
+            RecoveryNotBeforeUtc = record.RecoveryNotBeforeUtc,
+            RecoveryReadinessObservedAtUtc = record.RecoveryReadinessObservedAtUtc,
+            RecoverySuspended = record.RecoverySuspended,
+            HasRecoveryCheckpoint = record.HasRecoveryCheckpoint,
+            HasUnfinishedRecoveryWork = record.HasUnfinishedRecoveryWork,
+            RecoveryTaskRunning = record.RecoveryTaskRunning,
+            RecoveryLifestreamReadable = record.RecoveryLifestreamReadable,
+            RecoveryLifestreamBusy = record.RecoveryLifestreamBusy,
+            RecoveryDropboxReadable = record.RecoveryDropboxReadable,
+            RecoveryDropboxBusy = record.RecoveryDropboxBusy,
+            RecoveryTradeVisible = record.RecoveryTradeVisible,
+            RecoveryAtUsableTitle = record.RecoveryAtUsableTitle,
+            RecoverySafeIdle = record.RecoverySafeIdle,
+            CanResumeRecovery = record.CanResumeRecovery,
             CollectionFirstEnabled = record.CollectionFirstEnabled,
             CollectionFirstRequested = record.CollectionFirstRequested,
             HasConditionalItemPolicies = record.HasConditionalItemPolicies,
@@ -1272,6 +1380,24 @@ public sealed class XagmanPeerService : IDisposable
             GreenValueSnapshot = CloneGreenValueSnapshot(record.GreenValueSnapshot),
             TradeCapacityForecast = CloneTradeCapacityForecast(record.TradeCapacityForecast),
             Eta = CloneEtaReport(record.Eta),
+        };
+    }
+
+    private static XagmanNetworkRecoveryDirective? CloneNetworkRecoveryDirective(XagmanNetworkRecoveryDirective? directive)
+    {
+        if (directive == null) return null;
+        return new XagmanNetworkRecoveryDirective
+        {
+            Revision = directive.Revision,
+            Action = directive.Action,
+            SessionId = directive.SessionId ?? string.Empty,
+            CoordinatorInstanceId = directive.CoordinatorInstanceId ?? string.Empty,
+            IncidentId = directive.IncidentId ?? string.Empty,
+            Epoch = directive.Epoch,
+            FailureCount = directive.FailureCount,
+            NotBeforeUtc = directive.NotBeforeUtc,
+            ParticipantInstanceIds = directive.ParticipantInstanceIds == null
+                ? new List<string>() : new List<string>(directive.ParticipantInstanceIds),
         };
     }
 
@@ -1501,6 +1627,35 @@ public sealed class XagmanPeerService : IDisposable
         public XagmanPeerPresence? Presence { get; set; }
     }
 
+    public async Task<bool> SendNetworkRecoveryAsync(
+        XagmanNetworkRecoveryDirective directive,
+        IReadOnlyCollection<string> targetInstanceIds,
+        CancellationToken cancellationToken = default)
+    {
+        var snapshot = CloneNetworkRecoveryDirective(directive);
+        if (!started || isDisposed || !IsValidNetworkRecoveryDirective(snapshot)
+            || targetInstanceIds == null || targetInstanceIds.Count == 0
+            || targetInstanceIds.Any(id => !IsNetworkRecoveryRouteAllowed(snapshot!, localInstanceId, id)))
+            return false;
+        var targets = targetInstanceIds.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var allSent = true;
+        foreach (var targetInstanceId in targets)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!await SendToHubAsync(new XagmanPeerMessage
+            {
+                MessageType = XagmanPeerMessageTypes.NetworkRecovery,
+                SenderInstanceId = localInstanceId,
+                TargetInstanceId = targetInstanceId,
+                SentAtUtc = DateTime.UtcNow,
+                NetworkRecovery = snapshot,
+            }).ConfigureAwait(false))
+                allSent = false;
+        }
+        // Successful transport writes are not readiness/resume acknowledgments from the participants.
+        return allSent;
+    }
+
     public async Task<bool> SendStartTaskToAllPeersAsync(
         string runId,
         bool collectionFirstEnabled,
@@ -1508,7 +1663,8 @@ public sealed class XagmanPeerService : IDisposable
         int coordinationProtocolRevision,
         int greenValueProtocolRevision,
         IReadOnlyCollection<string>? expectedFranchiseOwnerInstanceIds,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string networkRecoverySessionId = "")
     {
         if (!started)
             return false;
@@ -1522,6 +1678,7 @@ public sealed class XagmanPeerService : IDisposable
             CoordinationProtocolRevision = coordinationProtocolRevision,
             GreenValueProtocolRevision = greenValueProtocolRevision,
             RunId = runId ?? string.Empty,
+            NetworkRecoverySessionId = networkRecoverySessionId ?? string.Empty,
             CollectionFirstEnabled = collectionFirstEnabled,
             RunPhase = runPhase,
             ExpectedFranchiseOwnerInstanceIds = expectedFranchiseOwnerInstanceIds == null

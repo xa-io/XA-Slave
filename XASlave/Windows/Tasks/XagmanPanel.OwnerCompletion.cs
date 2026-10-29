@@ -100,7 +100,8 @@ public partial class SlaveWindow
     private void ObserveXagmanOwnerClientCompletions()
     {
         if (!IsXagmanSupplyCycleActive() || xagmanActiveRole != XagmanRole.Tony
-            || IsXagmanCapacityRecoveryActive() || IsXagmanCapacityDrainActive() || xagmanStatus == XagmanStatus.Error) return;
+            || IsXagmanCapacityRecoveryActive() || IsXagmanCapacityDrainActive()
+            || (xagmanStatus == XagmanStatus.Error && !IsXagmanNetworkRecoveryHolding)) return;
         var changed = false;
         foreach (var peer in plugin.XagmanPeers.Peers)
         {
