@@ -427,6 +427,9 @@ public class Configuration : IPluginConfiguration
     public bool AutoCloseLobbyErrorsEnabled { get; set; } = false;
     public bool DisplayActualQueuePositionEnabled { get; set; } = false;
     public bool ReplaceUnownedMountHotbarsEnabled { get; set; } = false;
+    public bool PvpHotbarsEnabled { get; set; } = false;
+    // Legacy manual selection retained for config round-tripping only; no runtime effect.
+    public int PvpHotbarsMask { get; set; } = 1 << 2;
     public bool DisableBackgroundGameRenderingEnabled { get; set; } = false;
     public bool DisableBackgroundGameRenderingOnlyWhenMinimized { get; set; } = false;
     public bool DisableBackgroundGameRenderingDisableWhenArMultiIsOn { get; set; } = false;

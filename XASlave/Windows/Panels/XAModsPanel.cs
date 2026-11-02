@@ -3287,6 +3287,18 @@ public partial class SlaveWindow
             () => plugin.ReplaceUnownedMountHotbars.LocalizedStatusText,
             searchTerms: ["mount roulette", "unowned mount", "hotbar", "cross hotbar", "missing mount"]);
         AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "pvp-hotbars",
+            "PVP Hotbar Disabler",
+            () => configuration.PvpHotbarsEnabled,
+            plugin.PvpHotbars.SetEnabled,
+            applied => configuration.PvpHotbarsEnabled = applied,
+            "Handle blocked /hotbar display commands in PvP.",
+            "Enable chat monitoring while logged in with the main _ActionBar visible, then use /hotbar display commands.",
+            () => plugin.PvpHotbars.StatusText,
+            searchTerms: ["pvp", "hotbar", "display", "disabler", "monitor", "unavailable", "Wolves' Den"],
+            drawOptions: DrawPvpHotbarsOptions);
+        AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,
             "disable-background-game-rendering",
             UiLocale.Native("SA0D7106CA86D90A6"),

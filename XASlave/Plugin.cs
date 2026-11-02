@@ -239,6 +239,7 @@ public sealed class Plugin : IDalamudPlugin
     public BetterHighlightPotentialTargetsService BetterHighlightPotentialTargets { get; init; }
     public SystemWindowModsService SystemWindowMods { get; init; }
     public ReplaceUnownedMountHotbarsService ReplaceUnownedMountHotbars { get; init; }
+    public PvpHotbarsService PvpHotbars { get; init; }
     public LobbyErrorAutoCloseService LobbyErrorAutoClose { get; init; }
     public QueuePositionDisplayService QueuePositionDisplay { get; init; }
     public MsqProgressDisplayService MsqProgressDisplay { get; init; }
@@ -391,6 +392,7 @@ public sealed class Plugin : IDalamudPlugin
         BetterHighlightPotentialTargets = new BetterHighlightPotentialTargetsService(Framework, ObjectTable, TargetManager, ClientState, Log);
         SystemWindowMods = new SystemWindowModsService(SigScanner, GameInterop, Log, Framework, GameConfig, ClientState, () => IpcClient.AutoRetainerGetMultiModeEnabled());
         ReplaceUnownedMountHotbars = new ReplaceUnownedMountHotbarsService(GameInterop, Log);
+        PvpHotbars = new PvpHotbarsService();
         LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Framework, ClientState, Log);
         QueuePositionDisplay = new QueuePositionDisplayService(Framework, SigScanner, GameInterop, Log);
         MsqProgressDisplay = new MsqProgressDisplayService(AddonLifecycle, DataManager, Log);
@@ -1088,6 +1090,14 @@ public sealed class Plugin : IDalamudPlugin
         }
         QueueDeferredStartupAction(() =>
         {
+            if (Configuration.PvpHotbarsEnabled && !PvpHotbars.SetEnabled(true))
+            {
+                Configuration.PvpHotbarsEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
             if (!Configuration.UnlockExpertDeliveryEnabled)
                 return;
 
@@ -1749,6 +1759,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Prevent Lobby Exit", Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.PreventLobbyExitStatusText);
         yield return CreateStartupSurfaceStatus("Queue Position Display", Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.StatusText, "DisplayActualQueuePositionEnabled");
         yield return CreateStartupSurfaceStatus("Replace Unowned Mount Hotbars", Configuration.ReplaceUnownedMountHotbarsEnabled, ReplaceUnownedMountHotbars.StatusText, "ReplaceUnownedMountHotbarsEnabled");
+        yield return CreateStartupSurfaceStatus("PVP Hotbar Disabler", Configuration.PvpHotbarsEnabled, PvpHotbars.StatusText);
         yield return CreateStartupSurfaceStatus("Disable Title Screen Movie", Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.DisableTitleScreenMovieStatusText);
         yield return CreateStartupSurfaceStatus("Auto Display IDs", Configuration.AutoDisplayIdsEnabled, AutoDisplayIds.StatusText);
         yield return CreateStartupSurfaceStatus("Display Network Latency", Configuration.AutoDisplayNetworkLatencyEnabled, AutoDisplayNetworkLatency.StatusText);
@@ -1881,6 +1892,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("BetterHighlightPotentialTargets", BetterHighlightPotentialTargets);
         TryDispose("SystemWindowMods", SystemWindowMods);
         TryDispose("ReplaceUnownedMountHotbars", ReplaceUnownedMountHotbars);
+        TryDispose("PvpHotbars", PvpHotbars);
         TryDispose("LobbyErrorAutoClose", LobbyErrorAutoClose);
         TryDispose("QueuePositionDisplay", QueuePositionDisplay);
         TryDispose("MsqProgressDisplay", MsqProgressDisplay);
@@ -2325,6 +2337,14 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("hotbar", StringComparison.OrdinalIgnoreCase)
+            || subcommand.Equals("pvpbotbar", StringComparison.OrdinalIgnoreCase)
+            || subcommand.Equals("pvphotbar", StringComparison.OrdinalIgnoreCase))
+        {
+            PrintCommandResult(TryExecuteHotbarCommand(subcommandArgs, out var hotbarMessage), hotbarMessage);
+            return;
+        }
+
         if (TryHandleXAModToggleCommand(subcommand, subcommandArgs))
             return;
 
@@ -2632,6 +2652,11 @@ public sealed class Plugin : IDalamudPlugin
         if (movementHandled)
             return false;
 
+        if (subcommand.Equals("hotbar", StringComparison.OrdinalIgnoreCase)
+            || subcommand.Equals("pvpbotbar", StringComparison.OrdinalIgnoreCase)
+            || subcommand.Equals("pvphotbar", StringComparison.OrdinalIgnoreCase))
+            return TryExecuteHotbarCommand(subcommandArgs, out message);
+
         if (TryGetXAModToggleCommandDefinition(subcommand, out var commandDefinition))
         {
             if (string.IsNullOrWhiteSpace(subcommandArgs))
@@ -2652,6 +2677,20 @@ public sealed class Plugin : IDalamudPlugin
 
         message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S8CE5A27047F8FF4F"));
         return false;
+    }
+
+    private bool TryExecuteHotbarCommand(string arguments, out string message)
+    {
+        var value = arguments.Trim();
+        if (value.Length == 0)
+        {
+            message = $"PVP Hotbar Disabler: {(Configuration.PvpHotbarsEnabled ? "On" : "Off")}. {PvpHotbars.StatusText} Usage: /xa hotbar on|off or /xa hotbar <1-10> [on|off].";
+            return true;
+        }
+        if (value.Equals("on", StringComparison.OrdinalIgnoreCase)
+            || value.Equals("off", StringComparison.OrdinalIgnoreCase))
+            return SetXAModEnabled(GetXAModDefinition("pvp-hotbars"), value.Equals("on", StringComparison.OrdinalIgnoreCase), out message);
+        return PvpHotbars.TryExecuteDisplayCommand(value, out message);
     }
 
     private static string NormalizeXaCommandInput(string rawCommand)
@@ -5632,6 +5671,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("better-duty-finder", global::XASlave.Localization.UiLocale.Native("S023C4C5983AAE7D3"), XAModsRestoreScope.Ui, () => Configuration.BetterDutyFinderEnabled, BetterDutyFinder.SetEnabled, applied => Configuration.BetterDutyFinderEnabled = applied, () => BetterDutyFinder.StatusTextMessage);
         yield return new("display-actual-queue-position", global::XASlave.Localization.UiLocale.Native("SA67487F2DBAEAB93"), XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusTextMessage);
         yield return new("replace-unowned-mount-hotbars", global::XASlave.Localization.UiLocale.Native("S6D3BD3F66D7757D7"), XAModsRestoreScope.Game, () => Configuration.ReplaceUnownedMountHotbarsEnabled, ReplaceUnownedMountHotbars.SetEnabled, applied => Configuration.ReplaceUnownedMountHotbarsEnabled = applied, () => ReplaceUnownedMountHotbars.StatusTextMessage);
+        yield return new("pvp-hotbars", "PVP Hotbar Disabler", XAModsRestoreScope.Game, () => Configuration.PvpHotbarsEnabled, PvpHotbars.SetEnabled, applied => Configuration.PvpHotbarsEnabled = applied, () => global::XASlave.Localization.UiMessage.Raw(PvpHotbars.StatusText));
         yield return new("target-command-fix", global::XASlave.Localization.UiLocale.Native("S762FC3E87F23DC97"), XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusTextMessage);
         yield return new("copy-item-name-for-all", global::XASlave.Localization.UiLocale.Native("SE47CEA80BEEED0B2"), XAModsRestoreScope.Ui, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusTextMessage);
         yield return new("expanded-player-right-click-menu-search", global::XASlave.Localization.UiLocale.Native("SF6F93682DCAB79ED"), XAModsRestoreScope.Ui, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusTextMessage);
@@ -5915,6 +5955,9 @@ public sealed class Plugin : IDalamudPlugin
                 return true;
             case "queueposition":
                 definition = new("queueposition", "/xa queueposition on|off", GetXAModDefinition("display-actual-queue-position"));
+                return true;
+            case "pvphotbars":
+                definition = new("pvphotbars", "/xa hotbar on|off", GetXAModDefinition("pvp-hotbars"));
                 return true;
             case "targetfix":
             case "targetcommand":
@@ -6331,5 +6374,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.60";
+    public const string Version = "0.0.0.61";
 }

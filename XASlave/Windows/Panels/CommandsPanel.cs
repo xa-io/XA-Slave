@@ -12,10 +12,10 @@ namespace XASlave.Windows;
 /// </summary>
 public partial class SlaveWindow
 {
-    private sealed record CommandReferenceEntry(string Command, string PurposeKey, string NotesKey)
+    private sealed record CommandReferenceEntry(string Command, string PurposeKey, string NotesKey, bool LiteralText = false)
     {
-        public string Purpose => UiLocale.Get(PurposeKey);
-        public string Notes => UiLocale.Get(NotesKey);
+        public string Purpose => LiteralText ? PurposeKey : UiLocale.Get(PurposeKey);
+        public string Notes => LiteralText ? NotesKey : UiLocale.Get(NotesKey);
         public string SearchHaystack => UiLocale.Culture.TextInfo.ToLower($"{Command}\n{Purpose}\n{Notes}");
     }
 
@@ -53,6 +53,7 @@ public partial class SlaveWindow
 
     private static readonly CommandReferenceEntry[] GameModsCommandEntries =
     {
+        new("/xa hotbar <1-10> [on|off|toggle]", "Directly show, hide or toggle a PvP hotbar.", "Enable PVP Hotbar Disabler first. No state toggles; on shows; off hides. Works without an error and can restore a hidden main bar.", LiteralText: true),
         new("/xa clearlog", "S525AC46D6D432DF6", "S94217AC7F74A697A"),
         new("/xa chocobocutscene on|off", "S8F540FDDA5EB58B5", "S2149784C39C936B9"),
         new("/xa closeerrors on|off", "S45F7B3137669A582", "SF6B242DFE5BD1CCB"),
@@ -62,6 +63,8 @@ public partial class SlaveWindow
         new("/xa multiinstance on|off", "SAAA8CE511A14CD50", "S6649519E36332FB8"),
         new("/xa preventlobbyexit on|off", "SE7182D7C4E3AB285", "SD62A02733CE86800"),
         new("/xa queueposition on|off", "S825BF42D898C87C2", "S4DDE4870AEE4F22C"),
+        new("/xa hotbar on|off", "Enable or disable PVP Hotbar Disabler.", "On monitors blocked /hotbar display errors; off stops monitoring and shows all bars controlled by this mod. Omit on/off for status.", LiteralText: true),
+        new("/hotbar display <1-10> [on|off]", "Apply a blocked hotbar display command in PvP.", "Enable PVP Hotbar Disabler first. Requires the English unavailable error, login and a visible main _ActionBar. Omit on/off to toggle. Disabling the mod shows all bars controlled by this mod.", LiteralText: true),
         new("/xa skipcutscenes on|off", "SA34E45C375791613", "SE890035D4E0EFA74"),
         new("/xa skipdialogue on|off", "SA6771B5E4B120506", "SEA190C45A962C27A"),
         new("/xa targetfix on|off", "SE8D8BA4631BD6518", "SA08C366D54648DE7"),

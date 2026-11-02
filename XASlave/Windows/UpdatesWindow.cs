@@ -23,6 +23,14 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.61 - 2026-11-02",
+            Lines =
+            [
+                "- Added PVP Hotbar Disabler: Handle blocked /hotbar display commands in PvP or use /xa hotbar <1-10> [on|off] directly. Omit on/off to toggle. Enable the mod with /xa hotbar on.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.60 - 2026-10-29",
             Lines =
             [
