@@ -951,20 +951,20 @@ public sealed class MonthlyReloggerTask
         return BuildCollectPersonalPlotInfoSteps(plugin, runner.AddLog);
     }
 
-    internal static List<TaskStep> BuildCollectPersonalPlotInfoSteps(Plugin plugin, Action<string> addLog)
+    internal static List<TaskStep> BuildCollectPersonalPlotInfoSteps(Plugin plugin, Action<string> addLog, Func<bool>? saveToXaDatabase = null)
     {
         var steps = new List<TaskStep>();
         steps.AddRange(BuildCollectHousingTypeSteps(plugin, "Apartment", "Apartment", () =>
             AddonHelper.AddonHasText("HousingSubmenu", "Apartment Options")
-            || AddonHelper.AddonHasText("HousingSubmenu", "View Room Details"), addLog));
+            || AddonHelper.AddonHasText("HousingSubmenu", "View Room Details"), addLog, saveToXaDatabase: saveToXaDatabase));
         steps.AddRange(BuildCollectHousingTypeSteps(plugin, "Private Estate", "Private Estate", () =>
-            AddonHelper.AddonHasText("HousingSubmenu", "Private Estate"), addLog));
+            AddonHelper.AddonHasText("HousingSubmenu", "Private Estate"), addLog, saveToXaDatabase: saveToXaDatabase));
         steps.AddRange(BuildCollectHousingTypeSteps(plugin, "Shared Estate", "Shared Estate", () =>
-            AddonHelper.AddonHasText("HousingSubmenu", "Shared Estate", true), addLog, selectionContains: true));
+            AddonHelper.AddonHasText("HousingSubmenu", "Shared Estate", true), addLog, selectionContains: true, saveToXaDatabase: saveToXaDatabase));
         return steps;
     }
 
-    private static List<TaskStep> BuildCollectHousingTypeSteps(Plugin plugin, string label, string selectionText, Func<bool> isDirectSubmenuMatch, Action<string> addLog, bool selectionContains = false)
+    private static List<TaskStep> BuildCollectHousingTypeSteps(Plugin plugin, string label, string selectionText, Func<bool> isDirectSubmenuMatch, Action<string> addLog, bool selectionContains = false, Func<bool>? saveToXaDatabase = null)
     {
         var steps = new List<TaskStep>();
         var housingUiVisible = false;
@@ -1101,7 +1101,7 @@ public sealed class MonthlyReloggerTask
                 else
                     addLog($"Plot Info: {label} address text not found.");
 
-                if (plugin.SaveToXaDatabaseAndRecordSync())
+                if (saveToXaDatabase != null ? saveToXaDatabase() : plugin.SaveToXaDatabaseAndRecordSync())
                     addLog($"Plot Info: saved {label} data to XA Database.");
                 else
                     addLog($"Plot Info: XA Database save failed while collecting {label}.");

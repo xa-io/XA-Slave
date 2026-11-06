@@ -1,5 +1,6 @@
 using System;
 using XASlave.Localization;
+using XASlave.Data;
 using System.Collections.Generic;
 using System.Numerics;
 using Dalamud.Bindings.ImGui;
@@ -49,6 +50,8 @@ public partial class SlaveWindow
 
     private bool pluginOpsFavInputsInitialized;
     private int pluginOpsFavConfigFingerprint;
+    private UiMessage pluginOpsStartupWindowStatus = UiMessage.Raw(string.Empty);
+    private bool pluginOpsStartupWindowError;
 
     private void EnsurePluginOpsFavInputsInitialized()
     {
@@ -150,6 +153,93 @@ public partial class SlaveWindow
         return true;
     }
 
+    private bool SavePluginOpsStartupWindowSettings(Action apply, Action rollback)
+    {
+        // A settings edit applies on the next load, never through the old queued startup request.
+        plugin.StartupWindowPlacement.Cancel();
+        try
+        {
+            apply();
+            plugin.Configuration.Save();
+            pluginOpsStartupWindowStatus = UiMessage.Authored("Startup window settings saved for the next plugin load.");
+            pluginOpsStartupWindowError = false;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            rollback();
+            pluginOpsStartupWindowStatus = UiMessage.Format(UiLocale.Key("Could not save startup window settings: {0}"), UiMessage.FromException(ex));
+            pluginOpsStartupWindowError = true;
+            return false;
+        }
+    }
+
+    private void DrawPluginOpsStartupWindowPlacement(Configuration cfg)
+    {
+        ImGui.Spacing();
+        var enabled = cfg.WindowPositionOnLoadEnabled;
+        if (UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Window Position on Plugin Load")), ref enabled))
+        {
+            var previous = cfg.WindowPositionOnLoadEnabled;
+            SavePluginOpsStartupWindowSettings(() => cfg.WindowPositionOnLoadEnabled = enabled,
+                () => cfg.WindowPositionOnLoadEnabled = previous);
+        }
+        ImGui.TextWrapped(UiMessage.Authored("Capture the current game window, then enable this option to restore its position on the next plugin load. Saving does not move the window.").Display);
+
+        // Capture is available while disabled so a valid target can be prepared before opting in.
+        if (UiNative.Button(UiLocale.Native(UiLocale.Key("Capture Current Position"))))
+        {
+            if (plugin.StartupWindowPlacement.TryCapture(out var captured, out var message))
+            {
+                var previous = cfg.WindowPositionOnLoadPlacement;
+                SavePluginOpsStartupWindowSettings(() => cfg.WindowPositionOnLoadPlacement = captured,
+                    () => cfg.WindowPositionOnLoadPlacement = previous);
+            }
+            else
+            {
+                pluginOpsStartupWindowStatus = message;
+                pluginOpsStartupWindowError = true;
+            }
+        }
+
+        var saved = cfg.WindowPositionOnLoadPlacement;
+        if (saved == null)
+        {
+            ImGui.TextDisabled(UiMessage.Authored("No window position has been saved.").Display);
+        }
+        else
+        {
+            ImGui.TextUnformatted(UiMessage.Format(UiLocale.Key("Saved monitor: {0}"), saved.MonitorDeviceName).Display);
+            var x = saved.X;
+            var y = saved.Y;
+            ImGui.SetNextItemWidth(Scale(160f));
+            var changed = UiNative.InputInt(UiLocale.Native(UiLocale.Key("Desktop X")) + "##StartupWindowX", ref x);
+            ImGui.SetNextItemWidth(Scale(160f));
+            changed |= UiNative.InputInt(UiLocale.Native(UiLocale.Key("Desktop Y")) + "##StartupWindowY", ref y);
+            if (changed)
+            {
+                var replacement = new StartupWindowPlacement
+                {
+                    MonitorDeviceName = saved.MonitorDeviceName,
+                    X = x,
+                    Y = y,
+                    MonitorWorkLeft = saved.MonitorWorkLeft,
+                    MonitorWorkTop = saved.MonitorWorkTop,
+                };
+                SavePluginOpsStartupWindowSettings(() => cfg.WindowPositionOnLoadPlacement = replacement,
+                    () => cfg.WindowPositionOnLoadPlacement = saved);
+            }
+            ImGui.TextWrapped(UiMessage.Authored("Desktop coordinates may be negative. Capture again after moving the game window to a different monitor.").Display);
+        }
+
+        ImGui.TextWrapped(UiMessage.Authored("Settings changes cancel any pending startup window adjustment until the next plugin load.").Display);
+        if (pluginOpsStartupWindowStatus.Original.Length != 0)
+            ImGui.TextColored(pluginOpsStartupWindowError ? new Vector4(1f, 0.45f, 0.4f, 1f) : new Vector4(0.7f, 0.85f, 0.7f, 1f), pluginOpsStartupWindowStatus.Display);
+        if (plugin.StartupWindowPlacement.IsPending || pluginOpsStartupWindowStatus.Original.Length == 0)
+            ImGui.TextWrapped(plugin.StartupWindowPlacement.StatusMessage.Display);
+        ImGui.Spacing();
+    }
+
     private void DrawPluginOperationsTask()
     {
         EnsurePluginOpsFavInputsInitialized();
@@ -163,6 +253,9 @@ public partial class SlaveWindow
         ImGui.Spacing();
 
         UiLocale.DrawLanguageSelector("OperationsLanguage", cfg, showLabel: true);
+        ImGui.Spacing();
+
+        DrawPluginOpsXAModHotkeys();
         ImGui.Spacing();
 
         var openPluginOnLoad = cfg.OpenPluginOnLoad;
@@ -179,8 +272,9 @@ public partial class SlaveWindow
         var customResolutionOnLoad = cfg.CustomResolutionOnLoadEnabled;
         if (UiNative.Checkbox(UiLocale.Native("S2DBBF28C1D7B07C1"), ref customResolutionOnLoad))
         {
-            cfg.CustomResolutionOnLoadEnabled = customResolutionOnLoad;
-            cfg.Save();
+            var previous = cfg.CustomResolutionOnLoadEnabled;
+            SavePluginOpsStartupWindowSettings(() => cfg.CustomResolutionOnLoadEnabled = customResolutionOnLoad,
+                () => cfg.CustomResolutionOnLoadEnabled = previous);
         }
 
         ImGui.TextDisabled(UiLocale.Get("S5798EA0539A8A3EB"));
@@ -193,29 +287,34 @@ public partial class SlaveWindow
             ImGui.SetNextItemWidth(Scale(160f));
             if (UiNative.InputInt(UiLocale.Native("S3019947B6DAF18B0") + "##CustomResolutionOnLoadWidth", ref customResWidth))
             {
-                cfg.CustomResolutionOnLoadWidth = Math.Clamp(customResWidth, 250, 16384);
-                cfg.Save();
+                var previous = cfg.CustomResolutionOnLoadWidth;
+                SavePluginOpsStartupWindowSettings(() => cfg.CustomResolutionOnLoadWidth = Math.Clamp(customResWidth, 250, 16384),
+                    () => cfg.CustomResolutionOnLoadWidth = previous);
             }
 
             var customResHeight = cfg.CustomResolutionOnLoadHeight;
             ImGui.SetNextItemWidth(Scale(160f));
             if (UiNative.InputInt(UiLocale.Native("SBFE2ECA401797325") + "##CustomResolutionOnLoadHeight", ref customResHeight))
             {
-                cfg.CustomResolutionOnLoadHeight = Math.Clamp(customResHeight, 200, 16384);
-                cfg.Save();
+                var previous = cfg.CustomResolutionOnLoadHeight;
+                SavePluginOpsStartupWindowSettings(() => cfg.CustomResolutionOnLoadHeight = Math.Clamp(customResHeight, 200, 16384),
+                    () => cfg.CustomResolutionOnLoadHeight = previous);
             }
 
             var customResIgnoreMin = cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize;
             if (UiNative.Checkbox(UiLocale.Native("SD9CCEE8B9E9A452B") + "##CustomResolutionOnLoad", ref customResIgnoreMin))
             {
-                cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize = customResIgnoreMin;
-                cfg.Save();
+                var previous = cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize;
+                SavePluginOpsStartupWindowSettings(() => cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize = customResIgnoreMin,
+                    () => cfg.CustomResolutionOnLoadIgnoreMinimumWindowSize = previous);
             }
 
             ImGui.TextDisabled(UiLocale.Get("SAD0D4FD81C156819"));
 
             ImGui.Unindent();
         }
+
+        DrawPluginOpsStartupWindowPlacement(cfg);
 
         var showVersionInTitle = cfg.ShowVersionInUpdatesTitle;
         if (UiNative.Checkbox(UiLocale.Native("S820A3236DFFB92C2"), ref showVersionInTitle))

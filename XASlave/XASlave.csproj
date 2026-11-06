@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.0.0.61</Version>
+    <Version>0.0.0.62</Version>
     <LangVersion>preview</LangVersion>
     <PackageProjectUrl>https://aethertek.io/</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
@@ -19,6 +19,7 @@
     <Compile Remove="**\backups\**" />
     <None Remove="backups\**" />
     <None Remove="**\backups\**" />
+    <EmbeddedResource Remove="backups\**;**\backups\**" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.9" />

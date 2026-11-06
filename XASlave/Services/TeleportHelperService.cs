@@ -1,5 +1,7 @@
 using System;
 using System.Text;
+using Dalamud.Game.Addon.Lifecycle;
+using Dalamud.Game.Addon.Lifecycle.AddonArgTypes;
 using Dalamud.Plugin.Services;
 
 namespace XASlave.Services;
@@ -12,6 +14,7 @@ public sealed class TeleportHelperService : IDisposable
     private readonly IFramework framework;
     private readonly IClientState clientState;
     private readonly IPlayerState playerState;
+    private readonly IAddonLifecycle addonLifecycle;
     private readonly IPluginLog log;
 
     private bool enabled;
@@ -20,6 +23,8 @@ public sealed class TeleportHelperService : IDisposable
     private bool subscribed;
     private bool selectYes;
     private long lastClickAttemptTick;
+    private bool responseEchoed;
+    private ulong promptGeneration;
     private bool EffectiveEnabled => !disposed && (enabled || requiredByXagman);
     private bool EffectiveSelectYes => !requiredByXagman && selectYes;
 
@@ -27,11 +32,13 @@ public sealed class TeleportHelperService : IDisposable
         IFramework framework,
         IClientState clientState,
         IPlayerState playerState,
+        IAddonLifecycle addonLifecycle,
         IPluginLog log)
     {
         this.framework = framework;
         this.clientState = clientState;
         this.playerState = playerState;
+        this.addonLifecycle = addonLifecycle;
         this.log = log;
         UpdateStatusText();
     }
@@ -89,9 +96,16 @@ public sealed class TeleportHelperService : IDisposable
             return;
 
         if (targetEnabled)
+        {
+            addonLifecycle.RegisterListener(AddonEvent.PostSetup, SelectYesnoAddonName, OnPromptSetup);
             framework.Update += OnFrameworkUpdate;
+        }
         else
+        {
             framework.Update -= OnFrameworkUpdate;
+            addonLifecycle.UnregisterListener(OnPromptSetup);
+            ResetPromptReceipt();
+        }
 
         subscribed = targetEnabled;
     }
@@ -103,12 +117,15 @@ public sealed class TeleportHelperService : IDisposable
 
         if (!clientState.IsLoggedIn || !playerState.IsLoaded)
         {
+            ResetPromptReceipt();
             UpdateStatusText();
             return;
         }
 
         if (!AddonHelper.IsAddonReady(SelectYesnoAddonName))
         {
+            if (!AddonHelper.IsAddonVisible(SelectYesnoAddonName))
+                ResetPromptReceipt();
             UpdateStatusText();
             return;
         }
@@ -124,11 +141,15 @@ public sealed class TeleportHelperService : IDisposable
             return;
 
         lastClickAttemptTick = now;
+        var response = EffectiveSelectYes;
+        var generation = promptGeneration;
+        var shouldEcho = !responseEchoed;
         try
         {
-            if (!AddonHelper.ClickYesNo(EffectiveSelectYes, closeAfter: true))
+            if (!AddonHelper.ClickYesNo(response, closeAfter: true))
                 return;
 
+            ReportResponse(response, generation, shouldEcho);
             LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S6B58A24BF036B14E", GetResponseLabel(), DateTime.Now));
             if (requiredByXagman)
                 log.Information("[XASlave] Xagman Teleport Helper: declined aetheryte ticket usage (No).");
@@ -140,6 +161,32 @@ public sealed class TeleportHelperService : IDisposable
             LastActionText = global::XASlave.Localization.UiMessage.Store(ref uiLastActionText, global::XASlave.Localization.UiMessage.Format("S050A8FCDEEB21FAB", GetResponseLabel(), DateTime.Now));
             UpdateStatusText(ticketPromptVisible: true);
         }
+    }
+
+    private void OnPromptSetup(AddonEvent _, AddonArgs args)
+    {
+        if (EffectiveEnabled)
+            ResetPromptReceipt();
+    }
+
+    private void ResetPromptReceipt()
+    {
+        responseEchoed = false;
+        promptGeneration++;
+    }
+
+    private void ReportResponse(bool response, ulong generation, bool shouldEcho)
+    {
+        if (!shouldEcho)
+            return;
+
+        // The callback can open another prompt. Never mark that new prompt as reported.
+        if (generation == promptGeneration)
+            responseEchoed = true;
+
+        // Feedback failure must not retry the echo or change the successful callback result.
+        if (!ChatHelper.TrySend(response ? "/e Teleport Request Accepted" : "/e Teleport Request Rejected"))
+            log.Warning("[XASlave] Teleport Helper response succeeded, but its echo could not be sent.");
     }
 
     private static bool TryGetAetheryteTicketPrompt(out string promptText)

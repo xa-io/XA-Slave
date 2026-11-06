@@ -848,6 +848,8 @@ public partial class SlaveWindow
         data.HighestLevel = ar.HighestLevel;
         data.Gil = ar.Gil;
         data.FcName = ar.FcName;
+        if (data.FCID != ar.FCID)
+            data.FcPoints = null;
         data.FCID = ar.FCID;
         data.CurrentWorld = ar.CurrentWorld;
         data.RetainerCount = ar.RetainerCount;
@@ -1058,12 +1060,13 @@ public partial class SlaveWindow
         var rows = new List<XaDatabaseCharacterRow>();
         using var conn = new Microsoft.Data.Sqlite.SqliteConnection($"Data Source={dbPath};Mode=ReadOnly");
         conn.Open();
+        var fcPointsColumn = HasXaDatabaseFcPointsColumn(conn, token) ? "fc_points" : "NULL";
         using var cmd = conn.CreateCommand();
-        cmd.CommandText = @"
+        cmd.CommandText = $@"
             SELECT content_id, character_name, world, updated_utc,
                    personal_estate, apartment, gil,
                    highest_job_level AS highest_level,
-                   fc_name, fc_id, fc_estate, retainer_count,
+                   fc_name, fc_id, {fcPointsColumn} AS fc_points, fc_estate, retainer_count,
                    free_company_json, fc_members_json, inventory_summaries_json,
                    snapshot_version, inventory_json, saddlebag_json, crystals_json,
                    armoury_json, equipped_json, items_json, listings_json, retainer_items_json
@@ -1092,6 +1095,7 @@ public partial class SlaveWindow
                 RetainerCount = Math.Max(0, ReadDatabaseInt32(reader["retainer_count"])),
             };
 
+            data.FcPoints = ReadXaDatabaseFcPoints(data.FCID, reader["fc_points"]);
             UpdateCharacterFcMemberRank(data, name, world, ReadDatabaseString(reader["fc_members_json"]));
             UpdateCharacterFreeCompanyRank(data, ReadDatabaseString(reader["free_company_json"]));
             UpdateCharacterInventorySummary(data, ReadDatabaseString(reader["inventory_summaries_json"]));
@@ -1153,6 +1157,35 @@ public partial class SlaveWindow
             try { callback(); }
             catch (Exception ex) { Plugin.Log.Warning(ex, "[XASlave] XA Database pull callback failed."); }
         }
+    }
+
+    private static bool HasXaDatabaseFcPointsColumn(
+        Microsoft.Data.Sqlite.SqliteConnection connection,
+        System.Threading.CancellationToken token)
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "PRAGMA table_info(xa_characters)";
+        using var reader = command.ExecuteReader();
+        while (reader.Read())
+        {
+            token.ThrowIfCancellationRequested();
+            if (string.Equals(reader.GetString(1), "fc_points", StringComparison.OrdinalIgnoreCase))
+                return true;
+        }
+        return false;
+    }
+
+    private static long? ReadXaDatabaseFcPoints(long fcId, object? value)
+    {
+        if (fcId == 0)
+            return null;
+        // SQLite INTEGER values arrive as Int64. Do not round REAL values or invent zero on failure.
+        if (value is long points)
+            return points >= 0 ? points : null;
+        return value is string storedText
+            && long.TryParse(storedText, System.Globalization.NumberStyles.None,
+                System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+            ? parsed : null;
     }
 
     private static string ReadDatabaseString(object? value)

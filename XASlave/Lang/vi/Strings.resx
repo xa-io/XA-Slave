@@ -28861,4 +28861,760 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
     <value>Túi của Tony {0} đã đầy và việc thu thập vật phẩm vẫn đang chờ hoặc chưa được xác minh; đóng giao dịch để đổi Tony. Số gil đang có sẽ không trì hoãn việc đổi Tony.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
   </data>
+  <data name="S7143F82330DF04E4" xml:space="preserve">
+    <value>Điểm FC</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; I243 FC Points.</comment>
+  </data>
+  <data name="S592AA83FCCD8E8B0" xml:space="preserve">
+    <value>Giá trị đã lưu trong XA Database. Các nhân vật cùng FC dùng chung số điểm này. Không rõ nghĩa là không có bản ghi điểm FC đã lưu có thể sử dụng.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; I243 FC Points.</comment>
+  </data>
+  <data name="S7854F7662947FE72" xml:space="preserve">
+    <value>Xuất nhật ký Dalamud</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SBF66B41AAE6E3F4F" xml:space="preserve">
+    <value>Lưu nhật ký Dalamud đang hoạt động của ứng dụng khách này vào thư mục xuất của plugin.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SA12745C8C47FD114" xml:space="preserve">
+    <value>Mở thư mục xuất của plugin trong File Explorer.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SE1C4D5523AA25AA5" xml:space="preserve">
+    <value>Sẵn sàng xuất nhật ký Dalamud đang hoạt động của ứng dụng khách này.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S631E4ABFB33003A5" xml:space="preserve">
+    <value>Cách dùng: /xa devlogs [folder]</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8176329472D31C0A" xml:space="preserve">
+    <value>Không thể xuất nhật ký khi XA Slave đang tắt.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8E2604B177C8AF1F" xml:space="preserve">
+    <value>Đang có một lần xuất nhật ký Dalamud.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SB86B57B60B9FDE8E" xml:space="preserve">
+    <value>Đang xuất nhật ký Dalamud hiện tại. Dùng /xa devlogs folder để mở thư mục xuất.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SA0A075359BB2410F" xml:space="preserve">
+    <value>Đang mở thư mục xuất nhật ký Dalamud.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SFF6585E7D4A49E9D" xml:space="preserve">
+    <value>Thư mục xuất đã được yêu cầu mở.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8B522C24A88B741A" xml:space="preserve">
+    <value>Đã mở thư mục xuất nhật ký Dalamud.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8F8D175EA00F9C4C" xml:space="preserve">
+    <value>Đã lưu {0:N0} byte vào {1}. Dùng /xa devlogs folder để mở thư mục xuất.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S3B44B8EBCBFA3A98" xml:space="preserve">
+    <value>Đã xuất nhật ký Dalamud. Dùng /xa devlogs folder để mở thư mục xuất.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S529BDAC6C5C7748C" xml:space="preserve">
+    <value>Đã lưu nhật ký Dalamud nhưng không thể hiển thị thông báo hoàn tất. Dùng /xa devlogs folder.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S440D22CFAE3AB6FD" xml:space="preserve">
+    <value>Không thể mở thư mục xuất nhật ký: {0}</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8FF19BCE1E61F9A3" xml:space="preserve">
+    <value>Không thể xuất nhật ký Dalamud: {0}</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S70A4CBAC051BD9F9" xml:space="preserve">
+    <value>Nhật ký đang hoạt động đã kết thúc trước khi sao chép đủ số byte ban đầu.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8D35CE14045790BE" xml:space="preserve">
+    <value>Danh sách nhân vật</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S88EE016BB710C034" xml:space="preserve">
+    <value>Lưu / Thay thế</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S4CEC14383936E62C" xml:space="preserve">
+    <value>Lưu các nhân vật đã đánh dấu thành danh sách có tên. Tải thay thế lựa chọn của vai trò này; danh sách trống sẽ bỏ chọn tất cả.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE58C1489200E570B" xml:space="preserve">
+    <value>Xuất sao chép một danh sách đã lưu. Nhập từ bảng nhớ tạm lưu danh sách mà không tải. Chỉ áp dụng cho nhân vật đã có trong danh sách.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SA5D5F3C250DF92CA" xml:space="preserve">
+    <value>Không thể dùng danh sách nhân vật đã lưu khi tự động hóa hoặc khôi phục đang hoạt động.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SB94776A1440C79F3" xml:space="preserve">
+    <value>Đã lưu {0} nhân vật trong '{1}'.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1411BC7063E9BAA6" xml:space="preserve">
+    <value>Đã nhập '{0}' ({1} nhân vật). Dùng Tải để áp dụng.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S3B4A42FA8838D47E" xml:space="preserve">
+    <value>Đã xuất '{0}' vào bảng nhớ tạm.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S2A5845A1CEE09EEE" xml:space="preserve">
+    <value>Đã xóa '{0}'.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1FDEC38FD285AF57" xml:space="preserve">
+    <value>Không thể lưu danh sách nhân vật: {0}</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S60BB30BDC6F0FC8F" xml:space="preserve">
+    <value>Không thể truy cập bảng nhớ tạm: {0}</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF5BFFD9A6691ADBE" xml:space="preserve">
+    <value>Đã có danh sách {0} tên '{1}'. Chọn tên khác hoặc xóa danh sách đó trước.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S69BF1FA26E9CCC82" xml:space="preserve">
+    <value>Chỉ được lưu tối đa {0} danh sách nhân vật.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S6841004D3ABCF28E" xml:space="preserve">
+    <value>Không tìm thấy nhân vật phù hợp. Đã giữ nguyên lựa chọn hiện tại.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S8F9D74E29593EA79" xml:space="preserve">
+    <value>Đã tải '{0}': chọn {1}, thiếu {2}, loại trừ {3}, không rõ {4}, xung đột {5}.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SAC7D9B2BA0C44374" xml:space="preserve">
+    <value>Nhân vật chưa xác định:</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S397DB221F1D7A44A" xml:space="preserve">
+    <value>Còn {0} mục...</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF7C047FDFC575C7F" xml:space="preserve">
+    <value>Dữ liệu nhân vật có ID xung đột cho {0}. Làm mới dữ liệu nhân vật trước khi dùng danh sách đã lưu.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S11E9FE71C67F4AB3" xml:space="preserve">
+    <value>{0} nhân vật</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SD2B77A734FFA9FF9" xml:space="preserve">
+    <value>Dữ liệu danh sách nhân vật không hợp lệ.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE28E34D4D126874E" xml:space="preserve">
+    <value>Tên danh sách nhân vật phải dài từ 1 đến {0} ký tự và không chứa ký tự điều khiển.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF2F58EBC9CCA30E2" xml:space="preserve">
+    <value>Danh sách nhân vật chỉ hỗ trợ vai trò Tony hoặc Franchise Owner.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S87D5B4347B0A1FF0" xml:space="preserve">
+    <value>Danh sách nhân vật này thuộc một vai trò Xagman khác.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE53E43F24C215F6C" xml:space="preserve">
+    <value>Định dạng danh sách nhân vật hoặc phiên bản lược đồ không được hỗ trợ.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S3B12B9090F306A92" xml:space="preserve">
+    <value>JSON danh sách nhân vật không được vượt quá {0:N0} ký tự.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1D813716739C9CD6" xml:space="preserve">
+    <value>JSON danh sách nhân vật không hợp lệ hoặc chứa thuộc tính không rõ, bị thiếu hay bị lặp.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SA640823C35D9273B" xml:space="preserve">
+    <value>Danh sách chỉ hỗ trợ tối đa {0:N0} nhân vật.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S2A78AE5599347A7E" xml:space="preserve">
+    <value>Danh sách chứa định danh nhân vật hoặc Content ID không hợp lệ.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF0F93CB142075445" xml:space="preserve">
+    <value>Danh sách chứa khóa nhân vật hoặc Content ID trùng lặp.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S389D5974555E7B47" xml:space="preserve">
+    <value>Danh sách nhân vật đã cấu hình chứa định danh không hợp lệ hoặc chỉ số hàng bị lặp.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S8B3C82630CAFBA84" xml:space="preserve">
+    <value>Các hàng nhân vật đã chọn không khả dụng hoặc đã bị loại trừ.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF33521EA8C45FD03" xml:space="preserve">
+    <value>Danh sách nhân vật hợp lệ.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SB364866482A6EFD6" xml:space="preserve">
+    <value>Khớp {0:N0} nhân vật; thiếu: {1:N0}, loại trừ: {2:N0}, không rõ: {3:N0}, ID xung đột: {4:N0}.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S15E6D623EC86CD42" xml:space="preserve">
+    <value>Đã giữ nguyên lựa chọn hiện tại: {0} không tìm thấy, {1} bị loại trừ, {2} không rõ, {3} xung đột.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S289D852CAE06545A" xml:space="preserve">
+    <value>Các dòng nhân vật đã chọn không khả dụng.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S36E39ECB0AB47FB3" xml:space="preserve">
+    <value>Vị trí cửa sổ khi tải plugin</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SCCBDC0861A411D74" xml:space="preserve">
+    <value>Ghi lại vị trí hiện tại</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S5D5814324B59E477" xml:space="preserve">
+    <value>Ghi lại vị trí cửa sổ trò chơi hiện tại, rồi bật tùy chọn này để khôi phục vị trí khi tải plugin lần sau. Việc lưu không di chuyển cửa sổ.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SB16FCA2B5A6FEFCF" xml:space="preserve">
+    <value>Chưa lưu vị trí cửa sổ nào.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBAE4E612D9038688" xml:space="preserve">
+    <value>Màn hình đã lưu: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SA3DA8FCAA8B47575" xml:space="preserve">
+    <value>X trên màn hình nền</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SF12938A22E5B9524" xml:space="preserve">
+    <value>Y trên màn hình nền</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC47595D1EF3CEA03" xml:space="preserve">
+    <value>Tọa độ màn hình nền có thể âm. Hãy ghi lại vị trí sau khi chuyển cửa sổ trò chơi sang màn hình khác.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SE63B6997264E3013" xml:space="preserve">
+    <value>Đã lưu cài đặt cửa sổ khởi động cho lần tải plugin tiếp theo.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7D3DE00F7AFBFAE9" xml:space="preserve">
+    <value>Không thể lưu cài đặt cửa sổ khởi động: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S8FB65BADFA5840F2" xml:space="preserve">
+    <value>Thay đổi cài đặt sẽ hủy mọi điều chỉnh cửa sổ khởi động đang chờ cho đến lần tải plugin tiếp theo.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBC2E3B713D3F809C" xml:space="preserve">
+    <value>Bố cục cửa sổ khởi động đang nhàn rỗi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBDF7355146BB2B9C" xml:space="preserve">
+    <value>Đang chờ cửa sổ sẵn sàng và không bị khóa để áp dụng bố cục khởi động.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7E0FEE8B14FD02C5" xml:space="preserve">
+    <value>Đã hủy bố cục cửa sổ khởi động.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S8F79AF878F4C126F" xml:space="preserve">
+    <value>Hết thời gian chờ cửa sổ sẵn sàng và không bị khóa cho bố cục khởi động.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7AEB6C78FFA7214F" xml:space="preserve">
+    <value>Vị trí cửa sổ khởi động không hợp lệ.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S65B9D5CB3DEC4565" xml:space="preserve">
+    <value>Việc đặt cửa sổ khởi động yêu cầu cửa sổ ở trạng thái bình thường trên luồng sở hữu nó.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SCEC84864868B78E7" xml:space="preserve">
+    <value>Không thể đọc thông tin cửa sổ hoặc màn hình hiện tại.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC1D37627E426E38B" xml:space="preserve">
+    <value>Đã ghi lại vị trí cửa sổ {0}, {1} trên {2}.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S33AF1ADEAB47572F" xml:space="preserve">
+    <value>Đã dừng bố cục cửa sổ khởi động vì cửa sổ, trạng thái khóa hoặc cài đặt đã thay đổi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S76DC735EA2738AA6" xml:space="preserve">
+    <value>Không thể di chuyển cửa sổ trò chơi (lỗi Windows {0}).</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC213F32D8EF829B8" xml:space="preserve">
+    <value>Vị trí cửa sổ khởi động không khớp với vị trí được yêu cầu.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S363F3A3D0073FD5F" xml:space="preserve">
+    <value>Đã áp dụng bố cục cửa sổ khởi động.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S17AE454E10634226" xml:space="preserve">
+    <value>Đã áp dụng bố cục cửa sổ khởi động trên màn hình chính vì màn hình đã lưu không khả dụng.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SDFC2D150B4F0017E" xml:space="preserve">
+    <value>Bố cục cửa sổ khởi động thất bại: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S007CC0B77AB59EBE" xml:space="preserve">
+    <value>Không thể bật độ phân giải tùy chỉnh cho bố cục khởi động.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S4B16A68D1F062106" xml:space="preserve">
+    <value>Không thể giảm kích thước cửa sổ tối thiểu cho bố cục khởi động.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S6B93E2DDBE373EC5" xml:space="preserve">
+    <value>Độ phân giải khởi động không khớp với kích thước vùng nội dung được yêu cầu.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBD96C29733E86CCE" xml:space="preserve">
+    <value>Không thể chuyển sang ngữ cảnh tọa độ pixel của màn hình nền.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC5E1AF73A3FFA825" xml:space="preserve">
+    <value>Không thể khôi phục ngữ cảnh tọa độ cửa sổ trước đó.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SF8A5A1AE7D008AB7" xml:space="preserve">
+    <value>Đã áp dụng độ phân giải khởi động; vị trí cửa sổ đã lưu không hợp lệ nên đã bỏ qua.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S55BDCD7DECFB581A" xml:space="preserve">
+    <value>Tự động dùng thức ăn</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S2AF6D2C22FAEF9E9" xml:space="preserve">
+    <value>Duy trì hiệu ứng no bụng của món đã chọn khi có thể dùng thức ăn an toàn.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S3C56AC5340AF8D0E" xml:space="preserve">
+    <value>Chọn một món và đúng chất lượng NQ/HQ. Hiệu ứng thức ăn khác được giữ đến khi hết hạn. Bộ lọc khu nghỉ và nhiệm vụ là tùy chọn.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SE4EB18069D65AAA9" xml:space="preserve">
+    <value>Thức ăn</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S11AA1327967FBD75" xml:space="preserve">
+    <value>Chưa chọn thức ăn.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S1DEF5DDD00299C70" xml:space="preserve">
+    <value>Thức ăn đã chọn không khả dụng (vật phẩm {0}).</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9730EBD5A2B184FA" xml:space="preserve">
+    <value>Không có món ăn phù hợp.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S60896D83E37CCFC7" xml:space="preserve">
+    <value>Dùng thức ăn HQ</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S4742D66F333442D0" xml:space="preserve">
+    <value>Thức ăn đã chọn: {0} ({1}).</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SF4EB7A9866C3ADEB" xml:space="preserve">
+    <value>Chỉ dùng chất lượng đã chọn, không thay thế NQ/HQ.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S8298112BCE538DAF" xml:space="preserve">
+    <value>Chỉ trong khu nghỉ</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S11A3A6AAE6C70D6F" xml:space="preserve">
+    <value>Chỉ trong nhiệm vụ</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5B94009668CB9919" xml:space="preserve">
+    <value>Không chọn: mọi địa điểm phù hợp. Chọn cả hai: khu nghỉ hoặc nhiệm vụ.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S519B035F59C3B629" xml:space="preserve">
+    <value>Làm mới khi còn dưới (giây)</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9693CB7DC510CB34" xml:space="preserve">
+    <value>0 chỉ làm mới sau khi hiệu ứng no bụng hết hạn. Không thay thế hiệu ứng thức ăn khác đang hoạt động.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S67B2D20C7A2DDC7B" xml:space="preserve">
+    <value>Không thể lưu cài đặt thức ăn: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0BCDF2A71A2F8B4B" xml:space="preserve">
+    <value>Bật hoặc tắt tự động dùng thức ăn.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S49AA40EC95661092" xml:space="preserve">
+    <value>Chọn thức ăn và chất lượng trong XA Mods &gt; Player Mods. Bí danh: /xa food on|off. Bỏ on/off để xem trạng thái.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9509C8874D666432" xml:space="preserve">
+    <value>Tự động dùng thức ăn đang tắt.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SAFDBB1CE4564FA10" xml:space="preserve">
+    <value>Chọn thức ăn để duy trì hiệu ứng no bụng.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0B77E084F921F82B" xml:space="preserve">
+    <value>Thức ăn hoặc chất lượng đã chọn không khả dụng.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5E4B2C5AAE29E533" xml:space="preserve">
+    <value>Đang chờ nhân vật đăng nhập.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S6560C56E601CD45D" xml:space="preserve">
+    <value>Đang chờ đến khi nhân vật có thể dùng thức ăn an toàn.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9AF9663B74FE28E1" xml:space="preserve">
+    <value>Đang chờ khu nghỉ hoặc nhiệm vụ đã chọn.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SAF599778D29BF6E1" xml:space="preserve">
+    <value>Một hiệu ứng thức ăn khác hoặc không xác định đang hoạt động; chờ hiệu ứng hết hạn.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SA7D0890EDC9AC27F" xml:space="preserve">
+    <value>Không cần làm mới hiệu ứng no bụng.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SE266A00BFCA12A9B" xml:space="preserve">
+    <value>Không có thức ăn chất lượng đã chọn trong túi đồ chính.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0E8DCF82FCFD5350" xml:space="preserve">
+    <value>Túi đồ chính hoặc trạng thái thức ăn không khả dụng.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SEAC8EC2682BB99C1" xml:space="preserve">
+    <value>Đang chờ thức ăn đã chọn có thể sử dụng.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S770FEE3142B32044" xml:space="preserve">
+    <value>Đang chờ xác nhận dùng thức ăn.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S063A1891E16848F2" xml:space="preserve">
+    <value>Đã làm mới hiệu ứng no bụng.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S37E0F3FD7AE786D8" xml:space="preserve">
+    <value>Yêu cầu dùng thức ăn bị từ chối; đang thử lại ({0}/{1}).</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S8C73C7D43CCECA79" xml:space="preserve">
+    <value>Dùng thức ăn thất bại ba lần. Tắt rồi bật lại tự động dùng thức ăn để thử lại.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S17AD1455ED06B495" xml:space="preserve">
+    <value>Không thể xác nhận việc dùng thức ăn. Tắt rồi bật lại tự động dùng thức ăn để thử lại.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SB52197D01EFCFDE2" xml:space="preserve">
+    <value>Túi đồ thay đổi nhưng không có hiệu ứng thức ăn mong đợi. Tắt rồi bật lại tự động dùng thức ăn để thử lại.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5827BCC775A704D6" xml:space="preserve">
+    <value>Nhân vật hoặc khu vực thay đổi trong lúc dùng thức ăn. Tắt rồi bật lại tự động dùng thức ăn để thử lại.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9CD9B3FFE80D10CC" xml:space="preserve">
+    <value>Tự động dùng thức ăn thất bại: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S4FD8EEBAA7DFB799" xml:space="preserve">
+    <value>Không thể tải dữ liệu thức ăn: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SEEB8E55152E234E9" xml:space="preserve">
+    <value>Trạng thái Bận tự động</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S4AED9A414D8A8AF2" xml:space="preserve">
+    <value>Dùng trạng thái Bận để chặn yêu cầu giao dịch không mong muốn từ người chơi.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S6E7BC19EF1AC4096" xml:space="preserve">
+    <value>Giữ nguyên trạng thái Bận đã được đặt thủ công. Chỉ xóa trạng thái do tính năng này đặt. Tạm bỏ trạng thái của tính năng này để thực hiện giao dịch Xagman dự kiến. Không xóa trạng thái thủ công để ép thực hiện giao dịch.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S609AFDA86D644E89" xml:space="preserve">
+    <value>Bật hoặc tắt trạng thái Bận tự động.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5DB0F6C35C10C6E6" xml:space="preserve">
+    <value>Giữ nguyên trạng thái Bận đặt thủ công. Bỏ on/off để xem trạng thái.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5673A82993407664" xml:space="preserve">
+    <value>Trạng thái Bận tự động đã tắt.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S1D8E1A21AD2A92D2" xml:space="preserve">
+    <value>Đang chờ nhân vật sẵn sàng để cập nhật trạng thái Bận.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S2FCA8DCA5A7654CA" xml:space="preserve">
+    <value>Trạng thái Bận đang bật.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S7B6B01E150D4034E" xml:space="preserve">
+    <value>Trạng thái Bận hiện có được giữ nguyên.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S08B01883A2641144" xml:space="preserve">
+    <value>Trạng thái Bận đã bị thay đổi bên ngoài tính năng này; hãy tắt rồi bật lại tính năng để tiếp tục.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S9A6799919B79A85B" xml:space="preserve">
+    <value>Đang chờ xác nhận trạng thái Bận.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="SDCED69AE8C96B271" xml:space="preserve">
+    <value>Không thể xác nhận trạng thái Bận; hãy tắt rồi bật lại tính năng để thử lại.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S11335521063A94FA" xml:space="preserve">
+    <value>Lệnh Bận bị từ chối; đang chờ trước khi thử lại.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S8209CD8A5549D5C9" xml:space="preserve">
+    <value>Trạng thái Bận tạm thời được bỏ để giao dịch.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S8CFDC3ED6CB4471B" xml:space="preserve">
+    <value>Trạng thái Bận thủ công đang chặn giao dịch này. Hãy tắt Bận thủ công để tiếp tục.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="SCA26D2298BD2E686" xml:space="preserve">
+    <value>Trạng thái Bận đã sẵn sàng cho giao dịch.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5D31DF8C82E76619" xml:space="preserve">
+    <value>Quyền tạm thời quản lý trạng thái Bận không còn hợp lệ cho nhân vật này.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S72AEE0B7209040C7" xml:space="preserve">
+    <value>Đã hết thời gian chờ trạng thái Bận sẵn sàng.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S329E6AA07F7E03A7" xml:space="preserve">
+    <value>Quyền tạm thời quản lý trạng thái Bận đã được giải phóng.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S52D30D0DA3413702" xml:space="preserve">
+    <value>Trạng thái Bận tự động thất bại: {0}</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S1A3ABA789EAB9D47" xml:space="preserve">
+    <value>Trạng thái Bận do tính năng này đặt có thể vẫn còn; dùng /busy off nếu cần.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S19D833AFC0A9695B" xml:space="preserve">
+    <value>Giữ nguyên trạng thái Bận đã được đặt thủ công. Chỉ xóa trạng thái do tính năng này đặt. Tạm bỏ trạng thái của tính năng này trong toàn bộ lượt chạy Xagman; bật “Từ chối giao dịch khi nhàn rỗi” để bảo vệ thời gian chờ. Không xóa trạng thái thủ công để ép thực hiện giao dịch.</value>
+    <comment>Source: I252 Auto Busy Status full-run Xagman scope.</comment>
+  </data>
+  <data name="SD476521A6A2A1593" xml:space="preserve">
+    <value>Chuẩn bị trạng thái Bận để di chuyển đến thành phố: {0}</value>
+    <comment>Source: I254 Busy before City Chat Flooder travel.</comment>
+  </data>
+  <data name="SFA66B6FEBEA27825" xml:space="preserve">
+    <value>Không thể xác nhận trạng thái Bận trước khi di chuyển đến thành phố.</value>
+    <comment>Source: I254 Busy before City Chat Flooder travel.</comment>
+  </data>
+  <data name="SDF0DB357D406B347" xml:space="preserve">
+    <value>Điểm đến thành phố không rõ ràng: {0}. Chọn một tên aetheryte chính xác.</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="SEC24DA3BC5028C83" xml:space="preserve">
+    <value>Không tìm thấy điểm đến thành phố: {0}. Dùng tên aetheryte bằng tiếng Anh hoặc ngôn ngữ hiện tại của trò chơi.</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="S11D21EACE14B8F4A" xml:space="preserve">
+    <value>Không thể đọc dữ liệu điểm đến thành phố: {0}</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="S858E4BA7A29FD38B" xml:space="preserve">
+    <value>Tạm dừng</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SD640C7421DA06661" xml:space="preserve">
+    <value>Tiếp tục</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S06BE4326D0311053" xml:space="preserve">
+    <value>Đã yêu cầu tạm dừng</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SC237B77195598E40" xml:space="preserve">
+    <value>Đang hoàn tất chuyến đi hiện tại trước khi tạm dừng.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S6A4B96795A037B1D" xml:space="preserve">
+    <value>Tạm dừng sau khi chuyến đi hiện tại kết thúc; sẽ không bắt đầu chuyến đi hay thông báo mới.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S3E79A38210BCAC7F" xml:space="preserve">
+    <value>Tiếp tục từ cùng thành phố và bước đang dở.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SD854D5AA265A7613" xml:space="preserve">
+    <value>Để tiếp tục, cần nhân vật ban đầu ở vị trí tạm dừng và Lifestream ở trạng thái rảnh.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SC15F1530D219F94A" xml:space="preserve">
+    <value>Phím tắt</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6A6485AF02CAB90B" xml:space="preserve">
+    <value>Phím tắt</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9E0BEC5DC44EA1D7" xml:space="preserve">
+    <value>Bật phím tắt</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6352BA5342074B06" xml:space="preserve">
+    <value>Tìm phím tắt</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S13075C2336114CD6" xml:space="preserve">
+    <value>Chưa gán</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S355ABB3D587E5D5D" xml:space="preserve">
+    <value>Đặt phím tắt</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0A7466B20A742807" xml:space="preserve">
+    <value>Nhấn một tổ hợp phím. Escape để hủy.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S5ED6F609248A45FB" xml:space="preserve">
+    <value>Thả tất cả các phím, sau đó nhấn một phím, có thể kèm Ctrl, Shift hoặc Alt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S503ED79C2E4C31B4" xml:space="preserve">
+    <value>Phím tắt bật hoặc tắt XA Mods. Chúng không kích hoạt khi đang nhập văn bản, gán phím hoặc dùng cửa sổ khác.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6EF93CA7306690C1" xml:space="preserve">
+    <value>Mod này yêu cầu Ctrl+Shift khi bật. Hãy thêm cả hai phím vào tổ hợp phím tắt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S22CA9D816ED9D7D3" xml:space="preserve">
+    <value>Phím được hỗ trợ: chữ cái, số, F1-F12, bàn phím số và phím điều hướng. Không hỗ trợ nút chuột hoặc phím tắt chỉ gồm phím bổ trợ.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9B68DD9F119C3FBD" xml:space="preserve">
+    <value>Phím tắt XA Mod đã sẵn sàng.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9652FFE81E6DA593" xml:space="preserve">
+    <value>Không thể dùng cài đặt phím tắt khi XA Slave đang được dỡ khỏi bộ nhớ.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S10AD87B7C3F6BECA" xml:space="preserve">
+    <value>XA Mod đó không khả dụng.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9EB1EA330D7D05BD" xml:space="preserve">
+    <value>Chọn một phím bàn phím được hỗ trợ.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SFD16F8EE67B4546C" xml:space="preserve">
+    <value>Tổ hợp phím bổ trợ của phím tắt không hợp lệ.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAD72E02E72B8DE20" xml:space="preserve">
+    <value>XA Mod này yêu cầu Ctrl+Shift trong phím tắt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0A0857DBB5D2EAE5" xml:space="preserve">
+    <value>XA Mod này có nhiều phím tắt đã lưu. Hãy lưu hoặc xóa để giải quyết xung đột.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAC28FCA7530B5F4C" xml:space="preserve">
+    <value>Phím tắt {0} đã được gán cho {1}.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0780342EDC24BA4F" xml:space="preserve">
+    <value>Không thể đọc đầu vào bàn phím. Phím tắt đã tạm dừng.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAE298BBFF7D12C68" xml:space="preserve">
+    <value>Đã lưu phím tắt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SB14B022B6230F27A" xml:space="preserve">
+    <value>Đã xóa phím tắt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9EF3B9FDB671EABB" xml:space="preserve">
+    <value>Chưa gán phím tắt cho XA Mod này.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SA0E48032B1503DFF" xml:space="preserve">
+    <value>Đã bật phím tắt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S5337D574F2B256A9" xml:space="preserve">
+    <value>Đã tắt phím tắt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0E3D9F02493D9616" xml:space="preserve">
+    <value>Không thể lưu cài đặt phím tắt: {0}</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9A746739A80D7BA0" xml:space="preserve">
+    <value>Đã hủy ghi nhận phím tắt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S2881BBC7966AF6CA" xml:space="preserve">
+    <value>Đã ghi nhận phím tắt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SEE5BD0D689D16F81" xml:space="preserve">
+    <value>Đã hủy phím tắt vì đầu vào hoặc cài đặt thay đổi.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SBF0062C24FC0E9D0" xml:space="preserve">
+    <value>Phím tắt: {0}</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S74D291E189C82727" xml:space="preserve">
+    <value>Giữ Ctrl+Shift để bật XA Mod này.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SA559648AE1C63AB1" xml:space="preserve">
+    <value>Không thể dùng phím đó làm phím tắt. Hãy chọn phím được hỗ trợ.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
 </root>

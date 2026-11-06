@@ -23,6 +23,26 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.62 - 2026-11-05",
+            Lines =
+            [
+                "- Fixed Xagman Completion: Unavailable gil no longer leaves owners pending or triggers extra Tony passes when the Shared Item List includes other items. Gil-only lists still require completion.",
+                "- Updated Teleport Helper: Echo accepted or rejected after answering an aetheryte-ticket prompt, including Xagman's automatic rejection.",
+                "- Added Xagman FO FC Points: Show an optional, sortable column with saved XA Database points for each character's FC.",
+                "- Fixed Xagman Selling: Rotate Tony or run final cleanup when a completed AutoRetainer or XA NPC sell attempt leaves gil unchanged.",
+                "- Fixed AutoRetainer Processing: Wait for safe readiness and stop pending menus and saves when the logged-in character changes.",
+                "- Added Dalamud Log Export: Save this client's active log with /xa devlogs and open the export folder with /xa devlogs folder.",
+                "- Added Xagman Character Lists: Save and load named Tony or Franchise Owner selections, with clipboard export and import.",
+                "- Added Startup Window Position: Capture a monitor and position in Plugin Operations, then restore it with the optional startup resolution when the game window is ready.",
+                "- Added Auto Food Consume: Keep your selected food buff active, with quality selection and optional sanctuary or duty restrictions in Player Mods.",
+                "- Added Auto Busy Status: Block incoming player trades from Player Mods, preserve existing Busy status, and pause automatic Busy during Xagman runs.",
+                "- Added City Teleport Protection: City Chat Flooder confirms Busy before city teleports and verifies the selected destination before announcing.",
+                "- Added City Chat Flooder Pause: Pause and resume your route with remaining waits and looping progress preserved. Travel already underway finishes before pausing.",
+                "- Added XA Mod Hotkeys: Assign shortcuts in Plugin Operations or beside each mod, with clear shortcut and enabled columns, duplicate checks, and protection while typing or using another window. Assignment captures keyboard focus, and valid shortcuts activate without the extra delay that could cancel them.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.61 - 2026-11-02",
             Lines =
             [

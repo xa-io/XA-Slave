@@ -275,6 +275,29 @@ public partial class SlaveWindow
             .Concat(state.PendingGiveItems.Select(item => $"give {GetXagmanTradeRequestLabel(item)}: {GetXagmanTradeRequestAmountLabel(item)}")))
             + (string.IsNullOrWhiteSpace(state.Reason) ? string.Empty : $" ({state.Reason})");
 
+    private bool TryGetXagmanOptionalGilSupply(IReadOnlyList<XagmanItemEntry> items, string tonyCharacter, out int quantity)
+    {
+        quantity = 0;
+        // The shared list, not the remaining requests, decides whether gil is optional.
+        // Give rows and value selectors also make this a mixed-item run.
+        if (!IsXagmanSupplyCycleActive() || xagmanActiveRole != XagmanRole.FranchiseOwner
+            || !items.Any(item => IsValidXagmanItemEntry(item)
+                && (item.SelectorKind != XagmanItemSelectorKind.ExactItem || !IsXagmanGilItem(item.ItemId)))) return false;
+        var tony = GetXagmanSupplyTonyPeer();
+        // Unknown or replacement stock must never be interpreted as a zero balance.
+        if (tony == null || !IsXagmanPeerFresh(tony) || tony.SupplyCycleRevision != XagmanSupplyCycleRevision
+            || string.IsNullOrWhiteSpace(xagmanOwnerSupplyPassId)
+            || tony.SupplyPassId != xagmanOwnerSupplyPassId || tony.InstanceId != xagmanOwnerSupplyTonyInstance
+            || !tony.ActiveCharacter.Equals(tonyCharacter, StringComparison.OrdinalIgnoreCase)
+            || !tony.SupplyInventoryComplete
+            || tony.Status is XagmanStatus.Error or XagmanStatus.Paused or XagmanStatus.Preflight or XagmanStatus.ReturningHome
+                or XagmanStatus.Relogging or XagmanStatus.Traveling or XagmanStatus.Trading) return false;
+        // Published supply already excludes Tony's configured gil minimum.
+        quantity = tony.SupplyInventory.Where(item => IsXagmanGilItem(item.ItemId) && !item.IsHq)
+            .Select(item => Math.Max(0, item.Quantity)).DefaultIfEmpty(0).Max();
+        return true;
+    }
+
     private bool TryAcceptXagmanPartialDeferral(string owner)
     {
         if (!IsXagmanSupplyCycleActive() || plugin.IpcClient.DropboxIsBusy() || AddonHelper.IsAddonVisible("Trade")) return false;

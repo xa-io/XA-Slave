@@ -6,14 +6,6 @@ A Dalamud plugin for FINAL FANTASY XIV that automates repetitive multi-character
 
 ## Key Features
 
-XA Nearby shows the total player count in its window title, leaving the full list area available for names.
-
-XA Mods checkboxes retain your selection while a queued change is applied, then reflect its result.
-
-Disabled XA Mods show only their checkbox, name and help marker. Select a mod to reveal its description, status and additional settings.
-
-Auto Skip Cutscenes shares one native hook for normal and general cutscene handling, while retaining category settings and zone exclusions.
-
 - **Character Automation** - Relog character rosters, prepare travel, return alts home, and run recurring tasks with AutoRetainer integration. Shared task controls provide progress, results, cancellation, and completion actions.
 - **FC & Housing Management** - Manage FC invitations and permissions, check housing plots, refresh workshops, bells, and chests, and handle furniture tasks across your characters.
 - **Xagman Item Transfers** - Coordinate collection and restocking across characters, worlds, and participating clients. Configure item policies, review stock forecasts, and rotate collectors through fixed-world, Server Matching, or Outside Network Helper runs.
@@ -24,6 +16,157 @@ Auto Skip Cutscenes shares one native hook for normal and general cutscene handl
 - **Plugin Tools** - Customize startup behavior and quick actions, browse plugin repositories and the command reference, and access task controls, update history, and IPC integrations.
 
 Open `/xa` to browse the task panels, or `/xa mods` to search the available mods and their settings.
+
+## Feature Directory
+
+Open `/xa` and choose a panel from the left menu. Select characters and review the panel's requirements before starting an automated task; use its progress and cancellation controls while it runs.
+
+<details>
+<summary>Tasks, tools, and reference panels</summary>
+
+| Section | Panel | Purpose |
+| --- | --- | --- |
+| Automated Tasks | AutoRetainer Helper | Configure pre/post-processing around AutoRetainer cycles, data collection, and stuck ship-result menu recovery. |
+| Automated Tasks | Save to XA Database | Save the current character's collected data to XA Database. |
+| City Shenanigans | Auto-Glam Weather | Apply configured glamour plates for weather conditions and jobs. |
+| City Shenanigans | City Chat Flooder | Schedule announcements across selected worlds, with delay, pause, and loop controls. |
+| FC Relations | Xagman | Coordinate item collection and restocking; see the guide below. |
+| FC Relations | Monthly Relogger | Visit selected characters and perform configured FC and housing maintenance actions. |
+| FC Relations | Prep Logistics | Move selected characters to a chosen world and optional location using Lifestream. |
+| FC Relations | Auto-Accept FC Invites | Accept invitations, wait, then leave the FC. This task can leave your current FC; review its settings before starting. |
+| FC Relations | FC Permissions Updater | Update member-rank permissions across selected FCs; each character must have Master rank. |
+| FC Relations | Check Duplicate Plots | Find shared estate/apartment records and refresh housing data to clear stale duplicates. |
+| FC Relations | Return Alts To Homeworlds | Relog selected characters and return visiting characters to their homeworlds. |
+| FC Relations | Refresh Sub/Bell/Chest | Refresh submarine, retainer, and company chest information. House entry requires Lifestream door-path and enter-house settings. |
+| Field Operations | Instance Hunter | Search selected Eureka zones for a different instance, using per-zone baselines and alerts. |
+| Field Operations | Logogram Creator | Manage Logos Manipulator recipes, favorites, and crafting queues. |
+| Utility | XA Mods | Browse the categorized mod list below, configure options, and manage presets and hotkeys. |
+| Utility | Window Renamer | Customize the game window title, with optional process ID and current-character name. |
+| Utility | Plugin Operations | Configure startup, window placement, logging, interface behavior, and title-bar favorites. |
+| Utility | Plugin Builder | Create custom windows with pages, information panels, and buttons from other plugins; early access. |
+| Reference | Export Data | Export character rosters to CSV, TSV, TXT, or JSON, with optional database and Lifestream details. |
+| Reference | Repo List | Browse plugin repositories. |
+| Reference | IPC Calls Available | Browse integration calls for external tools and plugins. |
+| Reference | Commands | Search slash commands and their usage notes. |
+| Reference | Splash Screen | View the plugin's introduction screen. |
+| Reference | Debug / Test | Access diagnostics when the debug menu is enabled. |
+
+</details>
+
+## XA Mods
+
+Open `/xa mods`, search by name, and select a mod to see its options and status. Use enabled-only filtering, saved presets, and per-mod hotkeys to manage your setup. Availability depends on the current game version and required integrations.
+
+<details>
+<summary>Mod list by category</summary>
+
+### Game Mods
+
+| Mod | Purpose |
+| --- | --- |
+| Allow Multiple Game Instances | Allow additional game clients to launch. |
+| Cancel Login Cooldown | Clear the temporary character-select login cooldown. |
+| Clean Chat | Hide selected login announcements and recognized RMT advertising. |
+| Close Lobby Errors | Confirm supported lobby error dialogs and close matching NoKillPlugin error panels. |
+| Custom Mouse | Resize, recolor or replace the game cursor with local artwork. |
+| Dalamud Log Cleaner | Archive and clear the active Dalamud log manually or automatically at a configured size threshold. |
+| Dalamud Log Disabler | Filters selected plugins' output to Dalamud's log (/xllog window and the on-disk log file) by log level. |
+| Display Actual Queue Position | Expands queue displays with position and ETA information. |
+| Export Dalamud Logs | Save this client's active Dalamud log to the plugin exports folder. |
+| Fix /target Command | Selects the closest targetable actor when the game's `/target` command cannot resolve a visible player or NPC name. |
+| Lock Game Window In Combat | Prevents the game window from being moved while the local character is in combat. |
+| Prevent Game Exiting From Lobby Errors | Prevent lobby error countdowns from closing the client. |
+| PVP Hotbar Disabler | Show, hide, or toggle hotbars in PvP through supported commands. |
+| Replace Unowned Mount Hotbars | Use Mount Roulette for hotbar mounts the current character has not unlocked. |
+| Skip Cutscenes | Skips standard cutscenes and optional content categories, with per-zone allow/block controls. |
+| Skip Dialogue | Automatically advance supported dialogue windows. |
+
+### UI Mods
+
+| Mod | Purpose |
+| --- | --- |
+| Anonymous Mode | Masks visible player nameplates locally with deterministic `Firstname Lastname` aliases. |
+| Auto Display IDs | Adds item, action, target, weather, zone, and map IDs to supported local UI surfaces. |
+| Bailout ESC Menu | Close the System menu when it remains open past the configured timer. |
+| Better Cast Bar | Restyles the local cast bar and adds a slidecast readiness marker. |
+| Better Duty Finder | Adds inline duty-finder setting buttons to Contents Finder and Raid Finder. |
+| Better Highlight Potential Targets | Change the potential-target hover highlight color. |
+| Copy Item Name For All | Adds inventory context-menu actions to copy base or glamour item names. |
+| Custom Timestamp Format | Adds seconds to chat timestamps. |
+| Dalamud Notifications Suck | Hides selected Dalamud toast notification categories before they draw. |
+| Display MSQ Progress | Expands Scenario Tree with remaining main-scenario count and completion percentage. |
+| Display Network Latency | Shows the detected game-server ping in the DTR bar. |
+| Enable Item Icon In Shops | Replaces placeholder shop row icons with the actual item icons when the shop addon refreshes. |
+| Expanded Player Right-Click Menu Search | Adds FFLogs, Lodestone, and Lalachievements shortcuts to player context menus. |
+| Inspect Outfit Try-on | Adds Try On All and Stop to a player inspection and saves outfit history. |
+
+### Graphic Mods
+
+| Mod | Purpose |
+| --- | --- |
+| Custom Resolutions | Applies saved or typed client sizes from the panel or `/xa res <width>x<height>` / `/xa res <width> <height>`. |
+| Disable Background Rendering | Pause background rendering, with periodic refreshes and optional minimized-only behavior. |
+| Disable Title Screen Movie | Prevents the title screen idle movie from starting. |
+| Hide Game Objects | Locally hides selected object categories, with optional player distance limits and duty and territory guards. |
+| Hide Unnecessary Popups | Closes tutorial and recommendation popups as they appear. |
+| Ignore Minimum Window Size | Lowers the client minimum window size and re-syncs rendering after restore or maximize. |
+| Low Resolution | Reduce the 3D rendering scale. |
+| No UI Fade | Suppresses common black, white, and event UI fade transitions. |
+| Special Rendering Modes | Reveals world fade and UI visibility tools. Turning this off restores all world/UI surfaces. |
+
+### Player Mods
+
+| Mod | Purpose |
+| --- | --- |
+| Alert When Typing In Combat | Plays a local sound and toast when ChatLog is focused during combat. |
+| Anti-AFK | Refresh the local AFK timer periodically. |
+| Auto Busy Status | Uses Busy status to block unsolicited player trades. |
+| Auto Duty Commence | Automatically confirms duty commencement prompts. |
+| Auto Food Consume | Keeps your selected food's Well Fed buff active when it is safe to use food. |
+| Auto Leave Duty | Leaves a completed duty automatically after combat and blocking duty UI states clear. |
+| Auto Merge | Merges incomplete main-bag stacks after opening the inventory. |
+| Auto Open Moogle Mail | Exposes Moogle Mail cleanup actions on the Letter List. |
+| Auto Restore Furniture | Move placed furniture to the storeroom or inventory, or stored furniture to inventory, in batches. |
+| Auto Sort Items | Sorts normal inventory and the current armoury chest. |
+| Automate Expert Delivery | Automates eligible Expert Delivery hand-ins with confirmation, inventory-progress, and configurable seal-cap checks. |
+| Better Company Chest | Adds FC chest defaults, right-click quick move, quantity prompt handling, and exchangeable gil-value display. |
+| Better Inventory Mover | Adds configurable-modifier right-click moves between open inventory, retainer, saddlebag, and premium saddlebag windows. |
+| Clear Teleportation Lock | Retry teleporting when blocked by the local teleport lock. |
+| Custom Sight Distance | Overrides camera distance, angle, FoV, and optional collision limits. |
+| Doze & Sit Anywhere | Lets you trigger Sit and Doze from the panel or `/xa sit` / `/xa doze` without nearby furniture. |
+| Estate Teleportation Context Menu | Add estate selection to supported player menus, including party members, for friends whose home world is your current world. Off by default; open Social > Friend List to load friends if needed. The game controls destinations and access; the existing Friend List menu is unchanged. |
+| Hide Nameplate Status Icons | Hide selected player status icons beside names. |
+| Infinite Sprint | Reapplies Sprint only while the local character is moving, with a configurable movement-start delay. |
+| Item Commands | Adds `/xa equip <itemId>`. |
+| Notify When Friend Is Near | Shows a local XA Slave alert when a configured player appears nearby. |
+| Refuse Trade Request | Refuses incoming trade requests automatically. |
+| Remove FC Tag | Hide the FC or visitor tag on player nameplates. |
+| Reveal Undiscovered Areas | Reveal undiscovered map areas locally. |
+| Show Blacklisted Playername In Party | Shows blocked party-list Unknown names as the blocked player name. |
+| Show Titles As Playernames | Moves visible player titles into the player name line. |
+| Show Traveler World Names | Shows visible wanderer, traveler, and voyager nameplates as Name@HomeWorld. |
+| View Single Item | Adds View Single Item to supported player and item menus, with Find item search in the preview window. |
+| XA Nearby | Compact nearby player list with direction, distance and optional radar lines. |
+| XA Peep | XA target tracker with a small cached list and full history window. |
+
+### Plugin Mods
+
+| Mod | Purpose |
+| --- | --- |
+| Anonymize Character Lists | Forces screenshot-safe aliases in XA Slave character-list tables. |
+| ARealmRecorded All Zones | Allow additional Duty Recorder content types in ARealmRecorded; zones without a Duty Finder entry remain unsupported. |
+| Force PeepingTom | Keeps Peeping Tom target tracking active in PvP matches. |
+| Plugin Guard | Protect selected plugins from disable commands and unload requests. |
+| Teleport Helper | Handles SelectYesNo prompts that ask about using an aetheryte ticket for teleporting. |
+
+### Eureka Mods
+
+| Mod | Purpose |
+| --- | --- |
+| Field Operations Entry Command | Adds `/xa fe <entry>` for Eureka entries. |
+| Instance ID | Shows the live Eureka instance ID while you are inside Anemos, Pagos, Pyros, or Hydatos. |
+
+</details>
 
 ## Xagman
 
@@ -116,6 +259,10 @@ The in-plugin `Reference > Commands` page contains the full command index and us
 
 | Command | Purpose |
 | --- | --- |
+| `/xa win <name>` | Toggle a saved Plugin Builder window by its configured command name; for example, `/xa win Test1`. |
+| `/xa xagman mini` or `/xa xagman m` | Toggle the compact Xagman progress/results window. It displays status without controlling the run. |
+| `/xa db subsupplies <days>` | Clear the Dropbox item queue, then queue supplies for four submarines using 9 Ceruleum Tanks and 1.33 Magitek Repair Kits per submarine per day, rounding totals up. For example, `30` requests 1,080 tanks and 160 kits. Accepts positive fractional days; invalid input leaves the queue unchanged. Queues available local stock and reports shortages; without a trade partner, use `/xa db begin` later. |
+| `/xa npcsell <subloot&#124;itemId,itemId,...>` | Sell all matching subaquatic salvage from the four main bags to a nearby NPC, independently of AutoRetainer sell rules. Use `subloot` for IDs 22500-22507 or a comma-separated subset; `/xa npcsell stop` stops a manual sale. Stops for gil limits, errors, or lack of progress. |
 | `/xa` | Toggle the XA Slave window. |
 | `/xa allrestore` | Disable every top-level XA Mod toggle. |
 | `/xa commands` | Open `Reference > Commands`. |
@@ -126,8 +273,8 @@ The in-plugin `Reference > Commands` page contains the full command index and us
 | `/xa db request <itemId:qty ...>` | Print the missing quantities still needed locally as a ready-to-run `/xa db ...` command. |
 | `/xa db <shortcut>` | Build missing crystal-fill commands with `shards`, `crystals`, `clusters`, `shards+crystals`, `crystals+clusters`, or `shards+crystals+clusters`. |
 | `/xa db subloot` | Shortcut for `/xa db 22500:99999 ... 22507:99999` (item IDs 22500-22507); adds those items from local inventory and reports their total vendor gil value in chat. Trading starts when a player is targeted/focus-targeted; without a partner the queue is retained and the result says trading did not start, so `/xa db begin` can be used later. |
-| `/xa db subgil <gil-value>` | Clear the Dropbox queue, then queue a minimum-overflow mixture of locally held subaquatic salvage (item IDs 22500-22507) whose vendor value is the smallest reachable total at or above the positive gil target. The result reports selected item count, value, overflow/shortfall, and the exact start outcome. Invalid input or a clear failure stops additions; without a partner the selected entries remain queued for a later `/xa db begin`. |
-| `/xa debug` | Toggle the Debug / Test menu during the current session in Debug builds, where it starts visible. Unavailable in Release builds. |
+| `/xa db subgil <gil-value>` or `/xa dbsub <gil-value>` | Clear the Dropbox queue, then queue a minimum-overflow mixture of locally held subaquatic salvage (item IDs 22500-22507) whose vendor value is the smallest reachable total at or above the positive gil target. The result reports selected item count, value, overflow/shortfall, and the exact start outcome. Invalid input or a clear failure stops additions; without a partner the selected entries remain queued for a later `/xa db begin`. |
+| `/xa debug` | Toggle the Debug / Test menu and save its visibility setting; enabling it opens the diagnostics panel. |
 | `/xa sort` | Trigger Auto Sort Items > Sort now using saved settings. Requires Auto Sort Items enabled. |
 | `/xa preset list` | List saved XA Mods presets. |
 | `/xa preset load <name>` | Load a saved XA Mods preset, including the supported subsettings captured for the enabled mods. |
@@ -142,6 +289,12 @@ The in-plugin `Reference > Commands` page contains the full command index and us
 
 | Command | Purpose |
 | --- | --- |
+| `/xa clearlog` | Archive and clear the active Dalamud log file; keeps up to 10 MiB in the old log. Does not clear the `/xllog` display. |
+| `/xa devlogs` | Export the active Dalamud log to the plugin exports folder. |
+| `/xa devlogs folder` | Open the plugin exports folder. |
+| `/xa hotbar on/off` | Toggle `PVP Hotbar Disabler`; omit on/off for status. Disabling it shows the hotbars it controls. |
+| `/xa hotbar <1-10> [on/off/toggle]` | Show, hide, or toggle a hotbar directly while `PVP Hotbar Disabler` is enabled; omit the action to toggle. |
+| `/hotbar display <1-10> [on/off]` | Handle blocked game hotbar commands in PvP while `PVP Hotbar Disabler` is enabled. Requires the English unavailable error, login, and a visible main hotbar; omit on/off to toggle. |
 | `/xa chocobocutscene on/off` | Toggle `Skip Cutscenes` > `Skip Feeding Chocobo`. |
 | `/xa closeerrors on/off` | Toggle `Close Lobby Errors`. |
 | `/xa disablelogs on/off` | Toggle `Dalamud Log Disabler`, filtering selected plugins' output to the Dalamud log (/xllog and the log file) by log level (e.g. keep Warning/Error/Fatal, blacklist Info/Debug/Verbose). Expand the Plugin list in XA Mods to access plugin checkboxes, filtering and bulk selection. |
@@ -205,10 +358,12 @@ The in-plugin `Reference > Commands` page contains the full command index and us
 <details>
 <summary>Player Mods</summary>
 
-`XA Mods > Player Mods > Estate Teleportation Context Menu` is off by default. Enable it to add `Estate Teleportation` to supported player right-click menus, including the party list, for friends whose home world is your current world. The friend list must be loaded; open Social > Friend List if needed. This opens the game's estate selector and leaves destination selection and access permissions to the game. The existing Friend List menu is unchanged.
-
 | Command | Purpose |
 | --- | --- |
+| `/xa autobusy on/off` | Toggle `Auto Busy Status`; preserves manually set Busy. Omit on/off for status. |
+| `/xa autofood on/off` | Toggle `Auto Food Consume`; choose food and NQ/HQ quality in XA Mods first. `/xa food` is an alias; omit on/off for status. |
+| `/xa viewitem` | Open `View Single Item` with item search visible. Enable the mod for searching and previews. |
+| `/xa outfits [player]` | Open saved outfit history, optionally filtered by player or world. Enable `Inspect Outfit Try-on` and inspect players to save outfits; use Try On or Remove per entry. Keeps the 500 most recently seen outfits. |
 | `/xa antiafk on/off` | Toggle `Anti-AFK`; while enabled XA refreshes the local AFK timer every 2 minutes. |
 | `/xa companychest on/off` | Toggle `Better Company Chest` page defaults, right-click store/recover moves, quantity prompt confirmation, and the exchangeable-item gil-value display. |
 | `/xa dutycommence on/off` | Toggle `Auto Duty Commence`. |

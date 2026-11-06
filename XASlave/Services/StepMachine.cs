@@ -27,6 +27,7 @@ internal sealed class StepMachine
     private DateTime stepStartUtc;
     private bool stepActionDone;
     private long generation;
+    private DateTime? pausedAt;
 
     // Opt-in strict owners stop on the first callback error. Existing consumers retain
     // their historical log-and-continue policy.
@@ -58,7 +59,7 @@ internal sealed class StepMachine
     public int CurrentStep => stepIndex;
     public int TotalSteps => steps.Count;
     public float CurrentStepElapsedSeconds => IsRunning
-        ? Math.Max(0f, (float)(utcNow() - stepStartUtc).TotalSeconds)
+        ? Math.Max(0f, (float)((pausedAt ?? utcNow()) - stepStartUtc).TotalSeconds)
         : 0f;
     public string CurrentStepName => IsRunning && (uint)stepIndex < (uint)steps.Count
         ? steps[stepIndex].Name
@@ -70,6 +71,7 @@ internal sealed class StepMachine
     public void Start(IEnumerable<TaskStep> source)
     {
         generation++;
+        pausedAt = null;
         LastError = null;
         lastErrorMessage = null;
         steps.Clear();
@@ -96,16 +98,28 @@ internal sealed class StepMachine
     {
         if (!IsRunning || (uint)index >= (uint)steps.Count) throw new ArgumentOutOfRangeException(nameof(index));
         generation++;
+        pausedAt = null;
         stepIndex = index;
         stepActionDone = false;
         stepStartUtc = utcNow();
     }
 
-    public void RestartCurrentStepClock() => stepStartUtc = utcNow();
+    public void RestartCurrentStepClock() => stepStartUtc = pausedAt ?? utcNow();
+
+    internal void SetPaused(bool value)
+    {
+        if (!IsRunning) { pausedAt = null; return; }
+        if (value) { pausedAt ??= utcNow(); return; }
+        if (!pausedAt.HasValue) return;
+        var elapsed = utcNow() - pausedAt.Value;
+        if (elapsed > TimeSpan.Zero) stepStartUtc += elapsed;
+        pausedAt = null;
+    }
 
     public void Stop()
     {
         generation++;
+        pausedAt = null;
         IsRunning = false;
         stepIndex = -1;
         stepActionDone = false;
@@ -119,6 +133,7 @@ internal sealed class StepMachine
     {
         if (!IsRunning || (uint)stepIndex >= (uint)steps.Count)
             return Complete();
+        if (pausedAt.HasValue) return StepMachineTickResult.Running;
 
         var tickGeneration = generation;
 
@@ -137,7 +152,7 @@ internal sealed class StepMachine
                 shouldSkip = false;
             }
 
-            if (!IsRunning || generation != tickGeneration)
+            if (!IsRunning || generation != tickGeneration || pausedAt.HasValue)
                 return StepMachineTickResult.Running;
             if (!shouldSkip)
                 break;
@@ -155,7 +170,7 @@ internal sealed class StepMachine
         if (!stepActionDone)
         {
             onStepStarted?.Invoke(stepIndex, step);
-            if (!IsRunning || generation != tickGeneration)
+            if (!IsRunning || generation != tickGeneration || pausedAt.HasValue)
                 return StepMachineTickResult.Running;
             if (step.OnEnter != null)
             {
@@ -172,17 +187,18 @@ internal sealed class StepMachine
             if (!IsRunning || generation != tickGeneration)
                 return StepMachineTickResult.Running;
             stepActionDone = true;
+            if (pausedAt.HasValue) return StepMachineTickResult.Running;
         }
 
         try
         {
             var complete = step.IsComplete();
-            if (!IsRunning || generation != tickGeneration)
+            if (!IsRunning || generation != tickGeneration || pausedAt.HasValue)
                 return StepMachineTickResult.Running;
             if (complete)
             {
                 onStepCompleted?.Invoke(stepIndex, step, elapsed);
-                if (!IsRunning || generation != tickGeneration)
+                if (!IsRunning || generation != tickGeneration || pausedAt.HasValue)
                     return StepMachineTickResult.Running;
                 Advance();
                 return IsRunning ? StepMachineTickResult.Advanced : StepMachineTickResult.Completed;
@@ -193,7 +209,7 @@ internal sealed class StepMachine
             ReportError(global::XASlave.Localization.UiMessage.Format("S980DF56051E02256", step.NameMessage), ex, $"Check error in '{step.Name}': {ex.Message}");
         }
 
-        if (!IsRunning || generation != tickGeneration)
+        if (!IsRunning || generation != tickGeneration || pausedAt.HasValue)
             return StepMachineTickResult.Running;
         if (elapsed <= step.TimeoutSec)
             return StepMachineTickResult.Running;

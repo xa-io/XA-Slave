@@ -597,7 +597,7 @@ public partial class SlaveWindow
         if (!TryStartXagmanTonySellWhenInventoryFull(xagmanOnhEngagedPartner, (succeeded, uncertain) =>
             {
                 if (!xagmanRunning || xagmanOnhPhase != XagmanOnhPhase.TonySelling) return;
-                if (uncertain) { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SE6C93B1BF70DBC6D")); return; }
+                if (uncertain) { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S85CFDE754AC94C85")); return; }
                 onhSaleSucceeded = succeeded;
                 onhSaleCompleted = true;
                 xagmanStatus = XagmanStatus.Traveling;

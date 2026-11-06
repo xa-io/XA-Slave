@@ -37,11 +37,22 @@ public sealed class TaskRunner : IDisposable
 
     // An owning operation may suspend polling while recovering an external task.
     internal Func<bool>? SuspendTick { get; set; }
+    // Independent session gate: lobby recovery and sequence cleanup do not own this callback.
+    internal Func<bool>? SuspendForTradeReadiness { get; set; }
     private bool tickWasSuspended;
+    private Func<bool>? pauseGate;
     internal void ResumeAtStep(int index) => stepMachine.ResumeAtStep(index);
     public bool IsRunning => hasActiveRun;
     /// <summary>Identity of the last successfully admitted run; rejected starts never advance it.</summary>
     public long CurrentRunId { get; private set; }
+    internal void PauseCurrentStep(long expectedRunId)
+    {
+        if (hasActiveRun && !haltRequested && CurrentRunId == expectedRunId) stepMachine.SetPaused(true);
+    }
+    internal void ResumeCurrentStep(long expectedRunId)
+    {
+        if (hasActiveRun && !haltRequested && CurrentRunId == expectedRunId) stepMachine.SetPaused(false);
+    }
 
     /// <summary>
     /// When true, the logout handler should NOT cancel this task.
@@ -136,9 +147,10 @@ public sealed class TaskRunner : IDisposable
         bool? suppressLogoutCancel = null,
         bool preserveRunHistory = false,
         Action? onTerminal = null,
-        bool haltOnStepError = false)
+        bool haltOnStepError = false,
+        Func<bool>? pauseGate = null)
         => Start(global::XASlave.Localization.UiMessage.Raw(taskName), taskSteps, onFinished, onLog,
-            suppressCompletionReport, totalItems, suppressLogoutCancel, preserveRunHistory, onTerminal, haltOnStepError);
+            suppressCompletionReport, totalItems, suppressLogoutCancel, preserveRunHistory, onTerminal, haltOnStepError, pauseGate);
 
     internal bool Start(
         global::XASlave.Localization.UiMessage taskName,
@@ -150,7 +162,8 @@ public sealed class TaskRunner : IDisposable
         bool? suppressLogoutCancel = null,
         bool preserveRunHistory = false,
         Action? onTerminal = null,
-        bool haltOnStepError = false)
+        bool haltOnStepError = false,
+        Func<bool>? pauseGate = null)
     {
         if (disposed || terminating) return false;
         var normalizedSteps = taskSteps ?? [];
@@ -172,6 +185,7 @@ public sealed class TaskRunner : IDisposable
         {
             this.onFinished = onFinished;
             this.onTerminal = onTerminal;
+            this.pauseGate = pauseGate;
             runGeneration++;
             stepMachine.HaltOnError = haltOnStepError;
             this.onLog = onLog;
@@ -407,7 +421,11 @@ public sealed class TaskRunner : IDisposable
         }
 
         var tickGeneration = runGeneration;
-        if (SuspendTick?.Invoke() == true)
+        var pause = pauseGate?.Invoke() == true;
+        if (!hasActiveRun || haltRequested || tickGeneration != runGeneration) return;
+        stepMachine.SetPaused(pause);
+        if (pause) return;
+        if ((SuspendTick?.Invoke() == true) || (SuspendForTradeReadiness?.Invoke() == true))
         {
             if (hasActiveRun && !haltRequested && tickGeneration == runGeneration)
                 tickWasSuspended = true;
@@ -552,6 +570,7 @@ public sealed class TaskRunner : IDisposable
     // Start is rejected during cleanup; a success continuation may start after it returns.
     private void InvokeTerminal()
     {
+        pauseGate = null;
         SuspendTick = null;
         tickWasSuspended = false;
         var terminal = onTerminal;
@@ -621,6 +640,7 @@ public sealed class TaskRunner : IDisposable
     public void Dispose()
     {
         disposed = true;
+        SuspendForTradeReadiness = null;
         if (hasActiveRun)
         {
             stepMachine.Stop();

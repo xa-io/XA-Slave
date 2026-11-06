@@ -20,6 +20,7 @@ public class ReloggerCharacterData
     public int Gil { get; set; }
     public string FcName { get; set; } = "";
     public long FCID { get; set; }
+    public long? FcPoints { get; set; }
     public DateTime LastLoggedIn { get; set; } = DateTime.MinValue;
     public string PersonalEstate { get; set; } = "";
     public string Apartment { get; set; } = "";
@@ -148,6 +149,10 @@ public class Configuration : IPluginConfiguration
     public int CustomResolutionOnLoadHeight { get; set; } = 345;
     public bool CustomResolutionOnLoadIgnoreMinimumWindowSize { get; set; } = true;
 
+    // Independent opt-in; capture saves a target without moving or enabling it.
+    public bool WindowPositionOnLoadEnabled { get; set; } = false;
+    public StartupWindowPlacement? WindowPositionOnLoadPlacement { get; set; }
+
     public bool VerboseTaskLogging { get; set; } = false;
     // Inert migration payload only: preserve old settings until imported by XA Zod.
     [Newtonsoft.Json.JsonProperty("AutoFcCreation", NullValueHandling = Newtonsoft.Json.NullValueHandling.Ignore)]
@@ -265,6 +270,7 @@ public class Configuration : IPluginConfiguration
     // User additions and overrides; omitted builds retain the built-in upkeep defaults.
     public Dictionary<string, SubmarineConsumptionRate> SubmarineBuildConsumptionRates { get; set; } = new(StringComparer.Ordinal);
     public List<XagmanNamedItemList> XagmanSavedItemLists { get; set; } = new();
+    public List<XagmanCharacterSelection> XagmanSavedCharacterLists { get; set; } = new();
     public List<XagmanItemEntry> XagmanTonyItems { get; set; } = new();
     public List<XagmanItemEntry> XagmanFranchiseItems { get; set; } = new();
     public bool XagmanSharedItemsMigrationComplete { get; set; }
@@ -549,6 +555,9 @@ public class Configuration : IPluginConfiguration
     public bool AntiAfkEnabled { get; set; } = false;
     public bool AutoDutyCommenceEnabled { get; set; } = false;
     public bool AutoLeaveDutyEnabled { get; set; } = false;
+    public bool AutoBusyStatusEnabled { get; set; } = false;
+    public bool AutoFoodConsumeEnabled { get; set; } = false;
+    public AutoFoodConsumeSettings AutoFoodConsumeSettings { get; set; } = new();
     public int AutoLeaveDutyDelaySeconds { get; set; } = AutoLeaveDutyService.DelaySecondsDefault;
     public bool FieldOperationsInstanceDisplayEnabled { get; set; } = false;
     public bool FieldOperationsInstanceDisplayShowInDtr { get; set; } = true;
@@ -695,6 +704,8 @@ public class Configuration : IPluginConfiguration
     public bool TitleBarFavArPostProcessEnabled { get; set; } = false;
     public List<TitleBarFavCustomItem> TitleBarFavCustomItems { get; set; } = new();
     public List<TitleBarFavResolutionItem> TitleBarFavResolutionItems { get; set; } = new();
+    public bool XAModHotkeysEnabled { get; set; } = true;
+    public List<XAModHotkeyBinding> XAModHotkeyBindings { get; set; } = new();
 
     public bool InitializeFloorderDefaults()
     {

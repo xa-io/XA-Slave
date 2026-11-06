@@ -28861,4 +28861,760 @@ Arsa tekliflerine erişebilmek için bunu 6. rütbe ve üzerindeyken yapmak en i
     <value>Tony {0} için çantalar dolu ve eşya toplama işlemi bekliyor veya doğrulanmadı; Tony değişimi için takas kapatılıyor. Eldeki gil değişimi geciktirmeyecek.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
   </data>
+  <data name="S7143F82330DF04E4" xml:space="preserve">
+    <value>FC Puanları</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; I243 FC Points.</comment>
+  </data>
+  <data name="S592AA83FCCD8E8B0" xml:space="preserve">
+    <value>XA Database içinde kaydedilmiş değer. Aynı Free Company içindeki karakterler bu puanları paylaşır. Bilinmiyor, kullanılabilir bir FC puanı kaydının bulunmadığı anlamına gelir.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; I243 FC Points.</comment>
+  </data>
+  <data name="S7854F7662947FE72" xml:space="preserve">
+    <value>Dalamud Günlüklerini Dışa Aktar</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SBF66B41AAE6E3F4F" xml:space="preserve">
+    <value>Bu istemcinin etkin Dalamud günlüğünü eklentinin dışa aktarma klasörüne kaydet.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SA12745C8C47FD114" xml:space="preserve">
+    <value>Eklentinin dışa aktarma klasörünü Dosya Gezgini'nde aç.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SE1C4D5523AA25AA5" xml:space="preserve">
+    <value>Bu istemcinin etkin Dalamud günlüğü dışa aktarılmaya hazır.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S631E4ABFB33003A5" xml:space="preserve">
+    <value>Kullanım: /xa devlogs [folder]</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8176329472D31C0A" xml:space="preserve">
+    <value>XA Slave kapanırken günlük dışa aktarılamaz.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8E2604B177C8AF1F" xml:space="preserve">
+    <value>Bir Dalamud günlüğü dışa aktarma işlemi zaten çalışıyor.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SB86B57B60B9FDE8E" xml:space="preserve">
+    <value>Geçerli Dalamud günlüğü dışa aktarılıyor. Dışa aktarma klasörünü açmak için /xa devlogs folder kullanın.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SA0A075359BB2410F" xml:space="preserve">
+    <value>Dalamud günlüklerinin dışa aktarma klasörü açılıyor.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SFF6585E7D4A49E9D" xml:space="preserve">
+    <value>Dışa aktarma klasörü zaten açılıyor.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8B522C24A88B741A" xml:space="preserve">
+    <value>Dalamud günlüklerinin dışa aktarma klasörü açıldı.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8F8D175EA00F9C4C" xml:space="preserve">
+    <value>{1} konumuna {0:N0} bayt kaydedildi. Dışa aktarma klasörünü açmak için /xa devlogs folder kullanın.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S3B44B8EBCBFA3A98" xml:space="preserve">
+    <value>Dalamud günlüğü dışa aktarıldı. Dışa aktarma klasörünü açmak için /xa devlogs folder kullanın.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S529BDAC6C5C7748C" xml:space="preserve">
+    <value>Dalamud günlüğü kaydedildi ancak tamamlanma bildirimi gösterilemedi. /xa devlogs folder kullanın.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S440D22CFAE3AB6FD" xml:space="preserve">
+    <value>Günlük dışa aktarma klasörü açılamadı: {0}</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8FF19BCE1E61F9A3" xml:space="preserve">
+    <value>Dalamud günlüğü dışa aktarılamadı: {0}</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S70A4CBAC051BD9F9" xml:space="preserve">
+    <value>İlk bayt sayısının tamamı kopyalanmadan etkin günlüğün sonuna ulaşıldı.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8D35CE14045790BE" xml:space="preserve">
+    <value>Karakter Listeleri</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S88EE016BB710C034" xml:space="preserve">
+    <value>Kaydet / Değiştir</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S4CEC14383936E62C" xml:space="preserve">
+    <value>İşaretli karakterleri adlandırılmış bir liste olarak kaydet. Yükle, bu rolün seçimini değiştirir; boş liste seçimi temizler.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE58C1489200E570B" xml:space="preserve">
+    <value>Dışa Aktar, kayıtlı bir listeyi kopyalar. Panodan İçe Aktar, listeyi yüklemeden kaydeder. Yalnızca mevcut karakter kayıtları.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SA5D5F3C250DF92CA" xml:space="preserve">
+    <value>Otomasyon veya kurtarma etkinken kayıtlı karakter listeleri kullanılamaz.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SB94776A1440C79F3" xml:space="preserve">
+    <value>'{1}' listesine {0} karakter kaydedildi.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1411BC7063E9BAA6" xml:space="preserve">
+    <value>'{0}' içe aktarıldı ({1} karakter). Uygulamak için Yükle'yi kullanın.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S3B4A42FA8838D47E" xml:space="preserve">
+    <value>'{0}' panoya aktarıldı.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S2A5845A1CEE09EEE" xml:space="preserve">
+    <value>'{0}' silindi.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1FDEC38FD285AF57" xml:space="preserve">
+    <value>Karakter listeleri kaydedilemedi: {0}</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S60BB30BDC6F0FC8F" xml:space="preserve">
+    <value>Panoya erişilemedi: {0}</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF5BFFD9A6691ADBE" xml:space="preserve">
+    <value>'{1}' adlı kayıtlı bir {0} listesi zaten var. Başka bir ad seçin veya önce o listeyi silin.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S69BF1FA26E9CCC82" xml:space="preserve">
+    <value>En fazla {0} karakter listesi kaydedilebilir.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S6841004D3ABCF28E" xml:space="preserve">
+    <value>Hiçbir karakter eşleştirilemedi. Mevcut seçim korundu.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S8F9D74E29593EA79" xml:space="preserve">
+    <value>'{0}' yüklendi: {1} seçili, {2} eksik, {3} hariç, {4} belirsiz, {5} çakışan.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SAC7D9B2BA0C44374" xml:space="preserve">
+    <value>Çözümlenemeyen karakterler:</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S397DB221F1D7A44A" xml:space="preserve">
+    <value>{0} tane daha...</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF7C047FDFC575C7F" xml:space="preserve">
+    <value>{0} için karakter verilerinde çakışan kimlikler var. Kayıtlı listeleri kullanmadan önce karakter verilerini yenileyin.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S11E9FE71C67F4AB3" xml:space="preserve">
+    <value>{0} karakter</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SD2B77A734FFA9FF9" xml:space="preserve">
+    <value>Karakter listesi verileri geçersiz.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE28E34D4D126874E" xml:space="preserve">
+    <value>Karakter listesi adı 1-{0} karakter içermeli ve kontrol karakteri içermemelidir.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF2F58EBC9CCA30E2" xml:space="preserve">
+    <value>Karakter listeleri yalnızca Tony veya Franchise Owner rollerini destekler.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S87D5B4347B0A1FF0" xml:space="preserve">
+    <value>Bu karakter listesi başka bir Xagman rolüne ait.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE53E43F24C215F6C" xml:space="preserve">
+    <value>Desteklenmeyen karakter listesi biçimi veya şema sürümü.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S3B12B9090F306A92" xml:space="preserve">
+    <value>Karakter listesi JSON'u {0:N0} karakteri aşmamalıdır.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1D813716739C9CD6" xml:space="preserve">
+    <value>Karakter listesi JSON'u geçersiz veya bilinmeyen, eksik ya da yinelenen özellikler içeriyor.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SA640823C35D9273B" xml:space="preserve">
+    <value>Karakter listeleri en fazla {0:N0} karakteri destekler.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S2A78AE5599347A7E" xml:space="preserve">
+    <value>Karakter listesi geçersiz bir karakter kimliği veya Content ID içeriyor.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF0F93CB142075445" xml:space="preserve">
+    <value>Karakter listesi yinelenen karakter anahtarları veya Content ID'ler içeriyor.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S389D5974555E7B47" xml:space="preserve">
+    <value>Yapılandırılan karakter kadrosu geçersiz kimlikler veya yinelenen satır dizinleri içeriyor.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S8B3C82630CAFBA84" xml:space="preserve">
+    <value>Seçilen karakter satırları kullanılamıyor veya hariç tutulmuş.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF33521EA8C45FD03" xml:space="preserve">
+    <value>Karakter listesi geçerli.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SB364866482A6EFD6" xml:space="preserve">
+    <value>{0:N0} karakter eşleşti; eksik: {1:N0}, hariç: {2:N0}, belirsiz: {3:N0}, çakışan kimlikler: {4:N0}.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S15E6D623EC86CD42" xml:space="preserve">
+    <value>Mevcut seçim korundu: {0} eksik, {1} hariç, {2} belirsiz, {3} çakışan.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S289D852CAE06545A" xml:space="preserve">
+    <value>Seçilen karakter satırları kullanılamıyor.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S36E39ECB0AB47FB3" xml:space="preserve">
+    <value>Eklenti Yüklenirken Pencere Konumu</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SCCBDC0861A411D74" xml:space="preserve">
+    <value>Mevcut Konumu Yakala</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S5D5814324B59E477" xml:space="preserve">
+    <value>Mevcut oyun penceresinin konumunu yakalayın, ardından sonraki eklenti yüklemesinde konumu geri yüklemek için bu seçeneği etkinleştirin. Kaydetmek pencereyi taşımaz.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SB16FCA2B5A6FEFCF" xml:space="preserve">
+    <value>Henüz bir pencere konumu kaydedilmedi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBAE4E612D9038688" xml:space="preserve">
+    <value>Kayıtlı monitör: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SA3DA8FCAA8B47575" xml:space="preserve">
+    <value>Masaüstü X</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SF12938A22E5B9524" xml:space="preserve">
+    <value>Masaüstü Y</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC47595D1EF3CEA03" xml:space="preserve">
+    <value>Masaüstü koordinatları negatif olabilir. Oyun penceresini başka bir monitöre taşıdıktan sonra konumu yeniden yakalayın.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SE63B6997264E3013" xml:space="preserve">
+    <value>Başlangıç penceresi ayarları sonraki eklenti yüklemesi için kaydedildi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7D3DE00F7AFBFAE9" xml:space="preserve">
+    <value>Başlangıç penceresi ayarları kaydedilemedi: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S8FB65BADFA5840F2" xml:space="preserve">
+    <value>Ayar değişiklikleri, bekleyen başlangıç penceresi düzenlemesini sonraki eklenti yüklemesine kadar iptal eder.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBC2E3B713D3F809C" xml:space="preserve">
+    <value>Başlangıç penceresi düzeni boşta.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBDF7355146BB2B9C" xml:space="preserve">
+    <value>Başlangıç düzenini uygulamak için hazır ve kilidi açık bir pencere bekleniyor.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7E0FEE8B14FD02C5" xml:space="preserve">
+    <value>Başlangıç penceresi düzeni iptal edildi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S8F79AF878F4C126F" xml:space="preserve">
+    <value>Başlangıç düzeni için hazır ve kilidi açık bir pencere bekleme süresi doldu.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7AEB6C78FFA7214F" xml:space="preserve">
+    <value>Başlangıç penceresi konumu geçersiz.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S65B9D5CB3DEC4565" xml:space="preserve">
+    <value>Başlangıç penceresi yerleşimi, sahibi olan iş parçacığında normal durumda bir pencere gerektirir.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SCEC84864868B78E7" xml:space="preserve">
+    <value>Mevcut pencere veya monitör bilgisi okunamadı.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC1D37627E426E38B" xml:space="preserve">
+    <value>{2} üzerinde {0}, {1} pencere konumu yakalandı.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S33AF1ADEAB47572F" xml:space="preserve">
+    <value>Pencere, kilit veya ayarlar değiştiği için başlangıç penceresi düzeni durduruldu.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S76DC735EA2738AA6" xml:space="preserve">
+    <value>Oyun penceresi taşınamadı (Windows hatası {0}).</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC213F32D8EF829B8" xml:space="preserve">
+    <value>Başlangıç penceresi konumu istenen konumla eşleşmedi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S363F3A3D0073FD5F" xml:space="preserve">
+    <value>Başlangıç penceresi düzeni uygulandı.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S17AE454E10634226" xml:space="preserve">
+    <value>Kayıtlı ekran kullanılamadığı için başlangıç penceresi düzeni ana ekrana uygulandı.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SDFC2D150B4F0017E" xml:space="preserve">
+    <value>Başlangıç penceresi düzeni başarısız oldu: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S007CC0B77AB59EBE" xml:space="preserve">
+    <value>Başlangıç düzeni için özel çözünürlükler etkinleştirilemedi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S4B16A68D1F062106" xml:space="preserve">
+    <value>Başlangıç düzeni için minimum pencere boyutu azaltılamadı.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S6B93E2DDBE373EC5" xml:space="preserve">
+    <value>Başlangıç çözünürlüğü istenen istemci alanı boyutuyla eşleşmedi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBD96C29733E86CCE" xml:space="preserve">
+    <value>Masaüstü piksel koordinatı bağlamına geçilemedi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC5E1AF73A3FFA825" xml:space="preserve">
+    <value>Önceki pencere koordinatı bağlamı geri yüklenemedi.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SF8A5A1AE7D008AB7" xml:space="preserve">
+    <value>Başlangıç çözünürlüğü uygulandı; kayıtlı pencere konumu geçersiz olduğu için atlandı.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S55BDCD7DECFB581A" xml:space="preserve">
+    <value>Otomatik Yemek Tüketimi</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S2AF6D2C22FAEF9E9" xml:space="preserve">
+    <value>Yemeği kullanmak güvenli olduğunda seçili yemeğin Well Fed etkisini etkin tutar.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S3C56AC5340AF8D0E" xml:space="preserve">
+    <value>Bir yemek ve tam NQ/HQ kalitesini seçin. Başka bir yemeğin etkisi süresi dolana kadar korunur. Sığınak ve görev filtreleri isteğe bağlıdır.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SE4EB18069D65AAA9" xml:space="preserve">
+    <value>Yemek</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S11AA1327967FBD75" xml:space="preserve">
+    <value>Yemek seçilmedi.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S1DEF5DDD00299C70" xml:space="preserve">
+    <value>Seçili yemek kullanılamıyor (eşya {0}).</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9730EBD5A2B184FA" xml:space="preserve">
+    <value>Eşleşen yemek yok.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S60896D83E37CCFC7" xml:space="preserve">
+    <value>HQ yemek kullan</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S4742D66F333442D0" xml:space="preserve">
+    <value>Seçili yemek: {0} ({1}).</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SF4EB7A9866C3ADEB" xml:space="preserve">
+    <value>Yalnızca seçili kalite kullanılır; NQ/HQ değişimi yapılmaz.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S8298112BCE538DAF" xml:space="preserve">
+    <value>Yalnızca sığınaklarda</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S11A3A6AAE6C70D6F" xml:space="preserve">
+    <value>Yalnızca görevlerde</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5B94009668CB9919" xml:space="preserve">
+    <value>Hiçbiri: uygun herhangi bir konum. İkisi de: sığınak veya görev.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S519B035F59C3B629" xml:space="preserve">
+    <value>Kalan süre bunun altındayken yenile (saniye)</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9693CB7DC510CB34" xml:space="preserve">
+    <value>0 yalnızca Well Fed süresi dolduktan sonra yeniler. Başka bir etkin yemek etkisi asla değiştirilmez.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S67B2D20C7A2DDC7B" xml:space="preserve">
+    <value>Yemek ayarları kaydedilemedi: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0BCDF2A71A2F8B4B" xml:space="preserve">
+    <value>Otomatik Yemek Tüketimini etkinleştir veya devre dışı bırak.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S49AA40EC95661092" xml:space="preserve">
+    <value>XA Mods &gt; Player Mods bölümünde yemek ve kaliteyi seçin. Alternatif: /xa food on|off. Durum için on/off yazmayın.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9509C8874D666432" xml:space="preserve">
+    <value>Otomatik Yemek Tüketimi devre dışı.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SAFDBB1CE4564FA10" xml:space="preserve">
+    <value>Well Fed etkisini sürdürmek için bir yemek eşyası seçin.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0B77E084F921F82B" xml:space="preserve">
+    <value>Seçili yemek veya kalite kullanılamıyor.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5E4B2C5AAE29E533" xml:space="preserve">
+    <value>Giriş yapmış bir karakter bekleniyor.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S6560C56E601CD45D" xml:space="preserve">
+    <value>Karakterin yemeği güvenle kullanabilmesi bekleniyor.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9AF9663B74FE28E1" xml:space="preserve">
+    <value>Seçilen sığınak veya görev bekleniyor.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SAF599778D29BF6E1" xml:space="preserve">
+    <value>Farklı veya bilinmeyen bir yemek etkisi etkin; süresinin dolması bekleniyor.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SA7D0890EDC9AC27F" xml:space="preserve">
+    <value>Well Fed etkisinin yenilenmesi gerekmiyor.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SE266A00BFCA12A9B" xml:space="preserve">
+    <value>Ana envanterde seçili kalitede yemek yok.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0E8DCF82FCFD5350" xml:space="preserve">
+    <value>Ana envanter veya yemek durumu kullanılamıyor.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SEAC8EC2682BB99C1" xml:space="preserve">
+    <value>Seçili yemeğin kullanılabilir olması bekleniyor.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S770FEE3142B32044" xml:space="preserve">
+    <value>Yemek kullanımı onayı bekleniyor.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S063A1891E16848F2" xml:space="preserve">
+    <value>Well Fed yenilendi.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S37E0F3FD7AE786D8" xml:space="preserve">
+    <value>Yemek kullanımı reddedildi; yeniden deneniyor ({0}/{1}).</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S8C73C7D43CCECA79" xml:space="preserve">
+    <value>Yemek kullanımı üç kez başarısız oldu. Yeniden denemek için Otomatik Yemek Tüketimini kapatıp açın.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S17AD1455ED06B495" xml:space="preserve">
+    <value>Yemek kullanımı doğrulanamadı. Yeniden denemek için Otomatik Yemek Tüketimini kapatıp açın.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SB52197D01EFCFDE2" xml:space="preserve">
+    <value>Beklenen yemek etkisi olmadan envanter değişti. Yeniden denemek için Otomatik Yemek Tüketimini kapatıp açın.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5827BCC775A704D6" xml:space="preserve">
+    <value>Yemek kullanılırken karakter veya bölge değişti. Yeniden denemek için Otomatik Yemek Tüketimini kapatıp açın.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9CD9B3FFE80D10CC" xml:space="preserve">
+    <value>Otomatik Yemek Tüketimi başarısız oldu: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S4FD8EEBAA7DFB799" xml:space="preserve">
+    <value>Yemek verileri yüklenemedi: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SEEB8E55152E234E9" xml:space="preserve">
+    <value>Otomatik Meşgul Durumu</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S4AED9A414D8A8AF2" xml:space="preserve">
+    <value>Oyunculardan gelen istenmeyen takas isteklerini engellemek için Meşgul durumunu kullanır.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S6E7BC19EF1AC4096" xml:space="preserve">
+    <value>Önceden elle ayarlanmış Meşgul durumunu korur. Yalnızca bu özelliğin uyguladığı durumu kaldırır. Planlanan Xagman takasları için kendi durumunu geçici olarak kaldırır. Takası zorlamak için elle ayarlanmış durum kaldırılmaz.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S609AFDA86D644E89" xml:space="preserve">
+    <value>Otomatik Meşgul Durumunu etkinleştir veya devre dışı bırak.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5DB0F6C35C10C6E6" xml:space="preserve">
+    <value>Elle ayarlanmış Meşgul durumunu korur. Durumu görmek için on/off yazmayın.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5673A82993407664" xml:space="preserve">
+    <value>Otomatik Meşgul durumu devre dışı.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S1D8E1A21AD2A92D2" xml:space="preserve">
+    <value>Meşgul durumunu güncellemek için karakterin hazır olması bekleniyor.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S2FCA8DCA5A7654CA" xml:space="preserve">
+    <value>Meşgul durumu etkin.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S7B6B01E150D4034E" xml:space="preserve">
+    <value>Mevcut Meşgul durumu korunuyor.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S08B01883A2641144" xml:space="preserve">
+    <value>Meşgul durumu bu özellik dışında değiştirildi; devam etmek için özelliği kapatıp tekrar açın.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S9A6799919B79A85B" xml:space="preserve">
+    <value>Meşgul durumu onayı bekleniyor.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="SDCED69AE8C96B271" xml:space="preserve">
+    <value>Meşgul durumu doğrulanamadı; yeniden denemek için özelliği kapatıp tekrar açın.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S11335521063A94FA" xml:space="preserve">
+    <value>Meşgul komutu reddedildi; yeniden denemeden önce bekleniyor.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S8209CD8A5549D5C9" xml:space="preserve">
+    <value>Meşgul durumu takas için geçici olarak kaldırıldı.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S8CFDC3ED6CB4471B" xml:space="preserve">
+    <value>Elle ayarlanan Meşgul durumu bu takası engelliyor. Devam etmek için Meşgul durumunu elle kapatın.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="SCA26D2298BD2E686" xml:space="preserve">
+    <value>Meşgul durumu takas için hazır.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5D31DF8C82E76619" xml:space="preserve">
+    <value>Meşgul durumunun geçici yönetim izni artık bu karakter için geçerli değil.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S72AEE0B7209040C7" xml:space="preserve">
+    <value>Meşgul durumunun hazır olması beklenirken zaman aşımına uğradı.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S329E6AA07F7E03A7" xml:space="preserve">
+    <value>Meşgul durumunun geçici yönetim izni serbest bırakıldı.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S52D30D0DA3413702" xml:space="preserve">
+    <value>Otomatik Meşgul durumu başarısız oldu: {0}</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S1A3ABA789EAB9D47" xml:space="preserve">
+    <value>Bu özelliğin uyguladığı Meşgul durumu etkin kalabilir; gerekirse /busy off kullanın.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S19D833AFC0A9695B" xml:space="preserve">
+    <value>Önceden elle ayarlanmış Meşgul durumunu korur. Yalnızca bu özelliğin uyguladığı durumu kaldırır. Xagman çalışmasının tamamında kendi durumunu askıya alır; bekleme sürelerini korumak için “Boştayken Takasları Reddet” seçeneğini açın. Takası zorlamak için elle ayarlanmış durum kaldırılmaz.</value>
+    <comment>Source: I252 Auto Busy Status full-run Xagman scope.</comment>
+  </data>
+  <data name="SD476521A6A2A1593" xml:space="preserve">
+    <value>Şehre yolculuk için Meşgul durumunu hazırla: {0}</value>
+    <comment>Source: I254 Busy before City Chat Flooder travel.</comment>
+  </data>
+  <data name="SFA66B6FEBEA27825" xml:space="preserve">
+    <value>Şehre yolculuktan önce Meşgul durumu doğrulanamadı.</value>
+    <comment>Source: I254 Busy before City Chat Flooder travel.</comment>
+  </data>
+  <data name="SDF0DB357D406B347" xml:space="preserve">
+    <value>Şehir hedefi belirsiz: {0}. Tam bir aetheryte adı seçin.</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="SEC24DA3BC5028C83" xml:space="preserve">
+    <value>Şehir hedefi bulunamadı: {0}. İngilizce veya oyunun mevcut dilindeki aetheryte adını kullanın.</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="S11D21EACE14B8F4A" xml:space="preserve">
+    <value>Şehir hedefi verileri okunamadı: {0}</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="S858E4BA7A29FD38B" xml:space="preserve">
+    <value>Duraklat</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SD640C7421DA06661" xml:space="preserve">
+    <value>Devam et</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S06BE4326D0311053" xml:space="preserve">
+    <value>Duraklatma istendi</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SC237B77195598E40" xml:space="preserve">
+    <value>Duraklatmadan önce mevcut yolculuk tamamlanıyor.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S6A4B96795A037B1D" xml:space="preserve">
+    <value>Mevcut yolculuk bittiğinde duraklatır; yeni yolculuk veya duyuru başlatılmaz.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S3E79A38210BCAC7F" xml:space="preserve">
+    <value>Aynı şehir ve adımdan devam et.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SD854D5AA265A7613" xml:space="preserve">
+    <value>Devam etmek için ilk karakterin duraklatılan konumda olması ve Lifestream’in boşta olması bekleniyor.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SC15F1530D219F94A" xml:space="preserve">
+    <value>Kısayol tuşları</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6A6485AF02CAB90B" xml:space="preserve">
+    <value>Kısayol tuşu</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9E0BEC5DC44EA1D7" xml:space="preserve">
+    <value>Kısayol tuşlarını etkinleştir</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6352BA5342074B06" xml:space="preserve">
+    <value>Kısayol ara</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S13075C2336114CD6" xml:space="preserve">
+    <value>Atanmadı</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S355ABB3D587E5D5D" xml:space="preserve">
+    <value>Kısayol ata</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0A7466B20A742807" xml:space="preserve">
+    <value>Bir tuş birleşimine basın. Escape iptal eder.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S5ED6F609248A45FB" xml:space="preserve">
+    <value>Tüm tuşları bırakın, ardından isterseniz Ctrl, Shift veya Alt ile birlikte bir tuşa basın.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S503ED79C2E4C31B4" xml:space="preserve">
+    <value>Kısayollar XA modlarını açıp kapatır. Yazı yazarken, tuş atarken veya başka bir pencere kullanırken çalışmazlar.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6EF93CA7306690C1" xml:space="preserve">
+    <value>Bu modu etkinleştirmek için Ctrl+Shift gerekir. Kısayola her iki tuşu da ekleyin.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S22CA9D816ED9D7D3" xml:space="preserve">
+    <value>Desteklenen tuşlar: harfler, rakamlar, F1-F12, sayısal tuş takımı ve gezinme tuşları. Fare düğmeleri ve yalnızca değiştirici tuşlardan oluşan kısayollar desteklenmez.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9B68DD9F119C3FBD" xml:space="preserve">
+    <value>XA Mod kısayolları hazır.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9652FFE81E6DA593" xml:space="preserve">
+    <value>XA Slave kaldırılırken kısayol ayarları kullanılamaz.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S10AD87B7C3F6BECA" xml:space="preserve">
+    <value>Bu XA Mod kullanılamıyor.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9EB1EA330D7D05BD" xml:space="preserve">
+    <value>Desteklenen bir klavye tuşu seçin.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SFD16F8EE67B4546C" xml:space="preserve">
+    <value>Kısayolun değiştirici tuş birleşimi geçersiz.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAD72E02E72B8DE20" xml:space="preserve">
+    <value>Bu XA Mod kısayolunda Ctrl+Shift gerektirir.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0A0857DBB5D2EAE5" xml:space="preserve">
+    <value>Bu XA Mod için birden fazla kısayol kaydedilmiş. Çakışmayı gidermek için kaydedin veya temizleyin.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAC28FCA7530B5F4C" xml:space="preserve">
+    <value>{0} kısayolu zaten {1} için atanmış.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0780342EDC24BA4F" xml:space="preserve">
+    <value>Klavye girişi kullanılamıyor. Kısayollar duraklatıldı.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAE298BBFF7D12C68" xml:space="preserve">
+    <value>Kısayol kaydedildi.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SB14B022B6230F27A" xml:space="preserve">
+    <value>Kısayol temizlendi.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9EF3B9FDB671EABB" xml:space="preserve">
+    <value>Bu XA Mod için atanmış kısayol yok.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SA0E48032B1503DFF" xml:space="preserve">
+    <value>Kısayollar etkinleştirildi.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S5337D574F2B256A9" xml:space="preserve">
+    <value>Kısayollar devre dışı bırakıldı.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0E3D9F02493D9616" xml:space="preserve">
+    <value>Kısayol ayarları kaydedilemedi: {0}</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9A746739A80D7BA0" xml:space="preserve">
+    <value>Kısayol yakalama iptal edildi.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S2881BBC7966AF6CA" xml:space="preserve">
+    <value>Kısayol yakalandı.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SEE5BD0D689D16F81" xml:space="preserve">
+    <value>Giriş veya ayarlar değiştiği için kısayol iptal edildi.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SBF0062C24FC0E9D0" xml:space="preserve">
+    <value>Kısayol: {0}</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S74D291E189C82727" xml:space="preserve">
+    <value>Bu XA Modu etkinleştirmek için Ctrl+Shift tuşlarını basılı tutun.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SA559648AE1C63AB1" xml:space="preserve">
+    <value>Bu tuş kısayol olarak kullanılamaz. Desteklenen bir tuş seçin.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
 </root>

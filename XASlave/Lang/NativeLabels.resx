@@ -29415,4 +29415,756 @@ It's best to do this when you're rank 6+ so you have access to plot bidding.</va
   <data name="S196ABC7735ED888F" xml:space="preserve">
     <value>Tony {0} has full bags with item collection pending or unverified; closing the trade for a replacement. Held gil will not delay rotation.</value>
   </data>
+  <data name="S7143F82330DF04E4" xml:space="preserve">
+    <value>FC Points</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; I243 FC Points.</comment>
+  </data>
+  <data name="S7854F7662947FE72" xml:space="preserve">
+    <value>Export Dalamud Logs</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SBF66B41AAE6E3F4F" xml:space="preserve">
+    <value>Save this client's active Dalamud log to the plugin exports folder.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SA12745C8C47FD114" xml:space="preserve">
+    <value>Open the plugin exports folder in File Explorer.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SE1C4D5523AA25AA5" xml:space="preserve">
+    <value>Ready to export this client's active Dalamud log.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S631E4ABFB33003A5" xml:space="preserve">
+    <value>Usage: /xa devlogs [folder]</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8176329472D31C0A" xml:space="preserve">
+    <value>Log export is unavailable while XA Slave is shutting down.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8E2604B177C8AF1F" xml:space="preserve">
+    <value>A Dalamud log export is already running.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SB86B57B60B9FDE8E" xml:space="preserve">
+    <value>Exporting the current Dalamud log. Use /xa devlogs folder to open exports.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SA0A075359BB2410F" xml:space="preserve">
+    <value>Opening the Dalamud log exports folder.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SFF6585E7D4A49E9D" xml:space="preserve">
+    <value>The exports folder is already opening.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8B522C24A88B741A" xml:space="preserve">
+    <value>Opened the Dalamud log exports folder.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8F8D175EA00F9C4C" xml:space="preserve">
+    <value>Saved {0:N0} bytes to {1}. Use /xa devlogs folder to open exports.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S3B44B8EBCBFA3A98" xml:space="preserve">
+    <value>Exported Dalamud log. Use /xa devlogs folder to open exports.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S529BDAC6C5C7748C" xml:space="preserve">
+    <value>Dalamud log was saved, but a completion notification could not be shown. Use /xa devlogs folder.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S440D22CFAE3AB6FD" xml:space="preserve">
+    <value>Could not open the log exports folder: {0}</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8FF19BCE1E61F9A3" xml:space="preserve">
+    <value>Could not export the Dalamud log: {0}</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S70A4CBAC051BD9F9" xml:space="preserve">
+    <value>The active log ended before its initial byte count was copied.</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8D35CE14045790BE" xml:space="preserve">
+    <value>Character Lists</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S88EE016BB710C034" xml:space="preserve">
+    <value>Save / Replace</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S4CEC14383936E62C" xml:space="preserve">
+    <value>Save checked characters as a named list. Load replaces this role's selection; an empty list clears it.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE58C1489200E570B" xml:space="preserve">
+    <value>Export copies a saved list. Import from Clipboard saves a list without loading it. Existing roster entries only.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SA5D5F3C250DF92CA" xml:space="preserve">
+    <value>Saved character lists are unavailable while automation or recovery is active.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SB94776A1440C79F3" xml:space="preserve">
+    <value>Saved {0} characters in '{1}'.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1411BC7063E9BAA6" xml:space="preserve">
+    <value>Imported '{0}' ({1} characters). Use Load to apply it.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S3B4A42FA8838D47E" xml:space="preserve">
+    <value>Exported '{0}' to the clipboard.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S2A5845A1CEE09EEE" xml:space="preserve">
+    <value>Deleted '{0}'.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1FDEC38FD285AF57" xml:space="preserve">
+    <value>Could not save character lists: {0}</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S60BB30BDC6F0FC8F" xml:space="preserve">
+    <value>Could not access the clipboard: {0}</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF5BFFD9A6691ADBE" xml:space="preserve">
+    <value>A saved {0} list named '{1}' already exists. Choose another name or delete that list first.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S69BF1FA26E9CCC82" xml:space="preserve">
+    <value>At most {0} saved character lists are allowed.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S6841004D3ABCF28E" xml:space="preserve">
+    <value>Could not match any characters. Current selection was kept.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S8F9D74E29593EA79" xml:space="preserve">
+    <value>Loaded '{0}': {1} selected, {2} missing, {3} excluded, {4} ambiguous, {5} conflicting.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SAC7D9B2BA0C44374" xml:space="preserve">
+    <value>Unresolved characters:</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S397DB221F1D7A44A" xml:space="preserve">
+    <value>{0} more...</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF7C047FDFC575C7F" xml:space="preserve">
+    <value>Character data has conflicting IDs for {0}. Refresh character data before using saved lists.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S11E9FE71C67F4AB3" xml:space="preserve">
+    <value>{0} characters</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SD2B77A734FFA9FF9" xml:space="preserve">
+    <value>Character list data is invalid.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE28E34D4D126874E" xml:space="preserve">
+    <value>Character list name must contain 1-{0} characters and no control characters.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF2F58EBC9CCA30E2" xml:space="preserve">
+    <value>Character lists support only Tony or Franchise Owner roles.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S87D5B4347B0A1FF0" xml:space="preserve">
+    <value>This character list belongs to a different Xagman role.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE53E43F24C215F6C" xml:space="preserve">
+    <value>Unsupported character list format or schema version.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S3B12B9090F306A92" xml:space="preserve">
+    <value>Character list JSON must contain no more than {0:N0} characters.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1D813716739C9CD6" xml:space="preserve">
+    <value>Character list JSON is invalid or contains unknown, missing or repeated properties.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SA640823C35D9273B" xml:space="preserve">
+    <value>Character lists support no more than {0:N0} characters.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S2A78AE5599347A7E" xml:space="preserve">
+    <value>Character list contains an invalid character identity or content ID.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF0F93CB142075445" xml:space="preserve">
+    <value>Character list contains duplicate character keys or content IDs.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S389D5974555E7B47" xml:space="preserve">
+    <value>The configured character roster contains invalid identities or repeated row indices.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S8B3C82630CAFBA84" xml:space="preserve">
+    <value>The selected character rows are unavailable or excluded.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF33521EA8C45FD03" xml:space="preserve">
+    <value>Character list is valid.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SB364866482A6EFD6" xml:space="preserve">
+    <value>Matched {0:N0} characters; missing: {1:N0}, excluded: {2:N0}, ambiguous: {3:N0}, conflicting IDs: {4:N0}.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S15E6D623EC86CD42" xml:space="preserve">
+    <value>Current selection was kept: {0} missing, {1} excluded, {2} ambiguous, {3} conflicting.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S289D852CAE06545A" xml:space="preserve">
+    <value>The selected character rows are unavailable.</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S36E39ECB0AB47FB3" xml:space="preserve">
+    <value>Window Position on Plugin Load</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SCCBDC0861A411D74" xml:space="preserve">
+    <value>Capture Current Position</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S5D5814324B59E477" xml:space="preserve">
+    <value>Capture the current game window, then enable this option to restore its position on the next plugin load. Saving does not move the window.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SB16FCA2B5A6FEFCF" xml:space="preserve">
+    <value>No window position has been saved.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBAE4E612D9038688" xml:space="preserve">
+    <value>Saved monitor: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SA3DA8FCAA8B47575" xml:space="preserve">
+    <value>Desktop X</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SF12938A22E5B9524" xml:space="preserve">
+    <value>Desktop Y</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC47595D1EF3CEA03" xml:space="preserve">
+    <value>Desktop coordinates may be negative. Capture again after moving the game window to a different monitor.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SE63B6997264E3013" xml:space="preserve">
+    <value>Startup window settings saved for the next plugin load.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7D3DE00F7AFBFAE9" xml:space="preserve">
+    <value>Could not save startup window settings: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S8FB65BADFA5840F2" xml:space="preserve">
+    <value>Settings changes cancel any pending startup window adjustment until the next plugin load.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBC2E3B713D3F809C" xml:space="preserve">
+    <value>Startup window layout is idle.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBDF7355146BB2B9C" xml:space="preserve">
+    <value>Waiting for a ready, unlocked window to apply the startup layout.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7E0FEE8B14FD02C5" xml:space="preserve">
+    <value>Startup window layout was cancelled.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S8F79AF878F4C126F" xml:space="preserve">
+    <value>Startup window layout timed out waiting for a ready, unlocked window.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7AEB6C78FFA7214F" xml:space="preserve">
+    <value>Startup window placement is invalid.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S65B9D5CB3DEC4565" xml:space="preserve">
+    <value>Startup window placement requires a normal window on its owning thread.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SCEC84864868B78E7" xml:space="preserve">
+    <value>Could not read the current window or monitor information.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC1D37627E426E38B" xml:space="preserve">
+    <value>Captured window position {0}, {1} on {2}.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S33AF1ADEAB47572F" xml:space="preserve">
+    <value>Startup window layout stopped because the window, lock or settings changed.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S76DC735EA2738AA6" xml:space="preserve">
+    <value>Could not move the game window (Windows error {0}).</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC213F32D8EF829B8" xml:space="preserve">
+    <value>Startup window position did not match the requested position.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S363F3A3D0073FD5F" xml:space="preserve">
+    <value>Startup window layout applied.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S17AE454E10634226" xml:space="preserve">
+    <value>Startup window layout applied using the primary display because the saved display was unavailable.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SDFC2D150B4F0017E" xml:space="preserve">
+    <value>Startup window layout failed: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S007CC0B77AB59EBE" xml:space="preserve">
+    <value>Could not enable custom resolutions for the startup layout.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S4B16A68D1F062106" xml:space="preserve">
+    <value>Could not lower the minimum window size for the startup layout.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S6B93E2DDBE373EC5" xml:space="preserve">
+    <value>Startup resolution did not match the requested client size.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBD96C29733E86CCE" xml:space="preserve">
+    <value>Could not enter the desktop pixel coordinate context.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC5E1AF73A3FFA825" xml:space="preserve">
+    <value>Could not restore the previous window coordinate context.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SF8A5A1AE7D008AB7" xml:space="preserve">
+    <value>Startup resolution applied; saved window placement is invalid and was skipped.</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S55BDCD7DECFB581A" xml:space="preserve">
+    <value>Auto Food Consume</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S2AF6D2C22FAEF9E9" xml:space="preserve">
+    <value>Keeps your selected food's Well Fed buff active when it is safe to use food.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S3C56AC5340AF8D0E" xml:space="preserve">
+    <value>Choose one meal and its exact NQ/HQ quality. Existing different food is preserved until it expires. Sanctuary and duty filters are optional.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SE4EB18069D65AAA9" xml:space="preserve">
+    <value>Food</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S11AA1327967FBD75" xml:space="preserve">
+    <value>No food selected.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S1DEF5DDD00299C70" xml:space="preserve">
+    <value>Selected food is unavailable (item {0}).</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9730EBD5A2B184FA" xml:space="preserve">
+    <value>No matching meals.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S60896D83E37CCFC7" xml:space="preserve">
+    <value>Use HQ food</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S4742D66F333442D0" xml:space="preserve">
+    <value>Selected food: {0} ({1}).</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SF4EB7A9866C3ADEB" xml:space="preserve">
+    <value>Only the selected quality is used; no NQ/HQ substitution.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S8298112BCE538DAF" xml:space="preserve">
+    <value>Only in sanctuaries</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S11A3A6AAE6C70D6F" xml:space="preserve">
+    <value>Only in duties</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5B94009668CB9919" xml:space="preserve">
+    <value>Neither option: any eligible location. Both options: a sanctuary or a duty.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S519B035F59C3B629" xml:space="preserve">
+    <value>Refresh below (seconds)</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9693CB7DC510CB34" xml:space="preserve">
+    <value>0 refreshes only after Well Fed expires. A different active food is never replaced.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S67B2D20C7A2DDC7B" xml:space="preserve">
+    <value>Could not save food settings: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0BCDF2A71A2F8B4B" xml:space="preserve">
+    <value>Enable or disable Auto Food Consume.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S49AA40EC95661092" xml:space="preserve">
+    <value>Choose food and quality in XA Mods &gt; Player Mods. Alias: /xa food on|off. Omit on/off for status.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9509C8874D666432" xml:space="preserve">
+    <value>Auto Food Consume is disabled.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SAFDBB1CE4564FA10" xml:space="preserve">
+    <value>Select a food item to maintain Well Fed.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0B77E084F921F82B" xml:space="preserve">
+    <value>The selected food or quality is unavailable.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5E4B2C5AAE29E533" xml:space="preserve">
+    <value>Waiting for a logged-in character.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S6560C56E601CD45D" xml:space="preserve">
+    <value>Waiting until the character can safely use food.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9AF9663B74FE28E1" xml:space="preserve">
+    <value>Waiting for a selected sanctuary or duty.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SAF599778D29BF6E1" xml:space="preserve">
+    <value>A different or unknown food buff is active; waiting for it to expire.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SA7D0890EDC9AC27F" xml:space="preserve">
+    <value>Well Fed does not need refreshing.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SE266A00BFCA12A9B" xml:space="preserve">
+    <value>The selected food quality is missing from the main inventory.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0E8DCF82FCFD5350" xml:space="preserve">
+    <value>The main inventory or food status is unavailable.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SEAC8EC2682BB99C1" xml:space="preserve">
+    <value>Waiting for the selected food to become usable.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S770FEE3142B32044" xml:space="preserve">
+    <value>Waiting for food use confirmation.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S063A1891E16848F2" xml:space="preserve">
+    <value>Well Fed was refreshed.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S37E0F3FD7AE786D8" xml:space="preserve">
+    <value>Food use was rejected; retrying ({0}/{1}).</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S8C73C7D43CCECA79" xml:space="preserve">
+    <value>Food use failed three times. Disable and re-enable Auto Food Consume to retry.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S17AD1455ED06B495" xml:space="preserve">
+    <value>Food use could not be confirmed. Disable and re-enable Auto Food Consume to retry.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SB52197D01EFCFDE2" xml:space="preserve">
+    <value>Inventory changed without the expected food buff. Disable and re-enable Auto Food Consume to retry.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5827BCC775A704D6" xml:space="preserve">
+    <value>Character or territory changed during food use. Disable and re-enable Auto Food Consume to retry.</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9CD9B3FFE80D10CC" xml:space="preserve">
+    <value>Auto Food Consume failed: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S4FD8EEBAA7DFB799" xml:space="preserve">
+    <value>Food data could not be loaded: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SEEB8E55152E234E9" xml:space="preserve">
+    <value>Auto Busy Status</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S4AED9A414D8A8AF2" xml:space="preserve">
+    <value>Uses Busy status to block unsolicited player trades.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S6E7BC19EF1AC4096" xml:space="preserve">
+    <value>Preserves Busy that was already set manually. Clears only Busy applied by this feature. Temporarily releases its own Busy for intended Xagman trades. Manually set Busy is not cleared to force a trade.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S609AFDA86D644E89" xml:space="preserve">
+    <value>Enable or disable Auto Busy Status.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5DB0F6C35C10C6E6" xml:space="preserve">
+    <value>Preserves manually set Busy. Omit on/off for status.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5673A82993407664" xml:space="preserve">
+    <value>Auto Busy is disabled.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S1D8E1A21AD2A92D2" xml:space="preserve">
+    <value>Waiting for a ready character to update Busy.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S2FCA8DCA5A7654CA" xml:space="preserve">
+    <value>Busy is active.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S7B6B01E150D4034E" xml:space="preserve">
+    <value>Existing Busy status is preserved.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S08B01883A2641144" xml:space="preserve">
+    <value>Busy was changed outside Auto Busy; disable and re-enable to resume.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S9A6799919B79A85B" xml:space="preserve">
+    <value>Waiting for Busy status confirmation.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="SDCED69AE8C96B271" xml:space="preserve">
+    <value>Busy status could not be confirmed; disable and re-enable to retry.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S11335521063A94FA" xml:space="preserve">
+    <value>Busy command was rejected; waiting before retry.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S8209CD8A5549D5C9" xml:space="preserve">
+    <value>Busy is temporarily released for trading.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S8CFDC3ED6CB4471B" xml:space="preserve">
+    <value>Manual Busy is blocking this trade. Turn Busy off manually to continue.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="SCA26D2298BD2E686" xml:space="preserve">
+    <value>Busy status is ready for trading.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5D31DF8C82E76619" xml:space="preserve">
+    <value>Busy lease is no longer valid for this character.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S72AEE0B7209040C7" xml:space="preserve">
+    <value>Busy readiness timed out.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S329E6AA07F7E03A7" xml:space="preserve">
+    <value>Busy lease has been released.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S52D30D0DA3413702" xml:space="preserve">
+    <value>Auto Busy failed: {0}</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S1A3ABA789EAB9D47" xml:space="preserve">
+    <value>Busy applied by Auto Busy may remain active; use /busy off if needed.</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S19D833AFC0A9695B" xml:space="preserve">
+    <value>Preserves Busy that was already set manually. Clears only Busy applied by this feature. Pauses its own Busy for the entire Xagman run; enable Refuse Trades When Idle to protect waiting periods. Manually set Busy is not cleared to force a trade.</value>
+    <comment>Source: I252 Auto Busy Status full-run Xagman scope.</comment>
+  </data>
+  <data name="SD476521A6A2A1593" xml:space="preserve">
+    <value>Prepare Busy for city travel: {0}</value>
+    <comment>Source: I254 Busy before City Chat Flooder travel.</comment>
+  </data>
+  <data name="SFA66B6FEBEA27825" xml:space="preserve">
+    <value>Busy could not be confirmed before city travel.</value>
+    <comment>Source: I254 Busy before City Chat Flooder travel.</comment>
+  </data>
+  <data name="SDF0DB357D406B347" xml:space="preserve">
+    <value>City destination is ambiguous: {0}. Choose one exact aetheryte name.</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="SEC24DA3BC5028C83" xml:space="preserve">
+    <value>City destination was not found: {0}. Use an English or current game-language aetheryte name.</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="S11D21EACE14B8F4A" xml:space="preserve">
+    <value>City destination data could not be read: {0}</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="S858E4BA7A29FD38B" xml:space="preserve">
+    <value>Pause</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SD640C7421DA06661" xml:space="preserve">
+    <value>Resume</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S06BE4326D0311053" xml:space="preserve">
+    <value>Pause requested</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SC237B77195598E40" xml:space="preserve">
+    <value>Finishing current travel before pausing.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S6A4B96795A037B1D" xml:space="preserve">
+    <value>Pause after current travel finishes; no new travel or announcements will start.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S3E79A38210BCAC7F" xml:space="preserve">
+    <value>Resume from the same city and step.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SD854D5AA265A7613" xml:space="preserve">
+    <value>Resume is waiting for the original character, paused location, and an idle Lifestream.</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SC15F1530D219F94A" xml:space="preserve">
+    <value>Hotkeys</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6A6485AF02CAB90B" xml:space="preserve">
+    <value>Hotkey</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9E0BEC5DC44EA1D7" xml:space="preserve">
+    <value>Enable hotkeys</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6352BA5342074B06" xml:space="preserve">
+    <value>Search hotkeys</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S13075C2336114CD6" xml:space="preserve">
+    <value>Not assigned</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S355ABB3D587E5D5D" xml:space="preserve">
+    <value>Set hotkey</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0A7466B20A742807" xml:space="preserve">
+    <value>Press a key combination. Escape cancels.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S5ED6F609248A45FB" xml:space="preserve">
+    <value>Release all keys, then press a key with optional Ctrl, Shift, or Alt.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S503ED79C2E4C31B4" xml:space="preserve">
+    <value>Hotkeys toggle XA Mods. They do not activate while typing, assigning a key, or using another window.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6EF93CA7306690C1" xml:space="preserve">
+    <value>This mod requires Ctrl+Shift when enabling. Include both in its hotkey.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S22CA9D816ED9D7D3" xml:space="preserve">
+    <value>Supported keys: letters, numbers, F1-F12, numpad, and navigation keys. Mouse buttons and modifier-only shortcuts are not supported.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9B68DD9F119C3FBD" xml:space="preserve">
+    <value>XA Mod hotkeys are ready.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9652FFE81E6DA593" xml:space="preserve">
+    <value>Hotkey settings are unavailable while XA Slave is unloading.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S10AD87B7C3F6BECA" xml:space="preserve">
+    <value>That XA Mod is unavailable.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9EB1EA330D7D05BD" xml:space="preserve">
+    <value>Choose a supported keyboard key.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SFD16F8EE67B4546C" xml:space="preserve">
+    <value>The hotkey modifier combination is invalid.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAD72E02E72B8DE20" xml:space="preserve">
+    <value>This XA Mod requires Ctrl+Shift in its hotkey.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0A0857DBB5D2EAE5" xml:space="preserve">
+    <value>This XA Mod has more than one saved hotkey entry. Save or clear it to resolve the conflict.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAC28FCA7530B5F4C" xml:space="preserve">
+    <value>Hotkey {0} is already assigned to {1}.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0780342EDC24BA4F" xml:space="preserve">
+    <value>Keyboard input is unavailable. Hotkeys are paused.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAE298BBFF7D12C68" xml:space="preserve">
+    <value>Hotkey saved.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SB14B022B6230F27A" xml:space="preserve">
+    <value>Hotkey cleared.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9EF3B9FDB671EABB" xml:space="preserve">
+    <value>No hotkey is assigned to this XA Mod.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SA0E48032B1503DFF" xml:space="preserve">
+    <value>Hotkeys enabled.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S5337D574F2B256A9" xml:space="preserve">
+    <value>Hotkeys disabled.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0E3D9F02493D9616" xml:space="preserve">
+    <value>Could not save hotkey settings: {0}</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9A746739A80D7BA0" xml:space="preserve">
+    <value>Hotkey capture cancelled.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S2881BBC7966AF6CA" xml:space="preserve">
+    <value>Hotkey captured.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SEE5BD0D689D16F81" xml:space="preserve">
+    <value>Hotkey cancelled because input or settings changed.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SBF0062C24FC0E9D0" xml:space="preserve">
+    <value>Hotkey: {0}</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S74D291E189C82727" xml:space="preserve">
+    <value>Hold Ctrl+Shift to enable this XA Mod.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SA559648AE1C63AB1" xml:space="preserve">
+    <value>That key cannot be used as a hotkey. Choose a supported key.</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
 </root>

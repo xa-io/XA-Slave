@@ -33,6 +33,7 @@ public sealed class Plugin : IDalamudPlugin
     [PluginService] public static IObjectTable ObjectTable { get; private set; } = null!;
     [PluginService] public static ICondition Condition { get; private set; } = null!;
     [PluginService] public static IFramework Framework { get; private set; } = null!;
+    [PluginService] public static IKeyState KeyState { get; private set; } = null!;
     [PluginService] public static IDataManager DataManager { get; private set; } = null!;
     [PluginService] public static IDutyState DutyState { get; private set; } = null!;
     [PluginService] public static ITargetManager TargetManager { get; private set; } = null!;
@@ -236,8 +237,11 @@ public sealed class Plugin : IDalamudPlugin
     public DalamudNotificationSuppressorService DalamudNotificationsSuck { get; init; }
     public DalamudLogDisablerService DalamudLogDisabler { get; init; }
     public DalamudLogCleanerService DalamudLogCleaner { get; } = new();
+    public DalamudLogExportService DalamudLogExport { get; init; }
     public BetterHighlightPotentialTargetsService BetterHighlightPotentialTargets { get; init; }
     public SystemWindowModsService SystemWindowMods { get; init; }
+    public StartupWindowPlacementService StartupWindowPlacement { get; init; }
+    public XAModHotkeyService XAModHotkeys { get; private set; } = null!;
     public ReplaceUnownedMountHotbarsService ReplaceUnownedMountHotbars { get; init; }
     public PvpHotbarsService PvpHotbars { get; init; }
     public LobbyErrorAutoCloseService LobbyErrorAutoClose { get; init; }
@@ -270,6 +274,8 @@ public sealed class Plugin : IDalamudPlugin
     public AntiAfkService AntiAfk { get; init; }
     public AutoDutyCommenceService AutoDutyCommence { get; init; }
     public AutoLeaveDutyService AutoLeaveDuty { get; init; }
+    public AutoBusyStatusService AutoBusyStatus { get; init; }
+    public AutoFoodConsumeService AutoFoodConsume { get; init; }
     public BetterInventoryMoverService BetterInventoryMover { get; init; }
     public BetterCompanyChestService BetterCompanyChest { get; init; }
     public AutoOpenMoogleMailService AutoOpenMoogleMail { get; init; }
@@ -337,6 +343,7 @@ public sealed class Plugin : IDalamudPlugin
         {
         Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
         UiLocale.Initialize(Configuration);
+        DalamudLogExport = new DalamudLogExportService(System.IO.Path.Combine(PluginInterface.GetPluginConfigDirectory(), "exports"));
         uiLocaleFonts = new UiLocaleFonts(PluginInterface.UiBuilder);
         var livePullsWereEnabled = Configuration.IpcLivePullsEnabled;
         Configuration.IpcLivePullsEnabled = false;
@@ -406,6 +413,13 @@ public sealed class Plugin : IDalamudPlugin
         AutoHideGameObjects = new AutoHideGameObjectsService(Framework, ClientState, Condition, TargetManager, SigScanner, GameInterop, Log);
         DialogueSkip = new DialogueSkipService(AddonLifecycle, SigScanner, GameInterop, Log);
         AutoLockGameWindow = new AutoLockGameWindowService(Condition, Log);
+        StartupWindowPlacement = new StartupWindowPlacementService(
+            Framework, GameConfig, Log, SystemWindowMods,
+            () => PluginInterface.UiBuilder.WindowHandlePtr,
+            () => AutoLockGameWindow.IsLocked
+                || (Configuration.LockGameWindowInCombatEnabled
+                    && Condition[Dalamud.Game.ClientState.Conditions.ConditionFlag.InCombat]),
+            () => isDisposed);
         NotifyWhenFriendIsNear = new NotifyWhenFriendIsNearService(Framework, ClientState, ObjectTable, ToastGui, ChatGui, Log, IpcClient.TrySpeakNearbyPlayerNotification);
         AlertWhenTypingInCombat = new AlertWhenTypingInCombatService(Framework, ClientState, Condition, ToastGui, Log);
         BetterCastBar = new BetterCastBarService(AddonLifecycle, ObjectTable, DataManager, Log);
@@ -431,6 +445,10 @@ public sealed class Plugin : IDalamudPlugin
         AntiAfk = new AntiAfkService(Framework, ClientState, Log);
         AutoDutyCommence = new AutoDutyCommenceService(AddonLifecycle, Log);
         AutoLeaveDuty = new AutoLeaveDutyService(DutyState, ClientState, PlayerState, Condition, Framework, Log);
+        AutoBusyStatus = new AutoBusyStatusService(Framework, ClientState, PlayerState, ObjectTable, Condition, Log, () => isDisposed);
+        AutoFoodConsume = new AutoFoodConsumeService(Framework, ClientState, PlayerState, ObjectTable, Condition, DataManager, Log, () => isDisposed);
+        Configuration.AutoFoodConsumeSettings = (Configuration.AutoFoodConsumeSettings ?? new()).Normalized();
+        AutoFoodConsume.ApplyConfiguration(Configuration.AutoFoodConsumeSettings);
         BetterInventoryMover = new BetterInventoryMoverService(ContextMenu, DataManager, Log);
         BetterCompanyChest = new BetterCompanyChestService(AddonLifecycle, ContextMenu, DataManager, Log);
         AutoOpenMoogleMail = new AutoOpenMoogleMailService(Framework, Log);
@@ -461,7 +479,7 @@ public sealed class Plugin : IDalamudPlugin
         Configuration.PluginGuardAdditionalPlugins = PluginGuardService.NormalizeAdditionalPlugins(Configuration.PluginGuardAdditionalPlugins);
         PluginGuard = new PluginGuardService(Configuration.PluginGuardAdditionalPlugins);
         ARealmRecordedIntegration = new ARealmRecordedIntegrationService(PluginInterface, Framework, ClientState, Condition, DataManager, Log);
-        TeleportHelper = new TeleportHelperService(Framework, ClientState, PlayerState, Log);
+        TeleportHelper = new TeleportHelperService(Framework, ClientState, PlayerState, AddonLifecycle, Log);
         ArPostProcessor = new ArPostProcessService(this, ClientState, Condition, Framework, ObjectTable, Log, DtrBar);
         XagmanPeers = new XagmanPeerService(Log, InstanceId, Configuration.XagmanHubAddress, Configuration.XagmanHubPort, _ => { });
         if (Configuration.XagmanPeerConnectionsEnabled)
@@ -805,31 +823,25 @@ public sealed class Plugin : IDalamudPlugin
         });
         QueueDeferredStartupAction(() =>
         {
-            if (!Configuration.CustomResolutionOnLoadEnabled)
-                return;
-
-            // Custom resolutions must be active in the service before a size can be applied.
-            if (!SystemWindowMods.SetCustomResolutionsEnabled(true))
-            {
-                Log.Warning("[CustomResolutionOnLoad] Could not enable custom resolutions; skipping on-load resize.");
-                return;
-            }
-
-            // Lower the client minimum window size first so sizes below 1024x720 stick instead of snapping back.
-            if (Configuration.CustomResolutionOnLoadIgnoreMinimumWindowSize)
-                SystemWindowMods.SetIgnoreMinimumWindowSizeEnabled(true);
-
-            if (SystemWindowMods.TryApplyCustomResolution(
-                    Configuration.CustomResolutionOnLoadWidth,
-                    Configuration.CustomResolutionOnLoadHeight,
-                    out var customResolutionOnLoadMessage))
-            {
-                Log.Info($"[CustomResolutionOnLoad] {customResolutionOnLoadMessage}");
-            }
-            else
-            {
-                Log.Warning($"[CustomResolutionOnLoad] {customResolutionOnLoadMessage}");
-            }
+            var resize = Configuration.CustomResolutionOnLoadEnabled;
+            var width = Configuration.CustomResolutionOnLoadWidth;
+            var height = Configuration.CustomResolutionOnLoadHeight;
+            var ignoreMinimum = Configuration.CustomResolutionOnLoadIgnoreMinimumWindowSize;
+            var move = Configuration.WindowPositionOnLoadEnabled;
+            var placement = Configuration.WindowPositionOnLoadPlacement;
+            var savedTarget = (placement?.MonitorDeviceName, placement?.X, placement?.Y,
+                placement?.MonitorWorkLeft, placement?.MonitorWorkTop);
+            StartupWindowPlacement.ArmStartup(
+                resize, width, height, ignoreMinimum, move, placement,
+                () => Configuration.CustomResolutionOnLoadEnabled == resize
+                    && Configuration.CustomResolutionOnLoadWidth == width
+                    && Configuration.CustomResolutionOnLoadHeight == height
+                    && Configuration.CustomResolutionOnLoadIgnoreMinimumWindowSize == ignoreMinimum
+                    && Configuration.WindowPositionOnLoadEnabled == move
+                    && savedTarget == (Configuration.WindowPositionOnLoadPlacement?.MonitorDeviceName,
+                        Configuration.WindowPositionOnLoadPlacement?.X, Configuration.WindowPositionOnLoadPlacement?.Y,
+                        Configuration.WindowPositionOnLoadPlacement?.MonitorWorkLeft,
+                        Configuration.WindowPositionOnLoadPlacement?.MonitorWorkTop));
         });
         if (Configuration.DisableBackgroundGameRenderingEnabled)
         {
@@ -1022,6 +1034,26 @@ public sealed class Plugin : IDalamudPlugin
             if (!AutoLeaveDuty.SetEnabled(true))
             {
                 Configuration.AutoLeaveDutyEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoBusyStatusEnabled", () =>
+        {
+            if (Configuration.AutoBusyStatusEnabled && !AutoBusyStatus.SetEnabled(true))
+            {
+                Configuration.AutoBusyStatusEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction("AutoFoodConsumeEnabled", () =>
+        {
+            if (!Configuration.AutoFoodConsumeEnabled)
+                return;
+
+            ApplyStoredXAModConfiguration("auto-food-consume");
+            if (!AutoFoodConsume.SetEnabled(true))
+            {
+                Configuration.AutoFoodConsumeEnabled = false;
                 Configuration.Save();
             }
         });
@@ -1336,6 +1368,9 @@ public sealed class Plugin : IDalamudPlugin
             });
         }
 
+        // Hotkeys are admitted only after every canonical mod target has been constructed.
+        XAModHotkeys = new XAModHotkeyService(this, Framework, KeyState, Log, () => isDisposed);
+
         // Register public IPC last: every gate can now safely dereference the complete service graph.
         IpcProvider = new IpcProvider(PluginInterface, this, Log);
 
@@ -1350,6 +1385,7 @@ public sealed class Plugin : IDalamudPlugin
         PluginInterface.UiBuilder.Draw += NearbyPlayersWindow.PrepareDraw;
         PluginInterface.UiBuilder.Draw += DrawWindowSystemOnGameThread;
         PluginInterface.UiBuilder.Draw += DrawLocalizedOverlays;
+        PluginInterface.UiBuilder.Draw += ObserveXAModHotkeyInput;
         PluginInterface.UiBuilder.OpenConfigUi += ToggleMainUi;
         PluginInterface.UiBuilder.OpenMainUi += ToggleMainUi;
 
@@ -1400,6 +1436,8 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     private void PrepareLocalizedUi() => uiLocaleFonts?.BeginFrame();
+
+    private void ObserveXAModHotkeyInput() => XAModHotkeys?.ObserveDraw();
 
     private void DrawLocalizedOverlays()
     {
@@ -1794,6 +1832,8 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Doze & Sit Anywhere", Configuration.DozeSitAnywhereEnabled, DozeSitAnywhere.StatusText);
         yield return CreateStartupSurfaceStatus("Auto Duty Commence", Configuration.AutoDutyCommenceEnabled, AutoDutyCommence.StatusText);
         yield return CreateStartupSurfaceStatus("Infinite Sprint", Configuration.InfiniteSprintEnabled, PlayerMods.InfiniteSprintStatusText);
+        yield return CreateStartupSurfaceStatus("Auto Busy Status", Configuration.AutoBusyStatusEnabled, AutoBusyStatus.StatusText);
+        yield return CreateStartupSurfaceStatus("Auto Food Consume", Configuration.AutoFoodConsumeEnabled, AutoFoodConsume.StatusText);
         yield return CreateStartupSurfaceStatus("Instant Logout", Configuration.InstantLogoutEnabled, InstantLogout.StatusText);
         yield return CreateStartupSurfaceStatus("Teleport Helper", Configuration.TeleportHelperEnabled, TeleportHelper.StatusText);
         yield return CreateStartupSurfaceStatus("Unlock Expert Delivery", Configuration.UnlockExpertDeliveryEnabled, ExpertDeliveryUnlock.StatusText);
@@ -1846,6 +1886,9 @@ public sealed class Plugin : IDalamudPlugin
             return;
 
         isDisposed = true;
+        TryCleanup("UiBuilder.Draw -= ObserveXAModHotkeyInput", () => PluginInterface.UiBuilder.Draw -= ObserveXAModHotkeyInput);
+        TryDispose("XAModHotkeys", XAModHotkeys);
+        TryDispose("StartupWindowPlacement", StartupWindowPlacement);
         TryCleanup("Configuration.FlushPendingSave", () => Configuration?.FlushPendingSave());
 
         // Detach public-facing callbacks first so a reload cannot re-enter partially disposed UI or services.
@@ -1864,6 +1907,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("PluginBuilder", PluginBuilder);
         TryDispose("IpcProvider", IpcProvider);
         TryDispose("DalamudLogCleaner", DalamudLogCleaner);
+        TryDispose("DalamudLogExport", DalamudLogExport);
         TryDispose("CleanChat", CleanChat);
         TryDispose("AutoSortItems", AutoSortItems);
         TryDispose("AutoRestoreFurniture", AutoRestoreFurniture);
@@ -1923,6 +1967,8 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AntiAfk", AntiAfk);
         TryDispose("AutoDutyCommence", AutoDutyCommence);
         TryDispose("AutoLeaveDuty", AutoLeaveDuty);
+        TryDispose("AutoBusyStatus", AutoBusyStatus);
+        TryDispose("AutoFoodConsume", AutoFoodConsume);
         TryDispose("BetterInventoryMover", BetterInventoryMover);
         TryDispose("BetterCompanyChest", BetterCompanyChest);
         TryDispose("AutoOpenMoogleMail", AutoOpenMoogleMail);
@@ -2264,6 +2310,13 @@ public sealed class Plugin : IDalamudPlugin
             return;
         }
 
+        if (subcommand.Equals("devlogs", StringComparison.OrdinalIgnoreCase))
+        {
+            var success = TryExecuteDevLogsCommand(subcommandArgs, out var message);
+            PrintCommandResult(success, message.Original);
+            return;
+        }
+
         if (subcommand.Equals("equip", StringComparison.OrdinalIgnoreCase))
         {
             PrintCommandResult(ItemCommands.TryExecuteEquipCommand(subcommandArgs, out var message), message);
@@ -2487,6 +2540,9 @@ public sealed class Plugin : IDalamudPlugin
 
     internal IpcUiSnapshot ReadDevelopmentUiState() => SlaveWindow.ReadDevelopmentUiState();
 
+    internal bool TryExecuteDevLogsCommand(string arguments, out UiMessage message)
+        => DalamudLogExport.TryExecute(arguments, out message);
+
     public bool TryExecuteXaCommandFromIpc(string rawCommand, out string message) => TryExecuteXaCommandFromIpcLocalizedCore(out _, rawCommand, out message);
     internal bool TryExecuteXaCommandFromIpcMessage(string rawCommand, out global::XASlave.Localization.UiMessage message)
     {
@@ -2615,6 +2671,13 @@ public sealed class Plugin : IDalamudPlugin
 
         if (subcommand.Equals("clearlog", StringComparison.OrdinalIgnoreCase))
             return DalamudLogCleaner.TryClean(subcommandArgs, out message);
+
+        if (subcommand.Equals("devlogs", StringComparison.OrdinalIgnoreCase))
+        {
+            var success = TryExecuteDevLogsCommand(subcommandArgs, out var presentation);
+            message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, presentation);
+            return success;
+        }
 
         if (subcommand.Equals("equip", StringComparison.OrdinalIgnoreCase))
             return ItemCommands.TryExecuteEquipCommand(subcommandArgs, out message);
@@ -3513,6 +3576,9 @@ public sealed class Plugin : IDalamudPlugin
                     DelaySeconds = Configuration.AutoLeaveDutyDelaySeconds,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "auto-food-consume":
+                snapshot = JsonSerializer.SerializeToElement((Configuration.AutoFoodConsumeSettings ?? new()).Normalized(), ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "eureka-instance-id":
                 snapshot = JsonSerializer.SerializeToElement(new XAModEurekaInstanceIdSettings
                 {
@@ -3999,6 +4065,13 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.BailoutEscMenuSeconds = EscMenuBailoutService.NormalizeTimeoutSeconds(bailoutEscMenuSettings.TimeoutSeconds);
             if (Configuration.BailoutEscMenuEnabled)
                 EscMenuBailout.ApplyConfiguration(Configuration.BailoutEscMenuSeconds);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "auto-food-consume", out AutoFoodConsumeSettings? autoFoodSettings)
+            && autoFoodSettings != null)
+        {
+            Configuration.AutoFoodConsumeSettings = autoFoodSettings.Normalized();
+            AutoFoodConsume.ApplyConfiguration(Configuration.AutoFoodConsumeSettings);
         }
 
         if (TryDeserializeXAModSettings(modSettings, "auto-leave-duty", out XAModAutoLeaveDutySettings? autoLeaveDutySettings)
@@ -5139,6 +5212,37 @@ public sealed class Plugin : IDalamudPlugin
     }
 
     public bool ToggleXAModByKey(string key, out bool enabled, out string message) => ToggleXAModByKeyLocalizedCore(out _, key, out enabled, out message);
+
+    internal bool QueueXAModHotkeyToggleMessage(string key, XAModHotkeyModifiers modifiers,
+        Func<bool> isRequestCurrent, Action<bool, UiMessage>? onCompleted, out UiMessage message)
+    {
+        var definition = GetAllXAModDefinitions().FirstOrDefault(entry => entry.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
+        if (definition.Key == null)
+        {
+            message = UiMessage.Authored("That XA Mod is unavailable.");
+            return false;
+        }
+        return QueueXAModMutationMessage(UiMessage.Format(UiLocale.Key("Hotkey: {0}"), definition.DisplayNameMessage),
+            () =>
+            {
+                // A queued edge must still belong to the same settings/input session when it executes.
+                if (!isRequestCurrent())
+                    return (false, UiMessage.Authored("Hotkey cancelled because input or settings changed."));
+                var enabled = !definition.GetCurrent();
+                if (!XAModHotkeyState.CanApply(definition.Key, enabled, modifiers))
+                    return (false, UiMessage.Authored("Hold Ctrl+Shift to enable this XA Mod."));
+                if (enabled) ApplyStoredXAModConfiguration(definition.Key);
+                var applied = definition.Apply(enabled);
+                definition.Store(applied);
+                var actual = definition.GetCurrent();
+                var result = actual
+                    ? UiMessage.Format("SFE2A0B6758F70664", definition.DisplayNameMessage, definition.GetStatusMessage())
+                    : UiMessage.Format("S3DB828D8EB4F90DE", definition.DisplayNameMessage);
+                if (actual != enabled) result = definition.GetStatusMessage();
+                return (actual == enabled, result);
+            }, onCompleted, out message, executeOnCurrentFrameworkTick: true);
+    }
+
     internal bool ToggleXAModByKeyMessage(string key, out bool enabled, out global::XASlave.Localization.UiMessage message)
     {
         var success = ToggleXAModByKeyLocalizedCore(out var presentation, key, out enabled, out var originalReply);
@@ -5284,6 +5388,10 @@ public sealed class Plugin : IDalamudPlugin
             case "auto-leave-duty":
                 AutoLeaveDuty.ApplyConfiguration(Configuration.AutoLeaveDutyDelaySeconds);
                 break;
+            case "auto-food-consume":
+                Configuration.AutoFoodConsumeSettings = (Configuration.AutoFoodConsumeSettings ?? new()).Normalized();
+                AutoFoodConsume.ApplyConfiguration(Configuration.AutoFoodConsumeSettings);
+                break;
             case "eureka-instance-id":
                 NormalizeEurekaInstanceIdConfiguration(Configuration);
                 EurekaInstanceId.ApplyConfiguration();
@@ -5411,9 +5519,10 @@ public sealed class Plugin : IDalamudPlugin
         global::XASlave.Localization.UiMessage operationLabel,
         Func<(bool Success, global::XASlave.Localization.UiMessage Message)> operation,
         Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
-        out global::XASlave.Localization.UiMessage message)
+        out global::XASlave.Localization.UiMessage message,
+        bool executeOnCurrentFrameworkTick = false)
     {
-        var success = QueueXAModMutationLocalizedCore(out var presentation, operationLabel, operation, onCompleted, out var originalReply);
+        var success = QueueXAModMutationLocalizedCore(out var presentation, operationLabel, operation, onCompleted, out var originalReply, executeOnCurrentFrameworkTick);
         message = global::XASlave.Localization.UiMessage.Capture(presentation, originalReply);
         return success;
     }
@@ -5422,7 +5531,8 @@ public sealed class Plugin : IDalamudPlugin
         global::XASlave.Localization.UiMessage operationLabel,
         Func<(bool Success, global::XASlave.Localization.UiMessage Message)> operation,
         Action<bool, global::XASlave.Localization.UiMessage>? onCompleted,
-        out string message)
+        out string message,
+        bool executeOnCurrentFrameworkTick = false)
     {
         replyPresentation = null;
         if (isDisposed)
@@ -5440,7 +5550,7 @@ public sealed class Plugin : IDalamudPlugin
         xaModMutationPending = true;
         try
         {
-            ScheduleOnGameThread(() =>
+            Action applyMutation = () =>
             {
                 if (isDisposed)
                 {
@@ -5490,7 +5600,14 @@ public sealed class Plugin : IDalamudPlugin
                 {
                     Log.Error(ex, $"[XASlave] XA Mods completion callback for '{operationLabel}' failed.");
                 }
-            }, delayTicks: 1);
+            };
+            // Hotkeys are admitted during Framework.Update. Apply through the same guarded path
+            // while that input snapshot is current, instead of cancelling after a later Draw.
+            // UI callers and off-thread requests retain the existing next-tick scheduling.
+            if (executeOnCurrentFrameworkTick && Framework.IsInFrameworkUpdateThread)
+                RunOnGameThread(applyMutation).GetAwaiter().GetResult();
+            else
+                ScheduleOnGameThread(applyMutation, delayTicks: 1);
         }
         catch (Exception ex)
         {
@@ -5694,6 +5811,8 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("auto-duty-commence", global::XASlave.Localization.UiLocale.Native("SBCF1820DD8640D0F"), XAModsRestoreScope.Player, () => Configuration.AutoDutyCommenceEnabled, AutoDutyCommence.SetEnabled, applied => Configuration.AutoDutyCommenceEnabled = applied, () => AutoDutyCommence.StatusTextMessage);
         yield return new("auto-expert-delivery", global::XASlave.Localization.UiLocale.Native("SDDD0990DE8ED14DD"), XAModsRestoreScope.Player, () => Configuration.AutoUnlockExpertDeliveryEnabled, AutoUnlockExpertDelivery.SetEnabled, applied => Configuration.AutoUnlockExpertDeliveryEnabled = applied, () => AutoUnlockExpertDelivery.StatusTextMessage);
         yield return new("auto-leave-duty", global::XASlave.Localization.UiLocale.Native("S6CDBCC0A69DE6B17"), XAModsRestoreScope.Player, () => Configuration.AutoLeaveDutyEnabled, AutoLeaveDuty.SetEnabled, applied => Configuration.AutoLeaveDutyEnabled = applied, () => AutoLeaveDuty.StatusTextMessage);
+        yield return new("auto-busy-status", UiLocale.Native(UiLocale.Key("Auto Busy Status")), XAModsRestoreScope.Player, () => Configuration.AutoBusyStatusEnabled, AutoBusyStatus.SetEnabled, applied => Configuration.AutoBusyStatusEnabled = applied, () => AutoBusyStatus.StatusTextMessage);
+        yield return new("auto-food-consume", UiLocale.Native(UiLocale.Key("Auto Food Consume")), XAModsRestoreScope.Player, () => Configuration.AutoFoodConsumeEnabled, AutoFoodConsume.SetEnabled, applied => Configuration.AutoFoodConsumeEnabled = applied, () => AutoFoodConsume.StatusTextMessage);
         yield return new("auto-merge", global::XASlave.Localization.UiLocale.Native("S90D9264B8B7B93D3"), XAModsRestoreScope.Player, () => Configuration.AutoMergeEnabled, AutoMerge.SetEnabled, applied => Configuration.AutoMergeEnabled = applied, () => AutoMerge.StatusTextMessage);
         yield return new("auto-sort-items", global::XASlave.Localization.UiLocale.Native("SA318747875972AD1"), XAModsRestoreScope.Player, () => Configuration.AutoSortItemsEnabled, AutoSortItems.SetEnabled, applied => Configuration.AutoSortItemsEnabled = applied, () => AutoSortItems.StatusTextMessage);
         yield return new("auto-restore-furniture", global::XASlave.Localization.UiLocale.Native("S62F6C455F98922D0"), XAModsRestoreScope.Player, () => Configuration.AutoRestoreFurnitureEnabled, AutoRestoreFurniture.SetEnabled, applied => Configuration.AutoRestoreFurnitureEnabled = applied, () => AutoRestoreFurniture.StatusTextMessage);
@@ -6019,6 +6138,13 @@ public sealed class Plugin : IDalamudPlugin
             case "leaveduty":
             case "autoleaveduty":
                 definition = new("leaveduty", "/xa leaveduty on|off", GetXAModDefinition("auto-leave-duty"));
+                return true;
+            case "autobusy":
+                definition = new("autobusy", "/xa autobusy on|off", GetXAModDefinition("auto-busy-status"));
+                return true;
+            case "autofood":
+            case "food":
+                definition = new("autofood", "/xa autofood on|off", GetXAModDefinition("auto-food-consume"));
                 return true;
             case "automerge":
             case "merge":
@@ -6374,5 +6500,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.61";
+    public const string Version = "0.0.0.62";
 }

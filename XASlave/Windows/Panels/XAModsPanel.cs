@@ -452,7 +452,9 @@ public partial class SlaveWindow
             string status,
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
-            System.Action? drawOptions = null)
+            System.Action? drawOptions = null,
+            bool drawOptionsWhenDisabled = false,
+            string? hotkeyKey = null)
         {
             var value = GetDisplayedXAModValue(label, currentValue);
             var modifierHeld = ImGui.GetIO().KeyCtrl && ImGui.GetIO().KeyShift;
@@ -497,6 +499,11 @@ public partial class SlaveWindow
 
             ImGui.SameLine(0f, 6f);
             DrawHelpMarker(helpText);
+            if (hotkeyKey != null)
+            {
+                ImGui.SameLine();
+                DrawXAModHotkeyShortcut(hotkeyKey, label);
+            }
 
             if (value)
             {
@@ -504,12 +511,13 @@ public partial class SlaveWindow
                 ImGui.TextDisabled(UiLocale.FormatKey("S390591EA8DC1971A", status));
                 DrawWarningText(warningText ?? string.Empty);
 
-                if (drawOptions != null)
-                {
-                    ImGui.Indent();
-                    drawOptions();
-                    ImGui.Unindent();
-                }
+            }
+
+            if (drawOptions != null && (value || drawOptionsWhenDisabled))
+            {
+                ImGui.Indent();
+                drawOptions();
+                ImGui.Unindent();
             }
 
             ImGui.Spacing();
@@ -547,7 +555,9 @@ public partial class SlaveWindow
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
             string[]? searchTerms = null,
-            Action? drawOptions = null)
+            Action? drawOptions = null,
+            bool drawOptionsWhenDisabled = false,
+            string? hotkeyKey = null)
         {
             var searchHaystack = BuildToonModsSearchHaystack(label, description, helpText, searchTerms);
             featureEntries.Add(new XAModCatalogueEntry(
@@ -565,7 +575,9 @@ public partial class SlaveWindow
                     getStatus(),
                     warningText,
                     requireCtrlShiftToEnable,
-                    drawOptions)));
+                    drawOptions,
+                    drawOptionsWhenDisabled,
+                    hotkeyKey)));
         }
 
         void AddSavedFeatureEntry(
@@ -581,10 +593,11 @@ public partial class SlaveWindow
             string? warningText = null,
             bool requireCtrlShiftToEnable = false,
             string[]? searchTerms = null,
-            Action? drawOptions = null)
+            Action? drawOptions = null,
+            bool drawOptionsWhenDisabled = false)
         {
             toonModDefinitions.Add((key, getCurrent, apply, store));
-            AddFeatureEntry(section, label, getCurrent, apply, store, description, helpText, getStatus, warningText, requireCtrlShiftToEnable, searchTerms, drawOptions);
+            AddFeatureEntry(section, label, getCurrent, apply, store, description, helpText, getStatus, warningText, requireCtrlShiftToEnable, searchTerms, drawOptions, drawOptionsWhenDisabled, key);
         }
 
         List<string> GetCurrentToonModKeys()
@@ -2800,7 +2813,7 @@ public partial class SlaveWindow
             }
         }
 
-        void DrawAutoSkipCutsceneOption(string label, Func<bool> getValue, Action<bool> setValue, string helpText, string? warningText = null)
+        void DrawAutoSkipCutsceneOption(string label, Func<bool> getValue, Action<bool> setValue, string helpText, string? warningText = null, string? hotkeyKey = null)
         {
             var value = getValue();
             if (UiNative.Checkbox(label, ref value))
@@ -2811,6 +2824,11 @@ public partial class SlaveWindow
 
             ImGui.SameLine(0f, 6f);
             DrawHelpMarker(helpText);
+            if (hotkeyKey != null)
+            {
+                ImGui.SameLine();
+                DrawXAModHotkeyShortcut(hotkeyKey, label);
+            }
             DrawWarningText(warningText ?? string.Empty);
         }
 
@@ -2886,7 +2904,7 @@ public partial class SlaveWindow
                 DrawAutoSkipCutsceneOption(UiLocale.Native("SAF656552835B48B1"), () => configuration.AutoSkipCutscenesExemptPortaDecumana, value => configuration.AutoSkipCutscenesExemptPortaDecumana = value, UiLocale.Native("S83344C09F3B7AE98"));
                 DrawAutoSkipCutsceneOption(UiLocale.Native("SD57FEA6FD8AB27CA"), () => configuration.AutoSkipCutscenesSkipMassivePc, value => configuration.AutoSkipCutscenesSkipMassivePc = value, UiLocale.Native("SB27EA4D5C3853164"));
                 DrawAutoSkipCutsceneOption(UiLocale.Native("S4143A9F1D7317F71"), () => configuration.AutoSkipCutscenesSkipCustomTalk, value => configuration.AutoSkipCutscenesSkipCustomTalk = value, UiLocale.Native("SCD647E7E8114D364"));
-                DrawAutoSkipCutsceneOption(UiLocale.Native("S877A038BE0B19BB6"), () => configuration.AutoSkipCutscenesFeedingChocoboEnabled, value => configuration.AutoSkipCutscenesFeedingChocoboEnabled = value, UiLocale.Native("S01406B12A875FA45"));
+                DrawAutoSkipCutsceneOption(UiLocale.Native("S877A038BE0B19BB6"), () => configuration.AutoSkipCutscenesFeedingChocoboEnabled, value => configuration.AutoSkipCutscenesFeedingChocoboEnabled = value, UiLocale.Native("S01406B12A875FA45"), hotkeyKey: "auto-skip-cutscenes-feeding-chocobo");
             });
 
             DrawAutoSkipCutsceneOptionGroup(UiLocale.Native("S264127BB1C4A3A70"), "AutoSkipCutscenesGoldSaucerGroup", () =>
@@ -3462,6 +3480,30 @@ public partial class SlaveWindow
             searchTerms: ["afk", "idle", "kick", "timer"]);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
+            "auto-busy-status",
+            UiLocale.Native(UiLocale.Key("Auto Busy Status")),
+            () => configuration.AutoBusyStatusEnabled,
+            plugin.AutoBusyStatus.SetEnabled,
+            applied => configuration.AutoBusyStatusEnabled = applied,
+            UiLocale.Native(UiLocale.Key("Uses Busy status to block unsolicited player trades.")),
+            UiLocale.Native(UiLocale.Key("Preserves Busy that was already set manually. Clears only Busy applied by this feature. Pauses its own Busy for the entire Xagman run; enable Refuse Trades When Idle to protect waiting periods. Manually set Busy is not cleared to force a trade.")),
+            () => plugin.AutoBusyStatus.LocalizedStatusText,
+            searchTerms: ["busy", "trade", "autobusy", "online status"]);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
+            "auto-food-consume",
+            UiLocale.Native(UiLocale.Key("Auto Food Consume")),
+            () => configuration.AutoFoodConsumeEnabled,
+            plugin.AutoFoodConsume.SetEnabled,
+            applied => configuration.AutoFoodConsumeEnabled = applied,
+            UiLocale.Native(UiLocale.Key("Keeps your selected food's Well Fed buff active when it is safe to use food.")),
+            UiLocale.Native(UiLocale.Key("Choose one meal and its exact NQ/HQ quality. Existing different food is preserved until it expires. Sanctuary and duty filters are optional.")),
+            () => plugin.AutoFoodConsume.LocalizedStatusText,
+            searchTerms: ["food", "meal", "Well Fed", "sanctuary", "duty", "HQ", "NQ", "autofood"],
+            drawOptions: DrawAutoFoodConsumeOptions,
+            drawOptionsWhenDisabled: true);
+        AddSavedFeatureEntry(
+            ToonModsSection.PlayerMods,
             "auto-duty-commence",
             UiLocale.Native("SBCF1820DD8640D0F"),
             () => configuration.AutoDutyCommenceEnabled,
@@ -3947,6 +3989,8 @@ public partial class SlaveWindow
                 configuration.DalamudLogCleanerAutomaticEnabled = plugin.SetDalamudLogCleanerAutomatic(automatic);
                 SaveConfiguration();
             }
+            ImGui.SameLine();
+            DrawXAModHotkeyShortcut("dalamud-log-cleaner", UiLocale.Native("SDCB2003435386091"));
             var interval = configuration.DalamudLogCleanerCheckIntervalMinutes;
             ImGui.SetNextItemWidth(Scale(120f));
             if (UiNative.InputInt(UiLocale.Native("S7AA7A676F53621D4"), ref interval))
@@ -3978,6 +4022,31 @@ public partial class SlaveWindow
             using (ImRaii.TextWrapPos(0f))
                 ImGui.TextDisabled(plugin.DalamudLogCleaner.LocalizedStatusText);
             ImGui.TextDisabled(UiLocale.Get("SB893943A80B8632E"));
+            ImGui.Spacing();
+        }
+
+        void DrawDalamudLogExport()
+        {
+            ImGui.TextUnformatted(UiLocale.Get("S7854F7662947FE72"));
+            using (ImRaii.TextWrapPos(0f))
+                ImGui.TextDisabled(UiLocale.Get("SBF66B41AAE6E3F4F"));
+            using (ImRaii.Disabled(plugin.DalamudLogExport.IsExporting))
+            {
+                if (UiNative.Button($"{UiLocale.Native("S3664895579F0A7E6")}##DalamudLogExport"))
+                {
+                    var success = plugin.TryExecuteDevLogsCommand(string.Empty, out var message);
+                    SetToonModsStatus(message, !success);
+                }
+            }
+            ImGui.SameLine();
+            if (UiNative.Button($"{UiLocale.Native("S68B3F4BFF6DE90AE")}##DalamudLogExportFolder"))
+            {
+                var success = plugin.TryExecuteDevLogsCommand("folder", out var message);
+                SetToonModsStatus(message, !success);
+            }
+            using (ImRaii.TextWrapPos(0f))
+                ImGui.TextDisabled(plugin.DalamudLogExport.StatusMessage.Display);
+            ImGui.TextDisabled("/xa devlogs | /xa devlogs folder");
             ImGui.Spacing();
         }
 
@@ -4284,6 +4353,12 @@ public partial class SlaveWindow
             BuildToonModsSearchHaystack("Dalamud Log Cleaner", "Archive and clear the active log file", "Manual action: /xa clearlog. Optional automatic cleanup at 90 MiB, checked every 15 minutes by default.", ["logging", "dalamud.log", "cache", "reset", "clearlog", "automatic", "interval"]),
             () => configuration.DalamudLogCleanerAutomaticEnabled,
             DrawDalamudLogCleaner));
+        featureEntries.Add(new XAModCatalogueEntry(
+            ToonModsSection.GameMods,
+            UiLocale.Native("S7854F7662947FE72"),
+            BuildToonModsSearchHaystack(UiLocale.Native("S7854F7662947FE72"), UiLocale.Native("SBF66B41AAE6E3F4F"), "/xa devlogs | /xa devlogs folder", ["logging", "dalamud.log", "export", "devlogs", "folder", "support"]),
+            () => plugin.DalamudLogExport.IsExporting,
+            DrawDalamudLogExport));
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "clean-chat",

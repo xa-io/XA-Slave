@@ -28861,4 +28861,760 @@ xafuncのDoNavFlySequenceXAのロジック（Player.CanFly確認）と同じで�
     <value>Tony {0} のバッグが満杯で、アイテム回収が未完了または未確認です。交代のためトレードを終了します。所持ギルを理由に交代を遅らせることはありません。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.SupplyDrain.cs</comment>
   </data>
+  <data name="S7143F82330DF04E4" xml:space="preserve">
+    <value>FCポイント</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; I243 FC Points.</comment>
+  </data>
+  <data name="S592AA83FCCD8E8B0" xml:space="preserve">
+    <value>XA Databaseに保存された値です。同じFCのキャラクターはこのポイント残高を共有します。「不明」は、利用可能なFCポイントの保存データがないことを示します。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs; I243 FC Points.</comment>
+  </data>
+  <data name="S7854F7662947FE72" xml:space="preserve">
+    <value>Dalamudログをエクスポート</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SBF66B41AAE6E3F4F" xml:space="preserve">
+    <value>このクライアントの現在のDalamudログをプラグインのエクスポートフォルダーに保存します。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SA12745C8C47FD114" xml:space="preserve">
+    <value>プラグインのエクスポートフォルダーをエクスプローラーで開きます。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SE1C4D5523AA25AA5" xml:space="preserve">
+    <value>このクライアントの現在のDalamudログをエクスポートできます。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S631E4ABFB33003A5" xml:space="preserve">
+    <value>使用方法: /xa devlogs [folder]</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8176329472D31C0A" xml:space="preserve">
+    <value>XA Slaveの終了中はログをエクスポートできません。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8E2604B177C8AF1F" xml:space="preserve">
+    <value>Dalamudログのエクスポートはすでに実行中です。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SB86B57B60B9FDE8E" xml:space="preserve">
+    <value>現在のDalamudログをエクスポートしています。/xa devlogs folderでエクスポートフォルダーを開けます。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SA0A075359BB2410F" xml:space="preserve">
+    <value>Dalamudログのエクスポートフォルダーを開いています。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="SFF6585E7D4A49E9D" xml:space="preserve">
+    <value>エクスポートフォルダーはすでに開いている途中です。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8B522C24A88B741A" xml:space="preserve">
+    <value>Dalamudログのエクスポートフォルダーを開きました。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8F8D175EA00F9C4C" xml:space="preserve">
+    <value>{0:N0}バイトを{1}に保存しました。/xa devlogs folderでエクスポートフォルダーを開けます。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S3B44B8EBCBFA3A98" xml:space="preserve">
+    <value>Dalamudログをエクスポートしました。/xa devlogs folderでエクスポートフォルダーを開けます。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S529BDAC6C5C7748C" xml:space="preserve">
+    <value>Dalamudログを保存しましたが、完了通知を表示できませんでした。/xa devlogs folderを使用してください。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S440D22CFAE3AB6FD" xml:space="preserve">
+    <value>ログのエクスポートフォルダーを開けませんでした: {0}</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8FF19BCE1E61F9A3" xml:space="preserve">
+    <value>Dalamudログをエクスポートできませんでした: {0}</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S70A4CBAC051BD9F9" xml:space="preserve">
+    <value>最初に確認したバイト数をコピーする前に、現在のログの末尾に達しました。</value>
+    <comment>Source: I228 Dalamud log export service, XA Mods and Commands.</comment>
+  </data>
+  <data name="S8D35CE14045790BE" xml:space="preserve">
+    <value>キャラクターリスト</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S88EE016BB710C034" xml:space="preserve">
+    <value>保存 / 置換</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S4CEC14383936E62C" xml:space="preserve">
+    <value>チェックしたキャラクターを名前付きリストとして保存します。読み込みはこの役割の選択を置き換えます。空のリストでは選択を解除します。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE58C1489200E570B" xml:space="preserve">
+    <value>エクスポートは保存済みリストをコピーします。クリップボードからのインポートは読み込まずにリストを保存します。登録済みキャラクターのみが対象です。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SA5D5F3C250DF92CA" xml:space="preserve">
+    <value>自動操作または復旧が実行中の場合、保存済みキャラクターリストは使用できません。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SB94776A1440C79F3" xml:space="preserve">
+    <value>'{1}'に{0}キャラクターを保存しました。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1411BC7063E9BAA6" xml:space="preserve">
+    <value>'{0}'をインポートしました（{1}キャラクター）。適用するには読み込みを使用してください。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S3B4A42FA8838D47E" xml:space="preserve">
+    <value>'{0}'をクリップボードにエクスポートしました。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S2A5845A1CEE09EEE" xml:space="preserve">
+    <value>'{0}'を削除しました。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1FDEC38FD285AF57" xml:space="preserve">
+    <value>キャラクターリストを保存できませんでした: {0}</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S60BB30BDC6F0FC8F" xml:space="preserve">
+    <value>クリップボードにアクセスできませんでした: {0}</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF5BFFD9A6691ADBE" xml:space="preserve">
+    <value>'{1}'という名前の{0}リストはすでに保存されています。別の名前を選ぶか、先にそのリストを削除してください。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S69BF1FA26E9CCC82" xml:space="preserve">
+    <value>保存できるキャラクターリストは最大{0}件です。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S6841004D3ABCF28E" xml:space="preserve">
+    <value>一致するキャラクターが見つかりませんでした。現在の選択を維持しました。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S8F9D74E29593EA79" xml:space="preserve">
+    <value>'{0}'を読み込みました: 選択{1}、未登録{2}、除外{3}、判別不能{4}、競合{5}。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SAC7D9B2BA0C44374" xml:space="preserve">
+    <value>照合できないキャラクター:</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S397DB221F1D7A44A" xml:space="preserve">
+    <value>他{0}件...</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF7C047FDFC575C7F" xml:space="preserve">
+    <value>{0}のキャラクターデータに競合するIDがあります。保存済みリストを使用する前にキャラクターデータを更新してください。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S11E9FE71C67F4AB3" xml:space="preserve">
+    <value>{0}キャラクター</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SD2B77A734FFA9FF9" xml:space="preserve">
+    <value>キャラクターリストのデータが無効です。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE28E34D4D126874E" xml:space="preserve">
+    <value>キャラクターリスト名は1～{0}文字で、制御文字を含めないでください。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF2F58EBC9CCA30E2" xml:space="preserve">
+    <value>キャラクターリストはTonyまたはFranchise Ownerの役割のみ対応しています。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S87D5B4347B0A1FF0" xml:space="preserve">
+    <value>このキャラクターリストは別のXagmanの役割に属しています。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SE53E43F24C215F6C" xml:space="preserve">
+    <value>未対応のキャラクターリスト形式またはスキーマバージョンです。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S3B12B9090F306A92" xml:space="preserve">
+    <value>キャラクターリストのJSONは{0:N0}文字以内にしてください。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S1D813716739C9CD6" xml:space="preserve">
+    <value>キャラクターリストのJSONが無効か、未知・欠落・重複したプロパティが含まれています。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SA640823C35D9273B" xml:space="preserve">
+    <value>キャラクターリストは最大{0:N0}キャラクターまで対応しています。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S2A78AE5599347A7E" xml:space="preserve">
+    <value>キャラクターリストに無効なキャラクター識別情報またはコンテンツIDが含まれています。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF0F93CB142075445" xml:space="preserve">
+    <value>キャラクターリストに重複したキャラクターキーまたはコンテンツIDが含まれています。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S389D5974555E7B47" xml:space="preserve">
+    <value>登録済みキャラクター一覧に無効な識別情報または重複した行番号が含まれています。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S8B3C82630CAFBA84" xml:space="preserve">
+    <value>選択したキャラクター行は利用できないか、除外されています。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SF33521EA8C45FD03" xml:space="preserve">
+    <value>キャラクターリストは有効です。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="SB364866482A6EFD6" xml:space="preserve">
+    <value>一致{0:N0}キャラクター、未登録: {1:N0}、除外: {2:N0}、判別不能: {3:N0}、ID競合: {4:N0}。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S15E6D623EC86CD42" xml:space="preserve">
+    <value>現在の選択を維持しました: 未検出 {0}、除外 {1}、特定不能 {2}、競合 {3}。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S289D852CAE06545A" xml:space="preserve">
+    <value>選択したキャラクター行は利用できません。</value>
+    <comment>Source: I242 Xagman saved character lists.</comment>
+  </data>
+  <data name="S36E39ECB0AB47FB3" xml:space="preserve">
+    <value>プラグイン読み込み時のウィンドウ位置</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SCCBDC0861A411D74" xml:space="preserve">
+    <value>現在の位置を取得</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S5D5814324B59E477" xml:space="preserve">
+    <value>現在のゲームウィンドウの位置を取得してから、この設定を有効にすると、次回のプラグイン読み込み時に位置を復元します。保存してもウィンドウは移動しません。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SB16FCA2B5A6FEFCF" xml:space="preserve">
+    <value>ウィンドウ位置はまだ保存されていません。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBAE4E612D9038688" xml:space="preserve">
+    <value>保存済みモニター: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SA3DA8FCAA8B47575" xml:space="preserve">
+    <value>デスクトップX</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SF12938A22E5B9524" xml:space="preserve">
+    <value>デスクトップY</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC47595D1EF3CEA03" xml:space="preserve">
+    <value>デスクトップ座標には負の値を使用できます。ゲームウィンドウを別のモニターへ移動した場合は、位置を再取得してください。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SE63B6997264E3013" xml:space="preserve">
+    <value>次回のプラグイン読み込み用に起動時のウィンドウ設定を保存しました。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7D3DE00F7AFBFAE9" xml:space="preserve">
+    <value>起動時のウィンドウ設定を保存できませんでした: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S8FB65BADFA5840F2" xml:space="preserve">
+    <value>設定を変更すると、保留中の起動時ウィンドウ調整は次回のプラグイン読み込みまでキャンセルされます。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBC2E3B713D3F809C" xml:space="preserve">
+    <value>起動時のウィンドウ配置は待機中です。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBDF7355146BB2B9C" xml:space="preserve">
+    <value>起動時の配置を適用するため、使用可能でロックされていないウィンドウを待っています。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7E0FEE8B14FD02C5" xml:space="preserve">
+    <value>起動時のウィンドウ配置をキャンセルしました。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S8F79AF878F4C126F" xml:space="preserve">
+    <value>起動時の配置で、使用可能でロックされていないウィンドウの待機がタイムアウトしました。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S7AEB6C78FFA7214F" xml:space="preserve">
+    <value>起動時のウィンドウ位置が無効です。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S65B9D5CB3DEC4565" xml:space="preserve">
+    <value>起動時のウィンドウ配置には、所有スレッド上の通常状態のウィンドウが必要です。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SCEC84864868B78E7" xml:space="preserve">
+    <value>現在のウィンドウまたはモニターの情報を読み取れませんでした。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC1D37627E426E38B" xml:space="preserve">
+    <value>{2} 上のウィンドウ位置 {0}, {1} を取得しました。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S33AF1ADEAB47572F" xml:space="preserve">
+    <value>ウィンドウ、ロック、または設定が変更されたため、起動時のウィンドウ配置を停止しました。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S76DC735EA2738AA6" xml:space="preserve">
+    <value>ゲームウィンドウを移動できませんでした (Windowsエラー {0})。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC213F32D8EF829B8" xml:space="preserve">
+    <value>起動時のウィンドウ位置が指定された位置と一致しませんでした。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S363F3A3D0073FD5F" xml:space="preserve">
+    <value>起動時のウィンドウ配置を適用しました。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S17AE454E10634226" xml:space="preserve">
+    <value>保存済みディスプレイが利用できないため、プライマリディスプレイに起動時のウィンドウ配置を適用しました。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SDFC2D150B4F0017E" xml:space="preserve">
+    <value>起動時のウィンドウ配置に失敗しました: {0}</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S007CC0B77AB59EBE" xml:space="preserve">
+    <value>起動時の配置でカスタム解像度を有効にできませんでした。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S4B16A68D1F062106" xml:space="preserve">
+    <value>起動時の配置で最小ウィンドウサイズを縮小できませんでした。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S6B93E2DDBE373EC5" xml:space="preserve">
+    <value>起動時の解像度が指定されたクライアント領域サイズと一致しませんでした。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SBD96C29733E86CCE" xml:space="preserve">
+    <value>デスクトップのピクセル座標コンテキストに切り替えられませんでした。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SC5E1AF73A3FFA825" xml:space="preserve">
+    <value>以前のウィンドウ座標コンテキストを復元できませんでした。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="SF8A5A1AE7D008AB7" xml:space="preserve">
+    <value>起動時の解像度を適用しました。保存済みのウィンドウ位置が無効なため、位置の復元をスキップしました。</value>
+    <comment>Source: I19 startup window placement.</comment>
+  </data>
+  <data name="S55BDCD7DECFB581A" xml:space="preserve">
+    <value>自動食事</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S2AF6D2C22FAEF9E9" xml:space="preserve">
+    <value>安全に食事を使用できるときに、選択した食事の効果を維持します。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S3C56AC5340AF8D0E" xml:space="preserve">
+    <value>食事を1つ選び、NQ/HQの品質を指定してください。別の食事効果が有効な間は、期限が切れるまで維持します。レストエリアとコンテンツの条件は任意です。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SE4EB18069D65AAA9" xml:space="preserve">
+    <value>食事</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S11AA1327967FBD75" xml:space="preserve">
+    <value>食事が選択されていません。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S1DEF5DDD00299C70" xml:space="preserve">
+    <value>選択した食事は利用できません (アイテム {0})。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9730EBD5A2B184FA" xml:space="preserve">
+    <value>一致する食事がありません。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S60896D83E37CCFC7" xml:space="preserve">
+    <value>HQの食事を使用</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S4742D66F333442D0" xml:space="preserve">
+    <value>選択した食事: {0} ({1})。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SF4EB7A9866C3ADEB" xml:space="preserve">
+    <value>選択した品質のみを使用し、NQ/HQの代用はしません。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S8298112BCE538DAF" xml:space="preserve">
+    <value>レストエリアのみ</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S11A3A6AAE6C70D6F" xml:space="preserve">
+    <value>コンテンツ内のみ</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5B94009668CB9919" xml:space="preserve">
+    <value>どちらもオフ: 使用可能なすべての場所。両方オン: レストエリアまたはコンテンツ内。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S519B035F59C3B629" xml:space="preserve">
+    <value>更新する残り時間 (秒未満)</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9693CB7DC510CB34" xml:space="preserve">
+    <value>0では食事効果が切れた後にのみ更新します。別の有効な食事効果は上書きしません。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S67B2D20C7A2DDC7B" xml:space="preserve">
+    <value>食事設定を保存できませんでした: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0BCDF2A71A2F8B4B" xml:space="preserve">
+    <value>自動食事を有効または無効にします。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S49AA40EC95661092" xml:space="preserve">
+    <value>XA Mods &gt; Player Modsで食事と品質を選択してください。別名: /xa food on|off。on/offを省略すると状態を表示します。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9509C8874D666432" xml:space="preserve">
+    <value>自動食事は無効です。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SAFDBB1CE4564FA10" xml:space="preserve">
+    <value>食事効果を維持するために食事アイテムを選択してください。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0B77E084F921F82B" xml:space="preserve">
+    <value>選択した食事または品質は利用できません。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5E4B2C5AAE29E533" xml:space="preserve">
+    <value>ログイン中のキャラクターを待っています。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S6560C56E601CD45D" xml:space="preserve">
+    <value>キャラクターが安全に食事を使用できるまで待っています。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9AF9663B74FE28E1" xml:space="preserve">
+    <value>選択したレストエリアまたはコンテンツを待っています。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SAF599778D29BF6E1" xml:space="preserve">
+    <value>別の食事効果または不明な食事効果が有効です。期限が切れるまで待っています。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SA7D0890EDC9AC27F" xml:space="preserve">
+    <value>食事効果の更新は必要ありません。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SE266A00BFCA12A9B" xml:space="preserve">
+    <value>指定した品質の食事がメイン所持品にありません。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S0E8DCF82FCFD5350" xml:space="preserve">
+    <value>メイン所持品または食事状態を取得できません。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SEAC8EC2682BB99C1" xml:space="preserve">
+    <value>選択した食事が使用可能になるまで待っています。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S770FEE3142B32044" xml:space="preserve">
+    <value>食事の使用確認を待っています。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S063A1891E16848F2" xml:space="preserve">
+    <value>食事効果を更新しました。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S37E0F3FD7AE786D8" xml:space="preserve">
+    <value>食事の使用が拒否されました。再試行中 ({0}/{1})。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S8C73C7D43CCECA79" xml:space="preserve">
+    <value>食事の使用が3回失敗しました。再試行するには自動食事を一度無効にしてから有効にしてください。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S17AD1455ED06B495" xml:space="preserve">
+    <value>食事の使用を確認できませんでした。再試行するには自動食事を一度無効にしてから有効にしてください。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SB52197D01EFCFDE2" xml:space="preserve">
+    <value>期待した食事効果が付かずに所持品が変化しました。再試行するには自動食事を一度無効にしてから有効にしてください。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S5827BCC775A704D6" xml:space="preserve">
+    <value>食事の使用中にキャラクターまたはエリアが変わりました。再試行するには自動食事を一度無効にしてから有効にしてください。</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S9CD9B3FFE80D10CC" xml:space="preserve">
+    <value>自動食事に失敗しました: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="S4FD8EEBAA7DFB799" xml:space="preserve">
+    <value>食事データを読み込めませんでした: {0}</value>
+    <comment>Source: I210 Auto Food Consume.</comment>
+  </data>
+  <data name="SEEB8E55152E234E9" xml:space="preserve">
+    <value>自動取り込み中ステータス</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S4AED9A414D8A8AF2" xml:space="preserve">
+    <value>取り込み中ステータスで、他のプレイヤーからの不要なトレードを防ぎます。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S6E7BC19EF1AC4096" xml:space="preserve">
+    <value>すでに手動で設定されている取り込み中ステータスは維持します。この機能で設定したステータスのみ解除します。予定されたXagmanのトレード時は、この機能のステータスを一時的に解除します。トレードを強行するために手動のステータスを解除することはありません。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S609AFDA86D644E89" xml:space="preserve">
+    <value>自動取り込み中ステータスを有効または無効にします。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5DB0F6C35C10C6E6" xml:space="preserve">
+    <value>手動で設定した取り込み中ステータスは維持します。on/offを省略すると状態を表示します。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5673A82993407664" xml:space="preserve">
+    <value>自動取り込み中は無効です。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S1D8E1A21AD2A92D2" xml:space="preserve">
+    <value>取り込み中を更新できるキャラクターの状態になるまで待機中です。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S2FCA8DCA5A7654CA" xml:space="preserve">
+    <value>取り込み中が有効です。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S7B6B01E150D4034E" xml:space="preserve">
+    <value>既存の取り込み中ステータスを維持しています。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S08B01883A2641144" xml:space="preserve">
+    <value>この機能以外で取り込み中が変更されました。再開するには機能を無効にしてから再度有効にしてください。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S9A6799919B79A85B" xml:space="preserve">
+    <value>取り込み中ステータスの確認を待機中です。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="SDCED69AE8C96B271" xml:space="preserve">
+    <value>取り込み中ステータスを確認できませんでした。再試行するには機能を無効にしてから再度有効にしてください。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S11335521063A94FA" xml:space="preserve">
+    <value>取り込み中のコマンドが拒否されました。再試行まで待機中です。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S8209CD8A5549D5C9" xml:space="preserve">
+    <value>トレードのため取り込み中を一時的に解除しています。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S8CFDC3ED6CB4471B" xml:space="preserve">
+    <value>手動の取り込み中ステータスがこのトレードを妨げています。続行するには手動で解除してください。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="SCA26D2298BD2E686" xml:space="preserve">
+    <value>取り込み中ステータスはトレード可能な状態です。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S5D31DF8C82E76619" xml:space="preserve">
+    <value>このキャラクターに対する取り込み中の一時管理権は無効になりました。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S72AEE0B7209040C7" xml:space="preserve">
+    <value>取り込み中ステータスの準備待ちがタイムアウトしました。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S329E6AA07F7E03A7" xml:space="preserve">
+    <value>取り込み中の一時管理権を解放しました。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S52D30D0DA3413702" xml:space="preserve">
+    <value>自動取り込み中に失敗しました: {0}</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S1A3ABA789EAB9D47" xml:space="preserve">
+    <value>この機能が設定した取り込み中ステータスが残る場合があります。必要に応じて /busy off を使用してください。</value>
+    <comment>Source: I252 Auto Busy Status.</comment>
+  </data>
+  <data name="S19D833AFC0A9695B" xml:space="preserve">
+    <value>すでに手動で設定されている取り込み中ステータスは維持します。この機能で設定したステータスのみ解除します。Xagmanの実行中は常にこの機能のステータスを解除します。待機中の保護には「待機中は取引を拒否」を有効にしてください。トレードを強行するために手動のステータスを解除することはありません。</value>
+    <comment>Source: I252 Auto Busy Status full-run Xagman scope.</comment>
+  </data>
+  <data name="SD476521A6A2A1593" xml:space="preserve">
+    <value>都市への移動に備えて取り込み中を設定: {0}</value>
+    <comment>Source: I254 Busy before City Chat Flooder travel.</comment>
+  </data>
+  <data name="SFA66B6FEBEA27825" xml:space="preserve">
+    <value>都市へ移動する前に取り込み中を確認できませんでした。</value>
+    <comment>Source: I254 Busy before City Chat Flooder travel.</comment>
+  </data>
+  <data name="SDF0DB357D406B347" xml:space="preserve">
+    <value>都市の目的地が一意に特定できません: {0}。正確なエーテライト名を選択してください。</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="SEC24DA3BC5028C83" xml:space="preserve">
+    <value>都市の目的地が見つかりません: {0}。英語または現在のゲーム言語のエーテライト名を使用してください。</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="S11D21EACE14B8F4A" xml:space="preserve">
+    <value>都市の目的地データを読み取れませんでした: {0}</value>
+    <comment>Source: I254 exact city destination resolution.</comment>
+  </data>
+  <data name="S858E4BA7A29FD38B" xml:space="preserve">
+    <value>一時停止</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SD640C7421DA06661" xml:space="preserve">
+    <value>再開</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S06BE4326D0311053" xml:space="preserve">
+    <value>一時停止を要求済み</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SC237B77195598E40" xml:space="preserve">
+    <value>現在の移動が完了してから一時停止します。</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S6A4B96795A037B1D" xml:space="preserve">
+    <value>現在の移動が完了した後に一時停止します。新しい移動や告知は開始されません。</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="S3E79A38210BCAC7F" xml:space="preserve">
+    <value>同じ都市と手順から再開します。</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SD854D5AA265A7613" xml:space="preserve">
+    <value>再開には、元のキャラクターが一時停止した場所にいて、Lifestream が待機中である必要があります。</value>
+    <comment>Source: I255 City Chat Flooder pause and resume.</comment>
+  </data>
+  <data name="SC15F1530D219F94A" xml:space="preserve">
+    <value>ホットキー</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6A6485AF02CAB90B" xml:space="preserve">
+    <value>ホットキー</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9E0BEC5DC44EA1D7" xml:space="preserve">
+    <value>ホットキーを有効にする</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6352BA5342074B06" xml:space="preserve">
+    <value>ホットキーを検索</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S13075C2336114CD6" xml:space="preserve">
+    <value>未割り当て</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S355ABB3D587E5D5D" xml:space="preserve">
+    <value>ホットキーを設定</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0A7466B20A742807" xml:space="preserve">
+    <value>キーの組み合わせを押してください。Escapeでキャンセルします。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S5ED6F609248A45FB" xml:space="preserve">
+    <value>すべてのキーを離してから、必要に応じてCtrl、Shift、Altと一緒にキーを押してください。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S503ED79C2E4C31B4" xml:space="preserve">
+    <value>ホットキーでXA Modsの有効・無効を切り替えます。文字入力中、キーの割り当て中、別のウィンドウの使用中は作動しません。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S6EF93CA7306690C1" xml:space="preserve">
+    <value>このModの有効化にはCtrl+Shiftが必要です。ホットキーに両方を含めてください。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S22CA9D816ED9D7D3" xml:space="preserve">
+    <value>対応キー：英字、数字、F1～F12、テンキー、ナビゲーションキー。マウスボタンや修飾キーのみのショートカットは使用できません。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9B68DD9F119C3FBD" xml:space="preserve">
+    <value>XA Modのホットキーは使用可能です。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9652FFE81E6DA593" xml:space="preserve">
+    <value>XA Slaveのアンロード中はホットキーを設定できません。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S10AD87B7C3F6BECA" xml:space="preserve">
+    <value>そのXA Modは利用できません。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9EB1EA330D7D05BD" xml:space="preserve">
+    <value>対応するキーボードのキーを選んでください。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SFD16F8EE67B4546C" xml:space="preserve">
+    <value>ホットキーの修飾キーの組み合わせが無効です。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAD72E02E72B8DE20" xml:space="preserve">
+    <value>このXA ModのホットキーにはCtrl+Shiftが必要です。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0A0857DBB5D2EAE5" xml:space="preserve">
+    <value>このXA Modには複数のホットキーが保存されています。保存または消去して競合を解消してください。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAC28FCA7530B5F4C" xml:space="preserve">
+    <value>ホットキー{0}は既に{1}に割り当てられています。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0780342EDC24BA4F" xml:space="preserve">
+    <value>キーボード入力を利用できません。ホットキーを一時停止しています。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SAE298BBFF7D12C68" xml:space="preserve">
+    <value>ホットキーを保存しました。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SB14B022B6230F27A" xml:space="preserve">
+    <value>ホットキーを消去しました。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9EF3B9FDB671EABB" xml:space="preserve">
+    <value>このXA Modにホットキーは割り当てられていません。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SA0E48032B1503DFF" xml:space="preserve">
+    <value>ホットキーを有効にしました。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S5337D574F2B256A9" xml:space="preserve">
+    <value>ホットキーを無効にしました。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S0E3D9F02493D9616" xml:space="preserve">
+    <value>ホットキー設定を保存できませんでした：{0}</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S9A746739A80D7BA0" xml:space="preserve">
+    <value>ホットキーの取得をキャンセルしました。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S2881BBC7966AF6CA" xml:space="preserve">
+    <value>ホットキーを取得しました。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SEE5BD0D689D16F81" xml:space="preserve">
+    <value>入力または設定が変更されたため、ホットキーをキャンセルしました。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SBF0062C24FC0E9D0" xml:space="preserve">
+    <value>ホットキー：{0}</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="S74D291E189C82727" xml:space="preserve">
+    <value>Ctrl+Shiftを押しながら、このXA Modを有効にしてください。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
+  <data name="SA559648AE1C63AB1" xml:space="preserve">
+    <value>そのキーはホットキーに使用できません。対応するキーを選んでください。</value>
+    <comment>Source: I134 XA Mods hotkeys.</comment>
+  </data>
 </root>

@@ -797,6 +797,13 @@ public sealed class IpcClient
         catch { return false; }
     }
 
+    public bool TryGetAutoRetainerSuppressed(out bool suppressed)
+    {
+        suppressed = false;
+        try { suppressed = arGetSuppressedSubscriber.InvokeFunc(); return true; }
+        catch { return false; }
+    }
+
     public bool AutoRetainerSetSuppressed(bool suppressed)
     {
         try { arSetSuppressedSubscriber.InvokeAction(suppressed); return true; }

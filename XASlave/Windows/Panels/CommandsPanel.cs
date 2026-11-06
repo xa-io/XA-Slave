@@ -55,6 +55,8 @@ public partial class SlaveWindow
     {
         new("/xa hotbar <1-10> [on|off|toggle]", "Directly show, hide or toggle a PvP hotbar.", "Enable PVP Hotbar Disabler first. No state toggles; on shows; off hides. Works without an error and can restore a hidden main bar.", LiteralText: true),
         new("/xa clearlog", "S525AC46D6D432DF6", "S94217AC7F74A697A"),
+        new("/xa devlogs", "S7854F7662947FE72", "SBF66B41AAE6E3F4F"),
+        new("/xa devlogs folder", "S68B3F4BFF6DE90AE", "SA12745C8C47FD114"),
         new("/xa chocobocutscene on|off", "S8F540FDDA5EB58B5", "S2149784C39C936B9"),
         new("/xa closeerrors on|off", "S45F7B3137669A582", "SF6B242DFE5BD1CCB"),
         new("/xa gamerestore", "SEB139D7B83029ADA", "S17A8A017466342B9"),
@@ -109,6 +111,8 @@ public partial class SlaveWindow
 
     private static readonly CommandReferenceEntry[] PlayerModsCommandEntries =
     {
+        new("/xa autobusy on|off", "S609AFDA86D644E89", "S5DB0F6C35C10C6E6"),
+        new("/xa autofood on|off", "S0BCDF2A71A2F8B4B", "S49AA40EC95661092"),
         new("/xa antiafk on|off", "S059A237494348EBE", "S0635770AF4AF4C9B"),
         new("/xa dutycommence on|off", "SAA110482D132D3CC", "S5C0F1B04B10A5021"),
         new("/xa companychest on|off", "SA30C4D9A04DCC1CA", "S282513C381F72989"),

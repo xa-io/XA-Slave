@@ -275,7 +275,7 @@ public sealed class DalamudLogCleanerService : IDisposable
         }
     }
 
-    private static string ResolveLogPath()
+    internal static string ResolveLogPath()
     {
         var assembly = typeof(IFramework).Assembly;
         var serviceType = assembly.GetType("Dalamud.Service`1", throwOnError: true)!;

@@ -1667,7 +1667,10 @@ public unsafe sealed class SystemWindowModsService : IDisposable
             Bottom = clientHeight,
         };
 
-        if (!AdjustWindowRectEx(ref desiredRect, style.ToInt32(), false, exStyle.ToInt32()))
+        // Startup placement may have just moved the window to a monitor with a different DPI.
+        // Use this window's DPI when converting requested client size to outer dimensions.
+        var dpi = GetDpiForWindow(windowHandle);
+        if (dpi == 0 || !AdjustWindowRectExForDpi(ref desiredRect, style.ToInt32(), false, exStyle.ToInt32(), dpi))
             return false;
 
         var outerWidth = desiredRect.Right - desiredRect.Left;
@@ -1924,7 +1927,10 @@ public unsafe sealed class SystemWindowModsService : IDisposable
     private static extern nint GetWindowLongPtr(nint windowHandle, int index);
 
     [DllImport("user32.dll")]
-    private static extern bool AdjustWindowRectEx(ref WindowRect rect, int style, bool hasMenu, int exStyle);
+    private static extern uint GetDpiForWindow(nint windowHandle);
+
+    [DllImport("user32.dll")]
+    private static extern bool AdjustWindowRectExForDpi(ref WindowRect rect, int style, bool hasMenu, int exStyle, uint dpi);
 
     [DllImport("user32.dll")]
     private static extern bool SetWindowPos(nint windowHandle, nint insertAfter, int x, int y, int width, int height, uint flags);

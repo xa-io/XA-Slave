@@ -62,6 +62,17 @@ public sealed class ArPostProcessService : IDisposable
     private bool preProcessLoginSubscribed;
     private bool postProcessIpcSubscribed;
     private bool postProcessArSuppressedByTask;
+    private bool preProcessArSuppressedByTask;
+    private bool terminating;
+    private bool disposed;
+    private long loginGeneration;
+    private long workGeneration;
+    private ulong processingContentId;
+    private string processingCharacterName = string.Empty;
+    private long processingLoginGeneration;
+    private ulong postProcessRequestedContentId;
+    private long postProcessRequestedLoginGeneration;
+    private bool postProcessHandoffActive;
     private bool startupRecoveryFrameworkHooked;
     private bool startupRecoveryCompleted;
     private bool startupRecoveryResetPending;
@@ -96,6 +107,8 @@ public sealed class ArPostProcessService : IDisposable
         this.log = log;
         this.dtrBar = dtrBar;
 
+        clientState.Logout += OnLogout;
+
         RefreshStartupRecoveryCheck();
 
         // If either pre or post processing is enabled, register on construction
@@ -108,6 +121,7 @@ public sealed class ArPostProcessService : IDisposable
     /// Pre: ClientState.Login ->’ suppress AR -> run steps -> un-suppress.</summary>
     public void Register()
     {
+        if (disposed || terminating) return;
         var needsRegistration = plugin.Configuration.ArPreProcessEnabled || plugin.Configuration.ArPostProcessEnabled || plugin.Configuration.ArShipExplorationBailoutEnabled;
         if (!needsRegistration)
         {
@@ -163,25 +177,7 @@ public sealed class ArPostProcessService : IDisposable
         AddLog("[AR Processing] Unsubscribed from all events.");
         LogInfo("[XASlave] ArProcessing: Unsubscribed from all events.");
 
-        // If currently running, clean up appropriately
-        if (running)
-        {
-            var wasPreProcess = isPreProcessing;
-            var wasShipBailout = isShipExplorationBailout;
-            Cancel();
-            if (wasShipBailout)
-            {
-                if (shipBailoutShouldUnsuppressAtEnd)
-                    plugin.IpcClient.AutoRetainerSetSuppressed(false);
-            }
-            else if (wasPreProcess)
-                plugin.IpcClient.AutoRetainerSetSuppressed(false);
-            else
-            {
-                ReleasePostProcessArSuppression();
-                plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
-            }
-        }
+        CancelProcessing(finishPostRequest: true, resumeBailout: false);
     }
 
     private void UpdateSubscriptions()
@@ -201,10 +197,9 @@ public sealed class ArPostProcessService : IDisposable
             plugin.IpcClient.AutoRetainerUnsubscribeCharacterPostProcess(OnCharacterReadyForPostprocess);
             postProcessIpcSubscribed = false;
 
-            if (running && !isPreProcessing)
+            if ((running && !isPreProcessing && !isShipExplorationBailout) || postProcessRequestedContentId != 0)
             {
-                Cancel();
-                plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
+                CancelProcessing(finishPostRequest: true, resumeBailout: false);
             }
         }
 
@@ -220,12 +215,9 @@ public sealed class ArPostProcessService : IDisposable
         {
             clientState.Login -= OnLogin;
             preProcessLoginSubscribed = false;
-            CancelPendingPreProcess();
-
-            if (running && isPreProcessing)
+            if (preProcessScheduledAt.HasValue || (running && isPreProcessing))
             {
                 Cancel();
-                plugin.IpcClient.AutoRetainerSetSuppressed(false);
             }
         }
 
@@ -246,9 +238,6 @@ public sealed class ArPostProcessService : IDisposable
             if (running && isShipExplorationBailout)
             {
                 Cancel();
-                if (shipBailoutShouldUnsuppressAtEnd)
-                    plugin.IpcClient.AutoRetainerSetSuppressed(false);
-                ResetShipExplorationBailoutState();
             }
         }
     }
@@ -264,6 +253,101 @@ public sealed class ArPostProcessService : IDisposable
             framework.Update -= OnPreProcessCheck;
             preProcessFrameworkHooked = false;
         }
+    }
+
+    private bool TryGetProcessingCharacter(out ulong contentId, out string characterName)
+    {
+        contentId = 0;
+        characterName = string.Empty;
+        try
+        {
+            if (!clientState.IsLoggedIn || !Plugin.PlayerState.IsLoaded)
+                return false;
+            var player = objectTable.LocalPlayer;
+            if (player == null || Plugin.PlayerState.ContentId == 0)
+                return false;
+            characterName = player.Name.ToString();
+            if (string.IsNullOrWhiteSpace(characterName)
+                || !string.Equals(characterName, Plugin.PlayerState.CharacterName.ToString(), StringComparison.Ordinal))
+                return false;
+            contentId = Plugin.PlayerState.ContentId;
+            return true;
+        }
+        catch { return false; }
+    }
+
+    private bool IsCurrentProcessingCharacter(ulong contentId, long generation)
+        => contentId != 0 && generation == loginGeneration
+            && TryGetProcessingCharacter(out var currentId, out _) && currentId == contentId;
+
+    private bool IsProcessingSessionCurrent()
+        => IsCurrentProcessingCharacter(processingContentId, processingLoginGeneration);
+
+    private void BindProcessingCharacter(ulong contentId, string characterName)
+    {
+        processingContentId = contentId;
+        processingCharacterName = characterName;
+        processingLoginGeneration = loginGeneration;
+    }
+
+    private void OnLogout(int type, int code)
+    {
+        loginGeneration++;
+        shipBailoutAddonVisibleSince.Clear();
+        CancelProcessing(finishPostRequest: false, resumeBailout: false);
+    }
+
+    private bool EnsureProcessingSession(long generation)
+    {
+        if (!running || disposed || terminating || generation != workGeneration)
+            return false;
+        if (IsProcessingSessionCurrent())
+            return true;
+        AddLog("[AR Processing] Character logged out or changed; cancelling remaining menus and saves.");
+        CancelProcessing(finishPostRequest: false, resumeBailout: false);
+        return false;
+    }
+
+    private bool SaveProcessingSnapshot()
+    {
+        var generation = workGeneration;
+        if (!EnsureProcessingSession(generation)) return false;
+        var contentId = processingContentId;
+        var characterName = processingCharacterName;
+        var saved = plugin.IpcClient.Save();
+        // IPC may synchronously trigger cancellation or logout. Never record a stale sync receipt.
+        if (!EnsureProcessingSession(generation) || !saved) return false;
+        plugin.SlaveDatabase.RecordLastSyncedToXaDb(contentId, characterName, DateTime.UtcNow);
+        return true;
+    }
+
+    private void AddProcessingPreflight()
+    {
+        var safePasses = 0;
+        var nextCheckAt = DateTime.MinValue;
+        steps.Add(new PostProcessStep
+        {
+            NameMessage = global::XASlave.Localization.UiMessage.Key("S80D1F3CAE51EBF31"),
+            IsComplete = () =>
+            {
+                if (DateTime.UtcNow < nextCheckAt) return false;
+                nextCheckAt = DateTime.UtcNow.AddSeconds(1);
+                if ((plugin.IpcClient.IsLifestreamAvailable()
+                    && (!plugin.IpcClient.TryGetLifestreamBusy(out var busy) || busy))
+                    || !CharacterSafetyHelper.IsCharacterSafeWaitReady())
+                {
+                    safePasses = 0;
+                    return false;
+                }
+                return ++safePasses >= 3;
+            },
+            TimeoutSec = 90f,
+            OnTimeout = () =>
+            {
+                AddLog("[AR Processing] Pre-flight readiness timed out; cancelling menus and saves.");
+                CancelProcessing(finishPostRequest: false, resumeBailout: false);
+            },
+        });
     }
 
     public void RefreshStartupRecoveryCheck()
@@ -367,7 +451,9 @@ public sealed class ArPostProcessService : IDisposable
     /// This is the signal for plugins to call RequestCharacterPostProcess to get into the list.</summary>
     private void OnCharacterAdditionalTask()
     {
-        if (!plugin.Configuration.ArPostProcessEnabled) return;
+        if (disposed || terminating || !plugin.Configuration.ArPostProcessEnabled
+            || running || preProcessScheduledAt.HasValue) return;
+        if (!TryGetProcessingCharacter(out var contentId, out _)) return;
 
         if (!plugin.IsCurrentCharacterSyncDue(plugin.Configuration.ArPrePostCheckEveryHours))
         {
@@ -379,6 +465,8 @@ public sealed class ArPostProcessService : IDisposable
         LogInfo("[XASlave] ArPostProcess: AR fired OnCharacterAdditionalTask - registering for this character.");
         AddLog("[AR Post-Process] AR signaled - registering for this character's post-processing.");
 
+        postProcessRequestedContentId = contentId;
+        postProcessRequestedLoginGeneration = loginGeneration;
         var success = plugin.IpcClient.AutoRetainerRequestCharacterPostProcess(PluginName);
         if (success)
         {
@@ -386,6 +474,7 @@ public sealed class ArPostProcessService : IDisposable
         }
         else
         {
+            postProcessRequestedContentId = 0;
             log.Error("[XASlave] ArPostProcess: Failed to register for this character's post-processing.");
             AddLog("[AR Post-Process] Failed to register for this character (AR may have rejected).");
         }
@@ -399,7 +488,8 @@ public sealed class ArPostProcessService : IDisposable
             return;
         }
 
-        if (running || preProcessScheduledAt.HasValue || !Plugin.PlayerState.IsLoaded)
+        if (disposed || terminating || running || preProcessScheduledAt.HasValue
+            || !TryGetProcessingCharacter(out var contentId, out var characterName))
         {
             shipBailoutAddonVisibleSince.Clear();
             return;
@@ -438,9 +528,10 @@ public sealed class ArPostProcessService : IDisposable
         if (triggeredAddon == null)
             return;
 
+        BindProcessingCharacter(contentId, characterName);
         shipBailoutAddonVisibleSince.Clear();
         shipBailoutShouldResumeMultiModeAtEnd = plugin.IpcClient.AutoRetainerGetMultiModeEnabled();
-        shipBailoutShouldUnsuppressAtEnd = shipBailoutShouldResumeMultiModeAtEnd;
+        shipBailoutShouldUnsuppressAtEnd = false;
         isPreProcessing = false;
         isShipExplorationBailout = true;
         AddLog($"[Ship Bailout] {triggeredAddon} stayed open for {plugin.Configuration.ArShipExplorationBailoutSeconds}s while AutoRetainer multi-mode was enabled. Starting bailout.");
@@ -456,8 +547,11 @@ public sealed class ArPostProcessService : IDisposable
     /// <summary>Called when any character logs in. Schedules pre-processing if enabled and AR multi-mode is active.</summary>
     private void OnLogin()
     {
-        if (!plugin.Configuration.ArPreProcessEnabled) return;
-        if (running) return; // Already running something
+        if (disposed || terminating || !plugin.Configuration.ArPreProcessEnabled) return;
+        if ((running || preProcessScheduledAt.HasValue) && !IsProcessingSessionCurrent())
+            CancelProcessing(finishPostRequest: false, resumeBailout: false);
+        if (running || preProcessScheduledAt.HasValue) return;
+        if (!TryGetProcessingCharacter(out var contentId, out var characterName)) return;
 
         // Only run pre-processing if AR multi-mode is enabled
         if (!plugin.IpcClient.AutoRetainerGetMultiModeEnabled())
@@ -466,8 +560,41 @@ public sealed class ArPostProcessService : IDisposable
             return;
         }
 
-        // Suppress AR immediately so it doesn't start retainer processing
-        plugin.IpcClient.AutoRetainerSetSuppressed(true);
+        BindProcessingCharacter(contentId, characterName);
+        // Publish pending ownership before IPC, which can synchronously cancel this login.
+        preProcessScheduledAt = DateTime.UtcNow;
+        var generation = workGeneration;
+        var suppressionReadable = plugin.IpcClient.TryGetAutoRetainerSuppressed(out var suppressed);
+        if (generation != workGeneration) return;
+        if (!suppressionReadable)
+        {
+            CancelProcessing(finishPostRequest: false, resumeBailout: false);
+            return;
+        }
+        if (generation != workGeneration) return;
+        if (!IsProcessingSessionCurrent())
+        {
+            CancelProcessing(finishPostRequest: false, resumeBailout: false);
+            return;
+        }
+        if (!suppressed)
+        {
+            preProcessArSuppressedByTask = true;
+            var acquired = plugin.IpcClient.AutoRetainerSetSuppressed(true);
+            if (generation != workGeneration) return;
+            if (!acquired)
+            {
+                preProcessArSuppressedByTask = false;
+                CancelProcessing(finishPostRequest: false, resumeBailout: false);
+                return;
+            }
+        }
+        if (generation != workGeneration) return;
+        if (!IsProcessingSessionCurrent())
+        {
+            CancelProcessing(finishPostRequest: false, resumeBailout: false);
+            return;
+        }
         AddLog("[AR Pre-Process] Login detected - AR suppressed, waiting for player to load...");
         LogInfo("[XASlave] ArPreProcess: Login detected, AR suppressed. Scheduling pre-processing.");
 
@@ -495,8 +622,11 @@ public sealed class ArPostProcessService : IDisposable
             return;
         }
 
-        // Wait for player to be fully loaded
-        if (!Plugin.PlayerState.IsLoaded) return;
+        if (disposed || terminating || !plugin.Configuration.ArPreProcessEnabled || !IsProcessingSessionCurrent())
+        {
+            CancelProcessing(finishPostRequest: false, resumeBailout: false);
+            return;
+        }
 
         // Wait for configured delay
         var elapsed = (float)(DateTime.UtcNow - preProcessScheduledAt.Value).TotalSeconds;
@@ -515,20 +645,14 @@ public sealed class ArPostProcessService : IDisposable
             preProcessSkipMessage = string.Empty;
             AddLog(skipMessage);
             LogInfo("[XASlave] ArPreProcess: Cadence gate skipped pre-processing and released AR.");
-            plugin.IpcClient.AutoRetainerSetSuppressed(false);
+            CancelProcessing(finishPostRequest: false, resumeBailout: false);
             return;
         }
 
         preProcessScheduledDelaySeconds = 0f;
         preProcessSkipMessage = string.Empty;
 
-        var charName = "Unknown";
-        try
-        {
-            var lp = objectTable.LocalPlayer;
-            if (lp != null) charName = lp.Name.ToString();
-        }
-        catch { /* ignore */ }
+        var charName = processingCharacterName;
 
         AddLog($"[AR Pre-Process] Starting pre-processing for {charName}...");
         LogInfo($"[XASlave] ArPreProcess: Starting pre-processing for {charName}.");
@@ -540,7 +664,7 @@ public sealed class ArPostProcessService : IDisposable
         {
             AddLog("[AR Pre-Process] No steps configured - un-suppressing AR.");
             LogInfo("[XASlave] ArPreProcess: No steps configured - un-suppressing AR.");
-            plugin.IpcClient.AutoRetainerSetSuppressed(false);
+            CancelProcessing(finishPostRequest: false, resumeBailout: false);
             return;
         }
 
@@ -550,6 +674,7 @@ public sealed class ArPostProcessService : IDisposable
     private void BuildPreProcessSteps()
     {
         steps.Clear();
+        AddProcessingPreflight();
         var config = plugin.Configuration;
 
         // Open Inventory
@@ -634,7 +759,7 @@ public sealed class ArPostProcessService : IDisposable
                     OnEnter = () =>
                     {
                         AddLog("Saving Journal data to XA Database...");
-                        if (plugin.SaveToXaDatabaseAndRecordSync())
+                        if (SaveProcessingSnapshot())
                             AddLog("Saved Journal data to XA Database.");
                         else
                             AddLog("XA Database Journal save failed (plugin may not be loaded).");
@@ -648,7 +773,7 @@ public sealed class ArPostProcessService : IDisposable
 
         if (config.ArPreProcessCollectPersonalPlotInfo)
         {
-            steps.AddRange(MonthlyReloggerTask.BuildCollectPersonalPlotInfoSteps(plugin, AddLog));
+            steps.AddRange(MonthlyReloggerTask.BuildCollectPersonalPlotInfoSteps(plugin, AddLog, SaveProcessingSnapshot));
         }
 
         // FC Window - full processing
@@ -743,7 +868,7 @@ public sealed class ArPostProcessService : IDisposable
                 OnEnter = () =>
                 {
                     AddLog("Saving to XA Database...");
-                    if (plugin.SaveToXaDatabaseAndRecordSync())
+                    if (SaveProcessingSnapshot())
                         AddLog("Saved to XA Database.");
                     else
                         AddLog("XA Database save failed (plugin may not be loaded).");
@@ -764,8 +889,28 @@ public sealed class ArPostProcessService : IDisposable
             NameMessage = global::XASlave.Localization.UiMessage.Key("S4795510F39271A1A"),
             OnEnter = () =>
             {
+                var generation = workGeneration;
+                if (!EnsureProcessingSession(generation)) return;
                 AddLog("[Ship Bailout] Suppressing AutoRetainer before ESC bailout...");
-                plugin.IpcClient.AutoRetainerSetSuppressed(true);
+                var suppressionReadable = plugin.IpcClient.TryGetAutoRetainerSuppressed(out var suppressed);
+                if (!EnsureProcessingSession(generation)) return;
+                if (!suppressionReadable)
+                {
+                    CancelProcessing(finishPostRequest: false, resumeBailout: false);
+                    return;
+                }
+                if (!EnsureProcessingSession(generation)) return;
+                if (!suppressed)
+                {
+                    shipBailoutShouldUnsuppressAtEnd = true;
+                    var acquired = plugin.IpcClient.AutoRetainerSetSuppressed(true);
+                    if (generation != workGeneration) return;
+                    if (!acquired)
+                    {
+                        shipBailoutShouldUnsuppressAtEnd = false;
+                        CancelProcessing(finishPostRequest: false, resumeBailout: false);
+                    }
+                }
             },
             IsComplete = () => true,
             TimeoutSec = 2f,
@@ -841,15 +986,16 @@ public sealed class ArPostProcessService : IDisposable
     private void OnCharacterReadyForPostprocess(string pluginName)
     {
         if (pluginName != PluginName) return;
-        if (!plugin.Configuration.ArPostProcessEnabled) return;
-
-        var charName = "Unknown";
-        try
+        if (disposed || terminating || !plugin.Configuration.ArPostProcessEnabled
+            || running || preProcessScheduledAt.HasValue) return;
+        if (!IsCurrentProcessingCharacter(postProcessRequestedContentId, postProcessRequestedLoginGeneration)
+            || !TryGetProcessingCharacter(out var contentId, out var charName))
         {
-            var lp = objectTable.LocalPlayer;
-            if (lp != null) charName = lp.Name.ToString();
+            postProcessRequestedContentId = 0;
+            return;
         }
-        catch { /* ignore */ }
+        BindProcessingCharacter(contentId, charName);
+        postProcessHandoffActive = true;
 
         LogInfo($"[XASlave] ArPostProcess: AR signaled character ready - {charName}");
         AddLog($"[AR Post-Process] Character ready: {charName}");
@@ -860,17 +1006,18 @@ public sealed class ArPostProcessService : IDisposable
         if (steps.Count == 0)
         {
             AddLog("[AR Post-Process] No steps configured - signaling AR to continue.");
-            plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
+            CancelProcessing(finishPostRequest: true, resumeBailout: false);
             return;
         }
 
-        AcquirePostProcessArSuppression();
         StartStepMachine($"post-processing for {charName}");
+        if (running) AcquirePostProcessArSuppression();
     }
 
     private void BuildPostProcessSteps()
     {
         steps.Clear();
+        AddProcessingPreflight();
         var config = plugin.Configuration;
 
         // Small initial delay to let AR finish closing retainer windows
@@ -963,7 +1110,7 @@ public sealed class ArPostProcessService : IDisposable
                     OnEnter = () =>
                     {
                         AddLog("Saving Journal data to XA Database...");
-                        if (plugin.SaveToXaDatabaseAndRecordSync())
+                        if (SaveProcessingSnapshot())
                             AddLog("Saved Journal data to XA Database.");
                         else
                             AddLog("XA Database Journal save failed (plugin may not be loaded).");
@@ -977,7 +1124,7 @@ public sealed class ArPostProcessService : IDisposable
 
         if (config.ArPostProcessCollectPersonalPlotInfo)
         {
-            steps.AddRange(MonthlyReloggerTask.BuildCollectPersonalPlotInfoSteps(plugin, AddLog));
+            steps.AddRange(MonthlyReloggerTask.BuildCollectPersonalPlotInfoSteps(plugin, AddLog, SaveProcessingSnapshot));
         }
 
         // FC Window - full processing (Members, Info, Housing)
@@ -1279,7 +1426,7 @@ public sealed class ArPostProcessService : IDisposable
                 OnEnter = () =>
                 {
                     AddLog("Saving FC chest gil to XA Database...");
-                    if (plugin.SaveToXaDatabaseAndRecordSync())
+                    if (SaveProcessingSnapshot())
                         AddLog("Saved FC chest gil to XA Database.");
                     else
                         AddLog("XA Database FC chest save failed (plugin may not be loaded).");
@@ -1336,7 +1483,7 @@ public sealed class ArPostProcessService : IDisposable
                 OnEnter = () =>
                 {
                     AddLog("Saving to XA Database...");
-                    if (plugin.SaveToXaDatabaseAndRecordSync())
+                    if (SaveProcessingSnapshot())
                         AddLog("Saved to XA Database.");
                     else
                         AddLog("XA Database save failed (plugin may not be loaded).");
@@ -1355,7 +1502,13 @@ public sealed class ArPostProcessService : IDisposable
     /// <summary>Start executing the current steps list.</summary>
     private void StartStepMachine(string label)
     {
-        if (steps.Count == 0) return;
+        if (disposed || terminating || running || steps.Count == 0) return;
+        if (!IsProcessingSessionCurrent())
+        {
+            CancelProcessing(finishPostRequest: false, resumeBailout: false);
+            return;
+        }
+        workGeneration++;
         stepIndex = 0;
         stepStart = DateTime.UtcNow;
         stepActionDone = false;
@@ -1370,36 +1523,51 @@ public sealed class ArPostProcessService : IDisposable
     }
 
     public void Cancel()
+        => CancelProcessing(finishPostRequest: false, resumeBailout: true);
+
+    private void CancelProcessing(bool finishPostRequest, bool resumeBailout)
     {
-        if (!running) return;
-        running = false;
-        framework.Update -= OnTick;
-        stepIndex = -1;
-        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD353A99EB4556847"));
-        ClearArDtr();
-        if (isShipExplorationBailout)
+        if (terminating) return;
+        terminating = true;
+        try
         {
-            AddLog("[Ship Bailout] Cancelled.");
-            LogInfo("[XASlave] ArShipBailout: Cancelled.");
-            if (shipBailoutShouldUnsuppressAtEnd)
-                plugin.IpcClient.AutoRetainerSetSuppressed(false);
-            if (shipBailoutShouldResumeMultiModeAtEnd)
-                plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true);
+            var requestId = postProcessRequestedContentId;
+            var requestGeneration = postProcessRequestedLoginGeneration;
+            var handoffActive = postProcessHandoffActive;
+            var contentId = processingContentId;
+            var sessionGeneration = processingLoginGeneration;
+            var releaseBailout = shipBailoutShouldUnsuppressAtEnd;
+            var restoreMulti = resumeBailout && isShipExplorationBailout && shipBailoutShouldResumeMultiModeAtEnd;
+            workGeneration++;
+            running = false;
+            framework.Update -= OnTick;
+            CancelPendingPreProcess();
+            stepIndex = -1;
+            stepActionDone = false;
+            processingContentId = 0;
+            processingCharacterName = string.Empty;
+            postProcessRequestedContentId = 0;
+            postProcessHandoffActive = false;
             ResetShipExplorationBailoutState();
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("SD353A99EB4556847"));
+            ClearArDtr();
+            ReleasePreProcessArSuppression();
+            ReleasePostProcessArSuppression();
+            if (releaseBailout) plugin.IpcClient.AutoRetainerSetSuppressed(false);
+            if (restoreMulti && IsCurrentProcessingCharacter(contentId, sessionGeneration))
+                plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true);
+            // This IPC is global. Only an explicit current-character handoff may release it.
+            if (finishPostRequest && handoffActive && IsCurrentProcessingCharacter(requestId, requestGeneration))
+                plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
         }
-        else
-        {
-            var mode = isPreProcessing ? "Pre" : "Post";
-            AddLog($"[AR {mode}-Process] Cancelled.");
-            LogInfo($"[XASlave] Ar{mode}Process: Cancelled.");
-            if (!isPreProcessing)
-                ReleasePostProcessArSuppression();
-        }
+        finally { terminating = false; }
     }
 
     private void OnTick(IFramework fw)
     {
-        if (!running || stepIndex < 0 || stepIndex >= steps.Count)
+        var generation = workGeneration;
+        if (!EnsureProcessingSession(generation)) return;
+        if (stepIndex < 0 || stepIndex >= steps.Count)
         {
             Finish();
             return;
@@ -1408,7 +1576,10 @@ public sealed class ArPostProcessService : IDisposable
         while (running && stepIndex >= 0 && stepIndex < steps.Count)
         {
             var pendingStep = steps[stepIndex];
-            if (pendingStep.ShouldSkip == null || !pendingStep.ShouldSkip())
+            if (!EnsureProcessingSession(generation)) return;
+            var skip = pendingStep.ShouldSkip?.Invoke() ?? false;
+            if (!EnsureProcessingSession(generation)) return;
+            if (!skip)
                 break;
 
             stepIndex++;
@@ -1423,7 +1594,8 @@ public sealed class ArPostProcessService : IDisposable
             StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, steps[stepIndex].NameMessage);
         }
 
-        if (!running || stepIndex < 0 || stepIndex >= steps.Count)
+        if (!EnsureProcessingSession(generation)) return;
+        if (stepIndex < 0 || stepIndex >= steps.Count)
         {
             Finish();
             return;
@@ -1439,12 +1611,16 @@ public sealed class ArPostProcessService : IDisposable
                 try { step.OnEnter(); }
                 catch (Exception ex) { log.Error($"[XASlave] ArProcess step '{step.Name}' action error: {ex.Message}"); }
             }
+            if (!EnsureProcessingSession(generation)) return;
             stepActionDone = true;
         }
 
         try
         {
-            if (step.IsComplete())
+            if (!EnsureProcessingSession(generation)) return;
+            var complete = step.IsComplete();
+            if (!EnsureProcessingSession(generation)) return;
+            if (complete)
             {
                 AdvanceStep();
                 return;
@@ -1455,6 +1631,7 @@ public sealed class ArPostProcessService : IDisposable
             log.Error($"[XASlave] ArProcess step '{step.Name}' check error: {ex.Message}");
         }
 
+        if (!EnsureProcessingSession(generation)) return;
         if (elapsed > step.TimeoutSec)
         {
             if (step.MaxRetries > 0 && step.RetryCount < step.MaxRetries)
@@ -1469,6 +1646,7 @@ public sealed class ArPostProcessService : IDisposable
             LogWarning($"[XASlave] ArPostProcess step '{step.Name}' timed out after {step.TimeoutSec}s, skipping.");
             try { step.OnTimeout?.Invoke(); }
             catch (Exception ex) { log.Error($"[XASlave] ArProcess step '{step.Name}' timeout handler error: {ex.Message}"); }
+            if (!EnsureProcessingSession(generation)) return;
             AdvanceStep();
         }
     }
@@ -1484,48 +1662,65 @@ public sealed class ArPostProcessService : IDisposable
 
     private void Finish()
     {
-        running = false;
-        framework.Update -= OnTick;
-        stepIndex = -1;
-        StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S143B270A32602D41"));
-        ClearArDtr();
-
-        if (isShipExplorationBailout)
+        if (!EnsureProcessingSession(workGeneration)) return;
+        terminating = true;
+        try
         {
-            AddLog("[Ship Bailout] Bailout complete.");
-            LogInfo("[XASlave] ArShipBailout: Finished bailout flow.");
-            if (shipBailoutShouldUnsuppressAtEnd)
+            var contentId = processingContentId;
+            var sessionGeneration = processingLoginGeneration;
+            var requestId = postProcessRequestedContentId;
+            var requestGeneration = postProcessRequestedLoginGeneration;
+            var handoffActive = postProcessHandoffActive;
+            workGeneration++;
+            running = false;
+            framework.Update -= OnTick;
+            stepIndex = -1;
+            StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S143B270A32602D41"));
+            ClearArDtr();
+            processingContentId = 0;
+            processingCharacterName = string.Empty;
+            postProcessRequestedContentId = 0;
+            postProcessHandoffActive = false;
+
+            if (isShipExplorationBailout)
             {
-                AddLog("[Ship Bailout] Releasing AutoRetainer suppression.");
-                plugin.IpcClient.AutoRetainerSetSuppressed(false);
+                AddLog("[Ship Bailout] Bailout complete.");
+                LogInfo("[XASlave] ArShipBailout: Finished bailout flow.");
+                if (shipBailoutShouldUnsuppressAtEnd)
+                {
+                    AddLog("[Ship Bailout] Releasing AutoRetainer suppression.");
+                    plugin.IpcClient.AutoRetainerSetSuppressed(false);
+                }
+                if (shipBailoutShouldResumeMultiModeAtEnd && IsCurrentProcessingCharacter(contentId, sessionGeneration))
+                {
+                    AddLog("[Ship Bailout] Re-enabling AutoRetainer Multi Mode after reset.");
+                    plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true);
+                }
+                ResetShipExplorationBailoutState();
             }
-            if (shipBailoutShouldResumeMultiModeAtEnd)
+            else if (isPreProcessing)
             {
-                AddLog("[Ship Bailout] Re-enabling AutoRetainer Multi Mode after reset.");
-                plugin.IpcClient.AutoRetainerSetMultiModeEnabled(true);
+                ReleasePreProcessArSuppression();
+                if (!IsCurrentProcessingCharacter(contentId, sessionGeneration)) return;
+                CharactersPreProcessed++;
+                AddLog($"[AR Pre-Process] Done - un-suppressing AR. (Total pre-processed: {CharactersPreProcessed})");
+                LogInfo("[XASlave] ArPreProcess: Finished - un-suppressing AR.");
+
             }
-            ResetShipExplorationBailoutState();
-        }
-        else if (isPreProcessing)
-        {
-            CharactersPreProcessed++;
-            AddLog($"[AR Pre-Process] Done - un-suppressing AR. (Total pre-processed: {CharactersPreProcessed})");
-            LogInfo("[XASlave] ArPreProcess: Finished - un-suppressing AR.");
+            else
+            {
+                ReleasePostProcessArSuppression();
+                if (!handoffActive || !IsCurrentProcessingCharacter(contentId, sessionGeneration)) return;
+                CharactersProcessed++;
+                AddLog($"[AR Post-Process] Done - signaling AR to continue. (Total post-processed: {CharactersProcessed})");
+                LogInfo("[XASlave] ArPostProcess: Finished - signaling AR to continue.");
 
-            // CRITICAL: Un-suppress AR so it can start retainer processing
-            plugin.IpcClient.AutoRetainerSetSuppressed(false);
+                // CRITICAL: Tell AR we're done so it can relog to the next character
+                if (IsCurrentProcessingCharacter(requestId, requestGeneration))
+                    plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
+            }
         }
-        else
-        {
-            CharactersProcessed++;
-            AddLog($"[AR Post-Process] Done - signaling AR to continue. (Total post-processed: {CharactersProcessed})");
-            LogInfo("[XASlave] ArPostProcess: Finished - signaling AR to continue.");
-
-            ReleasePostProcessArSuppression();
-
-            // CRITICAL: Tell AR we're done so it can relog to the next character
-            plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
-        }
+        finally { terminating = false; }
     }
 
     public bool LogEnabled
@@ -1610,27 +1805,26 @@ public sealed class ArPostProcessService : IDisposable
     private void AcquirePostProcessArSuppression()
     {
         postProcessArSuppressedByTask = false;
-
-        try
+        var generation = workGeneration;
+        if (!EnsureProcessingSession(generation)) return;
+        if (!plugin.IpcClient.TryGetAutoRetainerSuppressed(out var suppressed) || suppressed)
         {
-            if (plugin.IpcClient.AutoRetainerGetSuppressed())
-            {
-                AddLog("[AR Post-Process] AutoRetainer was already suppressed before post-processing; leaving that state unchanged.");
-                return;
-            }
-        }
-        catch
-        {
-            // If the read fails, still try to acquire suppression explicitly.
+            AddLog("[AR Post-Process] AutoRetainer suppression is pre-existing or unreadable; leaving it unchanged under the AR post-process pause.");
+            return;
         }
 
-        if (plugin.IpcClient.AutoRetainerSetSuppressed(true))
+        if (!EnsureProcessingSession(generation)) return;
+        postProcessArSuppressedByTask = true;
+        var acquired = plugin.IpcClient.AutoRetainerSetSuppressed(true);
+        if (generation != workGeneration) return;
+        if (acquired)
         {
-            postProcessArSuppressedByTask = true;
+            if (!EnsureProcessingSession(generation)) return;
             AddLog("[AR Post-Process] Suppressing AutoRetainer while XA Slave post-processing checkpoints run.");
         }
         else
         {
+            postProcessArSuppressedByTask = false;
             AddLog("[AR Post-Process] Failed to set AutoRetainer suppression; continuing under the AR post-process pause.");
         }
     }
@@ -1640,9 +1834,16 @@ public sealed class ArPostProcessService : IDisposable
         if (!postProcessArSuppressedByTask)
             return;
 
+        postProcessArSuppressedByTask = false;
         AddLog("[AR Post-Process] Releasing AutoRetainer suppression.");
         plugin.IpcClient.AutoRetainerSetSuppressed(false);
-        postProcessArSuppressedByTask = false;
+    }
+
+    private void ReleasePreProcessArSuppression()
+    {
+        if (!preProcessArSuppressedByTask) return;
+        preProcessArSuppressedByTask = false;
+        plugin.IpcClient.AutoRetainerSetSuppressed(false);
     }
 
     private unsafe bool IsInFreeCompany()
@@ -1744,52 +1945,11 @@ public sealed class ArPostProcessService : IDisposable
 
     public void Dispose()
     {
+        if (disposed) return;
+        disposed = true;
+        clientState.Logout -= OnLogout;
         DisarmStartupRecoveryCheck();
-
-        if (registered)
-        {
-            // Unsubscribe from all events
-            if (postProcessIpcSubscribed)
-            {
-                plugin.IpcClient.AutoRetainerUnsubscribeCharacterAdditionalTask(OnCharacterAdditionalTask);
-                plugin.IpcClient.AutoRetainerUnsubscribeCharacterPostProcess(OnCharacterReadyForPostprocess);
-                postProcessIpcSubscribed = false;
-            }
-            if (preProcessLoginSubscribed)
-            {
-                clientState.Login -= OnLogin;
-                preProcessLoginSubscribed = false;
-            }
-
-            if (shipBailoutFrameworkHooked)
-            {
-                framework.Update -= OnShipExplorationBailoutCheck;
-                shipBailoutFrameworkHooked = false;
-            }
-
-            // Cancel pre-process schedule if pending
-            CancelPendingPreProcess();
-            shipBailoutAddonVisibleSince.Clear();
-
-            // If running, clean up appropriately based on mode
-            if (running)
-            {
-                running = false;
-                framework.Update -= OnTick;
-                if (isShipExplorationBailout)
-                {
-                    if (shipBailoutShouldUnsuppressAtEnd)
-                        plugin.IpcClient.AutoRetainerSetSuppressed(false);
-                    ResetShipExplorationBailoutState();
-                }
-                else if (isPreProcessing)
-                    plugin.IpcClient.AutoRetainerSetSuppressed(false);
-                else
-                {
-                    ReleasePostProcessArSuppression();
-                    plugin.IpcClient.AutoRetainerFinishCharacterPostProcess();
-                }
-            }
-        }
+        Unregister();
+        CancelProcessing(finishPostRequest: false, resumeBailout: false);
     }
 }

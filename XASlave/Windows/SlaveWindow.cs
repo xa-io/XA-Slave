@@ -991,6 +991,7 @@ public partial class SlaveWindow : Window, IDisposable
             return;
 
         isDisposed = true;
+        DetachDuringDispose("City Chat Flooder", DisposeCityChatFlooder);
 
         DetachDuringDispose("Worker cancellation", workerCts.Cancel);
         DetachDuringDispose("Plugin Builder windows", DisposePluginBuilder);
