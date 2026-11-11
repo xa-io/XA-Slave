@@ -29617,4 +29617,448 @@ Arsa tekliflerine erişebilmek için bunu 6. rütbe ve üzerindeyken yapmak en i
     <value>Bu tuş kısayol olarak kullanılamaz. Desteklenen bir tuş seçin.</value>
     <comment>Source: I134 XA Mods hotkeys.</comment>
   </data>
+  <data name="S77940585632007E6" xml:space="preserve">
+    <value>Stok eşyası</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S84F85BC068049C81" xml:space="preserve">
+    <value>Minimum stok</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S83A292024EE019A9" xml:space="preserve">
+    <value>Stoka göre seç</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S2FB74173F401115D" xml:space="preserve">
+    <value>Kayıtlı stok denetleniyor...</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S0F87FE2BBE7F0FE8" xml:space="preserve">
+    <value>Kurulum veya envanter sağlayıcısı değiştiği için stok seçimi iptal edildi.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S4C52ED5CBA68D477" xml:space="preserve">
+    <value>Stok seçimi zaman aşımına uğradı. Envanteri yenileyip tekrar deneyin.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S7D96B8A4D9FB7C9A" xml:space="preserve">
+    <value>Envanter sorgusu başarısız oldu. Mevcut seçim korundu.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD32B3168FB34A854" xml:space="preserve">
+    <value>Bilinen stok bulunamadı. Mevcut seçim korundu.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SC972DED3C9AC3F8E" xml:space="preserve">
+    <value>{0} Tony seçildi; stoku bilinmeyen veya eski olan {1} Tony atlandı.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S55CCD119AAA21109" xml:space="preserve">
+    <value>Tüm Tony listesinden kayıtlı stoku minimuma eşit veya daha yüksek olanları seçer. Bilinmeyen veya eski stok hariç tutulur. Seçimi korumak için adlandırılmış bir karakter listesi kaydedin.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD6AA816E13650A1D" xml:space="preserve">
+    <value>Bu Tony karakterini mevcut seçimden çıkar.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SE23DB51A61294A37" xml:space="preserve">
+    <value>Tony mevcut seçimden çıkarıldı.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD5B12C1924E91DDA" xml:space="preserve">
+    <value>Gil için stok, Tony gil rezervini içermez.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S870942552144CE28" xml:space="preserve">
+    <value>Envanter Arama Çubuğu</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SC2A9ACBFB6EB565E" xml:space="preserve">
+    <value>Oyuncu ve retainer envanterlerinde eşya adına veya kimliğine göre arama yapın.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SBE46A3B74FED5615" xml:space="preserve">
+    <value>Eşyaları taşımadan eşleşmeyen yuvaları karartır. Ctrl+F etkin envanterdeki aramaya odaklanır; Escape aramayı temizler. Adlar oyun dilindedir; metin olduğu gibi aranır.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S024C6D7199F2538F" xml:space="preserve">
+    <value>Envanter araması hazır. Kendi envanterinizi veya bir retainer envanterini açın.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S345506B671848DC7" xml:space="preserve">
+    <value>Envanter araması kullanılamıyor: {0}</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S938E6B45CD3AEBAF" xml:space="preserve">
+    <value>Eşya adını olduğu gibi veya eşya kimliğini arayın. Ctrl+F etkin envanterdeki aramaya odaklanır.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S5C257E210B1A5615" xml:space="preserve">
+    <value>Takas kapasitesi doğrulanamadı. Görev günlüğüne bakın.</value>
+    <comment>Source: I153 receiver-capacity trade batches.</comment>
+  </data>
+  <data name="SB5929AF709082C0E" xml:space="preserve">
+    <value>Envanter, heybe, hizmetkâr ve Free Company sandığındaki eşyaları ad, kimlik veya eşya özelliklerine göre arayın.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S1BB180DBC0364B35" xml:space="preserve">
+    <value>Envanter araması hazır. Envanterinizi, heybenizi, bir hizmetkâr envanterini veya Free Company sandığınızı açın.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SE90EFC70058D7FF8" xml:space="preserve">
+    <value>Eşya adını düz metin olarak veya eşya kimliğini arayın. Ctrl+F etkin depolama penceresindeki aramaya odaklanır. T, NT, B ve U eşyaları filtreler. Escape aramayı ve filtreleri temizler.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SD053EAF81A901089" xml:space="preserve">
+    <value>Takas edilebilir: şu anda takas edilebilen eşyaları gösterir. Arama metni ve diğer filtrelerle birlikte uygulanır.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S8B322208AD91E717" xml:space="preserve">
+    <value>Takas edilemez: şu anda takas edilemeyen eşyaları gösterir. Arama metni ve diğer filtrelerle birlikte uygulanır.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S71FFD32EEDDE9073" xml:space="preserve">
+    <value>Bağlı: koleksiyon eşyaları hariç, ruh bağı olan eşyaları gösterir. Arama metni ve diğer filtrelerle birlikte uygulanır.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S92D269665B6AB115" xml:space="preserve">
+    <value>Benzersiz: Unique olarak işaretlenmiş eşyaları gösterir. Arama metni ve diğer filtrelerle birlikte uygulanır.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S83E0B9DDDE38050F" xml:space="preserve">
+    <value>Gil eksiklerini yok say</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S54BF15532188F035" xml:space="preserve">
+    <value>Gerçek eksikler dahil olmak üzere tahminlerde ve nihai sonuçlarda gil eksiklerini yok sayar. Gil aktarımları ve eşya gereksinimleri değişmez.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SADBF70DE1D082E88" xml:space="preserve">
+    <value>Gil eksiği yok sayıldı</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S7D648F5B47F34AFB" xml:space="preserve">
+    <value>Yok sayıldı</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S10EDC6C7796AAE14" xml:space="preserve">
+    <value>Seçilen sahiplerin bilinen stoku, gil dışındaki tüm Give parti hedeflerini karşılıyor.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S1E37A43E43DB3535" xml:space="preserve">
+    <value>Bilinen her sahip, gil dışındaki tüm pozitif Balance hedeflerini zaten karşılıyor.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S8D9A4AA562DAAD69" xml:space="preserve">
+    <value>Mevcut tedarik: seçilen Tony stoku, gil dışındaki tüm sabit bilinen gereksinimleri karşılıyor.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S6CA735C454B42CB6" xml:space="preserve">
+    <value>Mevcut tedarik: seçilen Tonylerin bilinen stoku, gil dışındaki sabit bilinen gereksinimleri karşılıyor; ancak bilinmeyen veya yinelenen girdiler sonucu değiştirebilir.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SBDDF5539CBC5DFB4" xml:space="preserve">
+    <value>Toplama sonrası tedarik: öngörülen Tony stoku, gil dışındaki tüm sabit bilinen ikmal gereksinimlerini karşılıyor.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S3E1E253E5CD15EA6" xml:space="preserve">
+    <value>Toplama sonrası tedarik: öngörülen bilinen stok, gil dışındaki sabit bilinen talebi yalnızca öngörülen tüm toplama sığarsa ve tüm bilinmeyen girdiler beklendiği gibi netleşirse karşılar.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S2D5F3616E2259EB9" xml:space="preserve">
+    <value>T göster (takas edilebilir)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SB9A60D18B6064186" xml:space="preserve">
+    <value>NT göster (takas edilemez)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SBC6660B2FC3061A1" xml:space="preserve">
+    <value>B göster (bağlı)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="S9B010E574A02A1EB" xml:space="preserve">
+    <value>U göster (benzersiz)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SAFFBE0EDFFE7ED1C" xml:space="preserve">
+    <value>Gizlenen filtre düğmeleri arama alanına daha fazla yer açar. Seçili bir filtreyi gizlemek, seçimini kaldırır.</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SFB379C0639B02DAF" xml:space="preserve">
+    <value>Arama çubuğu eklenemeden envanter penceresi değişti.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="SC516314371BAD2C5" xml:space="preserve">
+    <value>Envanter başlık çubuğu kullanılamıyor.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S2EBDA73F1FA78881" xml:space="preserve">
+    <value>Envanter başlık çubuğunun geometrisi desteklenmiyor.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S08C72A181576F45F" xml:space="preserve">
+    <value>Etkin olduğunda, PvP'de engellenen /hotbar display komutları için İngilizce sohbet hatalarını izler. Giriş yapmış olmanız ve ana _ActionBar çubuğunun görünür olması gerekir.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S227E7BC13EA9D851" xml:space="preserve">
+    <value>10. çubuğun görünürlüğünü değiştirmek için /hotbar display 10 kullanın veya on/off ekleyin. 1 ile 10 arasındaki çubuklar desteklenir. İzlemeyi etkinleştirmek, engellenen bir görüntüleme komutu işlenene kadar hiçbir çubuğu değiştirmez.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S4E14133FCE55493F" xml:space="preserve">
+    <value>Kabul edilen alternatif işlem, komutu tekrarlamadan hatayı işler. Gösterildi/gizlendi durumu, HUD değişikliği onayladıktan sonra bildirilir; onay başarısız olursa hata bildirilir. Eylemler ve tuş atamaları değişmez.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SCB19314CC4541E4D" xml:space="preserve">
+    <value>Doğrudan komut: /xa hotbar 1, 1. çubuğun görünürlüğünü değiştirir; göstermek için on, gizlemek için off ekleyin. 1–10 arasındaki çubuklar desteklenir. Bu modun etkin olması gerekir, ancak hata beklemez veya ana çubuğun görünür olmasını gerektirmez.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SC6EBD47ABE501159" xml:space="preserve">
+    <value>/xa hotbar on izlemeyi etkinleştirir; /xa hotbar off devre dışı bırakır ve hâlâ bu mod tarafından kontrol edilen çubukları gösterir. HUD kullanılamıyorsa geri yükleme bekler; başarısız geri yüklemeyi yeniden denemek için off komutunu tekrarlayın. Hata izleme ana çubuğun görünür olmasını gerektirdiğinden, gizli ana çubuğu geri getirmek için /xa hotbar 1 on kullanın.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SFD7341BC66A257EF" xml:space="preserve">
+    <value>PvP Kısayol Çubuğu Devre Dışı Bırakıcı</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S01E44E92B04C187C" xml:space="preserve">
+    <value>PvP'de engellenen /hotbar display komutlarını işle.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="SDF3525839B48C10F" xml:space="preserve">
+    <value>Giriş yapmışken ve ana _ActionBar çubuğu görünürken sohbet izlemeyi etkinleştirin, ardından /hotbar display komutlarını kullanın.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S4DC5CCBEF0102699" xml:space="preserve">
+    <value>Devre Dışı; kontrol edilen kısayol çubuklarının geri yüklenmesi bekleniyor</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SD84701543D60935E" xml:space="preserve">
+    <value>PvP'de engellenen /hotbar display komutları izleniyor</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SCF01459D717E88A1" xml:space="preserve">
+    <value>Kısayol çubuğu dinleyicileri kaydedilemiyor</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S6D2783A951EEB8EF" xml:space="preserve">
+    <value>HUD gizli veya kullanılamaz durumdayken duraklatıldı</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SB6EC744ECC7D5E55" xml:space="preserve">
+    <value>PvP kısayol çubukları bekleniyor</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S00257BA7EBD4E0D0" xml:space="preserve">
+    <value>Kısayol çubuğuna erişim hatasından sonra durduruldu; yeniden denemek için kapatıp açın</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SAA5606AD083D6237" xml:space="preserve">
+    <value>Yüklenen Dropbox derlemesinin sürümü okunamadı.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC8F182EC41515C89" xml:space="preserve">
+    <value>Ana uygulamanın yüklü eklenti koleksiyonu geçersiz bir kayıt içeriyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S56750EC27E3B1A01" xml:space="preserve">
+    <value>Ana uygulamanın yüklü eklenti koleksiyonu doğrulama sınırını aşıyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851417F28A56EC9F" xml:space="preserve">
+    <value>Ana uygulamanın yüklü eklenti koleksiyonunu alma yöntemi kullanılamıyor veya uyumsuz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C978BCF087A69B9" xml:space="preserve">
+    <value>Ana uygulamanın yüklü eklenti koleksiyonu kullanılamıyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S122A8A674A2DE07D" xml:space="preserve">
+    <value>Ana uygulamanın yüklü eklenti kaydının adı geçersiz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF035F3E2C28C6129" xml:space="preserve">
+    <value>Ana uygulamanın yaşam döngüsü enum sözleşmesi uyumsuz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC656ED743A98C5D7" xml:space="preserve">
+    <value>Ana uygulamanın yaşam döngüsü arayüzü kullanılamıyor veya uyumsuz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SDACF8E7760DB26E6" xml:space="preserve">
+    <value>Ana uygulamanın yaşam döngüsü türleri kullanılamıyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S616CD453CDAE5FD0" xml:space="preserve">
+    <value>Ana uygulamanın eklenti kurulum kimliğini alma yöntemi kullanılamıyor veya uyumsuz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1983E34B67FD5B4D" xml:space="preserve">
+    <value>Ana uygulamanın eklenti yöneticisi kullanılamıyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S02AF27A3FF436BC3" xml:space="preserve">
+    <value>Ana uygulamanın eklenti yöneticisi hizmetini alma yöntemi kullanılamıyor veya uyumsuz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD1C99CD34C2ABC45" xml:space="preserve">
+    <value>Ana uygulamanın eklenti adını alma yöntemi kullanılamıyor veya uyumsuz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9B78177D3EEC6D3E" xml:space="preserve">
+    <value>Ana uygulamanın eklenti durumunu alma yöntemi kullanılamıyor veya uyumsuz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S96B4FF3C235E45B9" xml:space="preserve">
+    <value>Yaşam döngüsü okuyucusu kullanılamıyor: {0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD748A01364AB06DB" xml:space="preserve">
+    <value>Hareket özelliği eşi</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S7CFE761B16572921" xml:space="preserve">
+    <value>Birden fazla eş kurulumu bellekten tamamen kaldırılmamış</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF22513C991F0CB3D" xml:space="preserve">
+    <value>ONH sürüm mutabakatı</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S100653D37DAABE3A" xml:space="preserve">
+    <value>Eş kurulum kimliği birden fazla kez görünüyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1E2ED8172E91F0E7" xml:space="preserve">
+    <value>Eş kurulum kimliği kullanılamıyor veya geçersiz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1BDB586894E64723" xml:space="preserve">
+    <value>Eş yaşam döngüsü okunamadı ({0})</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6053A12B80273858" xml:space="preserve">
+    <value>Eş yaşam döngüsü: {0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S568AD7D0A45C45FD" xml:space="preserve">
+    <value>Eş yaşam döngüsü durumu tanınmıyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S3302D41A86A08337" xml:space="preserve">
+    <value>Eş yaşam döngüsü durumu kullanılamıyor veya geçersiz</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S45FDD29564BDE619" xml:space="preserve">
+    <value>Eş eklentisi yükleniyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6C923ABAFFD29336" xml:space="preserve">
+    <value>Eş eklentisi bellekten kaldırılıyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S5EBB1697FDC852B7" xml:space="preserve">
+    <value>Eş eklentisinin yüklenmesi, bellekten kaldırılması veya bağımlılıklarının çözümlenmesi başarısız oldu</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S27B64EB0B3CAA9DE" xml:space="preserve">
+    <value>Eş eklentinin adı kullanılamıyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8D4F6114D5CAE8E1" xml:space="preserve">
+    <value>Tony'nin sürüm anlaşmasından sonra ONH karakteri değişti.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S724C52D78F1F7D4D" xml:space="preserve">
+    <value>Sürüm anlaşmasından önce ONH karakteri değişti.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F560AA230DC76FF" xml:space="preserve">
+    <value>ONH eşi, eşleşen XA Slave ve Dropbox sürümlerini sağlamadı.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9F7BA2473E010837" xml:space="preserve">
+    <value>ONH sürüm el sıkışması kurulmadı.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S67F304E72345F97C" xml:space="preserve">
+    <value>Bu ONH alışverişi sırasında etkin Tony'nin sürüm anlaşması değişti.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S93C01FAFC54D840E" xml:space="preserve">
+    <value>Etkin Tony'nin sürüm anlaşması kullanılamıyor.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0DCA5AD5069C8C4B" xml:space="preserve">
+    <value>Etkin Tony'nin yüklü XA Slave veya Dropbox sürümü kullanılamıyor.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SB1FF900AF3E947A1" xml:space="preserve">
+    <value>Etkin Tony/sahip ticaret çifti güncel değil veya karşılıklı olarak bağlı değil.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DBB063EA136CB84" xml:space="preserve">
+    <value>Yüklenen Dropbox derlemesinin sürümü kullanılamıyor.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S52E81B2AF87BC092" xml:space="preserve">
+    <value>Yüklenen Dropbox sağlayıcısı kullanılamıyor.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC6C9814C8F0D77A2" xml:space="preserve">
+    <value>Yüklü Dropbox sürümü kullanılamıyor veya geçersiz.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SE2CAD295157866AC" xml:space="preserve">
+    <value>Yüklü XA Slave sürümü kullanılamıyor veya geçersiz.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF0B0B41A45ADA9A6" xml:space="preserve">
+    <value>Eş, Tony'nin XA Slave ve Dropbox sürümlerini 15 saniye içinde onaylamadı.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C0D841237BD59F1" xml:space="preserve">
+    <value>Eş, gerekli Tony sürüm el sıkışmasını desteklemiyor.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S116E90EE8FCE1A4A" xml:space="preserve">
+    <value>Eş, Tony'nin XA Slave ve Dropbox sürüm el sıkışmasını atladı. O istemcideki XA Slave'i güncelleyin.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0E815C03839E4BBA" xml:space="preserve">
+    <value>Satıcı, gerekli Tony sürüm el sıkışmasını desteklemiyor.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F3F35EF7873F2E0" xml:space="preserve">
+    <value>Ticaret ortağı, Tony'nin sürüm el sıkışmasını desteklemiyor. O istemcideki XA Slave'i güncelleyin.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S4F3A989A90EB3C6C" xml:space="preserve">
+    <value>Etkin Tony/sahip sürüm el sıkışması beklenirken zaman aşımı oluştu.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S17065D0946DF707A" xml:space="preserve">
+    <value>Tony, XA Slave {0} ve Dropbox {1} gerektiriyor; ticaret ortağı XA Slave {2} ve Dropbox {3} bildiriyor.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S233EBAD47A25004E" xml:space="preserve">
+    <value>Tony, XA Slave {0} ve Dropbox {1} gerektiriyor; ticaret ortağının yüklü sürümleri kullanılamıyor.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD0D32A7E705FD605" xml:space="preserve">
+    <value>Tony'nin XA Slave ve Dropbox sürümlerini doğrula</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SBC57BFDA3D6FD68C" xml:space="preserve">
+    <value>Etkin Tony'nin XA Slave ve Dropbox sürüm anlaşması bekleniyor.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851B713C54880F95" xml:space="preserve">
+    <value>mevcut alıcı alışverişi</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DA262EB757C209B" xml:space="preserve">
+    <value>sürümleri uyumlu bir ticaret ortağı bekleniyor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
 </root>

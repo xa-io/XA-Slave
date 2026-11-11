@@ -29617,4 +29617,448 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
     <value>Không thể dùng phím đó làm phím tắt. Hãy chọn phím được hỗ trợ.</value>
     <comment>Source: I134 XA Mods hotkeys.</comment>
   </data>
+  <data name="S77940585632007E6" xml:space="preserve">
+    <value>Vật phẩm tồn kho</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S84F85BC068049C81" xml:space="preserve">
+    <value>Tồn kho tối thiểu</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S83A292024EE019A9" xml:space="preserve">
+    <value>Chọn theo tồn kho</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S2FB74173F401115D" xml:space="preserve">
+    <value>Đang kiểm tra tồn kho đã lưu...</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S0F87FE2BBE7F0FE8" xml:space="preserve">
+    <value>Đã hủy lựa chọn vì thiết lập hoặc nguồn cung cấp túi đồ đã thay đổi.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S4C52ED5CBA68D477" xml:space="preserve">
+    <value>Hết thời gian chọn theo tồn kho. Hãy làm mới túi đồ và thử lại.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S7D96B8A4D9FB7C9A" xml:space="preserve">
+    <value>Tra cứu túi đồ thất bại. Đã giữ nguyên lựa chọn hiện tại.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD32B3168FB34A854" xml:space="preserve">
+    <value>Không có tồn kho đã xác định. Đã giữ nguyên lựa chọn hiện tại.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SC972DED3C9AC3F8E" xml:space="preserve">
+    <value>Đã chọn {0} Tony; bỏ qua {1} Tony có tồn kho chưa rõ hoặc đã cũ.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S55CCD119AAA21109" xml:space="preserve">
+    <value>Chọn từ toàn bộ danh sách Tony theo tồn kho đã lưu đạt hoặc vượt mức tối thiểu. Loại trừ tồn kho chưa rõ hoặc đã cũ. Lưu danh sách nhân vật có tên để giữ lựa chọn.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD6AA816E13650A1D" xml:space="preserve">
+    <value>Bỏ Tony này khỏi lựa chọn hiện tại.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SE23DB51A61294A37" xml:space="preserve">
+    <value>Đã bỏ Tony khỏi lựa chọn hiện tại.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD5B12C1924E91DDA" xml:space="preserve">
+    <value>Với gil, tồn kho không bao gồm lượng gil dự trữ của Tony.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S870942552144CE28" xml:space="preserve">
+    <value>Thanh tìm kiếm túi đồ</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SC2A9ACBFB6EB565E" xml:space="preserve">
+    <value>Tìm trong túi đồ của người chơi và retainer theo tên hoặc ID vật phẩm.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SBE46A3B74FED5615" xml:space="preserve">
+    <value>Làm mờ các ô không khớp mà không di chuyển vật phẩm. Ctrl+F đưa con trỏ vào ô tìm kiếm của túi đồ đang dùng; Escape xóa nội dung. Tên dùng ngôn ngữ trò chơi; văn bản được tìm đúng theo ký tự đã nhập.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S024C6D7199F2538F" xml:space="preserve">
+    <value>Tìm kiếm túi đồ đã sẵn sàng. Mở túi đồ của bạn hoặc của retainer.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S345506B671848DC7" xml:space="preserve">
+    <value>Không thể tìm kiếm túi đồ: {0}</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S938E6B45CD3AEBAF" xml:space="preserve">
+    <value>Tìm theo tên vật phẩm nguyên văn hoặc ID vật phẩm. Ctrl+F đưa con trỏ vào ô tìm kiếm của túi đồ đang dùng.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S5C257E210B1A5615" xml:space="preserve">
+    <value>Không thể xác nhận sức chứa để giao dịch. Hãy xem nhật ký tác vụ.</value>
+    <comment>Source: I153 receiver-capacity trade batches.</comment>
+  </data>
+  <data name="SB5929AF709082C0E" xml:space="preserve">
+    <value>Tìm vật phẩm trong túi đồ, túi yên, túi retainer và rương Free Company theo tên, ID hoặc thuộc tính.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S1BB180DBC0364B35" xml:space="preserve">
+    <value>Tìm kiếm đã sẵn sàng. Hãy mở túi đồ, túi yên, túi của retainer hoặc rương Free Company.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SE90EFC70058D7FF8" xml:space="preserve">
+    <value>Tìm theo tên vật phẩm dạng văn bản thuần hoặc ID vật phẩm. Ctrl+F chuyển tiêu điểm đến ô tìm kiếm trong cửa sổ kho đang hoạt động. T, NT, B và U lọc vật phẩm. Escape xóa nội dung tìm kiếm và bộ lọc.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SD053EAF81A901089" xml:space="preserve">
+    <value>Có thể giao dịch: hiện vật phẩm hiện có thể giao dịch. Kết hợp với nội dung tìm kiếm và các bộ lọc khác.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S8B322208AD91E717" xml:space="preserve">
+    <value>Không thể giao dịch: hiện vật phẩm hiện không thể giao dịch. Kết hợp với nội dung tìm kiếm và các bộ lọc khác.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S71FFD32EEDDE9073" xml:space="preserve">
+    <value>Đã ràng buộc: hiện vật phẩm có độ gắn kết tinh thần, trừ vật phẩm sưu tầm. Kết hợp với nội dung tìm kiếm và các bộ lọc khác.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S92D269665B6AB115" xml:space="preserve">
+    <value>Độc nhất: hiện vật phẩm được đánh dấu Unique. Kết hợp với nội dung tìm kiếm và các bộ lọc khác.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S83E0B9DDDE38050F" xml:space="preserve">
+    <value>Bỏ qua thiếu gil</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S54BF15532188F035" xml:space="preserve">
+    <value>Bỏ qua thiếu gil trong dự báo và kết quả cuối cùng, kể cả thiếu thực sự. Việc chuyển gil và yêu cầu vật phẩm không thay đổi.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SADBF70DE1D082E88" xml:space="preserve">
+    <value>Đã bỏ qua thiếu gil</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S7D648F5B47F34AFB" xml:space="preserve">
+    <value>Đã bỏ qua</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S10EDC6C7796AAE14" xml:space="preserve">
+    <value>Kho đã biết của chủ sở hữu được chọn đáp ứng mọi mục tiêu lô Give ngoài gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S1E37A43E43DB3535" xml:space="preserve">
+    <value>Mọi chủ sở hữu đã biết đều đã đáp ứng từng mục tiêu Balance dương ngoài gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S8D9A4AA562DAAD69" xml:space="preserve">
+    <value>Nguồn cung hiện tại: kho của các Tony được chọn đáp ứng mọi yêu cầu cố định đã biết ngoài gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S6CA735C454B42CB6" xml:space="preserve">
+    <value>Nguồn cung hiện tại: kho đã biết của các Tony được chọn đáp ứng yêu cầu cố định đã biết ngoài gil, nhưng dữ liệu chưa rõ hoặc trùng lặp có thể thay đổi kết quả.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SBDDF5539CBC5DFB4" xml:space="preserve">
+    <value>Nguồn cung sau thu thập: kho dự kiến của Tony đáp ứng mọi yêu cầu bổ sung cố định đã biết ngoài gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S3E1E253E5CD15EA6" xml:space="preserve">
+    <value>Nguồn cung sau thu thập: kho dự kiến đã biết chỉ đáp ứng nhu cầu cố định đã biết ngoài gil nếu chứa đủ mọi vật phẩm thu thập dự kiến và dữ liệu chưa rõ được xác định đúng như dự kiến.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S2D5F3616E2259EB9" xml:space="preserve">
+    <value>Hiện T (có thể giao dịch)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SB9A60D18B6064186" xml:space="preserve">
+    <value>Hiện NT (không thể giao dịch)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SBC6660B2FC3061A1" xml:space="preserve">
+    <value>Hiện B (đã ràng buộc)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="S9B010E574A02A1EB" xml:space="preserve">
+    <value>Hiện U (độc nhất)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SAFFBE0EDFFE7ED1C" xml:space="preserve">
+    <value>Ẩn các nút bộ lọc giúp ô tìm kiếm rộng hơn. Ẩn bộ lọc đang được chọn sẽ bỏ chọn bộ lọc đó.</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SFB379C0639B02DAF" xml:space="preserve">
+    <value>Cửa sổ túi đồ đã thay đổi trước khi có thể gắn thanh tìm kiếm.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="SC516314371BAD2C5" xml:space="preserve">
+    <value>Thanh tiêu đề của túi đồ không khả dụng.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S2EBDA73F1FA78881" xml:space="preserve">
+    <value>Hình dạng thanh tiêu đề của túi đồ không được hỗ trợ.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S08C72A181576F45F" xml:space="preserve">
+    <value>Khi được bật, theo dõi lỗi trò chuyện bằng tiếng Anh để phát hiện các lệnh /hotbar display bị chặn trong PvP. Bạn phải đăng nhập và thanh chính _ActionBar phải hiển thị.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S227E7BC13EA9D851" xml:space="preserve">
+    <value>Dùng /hotbar display 10 để chuyển trạng thái hiển thị thanh 10, hoặc thêm on/off. Hỗ trợ các thanh từ 1 đến 10. Bật theo dõi không thay đổi thanh nào cho đến khi xử lý một lệnh hiển thị bị chặn.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S4E14133FCE55493F" xml:space="preserve">
+    <value>Phương án thay thế được chấp nhận sẽ xử lý lỗi mà không lặp lại lệnh. Trạng thái hiện/ẩn được báo sau khi HUD xác nhận thay đổi; nếu xác nhận thất bại thì báo lỗi. Các hành động và phím gán không thay đổi.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SCB19314CC4541E4D" xml:space="preserve">
+    <value>Lệnh trực tiếp: /xa hotbar 1 chuyển trạng thái hiển thị thanh 1; thêm on để hiện hoặc off để ẩn. Hỗ trợ các thanh 1–10. Mod này phải được bật, nhưng không cần chờ lỗi hoặc yêu cầu thanh chính hiển thị.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SC6EBD47ABE501159" xml:space="preserve">
+    <value>/xa hotbar on bật theo dõi; /xa hotbar off tắt theo dõi và hiển thị các thanh vẫn do mod này kiểm soát. Khôi phục sẽ chờ khi HUD không khả dụng; lặp lại off để thử lại lần khôi phục thất bại. Dùng /xa hotbar 1 on để khôi phục thanh chính bị ẩn, vì theo dõi lỗi yêu cầu thanh này hiển thị.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SFD7341BC66A257EF" xml:space="preserve">
+    <value>Tắt thanh kỹ năng PvP</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S01E44E92B04C187C" xml:space="preserve">
+    <value>Xử lý các lệnh /hotbar display bị chặn trong PvP.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="SDF3525839B48C10F" xml:space="preserve">
+    <value>Bật theo dõi trò chuyện khi đã đăng nhập và thanh chính _ActionBar hiển thị, sau đó dùng các lệnh /hotbar display.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S4DC5CCBEF0102699" xml:space="preserve">
+    <value>Đã tắt; đang chờ khôi phục các thanh kỹ năng được kiểm soát</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SD84701543D60935E" xml:space="preserve">
+    <value>Đang theo dõi các lệnh /hotbar display bị chặn trong PvP</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SCF01459D717E88A1" xml:space="preserve">
+    <value>Không thể đăng ký trình lắng nghe sự kiện của thanh kỹ năng</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S6D2783A951EEB8EF" xml:space="preserve">
+    <value>Tạm dừng khi HUD bị ẩn hoặc không khả dụng</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SB6EC744ECC7D5E55" xml:space="preserve">
+    <value>Đang chờ thanh kỹ năng PvP</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S00257BA7EBD4E0D0" xml:space="preserve">
+    <value>Đã dừng sau lỗi truy cập thanh kỹ năng; tắt rồi bật lại để thử lại</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SAA5606AD083D6237" xml:space="preserve">
+    <value>Không thể đọc phiên bản assembly Dropbox đã tải.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC8F182EC41515C89" xml:space="preserve">
+    <value>Danh sách plugin đã cài của ứng dụng chủ chứa bản ghi không hợp lệ</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S56750EC27E3B1A01" xml:space="preserve">
+    <value>Danh sách plugin đã cài của ứng dụng chủ vượt giới hạn xác thực</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851417F28A56EC9F" xml:space="preserve">
+    <value>Bộ truy xuất danh sách plugin đã cài của ứng dụng chủ không khả dụng hoặc không tương thích</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C978BCF087A69B9" xml:space="preserve">
+    <value>Danh sách plugin đã cài của ứng dụng chủ không khả dụng</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S122A8A674A2DE07D" xml:space="preserve">
+    <value>Bản ghi plugin đã cài của ứng dụng chủ có tên không hợp lệ</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF035F3E2C28C6129" xml:space="preserve">
+    <value>Hợp đồng kiểu liệt kê vòng đời của ứng dụng chủ không tương thích</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC656ED743A98C5D7" xml:space="preserve">
+    <value>Giao diện vòng đời của ứng dụng chủ không khả dụng hoặc không tương thích</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SDACF8E7760DB26E6" xml:space="preserve">
+    <value>Các kiểu vòng đời của ứng dụng chủ không khả dụng</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S616CD453CDAE5FD0" xml:space="preserve">
+    <value>Bộ truy xuất ID cài đặt plugin của ứng dụng chủ không khả dụng hoặc không tương thích</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1983E34B67FD5B4D" xml:space="preserve">
+    <value>Trình quản lý plugin của ứng dụng chủ không khả dụng</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S02AF27A3FF436BC3" xml:space="preserve">
+    <value>Bộ truy xuất dịch vụ quản lý plugin của ứng dụng chủ không khả dụng hoặc không tương thích</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD1C99CD34C2ABC45" xml:space="preserve">
+    <value>Bộ truy xuất tên plugin của ứng dụng chủ không khả dụng hoặc không tương thích</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9B78177D3EEC6D3E" xml:space="preserve">
+    <value>Bộ truy xuất trạng thái plugin của ứng dụng chủ không khả dụng hoặc không tương thích</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S96B4FF3C235E45B9" xml:space="preserve">
+    <value>Bộ đọc vòng đời không khả dụng: {0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD748A01364AB06DB" xml:space="preserve">
+    <value>Bên ngang hàng của tính năng di chuyển</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S7CFE761B16572921" xml:space="preserve">
+    <value>Nhiều bản cài đặt bên ngang hàng chưa được dỡ tải hoàn toàn</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF22513C991F0CB3D" xml:space="preserve">
+    <value>Thỏa thuận phiên bản ONH</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S100653D37DAABE3A" xml:space="preserve">
+    <value>ID cài đặt bên ngang hàng xuất hiện nhiều lần</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1E2ED8172E91F0E7" xml:space="preserve">
+    <value>ID cài đặt bên ngang hàng không khả dụng hoặc không hợp lệ</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1BDB586894E64723" xml:space="preserve">
+    <value>Không thể đọc vòng đời bên ngang hàng ({0})</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6053A12B80273858" xml:space="preserve">
+    <value>Vòng đời bên ngang hàng là {0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S568AD7D0A45C45FD" xml:space="preserve">
+    <value>Không nhận diện được trạng thái vòng đời bên ngang hàng</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S3302D41A86A08337" xml:space="preserve">
+    <value>Trạng thái vòng đời bên ngang hàng không khả dụng hoặc không hợp lệ</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S45FDD29564BDE619" xml:space="preserve">
+    <value>Plugin bên ngang hàng đang tải</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6C923ABAFFD29336" xml:space="preserve">
+    <value>Plugin bên ngang hàng đang dỡ tải</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S5EBB1697FDC852B7" xml:space="preserve">
+    <value>Tải, dỡ tải hoặc phân giải phụ thuộc của plugin bên ngang hàng thất bại</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S27B64EB0B3CAA9DE" xml:space="preserve">
+    <value>Không có tên plugin đối tác</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8D4F6114D5CAE8E1" xml:space="preserve">
+    <value>Nhân vật ONH đã thay đổi sau khi thống nhất phiên bản với Tony.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S724C52D78F1F7D4D" xml:space="preserve">
+    <value>Nhân vật ONH đã thay đổi trước khi thống nhất phiên bản.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F560AA230DC76FF" xml:space="preserve">
+    <value>Đối tác ONH không cung cấp phiên bản XA Slave và Dropbox khớp nhau.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9F7BA2473E010837" xml:space="preserve">
+    <value>Chưa thiết lập quá trình bắt tay phiên bản ONH.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S67F304E72345F97C" xml:space="preserve">
+    <value>Thỏa thuận phiên bản của Tony đang hoạt động đã thay đổi trong lần trao đổi ONH này.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S93C01FAFC54D840E" xml:space="preserve">
+    <value>Thỏa thuận phiên bản của Tony đang hoạt động không khả dụng.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0DCA5AD5069C8C4B" xml:space="preserve">
+    <value>Không có phiên bản XA Slave hoặc Dropbox đã nạp của Tony đang hoạt động.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SB1FF900AF3E947A1" xml:space="preserve">
+    <value>Cặp giao dịch Tony/chủ sở hữu đang hoạt động không còn cập nhật hoặc chưa liên kết hai chiều.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DBB063EA136CB84" xml:space="preserve">
+    <value>Không có phiên bản assembly Dropbox đã nạp.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S52E81B2AF87BC092" xml:space="preserve">
+    <value>Nhà cung cấp Dropbox đã nạp không khả dụng.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC6C9814C8F0D77A2" xml:space="preserve">
+    <value>Phiên bản Dropbox đã nạp không khả dụng hoặc không hợp lệ.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SE2CAD295157866AC" xml:space="preserve">
+    <value>Phiên bản XA Slave đã nạp không khả dụng hoặc không hợp lệ.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF0B0B41A45ADA9A6" xml:space="preserve">
+    <value>Đối tác không xác nhận phiên bản XA Slave và Dropbox của Tony trong vòng 15 giây.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C0D841237BD59F1" xml:space="preserve">
+    <value>Đối tác không hỗ trợ quá trình bắt tay phiên bản bắt buộc của Tony.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S116E90EE8FCE1A4A" xml:space="preserve">
+    <value>Đối tác đã bỏ qua quá trình bắt tay phiên bản XA Slave và Dropbox của Tony. Hãy cập nhật XA Slave trên máy khách đó.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0E815C03839E4BBA" xml:space="preserve">
+    <value>Người bán không hỗ trợ quá trình bắt tay phiên bản bắt buộc của Tony.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F3F35EF7873F2E0" xml:space="preserve">
+    <value>Đối tác giao dịch không hỗ trợ quá trình bắt tay phiên bản của Tony. Hãy cập nhật XA Slave trên máy khách đó.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S4F3A989A90EB3C6C" xml:space="preserve">
+    <value>Hết thời gian chờ quá trình bắt tay phiên bản giữa Tony đang hoạt động và chủ sở hữu.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S17065D0946DF707A" xml:space="preserve">
+    <value>Tony yêu cầu XA Slave {0} và Dropbox {1}; đối tác giao dịch báo cáo XA Slave {2} và Dropbox {3}.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S233EBAD47A25004E" xml:space="preserve">
+    <value>Tony yêu cầu XA Slave {0} và Dropbox {1}; không có phiên bản đã nạp của đối tác giao dịch.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD0D32A7E705FD605" xml:space="preserve">
+    <value>Xác minh phiên bản XA Slave và Dropbox của Tony</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SBC57BFDA3D6FD68C" xml:space="preserve">
+    <value>Đang chờ thống nhất phiên bản XA Slave và Dropbox của Tony đang hoạt động.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851B713C54880F95" xml:space="preserve">
+    <value>lần trao đổi hiện tại với người nhận</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DA262EB757C209B" xml:space="preserve">
+    <value>đang chờ đối tác giao dịch có phiên bản tương thích</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
 </root>

@@ -1185,6 +1185,12 @@ public sealed class IpcClient
         catch { return false; }
     }
 
+    internal bool DropboxTryGetBusy(out bool busy)
+    {
+        try { busy = dropboxIsBusySubscriber.InvokeFunc(); return true; }
+        catch { busy = false; return false; }
+    }
+
     public bool DropboxBeginTrading()
     {
         try { dropboxBeginTradingSubscriber.InvokeAction(); return true; }

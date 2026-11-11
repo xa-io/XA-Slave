@@ -30,7 +30,11 @@ internal sealed class DalamudPeerLifecycle
     }
 
     internal static DalamudPeerLifecycle? TryResolve(Assembly host, object initializedPluginInterface)
+        => TryResolve(host, initializedPluginInterface, out _);
+
+    internal static DalamudPeerLifecycle? TryResolve(Assembly host, object initializedPluginInterface, out string reason)
     {
+        reason = "Host lifecycle interface is unavailable or incompatible";
         try
         {
             // The actual DalamudPluginInterface constructor already obtains
@@ -40,47 +44,75 @@ internal sealed class DalamudPeerLifecycle
             var interfaceType = RequiredType(host, "Dalamud.Plugin.DalamudPluginInterface");
             if (initializedPluginInterface == null || initializedPluginInterface.GetType() != interfaceType)
                 return null;
+            reason = "Host lifecycle types are unavailable";
             var manager = RequiredType(host, "Dalamud.Plugin.Internal.PluginManager");
             var local = RequiredType(host, "Dalamud.Plugin.Internal.Types.LocalPlugin");
             var phase = RequiredType(host, "Dalamud.Plugin.Internal.Types.PluginState");
             var propagation = RequiredType(host, "Dalamud.ExceptionPropagationMode");
+            reason = "Host lifecycle enum contract is incompatible";
             ValidateEnum(phase, ("Unloaded", 0), ("UnloadError", 1), ("Unloading", 2), ("Loaded", 3),
                 ("LoadError", 4), ("Loading", 5), ("DependencyResolutionFailed", 6));
             ValidateEnum(propagation, ("PropagateAll", 0), ("PropagateNonUnloaded", 1), ("None", 2));
+            reason = "Host plugin manager service getter is unavailable or incompatible";
             var service = RequiredType(host, "Dalamud.Service`1").MakeGenericType(manager);
             var get = service.GetMethod("GetNullable", BindingFlags.Public | BindingFlags.Static,
                 binder: null, types: [propagation], modifiers: null);
             if (get == null || get.ReturnType != manager || get.IsGenericMethod || get.DeclaringType?.Assembly != host)
                 return null;
-            return new(local, get, Enum.ToObject(propagation, 2),
-                RequiredGetter(manager, "InstalledPlugins", typeof(IEnumerable<>).MakeGenericType(local)),
-                RequiredGetter(local, "InternalName", typeof(string)), RequiredGetter(local, "EffectiveWorkingPluginId", typeof(Guid)),
-                RequiredGetter(local, "State", phase));
+            reason = "Host installed-plugin collection getter is unavailable or incompatible";
+            var installed = RequiredGetter(manager, "InstalledPlugins", typeof(IEnumerable<>).MakeGenericType(local));
+            reason = "Host plugin name getter is unavailable or incompatible";
+            var name = RequiredGetter(local, "InternalName", typeof(string));
+            reason = "Host plugin installation ID getter is unavailable or incompatible";
+            var id = RequiredGetter(local, "EffectiveWorkingPluginId", typeof(Guid));
+            reason = "Host plugin state getter is unavailable or incompatible";
+            var pluginState = RequiredGetter(local, "State", phase);
+            var result = new DalamudPeerLifecycle(local, get, Enum.ToObject(propagation, 2), installed, name, id, pluginState);
+            reason = string.Empty;
+            return result;
         }
-        catch { return null; }
+        catch (Exception error)
+        {
+            reason += $" ({error.GetType().Name})";
+            return null;
+        }
     }
 
     internal PeerPluginObservation Observe(string peerInternalName)
     {
-        if (string.IsNullOrWhiteSpace(peerInternalName)) return default;
+        if (string.IsNullOrWhiteSpace(peerInternalName))
+            return new(PeerPluginPhase.Unknown, Guid.Empty, "Peer plugin name is unavailable");
         try
         {
             // The installed SDK's GetNullable(None) returns immediately when its
             // service task is incomplete/faulted. Do not use Get/GetAsync here.
             var manager = getNullable.Invoke(null, [noPropagation]);
-            if (manager == null || installedPlugins.GetValue(manager) is not IEnumerable plugins) return default;
-            var found = false;
-            var result = new PeerPluginObservation(PeerPluginPhase.Absent, Guid.Empty);
+            if (manager == null)
+                return new(PeerPluginPhase.Unknown, Guid.Empty, "Host plugin manager is unavailable");
+            if (installedPlugins.GetValue(manager) is not IEnumerable plugins)
+                return new(PeerPluginPhase.Unknown, Guid.Empty, "Host installed-plugin collection is unavailable");
+            PeerPluginObservation? active = null;
+            Guid? unloadedId = null;
+            var matchingIds = new HashSet<Guid>();
             var count = 0;
             foreach (var plugin in plugins)
             {
-                if (++count > 1024 || plugin == null || !localPluginType.IsInstanceOfType(plugin) ||
-                    plugin.GetType().Assembly != localPluginType.Assembly) return default;
-                if (internalName.GetValue(plugin) is not string name) return default;
+                if (++count > 1024)
+                    return new(PeerPluginPhase.Unknown, Guid.Empty, "Host installed-plugin collection exceeds the validation limit");
+                if (plugin == null || !localPluginType.IsInstanceOfType(plugin) ||
+                    plugin.GetType().Assembly != localPluginType.Assembly)
+                    return new(PeerPluginPhase.Unknown, Guid.Empty, "Host installed-plugin collection contains an invalid record");
+                if (internalName.GetValue(plugin) is not string name)
+                    return new(PeerPluginPhase.Unknown, Guid.Empty, "Host installed-plugin record has an invalid name");
                 if (!string.Equals(name, peerInternalName, StringComparison.Ordinal)) continue;
-                if (found || installationId.GetValue(plugin) is not Guid id || id == Guid.Empty) return default;
-                found = true;
-                var value = Convert.ToInt32(state.GetValue(plugin));
+                if (installationId.GetValue(plugin) is not Guid id || id == Guid.Empty)
+                    return new(PeerPluginPhase.Unknown, Guid.Empty, "Peer installation ID is unavailable or invalid");
+                if (!matchingIds.Add(id))
+                    return new(PeerPluginPhase.Unknown, Guid.Empty, "Peer installation ID appears more than once");
+                var rawState = state.GetValue(plugin);
+                if (rawState == null || rawState.GetType() != state.PropertyType)
+                    return new(PeerPluginPhase.Unknown, id, "Peer lifecycle state is unavailable or invalid");
+                var value = Convert.ToInt32(rawState);
                 var observed = value switch
                 {
                     0 => PeerPluginPhase.Unloaded,
@@ -90,11 +122,36 @@ internal sealed class DalamudPeerLifecycle
                     1 or 4 or 6 => PeerPluginPhase.Failed,
                     _ => PeerPluginPhase.Unknown,
                 };
-                result = new(observed, id);
+                if (observed == PeerPluginPhase.Unknown)
+                    return new(PeerPluginPhase.Unknown, id, "Peer lifecycle state is not recognized");
+                if (observed == PeerPluginPhase.Unloaded)
+                {
+                    // Stable across host enumeration order. Retained IPC publications
+                    // still have to pass FeatureConflictPeer's normal checks.
+                    if (!unloadedId.HasValue || id.CompareTo(unloadedId.Value) < 0) unloadedId = id;
+                    continue;
+                }
+                if (active.HasValue)
+                    return new(PeerPluginPhase.Unknown, Guid.Empty, "Multiple peer installations are not fully unloaded");
+                var detail = observed switch
+                {
+                    PeerPluginPhase.Loading => "Peer plugin is loading",
+                    PeerPluginPhase.Unloading => "Peer plugin is unloading",
+                    PeerPluginPhase.Failed => "Peer plugin load, unload or dependency resolution failed",
+                    _ => null,
+                };
+                active = new(observed, id, detail);
             }
-            return result;
+            // Choose only after validating the entire collection, so a later
+            // malformed or ambiguous record cannot be hidden by a loaded match.
+            return active ?? (unloadedId.HasValue
+                ? new PeerPluginObservation(PeerPluginPhase.Unloaded, unloadedId.Value)
+                : new PeerPluginObservation(PeerPluginPhase.Absent, Guid.Empty));
         }
-        catch { return default; }
+        catch (Exception error)
+        {
+            return new(PeerPluginPhase.Unknown, Guid.Empty, $"Peer lifecycle could not be read ({error.GetType().Name})");
+        }
     }
 
     private static Type RequiredType(Assembly host, string name) =>

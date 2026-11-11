@@ -35,6 +35,9 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
     private readonly FeatureConflictPeerReader otherTeleportPeer;
     private bool requestedEnabled;
     private bool preferencePending;
+    private bool retryingPeerActivation;
+    private long nextPeerActivationAttemptMs;
+    private const long PeerActivationRetryIntervalMs = 1000;
     private bool initialized;
     private bool transitionBusy;
     private bool cleanupFailed;
@@ -101,7 +104,38 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
     public string ProximityTextDisplay { get { lock (gate) return GetProximityMessage().Display; } }
 
     // These snapshots are evaluated under gate; operational strings retain their original culture/text.
-    private UiMessage GetStatusMessage() => RecoveryRequired ? UiMessage.Key("SECFE95A0B0FF924C") : enabled ? !PeersPermitted ? UiMessage.Format("SCC5DC8D369D8D14C", UiMessage.Authored(!peer.Permitted ? peer.Reason : otherTeleportPeer.Reason)) : workflow?.StatusMessage ?? statusMessage ?? UiMessage.Raw(status) : statusMessage ?? UiMessage.Raw(status);
+    private UiMessage GetStatusMessage() => RecoveryRequired ? UiMessage.Key("SECFE95A0B0FF924C") : enabled ? !PeersPermitted ? UiMessage.Format("SCC5DC8D369D8D14C", GetPeerReasonMessage(!peer.Permitted ? peer.Reason : otherTeleportPeer.Reason)) : workflow?.StatusMessage ?? statusMessage ?? UiMessage.Raw(status) : statusMessage ?? UiMessage.Raw(status);
+
+    private UiMessage GetPeerReasonMessage(string reason)
+    {
+        var reader = reason == peer.Reason ? peer : reason == otherTeleportPeer.Reason ? otherTeleportPeer : null;
+        if (reader is { ReasonPeer: { } name })
+            return UiMessage.Format(UiLocale.Key("{0}: {1}"),
+                name == "Movement feature peer" ? UiMessage.Authored(name) : UiMessage.Raw(name),
+                GetPeerReasonDetailMessage(reader.ReasonDetail));
+        return GetPeerReasonDetailMessage(reason);
+    }
+
+    // Only decompose phrases authored by our lifecycle reader. Peer names and
+    // exception type names remain opaque; raw conflict/log values never change.
+    private static UiMessage GetPeerReasonDetailMessage(string reason)
+    {
+        const string readerPrefix = "Lifecycle reader unavailable: ";
+        if (reason.StartsWith(readerPrefix, StringComparison.Ordinal))
+            return UiMessage.Format(UiLocale.Key("Lifecycle reader unavailable: {0}"),
+                GetPeerReasonDetailMessage(reason[readerPrefix.Length..]));
+        const string readPrefix = "Peer lifecycle could not be read (";
+        if (reason.StartsWith(readPrefix, StringComparison.Ordinal) && reason.EndsWith(')'))
+            return UiMessage.Format(UiLocale.Key("Peer lifecycle could not be read ({0})"), reason[readPrefix.Length..^1]);
+        const string phasePrefix = "Peer lifecycle is ";
+        if (reason.StartsWith(phasePrefix, StringComparison.Ordinal)
+            && Enum.TryParse<PeerPluginPhase>(reason[phasePrefix.Length..], out var phase))
+            return UiMessage.Format(UiLocale.Key("Peer lifecycle is {0}"), UiMessage.Authored(phase.ToString()));
+        var suffix = reason.LastIndexOf(" (", StringComparison.Ordinal);
+        if (suffix > 0 && reason.EndsWith(')') && UiLocale.HasOriginal(UiLocale.Key(reason[..suffix])))
+            return UiMessage.Format(UiLocale.Key("{0} ({1})"), UiMessage.Authored(reason[..suffix]), reason[(suffix + 2)..^1]);
+        return UiMessage.Authored(reason);
+    }
     private UiMessage GetLastActionMessage() => UiMessage.Format("S98984401FDC21498", workflow?.Requests ?? 0, workflow?.Dispatched ?? 0, workflow?.TransportsObserved ?? 0, workflow?.Failures ?? 0, workflow?.NativeCancelsSuppressed ?? 0);
     private UiMessage GetReadinessMessage() => !enabled ? UiMessage.Key("S75081B593D15CF6E") : workflow?.Active == true ? UiMessage.Key("S621D978C6232CEA0") : workflow?.GetStartBlockMessage(frame, sample, Environment.TickCount64) ?? UiMessage.Key("SF063CBAFB3BC2758");
     private UiMessage GetDiagnosticsMessage() => UiMessage.Format("SC8BDE5D63318156C", opcode, commandsSeen, positionPacketsSeen, workflow?.PreparedPositions ?? 0, movementStateAddress != 0 ? UiMessage.Key("SDC676B42859915C8") : UiMessage.Key("SBA691BA042BCEDD9"), castActionsSuppressed, lastTriggerResult.HasValue ? UiMessage.Raw(lastTriggerResult.Value.ToString()) : UiMessage.Key("S140BEDBF9C3F6D56"));
@@ -110,6 +144,18 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
     public bool IsTeleporting { get { lock (gate) return workflow?.Active == true; } }
     public int TeleportsProcessed { get { lock (gate) return workflow?.Dispatched ?? 0; } }
     public bool IsEnabled { get { lock (gate) return enabled; } }
+
+    internal bool IsWaitingForPeerLifecycle
+    {
+        get
+        {
+            lock (gate)
+                return requestedEnabled && !disposed && !RecoveryRequired
+                    && (retryingPeerActivation || ((!peer.Permitted || !otherTeleportPeer.Permitted)
+                    && (peer.Permitted || peer.IsWaiting)
+                    && (otherTeleportPeer.Permitted || otherTeleportPeer.IsWaiting)));
+        }
+    }
 
     public void RequestCancel() { lock (gate) cancelRequested = true; }
 
@@ -120,6 +166,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
             if (disposed) return false;
             requestedEnabled = value;
             preferencePending = true;
+            retryingPeerActivation = false;
             if (initialized && framework.IsInFrameworkUpdateThread) ApplyPreference();
             else status = UiMessage.Store(ref statusMessage, UiMessage.Key("S89F5714C5B66D729"));
             return preferencePending ? requestedEnabled : enabled;
@@ -128,7 +175,7 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
 
     public void InitializePreference(bool value)
     {
-        lock (gate) { initialized = true; requestedEnabled = value; preferencePending = true; }
+        lock (gate) { initialized = true; requestedEnabled = value; preferencePending = true; retryingPeerActivation = false; }
     }
 
     private bool PeersPermitted => peer.Permitted && otherTeleportPeer.Permitted;
@@ -136,6 +183,9 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
     {
         var primary = peer.Read();
         var other = otherTeleportPeer.Read();
+        // A temporary wait on one peer must not hide a real failure on the other.
+        if (!primary.Permitted && !primary.IsWaiting && !primary.RequiresRecheck) return primary;
+        if (!other.Permitted && !other.IsWaiting && !other.RequiresRecheck) return other;
         return primary.Permitted ? other : primary;
     }
 
@@ -145,15 +195,47 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
     private void ApplyPreference()
     {
         if (!preferencePending || transitionBusy) return;
+        if (retryingPeerActivation)
+        {
+            if (!requestedEnabled || RecoveryRequired)
+            {
+                preferencePending = false;
+                retryingPeerActivation = false;
+                return;
+            }
+            if (Environment.TickCount64 < nextPeerActivationAttemptMs) return;
+        }
+        var wasRetryingPeerActivation = retryingPeerActivation;
         preferencePending = false;
+        retryingPeerActivation = false;
         conflict.Publication.MarkReady();
         transitionBusy = true;
         try
         {
             if (requestedEnabled)
             {
-                var applied = conflict.Publication.TryEnable(ReadPeers, () => SetEnabledCore(true), ConflictActivity);
-                if (!applied) status = UiMessage.Store(ref statusMessage, UiMessage.Format("S5367AFABD2DAF74F", UiMessage.Authored(conflict.Publication.LastReason)));
+                var peerDecision = FeatureConflictDecision.Deny("Peer activation has not been evaluated");
+                var applied = conflict.Publication.TryEnable(() => peerDecision = ReadPeers(), () => SetEnabledCore(true), ConflictActivity);
+                if (!applied)
+                {
+                    var retryPeers = peerDecision.IsWaiting || peerDecision.RequiresRecheck;
+                    status = UiMessage.Store(ref statusMessage, UiMessage.Format(retryPeers ? "SA049806B28DC9897" : "S5367AFABD2DAF74F", GetPeerReasonMessage(conflict.Publication.LastReason)));
+                    // Retain the saved request only for a lifecycle transition or a read race.
+                    // Each retry repeats all peer, publication and recovery guards.
+                    if (retryPeers && requestedEnabled && !disposed && !RecoveryRequired)
+                    {
+                        preferencePending = true;
+                        retryingPeerActivation = true;
+                        nextPeerActivationAttemptMs = Environment.TickCount64 + PeerActivationRetryIntervalMs;
+                    }
+                }
+                if (wasRetryingPeerActivation && !preferencePending)
+                {
+                    if (applied)
+                        log.Information("[XASlave] Instant Teleport enabled after peer readiness checks.");
+                    else
+                        log.Warning($"[XASlave] Instant Teleport automatic activation stopped: {conflict.Publication.LastReason}");
+                }
             }
             else
             {
@@ -514,6 +596,8 @@ public unsafe sealed class InstantTeleportService : IDisposable, IInstantTelepor
         lock (gate)
         {
             if (disposed) return;
+            preferencePending = false;
+            retryingPeerActivation = false;
             try { conflict.Publication.BeginShutdown(); }
             catch { cleanupFailed = true; }
             transitionBusy = true;

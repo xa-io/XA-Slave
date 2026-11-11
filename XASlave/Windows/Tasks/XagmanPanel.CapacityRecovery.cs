@@ -526,7 +526,11 @@ public partial class SlaveWindow
         if (nextTony && pendingSupply) return false;
         if (xagmanCapacityRecoveredTonys.Count == 0)
         {
-            var partialDetails = owners.SelectMany(peer => peer.PartialOwners)
+            var partialDetails = owners.SelectMany(peer => peer.PartialOwners
+                    .Select(state => (State: state, IgnoreGil: CanIgnoreXagmanPeerGilShortfalls(peer)
+                        && !IsXagmanProtectedReportingOwner(state.CharacterNameWorld))))
+                .Where(entry => !entry.IgnoreGil || !IsXagmanIgnoredGilOnlyPartialOwner(entry.State))
+                .Select(entry => GetXagmanReportedPartialOwner(entry.State, allowIgnoredGil: entry.IgnoreGil))
                 .Select(state => $"{state.CharacterNameWorld}: {GetXagmanPartialOwnerDetail(state)}").ToList();
             var detail = partialDetails.Count == 0 ? "No requested outgoing supply freed usable receiving capacity."
                 : "Unfilled supplies: " + string.Join("; ", partialDetails);
@@ -612,7 +616,8 @@ public partial class SlaveWindow
                 && state.PendingGiveItems.Count == 0)
                 state.PendingGiveItems = CloneXagmanTradeRequests(checkpoint.ActivePendingGiveItems);
             state.ReasonMessage = global::XASlave.Localization.UiMessage.Key("S6C9C9EB470B90DC4");
-            plugin.TaskRunner.AddLog($"Xagman: completion warning: {owner}: {GetXagmanPartialOwnerDetail(state)}");
+            var reportedState = GetXagmanReportedPartialOwner(state, allowIgnoredGil: !IsXagmanProtectedReportingOwner(owner));
+            plugin.TaskRunner.AddLog($"Xagman: completion warning: {owner}: {GetXagmanPartialOwnerDetail(reportedState)}");
         }
         xagmanOwnerRunPlan = xagmanCollectionFirstOwnerFullPlan.ToList();
         xagmanOwnerTotalCharacters = xagmanOwnerRunPlan.Count;

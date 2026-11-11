@@ -23,6 +23,28 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.63 - 2026-11-11",
+            Lines =
+            [
+                "- Updated Dalamud 15.0.4.0 Compatibility: Updated support for Auto Sort Items, Better Inventory Mover, Auto Restore Furniture, Inspect Outfit Try-on and View Single Item.",
+                "- Added Xagman Forecast Controls: While stopped, exclude Tonys or select by an exact NQ/HQ item's minimum saved stock; unknown or stale stock is skipped.",
+                "- Fixed Xagman Forecast Refresh: Preserve totals and status when scans are unchanged, preventing orange/green flickering.",
+                "- Added Ignore Gil Shortfalls: Toggle below forecast Refresh to exclude gil shortages from forecasts and final outstanding results while preserving item requirements and actual trades.",
+                "- Fixed Startup Status Messages: Normal ready and waiting states are informational; warnings remain for unavailable features and failures.",
+                "- Fixed Instant Teleport Startup: Handle fully unloaded peer copies, retry temporary peer readiness checks, and identify the peer and reason when activation is blocked.",
+                "- Fixed Interface Translations: Inventory search errors, PvP hotbar controls and Xagman trade-version and Instant Teleport status messages use the selected interface language.",
+                "- Updated Xagman Trades: Fit batches to free receiver slots, recheck space and retain unfinished quantities. Clients must match Tony's XA Slave and Dropbox versions.",
+                "- Added XA Mods > Game Mods > Inventory Search Bar: Search player and retainer inventories, saddlebags and FC chests by item name or ID.",
+                "- Added Inventory Filters: Combine search with T tradable, NT untradable, B bound and U unique filters. Show or hide each button in Options to give search more room.",
+                "- Inventory Search Shortcuts: Ctrl+F focuses search; Escape clears the search and all selected filters.",
+                "- Fixed Inventory Search Controls: Improved typing focus, filter visibility and highlighting across inventory layouts, retainer pages and moved items.",
+                "- Fixed XA Mod Hotkeys: Repeated presses toggle features on and off while the hotkey's Enabled setting remains checked.",
+                "- Fixed PvP Hotbar Visibility: Correct show/hide commands and restore controlled bars when disabled, while respecting later HUD Layout changes.",
+                "- Fixed View Single Item Captures: Preserve FC crests in new captures. November captures remain compatible; October captures remain saved but require recapture for November previews.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.62 - 2026-11-05",
             Lines =
             [

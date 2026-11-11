@@ -29617,4 +29617,448 @@ NamePlate就绪 + PlayerAvailable + 未在咏唱 + 未在战斗。</value>
     <value>该键不能用作快捷键。请选择支持的按键。</value>
     <comment>Source: I134 XA Mods hotkeys.</comment>
   </data>
+  <data name="S77940585632007E6" xml:space="preserve">
+    <value>库存物品</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S84F85BC068049C81" xml:space="preserve">
+    <value>最低库存</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S83A292024EE019A9" xml:space="preserve">
+    <value>按库存条件选择</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S2FB74173F401115D" xml:space="preserve">
+    <value>正在检查已保存的库存...</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S0F87FE2BBE7F0FE8" xml:space="preserve">
+    <value>设置或库存提供方已更改，已取消库存选择。</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S4C52ED5CBA68D477" xml:space="preserve">
+    <value>库存选择超时。请刷新库存后重试。</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S7D96B8A4D9FB7C9A" xml:space="preserve">
+    <value>库存查询失败。已保留当前选择。</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD32B3168FB34A854" xml:space="preserve">
+    <value>没有已知库存可用。已保留当前选择。</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SC972DED3C9AC3F8E" xml:space="preserve">
+    <value>已选择 {0} 个 Tony；已跳过库存未知或过期的 {1} 个。</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S55CCD119AAA21109" xml:space="preserve">
+    <value>从完整 Tony 名单中选择已保存库存达到或超过最低值的角色。库存未知或过期的角色将被排除。请保存命名角色列表以保留选择。</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD6AA816E13650A1D" xml:space="preserve">
+    <value>将此 Tony 从当前选择中移除。</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SE23DB51A61294A37" xml:space="preserve">
+    <value>已将 Tony 从当前选择中移除。</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD5B12C1924E91DDA" xml:space="preserve">
+    <value>金币库存不包含 Tony 的金币保留额。</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S870942552144CE28" xml:space="preserve">
+    <value>背包搜索栏</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SC2A9ACBFB6EB565E" xml:space="preserve">
+    <value>按物品名称或ID搜索玩家和雇员的背包。</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SBE46A3B74FED5615" xml:space="preserve">
+    <value>调暗不匹配的格子，不移动物品。Ctrl+F聚焦当前背包的搜索栏，Escape清空搜索。名称使用游戏语言，按输入的文字直接匹配。</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S024C6D7199F2538F" xml:space="preserve">
+    <value>背包搜索已就绪。请打开自己或雇员的背包。</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S345506B671848DC7" xml:space="preserve">
+    <value>背包搜索不可用：{0}</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S938E6B45CD3AEBAF" xml:space="preserve">
+    <value>按物品名称原文或物品ID搜索。Ctrl+F聚焦当前背包的搜索栏。</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S5C257E210B1A5615" xml:space="preserve">
+    <value>无法确认交易容量。请查看任务日志。</value>
+    <comment>Source: I153 receiver-capacity trade batches.</comment>
+  </data>
+  <data name="SB5929AF709082C0E" xml:space="preserve">
+    <value>按名称、ID或物品属性搜索背包、陆行鸟鞍囊、雇员背包和部队储物柜中的物品。</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S1BB180DBC0364B35" xml:space="preserve">
+    <value>物品搜索已就绪。请打开背包、陆行鸟鞍囊、雇员背包或部队储物柜。</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SE90EFC70058D7FF8" xml:space="preserve">
+    <value>按物品名称的字面文本或物品ID搜索。Ctrl+F聚焦当前储物窗口的搜索栏。T、NT、B和U用于筛选物品。Escape清除搜索和筛选条件。</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SD053EAF81A901089" xml:space="preserve">
+    <value>可交易：显示当前可交易的物品。可与搜索文本和其他筛选条件组合使用。</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S8B322208AD91E717" xml:space="preserve">
+    <value>不可交易：显示当前不可交易的物品。可与搜索文本和其他筛选条件组合使用。</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S71FFD32EEDDE9073" xml:space="preserve">
+    <value>绑定：显示有精炼度的物品，收藏品除外。可与搜索文本和其他筛选条件组合使用。</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S92D269665B6AB115" xml:space="preserve">
+    <value>独占：显示标记为独占的物品。可与搜索文本和其他筛选条件组合使用。</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S83E0B9DDDE38050F" xml:space="preserve">
+    <value>忽略金币不足</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S54BF15532188F035" xml:space="preserve">
+    <value>在预测和最终结果中忽略金币不足，包括真实的不足。金币交易和物品需求保持不变。</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SADBF70DE1D082E88" xml:space="preserve">
+    <value>已忽略金币不足</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S7D648F5B47F34AFB" xml:space="preserve">
+    <value>已忽略</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S10EDC6C7796AAE14" xml:space="preserve">
+    <value>所选所有者的已知库存可满足除金币外的所有Give批次目标。</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S1E37A43E43DB3535" xml:space="preserve">
+    <value>每个已知所有者均已满足除金币外的所有正数Balance目标。</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S8D9A4AA562DAAD69" xml:space="preserve">
+    <value>当前供应：所选Tony的库存可满足除金币外的所有固定已知需求。</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S6CA735C454B42CB6" xml:space="preserve">
+    <value>当前供应：所选Tony的已知库存可满足除金币外的固定已知需求，但未知或重复的数据可能改变结果。</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SBDDF5539CBC5DFB4" xml:space="preserve">
+    <value>收集后供应：预计Tony库存可满足除金币外的所有固定已知补货需求。</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S3E1E253E5CD15EA6" xml:space="preserve">
+    <value>收集后供应：只有所有预计收集物品都能装下，且所有未知数据均如预期确定，预计已知库存才能满足除金币外的固定已知需求。</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S2D5F3616E2259EB9" xml:space="preserve">
+    <value>显示T（可交易）</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SB9A60D18B6064186" xml:space="preserve">
+    <value>显示NT（不可交易）</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SBC6660B2FC3061A1" xml:space="preserve">
+    <value>显示B（绑定）</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="S9B010E574A02A1EB" xml:space="preserve">
+    <value>显示U（独占）</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SAFFBE0EDFFE7ED1C" xml:space="preserve">
+    <value>隐藏筛选按钮可为搜索框留出更多空间。隐藏已选中的筛选条件时，会取消该条件的选择。</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SFB379C0639B02DAF" xml:space="preserve">
+    <value>尚未添加搜索栏，背包窗口就已发生变化。</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="SC516314371BAD2C5" xml:space="preserve">
+    <value>背包窗口标题栏不可用。</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S2EBDA73F1FA78881" xml:space="preserve">
+    <value>不支持此背包窗口标题栏的几何布局。</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S08C72A181576F45F" xml:space="preserve">
+    <value>启用时，监视英文聊天错误，以处理在PvP中被阻止的 /hotbar display 命令。你必须已登录，且主热键栏 _ActionBar 必须可见。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S227E7BC13EA9D851" xml:space="preserve">
+    <value>使用 /hotbar display 10 切换热键栏10的显示状态，或添加 on/off。支持热键栏1至10。启用监视本身不会更改任何热键栏，只有处理被阻止的显示命令时才会更改。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S4E14133FCE55493F" xml:space="preserve">
+    <value>备用处理被接受后，会处理错误而不重复执行命令。HUD确认更改后才会报告已显示或已隐藏；确认失败则报告错误。技能和按键绑定保持不变。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SCB19314CC4541E4D" xml:space="preserve">
+    <value>直接命令：/xa hotbar 1 切换热键栏1的显示状态；添加 on 可显示，添加 off 可隐藏。支持热键栏1至10。需要启用此模组，但不必等待错误，也不要求主热键栏可见。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SC6EBD47ABE501159" xml:space="preserve">
+    <value>/xa hotbar on 启用监视；/xa hotbar off 禁用监视，并显示仍由此模组控制的热键栏。HUD不可用时，恢复操作会等待；恢复失败时可再次执行 off 重试。错误监视要求主热键栏可见，因此可使用 /xa hotbar 1 on 恢复被隐藏的主热键栏。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SFD7341BC66A257EF" xml:space="preserve">
+    <value>PvP热键栏禁用器</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S01E44E92B04C187C" xml:space="preserve">
+    <value>处理在PvP中被阻止的 /hotbar display 命令。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="SDF3525839B48C10F" xml:space="preserve">
+    <value>登录后，在主热键栏 _ActionBar 可见时启用聊天监视，然后使用 /hotbar display 命令。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S4DC5CCBEF0102699" xml:space="preserve">
+    <value>已禁用；等待恢复受控热键栏</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SD84701543D60935E" xml:space="preserve">
+    <value>正在监视PvP中被阻止的 /hotbar display 命令</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SCF01459D717E88A1" xml:space="preserve">
+    <value>无法注册热键栏事件监听器</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S6D2783A951EEB8EF" xml:space="preserve">
+    <value>HUD隐藏或不可用时暂停</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SB6EC744ECC7D5E55" xml:space="preserve">
+    <value>等待PvP热键栏</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S00257BA7EBD4E0D0" xml:space="preserve">
+    <value>访问热键栏出错后已停止；关闭后重新开启以重试</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SAA5606AD083D6237" xml:space="preserve">
+    <value>无法读取已加载的Dropbox程序集版本。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC8F182EC41515C89" xml:space="preserve">
+    <value>宿主的已安装插件集合包含无效记录</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S56750EC27E3B1A01" xml:space="preserve">
+    <value>宿主的已安装插件集合超出验证上限</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851417F28A56EC9F" xml:space="preserve">
+    <value>宿主的已安装插件集合获取器不可用或不兼容</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C978BCF087A69B9" xml:space="preserve">
+    <value>宿主的已安装插件集合不可用</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S122A8A674A2DE07D" xml:space="preserve">
+    <value>宿主的已安装插件记录名称无效</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF035F3E2C28C6129" xml:space="preserve">
+    <value>宿主的生命周期枚举契约不兼容</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC656ED743A98C5D7" xml:space="preserve">
+    <value>宿主的生命周期接口不可用或不兼容</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SDACF8E7760DB26E6" xml:space="preserve">
+    <value>宿主的生命周期类型不可用</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S616CD453CDAE5FD0" xml:space="preserve">
+    <value>宿主的插件安装ID获取器不可用或不兼容</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1983E34B67FD5B4D" xml:space="preserve">
+    <value>宿主的插件管理器不可用</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S02AF27A3FF436BC3" xml:space="preserve">
+    <value>宿主的插件管理器服务获取器不可用或不兼容</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD1C99CD34C2ABC45" xml:space="preserve">
+    <value>宿主的插件名称获取器不可用或不兼容</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9B78177D3EEC6D3E" xml:space="preserve">
+    <value>宿主的插件状态获取器不可用或不兼容</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S96B4FF3C235E45B9" xml:space="preserve">
+    <value>生命周期读取器不可用：{0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD748A01364AB06DB" xml:space="preserve">
+    <value>移动功能对端</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S7CFE761B16572921" xml:space="preserve">
+    <value>多个对端安装实例尚未完全卸载</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF22513C991F0CB3D" xml:space="preserve">
+    <value>ONH版本协商</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S100653D37DAABE3A" xml:space="preserve">
+    <value>对端安装ID重复出现</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1E2ED8172E91F0E7" xml:space="preserve">
+    <value>对端安装ID不可用或无效</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1BDB586894E64723" xml:space="preserve">
+    <value>无法读取对端生命周期（{0}）</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6053A12B80273858" xml:space="preserve">
+    <value>对端生命周期为{0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S568AD7D0A45C45FD" xml:space="preserve">
+    <value>无法识别对端生命周期状态</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S3302D41A86A08337" xml:space="preserve">
+    <value>对端生命周期状态不可用或无效</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S45FDD29564BDE619" xml:space="preserve">
+    <value>对端插件正在加载</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6C923ABAFFD29336" xml:space="preserve">
+    <value>对端插件正在卸载</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S5EBB1697FDC852B7" xml:space="preserve">
+    <value>对端插件加载、卸载或依赖项解析失败</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S27B64EB0B3CAA9DE" xml:space="preserve">
+    <value>无法获取对方插件名称</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8D4F6114D5CAE8E1" xml:space="preserve">
+    <value>与Tony达成版本一致后，ONH角色发生了变化。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S724C52D78F1F7D4D" xml:space="preserve">
+    <value>达成版本一致前，ONH角色发生了变化。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F560AA230DC76FF" xml:space="preserve">
+    <value>ONH对方未提供匹配的XA Slave和Dropbox版本。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9F7BA2473E010837" xml:space="preserve">
+    <value>尚未建立ONH版本握手。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S67F304E72345F97C" xml:space="preserve">
+    <value>此次ONH交换期间，当前Tony的版本约定发生了变化。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S93C01FAFC54D840E" xml:space="preserve">
+    <value>无法获取当前Tony的版本约定。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0DCA5AD5069C8C4B" xml:space="preserve">
+    <value>无法获取当前Tony已加载的XA Slave或Dropbox版本。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SB1FF900AF3E947A1" xml:space="preserve">
+    <value>当前Tony与拥有者的交易配对信息已过期，或双方未相互绑定。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DBB063EA136CB84" xml:space="preserve">
+    <value>无法获取已加载的Dropbox程序集版本。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S52E81B2AF87BC092" xml:space="preserve">
+    <value>已加载的Dropbox提供程序不可用。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC6C9814C8F0D77A2" xml:space="preserve">
+    <value>已加载的Dropbox版本不可用或无效。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SE2CAD295157866AC" xml:space="preserve">
+    <value>已加载的XA Slave版本不可用或无效。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF0B0B41A45ADA9A6" xml:space="preserve">
+    <value>对方未在15秒内确认Tony的XA Slave和Dropbox版本。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C0D841237BD59F1" xml:space="preserve">
+    <value>对方不支持所需的Tony版本握手。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S116E90EE8FCE1A4A" xml:space="preserve">
+    <value>对方省略了Tony的XA Slave和Dropbox版本握手。请更新该客户端上的XA Slave。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0E815C03839E4BBA" xml:space="preserve">
+    <value>卖方不支持所需的Tony版本握手。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F3F35EF7873F2E0" xml:space="preserve">
+    <value>交易伙伴不支持Tony的版本握手。请更新该客户端上的XA Slave。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S4F3A989A90EB3C6C" xml:space="preserve">
+    <value>等待当前Tony与拥有者的版本握手超时。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S17065D0946DF707A" xml:space="preserve">
+    <value>Tony要求XA Slave {0}和Dropbox {1}；交易伙伴报告的是XA Slave {2}和Dropbox {3}。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S233EBAD47A25004E" xml:space="preserve">
+    <value>Tony要求XA Slave {0}和Dropbox {1}；无法获取交易伙伴已加载的版本。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD0D32A7E705FD605" xml:space="preserve">
+    <value>验证Tony的XA Slave和Dropbox版本</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SBC57BFDA3D6FD68C" xml:space="preserve">
+    <value>正在等待与当前Tony达成XA Slave和Dropbox版本一致。</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851B713C54880F95" xml:space="preserve">
+    <value>当前与接收方的交换</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DA262EB757C209B" xml:space="preserve">
+    <value>等待版本兼容的交易伙伴</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
 </root>

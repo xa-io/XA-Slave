@@ -20,7 +20,7 @@ public partial class SlaveWindow
 
         // Franchise Owner
         FoFindTony,          // find a present roster Tony and approach
-        FoAwaitStartGil,     // at Tony; auto-accept on; wait for Tony's +1 gil (start trigger)
+        FoAwaitStartGil,     // at Tony; arm after version agreement, then wait for Tony's +1 gil
         FoGiving,            // a give sub-task is running; resume here when done
         FoSettle,            // collection reconciliation and resupply request
         FoSendDoneGil,       // a send-1-gil sub-task is running; resume here when done
@@ -103,7 +103,7 @@ public partial class SlaveWindow
     // Tuning (first-pass values; tune from live testing).
     private const float XagmanOnhTradeStopDistance = 1.5f;
     private const float XagmanOnhScanRadius = 60f;                    // how far Tony looks for an arriving FO
-    private const int XagmanOnhTonyMinFreeSlots = 2;                  // free slots at/below which Tony is "full"
+    private const int XagmanOnhTonyMinFreeSlots = 0;                  // positive capacity can receive a bounded batch
     private const double XagmanOnhTonyIdleAdvanceSeconds = 300.0;     // no FO at all -> advance this Tony
     private const double XagmanOnhWaitLogSeconds = 15.0;
 
@@ -319,6 +319,10 @@ public partial class SlaveWindow
     {
         if (!xagmanRunning || !plugin.Configuration.XagmanOutsideNetworkHelper)
             return;
+        if (!TryValidateXagmanOnhLocalVersions(out var versionFailure))
+            RejectXagmanOnhTradeVersions(versionFailure);
+        if (!string.IsNullOrEmpty(onhVersionFailure))
+        { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Capture(onhVersionFailureUiMessage, onhVersionFailure)); return; }
         ObserveXagmanOnhTrade();
         if (xagmanActiveRole == XagmanRole.Tony) RefreshXagmanOnhQueue();
         if (plugin.TaskRunner.IsRunning)

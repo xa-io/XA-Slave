@@ -32,6 +32,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
     private readonly object sync = new();
     private readonly int[] foreignOperations = new int[SlotCount];
     private readonly nint moduleBase;
+    private readonly ViewSingleItemNativeContract contract;
     private readonly Action retireFilter;
     private readonly List<(int Rva, byte[] Bytes)> proofs = new();
     private readonly List<(int Rva, byte[] Bytes)> resumeProofs = new();
@@ -104,10 +105,11 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
     internal string ReadinessDiagnostic { get; private set; } = "stage=no-scene";
     internal string CameraDiagnostic => $"yaw={yaw:F3}; pitch={pitch:F3}; roll={roll:F3}; zoom={zoom:F3}; pan={panX:F3},{panY:F3}; viewport={viewport.X:F0}x{viewport.Y:F0}; itemSelection={itemSelection}; weaponSelection={weaponSelection}; paired={pairedWeapon}; requestedDrawn={DesiredWeaponDrawn}; accessory={fashionAccessory?.Id ?? 0}; companion={previewCompanion?.Id ?? 0}; standaloneModel={StandaloneModelId}; accessoryProjected={accessoryProjected}; {animationDiagnostic}";
 
-    internal ViewSingleItemScene(nint moduleBase, PEReader disk, Action retireFilter)
+    internal ViewSingleItemScene(nint moduleBase, PEReader disk, Action retireFilter, ViewSingleItemNativeContract contract)
     {
         NearbyZoneNativeBinding.RequireFramework();
         this.moduleBase = moduleBase;
+        this.contract = contract;
         this.retireFilter = retireFilter;
         ValidateLayouts();
         using var registration = ViewSingleItemRendererHookState.GetSyncRoot().EnterScope();
@@ -225,21 +227,21 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             RequirePointer((nint)ClientObjectManager.MemberFunctionPointers.GetObjectByIndex, 0x17598D0);
             RequirePointer((nint)IMemorySpace.MemberFunctionPointers.GetUISpace, 0x90D40);
             RequirePointer((nint)IMemorySpace.MemberFunctionPointers.Free, 0x8F270);
-            pauseCharacter = Marshal.GetDelegateForFunctionPointer<PauseCharacterDelegate>(moduleBase + 0x8D7420);
-            resumeCharacter = Marshal.GetDelegateForFunctionPointer<PauseCharacterDelegate>(moduleBase + 0x8D7750);
-            drawWeapon = Marshal.GetDelegateForFunctionPointer<DrawWeaponDelegate>(moduleBase + 0x8BFF10);
-            setupModel = Marshal.GetDelegateForFunctionPointer<SetupModelDelegate>(moduleBase + 0x8D0FA0);
-            disableDraw = Marshal.GetDelegateForFunctionPointer<CloneDrawDelegate>(moduleBase + 0x9075B0);
-            bodyVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x446E00);
-            handsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x4471C0);
-            legsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447320);
-            feetVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447620);
-            earringsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447810);
-            necklaceVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447980);
-            braceletVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447A60);
-            rightRingVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447B10);
-            leftRingVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447BA0);
-            hairVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(moduleBase + 0x447C30);
+            pauseCharacter = Marshal.GetDelegateForFunctionPointer<PauseCharacterDelegate>(NativeAddress(0x8D7420));
+            resumeCharacter = Marshal.GetDelegateForFunctionPointer<PauseCharacterDelegate>(NativeAddress(0x8D7750));
+            drawWeapon = Marshal.GetDelegateForFunctionPointer<DrawWeaponDelegate>(NativeAddress(0x8BFF10));
+            setupModel = Marshal.GetDelegateForFunctionPointer<SetupModelDelegate>(NativeAddress(0x8D0FA0));
+            disableDraw = Marshal.GetDelegateForFunctionPointer<CloneDrawDelegate>(NativeAddress(0x9075B0));
+            bodyVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x446E00));
+            handsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x4471C0));
+            legsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x447320));
+            feetVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x447620));
+            earringsVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x447810));
+            necklaceVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x447980));
+            braceletVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x447A60));
+            rightRingVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x447B10));
+            leftRingVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x447BA0));
+            hairVisibility = Marshal.GetDelegateForFunctionPointer<UpdateItemVisibilityDelegate>(NativeAddress(0x447C30));
             // Assign every delegate's hook field before enabling any detour.
             foreach (var target in hookProofs)
             {
@@ -339,14 +341,17 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S3C7EC1012B010261" , typeof(T).Name, name), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
+    private nint NativeAddress(int octoberRva) => moduleBase + contract.ResolveRva(octoberRva);
+
     private void RequirePointer(nint pointer, int rva)
     {
-        if (pointer != moduleBase + rva)
+        if (pointer != NativeAddress(rva))
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2466DF1446E291FA"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
     private void AddProof(PEReader disk, int rva, int length)
     {
+        rva = contract.ResolveRva(rva);
         var bytes = disk.GetSectionData(rva).GetContent(0, length).ToArray();
         if (!NearbyZoneNativeBinding.Read(moduleBase + rva, length).AsSpan().SequenceEqual(bytes))
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S1499CCB0FD60BDEB" , rva), originalMessageText => new InvalidOperationException(originalMessageText));
@@ -361,6 +366,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
 
     private void AddVtableProof(PEReader disk, int rva, int length)
     {
+        rva = contract.ResolveRva(rva);
         var header = disk.PEHeaders.PEHeader ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SD417D2FE9E47A2BA"), originalMessageText => new InvalidOperationException(originalMessageText));
         var bytes = disk.GetSectionData(rva).GetContent(0, length).ToArray();
         if (length % sizeof(ulong) != 0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1408F3B1F33A2E29"), originalMessageText => new InvalidOperationException(originalMessageText));
@@ -379,11 +385,13 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
 
     private Hook<T> AddHook<T>(PEReader disk, int rva, int length, T detour, int entryLength = 7) where T : Delegate
     {
+        var allowTitleEdit = rva == 0x1759180;
+        rva = contract.ResolveRva(rva);
         var bytes = disk.GetSectionData(rva).GetContent(0, length).ToArray();
         // TitleEdit's reviewed same-entry Create hook forwards gameplay calls.
         // Reloaded chains it through our Original; every other owner stays rejected.
         byte[]? saved;
-        try { saved = ViewSingleItemRendererHookState.ReadSavedEntry(moduleBase + rva, length, rva == 0x1759180); }
+        try { saved = ViewSingleItemRendererHookState.ReadSavedEntry(moduleBase + rva, length, allowTitleEdit); }
         catch (InvalidOperationException error)
         { throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S8391DA809DD9CA6B" , global::XASlave.Localization.UiMessage.Format("SE984AC6BEE2C9FAC" , rva), global::XASlave.Localization.UiMessage.FromException(error)), originalMessageText => new InvalidOperationException(originalMessageText, error)); }
         var loaded = NearbyZoneNativeBinding.Read(moduleBase + rva, length);
@@ -453,6 +461,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
 
     internal void Restore(ViewSingleItemCapture capture)
     {
+        capture.ValidateFor(contract);
         Validate();
         var copy = capture.Decode();
         lock (sync)
@@ -629,7 +638,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
                 adopted = true;
                 view->Ctor();
                 constructed = true;
-                if (Marshal.ReadIntPtr((nint)view) != moduleBase + 0x21A1CC8)
+                if (Marshal.ReadIntPtr((nint)view) != NativeAddress(0x21A1CC8))
                     throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF67A240C18F7A83A"), originalMessageText => new InvalidOperationException(originalMessageText));
                 // Native Initialize deletes an existing slot. Recheck while holding our
                 // lease lock and before the call; foreign requests use the preemption hooks.
@@ -731,11 +740,11 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         // A changed sequence is rejected instead of writing native view state.
         if (view->State != 3 || view->CharacterDataCopied || view->CharacterLoaded)
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SFE8FD4560EFD13C3" , StandaloneModelMessage, view->State, view->CharacterDataCopied, view->CharacterLoaded), originalMessageText => new InvalidOperationException(originalMessageText));
-        if (Marshal.ReadIntPtr((nint)view) != moduleBase + 0x21A1CC8 || view->CameraManager == 0
+        if (Marshal.ReadIntPtr((nint)view) != NativeAddress(0x21A1CC8) || view->CameraManager == 0
             || view->Camera == null || Marshal.ReadIntPtr(SceneSlot(slot)) != (nint)view->Camera || ContextCount(slot) != 1)
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SFAB322CD7D49730D" , StandaloneModelMessage), originalMessageText => new InvalidOperationException(originalMessageText));
         NearbyZoneNativeBinding.RequireReadable((nint)view->CameraManager, 0x20);
-        if (Marshal.ReadIntPtr((nint)view->CameraManager) != moduleBase + 0x214D248)
+        if (Marshal.ReadIntPtr((nint)view->CameraManager) != NativeAddress(0x214D248))
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("SB8C7236DE9FAE6A3" , StandaloneModelMessage), originalMessageText => new InvalidOperationException(originalMessageText));
         RequireFashionValue("StillOwner", ConfirmStillOwner() ? 1 : 0, 1);
         RequireFashionValue("AnimationPaused", animationPaused ? 1 : 0, 0);
@@ -869,7 +878,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         NearbyZoneNativeBinding.RequireReadable(character, sizeof(NativeCharacter));
         // The pause routine can recurse through these links. This value-only UI
         // clone must have none; never freeze an inspected or gameplay character.
-        if (Marshal.ReadIntPtr(character) != moduleBase + 0x21A5A28
+        if (Marshal.ReadIntPtr(character) != NativeAddress(0x21A5A28)
             || (Marshal.ReadByte(character + 0x190) & 4) == 0
             || Marshal.ReadIntPtr(character + 0x1B88) != character
             || Marshal.ReadIntPtr(character + 0x1990) != character
@@ -1396,7 +1405,7 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
             preempted = false;
             return;
         }
-        if (Marshal.ReadIntPtr((nint)retired) != moduleBase + 0x21A1CC8)
+        if (Marshal.ReadIntPtr((nint)retired) != NativeAddress(0x21A1CC8))
         {
             // Keep the allocation alive rather than free native resources through an
             // unproved virtual table. No further optional scene can be admitted.
@@ -1407,13 +1416,13 @@ internal sealed unsafe partial class ViewSingleItemScene : IDisposable
         if (retired->CameraManager != 0)
         {
             NearbyZoneNativeBinding.RequireReadable((nint)retired->CameraManager, 0x20);
-            if (Marshal.ReadIntPtr((nint)retired->CameraManager) != moduleBase + 0x214D248)
+            if (Marshal.ReadIntPtr((nint)retired->CameraManager) != NativeAddress(0x214D248))
             { cleanupBlocked = true; throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S44895003FA7F1CAF"), originalMessageText => new InvalidOperationException(originalMessageText)); }
         }
         if (retired->Camera != null)
         {
             NearbyZoneNativeBinding.RequireReadable((nint)retired->Camera, sizeof(SceneCamera));
-            if (Marshal.ReadIntPtr((nint)retired->Camera) != moduleBase + 0x216C9D8)
+            if (Marshal.ReadIntPtr((nint)retired->Camera) != NativeAddress(0x216C9D8))
             { cleanupBlocked = true; throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S2E098BA3E0609D6F"), originalMessageText => new InvalidOperationException(originalMessageText)); }
         }
         var manager = Objects();

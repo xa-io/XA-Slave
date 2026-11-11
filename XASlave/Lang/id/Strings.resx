@@ -29617,4 +29617,448 @@ Sebaiknya lakukan saat pangkat Anda 6+ agar memiliki akses penawaran plot.</valu
     <value>Tombol itu tidak dapat digunakan sebagai pintasan. Pilih tombol yang didukung.</value>
     <comment>Source: I134 XA Mods hotkeys.</comment>
   </data>
+  <data name="S77940585632007E6" xml:space="preserve">
+    <value>Item stok</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S84F85BC068049C81" xml:space="preserve">
+    <value>Stok minimum</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S83A292024EE019A9" xml:space="preserve">
+    <value>Pilih sesuai stok</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S2FB74173F401115D" xml:space="preserve">
+    <value>Memeriksa stok tersimpan...</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S0F87FE2BBE7F0FE8" xml:space="preserve">
+    <value>Pemilihan dibatalkan karena pengaturan atau penyedia inventaris berubah.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S4C52ED5CBA68D477" xml:space="preserve">
+    <value>Waktu pemilihan stok habis. Segarkan inventaris dan coba lagi.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S7D96B8A4D9FB7C9A" xml:space="preserve">
+    <value>Pencarian inventaris gagal. Pilihan saat ini dipertahankan.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD32B3168FB34A854" xml:space="preserve">
+    <value>Tidak ada stok yang diketahui. Pilihan saat ini dipertahankan.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SC972DED3C9AC3F8E" xml:space="preserve">
+    <value>{0} Tony dipilih; {1} dilewati karena stok tidak diketahui atau kedaluwarsa.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S55CCD119AAA21109" xml:space="preserve">
+    <value>Memilih dari seluruh daftar Tony berdasarkan stok tersimpan yang mencapai atau melebihi minimum. Stok tidak diketahui atau kedaluwarsa dikecualikan. Simpan daftar karakter bernama untuk mempertahankan pilihan.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD6AA816E13650A1D" xml:space="preserve">
+    <value>Hapus Tony ini dari pilihan saat ini.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SE23DB51A61294A37" xml:space="preserve">
+    <value>Tony dihapus dari pilihan saat ini.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD5B12C1924E91DDA" xml:space="preserve">
+    <value>Untuk gil, stok tidak mencakup cadangan gil Tony.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S870942552144CE28" xml:space="preserve">
+    <value>Bilah Pencarian Inventaris</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SC2A9ACBFB6EB565E" xml:space="preserve">
+    <value>Cari inventaris pemain dan retainer berdasarkan nama atau ID item.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SBE46A3B74FED5615" xml:space="preserve">
+    <value>Meredupkan slot yang tidak cocok tanpa memindahkan item. Ctrl+F memfokuskan pencarian di inventaris aktif; Escape menghapusnya. Nama mengikuti bahasa game; teks dicocokkan secara literal.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S024C6D7199F2538F" xml:space="preserve">
+    <value>Pencarian inventaris siap. Buka inventaris Anda atau inventaris retainer.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S345506B671848DC7" xml:space="preserve">
+    <value>Pencarian inventaris tidak tersedia: {0}</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S938E6B45CD3AEBAF" xml:space="preserve">
+    <value>Cari berdasarkan nama item literal atau ID item. Ctrl+F memfokuskan pencarian di inventaris aktif.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S5C257E210B1A5615" xml:space="preserve">
+    <value>Kapasitas perdagangan tidak dapat dikonfirmasi. Lihat log tugas.</value>
+    <comment>Source: I153 receiver-capacity trade batches.</comment>
+  </data>
+  <data name="SB5929AF709082C0E" xml:space="preserve">
+    <value>Cari item di inventaris, tas pelana, retainer, dan peti Free Company berdasarkan nama, ID, atau penanda item.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S1BB180DBC0364B35" xml:space="preserve">
+    <value>Pencarian inventaris siap. Buka inventaris, tas pelana, inventaris retainer, atau peti Free Company Anda.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SE90EFC70058D7FF8" xml:space="preserve">
+    <value>Cari berdasarkan nama item literal atau ID item. Ctrl+F memfokuskan pencarian di jendela penyimpanan aktif. T, NT, B, dan U menyaring item. Escape menghapus pencarian dan filter.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SD053EAF81A901089" xml:space="preserve">
+    <value>Dapat ditukar: tampilkan item yang saat ini dapat ditukar. Digabungkan dengan teks pencarian dan filter lain.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S8B322208AD91E717" xml:space="preserve">
+    <value>Tidak dapat ditukar: tampilkan item yang saat ini tidak dapat ditukar. Digabungkan dengan teks pencarian dan filter lain.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S71FFD32EEDDE9073" xml:space="preserve">
+    <value>Terikat: tampilkan item dengan spiritbond, kecuali collectable. Digabungkan dengan teks pencarian dan filter lain.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S92D269665B6AB115" xml:space="preserve">
+    <value>Unik: tampilkan item bertanda Unique. Digabungkan dengan teks pencarian dan filter lain.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S83E0B9DDDE38050F" xml:space="preserve">
+    <value>Abaikan kekurangan gil</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S54BF15532188F035" xml:space="preserve">
+    <value>Abaikan kekurangan gil dalam perkiraan dan hasil akhir, termasuk kekurangan yang nyata. Transfer gil dan kebutuhan item tidak berubah.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SADBF70DE1D082E88" xml:space="preserve">
+    <value>Kekurangan gil diabaikan</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S7D648F5B47F34AFB" xml:space="preserve">
+    <value>Diabaikan</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S10EDC6C7796AAE14" xml:space="preserve">
+    <value>Stok pemilik terpilih yang diketahui memenuhi semua target kelompok Give selain gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S1E37A43E43DB3535" xml:space="preserve">
+    <value>Setiap pemilik yang diketahui sudah memenuhi setiap target Balance positif selain gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S8D9A4AA562DAAD69" xml:space="preserve">
+    <value>Pasokan saat ini: stok Tony terpilih memenuhi semua kebutuhan tetap yang diketahui selain gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S6CA735C454B42CB6" xml:space="preserve">
+    <value>Pasokan saat ini: stok Tony terpilih yang diketahui memenuhi kebutuhan tetap yang diketahui selain gil, tetapi data yang tidak diketahui atau duplikat dapat mengubah hasilnya.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SBDDF5539CBC5DFB4" xml:space="preserve">
+    <value>Pasokan setelah pengumpulan: perkiraan stok Tony memenuhi semua kebutuhan pengisian tetap yang diketahui selain gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S3E1E253E5CD15EA6" xml:space="preserve">
+    <value>Pasokan setelah pengumpulan: perkiraan stok yang diketahui hanya memenuhi permintaan tetap yang diketahui selain gil jika semua perkiraan pengumpulan muat dan semua data yang tidak diketahui sesuai harapan.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S2D5F3616E2259EB9" xml:space="preserve">
+    <value>Tampilkan T (dapat ditukar)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SB9A60D18B6064186" xml:space="preserve">
+    <value>Tampilkan NT (tidak dapat ditukar)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SBC6660B2FC3061A1" xml:space="preserve">
+    <value>Tampilkan B (terikat)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="S9B010E574A02A1EB" xml:space="preserve">
+    <value>Tampilkan U (unik)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SAFFBE0EDFFE7ED1C" xml:space="preserve">
+    <value>Tombol filter yang disembunyikan memberi lebih banyak ruang pada kolom pencarian. Menyembunyikan filter yang dipilih akan membatalkan pilihan tersebut.</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SFB379C0639B02DAF" xml:space="preserve">
+    <value>Jendela inventaris berubah sebelum bilah pencarian dapat ditambahkan.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="SC516314371BAD2C5" xml:space="preserve">
+    <value>Bilah judul inventaris tidak tersedia.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S2EBDA73F1FA78881" xml:space="preserve">
+    <value>Geometri bilah judul inventaris tidak didukung.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S08C72A181576F45F" xml:space="preserve">
+    <value>Saat diaktifkan, pantau pesan kesalahan chat berbahasa Inggris untuk perintah /hotbar display yang diblokir dalam PvP. Anda harus sudah masuk dan hotbar utama _ActionBar harus terlihat.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S227E7BC13EA9D851" xml:space="preserve">
+    <value>Gunakan /hotbar display 10 untuk mengubah visibilitas hotbar 10, atau tambahkan on/off. Mendukung hotbar 1 hingga 10. Mengaktifkan pemantauan tidak mengubah hotbar mana pun sampai perintah tampilan yang diblokir ditangani.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S4E14133FCE55493F" xml:space="preserve">
+    <value>Penanganan alternatif yang diterima menangani kesalahan tanpa mengulangi perintah. Status ditampilkan/disembunyikan dilaporkan setelah HUD mengonfirmasi perubahan; konfirmasi yang gagal melaporkan kesalahan. Aksi dan pengaturan tombol tetap sama.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SCB19314CC4541E4D" xml:space="preserve">
+    <value>Perintah langsung: /xa hotbar 1 mengubah visibilitas hotbar 1; tambahkan on untuk menampilkan atau off untuk menyembunyikan. Mendukung hotbar 1–10. Mod ini harus diaktifkan, tetapi tidak perlu menunggu kesalahan atau menampilkan hotbar utama.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SC6EBD47ABE501159" xml:space="preserve">
+    <value>/xa hotbar on mengaktifkan pemantauan; /xa hotbar off menonaktifkannya dan menampilkan hotbar yang masih dikendalikan oleh mod ini. Pemulihan menunggu saat HUD tidak tersedia; ulangi off untuk mencoba kembali pemulihan yang gagal. Gunakan /xa hotbar 1 on untuk memulihkan hotbar utama yang tersembunyi, karena pemantauan kesalahan mengharuskannya terlihat.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SFD7341BC66A257EF" xml:space="preserve">
+    <value>Penonaktif Hotbar PvP</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S01E44E92B04C187C" xml:space="preserve">
+    <value>Tangani perintah /hotbar display yang diblokir dalam PvP.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="SDF3525839B48C10F" xml:space="preserve">
+    <value>Aktifkan pemantauan chat setelah masuk dengan hotbar utama _ActionBar terlihat, lalu gunakan perintah /hotbar display.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S4DC5CCBEF0102699" xml:space="preserve">
+    <value>Nonaktif; menunggu pemulihan hotbar yang dikendalikan</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SD84701543D60935E" xml:space="preserve">
+    <value>Memantau perintah /hotbar display yang diblokir dalam PvP</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SCF01459D717E88A1" xml:space="preserve">
+    <value>Tidak dapat mendaftarkan listener hotbar</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S6D2783A951EEB8EF" xml:space="preserve">
+    <value>Dijeda saat HUD tersembunyi atau tidak tersedia</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SB6EC744ECC7D5E55" xml:space="preserve">
+    <value>Menunggu hotbar PvP</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S00257BA7EBD4E0D0" xml:space="preserve">
+    <value>Dihentikan setelah kesalahan akses hotbar; nonaktifkan lalu aktifkan untuk mencoba kembali</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SAA5606AD083D6237" xml:space="preserve">
+    <value>Tidak dapat membaca versi assembly Dropbox yang dimuat.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC8F182EC41515C89" xml:space="preserve">
+    <value>Kumpulan plugin terpasang pada host berisi rekaman yang tidak valid</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S56750EC27E3B1A01" xml:space="preserve">
+    <value>Kumpulan plugin terpasang pada host melebihi batas validasi</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851417F28A56EC9F" xml:space="preserve">
+    <value>Getter kumpulan plugin terpasang pada host tidak tersedia atau tidak kompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C978BCF087A69B9" xml:space="preserve">
+    <value>Kumpulan plugin terpasang pada host tidak tersedia</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S122A8A674A2DE07D" xml:space="preserve">
+    <value>Rekaman plugin terpasang pada host memiliki nama yang tidak valid</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF035F3E2C28C6129" xml:space="preserve">
+    <value>Kontrak enumerasi siklus hidup host tidak kompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC656ED743A98C5D7" xml:space="preserve">
+    <value>Antarmuka siklus hidup host tidak tersedia atau tidak kompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SDACF8E7760DB26E6" xml:space="preserve">
+    <value>Tipe siklus hidup host tidak tersedia</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S616CD453CDAE5FD0" xml:space="preserve">
+    <value>Getter ID instalasi plugin host tidak tersedia atau tidak kompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1983E34B67FD5B4D" xml:space="preserve">
+    <value>Pengelola plugin host tidak tersedia</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S02AF27A3FF436BC3" xml:space="preserve">
+    <value>Getter layanan pengelola plugin host tidak tersedia atau tidak kompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD1C99CD34C2ABC45" xml:space="preserve">
+    <value>Getter nama plugin host tidak tersedia atau tidak kompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9B78177D3EEC6D3E" xml:space="preserve">
+    <value>Getter status plugin host tidak tersedia atau tidak kompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S96B4FF3C235E45B9" xml:space="preserve">
+    <value>Pembaca siklus hidup tidak tersedia: {0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD748A01364AB06DB" xml:space="preserve">
+    <value>Peer fitur pergerakan</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S7CFE761B16572921" xml:space="preserve">
+    <value>Beberapa instalasi peer belum sepenuhnya dilepas dari memori</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF22513C991F0CB3D" xml:space="preserve">
+    <value>Kesepakatan versi ONH</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S100653D37DAABE3A" xml:space="preserve">
+    <value>ID instalasi peer muncul lebih dari sekali</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1E2ED8172E91F0E7" xml:space="preserve">
+    <value>ID instalasi peer tidak tersedia atau tidak valid</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1BDB586894E64723" xml:space="preserve">
+    <value>Siklus hidup peer tidak dapat dibaca ({0})</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6053A12B80273858" xml:space="preserve">
+    <value>Siklus hidup peer adalah {0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S568AD7D0A45C45FD" xml:space="preserve">
+    <value>Status siklus hidup peer tidak dikenali</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S3302D41A86A08337" xml:space="preserve">
+    <value>Status siklus hidup peer tidak tersedia atau tidak valid</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S45FDD29564BDE619" xml:space="preserve">
+    <value>Plugin peer sedang dimuat</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6C923ABAFFD29336" xml:space="preserve">
+    <value>Plugin peer sedang dilepas dari memori</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S5EBB1697FDC852B7" xml:space="preserve">
+    <value>Pemuatan, pelepasan dari memori, atau resolusi dependensi plugin peer gagal</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S27B64EB0B3CAA9DE" xml:space="preserve">
+    <value>Nama plugin mitra tidak tersedia</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8D4F6114D5CAE8E1" xml:space="preserve">
+    <value>Karakter ONH berubah setelah persetujuan versi Tony.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S724C52D78F1F7D4D" xml:space="preserve">
+    <value>Karakter ONH berubah sebelum persetujuan versi.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F560AA230DC76FF" xml:space="preserve">
+    <value>Mitra ONH tidak memberikan versi XA Slave dan Dropbox yang cocok.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9F7BA2473E010837" xml:space="preserve">
+    <value>Negosiasi versi ONH belum terbentuk.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S67F304E72345F97C" xml:space="preserve">
+    <value>Kesepakatan versi Tony yang aktif berubah selama pertukaran ONH ini.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S93C01FAFC54D840E" xml:space="preserve">
+    <value>Kesepakatan versi Tony yang aktif tidak tersedia.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0DCA5AD5069C8C4B" xml:space="preserve">
+    <value>Versi XA Slave atau Dropbox yang dimuat oleh Tony yang aktif tidak tersedia.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SB1FF900AF3E947A1" xml:space="preserve">
+    <value>Pasangan perdagangan Tony/pemilik yang aktif tidak mutakhir atau belum terikat secara timbal balik.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DBB063EA136CB84" xml:space="preserve">
+    <value>Versi assembly Dropbox yang dimuat tidak tersedia.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S52E81B2AF87BC092" xml:space="preserve">
+    <value>Penyedia Dropbox yang dimuat tidak tersedia.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC6C9814C8F0D77A2" xml:space="preserve">
+    <value>Versi Dropbox yang dimuat tidak tersedia atau tidak valid.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SE2CAD295157866AC" xml:space="preserve">
+    <value>Versi XA Slave yang dimuat tidak tersedia atau tidak valid.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF0B0B41A45ADA9A6" xml:space="preserve">
+    <value>Mitra tidak mengonfirmasi versi XA Slave dan Dropbox milik Tony dalam 15 detik.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C0D841237BD59F1" xml:space="preserve">
+    <value>Mitra tidak mendukung negosiasi versi Tony yang diwajibkan.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S116E90EE8FCE1A4A" xml:space="preserve">
+    <value>Mitra melewatkan negosiasi versi XA Slave dan Dropbox milik Tony. Perbarui XA Slave pada klien tersebut.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0E815C03839E4BBA" xml:space="preserve">
+    <value>Penjual tidak mendukung negosiasi versi Tony yang diwajibkan.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F3F35EF7873F2E0" xml:space="preserve">
+    <value>Mitra dagang tidak mendukung negosiasi versi Tony. Perbarui XA Slave pada klien tersebut.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S4F3A989A90EB3C6C" xml:space="preserve">
+    <value>Waktu habis saat menunggu negosiasi versi antara Tony yang aktif dan pemilik.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S17065D0946DF707A" xml:space="preserve">
+    <value>Tony memerlukan XA Slave {0} dan Dropbox {1}; mitra dagang melaporkan XA Slave {2} dan Dropbox {3}.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S233EBAD47A25004E" xml:space="preserve">
+    <value>Tony memerlukan XA Slave {0} dan Dropbox {1}; versi yang dimuat oleh mitra dagang tidak tersedia.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD0D32A7E705FD605" xml:space="preserve">
+    <value>Verifikasi versi XA Slave dan Dropbox milik Tony</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SBC57BFDA3D6FD68C" xml:space="preserve">
+    <value>Menunggu persetujuan versi XA Slave dan Dropbox milik Tony yang aktif.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851B713C54880F95" xml:space="preserve">
+    <value>pertukaran penerima saat ini</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DA262EB757C209B" xml:space="preserve">
+    <value>menunggu mitra dagang dengan versi yang kompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
 </root>

@@ -280,6 +280,15 @@ public sealed class XAModBetterInventoryMoverSettings
 }
 
 [Serializable]
+public sealed class XAModInventorySearchSettings
+{
+    public bool ShowTradable { get; set; } = true;
+    public bool ShowUntradable { get; set; } = true;
+    public bool ShowBound { get; set; } = true;
+    public bool ShowUnique { get; set; } = true;
+}
+
+[Serializable]
 public sealed class XAModBetterCompanyChestSettings
 {
     public int DefaultPage { get; set; }

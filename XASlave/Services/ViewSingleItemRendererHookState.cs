@@ -23,6 +23,10 @@ internal static class ViewSingleItemRendererHookState
     private const string Reloaded15038Sha256 = "D9CD3C718302AF9BAC00F7AC846EE732575186FC8456AC111FE679EA0059F6AC";
     private const string Dalamud15039Sha256 = "F0550B8942E2EF142C6537A1F3D29DD73E70F51E0719AF27483D9294985E8A55";
     private const string Reloaded15039Sha256 = "A867659817E745BD38BA28C7E0F649BDFCCC5D4B4B01A45E375E27B6382E41FE";
+    private const string Dalamud15039Beta29Sha256 = "9E253D37E715BF9F290013E4B943C75AFC3FC3C60D729A886E5247E726E513B9";
+    private const string Reloaded422Beta29Sha256 = "1BB8F0B935BF58B4D51E148608518D89805DB59122F30D9AF440A7B505E976A3";
+    private const string Dalamud15040Sha256 = "183A261F92AFFBE56E1D38376756E131815D0255EDAFC9496384D63EA69BEF93";
+    private const string Reloaded422StableSha256 = "A73A3AF01C9E6FD49A978140CA872170316D3D3E1420A7F77F9672DB06AFD6D6";
 
     private static Type Manager => typeof(IDalamudHook).Assembly.GetType("Dalamud.Hooking.Internal.HookManager")
         ?? throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S3AE573BF0C96C5BF"), originalMessageText => new InvalidOperationException(originalMessageText));
@@ -45,7 +49,9 @@ internal static class ViewSingleItemRendererHookState
         return (dalamudSha256 == SupportedDalamudSha256 && reloadedSha256 == SupportedReloadedSha256)
             || (dalamudSha256 == Dalamud15037Sha256 && reloadedSha256 == Reloaded15037Sha256)
             || (dalamudSha256 == Dalamud15038Sha256 && reloadedSha256 == Reloaded15038Sha256)
-            || (dalamudSha256 == Dalamud15039Sha256 && reloadedSha256 == Reloaded15039Sha256);
+            || (dalamudSha256 == Dalamud15039Sha256 && reloadedSha256 == Reloaded15039Sha256)
+            || (dalamudSha256 == Dalamud15039Beta29Sha256 && reloadedSha256 == Reloaded422Beta29Sha256)
+            || (dalamudSha256 == Dalamud15040Sha256 && reloadedSha256 == Reloaded422StableSha256);
     }
 
     // Caller holds the actual Dalamud Lock through comparison, creation and enable.
@@ -161,8 +167,9 @@ internal static class ViewSingleItemRendererHookState
     internal static bool MatchesSupportedCode(byte[] original, byte[] loaded, byte[]? savedEntry, int entryLength = 7)
     {
         if (loaded.AsSpan().SequenceEqual(original)) return true;
-        // Reloaded 4.2.1 pads its seven-byte absolute indirect jump to whole
-        // instructions. These exact supported entries cover seven or ten bytes.
+        // The reviewed Reloaded 4.2.1 and 4.2.2 artifacts pad the seven-byte
+        // absolute indirect jump to whole instructions. These exact supported
+        // entries cover seven or ten bytes; actual bytes remain mandatory.
         if ((entryLength != 7 && entryLength != 10)
             || original.Length != loaded.Length || loaded.Length < entryLength
             || savedEntry == null || savedEntry.Length != entryLength

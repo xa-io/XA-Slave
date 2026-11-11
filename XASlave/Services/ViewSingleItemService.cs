@@ -137,7 +137,7 @@ internal sealed class ViewSingleItemService : IDisposable
         if (!enabled || disposed || !Ready()) return;
         try
         {
-            if (ViewSingleItemContextSource.TryResolve(args, out var itemId))
+            if (ViewSingleItemContextSource.TryResolve(args, preview!.Contract, out var itemId))
             {
                 if (!ViewSingleItemShopSource.TryDescribe(itemId, out _, out var reason))
                 {
@@ -519,7 +519,7 @@ internal sealed class ViewSingleItemService : IDisposable
         { StatusText = global::XASlave.Localization.UiMessage.Store(ref statusMessage, global::XASlave.Localization.UiMessage.Format("S936FA011B2E3075B" , entry.ErrorPresentation)); return; }
         try
         {
-            entry.Capture.Validate();
+            entry.Capture.ValidateFor(preview!.Contract);
             Stop();
             loginOwner = Plugin.PlayerState.ContentId;
             source = entry.Capture.Snapshot();

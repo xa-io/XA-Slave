@@ -16,10 +16,10 @@ internal static unsafe class ViewSingleItemContextSource
     // Exact-build native Inspect ReceiveEvent toggles this byte and selects GlamourItems.
     private const int InspectViewingGlamoursOffset = 0x582;
 
-    internal static bool TryResolve(IMenuOpenedArgs args, out uint itemId)
-        => TryResolve(args, out itemId, out _);
+    internal static bool TryResolve(IMenuOpenedArgs args, ViewSingleItemNativeContract contract, out uint itemId)
+        => TryResolve(args, contract, out itemId, out _);
 
-    internal static bool TryResolve(IMenuOpenedArgs args, out uint itemId, out uint glamourItemId)
+    internal static bool TryResolve(IMenuOpenedArgs args, ViewSingleItemNativeContract contract, out uint itemId, out uint glamourItemId)
     {
         NearbyZoneNativeBinding.RequireFramework();
         itemId = glamourItemId = 0;
@@ -50,7 +50,7 @@ internal static unsafe class ViewSingleItemContextSource
         // exchange-dialog, market, housing and other menus. Its +2C is the
         // actual native Try On/Link item; it does not depend on shop AtkValue
         // layouts, buy-list positions, purchase selection or hover caches.
-        var bound = TryBoundItemContext(args, addon->Id, out itemId, out var found);
+        var bound = TryBoundItemContext(args, addon->Id, contract, out itemId, out var found);
         if (found && !bound) return false; // Never override conflicting/stale handlers.
 
         var recipeContext = AgentRecipeItemContext.Instance();
@@ -130,7 +130,7 @@ internal static unsafe class ViewSingleItemContextSource
         return true;
     }
 
-    private static bool TryBoundItemContext(IMenuOpenedArgs args, ushort addonId, out uint itemId, out bool found)
+    private static bool TryBoundItemContext(IMenuOpenedArgs args, ushort addonId, ViewSingleItemNativeContract contract, out uint itemId, out bool found)
     {
         itemId = 0;
         found = false;
@@ -138,7 +138,7 @@ internal static unsafe class ViewSingleItemContextSource
         {
             if (handler == 0) continue;
             NearbyZoneNativeBinding.RequireReadable(handler, sizeof(nint));
-            if (Marshal.ReadIntPtr(handler) != Plugin.SigScanner.Module.BaseAddress + ItemContextVtableRva) continue;
+            if (Marshal.ReadIntPtr(handler) != Plugin.SigScanner.Module.BaseAddress + contract.ResolveRva(ItemContextVtableRva)) continue;
             found = true;
             NearbyZoneNativeBinding.RequireReadable(handler, 0x38);
             if (Marshal.ReadIntPtr(handler + 0x18) != args.AgentPtr

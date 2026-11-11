@@ -13,20 +13,35 @@ namespace XASlave.Services;
 // Validated native capabilities. No hooks or writes to game code.
 internal sealed unsafe class InspectOutfitNativeBinding
 {
-    // Inspect/Tryon layouts and helpers revalidated for the October 16 game and delivered 15.0.3.9 SDK.
+    // October keeps its reviewed SDKs. November uses its exact game/SDK pair and
+    // separately verified native helpers, singleton and generated bindings.
     internal const string ClientStructs15037Sha256 = "A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D";
     internal const string ClientStructs15038Sha256 = "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2";
     internal const string ClientStructs15039Sha256 = "F5A2C68CCECD3E199BDA572050E98902B2E7594066C95DC7826C2D4297CD0564";
+    private const string NovemberGameSha256 = "CEB4260B2574476ACF72E7B6105D0A4F8D1BD78B4E7CAB5D8115C453F2F39339";
+    private const string NovemberClientStructsSha256 = "2D268F54FB6C75B511C349BA49B00E8D197C09FF64FF380ACABDCAE42A1F7D9B";
+    private const string NovemberStableClientStructsSha256 = "28488F18AD05FDCD12373A83756EAB275C291B09C6AF061EF7F846AA06A36E29";
     private readonly nint moduleBase;
+    private readonly int tryOnRva, uiStateRva, clearPreviewRva, facewearRva;
 
     internal InspectOutfitNativeBinding()
     {
         NearbyZoneNativeBinding.RequireFramework();
-        RequireSupportedClientStructs(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(AgentTryon).Assembly.Location))));
+        var sdkHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(AgentTryon).Assembly.Location)));
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
-        if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)
-            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S61C6777880B2BA9C"), originalMessageText => new InvalidOperationException(originalMessageText));
+        var gameHash = Convert.ToHexString(SHA256.HashData(bytes));
+        var november = gameHash == NovemberGameSha256 && sdkHash is (NovemberClientStructsSha256 or NovemberStableClientStructsSha256);
+        if (!november)
+        {
+            RequireSupportedClientStructs(sdkHash);
+            if (gameHash != NearbyZoneNativeBinding.SupportedSha256)
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S61C6777880B2BA9C"), originalMessageText => new InvalidOperationException(originalMessageText));
+        }
+        tryOnRva = november ? 0xC7C3E0 : 0xC7C580;
+        uiStateRva = november ? 0x2AE0F10 : 0x2AE3F90;
+        clearPreviewRva = november ? 0xC7C010 : 0xC7C1B0;
+        facewearRva = november ? 0xC7BE80 : 0xC7C020;
         using var stream = new MemoryStream(bytes, false);
         using var pe = new PEReader(stream);
         moduleBase = module.BaseAddress;
@@ -47,8 +62,8 @@ internal sealed unsafe class InspectOutfitNativeBinding
     internal void Validate()
     {
         NearbyZoneNativeBinding.RequireFramework();
-        if ((nint)AgentTryon.MemberFunctionPointers.TryOn != moduleBase + 0xC7C580
-            || (nint)UIState.Instance() != moduleBase + 0x2AE3F90)
+        if ((nint)AgentTryon.MemberFunctionPointers.TryOn != moduleBase + tryOnRva
+            || (nint)UIState.Instance() != moduleBase + uiStateRva)
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SA4A062DC3A1D4C38"), originalMessageText => new InvalidOperationException(originalMessageText));
     }
 
@@ -66,7 +81,7 @@ internal sealed unsafe class InspectOutfitNativeBinding
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S922EB274B2D29A69"), originalMessageText => new InvalidOperationException(originalMessageText));
         // Supported-build native clear: resets all fourteen TryOnItems. Its
         // inactive path returns without refreshing or reopening the addon.
-        var clear = (delegate* unmanaged<AgentTryon*, void>)(moduleBase + 0xC7C1B0);
+        var clear = (delegate* unmanaged<AgentTryon*, void>)(moduleBase + clearPreviewRva);
         clear(agent);
         var current = Agent();
         if (current != agent || (requireClosed && current->IsAgentActive()))
@@ -111,7 +126,7 @@ internal sealed unsafe class InspectOutfitNativeBinding
             agent->SaveDeleteOutfit = true;
             // Native glasses-selection callback uses this helper. With Save
             // enabled it replaces only slot 13, preserving ordinary gear.
-            var apply = (delegate* unmanaged<AgentTryon*, ushort, void>)(moduleBase + 0xC7C020);
+            var apply = (delegate* unmanaged<AgentTryon*, ushort, void>)(moduleBase + facewearRva);
             apply(agent, glassesId);
         }
         finally

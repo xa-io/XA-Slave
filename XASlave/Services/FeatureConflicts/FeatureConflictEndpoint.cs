@@ -47,16 +47,23 @@ internal sealed class FeatureConflictPeerReader : IDisposable
     private readonly IDalamudPluginInterface pluginInterface;
     private readonly IFramework framework;
     private readonly DalamudPeerLifecycle? lifecycle;
+    private readonly string lifecycleFailureReason;
     private readonly Func<string?> peer;
+    private readonly string peerLabel;
     private readonly Func<string?>[] providers;
     private int invalidated = 1;
     private bool disposed;
     private bool permitted;
+    private bool waiting;
     internal string Reason { get; private set; } = "Peer state has not been evaluated";
+    // Presentation metadata only. Reason remains the original protocol/log value.
+    internal string? ReasonPeer { get; private set; }
+    internal string ReasonDetail { get; private set; } = "Peer state has not been evaluated";
     internal bool Permitted => !disposed && System.Threading.Volatile.Read(ref invalidated) == 0 && permitted;
+    internal bool IsWaiting => !disposed && System.Threading.Volatile.Read(ref invalidated) == 0 && !permitted && waiting;
 
     internal FeatureConflictPeerReader(IDalamudPluginInterface pluginInterface, IFramework framework, string peer, params string[] endpoints)
-        : this(pluginInterface, framework, () => peer, endpoints) { }
+        : this(pluginInterface, framework, () => peer, peer, endpoints) { }
 
     internal static FeatureConflictPeerReader FromCapability(IDalamudPluginInterface pluginInterface, IFramework framework, string ownerEndpoint, params string[] endpoints)
     {
@@ -68,15 +75,16 @@ internal sealed class FeatureConflictPeerReader : IDisposable
             if (string.IsNullOrWhiteSpace(name) || name.Length > 128)
                 throw new InvalidOperationException("Invalid conflict capability owner.");
             return name;
-        }, endpoints);
+        }, "Movement feature peer", endpoints);
     }
 
-    private FeatureConflictPeerReader(IDalamudPluginInterface pluginInterface, IFramework framework, Func<string?> peer, params string[] endpoints)
+    private FeatureConflictPeerReader(IDalamudPluginInterface pluginInterface, IFramework framework, Func<string?> peer, string peerLabel, params string[] endpoints)
     {
         this.pluginInterface = pluginInterface;
         this.framework = framework;
         this.peer = peer;
-        lifecycle = DalamudPeerLifecycle.TryResolve(typeof(IDalamudPluginInterface).Assembly, pluginInterface);
+        this.peerLabel = peerLabel;
+        lifecycle = DalamudPeerLifecycle.TryResolve(typeof(IDalamudPluginInterface).Assembly, pluginInterface, out lifecycleFailureReason);
         providers = new Func<string?>[endpoints.Length];
         for (var i = 0; i < endpoints.Length; ++i)
         {
@@ -102,15 +110,31 @@ internal sealed class FeatureConflictPeerReader : IDisposable
         if (disposed || !framework.IsInFrameworkUpdateThread)
             return FeatureConflictDecision.Deny("Peer evaluation requires the framework thread");
         System.Threading.Interlocked.Exchange(ref invalidated, 0);
-        var decision = FeatureConflictPeer.Read(() =>
+        var peerName = peerLabel;
+        var decision = lifecycle == null
+            ? FeatureConflictDecision.Deny($"Lifecycle reader unavailable: {lifecycleFailureReason}")
+            : FeatureConflictPeer.Read(() =>
         {
-            if (lifecycle == null) return default;
             var name = peer();
+            peerName = name ?? peerLabel;
             return name == null ? new PeerPluginObservation(PeerPluginPhase.Absent, Guid.Empty) : lifecycle.Observe(name);
         }, providers);
-        if (System.Threading.Volatile.Read(ref invalidated) != 0)
-            decision = FeatureConflictDecision.Deny("Plugin lifecycle changed during evaluation");
+        if (System.Threading.Volatile.Read(ref invalidated) != 0
+            && (decision.Permitted || decision.IsWaiting || decision.RequiresRecheck))
+            decision = FeatureConflictDecision.Recheck("Plugin lifecycle changed during evaluation");
+        if (!decision.Permitted)
+        {
+            ReasonPeer = peerName;
+            ReasonDetail = decision.Reason;
+            decision = decision with { Reason = $"{peerName}: {decision.Reason}" };
+        }
+        else
+        {
+            ReasonPeer = null;
+            ReasonDetail = decision.Reason;
+        }
         permitted = decision.Permitted;
+        waiting = decision.IsWaiting;
         Reason = decision.Reason;
         return decision;
     }

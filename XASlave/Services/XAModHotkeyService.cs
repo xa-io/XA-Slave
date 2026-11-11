@@ -5,6 +5,7 @@ using System.Runtime.InteropServices;
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Plugin.Services;
+using FFXIVClientStructs.FFXIV.Client.System.Input;
 using FFXIVClientStructs.FFXIV.Client.UI;
 using XASlave.Data;
 using XASlave.Localization;
@@ -43,6 +44,7 @@ public unsafe sealed class XAModHotkeyService : IDisposable
     private bool captureInputActive;
     private XAModHotkeyBinding? captureCandidate;
     private XAModHotkeyBinding? capturedBinding;
+    private string captureTraceState = string.Empty;
     private UiMessage status = UiMessage.Authored("XA Mod hotkeys are ready.");
     private bool statusIsError;
 
@@ -165,6 +167,8 @@ public unsafe sealed class XAModHotkeyService : IDisposable
             captureCandidate = null;
             editorOpen = true;
             editorTimestamp = Environment.TickCount64;
+            captureTraceState = string.Empty;
+            TraceCaptureState("begin");
             return Result(UiMessage.Authored("Press a key combination. Escape cancels."), false, out message);
         }
     }
@@ -263,19 +267,21 @@ public unsafe sealed class XAModHotkeyService : IDisposable
                     CancelCaptureCore();
                     return;
                 }
-                if (!captureInputActive) return;
+                if (!captureInputActive) { TraceCaptureState("awaiting-field-focus"); return; }
                 // Dalamud delivers ImGui keys and blocks game input while the owned writable field
                 // requests text input. Native chat focus must not reject our own assignment field.
                 if (!io.WantTextInput)
                 {
                     captureArmed = false;
                     captureCandidate = null;
+                    TraceCaptureState("awaiting-text-input-interception");
                     return;
                 }
                 if (io.KeySuper || HasUnsupportedCaptureKey())
                 {
                     captureArmed = false;
                     captureCandidate = null;
+                    TraceCaptureState("unsupported-key");
                     SetStatus(UiMessage.Authored("That key cannot be used as a hotkey. Choose a supported key."), true);
                     return;
                 }
@@ -288,9 +294,13 @@ public unsafe sealed class XAModHotkeyService : IDisposable
                     {
                         captureCandidate = null;
                         captureArmed = false;
+                        TraceCaptureState("ambiguous-chord");
                         return;
                     }
-                    if (drawHeldKeys.Count != 0 || drawModifiers != XAModHotkeyModifiers.None || !AreCaptureKeysReleased()) return;
+                    if (drawHeldKeys.Count != 0 || drawModifiers != XAModHotkeyModifiers.None)
+                    { TraceCaptureState("awaiting-draw-chord-release"); return; }
+                    if (!AreCaptureKeysReleased()) { TraceCaptureState("awaiting-physical-chord-release"); return; }
+                    TraceCaptureState("captured");
                     capturedBinding = pending;
                     captureCandidate = null;
                     captureModKey = null;
@@ -306,12 +316,13 @@ public unsafe sealed class XAModHotkeyService : IDisposable
                     // Before focus, Dalamud resets ImGui keys. A physical release also rejects
                     // an already-held movement key whose next OS repeat would look like a new press.
                     if (!captureArmed) captureArmed = drawModifiers == XAModHotkeyModifiers.None && AreCaptureKeysReleased();
+                    TraceCaptureState(captureArmed ? "ready-for-chord" : "awaiting-initial-release");
                     return;
                 }
-                if (!captureArmed) return;
+                if (!captureArmed) { TraceCaptureState("awaiting-initial-release"); return; }
                 captureArmed = false;
                 // Ambiguous simultaneous primary keys are ignored until every primary is released again.
-                if (drawHeldKeys.Count != 1) return;
+                if (drawHeldKeys.Count != 1) { TraceCaptureState("ambiguous-chord"); return; }
                 var keyCode = drawHeldKeys.First();
                 var modifiers = ReadModifiers(io.KeyCtrl, io.KeyAlt, io.KeyShift);
                 var current = FindBinding(captureModKey);
@@ -322,6 +333,7 @@ public unsafe sealed class XAModHotkeyService : IDisposable
                     Modifiers = modifiers,
                     Enabled = current?.Enabled ?? true,
                 };
+                TraceCaptureState("candidate-selected");
             }
             catch (Exception ex)
             {
@@ -367,15 +379,15 @@ public unsafe sealed class XAModHotkeyService : IDisposable
                 // Read generic modifier keys: left/right variants intentionally have identical binding semantics.
                 if (!keyState.IsVirtualKeyValid(0x11) || !keyState.IsVirtualKeyValid(0x12) || !keyState.IsVirtualKeyValid(0x10))
                     throw new InvalidOperationException("The game keyboard modifier state is unavailable.");
-                var modifiers = ReadModifiers(keyState[0x11], keyState[0x12], keyState[0x10]);
+                var modifiers = ReadModifiers(ReadKeyDown(0x11), ReadKeyDown(0x12), ReadKeyDown(0x10));
                 var pressedKeys = new List<int>();
                 foreach (var key in ActivePrimaryKeys())
                 {
                     if (!keyState.IsVirtualKeyValid(key)) { keyStates[key].Suppress(); continue; }
-                    var primaryDown = keyState[key];
-                    var drawHasKey = drawHeldKeys.Contains(key);
-                    var edge = keyStates[key].Observe(primaryDown || drawHasKey, true);
-                    if (XAModHotkeyState.CanDispatchObservedEdge(edge, primaryDown, drawHasKey, modifiers, drawModifiers)) pressedKeys.Add(key);
+                    // The game snapshot owns normal press/release edges. Draw runs separately;
+                    // merging its keys can consume a press early or hide a native release.
+                    var primaryDown = ReadKeyDown(key);
+                    if (keyStates[key].Observe(primaryDown, true)) pressedKeys.Add(key);
                 }
                 foreach (var key in pressedKeys)
                 {
@@ -446,6 +458,10 @@ public unsafe sealed class XAModHotkeyService : IDisposable
     private IEnumerable<int> ActivePrimaryKeys()
         => observedBindings.Where(binding => binding.Enabled && XAModHotkeyState.IsSupportedPrimaryKey(binding.VirtualKey))
             .Select(binding => binding.VirtualKey).Distinct();
+
+    // IKeyState's boolean indexer also returns true for the release-only flag.
+    private bool ReadKeyDown(int key)
+        => (keyState.GetRawValue(key) & (int)KeyStateFlags.Down) != 0;
 
     private static bool ReadNativeSafety()
     {
@@ -591,6 +607,15 @@ public unsafe sealed class XAModHotkeyService : IDisposable
     }
 
     private void SetStatus(UiMessage result, bool error) { status = result; statusIsError = error; }
+
+    // Log transitions only while the user owns assignment; never log typed text.
+    private void TraceCaptureState(string stage)
+    {
+        var state = $"{stage}; active={captureInputActive}; armed={captureArmed}; keys={drawHeldKeys.Count}; modifiers={(int)drawModifiers}";
+        if (state == captureTraceState) return;
+        captureTraceState = state;
+        log.Debug("[XASlave] XA Mod hotkey assignment {ModKey}: {State}", captureModKey ?? string.Empty, state);
+    }
 
     internal static bool RequiresCtrlShift(string modKey) => XAModHotkeyState.RequiresCtrlShift(modKey);
 

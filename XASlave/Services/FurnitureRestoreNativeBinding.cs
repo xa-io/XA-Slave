@@ -17,19 +17,23 @@ namespace XASlave.Services;
 // Construction validates disk/live bodies and layouts but issues no housing action.
 internal sealed unsafe class FurnitureRestoreNativeBinding
 {
+    private const string NovemberGameSha256 = "CEB4260B2574476ACF72E7B6105D0A4F8D1BD78B4E7CAB5D8115C453F2F39339";
+    private const string NovemberClientStructsSha256 = "2D268F54FB6C75B511C349BA49B00E8D197C09FF64FF380ACABDCAE42A1F7D9B";
+    private const string NovemberStableClientStructsSha256 = "28488F18AD05FDCD12373A83756EAB275C291B09C6AF061EF7F846AA06A36E29";
     // Only Prepare touches this field, on the framework thread. The worker reads
-    // files/metadata only. Each batch receives separate observer ownership state.
+    // files/metadata and acquires BCL cache references without reading entries.
+    // Each batch receives separate observer ownership state.
     private static Task<FurnitureRestoreNativeBinding>? preparation;
     // Reloaded disables its reverse wrapper, not the game's entry jump. Retain
     // only prefixes previously installed by this plugin and successfully disabled.
     // Framework-thread access only; this is never populated from arbitrary bytes.
-    private static readonly Dictionary<nint, byte[]> retired = GetRetiredProofs();
-    private static readonly Dictionary<nint, Dictionary<nint, byte[]>> retiredPaths = GetRetiredPaths();
+    private readonly Dictionary<nint, byte[]> retired;
+    private readonly Dictionary<nint, Dictionary<nint, byte[]>> retiredPaths;
 
-    private static Dictionary<nint, Dictionary<nint, byte[]>> GetRetiredPaths()
+    private static Dictionary<nint, Dictionary<nint, byte[]>> GetRetiredPaths(string gameHash)
     {
         var domain = AppDomain.CurrentDomain;
-        var key = "XASlave.FurnitureRestore.RetiredPaths.v2." + NearbyZoneNativeBinding.SupportedSha256;
+        var key = "XASlave.FurnitureRestore.RetiredPaths.v2." + gameHash;
         lock (domain)
         {
             var saved = domain.GetData(key);
@@ -41,13 +45,13 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         }
     }
 
-    private static Dictionary<nint, byte[]> GetRetiredProofs()
+    private static Dictionary<nint, byte[]> GetRetiredProofs(string gameHash)
     {
         // Plugin statics disappear on reload; Reloaded's inactive native entries
         // survive. Store only BCL values so this does not root a plugin assembly,
         // delegate, service or game object. This state dies with the game process.
         var domain = AppDomain.CurrentDomain;
-        var key = "XASlave.FurnitureRestore.RetiredPrefixes.v1." + NearbyZoneNativeBinding.SupportedSha256;
+        var key = "XASlave.FurnitureRestore.RetiredPrefixes.v1." + gameHash;
         lock (domain)
         {
             var saved = domain.GetData(key);
@@ -97,6 +101,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
 
     private FurnitureRestoreNativeBinding(FurnitureRestoreNativeBinding source)
     {
+        retired = source.retired; retiredPaths = source.retiredPaths;
         ModuleBase = source.ModuleBase; AgentTable = source.AgentTable;
         IndoorListenerTable = source.IndoorListenerTable; OutdoorListenerTable = source.OutdoorListenerTable;
         foreach (var entry in source.functions) functions.Add(entry.Key, entry.Value);
@@ -106,31 +111,39 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
 
     private FurnitureRestoreNativeBinding(string fileName, nint moduleBase, int moduleSize, string sdkPath)
     {
-        if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(sdkPath)))
-            is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2" or "F5A2C68CCECD3E199BDA572050E98902B2E7594066C95DC7826C2D4297CD0564"))
-            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0625ED9E9FD24A0D"), originalMessageText => new InvalidOperationException(originalMessageText));
+        var sdkHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(sdkPath)));
         var bytes = File.ReadAllBytes(fileName);
-        if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)
-            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6F84A5B869A10CBD"), originalMessageText => new InvalidOperationException(originalMessageText));
+        var gameHash = Convert.ToHexString(SHA256.HashData(bytes));
+        var november = gameHash == NovemberGameSha256 && sdkHash is (NovemberClientStructsSha256 or NovemberStableClientStructsSha256);
+        if (!november)
+        {
+            if (sdkHash is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2" or "F5A2C68CCECD3E199BDA572050E98902B2E7594066C95DC7826C2D4297CD0564"))
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S0625ED9E9FD24A0D"), originalMessageText => new InvalidOperationException(originalMessageText));
+            if (gameHash != NearbyZoneNativeBinding.SupportedSha256)
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S6F84A5B869A10CBD"), originalMessageText => new InvalidOperationException(originalMessageText));
+        }
+        // Retired hook ownership remains isolated by the exact admitted image.
+        // Preserve the old keys for October reloads and use distinct November keys.
+        retired = GetRetiredProofs(gameHash); retiredPaths = GetRetiredPaths(gameHash);
         using var stream = new MemoryStream(bytes, false);
         using var pe = new PEReader(stream);
         ModuleBase = moduleBase;
         if (pe.PEHeaders.PEHeader?.SizeOfImage != moduleSize)
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S95ECACEAEAC1B26A"), originalMessageText => new InvalidOperationException(originalMessageText));
-        Resolve(pe, Sigs.FurnitureRestoreInventoryRestoreProof);
-        Resolve(pe, Sigs.FurnitureRestoreStorageRestoreProof);
-        Resolve(pe, Sigs.FurnitureRestoreIndoorInventoryProof);
-        Resolve(pe, Sigs.FurnitureRestoreOutdoorInventoryProof);
-        Resolve(pe, Sigs.FurnitureRestoreIndoorStorageProof);
-        Resolve(pe, Sigs.FurnitureRestoreIndoorDecisionProof);
-        Resolve(pe, Sigs.FurnitureRestoreOutdoorDecisionProof);
-        Resolve(pe, Sigs.FurnitureRestoreWarningOpenProof);
-        Resolve(pe, Sigs.FurnitureRestoreIndoorPlacedSizeProof);
-        Resolve(pe, Sigs.FurnitureRestoreOutdoorSizeProof);
-        Resolve(pe, Sigs.FurnitureRestoreIndoorStoredSizeProof);
-        Resolve(pe, Sigs.FurnitureRestoreCurrentHouseProof);
-        Resolve(pe, Sigs.FurnitureRestoreAgentConstructorProof);
-        Resolve(pe, Sigs.FurnitureRestoreCountProducerProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberInventoryRestoreProof : Sigs.FurnitureRestoreInventoryRestoreProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberStorageRestoreProof : Sigs.FurnitureRestoreStorageRestoreProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberIndoorInventoryProof : Sigs.FurnitureRestoreIndoorInventoryProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberOutdoorInventoryProof : Sigs.FurnitureRestoreOutdoorInventoryProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberIndoorStorageProof : Sigs.FurnitureRestoreIndoorStorageProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberIndoorDecisionProof : Sigs.FurnitureRestoreIndoorDecisionProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberOutdoorDecisionProof : Sigs.FurnitureRestoreOutdoorDecisionProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberWarningOpenProof : Sigs.FurnitureRestoreWarningOpenProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberIndoorPlacedSizeProof : Sigs.FurnitureRestoreIndoorPlacedSizeProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberOutdoorSizeProof : Sigs.FurnitureRestoreOutdoorSizeProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberIndoorStoredSizeProof : Sigs.FurnitureRestoreIndoorStoredSizeProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberCurrentHouseProof : Sigs.FurnitureRestoreCurrentHouseProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberAgentConstructorProof : Sigs.FurnitureRestoreAgentConstructorProof);
+        Resolve(pe, november ? Sigs.FurnitureRestoreNovemberCountProducerProof : Sigs.FurnitureRestoreCountProducerProof);
 
         RequireBranch(pe, Function("InventoryRestore") + 12, 1, 5, Function("OutdoorInventory"));
         RequireBranch(pe, Function("InventoryRestore") + 24, 2, 6, Function("IndoorInventory"));
@@ -140,13 +153,13 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         if (!lea.AsSpan(0, 3).SequenceEqual(new byte[] { 0x48, 0x8D, 0x05 }))
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S61E6DF14B71A38CD"), originalMessageText => new InvalidOperationException(originalMessageText));
         AgentTable = constructor + 0x32 + BinaryPrimitives.ReadInt32LittleEndian(lea.AsSpan(3));
-        if (AgentTable - ModuleBase != 0x22CF978) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SFF0D897FD78DA6E4"), originalMessageText => new InvalidOperationException(originalMessageText));
+        if (AgentTable - ModuleBase != (november ? 0x22D2608 : 0x22CF978)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SFF0D897FD78DA6E4"), originalMessageText => new InvalidOperationException(originalMessageText));
         var updater = ResolveTableEntry(pe, AgentTable, 7);
-        if (updater - ModuleBase != 0x1721240) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S53FA04E3B57CF133"), originalMessageText => new InvalidOperationException(originalMessageText));
+        if (updater - ModuleBase != (november ? 0x1721160 : 0x1721240)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S53FA04E3B57CF133"), originalMessageText => new InvalidOperationException(originalMessageText));
         Pin(pe, checked((int)(updater - ModuleBase)), 0x33);
         RequireBranch(pe, updater + 0x2E, 1, 5, Function("CountProducer"));
-        IndoorListenerTable = FindReceiverTable(pe, Function("IndoorDecision"), 0x21CFEC0);
-        OutdoorListenerTable = FindReceiverTable(pe, Function("OutdoorDecision"), 0x21CFE58);
+        IndoorListenerTable = FindReceiverTable(pe, Function("IndoorDecision"), november ? 0x21D2A30 : 0x21CFEC0);
+        OutdoorListenerTable = FindReceiverTable(pe, Function("OutdoorDecision"), november ? 0x21D29C8 : 0x21CFE58);
 
         RequireOffset<HousingManager>(nameof(HousingManager.CurrentTerritory), 0);
         RequireOffset<HousingManager>(nameof(HousingManager.OutdoorTerritory), 8);
@@ -328,7 +341,7 @@ internal sealed unsafe class FurnitureRestoreNativeBinding
         return true;
     }
 
-    private static bool HasVerifiedRetirement(nint address, byte[] actual, byte[] proof)
+    private bool HasVerifiedRetirement(nint address, byte[] actual, byte[] proof)
     {
         if (!retired.TryGetValue(address, out var prefix) || !MatchesPrefix(actual, proof, prefix)
             || !retiredPaths.TryGetValue(address, out var snapshots) || snapshots.Count == 0) return false;

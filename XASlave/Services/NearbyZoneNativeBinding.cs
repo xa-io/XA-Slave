@@ -2,12 +2,15 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Reflection.PortableExecutable;
 using System.Runtime.InteropServices;
 using System.Security.Cryptography;
 using System.Text;
+using FFXIVClientStructs.FFXIV.Client.System.Framework;
 using FFXIVClientStructs.FFXIV.Client.UI.Agent;
 using FFXIVClientStructs.FFXIV.Client.UI.Info;
+using FFXIVClientStructs.FFXIV.Component.GUI;
 using XASlave.Data;
 
 namespace XASlave.Services;
@@ -16,21 +19,47 @@ namespace XASlave.Services;
 internal sealed unsafe class NearbyZoneNativeBinding
 {
     internal const string SupportedSha256 = "46A52AB1DBE80B9A8D6C4D4531BF66693904200C5135FACACD053EF28A5DE14A";
+    private const string NovemberGameSha256 = "CEB4260B2574476ACF72E7B6105D0A4F8D1BD78B4E7CAB5D8115C453F2F39339";
+    private const string NovemberClientStructsSha256 = "2D268F54FB6C75B511C349BA49B00E8D197C09FF64FF380ACABDCAE42A1F7D9B";
+    private const string NovemberStableClientStructsSha256 = "28488F18AD05FDCD12373A83756EAB275C291B09C6AF061EF7F846AA06A36E29";
     internal readonly nint ModuleBase;
     internal readonly int ImageSize;
+    private readonly bool november;
     private readonly Dictionary<int, byte[]> proofs = new();
     private readonly List<(int Start, int End)> executable = new();
     private readonly UTF8Encoding strictUtf8 = new(false, true);
-    internal nint SearchEnd => ModuleBase + 0x96EB00;
-    internal nint SearchRequest => ModuleBase + 0x96EB70;
-    internal nint ContentEnd => ModuleBase + 0x9851D0;
-    internal nint ContentStart => ModuleBase + 0x985270;
+    // The shared October identity still protects other features and saved captures.
+    // Only this binding selects the separately reviewed November game/SDK pair.
+    private int SearchEndRva => november ? 0x96EB80 : 0x96EB00;
+    private int SearchRequestRva => november ? 0x96EBF0 : 0x96EB70;
+    private int ContentEndRva => november ? 0x985280 : 0x9851D0;
+    private int ContentStartRva => november ? 0x985320 : 0x985270;
+    private int ContentReceiveEventRva => november ? 0x58F1D0 : 0x58F480;
+    private int InfoProxyGetterRva => november ? 0x958670 : 0x958600;
+    private int AgentGetterRva => november ? 0x494100 : 0x4943B0;
+    private int SearchTableRva => november ? 0x21A1938 : 0x219F498;
+    private int ContentTableRva => november ? 0x21A2338 : 0x219FE98;
+    private int ContentRequestRva => november ? 0x99F210 : 0x99F3F0;
+    private int ContentAgentTableRva => november ? 0x2177688 : 0x2176158;
+    internal nint SearchEnd => ModuleBase + SearchEndRva;
+    internal nint SearchRequest => ModuleBase + SearchRequestRva;
+    internal nint ContentEnd => ModuleBase + ContentEndRva;
+    internal nint ContentStart => ModuleBase + ContentStartRva;
+
+    internal static bool IsSupportedPair(string gameHash, string clientStructsHash)
+        => gameHash == SupportedSha256
+            || (gameHash == NovemberGameSha256 && clientStructsHash is (NovemberClientStructsSha256 or NovemberStableClientStructsSha256));
 
     internal NearbyZoneNativeBinding()
     {
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
-        if (Convert.ToHexString(SHA256.HashData(bytes)) != SupportedSha256) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S96715DD91DA36CFF"), originalMessageText => new InvalidOperationException(originalMessageText));
+        var gameHash = Convert.ToHexString(SHA256.HashData(bytes));
+        // Preserve the existing October admission; the new profile has an exact SDK pin.
+        var clientStructsHash = gameHash == SupportedSha256 ? string.Empty
+            : Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(InfoProxySearch).Assembly.Location)));
+        if (!IsSupportedPair(gameHash, clientStructsHash)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S96715DD91DA36CFF"), originalMessageText => new InvalidOperationException(originalMessageText));
+        november = gameHash == NovemberGameSha256;
         using var stream = new MemoryStream(bytes, false);
         using var pe = new PEReader(stream);
         ModuleBase = module.BaseAddress;
@@ -40,16 +69,79 @@ internal sealed unsafe class NearbyZoneNativeBinding
             if ((section.SectionCharacteristics & SectionCharacteristics.MemExecute) != 0)
                 executable.Add((section.VirtualAddress, checked(section.VirtualAddress + section.VirtualSize)));
         // Exact extents verified against the supported PE exception table (including chained fragments), or the bounded leaf body.
-        AddProof(pe, 0x96EB00, 0x65); AddProof(pe, 0x96EB70, 0x144);
-        AddProof(pe, 0x9851D0, 0x8B); AddProof(pe, 0x985270, 0x17);
-        AddProof(pe, 0x58F480, 0x2F8);
-        AddProof(pe, 0x958600, 11); AddProof(pe, 0x4943B0, 8);
+        AddProof(pe, SearchEndRva, 0x65); AddProof(pe, SearchRequestRva, 0x144);
+        AddProof(pe, ContentEndRva, 0x8B); AddProof(pe, ContentStartRva, 0x17);
+        AddProof(pe, ContentReceiveEventRva, 0x2F8);
+        AddProof(pe, InfoProxyGetterRva, 11); AddProof(pe, AgentGetterRva, 8);
+        if (november)
+        {
+            AddProof(pe, 0xD2910, 0x10); // Framework.GetUIModule, including the null branch.
+            AddProof(pe, 0x788050, 8); AddProof(pe, 0x788080, 8); // UIModule info/agent getters.
+            AddProof(pe, 0x482530, 8); // Both agents' IsAgentActive.
+        }
         if (sizeof(InfoProxySearch) != 400 || sizeof(InfoProxyCommonList) != 208 || sizeof(InfoProxyCommonList.CharacterData) != 112
             || Marshal.OffsetOf<InfoProxyCommonList>(nameof(InfoProxyCommonList.DataSize)).ToInt32() != 0xA2
             || Marshal.OffsetOf<InfoProxyCommonList>(nameof(InfoProxyCommonList.CharData)).ToInt32() != 0xB0
             || Marshal.OffsetOf<InfoProxyCommonList>(nameof(InfoProxyCommonList.EntryCount)).ToInt32() != 0x10
             || Marshal.OffsetOf<InfoProxyCommonList>(nameof(InfoProxyCommonList.CurrentRequestId)).ToInt32() != 0x19)
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCBC5EE83B1B68B21"), originalMessageText => new InvalidOperationException(originalMessageText));
+        if (november) ValidateNovemberLayouts();
+    }
+
+    private static void ValidateNovemberLayouts()
+    {
+        if (sizeof(InfoProxyContentMember) != 0xD58 || sizeof(AgentInterface) != 0x28 || sizeof(AtkValue) != 0x10
+            || !HasExpectedFieldOffset<InfoProxySearch>(nameof(InfoProxySearch.LocationCount), 0xD0)
+            || !HasExpectedFieldOffset<InfoProxySearch>(nameof(InfoProxySearch.JobMask), 0xD8)
+            || !HasExpectedFieldOffset<InfoProxySearch>(nameof(InfoProxySearch.LevelMin), 0xE0)
+            || !HasExpectedFieldOffset<InfoProxySearch>(nameof(InfoProxySearch.LevelMax), 0xE2)
+            || !HasExpectedFieldOffset<InfoProxySearch>(nameof(InfoProxySearch.GrandCompanyMask), 0xE8)
+            || !HasExpectedFieldOffset<InfoProxySearch>(nameof(InfoProxySearch.LanguageMask), 0xF0)
+            || !HasExpectedFieldOffset<InfoProxySearch>(nameof(InfoProxySearch.OnlineStatusMask), 0xF8)
+            || !HasExpectedFieldOffset<InfoProxySearch>("_locationIDs", 0x100)
+            || !HasExpectedFieldOffset<InfoProxySearch>("_name", 0x164)
+            || !HasExpectedFieldOffset<InfoProxyCommonList.CharacterData>(nameof(InfoProxyCommonList.CharacterData.HomeWorld), 0x28)
+            || !HasExpectedFieldOffset<InfoProxyCommonList.CharacterData>(nameof(InfoProxyCommonList.CharacterData.Location), 0x2A)
+            || !HasExpectedFieldOffset<InfoProxyCommonList.CharacterData>(nameof(InfoProxyCommonList.CharacterData.Job), 0x31)
+            || !HasExpectedFieldOffset<InfoProxyCommonList.CharacterData>("_name", 0x32)
+            || !HasExpectedFieldOffset<AgentInterface>(nameof(AgentInterface.AddonId), 0x20)
+            || !HasExpectedFieldOffset<AtkValue>(nameof(AtkValue.Type), 0)
+            || !HasExpectedFieldOffset<AtkValue>(nameof(AtkValue.Int), 8))
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCBC5EE83B1B68B21"), originalMessageText => new InvalidOperationException(originalMessageText));
+    }
+
+    private static bool HasExpectedFieldOffset<T>(string field, int expected) where T : struct
+    {
+        // Explicit ClientStructs layouts can contain fields the interop marshaler
+        // cannot represent. Inspect the declared field offset without marshaling T.
+        var type = typeof(T);
+        var info = type.GetField(field, BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic);
+        if (type.StructLayoutAttribute?.Value != LayoutKind.Explicit || info == null) return false;
+        var offset = info.GetCustomAttribute<FieldOffsetAttribute>();
+        return offset != null && offset.Value == expected;
+    }
+
+    private void ValidateNovemberModuleRoutes()
+    {
+        if (!november) return;
+        if ((nint)Framework.StaticAddressPointers.ppInstance != ModuleBase + 0x2904928
+            || (nint)Framework.MemberFunctionPointers.GetUIModule != ModuleBase + 0xD2910)
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCBC5EE83B1B68B21"), originalMessageText => new InvalidOperationException(originalMessageText));
+        RequireReadable(ModuleBase + 0x2904928, 8);
+        ValidateUnownedTarget(ModuleBase + 0xD2910);
+        var framework = Framework.Instance();
+        RequireReadable((nint)framework, 0x2B70);
+        var ui = framework->GetUIModule();
+        RequireReadable((nint)ui, 8);
+        var table = Marshal.ReadIntPtr((nint)ui);
+        if (table != ModuleBase + 0x2190778)
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCBC5EE83B1B68B21"), originalMessageText => new InvalidOperationException(originalMessageText));
+        RequireReadable(table, 38 * 8);
+        if (Marshal.ReadIntPtr(table, 35 * 8) != ModuleBase + 0x788050
+            || Marshal.ReadIntPtr(table, 37 * 8) != ModuleBase + 0x788080)
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCBC5EE83B1B68B21"), originalMessageText => new InvalidOperationException(originalMessageText));
+        ValidateUnownedTarget(ModuleBase + 0x788050);
+        ValidateUnownedTarget(ModuleBase + 0x788080);
     }
 
     private void AddProof(PEReader pe, int rva, int length)
@@ -78,8 +170,9 @@ internal sealed unsafe class NearbyZoneNativeBinding
     internal InfoProxyCommonList* CurrentProxy(NearbyZoneMode mode)
     {
         RequireFramework();
-        if ((nint)InfoModule.MemberFunctionPointers.GetInfoProxyById != ModuleBase + 0x958600) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SBF7AF0FBFFD92046"), originalMessageText => new InvalidOperationException(originalMessageText));
-        ValidateUnownedTarget(ModuleBase + 0x958600);
+        ValidateNovemberModuleRoutes();
+        if ((nint)InfoModule.MemberFunctionPointers.GetInfoProxyById != ModuleBase + InfoProxyGetterRva) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SBF7AF0FBFFD92046"), originalMessageText => new InvalidOperationException(originalMessageText));
+        ValidateUnownedTarget(ModuleBase + InfoProxyGetterRva);
         var pointer = mode == NearbyZoneMode.Search ? (InfoProxyCommonList*)InfoProxySearch.Instance() : (InfoProxyCommonList*)InfoProxyContentMember.Instance();
         ValidateProxy(pointer, mode);
         return pointer;
@@ -88,12 +181,12 @@ internal sealed unsafe class NearbyZoneNativeBinding
     internal void ValidateProxy(InfoProxyCommonList* pointer, NearbyZoneMode mode)
     {
         RequireReadable((nint)pointer, mode == NearbyZoneMode.Search ? 400 : 208);
-        var expected = ModuleBase + (mode == NearbyZoneMode.Search ? 0x219F498 : 0x219FE98);
+        var expected = ModuleBase + (mode == NearbyZoneMode.Search ? SearchTableRva : ContentTableRva);
         if (Marshal.ReadIntPtr((nint)pointer) != expected) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S7816CDFE0484C96B"), originalMessageText => new InvalidOperationException(originalMessageText));
         RequireReadable(expected, 88);
         var request = Marshal.ReadIntPtr(expected, 24);
         var end = Marshal.ReadIntPtr(expected, 80);
-        if (request != (mode == NearbyZoneMode.Search ? SearchRequest : ModuleBase + 0x99F3F0)
+        if (request != (mode == NearbyZoneMode.Search ? SearchRequest : ModuleBase + ContentRequestRva)
             || end != (mode == NearbyZoneMode.Search ? SearchEnd : ContentEnd)) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SEA5C9D0CB1EBA749"), originalMessageText => new InvalidOperationException(originalMessageText));
         if (pointer->DataSize != 200 || pointer->EntryCount > 200 || pointer->CharData == null)
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S3AD52C22A334713F" , mode, pointer->DataSize, pointer->EntryCount, ((pointer->CharData == null ? global::XASlave.Localization.UiMessage.Key("SFFA63583DFA6706B") : global::XASlave.Localization.UiMessage.Key("S4D4C7EEE2E28D03C")))), originalMessageText => new InvalidOperationException(originalMessageText));
@@ -103,21 +196,29 @@ internal sealed unsafe class NearbyZoneNativeBinding
     internal AgentInterface* Agent(NearbyZoneMode mode)
     {
         RequireFramework();
-        if ((nint)AgentModule.MemberFunctionPointers.GetAgentByInternalId != ModuleBase + 0x4943B0) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S504210DD49E7A769"), originalMessageText => new InvalidOperationException(originalMessageText));
-        ValidateUnownedTarget(ModuleBase + 0x4943B0);
+        ValidateNovemberModuleRoutes();
+        if ((nint)AgentModule.MemberFunctionPointers.GetAgentByInternalId != ModuleBase + AgentGetterRva) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S504210DD49E7A769"), originalMessageText => new InvalidOperationException(originalMessageText));
+        ValidateUnownedTarget(ModuleBase + AgentGetterRva);
         var module = AgentModule.Instance();
         if (module == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S4310051CF210BA30"), originalMessageText => new InvalidOperationException(originalMessageText));
         var agent = module->GetAgentByInternalId((AgentId)(mode == NearbyZoneMode.Search ? 63 : 299));
-        RequireReadable((nint)agent, 8);
+        RequireReadable((nint)agent, november ? 0x28 : 8);
         var table = Marshal.ReadIntPtr((nint)agent);
-        RequireReadable(table, 0x30);
+        RequireReadable(table, 0x38);
+        if (november)
+        {
+            if (table != ModuleBase + (mode == NearbyZoneMode.Search ? 0x2174818 : ContentAgentTableRva)
+                || Marshal.ReadIntPtr(table, 0x30) != ModuleBase + 0x482530)
+                throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SCBC5EE83B1B68B21"), originalMessageText => new InvalidOperationException(originalMessageText));
+            ValidateUnownedTarget(ModuleBase + 0x482530);
+        }
         if (mode == NearbyZoneMode.ContentMember)
         {
             var receiveEvent = Marshal.ReadIntPtr(table);
-            if (table != ModuleBase + 0x2176158 || receiveEvent != ModuleBase + 0x58F480)
+            if (table != ModuleBase + ContentAgentTableRva || receiveEvent != ModuleBase + ContentReceiveEventRva)
                 throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S8391DA809DD9CA6B" , global::XASlave.Localization.UiMessage.Format("SF02CBA92BAB94B6D" , (long)(table - ModuleBase)), global::XASlave.Localization.UiMessage.Format("S195CFBC75E452443" , (long)(receiveEvent - ModuleBase))), originalMessageText => new InvalidOperationException(
                     originalMessageText));
-            ValidateUnownedTarget(ModuleBase + 0x58F480);
+            ValidateUnownedTarget(ModuleBase + ContentReceiveEventRva);
         }
         return agent;
     }

@@ -289,6 +289,7 @@ public class Configuration : IPluginConfiguration
     public bool XagmanUsePreflightOnFirstCharacter { get; set; } = true;
     public bool XagmanAutoReturnToFc { get; set; } = true;
     public bool XagmanIgnoreGilInMatchingSelection { get; set; } = false;
+    public bool XagmanIgnoreGilShortfalls { get; set; } = false;
     public bool XagmanPrioritizeCharactersGivingItemsFirst { get; set; } = false;
     public bool XagmanRefuseTradesWhenIdle { get; set; } = false;
     public bool XagmanWarningDetailsExpanded { get; set; } = true;
@@ -528,6 +529,11 @@ public class Configuration : IPluginConfiguration
     public bool ShowTitlesAsPlayernamesHonorificSupportEnabled { get; set; } = true;
     public bool ShowBlacklistedPlayernameInPartyEnabled { get; set; } = false;
     public bool BetterInventoryMoverEnabled { get; set; } = false;
+    public bool InventorySearchBarEnabled { get; set; } = false;
+    public bool InventorySearchShowTradable { get; set; } = true;
+    public bool InventorySearchShowUntradable { get; set; } = true;
+    public bool InventorySearchShowBound { get; set; } = true;
+    public bool InventorySearchShowUnique { get; set; } = true;
     public BetterInventoryMoverModifierKey BetterInventoryMoverQuickMoveModifier { get; set; } = BetterInventoryMoverModifierKey.LeftShift;
     public bool BetterCompanyChestEnabled { get; set; } = false;
     public int BetterCompanyChestDefaultPage { get; set; } = 0;

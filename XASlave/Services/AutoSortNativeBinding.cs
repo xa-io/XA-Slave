@@ -12,6 +12,9 @@ namespace XASlave.Services;
 
 internal sealed class AutoSortNativeBinding
 {
+    private const string NovemberGameSha256 = "CEB4260B2574476ACF72E7B6105D0A4F8D1BD78B4E7CAB5D8115C453F2F39339";
+    private const string NovemberClientStructsSha256 = "2D268F54FB6C75B511C349BA49B00E8D197C09FF64FF380ACABDCAE42A1F7D9B";
+    private const string NovemberStableClientStructsSha256 = "28488F18AD05FDCD12373A83756EAB275C291B09C6AF061EF7F846AA06A36E29";
     private readonly Dictionary<nint, byte[]> proofs = new();
     private readonly Dictionary<AutoSortFunction, nint> functions = new();
     internal nint ModuleBase { get; }
@@ -21,37 +24,44 @@ internal sealed class AutoSortNativeBinding
     internal unsafe AutoSortNativeBinding()
     {
         NearbyZoneNativeBinding.RequireFramework();
-        if (Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(ItemOrderModuleSorter).Assembly.Location)))
-            is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2" or "F5A2C68CCECD3E199BDA572050E98902B2E7594066C95DC7826C2D4297CD0564"))
-            throw new InvalidOperationException("Item sorting requires revalidated client structures.");
+        var sdkHash = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(ItemOrderModuleSorter).Assembly.Location)));
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
-        if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)
-            throw new InvalidOperationException("Item sorting requires a revalidated game build.");
+        var gameHash = Convert.ToHexString(SHA256.HashData(bytes));
+        var november = gameHash == NovemberGameSha256 && sdkHash is (NovemberClientStructsSha256 or NovemberStableClientStructsSha256);
+        if (!november)
+        {
+            if (sdkHash is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2" or "F5A2C68CCECD3E199BDA572050E98902B2E7594066C95DC7826C2D4297CD0564"))
+                throw new InvalidOperationException("Item sorting requires revalidated client structures.");
+            if (gameHash != NearbyZoneNativeBinding.SupportedSha256)
+                throw new InvalidOperationException("Item sorting requires a revalidated game build.");
+        }
         using var stream = new MemoryStream(bytes, false);
         using var pe = new PEReader(stream);
         ModuleBase = module.BaseAddress;
         if (pe.PEHeaders.PEHeader?.SizeOfImage != module.ModuleMemorySize)
             throw new InvalidOperationException("Item-sort executable image changed.");
         var resolved = new Dictionary<string, nint>(StringComparer.Ordinal);
-        resolved.Add(Sigs.AutoSortStartCallerProof.Name, Resolve(pe, Sigs.AutoSortStartCallerProof));
-        resolved.Add(Sigs.AutoSortRuleInstallerProof.Name, Resolve(pe, Sigs.AutoSortRuleInstallerProof));
+        var startProof = november ? Sigs.AutoSortNovemberStartCallerProof : Sigs.AutoSortStartCallerProof;
+        var ruleProof = november ? Sigs.AutoSortNovemberRuleInstallerProof : Sigs.AutoSortRuleInstallerProof;
+        resolved.Add(startProof.Name, Resolve(pe, startProof));
+        resolved.Add(ruleProof.Name, Resolve(pe, ruleProof));
         var caller = resolved["StartCaller"];
         var call = pe.GetSectionData(checked((int)(caller - ModuleBase)) + 18).GetContent(0, 5).ToArray();
         if (call[0] != 0xE8) throw new InvalidOperationException("Item-sort native start caller changed.");
         Start = caller + 23 + BinaryPrimitives.ReadInt32LittleEndian(call.AsSpan(1));
-        if (Start - ModuleBase != 0x7E17B0 || !proofs.ContainsKey(Start))
+        if (Start - ModuleBase != (november ? 0x7E16C0 : 0x7E17B0) || !proofs.ContainsKey(Start))
             throw new InvalidOperationException("Item-sort start target is not the uniquely resolved proven function.");
         var installer = resolved["RuleInstaller"];
         functions.Add(AutoSortFunction.NullSentinel, 0);
-        ResolveRule(pe, installer, AutoSortFunction.IdPrimary, 0x2C, 0x7E2410);
-        ResolveRule(pe, installer, AutoSortFunction.IdSecondary, 0x68, 0x7E2580);
-        ResolveRule(pe, installer, AutoSortFunction.Category, 0x38, 0x7E2450);
-        ResolveRule(pe, installer, AutoSortFunction.ItemLevel, 0x5C, 0x7E2530);
-        ResolveRule(pe, installer, AutoSortFunction.Hq, 0x8C, 0x7E2640);
-        ResolveRule(pe, installer, AutoSortFunction.Tab, 0x44, 0x7E24C0);
+        ResolveRule(pe, installer, AutoSortFunction.IdPrimary, 0x2C, november ? 0x7E2320 : 0x7E2410);
+        ResolveRule(pe, installer, AutoSortFunction.IdSecondary, 0x68, november ? 0x7E2490 : 0x7E2580);
+        ResolveRule(pe, installer, AutoSortFunction.Category, 0x38, november ? 0x7E2360 : 0x7E2450);
+        ResolveRule(pe, installer, AutoSortFunction.ItemLevel, 0x5C, november ? 0x7E2440 : 0x7E2530);
+        ResolveRule(pe, installer, AutoSortFunction.Hq, 0x8C, november ? 0x7E2550 : 0x7E2640);
+        ResolveRule(pe, installer, AutoSortFunction.Tab, 0x44, november ? 0x7E23D0 : 0x7E24C0);
         // Complete inspected key-function region, including every selected leaf body.
-        Pin(pe, 0x7E23F0, 0x2B0);
+        Pin(pe, november ? 0x7E2300 : 0x7E23F0, 0x2B0);
         RequireLayout<ItemOrderModule>(nameof(ItemOrderModule.InventorySorter), 0x48, 224);
         RequireLayout<ItemOrderModuleSorter>(nameof(ItemOrderModuleSorter.SortFunctions), 0x40, 104);
         RequireLayout<ItemOrderModuleSorter>(nameof(ItemOrderModuleSorter.SortFunctionIndex), 0x38, 104);

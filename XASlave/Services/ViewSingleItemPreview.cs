@@ -35,6 +35,8 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
 {
     private const int MeshGateRva = 0x282A10, MeshGateLength = 0xD8C;
     private readonly nint moduleBase;
+    private readonly int meshGateRva;
+    internal ViewSingleItemNativeContract Contract { get; }
     private readonly Hook<MeshRenderDelegate> meshHook;
     private readonly byte[] installedBody;
     private readonly ViewSingleItemScene scene;
@@ -114,30 +116,28 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
     {
         NearbyZoneNativeBinding.RequireFramework();
         var sdk = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(typeof(AgentInspect).Assembly.Location)));
-        if (sdk is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2" or "F5A2C68CCECD3E199BDA572050E98902B2E7594066C95DC7826C2D4297CD0564"))
-            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S3AC296CB69ECFF46"), originalMessageText => new InvalidOperationException(originalMessageText));
         ValidateLayouts();
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
-        if (Convert.ToHexString(SHA256.HashData(bytes)) != NearbyZoneNativeBinding.SupportedSha256)
-            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF0B352CBCC662406"), originalMessageText => new InvalidOperationException(originalMessageText));
+        Contract = ViewSingleItemNativeContract.Resolve(Convert.ToHexString(SHA256.HashData(bytes)), sdk);
+        meshGateRva = Contract.ResolveRva(MeshGateRva);
         using var stream = new MemoryStream(bytes, false);
         using var pe = new PEReader(stream);
         if (pe.PEHeaders.PEHeader?.SizeOfImage != module.ModuleMemorySize)
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S94B5DBAC63D01E98"), originalMessageText => new InvalidOperationException(originalMessageText));
         moduleBase = module.BaseAddress;
-        var original = pe.GetSectionData(MeshGateRva).GetContent(0, MeshGateLength).ToArray();
+        var original = pe.GetSectionData(meshGateRva).GetContent(0, MeshGateLength).ToArray();
         using var hookRegistration = ViewSingleItemRendererHookState.GetSyncRoot().EnterScope();
-        var savedEntry = ViewSingleItemRendererHookState.ReadSavedEntry(moduleBase + MeshGateRva, MeshGateLength);
-        var loaded = NearbyZoneNativeBinding.Read(moduleBase + MeshGateRva, MeshGateLength);
+        var savedEntry = ViewSingleItemRendererHookState.ReadSavedEntry(moduleBase + meshGateRva, MeshGateLength);
+        var loaded = NearbyZoneNativeBinding.Read(moduleBase + meshGateRva, MeshGateLength);
         if (!ViewSingleItemRendererHookState.MatchesSupportedCode(original, loaded, savedEntry))
-            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S18116930FDB1719F" , ViewSingleItemRendererDiagnostics.DescribeBytes(MeshGateRva, original, loaded), ViewSingleItemRendererDiagnostics.DescribeOwners(moduleBase + MeshGateRva, MeshGateLength)), originalMessageText => new InvalidOperationException(originalMessageText));
-        meshHook = Plugin.GameInterop.HookFromAddress<MeshRenderDelegate>(moduleBase + MeshGateRva, RenderMesh);
+            throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Format("S18116930FDB1719F" , ViewSingleItemRendererDiagnostics.DescribeBytes(meshGateRva, original, loaded), ViewSingleItemRendererDiagnostics.DescribeOwners(moduleBase + meshGateRva, MeshGateLength)), originalMessageText => new InvalidOperationException(originalMessageText));
+        meshHook = Plugin.GameInterop.HookFromAddress<MeshRenderDelegate>(moduleBase + meshGateRva, RenderMesh);
         try
         {
             meshHook.Enable();
-            installedBody = NearbyZoneNativeBinding.Read(moduleBase + MeshGateRva, MeshGateLength);
-            scene = new ViewSingleItemScene(moduleBase, pe, RetireSceneImage);
+            installedBody = NearbyZoneNativeBinding.Read(moduleBase + meshGateRva, MeshGateLength);
+            scene = new ViewSingleItemScene(moduleBase, pe, RetireSceneImage, Contract);
         }
         catch { meshHook.Dispose(); throw; }
     }
@@ -192,7 +192,7 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         NearbyZoneNativeBinding.RequireFramework();
         ObjectDisposedException.ThrowIf(disposed, this);
         DrainSceneImageRetirement();
-        if (!meshHook.IsEnabled || !ViewSingleItemScene.MatchesNativeBytes(moduleBase + MeshGateRva, installedBody))
+        if (!meshHook.IsEnabled || !ViewSingleItemScene.MatchesNativeBytes(moduleBase + meshGateRva, installedBody))
         {
             Clear();
             throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("SF8EBB11384EF76AB"), originalMessageText => new InvalidOperationException(originalMessageText));
@@ -303,8 +303,11 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         Validate();
         if (source == null) throw global::XASlave.Localization.UiMessage.CreateException(global::XASlave.Localization.UiMessage.Key("S1BE83053D7E1622E"), originalMessageText => new InvalidOperationException(originalMessageText));
         var appearance = scene.ExportAppearance();
-        var schema = catalog != null || choices.Any(choice => choice.Key == 103) ? 3 : 2;
-        return new(schema, NearbyZoneNativeBinding.SupportedSha256, ViewSingleItemCapture.SupportedLayout,
+        // Fresh captures include companion choices and retain native crest
+        // visibility. A restored legacy schema-2 capture keeps its old shape
+        // and already-zero crest byte; no historical value is reconstructed.
+        var schema = catalog != null || choices.Any(choice => choice.Key == 103) ? 4 : 2;
+        return new(schema, Contract.GameBuild, Contract.CaptureLayout,
             source.Identity.Name, source.Identity.World, capturedUtc,
             (InspectOutfitItem[])source.Equipment.Clone(), choices.ToArray(), appearance,
             Convert.ToHexString(SHA256.HashData(appearance)), ornament, ornament?.Hash(),
@@ -317,13 +320,13 @@ internal sealed unsafe partial class ViewSingleItemPreview : IDisposable
         // Reuse the existing capture/geometry pipeline. The catalog constructor
         // keeps only customization and the requested item, never this outfit.
         scene.Capture(reference);
-        var capture = ViewSingleItemShopSource.CreateCapture(entry, scene.ExportAppearance());
+        var capture = ViewSingleItemShopSource.CreateCapture(entry, scene.ExportAppearance(), Contract);
         return capture;
     }
 
     internal IReadOnlyList<ViewSingleItemChoice> Restore(ViewSingleItemCapture capture, InspectOutfitSnapshot snapshot)
     {
-        capture.Validate(); Clear(); Validate();
+        capture.ValidateFor(Contract); Clear(); Validate();
         scene.Restore(capture);
         ornament = capture.Ornament;
         minion = capture.Minion; mount = capture.Mount; catalog = capture.Catalog;

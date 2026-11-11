@@ -22,8 +22,7 @@ public partial class SlaveWindow
     private int xagmanTonyAutoStatusKind; // 0: advisory, 1: covered, 2: shortfall
 
     private bool CanSelectXagmanTonyAutomatically()
-        => !xagmanRunning && !plugin.TaskRunner.IsRunning && !xagmanTradeSafetySessionActive
-            && System.Threading.Volatile.Read(ref xagmanManualXaDatabasePullRunning) == 0 && xagmanPendingMatchSelection == null
+        => CanEditXagmanCharacterLists() && xagmanPendingMatchSelection == null
             && plugin.Configuration.XagmanRole == XagmanRole.Tony
             && !plugin.Configuration.XagmanOutsideNetworkHelper && plugin.XagmanPeers.IsConnected;
 
@@ -184,6 +183,8 @@ public partial class SlaveWindow
         CheckXagmanTonyAutoSelectionState(now);
         if (!xagmanTonyAutoPending && !xagmanTonyAutoTracking)
             return;
+        if (xagmanTradeCapacityQueryDeferred || !IsXagmanTradeCapacityViewCurrent(now))
+            return;
         if (!TryGetXagmanTonyAutoDemands(now, ownerPeers, out var demands, out var error, out var validUntil))
         {
             StopXagmanTonyAutoSelection(global::XASlave.Localization.UiMessage.Format("S4E9660AA7A1043E2", error));
@@ -204,7 +205,8 @@ public partial class SlaveWindow
                 .ToList(), definitions);
         if (xagmanTradeCapacityQueryDeferred)
         {
-            xagmanTonyAutoValidUntilUtc = DateTime.MinValue;
+            // Keep the original deadline while candidate queries are pending. Only a completed
+            // scan below may extend it; a pending scan must not turn a valid plan orange.
             return;
         }
         if (definitions.Any(definition => !IsXagmanGilItem(definition.ItemId)

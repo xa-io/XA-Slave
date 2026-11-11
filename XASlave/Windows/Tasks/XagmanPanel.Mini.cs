@@ -38,22 +38,35 @@ public partial class SlaveWindow
         };
 
     private XagmanMiniSnapshot xagmanMiniSnapshot = XagmanMiniSnapshot.Empty;
+    private readonly HashSet<string> xagmanMiniOwnerKeys = new(StringComparer.OrdinalIgnoreCase);
     private long xagmanMiniNextUpdate;
 
     internal XagmanMiniSnapshot GetXagmanMiniSnapshot()
     {
         // Apply the current privacy setting even to a retained result captured before it changed.
         var snapshot = xagmanMiniSnapshot;
+        var ignoredOwnerCount = !snapshot.Running && snapshot.Role == XagmanRole.FranchiseOwner
+            && !snapshot.OutsideNetworkHelper && xagmanHasLastRunSnapshot
+            ? xagmanMiniOwnerKeys.Count(character => !xagmanLastRunFailedCharacters.Contains(character)
+                && !xagmanLastRunSkippedCharacters.Contains(character)
+                && xagmanLastRunPartialOwners.TryGetValue(character, out var state)
+                && IsXagmanIgnoredGilOnlyPartialOwner(state))
+            : 0;
+        var unfinished = Math.Max(0, snapshot.Unfinished - ignoredOwnerCount);
         return snapshot with
         {
             Character = string.IsNullOrWhiteSpace(snapshot.Character) ? string.Empty
                 : GetDisplayCharacterKey(snapshot.Character, IsCharacterListAnonymizationEnabled()),
+            Unfinished = unfinished,
+            Estimate = ignoredOwnerCount > 0 && unfinished == 0
+                ? global::XASlave.Localization.UiMessage.Key("S65AD5D9043739BDA") : snapshot.Estimate,
         };
     }
 
     private void ClearXagmanMiniSnapshot()
     {
         xagmanMiniSnapshot = XagmanMiniSnapshot.Empty;
+        xagmanMiniOwnerKeys.Clear();
         xagmanPublishedEta = null;
         xagmanMiniNextUpdate = 0;
     }
@@ -116,6 +129,9 @@ public partial class SlaveWindow
         }
 
         // Never include free-form task/status text: it can expose character and world names.
+        // Retain the exact counted population; the detailed results may append other partial owners.
+        xagmanMiniOwnerKeys.Clear();
+        if (owner && !onh) xagmanMiniOwnerKeys.UnionWith(keys);
         xagmanMiniSnapshot = new XagmanMiniSnapshot(true, xagmanRunning, xagmanActiveRole, onh,
             displayState, xagmanActiveCharacter, completed, keys.Count,
             owner && !onh ? global::XASlave.Localization.UiMessage.Key("SEEBBF6457E46A7F6") : global::XASlave.Localization.UiMessage.Key("S58190FFABF981AA3"), failedCount, skippedCount, partialCount, estimate);

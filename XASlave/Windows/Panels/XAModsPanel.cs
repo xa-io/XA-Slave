@@ -1959,6 +1959,27 @@ public partial class SlaveWindow
             };
         }
 
+        void DrawInventorySearchBarOptions()
+        {
+            var tradable = configuration.InventorySearchShowTradable;
+            var untradable = configuration.InventorySearchShowUntradable;
+            var bound = configuration.InventorySearchShowBound;
+            var unique = configuration.InventorySearchShowUnique;
+            var changed = UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show T (tradable)")), ref tradable);
+            changed |= UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show NT (untradable)")), ref untradable);
+            changed |= UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show B (bound)")), ref bound);
+            changed |= UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show U (unique)")), ref unique);
+            if (changed)
+            {
+                configuration.InventorySearchShowTradable = tradable;
+                configuration.InventorySearchShowUntradable = untradable;
+                configuration.InventorySearchShowBound = bound;
+                configuration.InventorySearchShowUnique = unique;
+                SaveConfiguration();
+            }
+            ImGui.TextWrapped(UiLocale.T("Hidden filter buttons give the search field more space. Hiding a selected filter clears it."));
+        }
+
         void DrawBetterInventoryMoverOptions()
         {
             var quickMoveModifier = BetterInventoryMoverService.NormalizeModifier(configuration.BetterInventoryMoverQuickMoveModifier);
@@ -3307,13 +3328,13 @@ public partial class SlaveWindow
         AddSavedFeatureEntry(
             ToonModsSection.GameMods,
             "pvp-hotbars",
-            "PVP Hotbar Disabler",
+            UiLocale.Native(UiLocale.Key("PVP Hotbar Disabler")),
             () => configuration.PvpHotbarsEnabled,
             plugin.PvpHotbars.SetEnabled,
             applied => configuration.PvpHotbarsEnabled = applied,
-            "Handle blocked /hotbar display commands in PvP.",
-            "Enable chat monitoring while logged in with the main _ActionBar visible, then use /hotbar display commands.",
-            () => plugin.PvpHotbars.StatusText,
+            UiLocale.Native(UiLocale.Key("Handle blocked /hotbar display commands in PvP.")),
+            UiLocale.Native(UiLocale.Key("Enable chat monitoring while logged in with the main _ActionBar visible, then use /hotbar display commands.")),
+            () => plugin.PvpHotbars.LocalizedStatusText,
             searchTerms: ["pvp", "hotbar", "display", "disabler", "monitor", "unavailable", "Wolves' Den"],
             drawOptions: DrawPvpHotbarsOptions);
         AddSavedFeatureEntry(
@@ -3418,6 +3439,19 @@ public partial class SlaveWindow
             () => plugin.BetterInventoryMover.LocalizedStatusText,
             searchTerms: ["inventory", "retainer", "saddlebag", "premium saddlebag", "move item", "context menu"],
             drawOptions: DrawBetterInventoryMoverOptions);
+        AddSavedFeatureEntry(
+            ToonModsSection.GameMods,
+            "inventory-search-bar",
+            UiLocale.Native(UiLocale.Key("Inventory Search Bar")),
+            () => configuration.InventorySearchBarEnabled,
+            plugin.InventorySearchBar.SetEnabled,
+            applied => configuration.InventorySearchBarEnabled = applied,
+            UiLocale.Native(UiLocale.Key("Search inventory, saddlebag, retainer and Free Company chest items by name, ID or item flags.")),
+            UiLocale.Native(UiLocale.Key("Dims nonmatching slots without moving items. Ctrl+F focuses search in the active inventory; Escape clears it. Names use the game language; text is matched literally.")),
+            () => plugin.InventorySearchBar.LocalizedStatusText,
+            searchTerms: ["inventory", "retainer", "search", "filter", "item name", "item ID", "Ctrl+F"],
+            drawOptions: DrawInventorySearchBarOptions,
+            drawOptionsWhenDisabled: true);
         AddSavedFeatureEntry(
             ToonModsSection.PlayerMods,
             "better-company-chest",

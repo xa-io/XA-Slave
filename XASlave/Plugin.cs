@@ -180,7 +180,8 @@ public sealed class Plugin : IDalamudPlugin
         bool Requested,
         string StatusText,
         bool IsReady,
-        bool IsPending);
+        bool IsPending,
+        bool IsWaiting);
 
     private readonly record struct DeferredStartupAction(
         Action Action,
@@ -288,6 +289,7 @@ public sealed class Plugin : IDalamudPlugin
     public AutoMergeService AutoMerge { get; init; }
     internal AutoSortItemsService AutoSortItems { get; init; }
     internal SlaveNativeUiLibrary NativeUiLibrary { get; init; }
+    internal InventorySearchBarService InventorySearchBar { get; init; }
     internal InspectOutfitTryOnService InspectOutfitTryOn { get; init; }
     internal ViewSingleItemService ViewSingleItem { get; init; }
     internal AutoRestoreFurnitureService AutoRestoreFurniture { get; init; }
@@ -461,6 +463,12 @@ public sealed class Plugin : IDalamudPlugin
         AutoMerge = new AutoMergeService(AddonLifecycle, Framework, ClientState, Condition, DataManager, Log);
         AutoSortItems = new AutoSortItemsService(Configuration, TaskRunner);
         NativeUiLibrary = new SlaveNativeUiLibrary(RetireNativeControls);
+        InventorySearchBar = new InventorySearchBarService(NativeUiLibrary,
+            () => (Configuration.InventorySearchShowTradable ? InventorySearchFilter.Tradable : InventorySearchFilter.None)
+                | (Configuration.InventorySearchShowUntradable ? InventorySearchFilter.Untradable : InventorySearchFilter.None)
+                | (Configuration.InventorySearchShowBound ? InventorySearchFilter.Bound : InventorySearchFilter.None)
+                | (Configuration.InventorySearchShowUnique ? InventorySearchFilter.Unique : InventorySearchFilter.None),
+            () => { Configuration.InventorySearchBarEnabled = false; Configuration.Save(); });
         InspectOutfitTryOn = new InspectOutfitTryOnService(NativeUiLibrary, () => { Configuration.InspectOutfitTryOnEnabled = false; Configuration.Save(); }, Configuration, () => InspectOutfitHistoryWindow?.Open());
         ViewSingleItem = new ViewSingleItemService(ContextMenu, Log, SlaveDatabase.DbPath);
         AutoRestoreFurniture = new AutoRestoreFurnitureService(TaskRunner, MessageLog, () => { Configuration.AutoRestoreFurnitureEnabled = false; Configuration.Save(); });
@@ -954,6 +962,14 @@ public sealed class Plugin : IDalamudPlugin
             if (Configuration.BetterInventoryMoverEnabled && !BetterInventoryMover.SetEnabled(true))
             {
                 Configuration.BetterInventoryMoverEnabled = false;
+                Configuration.Save();
+            }
+        });
+        QueueDeferredStartupAction(() =>
+        {
+            if (Configuration.InventorySearchBarEnabled && !InventorySearchBar.SetEnabled(true))
+            {
+                Configuration.InventorySearchBarEnabled = false;
                 Configuration.Save();
             }
         });
@@ -1760,7 +1776,7 @@ public sealed class Plugin : IDalamudPlugin
 
         if (requestedSurfaces.Count == 0)
         {
-            Log.Information("[XASlave] Plugin loaded successfully. No hook-backed startup XA Mods were armed.");
+            Log.Information("[XASlave] Plugin loaded successfully. No startup XA Mods were requested.");
             return;
         }
 
@@ -1768,21 +1784,24 @@ public sealed class Plugin : IDalamudPlugin
         var pending = requestedSurfaces
             .Where(surface => !surface.IsReady && surface.IsPending)
             .ToList();
+        var waiting = requestedSurfaces
+            .Where(surface => !surface.IsReady && !surface.IsPending && surface.IsWaiting)
+            .ToList();
         var unavailable = requestedSurfaces
-            .Where(surface => !surface.IsReady && !surface.IsPending)
+            .Where(surface => !surface.IsReady && !surface.IsPending && !surface.IsWaiting)
             .ToList();
 
-        var summary = (pending.Count, unavailable.Count) switch
-        {
-            (0, 0) => $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed.",
-            (_, 0) => $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed, {pending.Count} still arming.",
-            (0, _) => $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed, {unavailable.Count} unavailable. Open XA Mods for current status.",
-            _ => $"[XASlave] Plugin loaded successfully. {armedCount} hook-backed startup XA Mods armed, {pending.Count} still arming, {unavailable.Count} unavailable. Open XA Mods for current status.",
-        };
-        Log.Information(summary);
+        var summary = new List<string> { $"{armedCount} XA Mods ready" };
+        if (pending.Count > 0) summary.Add($"{pending.Count} still arming");
+        if (waiting.Count > 0) summary.Add($"{waiting.Count} waiting for context");
+        if (unavailable.Count > 0) summary.Add($"{unavailable.Count} unavailable");
+        Log.Information($"[XASlave] Plugin loaded successfully. {string.Join(", ", summary)}. Open XA Mods for current status.");
 
         if (pending.Count > 0)
             Log.Information($"[XASlave] Startup still arming: {string.Join("; ", pending.Select(surface => $"{surface.Name}: {surface.StatusText}"))}");
+
+        if (waiting.Count > 0)
+            Log.Information($"[XASlave] Startup waiting: {string.Join("; ", waiting.Select(surface => $"{surface.Name}: {surface.StatusText}"))}");
 
         if (unavailable.Count > 0)
             Log.Warning($"[XASlave] Startup unavailable: {string.Join("; ", unavailable.Select(surface => $"{surface.Name}: {surface.StatusText}"))}");
@@ -1802,7 +1821,8 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Auto Display IDs", Configuration.AutoDisplayIdsEnabled, AutoDisplayIds.StatusText);
         yield return CreateStartupSurfaceStatus("Display Network Latency", Configuration.AutoDisplayNetworkLatencyEnabled, AutoDisplayNetworkLatency.StatusText);
         yield return CreateStartupSurfaceStatus("Custom Timestamp Format", Configuration.CustomTimestampFormatEnabled, ChatTimestampFormat.StatusText, "CustomTimestampFormatEnabled");
-        yield return CreateStartupSurfaceStatus("Instant Teleport", Configuration.InstantTeleportEnabled, InstantTeleport.StatusText);
+        yield return CreateStartupSurfaceStatus("Instant Teleport", Configuration.InstantTeleportEnabled, InstantTeleport.StatusText,
+            waitingForPeerLifecycle: InstantTeleport.IsWaitingForPeerLifecycle);
         yield return CreateStartupSurfaceStatus("No UI Fade", Configuration.NoUiFadeEnabled, NoUiFade.StatusText, "NoUiFadeEnabled");
         yield return CreateStartupSurfaceStatus("Better Highlight Potential Targets", Configuration.BetterHighlightPotentialTargetsEnabled, BetterHighlightPotentialTargets.StatusText, "BetterHighlightPotentialTargetsEnabled");
         yield return CreateStartupSurfaceStatus("Auto Hide Game Objects", Configuration.AutoHideGameObjectsEnabled, AutoHideGameObjects.StatusText, "AutoHideGameObjectsEnabled");
@@ -1824,6 +1844,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Show Traveler World Names", Configuration.ShowTravelerWorldNamesEnabled, NameplatePrivacy.ShowTravelerWorldNamesStatusText);
         yield return CreateStartupSurfaceStatus("Fix /target Command", Configuration.TargetCommandFixEnabled, TargetCommandFix.StatusText);
         yield return CreateStartupSurfaceStatus("Better Inventory Mover", Configuration.BetterInventoryMoverEnabled, BetterInventoryMover.StatusText);
+        yield return CreateStartupSurfaceStatus("Inventory Search Bar", Configuration.InventorySearchBarEnabled, InventorySearchBar.StatusText);
         yield return CreateStartupSurfaceStatus("Better Company Chest", Configuration.BetterCompanyChestEnabled, BetterCompanyChest.StatusText);
         yield return CreateStartupSurfaceStatus("Auto Open Moogle Mail", Configuration.AutoOpenMoogleMailEnabled, AutoOpenMoogleMail.StatusText);
         yield return CreateStartupSurfaceStatus("Enable Item Icon In Shops", Configuration.EnableItemIconInShopsEnabled, EnableItemIconInShops.StatusText);
@@ -1840,26 +1861,59 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Moveable After Death", Configuration.MoveableAfterDeathEnabled, PlayerMods.MoveableAfterDeathStatusText);
     }
 
-    private StartupSurfaceStatus CreateStartupSurfaceStatus(string name, bool requested, string statusText, string? postLoadActivationKey = null)
+    private StartupSurfaceStatus CreateStartupSurfaceStatus(string name, bool requested, string statusText, string? postLoadActivationKey = null,
+        bool waitingForPeerLifecycle = false)
     {
         var postLoadActivationPending = postLoadActivationKey is not null
             && pendingPostLoadXAModActivations.Contains(postLoadActivationKey);
         var effectiveStatusText = postLoadActivationPending
             ? "Scheduled - post-load XA Mod activation will arm after core plugin load."
-            : statusText;
+            : waitingForPeerLifecycle ? "Waiting for peer plugin readiness." : statusText;
 
         return new StartupSurfaceStatus(
             name,
             requested,
             effectiveStatusText,
-            IsStartupSurfaceReady(effectiveStatusText),
-            postLoadActivationPending || IsStartupSurfacePending(effectiveStatusText));
+            IsStartupSurfaceReady(name, effectiveStatusText),
+            postLoadActivationPending || IsStartupSurfacePending(effectiveStatusText),
+            waitingForPeerLifecycle || IsStartupSurfaceWaiting(name, effectiveStatusText));
     }
 
-    private static bool IsStartupSurfaceReady(string statusText)
+    private static bool IsStartupSurfaceReady(string name, string statusText)
     {
-        return statusText.StartsWith("Enabled", StringComparison.OrdinalIgnoreCase)
-            || statusText.StartsWith("Ready", StringComparison.OrdinalIgnoreCase);
+        if (statusText.StartsWith("Enabled", StringComparison.OrdinalIgnoreCase)
+            || statusText.StartsWith("Ready", StringComparison.OrdinalIgnoreCase))
+            return true;
+        return name switch
+        {
+            "PVP Hotbar Disabler" => statusText == "Monitoring blocked /hotbar display commands in PvP",
+            "Inventory Search Bar" => statusText == "Inventory search ready. Open your inventory, saddlebag, a retainer inventory, or your Free Company chest.",
+            "Notify When Friend Is Near" => statusText == "Scanning nearby players...",
+            "Lock Game Window In Combat" => statusText == "Locked: game window position",
+            "Auto Busy Status" => statusText is "Busy is active." or "Existing Busy status is preserved." or "Busy is temporarily released for trading.",
+            "Auto Food Consume" => statusText is "Well Fed does not need refreshing." or "Well Fed was refreshed.",
+            "Teleport Helper" => statusText == "Required by Xagman - monitoring aetheryte ticket prompts and selecting No; saved mod settings are preserved.",
+            _ => false,
+        };
+    }
+
+    private static bool IsStartupSurfaceWaiting(string name, string statusText)
+    {
+        // Only known benign states from these services. Unknown, failed, recovery and
+        // unsupported statuses must not be hidden by a broad substring match.
+        return name switch
+        {
+            "PVP Hotbar Disabler" => statusText is "Waiting for login" or "Waiting for PvP hotbars" or "Paused while the HUD is hidden or unavailable",
+            "Instant Teleport" => statusText == "Waiting for the framework thread.",
+            "Notify When Friend Is Near" => statusText is "Waiting for login" or "Waiting for a valid local player",
+            "Lock Game Window In Combat" => statusText is "Waiting for framework window admission" or "Waiting for game window",
+            "Auto Busy Status" => statusText is "Waiting for a ready character to update Busy." or "Waiting for Busy status confirmation.",
+            "Auto Food Consume" => statusText is "Select a food item to maintain Well Fed." or "Waiting for a logged-in character."
+                or "Waiting for food use confirmation." or "A different or unknown food buff is active; waiting for it to expire."
+                or "Waiting until the character can safely use food." or "Waiting for a selected sanctuary or duty."
+                or "Waiting for the selected food to become usable.",
+            _ => false,
+        };
     }
 
     private static bool IsStartupSurfacePending(string statusText)
@@ -1912,6 +1966,7 @@ public sealed class Plugin : IDalamudPlugin
         TryDispose("AutoSortItems", AutoSortItems);
         TryDispose("AutoRestoreFurniture", AutoRestoreFurniture);
         TryDispose("InspectOutfitTryOn", InspectOutfitTryOn);
+        TryDispose("InventorySearchBar", InventorySearchBar);
         TryDispose("ViewSingleItem", ViewSingleItem);
         TryDispose("NativeUiLibrary", NativeUiLibrary);
         TryDispose("MessageLog", MessageLog);
@@ -3461,6 +3516,15 @@ public sealed class Plugin : IDalamudPlugin
                     QuickMoveModifier = BetterInventoryMoverService.NormalizeModifier(Configuration.BetterInventoryMoverQuickMoveModifier).ToString(),
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "inventory-search-bar":
+                snapshot = JsonSerializer.SerializeToElement(new XAModInventorySearchSettings
+                {
+                    ShowTradable = Configuration.InventorySearchShowTradable,
+                    ShowUntradable = Configuration.InventorySearchShowUntradable,
+                    ShowBound = Configuration.InventorySearchShowBound,
+                    ShowUnique = Configuration.InventorySearchShowUnique,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "better-company-chest":
                 snapshot = JsonSerializer.SerializeToElement(new XAModBetterCompanyChestSettings
                 {
@@ -3967,6 +4031,15 @@ public sealed class Plugin : IDalamudPlugin
         {
             Configuration.BetterInventoryMoverQuickMoveModifier = ParseBetterInventoryMoverModifier(inventoryMoverSettings.QuickMoveModifier);
             ApplyBetterInventoryMoverConfiguration(save: false);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "inventory-search-bar", out XAModInventorySearchSettings? inventorySearchSettings)
+            && inventorySearchSettings != null)
+        {
+            Configuration.InventorySearchShowTradable = inventorySearchSettings.ShowTradable;
+            Configuration.InventorySearchShowUntradable = inventorySearchSettings.ShowUntradable;
+            Configuration.InventorySearchShowBound = inventorySearchSettings.ShowBound;
+            Configuration.InventorySearchShowUnique = inventorySearchSettings.ShowUnique;
         }
 
         if (TryDeserializeXAModSettings(modSettings, "better-company-chest", out XAModBetterCompanyChestSettings? companyChestSettings)
@@ -5263,7 +5336,11 @@ public sealed class Plugin : IDalamudPlugin
     private void RetireNativeControls()
     {
         try { AutoRestoreFurniture.RetireControls(); }
-        finally { InspectOutfitTryOn.RetireAllControls(); }
+        finally
+        {
+            try { InspectOutfitTryOn.RetireAllControls(); }
+            finally { InventorySearchBar.RetireAllControls(); }
+        }
     }
 
     private void ApplyStoredXAModConfiguration(string key)
@@ -5720,6 +5797,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("auto-allow-multiple-game-instances", global::XASlave.Localization.UiLocale.Native("S70C9D007A7F6FE3E"), XAModsRestoreScope.Game, () => Configuration.AutoAllowMultipleGameInstancesEnabled, SystemWindowMods.SetAllowMultipleGameInstancesEnabled, applied => Configuration.AutoAllowMultipleGameInstancesEnabled = applied, () => SystemWindowMods.AllowMultipleGameInstancesStatusTextMessage);
         yield return new("auto-cancel-login-cooldown", global::XASlave.Localization.UiLocale.Native("SBAA9A862D2C2AC8C"), XAModsRestoreScope.Game, () => Configuration.AutoCancelLoginCooldownEnabled, SystemWindowMods.SetCancelLoginCooldownEnabled, applied => Configuration.AutoCancelLoginCooldownEnabled = applied, () => SystemWindowMods.CancelLoginCooldownStatusTextMessage);
         yield return new("inspect-outfit-try-on", global::XASlave.Localization.UiLocale.Native("S48A68C87A51F1E37"), XAModsRestoreScope.Ui, () => Configuration.InspectOutfitTryOnEnabled, InspectOutfitTryOn.SetEnabled, applied => Configuration.InspectOutfitTryOnEnabled = applied, () => InspectOutfitTryOn.StatusTextMessage);
+        yield return new("inventory-search-bar", global::XASlave.Localization.UiLocale.Native(global::XASlave.Localization.UiLocale.Key("Inventory Search Bar")), XAModsRestoreScope.Ui, () => Configuration.InventorySearchBarEnabled, InventorySearchBar.SetEnabled, applied => Configuration.InventorySearchBarEnabled = applied, () => InventorySearchBar.StatusTextMessage);
         yield return new("view-single-item", global::XASlave.Localization.UiLocale.Native("S26AFC61257A5D865"), XAModsRestoreScope.Player, () => Configuration.ViewSingleItemEnabled, ViewSingleItem.SetEnabled, applied => Configuration.ViewSingleItemEnabled = applied, () => ViewSingleItem.StatusMessage);
         yield return new("auto-display-msq-progress", global::XASlave.Localization.UiLocale.Native("S10F930E55675BD2E"), XAModsRestoreScope.Ui, () => Configuration.AutoDisplayMsqProgressEnabled, MsqProgressDisplay.SetEnabled, applied => Configuration.AutoDisplayMsqProgressEnabled = applied, () => MsqProgressDisplay.StatusTextMessage);
         yield return new("disable-title-screen-movie", global::XASlave.Localization.UiLocale.Native("S2A42EC4294B8E320"), XAModsRestoreScope.Graphic, () => Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.SetDisableTitleScreenMovieEnabled, applied => Configuration.DisableTitleScreenMovieEnabled = applied, () => SystemWindowMods.DisableTitleScreenMovieStatusTextMessage);
@@ -5788,7 +5866,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("better-duty-finder", global::XASlave.Localization.UiLocale.Native("S023C4C5983AAE7D3"), XAModsRestoreScope.Ui, () => Configuration.BetterDutyFinderEnabled, BetterDutyFinder.SetEnabled, applied => Configuration.BetterDutyFinderEnabled = applied, () => BetterDutyFinder.StatusTextMessage);
         yield return new("display-actual-queue-position", global::XASlave.Localization.UiLocale.Native("SA67487F2DBAEAB93"), XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusTextMessage);
         yield return new("replace-unowned-mount-hotbars", global::XASlave.Localization.UiLocale.Native("S6D3BD3F66D7757D7"), XAModsRestoreScope.Game, () => Configuration.ReplaceUnownedMountHotbarsEnabled, ReplaceUnownedMountHotbars.SetEnabled, applied => Configuration.ReplaceUnownedMountHotbarsEnabled = applied, () => ReplaceUnownedMountHotbars.StatusTextMessage);
-        yield return new("pvp-hotbars", "PVP Hotbar Disabler", XAModsRestoreScope.Game, () => Configuration.PvpHotbarsEnabled, PvpHotbars.SetEnabled, applied => Configuration.PvpHotbarsEnabled = applied, () => global::XASlave.Localization.UiMessage.Raw(PvpHotbars.StatusText));
+        yield return new("pvp-hotbars", global::XASlave.Localization.UiLocale.Native(global::XASlave.Localization.UiLocale.Key("PVP Hotbar Disabler")), XAModsRestoreScope.Game, () => Configuration.PvpHotbarsEnabled, PvpHotbars.SetEnabled, applied => Configuration.PvpHotbarsEnabled = applied, () => PvpHotbars.StatusTextMessage);
         yield return new("target-command-fix", global::XASlave.Localization.UiLocale.Native("S762FC3E87F23DC97"), XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusTextMessage);
         yield return new("copy-item-name-for-all", global::XASlave.Localization.UiLocale.Native("SE47CEA80BEEED0B2"), XAModsRestoreScope.Ui, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusTextMessage);
         yield return new("expanded-player-right-click-menu-search", global::XASlave.Localization.UiLocale.Native("SF6F93682DCAB79ED"), XAModsRestoreScope.Ui, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusTextMessage);
@@ -6500,5 +6578,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.62";
+    public const string Version = "0.0.0.63";
 }

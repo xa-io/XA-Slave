@@ -29617,4 +29617,448 @@ Am besten erfolgt dies ab FG-Rang 6, damit Grundstücksgebote verfügbar sind.</
     <value>Diese Taste kann nicht als Tastenkürzel verwendet werden. Eine unterstützte Taste auswählen.</value>
     <comment>Source: I134 XA Mods hotkeys.</comment>
   </data>
+  <data name="S77940585632007E6" xml:space="preserve">
+    <value>Bestandsgegenstand</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S84F85BC068049C81" xml:space="preserve">
+    <value>Mindestbestand</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S83A292024EE019A9" xml:space="preserve">
+    <value>Passenden Bestand auswählen</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S2FB74173F401115D" xml:space="preserve">
+    <value>Gespeicherten Bestand prüfen...</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S0F87FE2BBE7F0FE8" xml:space="preserve">
+    <value>Bestandsauswahl abgebrochen, da sich die Einrichtung oder der Inventaranbieter geändert hat.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S4C52ED5CBA68D477" xml:space="preserve">
+    <value>Zeitüberschreitung bei der Bestandsauswahl. Inventar aktualisieren und erneut versuchen.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S7D96B8A4D9FB7C9A" xml:space="preserve">
+    <value>Inventarabfrage fehlgeschlagen. Die aktuelle Auswahl wurde beibehalten.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD32B3168FB34A854" xml:space="preserve">
+    <value>Kein bekannter Bestand verfügbar. Die aktuelle Auswahl wurde beibehalten.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SC972DED3C9AC3F8E" xml:space="preserve">
+    <value>{0} Tonys ausgewählt; {1} mit unbekanntem oder veraltetem Bestand übersprungen.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S55CCD119AAA21109" xml:space="preserve">
+    <value>Wählt aus allen Tonys anhand des gespeicherten Bestands ab dem Mindestwert aus. Unbekannter oder veralteter Bestand wird ausgeschlossen. Zum Beibehalten der Auswahl eine benannte Charakterliste speichern.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD6AA816E13650A1D" xml:space="preserve">
+    <value>Diesen Tony aus der aktuellen Auswahl entfernen.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SE23DB51A61294A37" xml:space="preserve">
+    <value>Tony aus der aktuellen Auswahl entfernt.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="SD5B12C1924E91DDA" xml:space="preserve">
+    <value>Bei Gil wird die Gil-Reserve des Tonys vom Bestand abgezogen.</value>
+    <comment>Source: I155 Xagman forecast selection.</comment>
+  </data>
+  <data name="S870942552144CE28" xml:space="preserve">
+    <value>Inventarsuchleiste</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SC2A9ACBFB6EB565E" xml:space="preserve">
+    <value>Spieler- und Gehilfeninventare nach Gegenstandsname oder ID durchsuchen.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="SBE46A3B74FED5615" xml:space="preserve">
+    <value>Blendet nicht passende Plätze ab, ohne Gegenstände zu verschieben. Strg+F fokussiert die Suche im aktiven Inventar; Escape leert sie. Namen verwenden die Spielsprache; Text wird wörtlich gesucht.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S024C6D7199F2538F" xml:space="preserve">
+    <value>Inventarsuche bereit. Öffne dein Inventar oder ein Gehilfeninventar.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S345506B671848DC7" xml:space="preserve">
+    <value>Inventarsuche nicht verfügbar: {0}</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S938E6B45CD3AEBAF" xml:space="preserve">
+    <value>Nach wörtlichem Gegenstandsnamen oder Gegenstands-ID suchen. Strg+F fokussiert die Suche im aktiven Inventar.</value>
+    <comment>Source: I67 inventory and retainer search.</comment>
+  </data>
+  <data name="S5C257E210B1A5615" xml:space="preserve">
+    <value>Die Handelskapazität konnte nicht bestätigt werden. Siehe Aufgabenprotokoll.</value>
+    <comment>Source: I153 receiver-capacity trade batches.</comment>
+  </data>
+  <data name="SB5929AF709082C0E" xml:space="preserve">
+    <value>Suche Gegenstände in Inventar, Chocobo-Satteltasche, Gehilfeninventar und Gesellschaftstruhe nach Namen, ID oder Gegenstandsmerkmalen.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S1BB180DBC0364B35" xml:space="preserve">
+    <value>Inventarsuche bereit. Öffne dein Inventar, die Chocobo-Satteltasche, ein Gehilfeninventar oder die Gesellschaftstruhe.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SE90EFC70058D7FF8" xml:space="preserve">
+    <value>Suche nach wörtlichem Gegenstandsnamen oder Gegenstands-ID. Strg+F fokussiert die Suche im aktiven Lagerfenster. T, NT, B und U filtern Gegenstände. Escape löscht Suche und Filter.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="SD053EAF81A901089" xml:space="preserve">
+    <value>Handelbar: Zeigt Gegenstände, die derzeit gehandelt werden können. Wird mit Suchtext und anderen Filtern kombiniert.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S8B322208AD91E717" xml:space="preserve">
+    <value>Nicht handelbar: Zeigt Gegenstände, die derzeit nicht gehandelt werden können. Wird mit Suchtext und anderen Filtern kombiniert.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S71FFD32EEDDE9073" xml:space="preserve">
+    <value>Gebunden: Zeigt Gegenstände mit Seelenbindung, ausgenommen Sammlerstücke. Wird mit Suchtext und anderen Filtern kombiniert.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S92D269665B6AB115" xml:space="preserve">
+    <value>Einzigartig: Zeigt als Einzigartig markierte Gegenstände. Wird mit Suchtext und anderen Filtern kombiniert.</value>
+    <comment>Source: I244 storage search and item filters.</comment>
+  </data>
+  <data name="S83E0B9DDDE38050F" xml:space="preserve">
+    <value>Gil-Fehlmengen ignorieren</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S54BF15532188F035" xml:space="preserve">
+    <value>Gil-Fehlmengen in Prognosen und Endergebnissen ignorieren, auch tatsächliche Fehlmengen. Gil-Transfers und Gegenstandsanforderungen bleiben unverändert.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SADBF70DE1D082E88" xml:space="preserve">
+    <value>Gil-Fehlmenge ignoriert</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S7D648F5B47F34AFB" xml:space="preserve">
+    <value>Ignoriert</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S10EDC6C7796AAE14" xml:space="preserve">
+    <value>Der bekannte Vorrat der ausgewählten Eigentümer deckt alle Give-Chargenziele außer Gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S1E37A43E43DB3535" xml:space="preserve">
+    <value>Alle bekannten Eigentümer erfüllen bereits jedes positive Balance-Ziel außer Gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S8D9A4AA562DAAD69" xml:space="preserve">
+    <value>Aktueller Vorrat: Die ausgewählten Tonys decken alle festen bekannten Anforderungen außer Gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S6CA735C454B42CB6" xml:space="preserve">
+    <value>Aktueller Vorrat: Die ausgewählten Tonys decken die festen bekannten Anforderungen außer Gil; unbekannte oder doppelte Eingaben können das Ergebnis ändern.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="SBDDF5539CBC5DFB4" xml:space="preserve">
+    <value>Vorrat nach Sammlung: Der prognostizierte Tony-Vorrat deckt alle festen bekannten Auffüllanforderungen außer Gil.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S3E1E253E5CD15EA6" xml:space="preserve">
+    <value>Vorrat nach Sammlung: Der prognostizierte bekannte Vorrat deckt den festen bekannten Bedarf außer Gil nur, wenn alle geplanten Sammlungen Platz finden und sich alle unbekannten Eingaben wie erwartet auflösen.</value>
+    <comment>Source: Xagman forecast and shortfall reporting.</comment>
+  </data>
+  <data name="S2D5F3616E2259EB9" xml:space="preserve">
+    <value>T anzeigen (handelbar)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SB9A60D18B6064186" xml:space="preserve">
+    <value>NT anzeigen (nicht handelbar)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SBC6660B2FC3061A1" xml:space="preserve">
+    <value>B anzeigen (gebunden)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="S9B010E574A02A1EB" xml:space="preserve">
+    <value>U anzeigen (einzigartig)</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SAFFBE0EDFFE7ED1C" xml:space="preserve">
+    <value>Ausgeblendete Filterschaltflächen geben dem Suchfeld mehr Platz. Beim Ausblenden eines ausgewählten Filters wird dessen Auswahl aufgehoben.</value>
+    <comment>Source: Inventory search filter visibility.</comment>
+  </data>
+  <data name="SFB379C0639B02DAF" xml:space="preserve">
+    <value>Das Inventarfenster hat sich geändert, bevor die Suchleiste angefügt werden konnte.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="SC516314371BAD2C5" xml:space="preserve">
+    <value>Die Titelleiste des Inventars ist nicht verfügbar.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S2EBDA73F1FA78881" xml:space="preserve">
+    <value>Die Geometrie der Inventartitelleiste wird nicht unterstützt.</value>
+    <comment>Source: XASlave/Services/InventorySearchBarService.cs; surfaced exception detail.</comment>
+  </data>
+  <data name="S08C72A181576F45F" xml:space="preserve">
+    <value>Wenn aktiviert, werden englische Chatfehlermeldungen für gesperrte /hotbar display-Befehle im PvP überwacht. Du musst eingeloggt sein und die Hauptleiste _ActionBar muss sichtbar sein.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S227E7BC13EA9D851" xml:space="preserve">
+    <value>Mit /hotbar display 10 wird Leiste 10 umgeschaltet; alternativ on/off hinzufügen. Unterstützt werden Leisten 1 bis 10. Das Aktivieren der Überwachung ändert keine Leiste, bis ein gesperrter Anzeigebefehl verarbeitet wird.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="S4E14133FCE55493F" xml:space="preserve">
+    <value>Eine akzeptierte Ersatzaktion behandelt den Fehler, ohne den Befehl zu wiederholen. Angezeigt/ausgeblendet wird erst gemeldet, nachdem das HUD die Änderung bestätigt hat; eine fehlgeschlagene Bestätigung erzeugt eine Fehlermeldung. Aktionen und Tastenbelegungen bleiben unverändert.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SCB19314CC4541E4D" xml:space="preserve">
+    <value>Direkter Befehl: /xa hotbar 1 schaltet Leiste 1 um; on zum Anzeigen oder off zum Ausblenden hinzufügen. Unterstützt werden Leisten 1–10. Diese Mod muss aktiviert sein, es wird aber weder auf einen Fehler gewartet noch eine sichtbare Hauptleiste benötigt.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SC6EBD47ABE501159" xml:space="preserve">
+    <value>/xa hotbar on aktiviert die Überwachung; /xa hotbar off deaktiviert sie und zeigt die noch von dieser Mod gesteuerten Leisten an. Die Wiederherstellung wartet, solange das HUD nicht verfügbar ist; off wiederholen, um eine fehlgeschlagene Wiederherstellung erneut zu versuchen. Mit /xa hotbar 1 on lässt sich eine ausgeblendete Hauptleiste wiederherstellen, da die Fehlerüberwachung eine sichtbare Hauptleiste voraussetzt.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
+  </data>
+  <data name="SFD7341BC66A257EF" xml:space="preserve">
+    <value>PvP-Aktionsleisten-Deaktivierung</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S01E44E92B04C187C" xml:space="preserve">
+    <value>Gesperrte /hotbar display-Befehle im PvP behandeln.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="SDF3525839B48C10F" xml:space="preserve">
+    <value>Die Chatüberwachung aktivieren, während du eingeloggt bist und die Hauptleiste _ActionBar sichtbar ist; danach /hotbar display-Befehle verwenden.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
+  </data>
+  <data name="S4DC5CCBEF0102699" xml:space="preserve">
+    <value>Deaktiviert; warte auf Wiederherstellung der gesteuerten Aktionsleisten</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SD84701543D60935E" xml:space="preserve">
+    <value>Überwache gesperrte /hotbar display-Befehle im PvP</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SCF01459D717E88A1" xml:space="preserve">
+    <value>Listener für Aktionsleisten konnten nicht registriert werden</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S6D2783A951EEB8EF" xml:space="preserve">
+    <value>Pausiert, solange das HUD ausgeblendet oder nicht verfügbar ist</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SB6EC744ECC7D5E55" xml:space="preserve">
+    <value>Warte auf PvP-Aktionsleisten</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="S00257BA7EBD4E0D0" xml:space="preserve">
+    <value>Nach einem Zugriffsfehler auf Aktionsleisten angehalten; zum erneuten Versuch aus- und einschalten</value>
+    <comment>Source: XASlave/Services/PvpHotbarsService.cs; status presentation.</comment>
+  </data>
+  <data name="SAA5606AD083D6237" xml:space="preserve">
+    <value>Die Version der geladenen Dropbox-Assembly konnte nicht gelesen werden.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC8F182EC41515C89" xml:space="preserve">
+    <value>Die Sammlung installierter Plugins des Hosts enthält einen ungültigen Eintrag</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S56750EC27E3B1A01" xml:space="preserve">
+    <value>Die Sammlung installierter Plugins des Hosts überschreitet das Validierungslimit</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851417F28A56EC9F" xml:space="preserve">
+    <value>Der Getter für die Sammlung installierter Plugins des Hosts ist nicht verfügbar oder inkompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C978BCF087A69B9" xml:space="preserve">
+    <value>Die Sammlung installierter Plugins des Hosts ist nicht verfügbar</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S122A8A674A2DE07D" xml:space="preserve">
+    <value>Ein Eintrag für ein installiertes Plugin des Hosts hat einen ungültigen Namen</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF035F3E2C28C6129" xml:space="preserve">
+    <value>Der Lebenszyklus-Enum-Vertrag des Hosts ist inkompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC656ED743A98C5D7" xml:space="preserve">
+    <value>Die Lebenszyklusschnittstelle des Hosts ist nicht verfügbar oder inkompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SDACF8E7760DB26E6" xml:space="preserve">
+    <value>Die Lebenszyklustypen des Hosts sind nicht verfügbar</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S616CD453CDAE5FD0" xml:space="preserve">
+    <value>Der Getter für die Plugin-Installations-ID des Hosts ist nicht verfügbar oder inkompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1983E34B67FD5B4D" xml:space="preserve">
+    <value>Der Plugin-Manager des Hosts ist nicht verfügbar</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S02AF27A3FF436BC3" xml:space="preserve">
+    <value>Der Getter für den Plugin-Manager-Dienst des Hosts ist nicht verfügbar oder inkompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD1C99CD34C2ABC45" xml:space="preserve">
+    <value>Der Getter für den Plugin-Namen des Hosts ist nicht verfügbar oder inkompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9B78177D3EEC6D3E" xml:space="preserve">
+    <value>Der Getter für den Plugin-Zustand des Hosts ist nicht verfügbar oder inkompatibel</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S96B4FF3C235E45B9" xml:space="preserve">
+    <value>Lebenszyklusleser nicht verfügbar: {0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD748A01364AB06DB" xml:space="preserve">
+    <value>Peer der Bewegungsfunktion</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S7CFE761B16572921" xml:space="preserve">
+    <value>Mehrere Peer-Installationen sind nicht vollständig entladen</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF22513C991F0CB3D" xml:space="preserve">
+    <value>ONH-Versionsabgleich</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S100653D37DAABE3A" xml:space="preserve">
+    <value>Die Peer-Installations-ID kommt mehrfach vor</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1E2ED8172E91F0E7" xml:space="preserve">
+    <value>Die Peer-Installations-ID ist nicht verfügbar oder ungültig</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1BDB586894E64723" xml:space="preserve">
+    <value>Der Peer-Lebenszyklus konnte nicht gelesen werden ({0})</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6053A12B80273858" xml:space="preserve">
+    <value>Der Peer-Lebenszyklus ist {0}</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S568AD7D0A45C45FD" xml:space="preserve">
+    <value>Der Peer-Lebenszykluszustand wird nicht erkannt</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S3302D41A86A08337" xml:space="preserve">
+    <value>Der Peer-Lebenszykluszustand ist nicht verfügbar oder ungültig</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S45FDD29564BDE619" xml:space="preserve">
+    <value>Das Peer-Plugin wird geladen</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S6C923ABAFFD29336" xml:space="preserve">
+    <value>Das Peer-Plugin wird entladen</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S5EBB1697FDC852B7" xml:space="preserve">
+    <value>Das Laden, Entladen oder Auflösen von Abhängigkeiten des Peer-Plugins ist fehlgeschlagen</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S27B64EB0B3CAA9DE" xml:space="preserve">
+    <value>Der Name des Partner-Plugins ist nicht verfügbar</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8D4F6114D5CAE8E1" xml:space="preserve">
+    <value>Der ONH-Charakter hat sich nach der Versionsvereinbarung mit Tony geändert.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S724C52D78F1F7D4D" xml:space="preserve">
+    <value>Der ONH-Charakter hat sich vor der Versionsvereinbarung geändert.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F560AA230DC76FF" xml:space="preserve">
+    <value>Die ONH-Gegenstelle hat keine übereinstimmenden Versionen von XA Slave und Dropbox gemeldet.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9F7BA2473E010837" xml:space="preserve">
+    <value>Der ONH-Versionsabgleich ist nicht hergestellt.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S67F304E72345F97C" xml:space="preserve">
+    <value>Die Versionsvereinbarung des aktiven Tony hat sich während dieses ONH-Austauschs geändert.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S93C01FAFC54D840E" xml:space="preserve">
+    <value>Die Versionsvereinbarung des aktiven Tony ist nicht verfügbar.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0DCA5AD5069C8C4B" xml:space="preserve">
+    <value>Die geladene Version von XA Slave oder Dropbox des aktiven Tony ist nicht verfügbar.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SB1FF900AF3E947A1" xml:space="preserve">
+    <value>Das aktive Handelspaar aus Tony und Besitzer ist nicht aktuell oder nicht beidseitig zugeordnet.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DBB063EA136CB84" xml:space="preserve">
+    <value>Die Version der geladenen Dropbox-Assembly ist nicht verfügbar.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S52E81B2AF87BC092" xml:space="preserve">
+    <value>Der geladene Dropbox-Anbieter ist nicht verfügbar.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SC6C9814C8F0D77A2" xml:space="preserve">
+    <value>Die geladene Dropbox-Version ist nicht verfügbar oder ungültig.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SE2CAD295157866AC" xml:space="preserve">
+    <value>Die geladene XA Slave-Version ist nicht verfügbar oder ungültig.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SF0B0B41A45ADA9A6" xml:space="preserve">
+    <value>Die Gegenstelle hat Tonys XA Slave- und Dropbox-Versionen nicht innerhalb von 15 Sekunden bestätigt.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S1C0D841237BD59F1" xml:space="preserve">
+    <value>Die Gegenstelle unterstützt den erforderlichen Versionsabgleich mit Tony nicht.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S116E90EE8FCE1A4A" xml:space="preserve">
+    <value>Die Gegenstelle hat den Abgleich von Tonys XA Slave- und Dropbox-Versionen ausgelassen. Aktualisiere XA Slave auf diesem Client.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S0E815C03839E4BBA" xml:space="preserve">
+    <value>Der Verkäufer unterstützt den erforderlichen Versionsabgleich mit Tony nicht.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S8F3F35EF7873F2E0" xml:space="preserve">
+    <value>Der Handelspartner unterstützt Tonys Versionsabgleich nicht. Aktualisiere XA Slave auf diesem Client.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S4F3A989A90EB3C6C" xml:space="preserve">
+    <value>Zeitüberschreitung beim Warten auf den Versionsabgleich zwischen aktivem Tony und Besitzer.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S17065D0946DF707A" xml:space="preserve">
+    <value>Tony benötigt XA Slave {0} und Dropbox {1}; der Handelspartner meldet XA Slave {2} und Dropbox {3}.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S233EBAD47A25004E" xml:space="preserve">
+    <value>Tony benötigt XA Slave {0} und Dropbox {1}; die geladenen Versionen des Handelspartners sind nicht verfügbar.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SD0D32A7E705FD605" xml:space="preserve">
+    <value>Tonys XA Slave- und Dropbox-Versionen überprüfen</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="SBC57BFDA3D6FD68C" xml:space="preserve">
+    <value>Warte auf die Vereinbarung über die XA Slave- und Dropbox-Versionen des aktiven Tony.</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S851B713C54880F95" xml:space="preserve">
+    <value>den aktuellen Austausch mit dem Empfänger</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S9DA262EB757C209B" xml:space="preserve">
+    <value>warte auf einen Handelspartner mit kompatiblen Versionen</value>
+    <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
 </root>

@@ -51,10 +51,6 @@ internal sealed class XAModHotkeyState
     internal static bool MatchesModifiers(XAModHotkeyModifiers required, XAModHotkeyModifiers held)
         => IsValidModifiers(required) && IsValidModifiers(held) && required == held;
 
-    internal static bool CanDispatchObservedEdge(bool edge, bool primaryDown, bool drawHasKey,
-        XAModHotkeyModifiers held, XAModHotkeyModifiers drawHeld)
-        => edge && primaryDown && (!drawHasKey || MatchesModifiers(held, drawHeld));
-
     internal static bool RequiresCtrlShift(string key)
         => string.Equals(key, "auto-unlock-expert-delivery", StringComparison.OrdinalIgnoreCase)
             || string.Equals(key, "quick-return", StringComparison.OrdinalIgnoreCase)

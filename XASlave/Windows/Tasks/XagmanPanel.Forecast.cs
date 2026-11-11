@@ -8,6 +8,7 @@ using Dalamud.Bindings.ImGui;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using Lumina.Excel.Sheets;
 using XASlave.Data;
+using XASlave.Services;
 using XASlave.Services.Tasks;
 
 namespace XASlave.Windows;
@@ -47,6 +48,9 @@ public partial class SlaveWindow
     private bool xagmanTradeCapacityDirty = true;
     private int xagmanTradeCapacityQueryBudget;
     private bool xagmanTradeCapacityQueryDeferred;
+    private readonly XagmanForecastRefreshState xagmanTradeCapacityRefreshState = new();
+    private string xagmanTradeCapacityInputKey = string.Empty;
+    private string xagmanTradeCapacityInventorySourceKey = string.Empty;
     private XagmanTradeCapacityForecast? xagmanLocalTradeCapacityForecast;
     private XagmanTradeCapacityView? xagmanTradeCapacityView;
     private XagmanTradeCapacityView? xagmanPriorityTradeCapacityBaseline;
@@ -149,6 +153,8 @@ public partial class SlaveWindow
         public int DuplicateItemKeyCount { get; init; }
         public int AllAvailableGiveItemCount { get; init; }
         public int AllAvailableTakeItemCount { get; init; }
+        public int AllAvailableGiveGilItemCount { get; init; }
+        public int AllAvailableTakeGilItemCount { get; init; }
         public bool IsTruncated { get; init; }
         public int KnownTakeBagReadyOwnerCount { get; init; }
         public int KnownTakeNeedingSlotsOwnerCount { get; init; }
@@ -327,6 +333,74 @@ public partial class SlaveWindow
         xagmanTradeCapacityDatabaseFallbackRows = null;
     }
 
+    private bool IsXagmanTradeCapacityViewCurrent(DateTime now)
+        => xagmanTradeCapacityView != null && !xagmanTradeCapacityDirty
+            && xagmanTradeCapacityRefreshState.IsCurrent(xagmanTradeCapacityInputKey, now,
+                TimeSpan.FromSeconds(XagmanTradeCapacityForecastFreshSeconds));
+
+    private string GetXagmanTradeCapacityInputKey(DateTime now, XagmanRole role,
+        IReadOnlyList<XagmanPeerPresence> ownerPeers)
+    {
+        var cfg = plugin.Configuration;
+        return XagmanForecastRefreshState.SemanticKey(new
+        {
+            Role = role,
+            Running = xagmanRunning,
+            IgnoreGilShortfalls = cfg.XagmanIgnoreGilShortfalls,
+            Setup = GetXagmanTonyAutoSetupKey(),
+            Owners = role == XagmanRole.FranchiseOwner
+                ? GetXagmanForecastOwnerKeys().OrderBy(key => key, StringComparer.OrdinalIgnoreCase).ToArray()
+                : Array.Empty<string>(),
+            Items = role == XagmanRole.FranchiseOwner ? cfg.XagmanItems : null,
+            Partials = role == XagmanRole.FranchiseOwner && IsXagmanSupplyCycleActive()
+                ? xagmanPartialOwners.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase).ToArray() : null,
+            CollectionFirst = IsXagmanCollectionFirstRunActive(),
+            Restock = IsXagmanCollectionFirstRestockPhase(),
+            Peers = ownerPeers.OrderBy(peer => peer.InstanceId, StringComparer.Ordinal).Select(peer => new
+            {
+                peer.InstanceId,
+                PresenceFresh = IsXagmanTradeCapacityPeerFresh(peer, now),
+                ForecastFresh = peer.TradeCapacityForecast != null
+                    && IsXagmanTradeCapacityForecastFresh(peer.TradeCapacityForecast, now),
+                Forecast = peer.TradeCapacityForecast,
+                peer.CoordinationProtocolRevision,
+                peer.CollectionFirstRequested,
+                peer.HasConditionalItemPolicies,
+            }).ToArray(),
+        });
+    }
+
+    private string GetXagmanTradeCapacityInventorySourceKey(XagmanRole role)
+    {
+        var keys = role == XagmanRole.FranchiseOwner ? GetXagmanForecastOwnerKeys()
+            : plugin.Configuration.XagmanTonyCharacters.Select(entry => entry.CharacterNameWorld).ToArray();
+        // Capture identity belongs to the query cache, not the visible content revision. A new
+        // database capture must re-read items even when its aggregate quantities are unchanged.
+        return JsonSerializer.Serialize(new
+        {
+            Provider = GetXagmanForecastInventoryProviderIdentity(),
+            LocalContentId = Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ContentId : 0UL,
+            Characters = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(key => key, StringComparer.OrdinalIgnoreCase).Select(key => new
+                {
+                    Key = key,
+                    Info = TryGetXagmanForecastCharacterInfo(key, out var info) ? new
+                    {
+                        info.XaDatabaseSnapshotUpdatedUtc, info.MainInventoryTotalSlots,
+                        info.MainInventoryFreeSlots, info.Gil, info.FCID, info.FcMemberRankSort,
+                    } : null,
+                }).ToArray(),
+        });
+    }
+
+    private void ClearXagmanCommittedTradeCapacityForecast()
+    {
+        xagmanLocalTradeCapacityForecast = null;
+        xagmanTradeCapacityView = null;
+        xagmanOwnerForecastView = null;
+        xagmanTradeCapacityRefreshState.Reset();
+    }
+
     private XagmanTradeCapacityForecast? GetXagmanLocalTradeCapacityForecastForPresence()
     {
         if (plugin.Configuration.XagmanOutsideNetworkHelper || !plugin.XagmanPeers.IsConnected)
@@ -361,6 +435,7 @@ public partial class SlaveWindow
     {
         var now = DateTime.UtcNow;
         CheckXagmanTonyAutoSelectionState(now);
+        CheckXagmanTonyForecastSelectionState(now);
         // Forecasts are advisory and may cold-JIT or query cached inventory data. Keep that work
         // out of the immediate plugin-load window, but never delay an operator-started Xagman run.
         if (!xagmanRunning && now < xagmanTradeCapacityStartupNotBeforeUtc)
@@ -387,40 +462,67 @@ public partial class SlaveWindow
         if (role != XagmanRole.FranchiseOwner
             && (cfg.XagmanOutsideNetworkHelper || !plugin.XagmanPeers.IsConnected))
         {
-            xagmanLocalTradeCapacityForecast = null;
-            xagmanTradeCapacityView = null;
-            xagmanOwnerForecastView = null;
+            ClearXagmanCommittedTradeCapacityForecast();
             xagmanTradeCapacityQueryDeferred = false;
             ClearXagmanTradeCapacityInventorySearchCache();
             xagmanTradeCapacityNextInventoryRefreshUtc = DateTime.MinValue;
             return;
         }
 
-        var continuingDeferredQuerySequence = xagmanTradeCapacityQueryDeferred;
-        if (now >= xagmanTradeCapacityNextInventoryRefreshUtc && !continuingDeferredQuerySequence)
-        {
-            ClearXagmanTradeCapacityInventorySearchCache();
-            xagmanTradeCapacityNextInventoryRefreshUtc = now.AddSeconds(XagmanTradeCapacityInventoryRefreshSeconds);
-        }
-
-        xagmanTradeCapacityQueryBudget = 1;
-        xagmanTradeCapacityQueryDeferred = false;
         try
         {
+            var ownerPeers = role == XagmanRole.Tony
+                ? plugin.XagmanPeers.Peers.Where(peer => peer.Role == XagmanRole.FranchiseOwner).ToList()
+                : new List<XagmanPeerPresence>();
+            var inputKey = GetXagmanTradeCapacityInputKey(now, role, ownerPeers);
+            var sourceKey = GetXagmanTradeCapacityInventorySourceKey(role);
+            var continuingDeferredQuerySequence = xagmanTradeCapacityQueryDeferred;
+            var sourceChanged = !sourceKey.Equals(xagmanTradeCapacityInventorySourceKey, StringComparison.Ordinal);
+            if (sourceChanged || (now >= xagmanTradeCapacityNextInventoryRefreshUtc && !continuingDeferredQuerySequence))
+            {
+                ClearXagmanTradeCapacityInventorySearchCache();
+                xagmanTradeCapacityInventorySourceKey = sourceKey;
+                xagmanTradeCapacityNextInventoryRefreshUtc = now.AddSeconds(XagmanTradeCapacityInventoryRefreshSeconds);
+            }
+            xagmanTradeCapacityInputKey = inputKey;
+            if (!xagmanTradeCapacityRefreshState.IsCurrent(inputKey, now,
+                    TimeSpan.FromSeconds(XagmanTradeCapacityForecastFreshSeconds)))
+                ClearXagmanCommittedTradeCapacityForecast();
+
+            xagmanTradeCapacityQueryBudget = 1;
+            xagmanTradeCapacityQueryDeferred = false;
             if (role == XagmanRole.FranchiseOwner)
             {
-                xagmanLocalTradeCapacityForecast = BuildXagmanLocalTradeCapacityForecast(now, out var ownerForecastView);
-                xagmanOwnerForecastView = ownerForecastView;
-                xagmanTradeCapacityView = null;
+                var forecast = BuildXagmanLocalTradeCapacityForecast(now, out var ownerForecastView);
+                if (!xagmanTradeCapacityQueryDeferred)
+                {
+                    var contentKey = XagmanForecastRefreshState.SemanticKey(new { forecast, ownerForecastView });
+                    var changed = xagmanTradeCapacityRefreshState.Commit(inputKey, contentKey, now);
+                    if (changed)
+                        xagmanOwnerForecastView = ownerForecastView;
+                    else if (xagmanLocalTradeCapacityForecast != null)
+                        forecast.Revision = xagmanLocalTradeCapacityForecast.Revision;
+                    // A completed scan renews wire freshness, including an unchanged result. A
+                    // deferred scan never publishes a new timestamp or its temporary unknown rows.
+                    xagmanLocalTradeCapacityForecast = forecast;
+                    xagmanTradeCapacityView = null;
+                }
             }
             else
             {
-                xagmanLocalTradeCapacityForecast = null;
-                xagmanOwnerForecastView = null;
-                var ownerPeers = plugin.XagmanPeers.Peers
-                    .Where(peer => peer.Role == XagmanRole.FranchiseOwner).ToList();
-                xagmanTradeCapacityView = BuildXagmanTonyTradeCapacityView(now, ownerPeers);
-                UpdateXagmanTonyAutoSelection(now, ownerPeers);
+                var view = BuildXagmanTonyTradeCapacityView(now, ownerPeers);
+                if (!xagmanTradeCapacityQueryDeferred)
+                {
+                    var changed = xagmanTradeCapacityRefreshState.Commit(inputKey,
+                        XagmanForecastRefreshState.SemanticKey(view), now);
+                    if (changed)
+                        xagmanTradeCapacityView = view;
+                    xagmanLocalTradeCapacityForecast = null;
+                    xagmanOwnerForecastView = null;
+                    UpdateXagmanTonyForecastSelection(now);
+                    if (!xagmanTradeCapacityQueryDeferred && !xagmanTradeCapacityDirty)
+                        UpdateXagmanTonyAutoSelection(now, ownerPeers);
+                }
             }
             if (xagmanTradeCapacityQueryDeferred)
                 xagmanTradeCapacityNextRefreshUtc = now.AddSeconds(XagmanTradeCapacityQueryStepDelaySeconds);
@@ -432,9 +534,7 @@ public partial class SlaveWindow
             Plugin.Log.Warning(ex, "[Xagman] Trade-capacity forecast refresh failed");
             if (xagmanTonyAutoPending || xagmanTonyAutoTracking)
                 StopXagmanTonyAutoSelection(global::XASlave.Localization.UiMessage.Key("SFDAAB458DA9F7897"));
-            xagmanLocalTradeCapacityForecast = null;
-            xagmanTradeCapacityView = null;
-            xagmanOwnerForecastView = null;
+            ClearXagmanCommittedTradeCapacityForecast();
             xagmanTradeCapacityQueryDeferred = false;
             xagmanTradeCapacityNextInventoryRefreshUtc = DateTime.MinValue;
             xagmanTradeCapacityNextRefreshUtc = now.AddSeconds(15);
@@ -848,22 +948,22 @@ public partial class SlaveWindow
                 item.IsHq,
                 item.Applicability))
             .Count(group => group.Count() > 1);
-        var allAvailableGiveItemCount = effectivePolicies
+        var allAvailableGiveItems = effectivePolicies
             .Where(entry => entry.Item.Mode == XagmanItemMode.Give && entry.Item.Quantity <= 0)
             .Select(entry => new XagmanForecastPolicyKey(
                 entry.Item.ItemId,
                 entry.Item.IsHq,
                 entry.Item.Applicability))
             .Distinct()
-            .Count();
-        var allAvailableTakeItemCount = effectivePolicies
+            .ToList();
+        var allAvailableTakeItems = effectivePolicies
             .Where(entry => entry.Item.Mode == XagmanItemMode.Take && entry.Item.Quantity <= 0)
             .Select(entry => new XagmanForecastPolicyKey(
                 entry.Item.ItemId,
                 entry.Item.IsHq,
                 entry.Item.Applicability))
             .Distinct()
-            .Count();
+            .ToList();
 
         return new XagmanOwnerForecastView
         {
@@ -874,8 +974,10 @@ public partial class SlaveWindow
             UnknownConditionalPolicyOwnerCount = unknownConditionalPolicyOwnerCount,
             InvalidPlanningItemCount = invalidPlanningItemCount,
             DuplicateItemKeyCount = duplicateItemKeyCount,
-            AllAvailableGiveItemCount = allAvailableGiveItemCount,
-            AllAvailableTakeItemCount = allAvailableTakeItemCount,
+            AllAvailableGiveItemCount = allAvailableGiveItems.Count,
+            AllAvailableTakeItemCount = allAvailableTakeItems.Count,
+            AllAvailableGiveGilItemCount = allAvailableGiveItems.Count(item => IsXagmanGilItem(item.ItemId)),
+            AllAvailableTakeGilItemCount = allAvailableTakeItems.Count(item => IsXagmanGilItem(item.ItemId)),
             IsTruncated = isTruncated,
             KnownTakeBagReadyOwnerCount = knownTakeBagReadyOwnerCount,
             KnownTakeNeedingSlotsOwnerCount = Math.Max(
@@ -1610,11 +1712,6 @@ public partial class SlaveWindow
                 .Where(definition => !IsXagmanGilItem(definition.ItemId))
                 .Select(definition => definition.Key)
                 .ToHashSet();
-            if (requestedKeys.Count == 0)
-            {
-                snapshot.IsKnown = true;
-                return snapshot;
-            }
             var itemSheet = Plugin.DataManager.GetExcelSheet<Item>();
             var loadedContainerCount = 0;
             var inventoryTypes = requestedKeys.Any(key => IsXagmanElementalCrystalItem(key.ItemId))
@@ -1772,6 +1869,21 @@ public partial class SlaveWindow
         return index < 0 ? int.MaxValue : index;
     }
 
+    private void DrawXagmanIgnoreGilShortfalls(Configuration cfg)
+    {
+        var ignoreGilShortfalls = cfg.XagmanIgnoreGilShortfalls;
+        if (global::XASlave.Localization.UiNative.Checkbox(
+                global::XASlave.Localization.UiLocale.Native("S83E0B9DDDE38050F") + "##xagmanIgnoreGilShortfalls",
+                ref ignoreGilShortfalls))
+        {
+            cfg.XagmanIgnoreGilShortfalls = ignoreGilShortfalls;
+            cfg.Save();
+            InvalidateXagmanTradeCapacityForecast();
+        }
+        if (ImGui.IsItemHovered())
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S54BF15532188F035"));
+    }
+
     private void DrawXagmanOwnerForecasts(Configuration cfg)
     {
         var hasOwnerForecastMode = cfg.XagmanItems.Any(item =>
@@ -1789,6 +1901,7 @@ public partial class SlaveWindow
             RefreshXagmanTradeCapacityInventorySnapshots();
         ImGui.SameLine();
         ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SD158ED75B40CD3A1"));
+        DrawXagmanIgnoreGilShortfalls(cfg);
 
         if (xagmanRunning && xagmanActiveRole == XagmanRole.FranchiseOwner)
         {
@@ -1820,17 +1933,21 @@ public partial class SlaveWindow
             DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S9F78808BF74E1253", view.UnknownOwnerCount));
         if (view.UnknownConditionalPolicyOwnerCount > 0)
             DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("SBA36FF2C7C1A966F", view.UnknownConditionalPolicyOwnerCount));
-        if (view.AllAvailableGiveItemCount > 0)
-            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S01FF0BCF0B7C41FA", view.AllAvailableGiveItemCount));
-        if (view.AllAvailableTakeItemCount > 0)
-            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S197F510CCB6F6AC7", view.AllAvailableTakeItemCount));
+        var allAvailableGiveItemCount = view.AllAvailableGiveItemCount
+            - (cfg.XagmanIgnoreGilShortfalls ? view.AllAvailableGiveGilItemCount : 0);
+        var allAvailableTakeItemCount = view.AllAvailableTakeItemCount
+            - (cfg.XagmanIgnoreGilShortfalls ? view.AllAvailableTakeGilItemCount : 0);
+        if (allAvailableGiveItemCount > 0)
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S01FF0BCF0B7C41FA", allAvailableGiveItemCount));
+        if (allAvailableTakeItemCount > 0)
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S197F510CCB6F6AC7", allAvailableTakeItemCount));
 
         if (view.GiveItems.Count > 0)
             DrawXagmanOwnerGiveForecast(view);
         if (view.BalanceItems.Count > 0)
             DrawXagmanOwnerBalanceForecast(view);
-        if (view.TakeItems.Count > 0 || view.AllAvailableTakeItemCount > 0)
-            DrawXagmanOwnerTakeForecast(view);
+        if (view.TakeItems.Count > 0 || allAvailableTakeItemCount > 0)
+            DrawXagmanOwnerTakeForecast(view, allAvailableTakeItemCount);
         if (view.GiveItems.Count == 0 && view.BalanceItems.Count == 0 && view.TakeItems.Count == 0)
             ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SD3D5DEA433622BDA"));
     }
@@ -1840,8 +1957,11 @@ public partial class SlaveWindow
         ImGui.Spacing();
         ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S332048F1B8B03694"));
         ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S316D8FB05DDA6B00"));
-        var confirmedShortage = view.GiveItems.Sum(item => item.ConfirmedShortageQuantity);
-        var maximumShortage = view.GiveItems.Sum(item => item.MaximumShortageQuantity);
+        var ignoreGilShortfalls = plugin.Configuration.XagmanIgnoreGilShortfalls;
+        var confirmedShortage = view.GiveItems.Sum(item => XagmanShortfallPolicy.GetReportedShortfall(
+            ignoreGilShortfalls, item.ItemId, item.ConfirmedShortageQuantity));
+        var maximumShortage = view.GiveItems.Sum(item => XagmanShortfallPolicy.GetReportedShortfall(
+            ignoreGilShortfalls, item.ItemId, item.MaximumShortageQuantity));
         var configurationUncertainty = view.InvalidPlanningItemCount > 0
             || view.DuplicateItemKeyCount > 0
             || view.UnknownConditionalPolicyOwnerCount > 0
@@ -1862,7 +1982,8 @@ public partial class SlaveWindow
         else
         {
             ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f),
-                global::XASlave.Localization.UiLocale.Get("S7CF6DA9BD2340104"));
+                global::XASlave.Localization.UiLocale.Get(ignoreGilShortfalls
+                    ? "S10EDC6C7796AAE14" : "S7CF6DA9BD2340104"));
         }
 
         using (var table = ImRaii.Table("XagmanOwnerGiveForecastItems", 5,
@@ -1893,7 +2014,10 @@ public partial class SlaveWindow
             ImGui.TableNextColumn();
             ImGui.TextDisabled(item.KnownToGiveQuantity.ToString("N0", CultureInfo.InvariantCulture));
             ImGui.TableNextColumn();
-            DrawXagmanOwnerForecastRange(item.ConfirmedShortageQuantity, item.MaximumShortageQuantity);
+            if (XagmanShortfallPolicy.IsIgnoredGilShortfall(ignoreGilShortfalls, item.ItemId))
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S7D648F5B47F34AFB"));
+            else
+                DrawXagmanOwnerForecastRange(item.ConfirmedShortageQuantity, item.MaximumShortageQuantity);
         }
         }
         ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S2721972A5D38B357"));
@@ -1904,8 +2028,11 @@ public partial class SlaveWindow
         ImGui.Spacing();
         ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S1E781F8248D91BFD"));
         ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SAF462EC80A13C784"));
-        var confirmedNeeded = view.BalanceItems.Sum(item => item.ConfirmedNeededQuantity);
-        var maximumNeeded = view.BalanceItems.Sum(item => item.MaximumNeededQuantity);
+        var ignoreGilShortfalls = plugin.Configuration.XagmanIgnoreGilShortfalls;
+        var confirmedNeeded = view.BalanceItems.Sum(item => XagmanShortfallPolicy.GetReportedShortfall(
+            ignoreGilShortfalls, item.ItemId, item.ConfirmedNeededQuantity));
+        var maximumNeeded = view.BalanceItems.Sum(item => XagmanShortfallPolicy.GetReportedShortfall(
+            ignoreGilShortfalls, item.ItemId, item.MaximumNeededQuantity));
         var configurationUncertainty = view.InvalidPlanningItemCount > 0
             || view.DuplicateItemKeyCount > 0
             || view.UnknownConditionalPolicyOwnerCount > 0
@@ -1923,7 +2050,8 @@ public partial class SlaveWindow
         else
         {
             ImGui.TextColored(new Vector4(0.4f, 1.0f, 0.4f, 1.0f),
-                global::XASlave.Localization.UiLocale.Get("S4BA6A641BCF3BB64"));
+                global::XASlave.Localization.UiLocale.Get(ignoreGilShortfalls
+                    ? "S1E37A43E43DB3535" : "S4BA6A641BCF3BB64"));
         }
 
         using (var table = ImRaii.Table("XagmanOwnerBalanceForecastItems", 7,
@@ -1958,18 +2086,24 @@ public partial class SlaveWindow
             ImGui.TableNextColumn();
             ImGui.TextDisabled(item.KnownFilledQuantity.ToString("N0", CultureInfo.InvariantCulture));
             ImGui.TableNextColumn();
-            var ownersShort = item.KnownOwnersShortCount == item.MaximumOwnersShortCount
-                ? item.KnownOwnersShortCount.ToString("N0", CultureInfo.InvariantCulture)
-                : $"{item.KnownOwnersShortCount:N0}-{item.MaximumOwnersShortCount:N0}";
+            var ignoreShortfall = XagmanShortfallPolicy.IsIgnoredGilShortfall(ignoreGilShortfalls, item.ItemId);
+            var ownersShort = ignoreShortfall
+                ? global::XASlave.Localization.UiLocale.Get("S7D648F5B47F34AFB")
+                : item.KnownOwnersShortCount == item.MaximumOwnersShortCount
+                    ? item.KnownOwnersShortCount.ToString("N0", CultureInfo.InvariantCulture)
+                    : $"{item.KnownOwnersShortCount:N0}-{item.MaximumOwnersShortCount:N0}";
             ImGui.TextDisabled(ownersShort);
             ImGui.TableNextColumn();
-            DrawXagmanOwnerForecastRange(item.ConfirmedNeededQuantity, item.MaximumNeededQuantity);
+            if (ignoreShortfall)
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S7D648F5B47F34AFB"));
+            else
+                DrawXagmanOwnerForecastRange(item.ConfirmedNeededQuantity, item.MaximumNeededQuantity);
         }
         }
         ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S8E78C9DE82C647B7"));
     }
 
-    private void DrawXagmanOwnerTakeForecast(XagmanOwnerForecastView view)
+    private void DrawXagmanOwnerTakeForecast(XagmanOwnerForecastView view, int allAvailableTakeItemCount)
     {
         ImGui.Spacing();
         ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("S7858C7ABCF1E4D6F"));
@@ -1986,7 +2120,7 @@ public partial class SlaveWindow
             || view.DuplicateItemKeyCount > 0
             || view.UnknownConditionalPolicyOwnerCount > 0
             || view.IsTruncated
-            || view.AllAvailableTakeItemCount > 0;
+            || allAvailableTakeItemCount > 0;
         var slotSummary = (global::XASlave.Localization.UiMessage.Format("S226E6B2227A20E4A", view.KnownTakeRequiredSlots, view.KnownTakeFreeSlots, view.KnownTakeShortSlots)).Display;
         if (view.KnownTakeShortSlots > 0)
             ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), slotSummary);
@@ -2003,7 +2137,12 @@ public partial class SlaveWindow
         }
 
         if (view.HasFiniteTakeGil)
-            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.Get("S24C28ECF97696E99"));
+        {
+            if (plugin.Configuration.XagmanIgnoreGilShortfalls)
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S24C28ECF97696E99"));
+            else
+                DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.Get("S24C28ECF97696E99"));
+        }
 
         using (var table = ImRaii.Table("XagmanOwnerTakeForecastItems", 7,
                    ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
@@ -2092,6 +2231,7 @@ public partial class SlaveWindow
             RefreshXagmanTradeCapacityInventorySnapshots();
         ImGui.SameLine();
         ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S677B7E62445F8B82"));
+        DrawXagmanIgnoreGilShortfalls(cfg);
 
         var view = xagmanTradeCapacityView;
         if (view == null)
@@ -2102,6 +2242,7 @@ public partial class SlaveWindow
 
         ImGui.TextDisabled(
             global::XASlave.Localization.UiLocale.FormatKey("SC705F6BB882BACFC", view.ConnectedOwnerPeerCount, view.SelectedOwnerCount, view.SelectedTonyCount, view.GeneratedAtUtc.ToLocalTime()));
+        DrawXagmanTonyForecastSelection(view);
         if (view.ShowCollectionFirstProjection)
         {
             ImGui.TextWrapped(
@@ -2156,6 +2297,30 @@ public partial class SlaveWindow
 
     private void DrawXagmanTradeCapacityGroup(XagmanTradeCapacityView view, XagmanTradeCapacityViewGroup group)
     {
+        var ignoreGilShortfalls = plugin.Configuration.XagmanIgnoreGilShortfalls;
+        // Keep the cached view (including the collection-first baseline) factual. Apply the
+        // current reporting option only here so either toggle direction takes effect immediately.
+        var supplyShortageUnits = 0L;
+        var supplyShortageItemCount = 0;
+        var supplyAfterCollectionShortageUnits = 0L;
+        var supplyAfterCollectionShortageItemCount = 0;
+        var allAvailableRequestCount = 0;
+        foreach (var item in group.Items)
+        {
+            var shortage = XagmanShortfallPolicy.GetReportedShortfall(
+                ignoreGilShortfalls, item.ItemId, item.SupplyShortageQuantity);
+            supplyShortageUnits = SaturatingXagmanCapacityAdd(supplyShortageUnits, shortage);
+            if (shortage > 0)
+                supplyShortageItemCount++;
+            var projectedShortage = XagmanShortfallPolicy.GetReportedShortfall(
+                ignoreGilShortfalls, item.ItemId, item.ProjectedSupplyShortageAfterCollection);
+            supplyAfterCollectionShortageUnits = SaturatingXagmanCapacityAdd(
+                supplyAfterCollectionShortageUnits, projectedShortage);
+            if (projectedShortage > 0)
+                supplyAfterCollectionShortageItemCount++;
+            if (!XagmanShortfallPolicy.IsIgnoredGilShortfall(ignoreGilShortfalls, item.ItemId))
+                allAvailableRequestCount = SaturatingXagmanCountAdd(allAvailableRequestCount, item.AllAvailableRequestCount);
+        }
         ImGui.Spacing();
         var groupLabel = ((view.ServerMatching ? global::XASlave.Localization.UiMessage.Format("S84BDF8ACBFC44E37", group.GroupKey) : global::XASlave.Localization.UiMessage.Format("S16B9E43E0B7409C6", ((string.IsNullOrWhiteSpace(plugin.Configuration.XagmanTargetWorld) ? global::XASlave.Localization.UiMessage.Key("S8A92BCDD6DBDAA6E") : global::XASlave.Localization.UiMessage.Value(plugin.Configuration.XagmanTargetWorld)))))).Display;
         ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), groupLabel);
@@ -2204,51 +2369,54 @@ public partial class SlaveWindow
         if (!view.ServerMatching && group.FixedWorldRegionCapacities.Count > 0)
             DrawXagmanFixedWorldRegionCapacities(group, inputUncertainty);
 
-        if (group.SupplyShortageItemCount > 0 && !inputUncertainty)
+        if (supplyShortageItemCount > 0 && !inputUncertainty)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                global::XASlave.Localization.UiLocale.FormatKey("SDCC4C2EA74EE77A7", group.SupplyShortageUnits, group.SupplyShortageItemCount));
+                global::XASlave.Localization.UiLocale.FormatKey("SDCC4C2EA74EE77A7", supplyShortageUnits, supplyShortageItemCount));
         }
-        else if (group.SupplyShortageItemCount > 0)
+        else if (supplyShortageItemCount > 0)
         {
             ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                global::XASlave.Localization.UiLocale.FormatKey("S8AC322450890D2AD", group.SupplyShortageUnits, group.SupplyShortageItemCount));
+                global::XASlave.Localization.UiLocale.FormatKey("S8AC322450890D2AD", supplyShortageUnits, supplyShortageItemCount));
         }
         else
         {
-            var color = inputUncertainty || group.AllAvailableRequestCount > 0
+            var color = inputUncertainty || allAvailableRequestCount > 0
                 ? new Vector4(1.0f, 0.8f, 0.3f, 1.0f)
                 : new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
-            ImGui.TextColored(color,
-                ((inputUncertainty ? global::XASlave.Localization.UiMessage.Key("S4DBB42F4B1CD4B91") : global::XASlave.Localization.UiMessage.Key("SEE110F033051754C"))).Display);
+            var supplySummaryKey = inputUncertainty
+                ? (ignoreGilShortfalls ? "S6CA735C454B42CB6" : "S4DBB42F4B1CD4B91")
+                : (ignoreGilShortfalls ? "S8D9A4AA562DAAD69" : "SEE110F033051754C");
+            ImGui.TextColored(color, global::XASlave.Localization.UiLocale.Get(supplySummaryKey));
         }
         if (view.ShowCollectionFirstProjection)
         {
             var projectionUncertain = inputUncertainty
                 || collectionShortage > 0
-                || group.AllAvailableRequestCount > 0;
-            if (group.SupplyAfterCollectionShortageItemCount > 0 && !projectionUncertain)
+                || allAvailableRequestCount > 0;
+            if (supplyAfterCollectionShortageItemCount > 0 && !projectionUncertain)
             {
                 ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
-                    global::XASlave.Localization.UiLocale.FormatKey("SFCAF2E2402C42704", group.SupplyAfterCollectionShortageUnits, group.SupplyAfterCollectionShortageItemCount));
+                    global::XASlave.Localization.UiLocale.FormatKey("SFCAF2E2402C42704", supplyAfterCollectionShortageUnits, supplyAfterCollectionShortageItemCount));
             }
-            else if (group.SupplyAfterCollectionShortageItemCount > 0)
+            else if (supplyAfterCollectionShortageItemCount > 0)
             {
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f),
-                    global::XASlave.Localization.UiLocale.FormatKey("S8723DC57C5269BAD", group.SupplyAfterCollectionShortageUnits));
+                    global::XASlave.Localization.UiLocale.FormatKey("S8723DC57C5269BAD", supplyAfterCollectionShortageUnits));
             }
             else
             {
                 var projectionColor = projectionUncertain
                     ? new Vector4(1.0f, 0.8f, 0.3f, 1.0f)
                     : new Vector4(0.4f, 1.0f, 0.4f, 1.0f);
-                ImGui.TextColored(
-                    projectionColor,
-                    ((projectionUncertain ? global::XASlave.Localization.UiMessage.Key("SBF97441AE9D166D3") : global::XASlave.Localization.UiMessage.Key("S1EE66778C481C48D"))).Display);
+                var projectionSummaryKey = projectionUncertain
+                    ? (ignoreGilShortfalls ? "S3E1E253E5CD15EA6" : "SBF97441AE9D166D3")
+                    : (ignoreGilShortfalls ? "SBDDF5539CBC5DFB4" : "S1EE66778C481C48D");
+                ImGui.TextColored(projectionColor, global::XASlave.Localization.UiLocale.Get(projectionSummaryKey));
             }
         }
-        if (group.AllAvailableRequestCount > 0)
-            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S238C8B2584889BE0", group.AllAvailableRequestCount));
+        if (allAvailableRequestCount > 0)
+            DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("S238C8B2584889BE0", allAvailableRequestCount));
         if (group.UnknownTonyCount > 0)
             DrawXagmanTradeCapacityWarning(global::XASlave.Localization.UiLocale.FormatKey("SD698B45E68975C3B", group.UnknownTonyCount));
 
@@ -2274,6 +2442,7 @@ public partial class SlaveWindow
         global::XASlave.Localization.UiNative.TableHeadersRow();
         foreach (var item in group.Items)
         {
+            var ignoreShortfall = XagmanShortfallPolicy.IsIgnoredGilShortfall(ignoreGilShortfalls, item.ItemId);
             ImGui.TableNextRow();
             ImGui.TableNextColumn();
             ImGui.TextUnformatted(((item.IsHq ? global::XASlave.Localization.UiMessage.Format("S5864848AE53E7CAF", item.ItemName) : global::XASlave.Localization.UiMessage.Raw(item.ItemName))).Display);
@@ -2298,7 +2467,9 @@ public partial class SlaveWindow
                 ImGui.TextDisabled(((item.ProjectedTonyStockAfterCollection > 0 ? global::XASlave.Localization.UiMessage.Raw(item.ProjectedTonyStockAfterCollection.ToString("N0", CultureInfo.InvariantCulture)) : global::XASlave.Localization.UiMessage.Key("S3973E022E93220F9"))).Display);
             }
             ImGui.TableNextColumn();
-            if (item.SupplyShortageQuantity > 0 && !inputUncertainty)
+            if (ignoreShortfall)
+                ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S7D648F5B47F34AFB"));
+            else if (item.SupplyShortageQuantity > 0 && !inputUncertainty)
                 ImGui.TextColored(new Vector4(1.0f, 0.4f, 0.4f, 1.0f), item.SupplyShortageQuantity.ToString("N0", CultureInfo.InvariantCulture));
             else if (item.SupplyShortageQuantity > 0 || item.UnknownOwnerCount > 0 || item.AllAvailableRequestCount > 0 || duplicateUncertainty)
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), (global::XASlave.Localization.UiMessage.Key("S8A8DE823D5ED3E12")).Display);
@@ -2310,7 +2481,11 @@ public partial class SlaveWindow
                 var projectionUncertain = inputUncertainty
                     || collectionShortage > 0
                     || item.AllAvailableRequestCount > 0;
-                if (item.ProjectedSupplyShortageAfterCollection > 0 && !projectionUncertain)
+                if (ignoreShortfall)
+                {
+                    ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S7D648F5B47F34AFB"));
+                }
+                else if (item.ProjectedSupplyShortageAfterCollection > 0 && !projectionUncertain)
                 {
                     ImGui.TextColored(
                         new Vector4(1.0f, 0.4f, 0.4f, 1.0f),
@@ -2337,7 +2512,7 @@ public partial class SlaveWindow
         ImGui.Spacing();
         ImGui.TextColored(new Vector4(0.65f, 0.85f, 1.0f, 1.0f), global::XASlave.Localization.UiLocale.Get("SD81F1DCD0E6A83D2"));
         var availabilityTableId = $"XagmanTonySupplyAvailability##{group.GroupKey}";
-        using (var availabilityTable = ImRaii.Table(availabilityTableId, 4,
+        using (var availabilityTable = ImRaii.Table(availabilityTableId, 5,
                    ImGuiTableFlags.Borders | ImGuiTableFlags.RowBg | ImGuiTableFlags.Resizable))
         {
         if (!availabilityTable)
@@ -2346,6 +2521,7 @@ public partial class SlaveWindow
         global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S652BCC3A47842889"), ImGuiTableColumnFlags.WidthStretch);
         global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("SCD41DE668E2F141E"), ImGuiTableColumnFlags.WidthFixed, Scale(105f));
         global::XASlave.Localization.UiNative.TableSetupColumn(global::XASlave.Localization.UiLocale.Native("S97F0220721840ABC"), ImGuiTableColumnFlags.WidthFixed, Scale(120f));
+        ImGui.TableSetupColumn("##removeTony", ImGuiTableColumnFlags.WidthFixed, Scale(24f));
         global::XASlave.Localization.UiNative.TableHeadersRow();
         var anonymizeTonyCharacters = IsCharacterListAnonymizationEnabled();
         foreach (var availability in group.TonySupplyAvailability)
@@ -2372,6 +2548,15 @@ public partial class SlaveWindow
                 ImGui.TextDisabled(availability.TonyAvailableQuantity.ToString("N0", CultureInfo.InvariantCulture));
             else
                 ImGui.TextColored(new Vector4(1.0f, 0.8f, 0.3f, 1.0f), (global::XASlave.Localization.UiMessage.Key("S8A8DE823D5ED3E12")).Display);
+            ImGui.TableNextColumn();
+            using (ImRaii.PushId($"{availability.TonyCharacter}_{availability.ItemId}_{availability.IsHq}"))
+            using (ImRaii.Disabled(!CanEditXagmanTonyForecastSelection() || !IsXagmanTradeCapacityViewCurrent(DateTime.UtcNow)))
+            {
+                if (ImGui.SmallButton("X##removeTony"))
+                    RemoveXagmanTonyFromForecastSelection(availability.TonyCharacter);
+                if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
+                    ImGui.SetTooltip(global::XASlave.Localization.UiLocale.T("Remove this Tony from the current selection."));
+            }
         }
         }
         ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("SFC2AE8EDE11F1D3B"));

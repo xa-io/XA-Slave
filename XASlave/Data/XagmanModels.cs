@@ -205,6 +205,8 @@ public sealed class XagmanPeerPresence
 {
     public string InstanceId { get; set; } = string.Empty;
     public string PluginVersion { get; set; } = string.Empty;
+    public string DropboxVersion { get; set; } = string.Empty;
+    public int TradeVersionProtocolRevision { get; set; }
     public int ProcessId { get; set; }
     public DateTime LastSeenUtc { get; set; }
     public bool IsLoggedIn { get; set; }
@@ -281,6 +283,20 @@ public sealed class XagmanPeerPresence
     public string StandbyRotationTonyCharacter { get; set; } = string.Empty;
     public string StandbyRotationTonyInstanceId { get; set; } = string.Empty;
     public int MainInventoryFreeSlots { get; set; }
+    // Explicit per-batch capacity exchange. Advisory MainInventoryFreeSlots never authorizes a trade.
+    public int TradeCapacityProtocolRevision { get; set; }
+    public uint TradeCapacityEntityId { get; set; }
+    public string TradeCapacityRequestId { get; set; } = string.Empty;
+    public string TradeCapacityRequestReceiverInstanceId { get; set; } = string.Empty;
+    public string TradeCapacityRequestReceiverCharacter { get; set; } = string.Empty;
+    public ulong TradeCapacityRequestReceiverContentId { get; set; }
+    public string TradeCapacityResponseRequestId { get; set; } = string.Empty;
+    public string TradeCapacityResponseRequesterInstanceId { get; set; } = string.Empty;
+    public string TradeCapacityResponseRequesterCharacter { get; set; } = string.Empty;
+    public ulong TradeCapacityResponseRequesterContentId { get; set; }
+    public bool TradeCapacityResponseKnown { get; set; }
+    public int TradeCapacityResponseFreeSlots { get; set; }
+    public DateTime TradeCapacityResponseObservedAtUtc { get; set; } = DateTime.MinValue;
     public int Gil { get; set; }
     public int TonyGilMinimum { get; set; } = -1;
     public bool TonySellLocationActive { get; set; }

@@ -1194,8 +1194,6 @@ public sealed class XagmanPeerService : IDisposable
         }
     }
 
-    private bool versionMismatchHalted;
-
     private void UpdatePeers(IReadOnlyList<XagmanPeerPresence> updatedPeers)
     {
         var clones = updatedPeers.Select(ClonePresence).ToList();
@@ -1203,51 +1201,7 @@ public sealed class XagmanPeerService : IDisposable
         lock (syncRoot)
             peers = clones;
 
-        CheckPeerVersionCompatibility(clones);
-
         peersUpdated(clones);
-    }
-
-    private void CheckPeerVersionCompatibility(IReadOnlyList<XagmanPeerPresence> currentPeers)
-    {
-        var localVersion = BuildInfo.Version;
-        var versions = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { localVersion };
-        foreach (var peer in currentPeers)
-        {
-            if (peer.XagmanEnabled
-                && !string.IsNullOrWhiteSpace(peer.PluginVersion)
-                && IsWellFormedVersion(peer.PluginVersion.Trim()))
-            {
-                versions.Add(peer.PluginVersion.Trim());
-            }
-        }
-
-        if (versions.Count <= 1)
-        {
-            versionMismatchHalted = false;
-            return;
-        }
-
-        if (versionMismatchHalted)
-            return;
-
-        versionMismatchHalted = true;
-        var detail = string.Join(", ", currentPeers
-            .Where(peer => peer.XagmanEnabled
-                && !string.IsNullOrWhiteSpace(peer.PluginVersion)
-                && !string.Equals(peer.PluginVersion.Trim(), localVersion, StringComparison.OrdinalIgnoreCase))
-            .Select(peer => $"{(string.IsNullOrWhiteSpace(peer.CharacterName) ? peer.InstanceId : peer.CharacterName)} v{peer.PluginVersion.Trim()}"));
-        Plugin.Log.Warning($"[XagmanPeerService] XA Slave version mismatch detected (local v{localVersion}). Halting Xagman to avoid out-of-sync behaviour. Out-of-sync peers: {detail}");
-        TriggerXagmanTaskStop();
-    }
-
-    private static bool IsWellFormedVersion(string value)
-    {
-        // Only a well-formed x.x.x.x string counts as a real version mismatch, so a malformed or
-        // garbage PluginVersion from an (unauthenticated) peer cannot halt the local Xagman run.
-        // Full protection against a spoofed-but-valid version requires the hub auth handshake
-        // (tracked as a follow-up).
-        return Version.TryParse(value, out _);
     }
 
     private void SetStatus(string value)
@@ -1262,6 +1216,8 @@ public sealed class XagmanPeerService : IDisposable
         {
             InstanceId = record.InstanceId,
             PluginVersion = record.PluginVersion,
+            DropboxVersion = record.DropboxVersion ?? string.Empty,
+            TradeVersionProtocolRevision = record.TradeVersionProtocolRevision,
             ProcessId = record.ProcessId,
             LastSeenUtc = record.LastSeenUtc,
             IsLoggedIn = record.IsLoggedIn,
@@ -1332,6 +1288,19 @@ public sealed class XagmanPeerService : IDisposable
             StandbyRotationTonyCharacter = record.StandbyRotationTonyCharacter,
             StandbyRotationTonyInstanceId = record.StandbyRotationTonyInstanceId,
             MainInventoryFreeSlots = record.MainInventoryFreeSlots,
+            TradeCapacityProtocolRevision = record.TradeCapacityProtocolRevision,
+            TradeCapacityEntityId = record.TradeCapacityEntityId,
+            TradeCapacityRequestId = record.TradeCapacityRequestId ?? string.Empty,
+            TradeCapacityRequestReceiverInstanceId = record.TradeCapacityRequestReceiverInstanceId ?? string.Empty,
+            TradeCapacityRequestReceiverCharacter = record.TradeCapacityRequestReceiverCharacter ?? string.Empty,
+            TradeCapacityRequestReceiverContentId = record.TradeCapacityRequestReceiverContentId,
+            TradeCapacityResponseRequestId = record.TradeCapacityResponseRequestId ?? string.Empty,
+            TradeCapacityResponseRequesterInstanceId = record.TradeCapacityResponseRequesterInstanceId ?? string.Empty,
+            TradeCapacityResponseRequesterCharacter = record.TradeCapacityResponseRequesterCharacter ?? string.Empty,
+            TradeCapacityResponseRequesterContentId = record.TradeCapacityResponseRequesterContentId,
+            TradeCapacityResponseKnown = record.TradeCapacityResponseKnown,
+            TradeCapacityResponseFreeSlots = record.TradeCapacityResponseFreeSlots,
+            TradeCapacityResponseObservedAtUtc = record.TradeCapacityResponseObservedAtUtc,
             Gil = record.Gil,
             TonyGilMinimum = record.TonyGilMinimum,
             TonySellLocationActive = record.TonySellLocationActive,

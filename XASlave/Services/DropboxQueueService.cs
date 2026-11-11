@@ -31,7 +31,7 @@ internal sealed class DropboxQueueClientAdapter(IpcClient client) : IDropboxQueu
     public bool DropboxBeginTrading() => client.DropboxBeginTrading();
 }
 
-public sealed class DropboxQueueService
+public sealed partial class DropboxQueueService
 {
     private static readonly InventoryType[] MainInventoryTypes =
     {

@@ -47,9 +47,20 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
 {
     internal const string SupportedLayout = "CharaViewModelData:98:A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D";
 
+    internal const string NovemberLayout = "CharaViewModelData:98:2D268F54FB6C75B511C349BA49B00E8D197C09FF64FF380ACABDCAE42A1F7D9B";
+
+    internal void ValidateFor(ViewSingleItemNativeContract contract)
+    {
+        Validate();
+        if (GameBuild != contract.GameBuild || Layout != contract.CaptureLayout)
+            throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("SE828AEBEB7C17892")), UiMessage.Key("SE828AEBEB7C17892"));
+    }
+
     internal void Validate()
     {
-        if (Schema is not (1 or 2 or 3) || GameBuild != NearbyZoneNativeBinding.SupportedSha256 || Layout != SupportedLayout)
+        if (Schema is not (1 or 2 or 3 or 4)
+            || !((GameBuild == ViewSingleItemNativeContract.OctoberGameBuild && Layout == SupportedLayout)
+                || (Schema == 4 && GameBuild == ViewSingleItemNativeContract.NovemberGameBuild && Layout == NovemberLayout)))
             throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("SE828AEBEB7C17892")), UiMessage.Key("SE828AEBEB7C17892"));
         // Schema 1 has no accessory data. Schema 2 distinguishes an unavailable
         // capture (null) from a confirmed empty accessory slot (zero IDs).
@@ -65,7 +76,7 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
             || (Catalog == null ? CatalogHash != null : CatalogHash != Catalog.Hash()))
             throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("S1A0293390ADC4095")), UiMessage.Key("S1A0293390ADC4095"));
         Minion?.Validate(); Mount?.Validate(); Catalog?.Validate();
-        var expectedKeys = Catalog != null ? new[] { Catalog.Key } : Schema == 3 ? ExtendedKeys : Keys;
+        var expectedKeys = Catalog != null ? new[] { Catalog.Key } : Schema >= 3 ? ExtendedKeys : Keys;
         if (string.IsNullOrWhiteSpace(PlayerName) || PlayerName.Length > (Catalog == null ? 64 : 512)
             || (Catalog == null ? World == 0 : World != 0)
             || CapturedUtc.Kind != DateTimeKind.Utc || Equipment == null || Equipment.Length != 12
@@ -86,9 +97,13 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
                     || item.BaseId != (item.Slot == Catalog.Key ? Catalog.ItemId : 0)))
                 throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("S9D4F18854424D54E")), UiMessage.Key("S9D4F18854424D54E"));
         }
-        // Canonical value encoding excludes native padding and noncanonical bools.
+        // Schema 4 preserves the native crest-visibility byte at +0x8C.
+        // Schemas 1-3 intentionally retain their original zeroed encoding; do
+        // not infer a missing crest mask or rewrite their recorded provenance.
+        // Only +0x8D..+0x8F are padding after the four native boolean values.
         if (Appearance[0x1E] != 0 || Appearance[0x1F] != 0
-            || Appearance.Skip(0x8C).Take(4).Any(value => value != 0)
+            || (Schema < 4 && Appearance[0x8C] != 0)
+            || Appearance.Skip(0x8D).Take(3).Any(value => value != 0)
             || Appearance.Skip(0x88).Take(4).Any(value => value > 1))
             throw UiMessage.Attach(new InvalidDataException(UiLocale.Native("S4489963431C778C0")), UiMessage.Key("S4489963431C778C0"));
     }
@@ -102,7 +117,10 @@ internal sealed record ViewSingleItemCapture(int Schema, string GameBuild, strin
         var bytes = new byte[0x98];
         new ReadOnlySpan<byte>(&appearance, bytes.Length).CopyTo(bytes);
         bytes[0x1E] = bytes[0x1F] = 0;
-        Array.Clear(bytes, 0x8C, 4);
+        // CopyFromCharacter and CharaView's model loader both use +0x8C as
+        // the crest visibility mask. Preserve it even though the SDK field
+        // declaration overlaps VieraEarsHidden at +0x8B in reviewed packages.
+        Array.Clear(bytes, 0x8D, 3);
         return bytes;
     }
 

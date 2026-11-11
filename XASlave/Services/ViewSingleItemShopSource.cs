@@ -105,7 +105,7 @@ internal static unsafe class ViewSingleItemShopSource
             || !((id is > 300 and <= 350) || (id is > 1600 and <= 1650));
     }
 
-    internal static ViewSingleItemCapture CreateCapture(ViewSingleItemCatalogEntry entry, byte[] referenceAppearance)
+    internal static ViewSingleItemCapture CreateCapture(ViewSingleItemCatalogEntry entry, byte[] referenceAppearance, ViewSingleItemNativeContract contract)
     {
         var appearance = CreateAppearance(entry, referenceAppearance);
         var catalog = new ViewSingleItemCatalogItem(entry.ItemId, entry.Key, entry.FramerKitId);
@@ -113,8 +113,8 @@ internal static unsafe class ViewSingleItemShopSource
             slot == entry.Key ? entry.ItemId : 0, 0, 0, 0)).ToArray();
         var minion = entry.Key == 103 ? entry.Companion : null;
         var mount = entry.Key == 104 ? entry.Companion : null;
-        var capture = new ViewSingleItemCapture(3, NearbyZoneNativeBinding.SupportedSha256,
-            ViewSingleItemCapture.SupportedLayout, entry.Name, 0, DateTime.UtcNow,
+        var capture = new ViewSingleItemCapture(4, contract.GameBuild,
+            contract.CaptureLayout, entry.Name, 0, DateTime.UtcNow,
             equipment, [ViewSingleItemChoice.Create(entry.Key, NamePresentation(entry), entry.ItemId)], appearance,
             Convert.ToHexString(SHA256.HashData(appearance)), Minion: minion, MinionHash: minion?.Hash(),
             Mount: mount, MountHash: mount?.Hash(), Catalog: catalog, CatalogHash: catalog.Hash());

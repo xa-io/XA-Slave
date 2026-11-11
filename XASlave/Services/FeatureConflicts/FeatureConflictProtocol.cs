@@ -69,11 +69,14 @@ internal sealed record FeatureConflictSnapshot(Guid Instance, long Generation, b
 }
 
 internal enum PeerPluginPhase { Unknown, Absent, Unloaded, Loading, Loaded, Unloading, Failed }
-internal readonly record struct PeerPluginObservation(PeerPluginPhase Phase, Guid Installation);
-internal readonly record struct FeatureConflictDecision(bool Permitted, string Reason)
+internal readonly record struct PeerPluginObservation(PeerPluginPhase Phase, Guid Installation, string? Detail = null);
+internal readonly record struct FeatureConflictDecision(bool Permitted, string Reason, bool IsWaiting = false, bool RequiresRecheck = false)
 {
     internal static FeatureConflictDecision Allow => new(true, "Ready");
     internal static FeatureConflictDecision Deny(string reason) => new(false, reason);
+    // Reporting metadata only: a lifecycle wait never grants permission.
+    internal static FeatureConflictDecision Wait(string reason) => new(false, reason, true);
+    internal static FeatureConflictDecision Recheck(string reason) => new(false, reason, false, true);
 }
 
 internal static class FeatureConflictPeer
@@ -86,7 +89,10 @@ internal static class FeatureConflictPeer
         {
             var before = lifecycle();
             var absent = before.Phase is PeerPluginPhase.Absent or PeerPluginPhase.Unloaded;
-            if (!absent && before.Phase != PeerPluginPhase.Loaded) return FeatureConflictDecision.Deny("Peer lifecycle is not ready");
+            if (before.Phase is PeerPluginPhase.Loading or PeerPluginPhase.Unloading)
+                return FeatureConflictDecision.Wait(before.Detail ?? "Peer lifecycle is not ready");
+            if (!absent && before.Phase != PeerPluginPhase.Loaded)
+                return FeatureConflictDecision.Deny(before.Detail ?? $"Peer lifecycle is {before.Phase}");
             if (!absent && providers.Length == 0) return FeatureConflictDecision.Deny("Peer conflict providers are unavailable");
             var snapshots = new FeatureConflictSnapshot?[providers.Length];
             Guid? instance = null;
@@ -108,10 +114,19 @@ internal static class FeatureConflictPeer
             {
                 var json = providers[i]();
                 if (json == null && absent && snapshots[i] == null) continue;
-                if (!FeatureConflictSnapshot.TryParse(json, out var current) || current != snapshots[i])
-                    return FeatureConflictDecision.Deny("Peer state changed during evaluation");
+                if (!FeatureConflictSnapshot.TryParse(json, out var current))
+                    return FeatureConflictDecision.Deny("Peer conflict state is unavailable or incompatible");
+                if (current!.Blocks)
+                    return FeatureConflictDecision.Deny("Peer feature is enabled, busy, transitioning or requires recovery");
+                if (current != snapshots[i])
+                    return FeatureConflictDecision.Recheck("Peer state changed during evaluation");
             }
-            return before == lifecycle() ? FeatureConflictDecision.Allow : FeatureConflictDecision.Deny("Peer lifecycle changed");
+            var after = lifecycle();
+            if (after.Phase is PeerPluginPhase.Loading or PeerPluginPhase.Unloading)
+                return FeatureConflictDecision.Wait(after.Detail ?? "Peer lifecycle is not ready");
+            if (after.Phase is PeerPluginPhase.Unknown or PeerPluginPhase.Failed)
+                return FeatureConflictDecision.Deny(after.Detail ?? $"Peer lifecycle is {after.Phase}");
+            return before == after ? FeatureConflictDecision.Allow : FeatureConflictDecision.Recheck("Peer lifecycle changed");
         }
         catch { return FeatureConflictDecision.Deny("Peer conflict state could not be read"); }
     }
