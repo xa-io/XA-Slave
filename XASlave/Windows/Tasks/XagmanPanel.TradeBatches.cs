@@ -89,8 +89,10 @@ public partial class SlaveWindow
             plugin.TaskRunner.AddLog($"Xagman: cannot capture the outgoing selection: {failure}");
             return false;
         }
-        // ONH invitation/completion gil has its own acknowledged signal flow and wait steps.
-        if (selected.All(item => item.ItemId == 1)) { handled = false; return true; }
+        // Control gil retains its acknowledged signal path. Policy-driven ONH collection gil
+        // uses the same settlement/accounting as other collection, including cancellation.
+        if (selected.All(item => item.ItemId == 1) && !IsXagmanOnhCollectionTransfer) { handled = false; return true; }
+        xagmanBatchLegacyFailureKind = XagmanTradeFailureKind.None;
         if (!plugin.DropboxQueue.TryCaptureXagmanTradeStacks(out var stacks, out failure))
         {
             plugin.TaskRunner.AddLog($"Xagman: cannot measure outgoing inventory: {failure}");
@@ -141,6 +143,11 @@ public partial class SlaveWindow
         run.QuietSince = DateTime.MinValue;
         run.Trading = run.SawBusy = run.Stopping = run.LegacyFailure = false;
         run.Offered.Clear();
+        if (run.OutsideNetwork && IsXagmanOnhCollectionTransfer)
+        {
+            onhCollectionLocalCleanup = false;
+            onhCollectionTradeAdmitted = false;
+        }
         return RequestXagmanTradeCapacity(run.RequestId, out failure);
     }
 
@@ -226,6 +233,20 @@ public partial class SlaveWindow
             }
 
             var kind = GetXagmanBoundedTradeFailureKind(out var text);
+            if (run.OutsideNetwork && IsXagmanOnhCollectionTransfer)
+            {
+                if (onhCollectionCancellationObserved)
+                {
+                    kind = XagmanTradeFailureKind.TradeCanceled;
+                    text = "ONH admitted collection cancellation";
+                }
+                else if (kind == XagmanTradeFailureKind.TradeCanceled)
+                {
+                    // Visible English error text is neither a fresh event nor a scoped cancellation.
+                    kind = XagmanTradeFailureKind.None;
+                    text = string.Empty;
+                }
+            }
             var capacityError = IsXagmanInventoryCapacityFailure(text);
             if (kind == XagmanTradeFailureKind.None) run.LastCapacityError = string.Empty;
             if (!run.Stopping && kind != XagmanTradeFailureKind.None

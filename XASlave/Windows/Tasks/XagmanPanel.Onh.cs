@@ -13,11 +13,11 @@ namespace XASlave.Windows;
 //
 // Normal Xagman coordinates Tony and Franchise Owner clients over a local TCP peer hub
 // (XagmanPeerService). ONH mode is for two DIFFERENT players on DIFFERENT machines with no
-// shared peer network: coordination happens in game via proximity + 1-gil trade handshakes
-// instead of peer messages. Tony invites one owner, collects, then supplies its tell request.
+// shared peer network: owners request collection through versioned in-game tells.
+// Tony reserves the requester, receives collection, then supplies its tell request.
 //
 // This file holds the additive UI + clipboard character-list plumbing. The runtime handshake
-// state machine (1-gil start/resume + done signals, proximity movement, gil/inventory
+// state machine (request/reservation + completion signals, proximity movement, gil/inventory
 // monitoring, Tony rotation on full inventory) lives in XagmanPanel.OnhRuntime.cs and reuses the
 // existing Dropbox/inventory/movement/relog/travel helpers - the networked trading path is
 // not modified.
@@ -284,7 +284,7 @@ public partial class SlaveWindow
                 ImGui.TableNextColumn();
                 ImGui.TextUnformatted(list[i]);
                 ImGui.TableNextColumn();
-                var name = GetCharacterNameFromKey(list[i]);
+                var name = list[i].Trim();
                 var position = onhWaitingOwners.FindIndex(x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
                 var status = ((onhFailedOwners.Contains(name) ? global::XASlave.Localization.UiMessage.Key("S031A8F0F659DF890") : (onhRetiredTonys.Contains(name) ? global::XASlave.Localization.UiMessage.Key("S9280DCBD5E5A2D4A") : (xagmanOnhCompletedPartners.Contains(name) ? global::XASlave.Localization.UiMessage.Key("S22A970D2E5B1CC23") : (name.Equals(xagmanOnhEngagedPartner, StringComparison.OrdinalIgnoreCase) ? global::XASlave.Localization.UiMessage.Key("S92340695899BD2D8") : (position >= 0 ? global::XASlave.Localization.UiMessage.Format("SBBF393609432CA35", position + 1) : global::XASlave.Localization.UiMessage.Key("S331551B0DE4157C9"))))))).Display;
                 ImGui.TextDisabled(status);

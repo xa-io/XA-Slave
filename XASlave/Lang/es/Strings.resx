@@ -3387,7 +3387,7 @@ AR espera a que terminen los pasos antes de ir a la campana de sirvientes.</valu
     <comment>Source: XASlave/Windows/Tasks/CityChatFloorderPanel.cs</comment>
   </data>
   <data name="S1F805080DAB492FD" xml:space="preserve">
-    <value>Personajes Tony a los que puedes entregar objetos. Entrega tus objetos al Tony de esta lista que esté en el punto de encuentro.</value>
+    <value>Tonys autorizados para recogida y reabastecimiento. Los propietarios solicitan cualquier Tony disponible en el punto de encuentro; el orden de la lista no fija prioridades.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S1F845D49BB1DF162" xml:space="preserve">
@@ -5911,7 +5911,7 @@ Confirmado mediante /xldata Addon Inspector.</value>
     <comment>Source: XASlave/Services/AutoRetainerInventoryOperation.cs</comment>
   </data>
   <data name="S34B17FE52223FF18" xml:space="preserve">
-    <value>Personajes Propietario de franquicia de los que recibirás objetos. Tony procesa uno a la vez y nunca entrega objetos (solo intercambio de confirmación de 1 guil).</value>
+    <value>Propietarios de franquicia autorizados para solicitar una recogida. Tony recibe de un propietario a la vez y puede suministrar después los objetos solicitados.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S34B2227E117988A5" xml:space="preserve">
@@ -10378,7 +10378,7 @@ Envíala a tu compañero para que pueda importarla.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs</comment>
   </data>
   <data name="S5B08ACEA1AB7D3AD" xml:space="preserve">
-    <value>El estado de confirmación en vivo aparece en la línea de estado de tarea y en el registro; las marcas de finalización por fila aún no están conectadas.</value>
+    <value>Los números identifican entradas, no el orden de atención. El estado corresponde al personaje exacto y al intercambio actual.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S5B18DCDD63E1F5D9" xml:space="preserve">
@@ -18908,7 +18908,7 @@ Equivale a dfunc GetGCRank/GetFlamesGCRank/GetAddersGCRank/GetMaelstromGCRank</v
     <comment>Source: XASlave/Services/FurnitureObserverHook.cs</comment>
   </data>
   <data name="SA6582F5D40CC95E2" xml:space="preserve">
-    <value>Tony {0} está preparado; buscando un Propietario de franquicia.</value>
+    <value>Tony {0} está listo; esperando la solicitud de un propietario autorizado.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SA6711086459806CB" xml:space="preserve">
@@ -19648,7 +19648,7 @@ Usa sus protecciones de objetos y ajustes de descarte; desactivado de forma pred
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD1C68924E3212A6" xml:space="preserve">
-    <value>Cola de Ayudante fuera de la red: {0}</value>
+    <value>Lista del Ayudante fuera de la red - {0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD2DE7A64920F065" xml:space="preserve">
@@ -20730,13 +20730,13 @@ Usa sus protecciones de objetos y ajustes de descarte; desactivado de forma pred
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SB6EA6D7BD0D682F4" xml:space="preserve">
-    <value>Ayudante fuera de la red: transfiere objetos con otro jugador que NO está en tu red de pares
-(otra persona en otro PC). No hay conexión de pares; os coordináis dentro del juego.
-Tony invita a un propietario en cola con 1 gil. El propietario entrega objetos y solicita suministros mediante tell + 1 gil.
-Tony devuelve 1 gil al terminar o 2 gil para rotar. El propietario envía 2 gil si está lleno.
-Tony conserva al menos 5000 gil; los propietarios necesitan reservar 2 gil para señales de fallo.
-Exporta los personajes seleccionados y envía la lista a tu socio; importa la lista que te envíe.
-Cada parte elige su mundo y lugar de encuentro. La red de pares está desactivada en este modo.</value>
+    <value>Ayudante fuera de la red: comercia con otro jugador sin conexión entre pares.
+Importad vuestras listas de Nombre@MundoDeOrigen y elegid el mismo punto de encuentro.
+Los propietarios solicitan un Tony disponible e inician la entrega cuando ambos clientes coinciden en las versiones.
+El orden de la lista no limita las llegadas. Cada personaje gestiona un solo intercambio a la vez.
+Una entrega cancelada excluye a ese Tony durante esta ejecución; los objetos pendientes esperan a otro Tony autorizado.
+El reabastecimiento sigue usando mensajes privados y señales separadas de 1/2 guiles. Tony conserva al menos 5000 guiles; los propietarios reservan 2 guiles.
+Vender no restablece la elegibilidad de un Tony excluido. Un Tony disponible espera a los propietarios.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SB6F61AF9F826AAC2" xml:space="preserve">
@@ -21376,7 +21376,7 @@ Cada parte elige su mundo y lugar de encuentro. La red de pares está desactivad
     <comment>Source: XASlave/Services/ViewSingleItemScene.cs</comment>
   </data>
   <data name="SBBF393609432CA35" xml:space="preserve">
-    <value>En cola #{0}</value>
+    <value>Cercano n.º {0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SBC0632E5191418C8" xml:space="preserve">
@@ -30060,5 +30060,65 @@ Es mejor hacerlo a partir del rango 6 para tener acceso a las pujas por parcelas
   <data name="S9DA262EB757C209B" xml:space="preserve">
     <value>esperando un socio comercial con versiones compatibles</value>
     <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S99098C464623EAD9" xml:space="preserve">
+    <value>Esperando un Tony disponible de la lista importada.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S0F17D2B087F27D98" xml:space="preserve">
+    <value>Solicitando un intercambio de recogida ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S51BB99BD159F4DBC" xml:space="preserve">
+    <value>Esperando confirmación de la recogida ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S32FF9E600B6C30D4" xml:space="preserve">
+    <value>Esperando a que el receptor ONH esté listo.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBE2797C239992AB2" xml:space="preserve">
+    <value>Esperando una solicitud válida de recogida de un propietario.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S904C6FEA5DCF63D5" xml:space="preserve">
+    <value>Negociación de recogida ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S46A21A9A777CD929" xml:space="preserve">
+    <value>Receptor de recogida ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S4C92E6E135151092" xml:space="preserve">
+    <value>Reinicio de negociación con el socio ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S9383AC136A430DF5" xml:space="preserve">
+    <value>La recogida ONH requiere que ambos clientes admitan el protocolo iniciado por el propietario.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S1CFCEBFFCFCF8DDF" xml:space="preserve">
+    <value>Los mensajes de comercio ONH no están disponibles para el idioma actual del juego.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBDF3FBB1F94639EB" xml:space="preserve">
+    <value>La recogida ONH está en pausa porque no se pudo confirmar la limpieza del intercambio. Detén la ejecución tras revisar el registro de tareas.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S3FA1998D5364E068" xml:space="preserve">
+    <value>Esperando otro Tony disponible.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SD3FEE3D9E6EEF9C3" xml:space="preserve">
+    <value>La recogida ONH está en curso.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs</comment>
+  </data>
+  <data name="S67F517169AD87F95" xml:space="preserve">
+    <value>Receptor ONH preparado</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SE074FF78DF8F68C8" xml:space="preserve">
+    <value>Esperando la confirmación del regreso ONH tras la venta.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
 </root>

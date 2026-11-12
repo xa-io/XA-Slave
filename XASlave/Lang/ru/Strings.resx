@@ -3387,7 +3387,7 @@ AR ждёт завершения шагов, прежде чем идти к к�
     <comment>Source: XASlave/Windows/Tasks/CityChatFloorderPanel.cs</comment>
   </data>
   <data name="S1F805080DAB492FD" xml:space="preserve">
-    <value>Персонажи Tony, которым можно отдать предметы. Передайте предметы любому Tony из этого списка, находящемуся на месте встречи.</value>
+    <value>Допущенные Tony для сбора и пополнения запасов. Владельцы обращаются к любому доступному Tony в месте встречи; порядок списка не задаёт приоритет.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S1F845D49BB1DF162" xml:space="preserve">
@@ -5911,7 +5911,7 @@ AR ждёт завершения шагов, прежде чем идти к к�
     <comment>Source: XASlave/Services/AutoRetainerInventoryOperation.cs</comment>
   </data>
   <data name="S34B17FE52223FF18" xml:space="preserve">
-    <value>Персонажи Franchise Owner, от которых вы будете получать предметы. Tony обрабатывает по одному и никогда не отдаёт предметы (только подтверждение обменом 1 гил).</value>
+    <value>Допущенные владельцы франшизы, которые могут запросить сбор. Tony принимает предметы от одного владельца за раз, а затем может передать запрошенные припасы.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S34B2227E117988A5" xml:space="preserve">
@@ -10378,7 +10378,7 @@ AR ждёт завершения шагов, прежде чем идти к к�
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs</comment>
   </data>
   <data name="S5B08ACEA1AB7D3AD" xml:space="preserve">
-    <value>Текущий статус подтверждения виден в строке статуса задачи и журнале; отметки завершения по строкам ещё не подключены.</value>
+    <value>Номера обозначают записи, а не порядок обслуживания. Статус относится к точному персонажу и текущему обмену.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S5B18DCDD63E1F5D9" xml:space="preserve">
@@ -18908,7 +18908,7 @@ Ctrl+левый щелчок осматривает. Ctrl+правый откр�
     <comment>Source: XASlave/Services/FurnitureObserverHook.cs</comment>
   </data>
   <data name="SA6582F5D40CC95E2" xml:space="preserve">
-    <value>Tony {0} подготовлен; поиск Franchise Owner.</value>
+    <value>Tony {0} готов; ожидается запрос допущенного владельца.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SA6711086459806CB" xml:space="preserve">
@@ -19648,7 +19648,7 @@ Ctrl+левый щелчок осматривает. Ctrl+правый откр�
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD1C68924E3212A6" xml:space="preserve">
-    <value>Очередь помощника внешней сети — {0}</value>
+    <value>Список помощника вне сети — {0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD2DE7A64920F065" xml:space="preserve">
@@ -20730,13 +20730,13 @@ Ctrl+левый щелчок осматривает. Ctrl+правый откр�
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SB6EA6D7BD0D682F4" xml:space="preserve">
-    <value>Помощник внешней сети: обмен предметами с игроком, который НЕ входит в вашу сеть узлов
-(другой человек на другом ПК). Соединения узлов нет — координация происходит в игре.
-Tony приглашает одного владельца из очереди обменом 1 гил. Владелец отдаёт предметы и запрашивает припасы личным сообщением + 1 гил.
-Tony возвращает 1 гил при завершении или 2 гил для ротации. Владелец отправляет 2 гил при заполнении.
-Tony оставляет минимум 5000 гил; владельцам нужны 2 гил для сигналов сбоя.
-Экспортируйте выбранных персонажей и отправьте список партнёру; импортируйте его список.
-Каждая сторона выбирает свой мир и место встречи. В этом режиме сеть узлов выключена.</value>
+    <value>Помощник вне сети: обменивайтесь с другим игроком без подключения между клиентами.
+Импортируйте списки друг друга в формате Имя@РоднойМир и выберите одно место встречи.
+Владельцы обращаются к доступному Tony и начинают передачу после согласования версий обоими клиентами.
+Порядок списка не ограничивает порядок прибытия. Каждый персонаж ведёт только один обмен одновременно.
+Отмена передачи исключает этого Tony до конца текущего запуска; оставшиеся предметы ожидают другого подходящего Tony.
+Пополнение запасов по-прежнему использует личные сообщения и отдельные сигналы в 1/2 гила. Tony сохраняет минимум 5000 гилов; владельцы резервируют 2 гила.
+Продажа не возвращает исключённому Tony доступность. Доступный Tony ожидает владельцев.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SB6F61AF9F826AAC2" xml:space="preserve">
@@ -21376,7 +21376,7 @@ Tony оставляет минимум 5000 гил; владельцам нуж�
     <comment>Source: XASlave/Services/ViewSingleItemScene.cs</comment>
   </data>
   <data name="SBBF393609432CA35" xml:space="preserve">
-    <value>В очереди №{0}</value>
+    <value>Рядом №{0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SBC0632E5191418C8" xml:space="preserve">
@@ -30060,5 +30060,65 @@ NamePlate готов + PlayerAvailable + не применяет действи�
   <data name="S9DA262EB757C209B" xml:space="preserve">
     <value>ожидание торгового партнёра с совместимыми версиями</value>
     <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S99098C464623EAD9" xml:space="preserve">
+    <value>Ожидание доступного Tony из импортированного списка.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S0F17D2B087F27D98" xml:space="preserve">
+    <value>Запрашивается обмен для сбора ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S51BB99BD159F4DBC" xml:space="preserve">
+    <value>Ожидание подтверждения сбора ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S32FF9E600B6C30D4" xml:space="preserve">
+    <value>Ожидание готовности получателя ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBE2797C239992AB2" xml:space="preserve">
+    <value>Ожидание допустимого запроса на сбор от владельца.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S904C6FEA5DCF63D5" xml:space="preserve">
+    <value>Согласование сбора ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S46A21A9A777CD929" xml:space="preserve">
+    <value>Получатель сбора ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S4C92E6E135151092" xml:space="preserve">
+    <value>Сброс согласования с партнёром ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S9383AC136A430DF5" xml:space="preserve">
+    <value>Для сбора ONH оба клиента должны поддерживать протокол, инициируемый владельцем.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S1CFCEBFFCFCF8DDF" xml:space="preserve">
+    <value>Сообщения обмена ONH недоступны для текущего языка игры.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBDF3FBB1F94639EB" xml:space="preserve">
+    <value>Сбор ONH приостановлен: не удалось подтвердить завершение очистки обмена. Проверьте журнал задач и остановите выполнение.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S3FA1998D5364E068" xml:space="preserve">
+    <value>Ожидание другого доступного Tony.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SD3FEE3D9E6EEF9C3" xml:space="preserve">
+    <value>Идёт сбор ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs</comment>
+  </data>
+  <data name="S67F517169AD87F95" xml:space="preserve">
+    <value>Получатель ONH готов</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SE074FF78DF8F68C8" xml:space="preserve">
+    <value>Ожидание подтверждения возврата ONH после продажи.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
 </root>

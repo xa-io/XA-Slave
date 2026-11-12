@@ -3387,7 +3387,7 @@ PartyDisband、PartyLeave、Logoutなどの後に使用してください。</va
     <comment>Source: XASlave/Windows/Tasks/CityChatFloorderPanel.cs</comment>
   </data>
   <data name="S1F805080DAB492FD" xml:space="preserve">
-    <value>アイテムを渡せるTonyキャラクターです。このリストのうち、合流地点にいるTonyにアイテムを渡してください。</value>
+    <value>回収と補充の対象となるTonyです。オーナーは集合場所にいる利用可能なTonyに要求します。名簿の順番は優先順位ではありません。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S1F845D49BB1DF162" xml:space="preserve">
@@ -5911,7 +5911,7 @@ dfunc GetInternalNamesIPCと同等です</value>
     <comment>Source: XASlave/Services/AutoRetainerInventoryOperation.cs</comment>
   </data>
   <data name="S34B17FE52223FF18" xml:space="preserve">
-    <value>アイテムを受け取る相手のFranchise Ownerキャラクターです。Tonyは1人ずつ処理し、アイテムは渡しません（1ギルの確認取引のみ）。</value>
+    <value>回収を要求できる対象のフランチャイズオーナーです。Tonyは一度に1人のオーナーから受け取り、その後で要求されたアイテムを補充できます。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S34B2227E117988A5" xml:space="preserve">
@@ -10378,7 +10378,7 @@ Lifestreamにドアまでの経路とハウスへ入る設定が必要です。
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs</comment>
   </data>
   <data name="S5B08ACEA1AB7D3AD" xml:space="preserve">
-    <value>現在の確認通信の状態はタスク状態行とログに表示します。各行の完了マークはまだ連動していません。</value>
+    <value>名簿の番号は項目の識別用で、対応順ではありません。状態は正確なキャラクターと現在の交換に対応します。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S5B18DCDD63E1F5D9" xml:space="preserve">
@@ -18908,7 +18908,7 @@ dfunc GetGCRank/GetFlamesGCRank/GetAddersGCRank/GetMaelstromGCRankと同等で�
     <comment>Source: XASlave/Services/FurnitureObserverHook.cs</comment>
   </data>
   <data name="SA6582F5D40CC95E2" xml:space="preserve">
-    <value>Tony {0}は待機位置にいます。Franchise Ownerを探しています。</value>
+    <value>Tony {0}は準備完了です。対象オーナーからの要求を待っています。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SA6711086459806CB" xml:space="preserve">
@@ -19648,7 +19648,7 @@ AutoRetainerのアイテム保護と破棄設定を使用します。初期設�
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD1C68924E3212A6" xml:space="preserve">
-    <value>外部ネットワークヘルパーキュー - {0}</value>
+    <value>外部ネットワークヘルパー名簿 - {0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD2DE7A64920F065" xml:space="preserve">
@@ -20730,13 +20730,13 @@ AutoRetainerのアイテム保護と破棄設定を使用します。初期設�
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SB6EA6D7BD0D682F4" xml:space="preserve">
-    <value>外部ネットワークヘルパー: クライアント間ネットワーク外の別プレイヤー
-（別のPCを使う別の人）とアイテムを転送します。接続機能は使わず、ゲーム内で連携します。
-Tonyはキュー内のオーナーを1人ずつ1ギルで招待します。オーナーはアイテムを渡し、Tell + 1ギルで補給を要求します。
-Tonyは完了時に1ギル、交代時に2ギルを返します。オーナーは満杯になったら2ギルを送ります。
-Tonyは最低5000ギルを保持し、オーナーは失敗シグナル用に2ギルを確保する必要があります。
-選択したキャラクターをエクスポートして相手に送り、相手から受け取ったリストをインポートしてください。
-双方で集合先ワールドと場所を選びます。このモードではクライアント間通信は無効です。</value>
+    <value>外部ネットワークヘルパー：ピア接続なしで別のプレイヤーと取引します。
+互いの名前@ホームワールドの名簿をインポートし、同じ集合場所を選択してください。
+オーナーが利用可能なTonyに要求し、両クライアントのバージョン一致を確認してから回収用の取引を開始します。
+名簿の順番は到着順を制限しません。各キャラクターは一度に1件の交換を行います。
+回収取引をキャンセルすると、そのTonyは今回の実行から除外されます。残りのアイテムは別の対象Tonyを待ちます。
+補充には引き続きTellと個別の1/2ギル信号を使います。Tonyは最低5000ギルを保持し、オーナーは2ギルを確保します。
+売却しても除外されたTonyは再び対象になりません。利用可能なTonyはオーナーを待ちます。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SB6F61AF9F826AAC2" xml:space="preserve">
@@ -21376,7 +21376,7 @@ Tonyは最低5000ギルを保持し、オーナーは失敗シグナル用に2�
     <comment>Source: XASlave/Services/ViewSingleItemScene.cs</comment>
   </data>
   <data name="SBBF393609432CA35" xml:space="preserve">
-    <value>キュー内 #{0}</value>
+    <value>付近 #{0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SBC0632E5191418C8" xml:space="preserve">
@@ -30060,5 +30060,65 @@ xafuncのDoNavFlySequenceXAのロジック（Player.CanFly確認）と同じで�
   <data name="S9DA262EB757C209B" xml:space="preserve">
     <value>互換性のあるバージョンの取引相手を待機しています</value>
     <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S99098C464623EAD9" xml:space="preserve">
+    <value>インポートした名簿の利用可能なTonyを待っています。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S0F17D2B087F27D98" xml:space="preserve">
+    <value>ONH回収取引を要求しています。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S51BB99BD159F4DBC" xml:space="preserve">
+    <value>ONH回収の確認を待っています。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S32FF9E600B6C30D4" xml:space="preserve">
+    <value>ONH受信側の準備を待っています。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBE2797C239992AB2" xml:space="preserve">
+    <value>有効なオーナーの回収要求を待っています。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S904C6FEA5DCF63D5" xml:space="preserve">
+    <value>ONH回収の調整</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S46A21A9A777CD929" xml:space="preserve">
+    <value>ONH回収の受信側</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S4C92E6E135151092" xml:space="preserve">
+    <value>ONH取引相手の調整をリセット</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S9383AC136A430DF5" xml:space="preserve">
+    <value>ONH回収には、両クライアントでオーナー主導プロトコルのサポートが必要です。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S1CFCEBFFCFCF8DDF" xml:space="preserve">
+    <value>現在のゲーム言語ではONH取引メッセージを利用できません。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBDF3FBB1F94639EB" xml:space="preserve">
+    <value>取引の後処理完了を確認できなかったため、ONH回収を一時停止しています。タスクログを確認してから実行を停止してください。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S3FA1998D5364E068" xml:space="preserve">
+    <value>別の利用可能なTonyを待っています。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SD3FEE3D9E6EEF9C3" xml:space="preserve">
+    <value>ONH回収を実行中です。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs</comment>
+  </data>
+  <data name="S67F517169AD87F95" xml:space="preserve">
+    <value>ONH受信側の準備完了</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SE074FF78DF8F68C8" xml:space="preserve">
+    <value>ONH売却後の帰還確認を待っています。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
 </root>

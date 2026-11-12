@@ -9,7 +9,7 @@ using XASlave.Services.Tasks;
 
 namespace XASlave.Windows;
 
-// Offline queue, invitation, collection and resupply. Protocol effects live in OnhProtocol.cs.
+// Owner-requested offline collection and resupply. Protocol effects live in the ONH partials.
 public partial class SlaveWindow
 {
     private enum XagmanOnhPhase
@@ -20,14 +20,14 @@ public partial class SlaveWindow
 
         // Franchise Owner
         FoFindTony,          // find a present roster Tony and approach
-        FoAwaitStartGil,     // at Tony; arm after version agreement, then wait for Tony's +1 gil
+        FoAwaitReservation,  // owner request, Tony reservation, confirmation and effective readiness
         FoGiving,            // a give sub-task is running; resume here when done
         FoSettle,            // collection reconciliation and resupply request
         FoSendDoneGil,       // a send-1-gil sub-task is running; resume here when done
 
         // Tony queue owner
-        TonySearch,          // scan roster FO nearby; wait-if-moving; approach
-        TonySendStartGil,    // a send-1-gil sub-task is running; resume here when done
+        TonySearch,          // available; wait for an eligible owner request
+        TonyAwaitConfirmation, // bind the requester before accepting any collection trade
         TonyReceiving,       // collect until the owner confirms its complete supply request
 
         FoReceiving,
@@ -38,6 +38,7 @@ public partial class SlaveWindow
         TonyPauseForSale,
         TonySelling,
         TonyReturnFromSale,
+        TonyAwaitSaleResolution,
         FoAwaitSale,
         ReturningHome,
         Completed,
@@ -51,12 +52,12 @@ public partial class SlaveWindow
             XagmanOnhPhase.StartCharacter => global::XASlave.Localization.UiMessage.Key("S18A256D257EBC835"),
             XagmanOnhPhase.AwaitStartup => global::XASlave.Localization.UiMessage.Key("S18951979DFBF87A2"),
             XagmanOnhPhase.FoFindTony => global::XASlave.Localization.UiMessage.Key("SF1CDA68741501B0D"),
-            XagmanOnhPhase.FoAwaitStartGil => global::XASlave.Localization.UiMessage.Key("S93704451549487B3"),
+            XagmanOnhPhase.FoAwaitReservation => global::XASlave.Localization.UiMessage.Authored("Requesting an ONH collection exchange."),
             XagmanOnhPhase.FoGiving => global::XASlave.Localization.UiMessage.Key("SEBDA7F07AABD3CD5"),
             XagmanOnhPhase.FoSettle => global::XASlave.Localization.UiMessage.Key("S036D9B29686E3551"),
             XagmanOnhPhase.FoSendDoneGil => global::XASlave.Localization.UiMessage.Key("S25B6F0ED1C76AB74"),
             XagmanOnhPhase.TonySearch => global::XASlave.Localization.UiMessage.Key("SE46287AED3FC46F3"),
-            XagmanOnhPhase.TonySendStartGil => global::XASlave.Localization.UiMessage.Key("S3BA44B04941942FF"),
+            XagmanOnhPhase.TonyAwaitConfirmation => global::XASlave.Localization.UiMessage.Authored("Waiting for ONH collection confirmation."),
             XagmanOnhPhase.TonyReceiving => global::XASlave.Localization.UiMessage.Key("S05F4BE0A4FF9EF83"),
             XagmanOnhPhase.FoReceiving => global::XASlave.Localization.UiMessage.Key("S4B037E60B93FC1AF"),
             XagmanOnhPhase.FoSendFailed => global::XASlave.Localization.UiMessage.Key("SB6E103E230B3A249"),
@@ -66,6 +67,7 @@ public partial class SlaveWindow
             XagmanOnhPhase.TonyPauseForSale => global::XASlave.Localization.UiMessage.Key("SE4EE450C33D21D14"),
             XagmanOnhPhase.TonySelling => global::XASlave.Localization.UiMessage.Key("S8B183230429E73A4"),
             XagmanOnhPhase.TonyReturnFromSale => global::XASlave.Localization.UiMessage.Key("S32E60C761C6BBBF7"),
+            XagmanOnhPhase.TonyAwaitSaleResolution => global::XASlave.Localization.UiMessage.Authored("Waiting for ONH sale-return confirmation."),
             XagmanOnhPhase.FoAwaitSale => global::XASlave.Localization.UiMessage.Key("S30EEAC21EF5E6FE7"),
             XagmanOnhPhase.ReturningHome => global::XASlave.Localization.UiMessage.Key("SF92BBC0FDA7E1F62"),
             XagmanOnhPhase.Completed => global::XASlave.Localization.UiMessage.Key("S22A970D2E5B1CC23"),
@@ -85,7 +87,6 @@ public partial class SlaveWindow
 
     // Tony receiving bookkeeping.
     private readonly HashSet<string> xagmanOnhCompletedPartners = new(StringComparer.OrdinalIgnoreCase);
-    private DateTime xagmanOnhSearchSinceUtc = DateTime.MinValue;
 
     // FO bookkeeping.
     private DateTime xagmanOnhFoSettleSinceUtc = DateTime.MinValue;
@@ -104,7 +105,6 @@ public partial class SlaveWindow
     private const float XagmanOnhTradeStopDistance = 1.5f;
     private const float XagmanOnhScanRadius = 60f;                    // how far Tony looks for an arriving FO
     private const int XagmanOnhTonyMinFreeSlots = 0;                  // positive capacity can receive a bounded batch
-    private const double XagmanOnhTonyIdleAdvanceSeconds = 300.0;     // no FO at all -> advance this Tony
     private const double XagmanOnhWaitLogSeconds = 15.0;
 
     private static bool HasXagmanOnhMeetDestination(Configuration cfg)
@@ -223,8 +223,13 @@ public partial class SlaveWindow
             xagmanOwnerTotalCharacters = runList.Count;
             xagmanOwnerCompletedCharacters = 0;
         }
+        if (!TryStartXagmanOnhCollectionObservation())
+        {
+            FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Authored("ONH trade messages are unavailable for the current game language."));
+            return;
+        }
         HookXagmanOnhChat();
-        if (!plugin.AutoRefuseTrade.SetOnhTradeAdmission(AdmitXagmanOnhTrade, ObserveXagmanOnhTradeStart))
+        if (!plugin.AutoRefuseTrade.SetOnhTradeAdmission(AdmitXagmanOnhTrade, ObserveXagmanOnhTradeStart, SuppressXagmanOnhIncomingTrade))
         {
             FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S47D1B5A2992A717E"));
             return;
@@ -257,7 +262,6 @@ public partial class SlaveWindow
         xagmanOnhSubTaskCompleted = false;
         xagmanOnhEngagedPartner = string.Empty;
         xagmanOnhCompletedPartners.Clear();
-        xagmanOnhSearchSinceUtc = DateTime.MinValue;
         xagmanOnhFoSettleSinceUtc = DateTime.MinValue;
         xagmanOnhGilSendAborted = false;
         xagmanOnhWaitingLogged = false;
@@ -319,13 +323,19 @@ public partial class SlaveWindow
     {
         if (!xagmanRunning || !plugin.Configuration.XagmanOutsideNetworkHelper)
             return;
+        if (onhCollectionHeld) return;
+        if (!UpdateXagmanOnhIncomingRefusal()) return;
         if (!TryValidateXagmanOnhLocalVersions(out var versionFailure))
             RejectXagmanOnhTradeVersions(versionFailure);
+        if (onhCollectionHeld) return;
         if (!string.IsNullOrEmpty(onhVersionFailure))
         { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Capture(onhVersionFailureUiMessage, onhVersionFailure)); return; }
         ObserveXagmanOnhTrade();
+        if (onhCollectionHeld) return;
         if (xagmanActiveRole == XagmanRole.Tony) RefreshXagmanOnhQueue();
         if (plugin.TaskRunner.IsRunning)
+            return;
+        if (xagmanActiveRole == XagmanRole.FranchiseOwner && TryRetireXagmanOnhCollectionPartner())
             return;
         if (xagmanOnhPhase == XagmanOnhPhase.TonySelling && !onhSaleCompleted
             && plugin.TaskRunner.StatusText is "Cancelled" or "Halted")
@@ -354,8 +364,8 @@ public partial class SlaveWindow
             case XagmanOnhPhase.FoFindTony:
                 DriveXagmanOnhFoFindTony();
                 break;
-            case XagmanOnhPhase.FoAwaitStartGil:
-                DriveXagmanOnhFoAwaitStartGil();
+            case XagmanOnhPhase.FoAwaitReservation:
+                DriveXagmanOnhOwnerPairing();
                 break;
             case XagmanOnhPhase.FoGiving:
                 if (!TryConsumeXagmanOnhSubTaskCompletion())
@@ -374,10 +384,8 @@ public partial class SlaveWindow
             case XagmanOnhPhase.TonySearch:
                 DriveXagmanOnhTonySearch();
                 break;
-            case XagmanOnhPhase.TonySendStartGil:
-                if (!TryConsumeXagmanOnhSubTaskCompletion())
-                    return;
-                DriveXagmanOnhTonyAfterStartGil();
+            case XagmanOnhPhase.TonyAwaitConfirmation:
+                DriveXagmanOnhTonyPairing();
                 break;
             case XagmanOnhPhase.TonyReceiving:
                 DriveXagmanOnhTonyReceiving();
@@ -508,7 +516,7 @@ public partial class SlaveWindow
 
         AddXagmanCustomMeetingStep(steps, charKey, ShouldSkipStartup);
 
-        // Both roles must have Dropbox ready before the first invitation.
+        // Both roles must have Dropbox ready before negotiating collection.
         {
             steps.Add(new TaskStep
             {
@@ -559,15 +567,15 @@ public partial class SlaveWindow
         xagmanOnhWaitingLogged = false;
         if (xagmanActiveRole == XagmanRole.Tony)
         {
-            // Tony sends the start gil first, so begin as a giver (auto-accept off) until then.
+            // Stay closed until a requesting owner is bound and compatibility is confirmed.
             if (!TrySetXagmanDropboxAutoAccept(false))
             {
                 FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Format("SC96E9981A964BE11", xagmanActiveCharacter));
                 return;
             }
-            xagmanOnhSearchSinceUtc = DateTime.UtcNow;
-                xagmanStatus = XagmanStatus.AtMeetSpot;
-            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SA6582F5D40CC95E2", xagmanActiveCharacter));
+            xagmanStatus = XagmanStatus.AtMeetSpot;
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage,
+                global::XASlave.Localization.UiMessage.Authored("Waiting for a valid owner collection request."));
             SetXagmanOnhPhase(XagmanOnhPhase.TonySearch);
             return;
         }
@@ -587,8 +595,8 @@ public partial class SlaveWindow
 
     // ---- Presence / proximity helpers ----
 
-    // Closest present roster member within the scan radius that has not already completed, plus its
-    // world position (used for the Tony "wait if moving" check).
+    // Roster order is informational. Discover the closest exact eligible actor;
+    // temporarily deferred busy Tonys do not block other available candidates.
     private string FindNearbyXagmanOnhRosterMember(IReadOnlyList<string> roster, ISet<string> exclude, out Vector3 position)
     {
         position = default;
@@ -600,23 +608,18 @@ public partial class SlaveWindow
         var bestDistance = float.MaxValue;
         foreach (var key in roster)
         {
-            var name = GetCharacterNameFromKey(key);
-            if (string.IsNullOrWhiteSpace(name) || exclude.Contains(name))
+            var name = key.Trim();
+            if (!IsXagmanOnhFullKey(name) || exclude.Contains(name)
+                || (xagmanActiveRole == XagmanRole.FranchiseOwner && IsXagmanOnhTonyDeferred(name)))
                 continue;
-            foreach (var gameObject in Plugin.ObjectTable)
+            var actor = FindXagmanOnhPlayer(name);
+            if (actor == null) continue;
+            var distance = Vector3.Distance(actor.Position, local.Position);
+            if (distance <= XagmanOnhScanRadius && distance < bestDistance)
             {
-                if (gameObject == null)
-                    continue;
-                if (!gameObject.Name.ToString().Equals(name, StringComparison.OrdinalIgnoreCase))
-                    continue;
-                var distance = Vector3.Distance(gameObject.Position, local.Position);
-                if (distance <= XagmanOnhScanRadius && distance < bestDistance)
-                {
-                    bestDistance = distance;
-                    best = name;
-                    position = gameObject.Position;
-                }
-                break;
+                bestDistance = distance;
+                best = GetXagmanOnhActorKey(actor);
+                position = actor.Position;
             }
         }
         return best;
@@ -625,19 +628,10 @@ public partial class SlaveWindow
     private bool TryGetXagmanObjectPosition(string nameOrKey, out Vector3 position)
     {
         position = default;
-        var visibleName = GetCharacterNameFromKey(nameOrKey);
-        if (string.IsNullOrWhiteSpace(visibleName))
-            return false;
-        foreach (var gameObject in Plugin.ObjectTable)
-        {
-            if (gameObject == null)
-                continue;
-            if (!gameObject.Name.ToString().Equals(visibleName, StringComparison.OrdinalIgnoreCase))
-                continue;
-            position = gameObject.Position;
-            return true;
-        }
-        return false;
+        var actor = FindXagmanOnhPlayer(nameOrKey);
+        if (actor == null) return false;
+        position = actor.Position;
+        return true;
     }
 
     private bool IsXagmanOnhPartnerPresent(string nameOrKey)
@@ -699,6 +693,7 @@ public partial class SlaveWindow
 
     private void FailXagmanOnhRun(global::XASlave.Localization.UiMessage reason)
     {
+        if (onhCollectionHeld) return;
         plugin.TaskRunner.AddLog($"Xagman ONH: stopping due to error - {reason}.");
         SetXagmanOnhPhase(XagmanOnhPhase.Error);
         if (plugin.TaskRunner.IsRunning) plugin.TaskRunner.RequestHalt(reason.Original);

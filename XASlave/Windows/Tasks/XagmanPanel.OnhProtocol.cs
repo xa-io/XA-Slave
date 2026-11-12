@@ -22,6 +22,7 @@ public partial class SlaveWindow
         public int GiveFloor;
         public int ReceiveTarget;
         public bool TakeAll;
+        public bool TakeAllAnnounced;
         public bool Collect;
         public uint WireId => Id + (Hq ? 1_000_000u : 0);
     }
@@ -79,6 +80,10 @@ public partial class SlaveWindow
 
     private void ResetXagmanOnhProtocol()
     {
+        StopXagmanOnhCollectionObservation();
+        onhCollectionHeld = false;
+        ResetXagmanOnhSaleResolution();
+        ResetXagmanOnhPairing(newRun: true);
         onhRetiredTonys.Clear();
         onhFailedOwners.Clear();
         onhWaitingOwners.Clear();
@@ -98,6 +103,8 @@ public partial class SlaveWindow
 
     private void ResetXagmanOnhExchange()
     {
+        ResetXagmanOnhCollection();
+        ResetXagmanOnhPairing();
         ResetXagmanOnhTradeVersions();
         onhSession = string.Empty;
         onhRequestParts.Clear();
@@ -119,17 +126,19 @@ public partial class SlaveWindow
 
     private IPlayerCharacter? FindXagmanOnhPlayer(string key)
     {
-        var name = GetCharacterNameFromKey(key);
-        return Plugin.ObjectTable.OfType<IPlayerCharacter>().FirstOrDefault(p => p.IsTargetable
-            && p.Name.TextValue.Equals(name, StringComparison.OrdinalIgnoreCase));
+        if (!IsXagmanOnhFullKey(key)) return null;
+        var matches = Plugin.ObjectTable.OfType<IPlayerCharacter>().Where(p => p.IsTargetable && p.EntityId != 0
+            && GetXagmanOnhActorKey(p).Equals(key.Trim(), StringComparison.OrdinalIgnoreCase)).Take(2).ToArray();
+        return matches.Length == 1 ? matches[0] : null;
     }
 
     private bool AdmitXagmanOnhTrade(uint entityId)
     {
         if (!xagmanRunning || !plugin.Configuration.XagmanOutsideNetworkHelper
+            || onhCollectionHeld || onhIncomingRefusalPending || onhCollectionPartnerUnavailable || onhCollectionCancellationObserved || !IsXagmanOnhPairReady
             || string.IsNullOrWhiteSpace(xagmanOnhEngagedPartner)
             || xagmanOnhPhase is XagmanOnhPhase.ReturningHome or XagmanOnhPhase.StartCharacter or XagmanOnhPhase.AwaitStartup
-                or XagmanOnhPhase.TonySelling or XagmanOnhPhase.TonyReturnFromSale)
+                or XagmanOnhPhase.TonySelling or XagmanOnhPhase.TonyReturnFromSale or XagmanOnhPhase.TonyAwaitSaleResolution)
             return false;
         var actor = FindXagmanOnhPlayer(xagmanOnhEngagedPartner);
         return actor != null && actor.EntityId == entityId && TryRequireXagmanOnhTradeVersions(out _);
@@ -157,6 +166,7 @@ public partial class SlaveWindow
     private void ObserveXagmanOnhTradeStart(uint entityId)
     {
         if (!AdmitXagmanOnhTrade(entityId)) return;
+        ObserveXagmanOnhCollectionTradeStart(entityId);
         // SendTradeRequest and the incoming-status hook may observe the same trade.
         if (onhTradeBefore != null)
         {
@@ -172,6 +182,8 @@ public partial class SlaveWindow
 
     private void ObserveXagmanOnhTrade()
     {
+        UpdateXagmanOnhSaleReturnNotice();
+        if (onhCollectionHeld) return;
         if (onhRemoteTransferStop)
         {
             onhRemoteTransferStop = false;
@@ -236,32 +248,37 @@ public partial class SlaveWindow
     private void ReceiveXagmanOnhTell(IHandleableChatMessage message)
     {
         // TellIncoming is base log kind 13; ignore links/commands in every other channel.
-        if (!xagmanRunning || ((int)message.LogKind & 0x7f) != 13) return;
+        if (!xagmanRunning || onhCollectionHeld || onhIncomingRefusalPending || ((int)message.LogKind & 0x7f) != 13) return;
         var senderPayload = message.Sender.Payloads.OfType<PlayerPayload>().FirstOrDefault();
         var sender = senderPayload?.PlayerName;
         if (string.IsNullOrWhiteSpace(sender)) return;
-        var roster = xagmanActiveRole == XagmanRole.Tony ? plugin.Configuration.XagmanOnhFriendFoCharacters : plugin.Configuration.XagmanOnhFriendTonyCharacters;
-        if (!roster.Any(k => GetCharacterNameFromKey(k).Equals(sender, StringComparison.OrdinalIgnoreCase))
-            || !sender.Equals(xagmanOnhEngagedPartner, StringComparison.OrdinalIgnoreCase)) return;
-        if (senderPayload == null || !TryGetXagmanOnhVersionPartner(senderPayload, out _, out _)) return;
         var text = message.Message.TextValue.Trim();
-        if (text.Length > 400) return;
+        if (text.Length > 400 || senderPayload == null) return;
+        if (TryReceiveXagmanOnhPairingTell(senderPayload, text)) return;
         var parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
+        if (TryReceiveXagmanOnhSaleReturn(parts, senderPayload)) return;
+        var senderKey = $"{sender}@{senderPayload.World.Value.Name}";
+        var roster = xagmanActiveRole == XagmanRole.Tony ? plugin.Configuration.XagmanOnhFriendFoCharacters : plugin.Configuration.XagmanOnhFriendTonyCharacters;
+        if (!roster.Any(k => k.Trim().Equals(senderKey, StringComparison.OrdinalIgnoreCase))
+            || !senderKey.Equals(xagmanOnhEngagedPartner, StringComparison.OrdinalIgnoreCase)) return;
+        if (!TryGetXagmanOnhVersionPartner(senderPayload, out _, out _)) return;
+        if (xagmanOnhPhase == XagmanOnhPhase.FoAwaitReservation && parts.Length >= 6
+            && parts[0] == "/xa" && parts[1] == "onh" && parts[3] == "signal" && parts[5] == "1")
+        {
+            RejectXagmanOnhTradeVersions("ONH collection requires owner-led protocol support on both clients.");
+            return;
+        }
         if (TryReceiveXagmanTradeCapacityTell(parts, senderPayload)) return;
         if (parts.Length >= 5 && parts[0] == "/xa" && parts[1] == "onh"
             && XagmanTradeCapacityProtocol.IsRequestIdValid(parts[2])
             && int.TryParse(parts[4], out var legacySequence) && legacySequence > 0)
         {
-            var initialLegacySignal = parts.Length == 6 && parts[3] == "signal" && parts[5] == "1"
-                && xagmanActiveRole == XagmanRole.FranchiseOwner && xagmanOnhPhase == XagmanOnhPhase.FoAwaitStartGil
-                && string.IsNullOrEmpty(onhVersionSession) && onhReceivedSignals.Count == 0
-                && !OnhTradeOpen && onhTradeBefore == null;
             var currentLegacySignal = parts[2] == onhSession
                 && ((parts.Length == 6 && parts[3] == "signal" && parts[5] is "1" or "2" && legacySequence > onhLastReceivedSequence)
                     || (parts.Length == 5 && parts[3] == "armed" && legacySequence == onhSignalSequence)
                     || (parts.Length == 5 && parts[3] == "selling" && legacySequence > onhLastReceivedSequence
                         && xagmanActiveRole == XagmanRole.FranchiseOwner));
-            if (initialLegacySignal || currentLegacySignal)
+            if (currentLegacySignal)
             { RejectXagmanOnhTradeVersions("The peer omitted Tony's XA Slave and Dropbox version handshake. Update XA Slave on that client."); return; }
         }
         if (parts.Length == 8 && parts[0] == "/xa" && parts[1] == "onh" && parts[2] == onhSession
@@ -269,6 +286,8 @@ public partial class SlaveWindow
             && xagmanActiveRole == XagmanRole.FranchiseOwner
             && xagmanOnhPhase is XagmanOnhPhase.FoGiving or XagmanOnhPhase.FoSettle or XagmanOnhPhase.FoSendDoneGil or XagmanOnhPhase.FoAwaitSale)
         {
+            if (onhCollectionCancellationObserved || onhCollectionPartnerUnavailable
+                || onhRetiredTonys.Contains(xagmanOnhEngagedPartner)) return;
             if (parts[5] != XagmanTradeVersionPolicy.Revision.ToString(CultureInfo.InvariantCulture))
             { RejectXagmanOnhTradeVersions("The seller does not support the required Tony version handshake."); return; }
             if (!TryAcceptXagmanOnhPeerVersions(parts[2], parts[6], parts[7], senderPayload, false, out var versionFailure))
@@ -289,31 +308,17 @@ public partial class SlaveWindow
             && int.TryParse(parts[4], out var seq) && seq > onhLastReceivedSequence
             && int.TryParse(parts[5], out var amount) && amount is 1 or 2)
         {
-            var initialTonyOffer = xagmanActiveRole == XagmanRole.FranchiseOwner
-                && xagmanOnhPhase == XagmanOnhPhase.FoAwaitStartGil && amount == 1
-                && onhReceivedSignals.Count == 0 && !OnhTradeOpen && onhTradeBefore == null
-                && string.IsNullOrEmpty(onhVersionSession);
-            if (!initialTonyOffer && onhSession != parts[2]) return;
+            if (onhSession != parts[2]) return;
             if (parts[6] != XagmanTradeVersionPolicy.Revision.ToString(CultureInfo.InvariantCulture))
             { RejectXagmanOnhTradeVersions("The peer does not support the required Tony version handshake."); return; }
-            if (xagmanOnhPhase == XagmanOnhPhase.FoAwaitStartGil && amount == 1
-                && initialTonyOffer)
-            {
-                if (!TryAcceptXagmanOnhPeerVersions(parts[2], parts[7], parts[8], senderPayload, true, out var versionFailure))
-                { RejectXagmanOnhTradeVersions(versionFailure); return; }
-                onhSession = parts[2];
-                onhLastReceivedSequence = 0;
-            }
-            if (onhSession != parts[2]) return;
             var allowedPhase = xagmanActiveRole == XagmanRole.Tony
                 ? (amount == 1 ? xagmanOnhPhase == XagmanOnhPhase.TonyReceiving && OnhRequestsComplete
                     : xagmanOnhPhase is XagmanOnhPhase.TonySupplying or XagmanOnhPhase.TonyReceiving)
-                : (amount == 1 ? xagmanOnhPhase is XagmanOnhPhase.FoAwaitStartGil or XagmanOnhPhase.FoReceiving or XagmanOnhPhase.FoSendDoneGil or XagmanOnhPhase.FoAwaitSale
+                : (amount == 1 ? xagmanOnhPhase is XagmanOnhPhase.FoReceiving or XagmanOnhPhase.FoSendDoneGil
                     : xagmanOnhPhase is XagmanOnhPhase.FoGiving or XagmanOnhPhase.FoSettle or XagmanOnhPhase.FoReceiving or XagmanOnhPhase.FoAwaitSale);
             if (!allowedPhase) return;
-            if (!TryAcceptXagmanOnhPeerVersions(parts[2], parts[7], parts[8], senderPayload, false, out var signalVersionFailure, returningTony: true))
+            if (!TryAcceptXagmanOnhPeerVersions(parts[2], parts[7], parts[8], senderPayload, false, out var signalVersionFailure))
             { RejectXagmanOnhTradeVersions(signalVersionFailure); return; }
-            if (initialTonyOffer && !TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Authored("ONH version agreement"))) return;
             if (!TryGetXagmanOnhVersionSuffix(out var versionSuffix, out signalVersionFailure))
             { RejectXagmanOnhTradeVersions(signalVersionFailure); return; }
             onhArmedSequence = seq;
@@ -344,7 +349,11 @@ public partial class SlaveWindow
             if (goal != null && !onhSupplyAnnounced.ContainsKey(suppliedId))
             {
                 onhSupplyAnnounced[suppliedId] = suppliedQty;
-                if (goal.TakeAll) goal.ReceiveTarget = (int)Math.Min(int.MaxValue, (long)OnhOwnerHeld(suppliedId) + suppliedQty);
+                if (goal.TakeAll && !goal.TakeAllAnnounced)
+                {
+                    goal.ReceiveTarget = (int)Math.Min(int.MaxValue, (long)OnhOwnerHeld(suppliedId) + suppliedQty);
+                    goal.TakeAllAnnounced = true;
+                }
             }
             return;
         }
@@ -375,7 +384,7 @@ public partial class SlaveWindow
             || xagmanOnhCompletedPartners.Contains(name));
         foreach (var key in plugin.Configuration.XagmanOnhFriendFoCharacters)
         {
-            var name = GetCharacterNameFromKey(key);
+            var name = key.Trim();
             var p = FindXagmanOnhPlayer(name);
             if (p == null || Vector3.Distance(p.Position, local.Position) > XagmanOnhScanRadius
                 || xagmanOnhCompletedPartners.Contains(name) || onhWaitingOwners.Contains(name, StringComparer.OrdinalIgnoreCase)
@@ -412,8 +421,8 @@ public partial class SlaveWindow
             .Where(x => x.Quantity > 0).ToList();
 
     private List<(uint Id, int Quantity)> XagmanOnhReceiveRemaining()
-        => onhGoals.Where(g => g.TakeAll || g.ReceiveTarget > OnhOwnerHeld(g.WireId))
-            .Select(g => (g.WireId, g.TakeAll ? 0 : g.ReceiveTarget - OnhOwnerHeld(g.WireId))).ToList();
+        => onhGoals.Where(g => (g.TakeAll && !g.TakeAllAnnounced) || g.ReceiveTarget > OnhOwnerHeld(g.WireId))
+            .Select(g => (g.WireId, g.TakeAll && !g.TakeAllAnnounced ? 0 : Math.Max(0, g.ReceiveTarget - OnhOwnerHeld(g.WireId)))).ToList();
 
     private void DriveXagmanOnhFoFindTony()
     {
@@ -421,7 +430,8 @@ public partial class SlaveWindow
         if (tony.Length == 0)
         {
             xagmanStatus = XagmanStatus.Standby;
-            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("SFBE80885519A4264"));
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage,
+                global::XASlave.Localization.UiMessage.Authored("Waiting for an available imported Tony."));
             MaybeLogOnhWait("no eligible Tony nearby; waiting for rotation or arrival.");
             return;
         }
@@ -430,39 +440,14 @@ public partial class SlaveWindow
             ResetXagmanOnhExchange();
             xagmanOnhEngagedPartner = xagmanActiveTradePartner = tony;
         }
-        if (!IsCurrentTargetWithinStopDistanceAndStopped(tony, XagmanOnhTradeStopDistance)) return;
-        BeginXagmanOnhFoAwaitStart(global::XASlave.Localization.UiMessage.Key("SF78476E73B354613"));
-    }
-
-    private void BeginXagmanOnhFoAwaitStart(global::XASlave.Localization.UiMessage reason)
-    {
-        // The versioned invitation enables acceptance only after this owner's versions match Tony.
-        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("SB899E6BCA20868ED"))) return;
-        xagmanStatus = XagmanStatus.Queued;
-        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SED7CBBA203C6B932", reason, xagmanOnhEngagedPartner));
-        SetXagmanOnhPhase(XagmanOnhPhase.FoAwaitStartGil);
-    }
-
-    private void DriveXagmanOnhFoAwaitStartGil()
-    {
-        if (onhReceivedSignals.TryDequeue(out var signal) && signal == 1)
-        {
-            var rows = XagmanOnhGiveRemaining();
-            var steps = BuildXagmanOnhTransfer(rows, false);
-            if (TryStartXagmanOnhSubTask(steps)) SetXagmanOnhPhase(XagmanOnhPhase.FoGiving);
-            return;
-        }
-        if (!IsXagmanOnhPartnerPresent(xagmanOnhEngagedPartner))
-        {
-            ReleaseXagmanOnhOwnerPartner(false);
-            return;
-        }
-        // Waiting behind other FOs is not a failed invitation and has no short timeout.
-        MaybeLogOnhWait($"{xagmanActiveCharacter} queued for {xagmanOnhEngagedPartner}'s 1-gil invitation.");
+        if (!ApproachXagmanOnhPartner(tony)) return;
+        BeginXagmanOnhOwnerPairing(tony);
     }
 
     private void DriveXagmanOnhFoAfterGive()
     {
+        if (TryRetireXagmanOnhCollectionPartner()) return;
+        onhCollectionTransferActive = false;
         onhGiveBlocked = XagmanOnhGiveRemaining().Count > 0;
         if (!onhGiveBlocked) onhCollectionDone = true;
         if (!TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("S8AE8498B0D5B49A9"))) return;
@@ -506,8 +491,9 @@ public partial class SlaveWindow
 
     private void ReleaseXagmanOnhOwnerPartner(bool retire)
     {
+        if (!TrySetXagmanDropboxAutoAccept(false))
+        { HoldXagmanOnhCollection("Receiver acceptance could not be disabled before releasing the owner partner."); return; }
         if (retire) onhRetiredTonys.Add(xagmanOnhEngagedPartner);
-        if (!TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("S98C1BB0E85998E9F"))) return;
         plugin.TaskRunner.AddLog($"Xagman ONH: {(retire ? "retired" : "released")} Tony {xagmanOnhEngagedPartner}; preserving outstanding inventory goals.");
         xagmanOnhEngagedPartner = xagmanActiveTradePartner = string.Empty;
         onhGiveBlocked = false;
@@ -519,39 +505,12 @@ public partial class SlaveWindow
     {
         if (TryGetXagmanLiveLocalMainInventoryFreeSlots(out var freeSlots) && freeSlots <= XagmanOnhTonyMinFreeSlots)
         { StartXagmanOnhFullInventoryRecovery(false); return; }
-        if (onhWaitingOwners.Count == 0)
-        {
-            MaybeLogOnhWait("Tony waiting for a nearby imported FO.");
-            if ((DateTime.UtcNow - xagmanOnhSearchSinceUtc).TotalSeconds >= XagmanOnhTonyIdleAdvanceSeconds)
-                AdvanceXagmanOnhCharacter(false);
-            return;
-        }
-        var candidate = onhWaitingOwners[0];
-        if (xagmanOnhEngagedPartner != candidate)
-        {
-            ResetXagmanOnhExchange();
-            xagmanOnhEngagedPartner = xagmanActiveTradePartner = candidate;
-            onhSession = Guid.NewGuid().ToString("N");
-        }
         if (GetXagmanOwnGil() < OnhGilFloor + 3)
         { AdvanceXagmanOnhCharacter(false, rotateForFull: true); return; }
-        if (!IsCurrentTargetWithinStopDistanceAndStopped(candidate, XagmanOnhTradeStopDistance))
-        {
-            if ((DateTime.UtcNow - onhPhaseSince).TotalSeconds > 30) FinishXagmanOnhTonyEngagement(false);
-            return;
-        }
-        if ((DateTime.UtcNow - onhPhaseSince).TotalSeconds < 2) return;
-        if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(candidate, global::XASlave.Localization.UiMessage.Key("SA3013C082C75EDC9"), 1)))
-            SetXagmanOnhPhase(XagmanOnhPhase.TonySendStartGil);
-    }
-
-    private void DriveXagmanOnhTonyAfterStartGil()
-    {
-        if (xagmanOnhGilSendAborted) { FinishXagmanOnhTonyEngagement(false); return; }
-        if (!TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("SAEB459D349FF1B72"))) return;
-        onhLastActivity = DateTime.UtcNow;
-        SetXagmanOnhPhase(XagmanOnhPhase.TonyReceiving);
-        plugin.TaskRunner.AddLog($"Xagman ONH: invitation delivered to {xagmanOnhEngagedPartner}; receiving collection.");
+        xagmanStatus = XagmanStatus.Standby;
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage,
+            global::XASlave.Localization.UiMessage.Authored("Waiting for a valid owner collection request."));
+        MaybeLogOnhWait("Tony waiting for an eligible owner to request collection.");
     }
 
     private void DriveXagmanOnhTonyReceiving()
@@ -588,7 +547,6 @@ public partial class SlaveWindow
         CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("SC4697A92FC94FC0D"));
         xagmanOnhEngagedPartner = xagmanActiveTradePartner = string.Empty;
         ResetXagmanOnhExchange();
-        xagmanOnhSearchSinceUtc = DateTime.UtcNow;
         SetXagmanOnhPhase(XagmanOnhPhase.TonySearch);
     }
 
@@ -695,15 +653,12 @@ public partial class SlaveWindow
             case XagmanOnhPhase.FoAwaitSale:
                 xagmanStatus = XagmanStatus.Paused;
                 xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SAD03D2DA370A07B0", xagmanOnhEngagedPartner));
-                if (onhReceivedSignals.TryPeek(out var saleSignal))
+                if (onhReceivedSignals.TryPeek(out var saleSignal) && saleSignal == 2)
                 {
                     onhPartnerSelling = false;
-                    if (saleSignal == 2) { onhReceivedSignals.Dequeue(); ReleaseXagmanOnhOwnerPartner(true); return true; }
-                    onhGiveBlocked = false;
-                    xagmanStatus = XagmanStatus.Trading;
-                    xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S16B3E80875EB0181", xagmanOnhEngagedPartner));
-                    SetXagmanOnhPhase(XagmanOnhPhase.FoAwaitStartGil);
-                    DriveXagmanOnhFoAwaitStartGil();
+                    onhReceivedSignals.Dequeue();
+                    ReleaseXagmanOnhOwnerPartner(true);
+                    return true;
                 }
                 else if ((DateTime.UtcNow - onhPartnerSellSince).TotalSeconds > 2400)
                     FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S4FDDDF89575C5614"));
@@ -726,23 +681,25 @@ public partial class SlaveWindow
                 if (onhSaleReturnFailed) { FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SF01C0DB40735EFBD")); return true; }
                 if (!onhSaleSucceeded)
                 {
-                    if (onhSellHasOwner && IsXagmanOnhPartnerPresent(xagmanOnhEngagedPartner)) StartXagmanOnhTonyRotationSignal();
+                    if (onhSellHasOwner && IsXagmanOnhPartnerPresent(xagmanOnhEngagedPartner)) AnnounceXagmanOnhSaleReturn(unavailable: true);
                     else AdvanceXagmanOnhCharacter(false, rotateForFull: true);
                     return true;
                 }
                 if (!onhSellHasOwner || !IsXagmanOnhPartnerPresent(xagmanOnhEngagedPartner))
                 { FinishXagmanOnhTonyEngagement(false); return true; }
-                onhRequestParts.Clear();
-                onhRequestCount = -1;
-                onhReceivedSignals.Clear();
-                if (TryStartXagmanOnhSubTask(BuildXagmanOnhSendGilSteps(xagmanOnhEngagedPartner, global::XASlave.Localization.UiMessage.Key("SA790D1AC3D7AFEC6"), 1)))
-                    SetXagmanOnhPhase(XagmanOnhPhase.TonySendStartGil);
+                AnnounceXagmanOnhSaleReturn();
+                return true;
+            case XagmanOnhPhase.TonyAwaitSaleResolution:
+                if (!onhSaleReturnAcknowledged) return true;
+                onhSaleReturnText = string.Empty;
+                if (onhSaleReturnUnavailable) AdvanceXagmanOnhCharacter(false, rotateForFull: true);
+                else FinishXagmanOnhTonyEngagement(false);
                 return true;
             case XagmanOnhPhase.FoReceiving:
                 if (onhReceivedSignals.TryDequeue(out var signal))
                 {
                     if (signal == 2) { ReleaseXagmanOnhOwnerPartner(true); return true; }
-                    var satisfied = onhGoals.All(g => (!g.TakeAll || onhSupplyAnnounced.ContainsKey(g.WireId))
+                    var satisfied = onhGoals.All(g => (!g.TakeAll || g.TakeAllAnnounced)
                         && OnhOwnerHeld(g.WireId) >= g.ReceiveTarget);
                     if (satisfied) AdvanceXagmanOnhCharacter(false);
                     else FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S91C2BD61954E3FD1"));
@@ -825,6 +782,8 @@ public partial class SlaveWindow
 
     private List<TaskStep> BuildXagmanOnhTransfer(List<(uint Id, int Quantity)> rows, bool supplying)
     {
+        ResetXagmanOnhCollection();
+        onhCollectionTransferActive = !supplying && rows.Count > 0;
         onhTransferFailed = onhTransferPartial = false;
         var steps = new List<TaskStep>();
         var targets = new Dictionary<uint, int>();
@@ -853,7 +812,7 @@ public partial class SlaveWindow
                 OpenXagmanDropboxWindow();
                 OpenXagmanDropboxTradeTab();
                 if (!TryClearXagmanDropbox(out _) || !TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("S4E84B6471C8CD19D"))
-                    || !FocusXagmanCurrentTarget(xagmanOnhEngagedPartner)) onhTransferFailed = true;
+                    || !FocusXagmanOnhPartner(xagmanOnhEngagedPartner)) onhTransferFailed = true;
             }, IsComplete = () => true, TimeoutSec = 2,
         });
         steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S9DDE364F2BE9A65F"), 1f));
@@ -880,12 +839,13 @@ public partial class SlaveWindow
                         || !plugin.IpcClient.DropboxTryGetItemQuantity(row.Id % 1_000_000, row.Id >= 1_000_000, out var queued)
                         || queued != amount) onhTransferFailed = true;
                 }
-                if (!FocusXagmanCurrentTarget(xagmanOnhEngagedPartner)) onhTransferFailed = true;
+                if (!FocusXagmanOnhPartner(xagmanOnhEngagedPartner)) onhTransferFailed = true;
                 if (onhTransferFailed) ClearXagmanDropbox();
                 else if (queuedRows > 0 && !StartXagmanDropboxTrade("ONH exact item transfer"))
                 {
                     onhTransferFailed = true;
-                    HaltXagmanCapacityTrade("The ONH transfer could not be started safely; outstanding inventory goals are retained.");
+                    if (!supplying) HoldXagmanOnhCollection("The ONH collection could not be started safely.");
+                    else HaltXagmanCapacityTrade("The ONH transfer could not be started safely; outstanding inventory goals are retained.");
                 }
                 onhPhaseSince = DateTime.UtcNow;
             }, IsComplete = () => true, TimeoutSec = 2,
@@ -901,12 +861,13 @@ public partial class SlaveWindow
                 if (batchProgress == XagmanBatchProgress.Failed)
                 {
                     onhTransferFailed = true;
-                    HaltXagmanCapacityTrade(batchFailure);
+                    if (!supplying) HoldXagmanOnhCollection(batchFailure);
+                    else HaltXagmanCapacityTrade(batchFailure);
                     return true;
                 }
                 if (batchProgress == XagmanBatchProgress.CapacityBlocked)
                 {
-                    // A full Tony follows the existing incomplete-collection settle/rotation path.
+                    // A confirmed collection-capacity block retires the exact receiving Tony after settlement.
                     // A full owner cannot be repaired by retiring a stocked Tony or claiming completion.
                     onhTransferPartial = true;
                     if (supplying)
@@ -914,10 +875,22 @@ public partial class SlaveWindow
                         onhTransferFailed = true;
                         HaltXagmanCapacityTrade("The ONH owner has no free bag slots; requested supply remains incomplete.");
                     }
+                    else
+                    {
+                        onhCollectionPartnerUnavailable = true;
+                        onhCollectionSettlementConfirmed = true;
+                    }
                     return true;
                 }
                 if (batchProgress == XagmanBatchProgress.LegacyFailure)
                 {
+                    if (!supplying && xagmanBatchLegacyFailureKind == XagmanTradeFailureKind.TradeCanceled
+                        && onhCollectionCancellationObserved)
+                    {
+                        onhCollectionPartnerUnavailable = true;
+                        onhCollectionSettlementConfirmed = true;
+                        return true;
+                    }
                     onhTransferFailed = true;
                     plugin.TaskRunner.AddLog($"Xagman ONH: trade stopped before completion: {batchFailure}");
                     CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S3B1C5D0D954822B5"));
@@ -942,6 +915,7 @@ public partial class SlaveWindow
             NameMessage = global::XASlave.Localization.UiMessage.Key("SB7A2305A9354AC9E"),
             OnEnter = () =>
             {
+                if (onhCollectionHeld || onhCollectionPartnerUnavailable) return;
                 ClearXagmanDropbox();
                 TryRequireXagmanReceiverAutoAccept(global::XASlave.Localization.UiMessage.Key("SD1DBFC3ACE79748B"));
                 onhLastActivity = DateTime.UtcNow;
@@ -984,7 +958,7 @@ public partial class SlaveWindow
         {
             NameMessage = global::XASlave.Localization.UiMessage.Format("SCA00E6D061DCEBE7", contextLabel),
             ShouldSkip = () => xagmanOnhGilSendAborted,
-            IsComplete = () => IsCurrentTargetWithinStopDistanceAndStopped(targetKey, XagmanOnhTradeStopDistance),
+            IsComplete = () => IsXagmanOnhPartnerInRange(targetKey),
             TimeoutSec = 15, OnTimeout = () => xagmanOnhGilSendAborted = true,
         });
         steps.Add(new TaskStep
@@ -998,7 +972,7 @@ public partial class SlaveWindow
                 OpenXagmanDropboxWindow();
                 OpenXagmanDropboxTradeTab();
                 if (!TryClearXagmanDropbox(out _) || !TrySetXagmanDropboxAutoAcceptOrStop(false, global::XASlave.Localization.UiMessage.Key("SEE3984428C9C76EC"))
-                    || !FocusXagmanCurrentTarget(targetKey)) xagmanOnhGilSendAborted = true;
+                    || !FocusXagmanOnhPartner(targetKey)) xagmanOnhGilSendAborted = true;
             }, IsComplete = () => true, TimeoutSec = 2,
         });
         steps.Add(MonthlyReloggerTask.MakeDelay(global::XASlave.Localization.UiMessage.Key("S8CF90E20F5BB2374"), 1f));
@@ -1013,7 +987,7 @@ public partial class SlaveWindow
                 var floor = xagmanActiveRole == XagmanRole.Tony ? OnhGilFloor : 0;
                 onhOutgoingSignalAmount = amount;
                 onhOutgoingSignalConfirmed = false;
-                if (!FocusXagmanCurrentTarget(targetKey) || GetXagmanOwnGil() - amount < floor
+                if (!FocusXagmanOnhPartner(targetKey) || GetXagmanOwnGil() - amount < floor
                     || !plugin.IpcClient.DropboxSetItemQuantity(1, false, amount)
                     || !plugin.IpcClient.DropboxTryGetItemQuantity(1, false, out var queued) || queued != amount
                     || !StartXagmanDropboxTrade($"ONH {amount}-gil {contextLabel}")) xagmanOnhGilSendAborted = true;

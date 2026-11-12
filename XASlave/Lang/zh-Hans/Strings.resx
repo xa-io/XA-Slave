@@ -3387,7 +3387,7 @@ AR会等待步骤完成后再前往雇员传唤铃。</value>
     <comment>Source: XASlave/Windows/Tasks/CityChatFloorderPanel.cs</comment>
   </data>
   <data name="S1F805080DAB492FD" xml:space="preserve">
-    <value>可接收你物品的Tony角色。将物品交给列表中当前位于会合点的任意Tony。</value>
+    <value>可进行收集和补货的合格Tony。所有者可向集合地点任何可用的Tony发出请求；名单顺序不决定优先级。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S1F845D49BB1DF162" xml:space="preserve">
@@ -5911,7 +5911,7 @@ AR会等待步骤完成后再前往雇员传唤铃。</value>
     <comment>Source: XASlave/Services/AutoRetainerInventoryOperation.cs</comment>
   </data>
   <data name="S34B17FE52223FF18" xml:space="preserve">
-    <value>你将从这些加盟业主角色接收物品。Tony一次处理一个，绝不交出物品（仅用1金币握手）。</value>
+    <value>可请求收集交易的合格特许经营者。Tony每次从一位所有者接收物品，随后可提供所请求的补给。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S34B2227E117988A5" xml:space="preserve">
@@ -10378,7 +10378,7 @@ AR会等待步骤完成后再前往雇员传唤铃。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs</comment>
   </data>
   <data name="S5B08ACEA1AB7D3AD" xml:space="preserve">
-    <value>实时握手状态显示在任务状态行和日志中；逐行完成标记尚未接入。</value>
+    <value>名单编号用于标识条目，并非服务顺序。状态对应准确的角色和当前交换。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S5B18DCDD63E1F5D9" xml:space="preserve">
@@ -18908,7 +18908,7 @@ Ctrl+左键查看，Ctrl+右键打开冒险者铭牌。</value>
     <comment>Source: XASlave/Services/FurnitureObserverHook.cs</comment>
   </data>
   <data name="SA6582F5D40CC95E2" xml:space="preserve">
-    <value>Tony {0}已就位；正在寻找加盟业主。</value>
+    <value>Tony {0}已就绪，正在等待合格所有者的请求。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SA6711086459806CB" xml:space="preserve">
@@ -19648,7 +19648,7 @@ Ctrl+左键查看，Ctrl+右键打开冒险者铭牌。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD1C68924E3212A6" xml:space="preserve">
-    <value>外部网络助手队列 - {0}</value>
+    <value>外部网络助手名单 - {0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD2DE7A64920F065" xml:space="preserve">
@@ -20730,13 +20730,13 @@ Ctrl+左键查看，Ctrl+右键打开冒险者铭牌。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SB6EA6D7BD0D682F4" xml:space="preserve">
-    <value>外部网络助手：与不在对端网络中的另一位玩家转移物品
-（另一台电脑上的其他人）。没有对端连接，你们在游戏中协调。
-Tony用1金币邀请一位排队业主。业主交出物品，再通过私聊加1金币请求物资。
-Tony完成时返还1金币，轮换时返还2金币。业主背包满时发送2金币。
-Tony至少保留5000金币；业主需预留2金币用于失败信号。
-导出所选角色并把列表发给伙伴，再导入对方发送的列表。
-双方各自选择会合服务器和位置。此模式禁用对端网络。</value>
+    <value>外部网络助手：无需对等连接即可与另一名玩家交易。
+互相导入Name@HomeWorld（姓名@原始服务器）名单，并选择相同的集合地点。
+所有者向可用的Tony发出请求，双方客户端确认版本一致后，由所有者发起收集交易。
+名单顺序不限制到达顺序。每个角色同时只处理一笔交换。
+收集交易取消后，该Tony将在本次运行中被排除；剩余物品等待其他符合条件的Tony。
+补货仍使用私聊和独立的1/2金币信号。Tony至少保留5000金币，所有者预留2金币。
+出售物品不会恢复已排除Tony的资格。可用的Tony会继续等待所有者。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SB6F61AF9F826AAC2" xml:space="preserve">
@@ -21376,7 +21376,7 @@ Tony至少保留5000金币；业主需预留2金币用于失败信号。
     <comment>Source: XASlave/Services/ViewSingleItemScene.cs</comment>
   </data>
   <data name="SBBF393609432CA35" xml:space="preserve">
-    <value>已加入队列#{0}</value>
+    <value>附近 #{0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SBC0632E5191418C8" xml:space="preserve">
@@ -30060,5 +30060,65 @@ NamePlate就绪 + PlayerAvailable + 未在咏唱 + 未在战斗。</value>
   <data name="S9DA262EB757C209B" xml:space="preserve">
     <value>等待版本兼容的交易伙伴</value>
     <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S99098C464623EAD9" xml:space="preserve">
+    <value>正在等待导入名单中可用的Tony。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S0F17D2B087F27D98" xml:space="preserve">
+    <value>正在请求ONH收集交易。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S51BB99BD159F4DBC" xml:space="preserve">
+    <value>正在等待ONH收集确认。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S32FF9E600B6C30D4" xml:space="preserve">
+    <value>正在等待ONH接收方就绪。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBE2797C239992AB2" xml:space="preserve">
+    <value>正在等待所有者的有效收集请求。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S904C6FEA5DCF63D5" xml:space="preserve">
+    <value>ONH收集协商</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S46A21A9A777CD929" xml:space="preserve">
+    <value>ONH收集接收方</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S4C92E6E135151092" xml:space="preserve">
+    <value>重置ONH交易伙伴协商</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S9383AC136A430DF5" xml:space="preserve">
+    <value>ONH收集要求双方客户端均支持由所有者发起的协议。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S1CFCEBFFCFCF8DDF" xml:space="preserve">
+    <value>当前游戏语言无法提供ONH交易消息。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBDF3FBB1F94639EB" xml:space="preserve">
+    <value>由于无法确认交易清理已完成，ONH收集已暂停。请检查任务日志后停止运行。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S3FA1998D5364E068" xml:space="preserve">
+    <value>正在等待其他可用的Tony。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SD3FEE3D9E6EEF9C3" xml:space="preserve">
+    <value>ONH收集正在进行中。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs</comment>
+  </data>
+  <data name="S67F517169AD87F95" xml:space="preserve">
+    <value>ONH接收方已就绪</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SE074FF78DF8F68C8" xml:space="preserve">
+    <value>正在等待ONH出售后返回确认。</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
 </root>

@@ -46,7 +46,7 @@ public partial class SlaveWindow
         var key = $"{actor.Name.TextValue}@{actor.HomeWorld.Value.Name}";
         var roster = xagmanActiveRole == XagmanRole.Tony
             ? plugin.Configuration.XagmanOnhFriendFoCharacters : plugin.Configuration.XagmanOnhFriendTonyCharacters;
-        if (!roster.Any(entry => entry.Equals(key, StringComparison.OrdinalIgnoreCase))) return false;
+        if (!roster.Any(entry => entry.Trim().Equals(key, StringComparison.OrdinalIgnoreCase))) return false;
         character = key;
         entityId = actor.EntityId;
         return true;
@@ -55,6 +55,7 @@ public partial class SlaveWindow
     private bool TryPinXagmanOnhTonyVersions(string session, string slave, string dropbox,
         PlayerPayload? sender, out string failure)
     {
+        if (!TryRequireXagmanOnhProviderIdentity(out failure)) return false;
         failure = "The active Tony version contract is unavailable.";
         if (!XagmanTradeCapacityProtocol.IsRequestIdValid(session)
             || !TryGetXagmanOnhVersionPartner(sender, out var partner, out var entityId)
@@ -88,11 +89,12 @@ public partial class SlaveWindow
     private bool TryAcceptXagmanOnhPeerVersions(string session, string slave, string dropbox,
         PlayerPayload sender, bool initialTonyOffer, out string failure, bool returningTony = false)
     {
+        if (!TryRequireXagmanOnhProviderIdentity(out failure)) return false;
         failure = "The ONH version handshake is not established.";
         if (initialTonyOffer)
         {
-            // Only an initial offer from this owner's exact selected Tony can define the expected pair.
-            if (xagmanActiveRole != XagmanRole.FranchiseOwner || xagmanOnhPhase != XagmanOnhPhase.FoAwaitStartGil
+            // Only a reservation answering this owner's request may define Tony's expected pair.
+            if (xagmanActiveRole != XagmanRole.FranchiseOwner || xagmanOnhPhase != XagmanOnhPhase.FoAwaitReservation
                 || !TryPinXagmanOnhTonyVersions(session, slave, dropbox, sender, out failure)) return false;
         }
         if (onhVersionSession != session || !string.IsNullOrEmpty(onhVersionFailure)
@@ -117,6 +119,7 @@ public partial class SlaveWindow
 
     private bool TryRequireXagmanOnhTradeVersions(out string failure)
     {
+        if (!TryRequireXagmanOnhProviderIdentity(out failure)) return false;
         failure = string.IsNullOrEmpty(onhVersionFailure) ? "Waiting for the active Tony's XA Slave and Dropbox version agreement." : onhVersionFailure;
         if (!onhVersionsAccepted || !string.IsNullOrEmpty(onhVersionFailure)
             || onhVersionSession != onhSession || !XagmanTradeCapacityProtocol.IsRequestIdValid(onhSession)
@@ -131,6 +134,7 @@ public partial class SlaveWindow
 
     private bool TryValidateXagmanOnhLocalVersions(out string failure)
     {
+        if (!TryRequireXagmanOnhProviderIdentity(out failure)) return false;
         failure = onhVersionFailure;
         if (!string.IsNullOrEmpty(failure)) return false;
         if (string.IsNullOrEmpty(onhVersionSession)) return true;
@@ -145,21 +149,31 @@ public partial class SlaveWindow
             && TryMatchXagmanTradeVersions(onhTonySlaveVersion, onhTonyDropboxVersion, slave, dropbox, out failure);
     }
 
+    private bool TryRequireXagmanOnhProviderIdentity(out string failure)
+    {
+        failure = "The ONH Dropbox provider is unavailable or has changed.";
+        if (onhCollectionHeld) return false;
+        if (onhAdmissionProvider != null
+            && plugin.DropboxQueue.IsXagmanProviderIdentityCurrent(onhAdmissionProvider, out failure)) return true;
+        // Equal versions do not authorize mutating a replacement provider instance.
+        HoldXagmanOnhCollection(failure);
+        return false;
+    }
+
     private bool TryGetXagmanOnhVersionSuffix(out string suffix, out string failure)
     {
         suffix = string.Empty;
         if (!TryGetXagmanTradeVersions(out var slave, out var dropbox, out failure)) return false;
-        if (xagmanActiveRole == XagmanRole.Tony && string.IsNullOrEmpty(onhVersionSession))
-        {
-            if (!TryPinXagmanOnhTonyVersions(onhSession, slave, dropbox, null, out failure)) return false;
-        }
-        else if (!TryRequireXagmanOnhTradeVersions(out failure)) return false;
+        // Collection bootstrap uses the request/reservation transport. Control
+        // markers may only reuse a fully negotiated pair, never create one.
+        if (!TryRequireXagmanOnhTradeVersions(out failure)) return false;
         suffix = $"{XagmanTradeVersionPolicy.Revision} {slave} {dropbox}";
         return true;
     }
 
     private void RejectXagmanOnhTradeVersions(string failure)
     {
+        if (onhCollectionHeld) return;
         onhVersionFailure = string.IsNullOrWhiteSpace(failure) ? "The ONH peer did not supply matching XA Slave and Dropbox versions." : failure;
         if (onhVersionFailureUiMessage?.Original != onhVersionFailure)
             onhVersionFailureUiMessage = GetXagmanTradeVersionFailureMessage(onhVersionFailure);

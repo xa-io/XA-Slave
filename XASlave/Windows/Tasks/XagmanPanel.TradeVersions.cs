@@ -98,6 +98,7 @@ public partial class SlaveWindow
 
     private bool FailXagmanTradeVersions(string failure)
     {
+        if (plugin.Configuration.XagmanOutsideNetworkHelper && onhCollectionHeld) return false;
         var failureMessage = GetXagmanTradeVersionFailureMessage(failure);
         plugin.TaskRunner.AddLog($"Xagman: trade version compatibility failed: {failure}");
         StopXagmanTask();

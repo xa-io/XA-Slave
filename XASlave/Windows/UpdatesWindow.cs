@@ -23,6 +23,20 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.64 - 2026-11-11",
+            Lines =
+            [
+                "- Fixed Xagman ONH Collection: Owners initiate collection with any available eligible Tony, without the initial 1-gil invitation.",
+                "- Fixed ONH Partner Matching: Busy Tonys no longer block other candidates; partners are matched by name and home world.",
+                "- Fixed ONH Collection Recovery: Cancelled collection trades retire Tony for the run after cleanup, preserving remaining collection and restocking goals.",
+                "- Fixed ONH Trade Safety: Uncertain cleanup pauses the run with goals retained before another partner is selected.",
+                "- Fixed ONH Waiting: Available Tonys keep waiting for owners instead of advancing after five minutes.",
+                "- Fixed ONH Selling: Sale returns require acknowledgment and fresh pairing; retired Tonys remain excluded for the current run.",
+                "- Updated ONH Languages: Help and status messages support all 14 interface languages. Update every participating client together.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.63 - 2026-11-11",
             Lines =
             [

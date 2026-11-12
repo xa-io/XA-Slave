@@ -3387,7 +3387,7 @@ PartyDisband, PartyLeave, Logout 등 이후에 사용하세요.</value>
     <comment>Source: XASlave/Windows/Tasks/CityChatFloorderPanel.cs</comment>
   </data>
   <data name="S1F805080DAB492FD" xml:space="preserve">
-    <value>아이템을 건넬 수 있는 Tony 캐릭터입니다. 이 목록에서 만남 장소에 있는 Tony에게 아이템을 건네세요.</value>
+    <value>수집 및 재보급에 참여할 수 있는 Tony입니다. 소유자는 집결지에서 이용 가능한 Tony에게 요청하며 명단 순서는 우선순위를 정하지 않습니다.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S1F845D49BB1DF162" xml:space="preserve">
@@ -5911,7 +5911,7 @@ dfunc GetInternalNamesIPC와 동일합니다</value>
     <comment>Source: XASlave/Services/AutoRetainerInventoryOperation.cs</comment>
   </data>
   <data name="S34B17FE52223FF18" xml:space="preserve">
-    <value>아이템을 받을 가맹 소유자 캐릭터입니다. Tony는 한 명씩 처리하며 아이템을 주지 않습니다(1길 확인 교환만 수행).</value>
+    <value>수집을 요청할 수 있는 적격 프랜차이즈 소유자입니다. Tony는 한 번에 한 소유자에게서 아이템을 받고 이후 요청한 아이템을 보급할 수 있습니다.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S34B2227E117988A5" xml:space="preserve">
@@ -10378,7 +10378,7 @@ LIFESTREAM에서 문까지 이동하도록 설정하고
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs</comment>
   </data>
   <data name="S5B08ACEA1AB7D3AD" xml:space="preserve">
-    <value>실시간 연결 확인 상태는 작업 상태 줄과 로그에 표시됩니다. 행별 완료 표시는 아직 연결되지 않았습니다.</value>
+    <value>명단 번호는 항목 식별용이며 처리 순서가 아닙니다. 상태는 정확한 캐릭터와 현재 교환을 따릅니다.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S5B18DCDD63E1F5D9" xml:space="preserve">
@@ -18908,7 +18908,7 @@ dfunc GetGCRank/GetFlamesGCRank/GetAddersGCRank/GetMaelstromGCRank와 동일합�
     <comment>Source: XASlave/Services/FurnitureObserverHook.cs</comment>
   </data>
   <data name="SA6582F5D40CC95E2" xml:space="preserve">
-    <value>Tony {0}이(가) 대기 위치에 있습니다. 가맹 소유자를 찾는 중.</value>
+    <value>Tony {0} 준비 완료; 적격 소유자의 요청을 기다리는 중입니다.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SA6711086459806CB" xml:space="preserve">
@@ -19648,7 +19648,7 @@ dfunc BroCheck/GetPartyMemberName과 동일합니다</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD1C68924E3212A6" xml:space="preserve">
-    <value>외부 네트워크 도우미 대기열 - {0}</value>
+    <value>외부 네트워크 도우미 명단 - {0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD2DE7A64920F065" xml:space="preserve">
@@ -20730,13 +20730,13 @@ dfunc BroCheck/GetPartyMemberName과 동일합니다</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SB6EA6D7BD0D682F4" xml:space="preserve">
-    <value>외부 네트워크 도우미: 클라이언트 간 네트워크에 없는 다른 플레이어와 아이템을 주고받습니다
-(다른 PC를 사용하는 다른 사람). 상대 연결 없이 게임 안에서 조정합니다.
-Tony가 대기 중인 소유자 한 명을 1길로 초대합니다. 소유자는 아이템을 준 뒤 귓속말 + 1길로 보급을 요청합니다.
-Tony는 완료 시 1길, 교체 시 2길을 돌려줍니다. 소유자는 가득 차면 2길을 보냅니다.
-Tony는 최소 5000길을 유지합니다. 소유자는 실패 신호용 2길을 남겨 두어야 합니다.
-선택한 캐릭터를 내보내 상대에게 보내고 상대가 보낸 목록을 가져오세요.
-양쪽은 각자의 만남 월드와 위치를 선택합니다. 이 모드에서는 클라이언트 간 네트워크가 비활성화됩니다.</value>
+    <value>외부 네트워크 도우미: 피어 연결 없이 다른 플레이어와 거래합니다.
+서로의 이름@홈월드 명단을 가져오고 같은 집결지를 선택하세요.
+소유자가 이용 가능한 Tony에게 요청하고 두 클라이언트의 버전이 일치한 후 수집 거래를 시작합니다.
+명단 순서는 도착 순서를 제한하지 않습니다. 각 캐릭터는 한 번에 하나의 교환만 처리합니다.
+수집 거래를 취소하면 해당 Tony는 이번 실행에서 제외되며, 남은 아이템은 다른 적격 Tony를 기다립니다.
+재보급은 계속 귓속말과 별도의 1/2길 신호를 사용합니다. Tony는 최소 5000길을 유지하고 소유자는 2길을 남깁니다.
+판매해도 제외된 Tony의 자격은 복구되지 않습니다. 이용 가능한 Tony는 소유자를 기다립니다.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SB6F61AF9F826AAC2" xml:space="preserve">
@@ -21376,7 +21376,7 @@ Tony는 최소 5000길을 유지합니다. 소유자는 실패 신호용 2길을
     <comment>Source: XASlave/Services/ViewSingleItemScene.cs</comment>
   </data>
   <data name="SBBF393609432CA35" xml:space="preserve">
-    <value>대기열 #{0}</value>
+    <value>근처 #{0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SBC0632E5191418C8" xml:space="preserve">
@@ -30060,5 +30060,65 @@ xafunc의 DoNavFlySequenceXA 논리와 같습니다(Player.CanFly 확인).</valu
   <data name="S9DA262EB757C209B" xml:space="preserve">
     <value>버전이 호환되는 거래 상대 대기 중</value>
     <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S99098C464623EAD9" xml:space="preserve">
+    <value>가져온 명단에서 이용 가능한 Tony를 기다리는 중입니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S0F17D2B087F27D98" xml:space="preserve">
+    <value>ONH 수집 거래를 요청하는 중입니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S51BB99BD159F4DBC" xml:space="preserve">
+    <value>ONH 수집 확인을 기다리는 중입니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S32FF9E600B6C30D4" xml:space="preserve">
+    <value>ONH 수신 측이 준비되기를 기다리는 중입니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBE2797C239992AB2" xml:space="preserve">
+    <value>소유자의 유효한 수집 요청을 기다리는 중입니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S904C6FEA5DCF63D5" xml:space="preserve">
+    <value>ONH 수집 협의</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S46A21A9A777CD929" xml:space="preserve">
+    <value>ONH 수집 수신 측</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S4C92E6E135151092" xml:space="preserve">
+    <value>ONH 상대 협의 초기화</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S9383AC136A430DF5" xml:space="preserve">
+    <value>ONH 수집에는 두 클라이언트 모두 소유자 주도 프로토콜 지원이 필요합니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S1CFCEBFFCFCF8DDF" xml:space="preserve">
+    <value>현재 게임 언어에서는 ONH 거래 메시지를 사용할 수 없습니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBDF3FBB1F94639EB" xml:space="preserve">
+    <value>거래 정리 완료를 확인할 수 없어 ONH 수집이 일시 중지되었습니다. 작업 로그를 검토한 후 실행을 중지하세요.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S3FA1998D5364E068" xml:space="preserve">
+    <value>이용 가능한 다른 Tony를 기다리는 중입니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SD3FEE3D9E6EEF9C3" xml:space="preserve">
+    <value>ONH 수집이 진행 중입니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs</comment>
+  </data>
+  <data name="S67F517169AD87F95" xml:space="preserve">
+    <value>ONH 수신자 준비 완료</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SE074FF78DF8F68C8" xml:space="preserve">
+    <value>ONH 판매 후 복귀 확인을 기다리는 중입니다.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
 </root>

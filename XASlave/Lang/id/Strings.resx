@@ -3387,7 +3387,7 @@ Gunakan setelah PartyDisband, PartyLeave, Logout, dan sebagainya.</value>
     <comment>Source: XASlave/Windows/Tasks/CityChatFloorderPanel.cs</comment>
   </data>
   <data name="S1F805080DAB492FD" xml:space="preserve">
-    <value>Karakter Tony yang dapat menerima item Anda. Berikan item Anda kepada Tony mana pun dari daftar ini yang berada di titik pertemuan.</value>
+    <value>Tony yang memenuhi syarat untuk pengumpulan dan pengisian ulang. Pemilik meminta Tony mana pun yang tersedia di titik pertemuan; urutan daftar tidak menentukan prioritas.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S1F845D49BB1DF162" xml:space="preserve">
@@ -5911,7 +5911,7 @@ Berguna untuk men-debug masalah status pemain.</value>
     <comment>Source: XASlave/Services/AutoRetainerInventoryOperation.cs</comment>
   </data>
   <data name="S34B17FE52223FF18" xml:space="preserve">
-    <value>Karakter Franchise Owner yang akan mengirim item kepada Anda. Tony memproses satu per satu dan tidak pernah memberikan item (hanya jabat tangan 1 gil).</value>
+    <value>Pemilik Waralaba yang memenuhi syarat untuk meminta pengumpulan. Tony menerima dari satu pemilik pada satu waktu dan dapat memasok item yang diminta setelahnya.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S34B2227E117988A5" xml:space="preserve">
@@ -10378,7 +10378,7 @@ Kirimkan ke mitra Anda agar mereka dapat mengimpornya.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs</comment>
   </data>
   <data name="S5B08ACEA1AB7D3AD" xml:space="preserve">
-    <value>Status jabat tangan langsung ditampilkan pada baris status tugas dan log; tanda penyelesaian per baris belum dihubungkan.</value>
+    <value>Nomor daftar mengidentifikasi entri, bukan urutan layanan. Status mengikuti karakter yang tepat dan pertukaran saat ini.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S5B18DCDD63E1F5D9" xml:space="preserve">
@@ -18908,7 +18908,7 @@ Setara dengan dfunc GetGCRank/GetFlamesGCRank/GetAddersGCRank/GetMaelstromGCRank
     <comment>Source: XASlave/Services/FurnitureObserverHook.cs</comment>
   </data>
   <data name="SA6582F5D40CC95E2" xml:space="preserve">
-    <value>Tony {0} siap; mencari Franchise Owner.</value>
+    <value>Tony {0} siap; menunggu permintaan pemilik yang memenuhi syarat.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SA6711086459806CB" xml:space="preserve">
@@ -19648,7 +19648,7 @@ Menggunakan perlindungan item dan pengaturan pembuangannya; nonaktif secara defa
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD1C68924E3212A6" xml:space="preserve">
-    <value>Antrean Outside Network Helper - {0}</value>
+    <value>Daftar Pembantu di luar jaringan - {0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD2DE7A64920F065" xml:space="preserve">
@@ -20730,13 +20730,13 @@ Menggunakan perlindungan item dan pengaturan pembuangannya; nonaktif secara defa
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SB6EA6D7BD0D682F4" xml:space="preserve">
-    <value>Outside Network Helper: pindahkan item dengan pemain lain yang TIDAK berada di jaringan peer Anda
-(orang berbeda pada PC berbeda). Tidak ada koneksi peer - Anda berkoordinasi dalam game.
-Tony mengundang satu pemilik dalam antrean dengan 1 gil. Pemilik memberikan item, lalu meminta persediaan melalui tell + 1 gil.
-Tony mengembalikan 1 gil saat selesai, atau 2 gil untuk rotasi. Pemilik mengirim 2 gil jika penuh.
-Tony menyisakan setidaknya 5000 gil; pemilik perlu menyisakan 2 gil untuk sinyal kegagalan.
-Ekspor karakter pilihan Anda dan kirim daftar ke mitra; impor daftar yang mereka kirim.
-Setiap pihak memilih world dan lokasi pertemuannya sendiri. Jaringan peer dinonaktifkan dalam mode ini.</value>
+    <value>Pembantu di luar jaringan: berdagang dengan pemain lain tanpa koneksi peer.
+Impor daftar Nama@DuniaAsal satu sama lain dan pilih titik pertemuan yang sama.
+Pemilik meminta Tony yang tersedia dan memulai pengumpulan setelah kedua klien menyepakati versi.
+Urutan daftar tidak membatasi kedatangan. Setiap karakter menangani satu pertukaran pada satu waktu.
+Pengumpulan yang dibatalkan mengecualikan Tony tersebut untuk sesi ini; item yang tersisa menunggu Tony lain yang memenuhi syarat.
+Pengisian ulang tetap memakai pesan pribadi dan sinyal 1/2 gil terpisah. Tony menyimpan setidaknya 5000 gil; pemilik menyisihkan 2 gil.
+Menjual tidak memulihkan kelayakan Tony yang dikecualikan. Tony yang tersedia menunggu pemilik.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SB6F61AF9F826AAC2" xml:space="preserve">
@@ -21376,7 +21376,7 @@ Setiap pihak memilih world dan lokasi pertemuannya sendiri. Jaringan peer dinona
     <comment>Source: XASlave/Services/ViewSingleItemScene.cs</comment>
   </data>
   <data name="SBBF393609432CA35" xml:space="preserve">
-    <value>Diantrekan #{0}</value>
+    <value>Di dekat #{0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SBC0632E5191418C8" xml:space="preserve">
@@ -30060,5 +30060,65 @@ Sebaiknya lakukan saat pangkat Anda 6+ agar memiliki akses penawaran plot.</valu
   <data name="S9DA262EB757C209B" xml:space="preserve">
     <value>menunggu mitra dagang dengan versi yang kompatibel</value>
     <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S99098C464623EAD9" xml:space="preserve">
+    <value>Menunggu Tony yang tersedia dalam daftar impor.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S0F17D2B087F27D98" xml:space="preserve">
+    <value>Meminta pertukaran pengumpulan ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S51BB99BD159F4DBC" xml:space="preserve">
+    <value>Menunggu konfirmasi pengumpulan ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S32FF9E600B6C30D4" xml:space="preserve">
+    <value>Menunggu kesiapan penerima ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBE2797C239992AB2" xml:space="preserve">
+    <value>Menunggu permintaan pengumpulan yang valid dari pemilik.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S904C6FEA5DCF63D5" xml:space="preserve">
+    <value>Negosiasi pengumpulan ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S46A21A9A777CD929" xml:space="preserve">
+    <value>Penerima pengumpulan ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S4C92E6E135151092" xml:space="preserve">
+    <value>Atur ulang negosiasi mitra ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S9383AC136A430DF5" xml:space="preserve">
+    <value>Pengumpulan ONH memerlukan dukungan protokol yang dimulai pemilik pada kedua klien.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S1CFCEBFFCFCF8DDF" xml:space="preserve">
+    <value>Pesan perdagangan ONH tidak tersedia untuk bahasa game saat ini.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBDF3FBB1F94639EB" xml:space="preserve">
+    <value>Pengumpulan ONH dijeda karena penyelesaian pembersihan perdagangan tidak dapat dikonfirmasi. Hentikan sesi setelah memeriksa log tugas.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S3FA1998D5364E068" xml:space="preserve">
+    <value>Menunggu Tony lain yang tersedia.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SD3FEE3D9E6EEF9C3" xml:space="preserve">
+    <value>Pengumpulan ONH sedang berlangsung.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs</comment>
+  </data>
+  <data name="S67F517169AD87F95" xml:space="preserve">
+    <value>Penerima ONH siap</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SE074FF78DF8F68C8" xml:space="preserve">
+    <value>Menunggu konfirmasi ONH kembali setelah menjual.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
 </root>

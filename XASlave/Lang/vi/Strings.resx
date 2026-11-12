@@ -3387,7 +3387,7 @@ Dùng sau PartyDisband, PartyLeave, Logout, v.v.</value>
     <comment>Source: XASlave/Windows/Tasks/CityChatFloorderPanel.cs</comment>
   </data>
   <data name="S1F805080DAB492FD" xml:space="preserve">
-    <value>Các nhân vật Tony bạn có thể gửi vật phẩm cho. Gửi vật phẩm cho bất kỳ Tony nào trong danh sách này đang ở điểm gặp.</value>
+    <value>Các Tony hợp lệ để thu gom và tiếp tế. Chủ sở hữu yêu cầu bất kỳ Tony khả dụng nào tại điểm hẹn; thứ tự danh sách không quyết định ưu tiên.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S1F845D49BB1DF162" xml:space="preserve">
@@ -5911,7 +5911,7 @@ Hữu ích để gỡ lỗi trạng thái người chơi.</value>
     <comment>Source: XASlave/Services/AutoRetainerInventoryOperation.cs</comment>
   </data>
   <data name="S34B17FE52223FF18" xml:space="preserve">
-    <value>Nhân vật Chủ nhượng quyền mà bạn sẽ nhận vật phẩm. Tony xử lý từng người và không gửi vật phẩm (chỉ bắt tay 1 gil).</value>
+    <value>Các Chủ sở hữu nhượng quyền hợp lệ có thể yêu cầu thu gom. Tony nhận từ một chủ sở hữu mỗi lần và sau đó có thể cung cấp vật phẩm được yêu cầu.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S34B2227E117988A5" xml:space="preserve">
@@ -10378,7 +10378,7 @@ Gửi cho đối tác để họ nhập vào.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.cs</comment>
   </data>
   <data name="S5B08ACEA1AB7D3AD" xml:space="preserve">
-    <value>Trạng thái bắt tay trực tiếp hiển thị ở dòng trạng thái tác vụ và nhật ký; dấu hoàn tất từng dòng chưa được nối.</value>
+    <value>Số trong danh sách dùng để nhận diện mục, không phải thứ tự phục vụ. Trạng thái gắn với đúng nhân vật và cuộc trao đổi hiện tại.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="S5B18DCDD63E1F5D9" xml:space="preserve">
@@ -18908,7 +18908,7 @@ Tương đương dfunc GetGCRank/GetFlamesGCRank/GetAddersGCRank/GetMaelstromGCR
     <comment>Source: XASlave/Services/FurnitureObserverHook.cs</comment>
   </data>
   <data name="SA6582F5D40CC95E2" xml:space="preserve">
-    <value>Tony {0} đã tập kết; đang tìm Chủ nhượng quyền.</value>
+    <value>Tony {0} đã sẵn sàng; đang chờ yêu cầu từ chủ sở hữu hợp lệ.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SA6711086459806CB" xml:space="preserve">
@@ -19648,7 +19648,7 @@ Sử dụng các bảo vệ vật phẩm và cài đặt loại bỏ của nó; 
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD1C68924E3212A6" xml:space="preserve">
-    <value>Hàng đợi Trợ giúp ngoài mạng - {0}</value>
+    <value>Danh sách Trợ giúp ngoài mạng - {0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SAD2DE7A64920F065" xml:space="preserve">
@@ -20730,13 +20730,13 @@ Sử dụng các bảo vệ vật phẩm và cài đặt loại bỏ của nó; 
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs</comment>
   </data>
   <data name="SB6EA6D7BD0D682F4" xml:space="preserve">
-    <value>Trợ giúp ngoài mạng: chuyển vật phẩm với người chơi KHÔNG ở mạng ngang hàng của bạn
-(một người khác trên PC khác). Không có kết nối ngang hàng - hai bên phối hợp trong game.
-Tony mời một chủ trong hàng đợi bằng 1 gil. Chủ gửi vật phẩm, rồi yêu cầu vật tư bằng tin nhắn riêng + 1 gil.
-Tony trả 1 gil khi xong, hoặc 2 gil để luân chuyển. Chủ gửi 2 gil nếu đầy.
-Tony giữ ít nhất 5000 gil; chủ cần dự phòng 2 gil cho tín hiệu lỗi.
-Xuất nhân vật đã chọn và gửi danh sách cho đối tác; nhập danh sách họ gửi bạn.
-Mỗi bên tự chọn thế giới và địa điểm gặp. Mạng ngang hàng bị tắt trong chế độ này.</value>
+    <value>Trợ giúp ngoài mạng: giao dịch với người chơi khác mà không cần kết nối ngang hàng.
+Nhập danh sách Tên@ThếGiớiGốc của nhau và chọn cùng điểm hẹn.
+Chủ sở hữu yêu cầu một Tony khả dụng và bắt đầu giao vật phẩm sau khi hai máy khách thống nhất phiên bản.
+Thứ tự danh sách không giới hạn thứ tự đến. Mỗi nhân vật chỉ xử lý một cuộc trao đổi tại một thời điểm.
+Hủy giao vật phẩm sẽ loại Tony đó khỏi lần chạy này; vật phẩm còn lại chờ một Tony hợp lệ khác.
+Tiếp tế vẫn dùng tin nhắn riêng và tín hiệu 1/2 gil riêng biệt. Tony giữ ít nhất 5000 gil; chủ sở hữu dành lại 2 gil.
+Bán đồ không khôi phục tư cách của Tony đã bị loại. Tony khả dụng sẽ chờ chủ sở hữu.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SB6F61AF9F826AAC2" xml:space="preserve">
@@ -21376,7 +21376,7 @@ Mỗi bên tự chọn thế giới và địa điểm gặp. Mạng ngang hàng
     <comment>Source: XASlave/Services/ViewSingleItemScene.cs</comment>
   </data>
   <data name="SBBF393609432CA35" xml:space="preserve">
-    <value>Đã xếp hàng #{0}</value>
+    <value>Ở gần #{0}</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.Onh.cs</comment>
   </data>
   <data name="SBC0632E5191418C8" xml:space="preserve">
@@ -30060,5 +30060,65 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
   <data name="S9DA262EB757C209B" xml:space="preserve">
     <value>đang chờ đối tác giao dịch có phiên bản tương thích</value>
     <comment>Source: Xagman version admission and Instant Teleport peer-readiness presentation.</comment>
+  </data>
+  <data name="S99098C464623EAD9" xml:space="preserve">
+    <value>Đang chờ Tony khả dụng trong danh sách đã nhập.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S0F17D2B087F27D98" xml:space="preserve">
+    <value>Đang yêu cầu trao đổi thu gom ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S51BB99BD159F4DBC" xml:space="preserve">
+    <value>Đang chờ xác nhận thu gom ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S32FF9E600B6C30D4" xml:space="preserve">
+    <value>Đang chờ bên nhận ONH sẵn sàng.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBE2797C239992AB2" xml:space="preserve">
+    <value>Đang chờ yêu cầu thu gom hợp lệ từ chủ sở hữu.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S904C6FEA5DCF63D5" xml:space="preserve">
+    <value>Thỏa thuận thu gom ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S46A21A9A777CD929" xml:space="preserve">
+    <value>Bên nhận thu gom ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S4C92E6E135151092" xml:space="preserve">
+    <value>Đặt lại thỏa thuận với đối tác ONH</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S9383AC136A430DF5" xml:space="preserve">
+    <value>Thu gom ONH yêu cầu cả hai máy khách hỗ trợ giao thức do chủ sở hữu khởi tạo.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S1CFCEBFFCFCF8DDF" xml:space="preserve">
+    <value>Không có thông báo giao dịch ONH cho ngôn ngữ trò chơi hiện tại.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SBDF3FBB1F94639EB" xml:space="preserve">
+    <value>Thu gom ONH đã tạm dừng vì không thể xác nhận việc dọn dẹp giao dịch đã hoàn tất. Hãy xem nhật ký tác vụ rồi dừng lần chạy.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="S3FA1998D5364E068" xml:space="preserve">
+    <value>Đang chờ một Tony khả dụng khác.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SD3FEE3D9E6EEF9C3" xml:space="preserve">
+    <value>Đang thu gom ONH.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhPairing.cs</comment>
+  </data>
+  <data name="S67F517169AD87F95" xml:space="preserve">
+    <value>Bên nhận ONH đã sẵn sàng</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
+  </data>
+  <data name="SE074FF78DF8F68C8" xml:space="preserve">
+    <value>Đang chờ xác nhận ONH quay lại sau khi bán.</value>
+    <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
 </root>

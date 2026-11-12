@@ -6500,6 +6500,7 @@ public partial class SlaveWindow
 
     private void StopXagmanTask()
     {
+        MarkXagmanOnhLocalTradeCleanup();
         CancelXagmanTradeBatch();
         ResetXagmanNetworkRecovery();
         xagmanNpcSell?.Abort("Xagman stopped");
@@ -13533,6 +13534,7 @@ public partial class SlaveWindow
      private bool TryClearXagmanDropbox(out string failure)
      {
          CancelXagmanTradeBatch();
+         if (!CanMutateXagmanOnhProvider(out failure)) return false;
          if (plugin.DropboxQueue.TryClearQueue(out var message))
          {
              failure = string.Empty;
@@ -14303,6 +14305,7 @@ public partial class SlaveWindow
 
      private bool TryWriteXagmanDropboxAutoAccept(bool enabled)
     {
+        if (!CanMutateXagmanOnhProvider(out _)) return false;
         try
         {
             var dropboxPlugin = GetXagmanDropboxPlugin();
@@ -14326,6 +14329,8 @@ public partial class SlaveWindow
     {
         if (TrySetXagmanDropboxAutoAccept(enabled))
             return true;
+
+        if (plugin.Configuration.XagmanOutsideNetworkHelper && onhCollectionHeld) return false;
 
         var transitionLabel = (enabled ? global::XASlave.Localization.UiMessage.Key("SB8D31E852725AFB1") : global::XASlave.Localization.UiMessage.Key("SB4DC66DDE806261B"));
         plugin.TaskRunner.AddLog(
@@ -14385,7 +14390,9 @@ public partial class SlaveWindow
 
      private bool TryStopXagmanDropboxTradeQueue(bool preserveCapacityBatch = false)
     {
+        MarkXagmanOnhLocalTradeCleanup();
         if (!preserveCapacityBatch) CancelXagmanTradeBatch();
+        if (!CanMutateXagmanOnhProvider(out _)) return false;
         try
         {
             var dropboxPlugin = GetXagmanDropboxPlugin();

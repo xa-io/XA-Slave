@@ -360,6 +360,39 @@ public sealed partial class DropboxQueueService
         }
     }
 
+    internal bool TryConfirmXagmanAcceptanceSuppressed(object providerIdentity, out string failure)
+    {
+        failure = string.Empty;
+        try
+        {
+            Plugin.AssertGameThread();
+            if (!TryGetXagmanDropboxBatchContract(out var instance, out _, out _, out failure)
+                || !ReferenceEquals(providerIdentity, instance)) return false;
+            const BindingFlags staticFlags = BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic;
+            const BindingFlags memberFlags = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            var manager = instance.GetType().GetField("TaskManager", memberFlags)?.GetValue(instance)
+                ?? instance.GetType().GetProperty("TaskManager", memberFlags)?.GetValue(instance);
+            var config = instance.GetType().GetField("C", staticFlags)?.GetValue(null);
+            var confirm = instance.GetType().Assembly.GetType("Dropbox.TradeTask")?.GetField("ConfirmAllowed", staticFlags);
+            if (manager == null || config == null || confirm == null
+                || manager.GetType().GetProperty("IsBusy", memberFlags)?.GetValue(manager) is not false
+                || config.GetType().GetField("Active", BindingFlags.Instance | BindingFlags.Public)?.GetValue(config) is not false
+                || confirm.FieldType != typeof(bool) || confirm.IsInitOnly)
+            { failure = "Dropbox acceptance suppression was not positively confirmed."; return false; }
+            confirm.SetValue(null, false);
+            // This gate does not clear quantities/physical entries or assume the native trade has closed.
+            return confirm.GetValue(null) is false && IsXagmanProviderIdentityCurrent(providerIdentity, out failure)
+                && manager.GetType().GetProperty("IsBusy", memberFlags)?.GetValue(manager) is false
+                && config.GetType().GetField("Active", BindingFlags.Instance | BindingFlags.Public)?.GetValue(config) is false;
+        }
+        catch (Exception error)
+        {
+            failure = "Could not read the Dropbox confirmation gate.";
+            log.Warning(error, "[Xagman] {Failure}", failure);
+            return false;
+        }
+    }
+
     private static unsafe bool TryRequireXagmanDropboxIdle(object instance, Type queueType, out string failure, bool allowPendingPhysicalEntries = false)
     {
         failure = string.Empty;

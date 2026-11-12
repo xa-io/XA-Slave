@@ -43,19 +43,23 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     private long lastIncomingTradeEntityMs;
     private Func<uint, bool>? onhTradeAdmission;
     private Action<uint>? onhTradeStarted;
+    private Func<bool>? onhSuppressConfirmation;
 
     // ONH owns this temporary filter only while running. Unknown actors fail closed.
-    public bool SetOnhTradeAdmission(Func<uint, bool>? admission, Action<uint>? started = null)
+    public bool SetOnhTradeAdmission(Func<uint, bool>? admission, Action<uint>? started = null, Func<bool>? suppressConfirmation = null)
     {
         onhTradeAdmission = admission;
         onhTradeStarted = started;
+        onhSuppressConfirmation = admission == null ? null : suppressConfirmation;
         if (admission != null)
         {
             EnsureInitialized(retryMissing: initialized);
-            if (tradeStatusUpdateHook == null || sendTradeRequestHook == null)
+            if (tradeStatusUpdateHook == null || sendTradeRequestHook == null || tradeAgentShowHook == null
+                || onhSuppressConfirmation == null)
             {
                 onhTradeAdmission = null;
                 onhTradeStarted = null;
+                onhSuppressConfirmation = null;
                 return false;
             }
             // A retry may have created the status hook while manual refusal was already active.
@@ -137,6 +141,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
     {
         onhTradeAdmission = null;
         onhTradeStarted = null;
+        onhSuppressConfirmation = null;
         manualEnabled = false;
         xagmanOverride = XagmanTradeRefusalOverride.Inactive;
         enabled = false;
@@ -403,12 +408,14 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
             {
                 if (!onhTradeAdmission(entityId))
                     return;
+                RememberIncomingTrader(entityId); // The mandatory show gate also needs the outgoing actor.
                 onhTradeStarted?.Invoke(entityId);
             }
         }
         catch (Exception ex)
         {
             log.Warning(ex, "[XASlave] Auto Refuse Trade failed to record an outgoing trade timestamp.");
+            if (onhTradeAdmission != null) return;
         }
 
         sendTradeRequestHook?.OriginalDisposeSafe(manager, entityId);
@@ -424,6 +431,17 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
         try
         {
+            if (onhTradeAdmission != null)
+            {
+                if (!onhTradeAdmission(GetCurrentTraderEntityId(0, Environment.TickCount64)))
+                {
+                    onhSuppressConfirmation?.Invoke();
+                    TryRefuseIncomingTrade();
+                    return; // ONH denial never exposes the trade window, even if native refusal fails.
+                }
+                tradeAgentShowHook?.OriginalDisposeSafe(agent);
+                return;
+            }
             var permitted = onhTradeAdmission?.Invoke(GetCurrentTraderEntityId(0, Environment.TickCount64)) ?? false;
             if (!permitted && IsLikelyIncomingTrade() && TryRefuseIncomingTrade())
                 return;
@@ -431,6 +449,7 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
         catch (Exception ex)
         {
             log.Warning(ex, "[XASlave] Auto Refuse Trade failed while intercepting the trade window.");
+            if (onhTradeAdmission != null) return;
         }
 
         tradeAgentShowHook?.OriginalDisposeSafe(agent);
@@ -438,7 +457,8 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
 
     private nint TradeStatusUpdateDetour(InventoryManager* manager, nint entityId, nint packet)
     {
-        // Record admission before Original can show Trade and Dropbox can confirm it.
+        // Preserve the native status update, but suppress provider confirmation BEFORE forwarding
+        // a denied actor. The mandatory show hook then refuses without exposing the window.
         if (onhTradeAdmission != null && packet != nint.Zero && Marshal.ReadByte(packet + 4) == 1)
         {
             try
@@ -447,10 +467,21 @@ public unsafe sealed class AutoRefuseTradeService : IDisposable
                 RememberIncomingTrader(trader);
                 if (onhTradeAdmission(trader))
                     onhTradeStarted?.Invoke(trader);
+                else if (onhSuppressConfirmation?.Invoke() != true)
+                {
+                    // Suppression failure has held the ONH run. Do not expose this request to
+                    // native UI/provider confirmation with an unconfirmed acceptance gate.
+                    // The native status-return contract is not established; this exceptional
+                    // path intentionally holds for operator recovery instead of resuming.
+                    TryRefuseIncomingTrade(trader);
+                    return 0;
+                }
             }
             catch (Exception ex)
             {
                 log.Warning(ex, "[XASlave] ONH trade admission observation failed.");
+                try { onhSuppressConfirmation?.Invoke(); } catch { /* Deny the incoming request. */ }
+                return 0;
             }
         }
         var result = tradeStatusUpdateHook?.OriginalDisposeSafe(manager, entityId, packet) ?? 0;
