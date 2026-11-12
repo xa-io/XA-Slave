@@ -138,6 +138,7 @@ public partial class SlaveWindow
             || onhCollectionHeld || onhIncomingRefusalPending || onhCollectionPartnerUnavailable || onhCollectionCancellationObserved || !IsXagmanOnhPairReady
             || string.IsNullOrWhiteSpace(xagmanOnhEngagedPartner)
             || xagmanOnhPhase is XagmanOnhPhase.ReturningHome or XagmanOnhPhase.StartCharacter or XagmanOnhPhase.AwaitStartup
+                or XagmanOnhPhase.FoConfirmCompletion or XagmanOnhPhase.TonyAwaitOwnerCompletion
                 or XagmanOnhPhase.TonySelling or XagmanOnhPhase.TonyReturnFromSale or XagmanOnhPhase.TonyAwaitSaleResolution)
             return false;
         var actor = FindXagmanOnhPlayer(xagmanOnhEngagedPartner);
@@ -258,7 +259,7 @@ public partial class SlaveWindow
         var parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
         if (TryReceiveXagmanOnhSaleReturn(parts, senderPayload)) return;
         var senderKey = $"{sender}@{senderPayload.World.Value.Name}";
-        var roster = xagmanActiveRole == XagmanRole.Tony ? plugin.Configuration.XagmanOnhFriendFoCharacters : plugin.Configuration.XagmanOnhFriendTonyCharacters;
+        var roster = GetXagmanOnhPartnerRoster();
         if (!roster.Any(k => k.Trim().Equals(senderKey, StringComparison.OrdinalIgnoreCase))
             || !senderKey.Equals(xagmanOnhEngagedPartner, StringComparison.OrdinalIgnoreCase)) return;
         if (!TryGetXagmanOnhVersionPartner(senderPayload, out _, out _)) return;
@@ -381,12 +382,12 @@ public partial class SlaveWindow
         if (local == null) return;
         onhWaitingOwners.RemoveAll(name => FindXagmanOnhPlayer(name) is not { } p
             || Vector3.Distance(p.Position, local.Position) > XagmanOnhScanRadius
-            || xagmanOnhCompletedPartners.Contains(name));
-        foreach (var key in plugin.Configuration.XagmanOnhFriendFoCharacters)
+            || xagmanOnhCompletedPartners.Contains(name) || !IsXagmanOnhPartnerInActiveRegion(name));
+        foreach (var key in GetXagmanOnhPartnerRoster())
         {
             var name = key.Trim();
             var p = FindXagmanOnhPlayer(name);
-            if (p == null || Vector3.Distance(p.Position, local.Position) > XagmanOnhScanRadius
+            if (p == null || !IsXagmanOnhPartnerInActiveRegion(name) || Vector3.Distance(p.Position, local.Position) > XagmanOnhScanRadius
                 || xagmanOnhCompletedPartners.Contains(name) || onhWaitingOwners.Contains(name, StringComparer.OrdinalIgnoreCase)
                 || name.Equals(xagmanOnhEngagedPartner, StringComparison.OrdinalIgnoreCase)) continue;
             onhWaitingOwners.Add(name);
@@ -426,7 +427,7 @@ public partial class SlaveWindow
 
     private void DriveXagmanOnhFoFindTony()
     {
-        var tony = FindNearbyXagmanOnhRosterMember(plugin.Configuration.XagmanOnhFriendTonyCharacters, onhRetiredTonys, out _);
+        var tony = FindNearbyXagmanOnhRosterMember(GetXagmanOnhPartnerRoster(), onhRetiredTonys, out _);
         if (tony.Length == 0)
         {
             xagmanStatus = XagmanStatus.Standby;
@@ -503,6 +504,16 @@ public partial class SlaveWindow
 
     private void DriveXagmanOnhTonySearch()
     {
+        if (xagmanOnhRegionalMatching)
+        {
+            // Give a completed owner time to repeat a lost receipt before any departure.
+            if ((DateTime.UtcNow - onhLastTerminalOwnerUtc).TotalSeconds < 6) return;
+            if (IsXagmanOnhRegionComplete())
+            {
+                AdvanceXagmanOnhCharacter(false);
+                return;
+            }
+        }
         if (TryGetXagmanLiveLocalMainInventoryFreeSlots(out var freeSlots) && freeSlots <= XagmanOnhTonyMinFreeSlots)
         { StartXagmanOnhFullInventoryRecovery(false); return; }
         if (GetXagmanOwnGil() < OnhGilFloor + 3)
@@ -542,7 +553,11 @@ public partial class SlaveWindow
     private void FinishXagmanOnhTonyEngagement(bool completed = true)
     {
         var name = xagmanOnhEngagedPartner;
-        if (completed) xagmanOnhCompletedPartners.Add(name);
+        if (completed)
+        {
+            xagmanOnhCompletedPartners.Add(name);
+            onhLastTerminalOwnerUtc = DateTime.UtcNow;
+        }
         onhWaitingOwners.RemoveAll(x => x.Equals(name, StringComparison.OrdinalIgnoreCase));
         CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("SC4697A92FC94FC0D"));
         xagmanOnhEngagedPartner = xagmanActiveTradePartner = string.Empty;
@@ -567,7 +582,7 @@ public partial class SlaveWindow
     private void StartXagmanOnhFullInventoryRecovery(bool hasOwner)
     {
         // Collection uses the next selected Tony before considering last-Tony selling.
-        if (xagmanOnhIndex + 1 < xagmanOnhRunList.Count || !plugin.Configuration.XagmanSellWhenInventoryFull)
+        if (HasXagmanOnhNextTonyInRegion() || !plugin.Configuration.XagmanSellWhenInventoryFull)
         {
             if (hasOwner) StartXagmanOnhTonyRotationSignal();
             else AdvanceXagmanOnhCharacter(false, rotateForFull: true);
@@ -635,13 +650,16 @@ public partial class SlaveWindow
             TimeoutSec = 15,
             OnTimeout = () => FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S48DB4408676787D5")),
         });
-        AddXagmanTeleportSteps(steps, global::XASlave.Localization.UiMessage.Key("S6604736E1D66E93A"), GetXagmanActiveMeetAetheryte, plugin.TaskRunner, null, true,
+        AddXagmanTeleportSteps(steps, global::XASlave.Localization.UiMessage.Key("S6604736E1D66E93A"), GetXagmanActiveMeetDestinationCommand, plugin.TaskRunner,
+            () => IsXagmanAtMeetDestination(GetXagmanActiveMeetWorld(), GetXagmanActiveMeetAetheryte()), true,
             () => { xagmanStatus = XagmanStatus.Traveling; xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("SC4490041E92783F2")); },
             () =>
             {
                 if (!IsXagmanAtMeetDestination(GetXagmanActiveMeetWorld(), GetXagmanActiveMeetAetheryte())) onhSaleReturnFailed = true;
             },
-            () => onhSaleReturnFailed = true, expectCrossDataCenterLogout: true);
+            () => onhSaleReturnFailed = true, expectCrossDataCenterLogout: true,
+            travelSourceCharacterProvider: () => xagmanActiveCharacter,
+            travelDestinationWorldProvider: GetXagmanActiveMeetWorld);
         AddXagmanCustomMeetingStep(steps, xagmanActiveCharacter, () => onhSaleReturnFailed);
         if (TryStartXagmanOnhSubTask(steps)) SetXagmanOnhPhase(XagmanOnhPhase.TonyReturnFromSale);
     }
@@ -650,6 +668,10 @@ public partial class SlaveWindow
     {
         switch (xagmanOnhPhase)
         {
+            case XagmanOnhPhase.FoConfirmCompletion:
+            case XagmanOnhPhase.TonyAwaitOwnerCompletion:
+                DriveXagmanOnhCompletionConfirmation();
+                return true;
             case XagmanOnhPhase.FoAwaitSale:
                 xagmanStatus = XagmanStatus.Paused;
                 xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SAD03D2DA370A07B0", xagmanOnhEngagedPartner));
@@ -701,7 +723,11 @@ public partial class SlaveWindow
                     if (signal == 2) { ReleaseXagmanOnhOwnerPartner(true); return true; }
                     var satisfied = onhGoals.All(g => (!g.TakeAll || g.TakeAllAnnounced)
                         && OnhOwnerHeld(g.WireId) >= g.ReceiveTarget);
-                    if (satisfied) AdvanceXagmanOnhCharacter(false);
+                    if (satisfied)
+                    {
+                        if (xagmanOnhRegionalMatching) BeginXagmanOnhCompletionConfirmation(owner: true);
+                        else AdvanceXagmanOnhCharacter(false);
+                    }
                     else FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S91C2BD61954E3FD1"));
                     return true;
                 }
@@ -740,6 +766,7 @@ public partial class SlaveWindow
             case XagmanOnhPhase.TonySendFinish:
                 if (!TryConsumeXagmanOnhSubTaskCompletion()) return true;
                 if (xagmanOnhGilSendAborted) FailXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("S5EA4394FF3E98275"));
+                else if (xagmanOnhRegionalMatching) BeginXagmanOnhCompletionConfirmation(owner: false);
                 else FinishXagmanOnhTonyEngagement();
                 return true;
             case XagmanOnhPhase.TonySendRotate:

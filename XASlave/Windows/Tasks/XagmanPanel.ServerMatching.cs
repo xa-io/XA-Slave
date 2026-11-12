@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using XASlave.Data;
+using XASlave.Services;
 
 namespace XASlave.Windows;
 
@@ -12,11 +13,10 @@ namespace XASlave.Windows;
 //   Server = data center: Aether, Crystal, Dynamis, Primal, ...  (WorldData.DataCenter)
 //   World  = Siren, Adamantoise, ...        (WorldData.Name)
 //
-// In Server Matching mode the Tony picks one meet World per Server and one shared meet location,
-// then sweeps Server-by-Server within a Region (Aether -> Crystal -> Dynamis -> Primal), region by
-// region (NA -> EU -> JP -> OCE). Franchise Owners only ever World-travel inside their own Server to
-// the Tony's selected meet World for that Server; they never DC-travel. Owners whose Server has not
-// been reached yet wait; owners whose Server is passed without service are skipped (purple).
+// Server Matching selects one world per region and one shared meeting location.
+// All home DCs in that region are served together, then NA -> EU -> JP -> OCE advances.
+// The stored active DC is the selected meeting world's actual DC, never an owner's home DC.
+// Lifestream owns the travel mechanism; XA verifies the character, world and safe arrival.
 public partial class SlaveWindow
 {
     // How long the current server must look drained (no queue, no pending owners) before the Tony
@@ -112,8 +112,8 @@ public partial class SlaveWindow
 
         return cfg.XagmanServerMatchingEnabled
             && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte)
-            && cfg.XagmanServerMeetWorlds != null
-            && cfg.XagmanServerMeetWorlds.Values.Any(world => !string.IsNullOrWhiteSpace(world));
+            && cfg.XagmanRegionMeetWorlds != null
+            && cfg.XagmanRegionMeetWorlds.Values.Any(world => !string.IsNullOrWhiteSpace(world));
     }
 
     private void PinXagmanMeetRouteSnapshot(bool serverMatching)
@@ -130,7 +130,7 @@ public partial class SlaveWindow
             return;
         }
 
-        var configuredMeetWorlds = plugin.Configuration.XagmanServerMeetWorlds;
+        var configuredMeetWorlds = plugin.Configuration.XagmanRegionMeetWorlds ?? new Dictionary<string, string>();
         foreach (var configured in configuredMeetWorlds)
             xagmanServerMeetWorldsSnapshot[configured.Key] = (configured.Value ?? string.Empty).Trim();
         xagmanMeetRouteSnapshotPinned = true;
@@ -151,14 +151,50 @@ public partial class SlaveWindow
 
     private string GetXagmanServerMeetWorld(string dataCenter)
     {
-        if (string.IsNullOrWhiteSpace(dataCenter))
-            return string.Empty;
+        var region = WorldData.GetRegionOfDataCenter(dataCenter);
+        return region == null ? string.Empty : GetXagmanRegionMeetWorld(region);
+    }
+
+    private string GetXagmanRegionMeetWorld(string region)
+    {
         var map = xagmanMeetRouteSnapshotPinned
             ? xagmanServerMeetWorldsSnapshot
-            : plugin.Configuration.XagmanServerMeetWorlds;
-        return map != null && map.TryGetValue(dataCenter, out var world)
-            ? (world ?? string.Empty)
-            : string.Empty;
+            : plugin.Configuration.XagmanRegionMeetWorlds;
+        return XagmanRegionalRoutePolicy.GetMeetWorld(map, region);
+    }
+
+    private string GetXagmanRegionalMeetDataCenter(string homeDataCenter)
+        => XagmanRegionalRoutePolicy.GetMeetDataCenter(xagmanMeetRouteSnapshotPinned
+            ? xagmanServerMeetWorldsSnapshot : plugin.Configuration.XagmanRegionMeetWorlds, homeDataCenter);
+
+    private static bool IsXagmanSameRegion(string firstDataCenter, string secondDataCenter)
+        => XagmanRegionalRoutePolicy.SameRegion(firstDataCenter, secondDataCenter);
+
+    private static int GetXagmanRegionOrdinal(string dataCenter)
+        => XagmanRegionalRoutePolicy.RegionOrdinal(dataCenter);
+
+    private bool TryValidateXagmanRegionalMeetForCharacterMessage(string character, out string meetWorld,
+        out global::XASlave.Localization.UiMessage reason)
+    {
+        var region = GetXagmanRegionOfChar(character);
+        meetWorld = GetXagmanRegionMeetWorld(region);
+        if (string.IsNullOrWhiteSpace(region) || string.IsNullOrWhiteSpace(meetWorld))
+        {
+            reason = global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key("Select a meeting world for region {0}."), region);
+            return false;
+        }
+        var world = WorldData.GetByName(meetWorld);
+        if (world == null || !world.Region.Equals(region, StringComparison.OrdinalIgnoreCase))
+        {
+            reason = global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key("Meeting world {0} must belong to region {1}."), meetWorld, region);
+            return false;
+        }
+        if (string.IsNullOrWhiteSpace(GetXagmanSharedMeetLocation()))
+        {
+            reason = global::XASlave.Localization.UiMessage.Key("S7E690D483193A352");
+            return false;
+        }
+        return TryValidateXagmanMeetTravelMessage(character, meetWorld, out reason);
     }
 
     private string GetXagmanSharedMeetLocation()
@@ -166,14 +202,15 @@ public partial class SlaveWindow
             ? xagmanMeetAetheryteSnapshot
             : (plugin.Configuration.XagmanTargetAetheryte ?? string.Empty);
 
-    // Servers (data centers) that have a selected meet world, in Region -> Server sweep order.
+    // One actual meeting DC per configured region, in regional processing order.
     private List<string> GetXagmanConfiguredSweepServers()
     {
         var result = new List<string>();
-        foreach (var (_, dc) in WorldData.EnumerateDataCentersInSweepOrder())
+        foreach (var region in WorldData.RegionOrder)
         {
-            if (!string.IsNullOrWhiteSpace(GetXagmanServerMeetWorld(dc)))
-                result.Add(dc);
+            var world = WorldData.GetByName(GetXagmanRegionMeetWorld(region));
+            if (world != null && world.Region.Equals(region, StringComparison.OrdinalIgnoreCase))
+                result.Add(world.DataCenter);
         }
 
         return result;
@@ -222,10 +259,10 @@ public partial class SlaveWindow
 
         var configuredMeetWorlds = xagmanMeetRouteSnapshotPinned
             ? xagmanServerMeetWorldsSnapshot
-            : plugin.Configuration.XagmanServerMeetWorlds;
-        if (configuredMeetWorlds.Count == 0)
+            : plugin.Configuration.XagmanRegionMeetWorlds;
+        if (configuredMeetWorlds == null || configuredMeetWorlds.Count == 0)
         {
-            reason = global::XASlave.Localization.UiMessage.Key("SCBCB9A365D0AC6DE");
+            reason = global::XASlave.Localization.UiMessage.Authored("Select one meeting world for each region you will process.");
             return false;
         }
 
@@ -234,10 +271,10 @@ public partial class SlaveWindow
             if (string.IsNullOrWhiteSpace(configured.Value))
                 continue;
 
-            var configuredRegion = WorldData.GetRegionOfDataCenter(configured.Key);
-            if (string.IsNullOrWhiteSpace(configuredRegion))
+            var configuredRegion = WorldData.RegionOrder.FirstOrDefault(region => region.Equals(configured.Key, StringComparison.OrdinalIgnoreCase));
+            if (configuredRegion == null)
             {
-                reason = global::XASlave.Localization.UiMessage.Format("S49DB8AFE58529671", configured.Key);
+                reason = global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key("Unknown meeting region: {0}."), configured.Key);
                 return false;
             }
 
@@ -247,13 +284,17 @@ public partial class SlaveWindow
                 reason = global::XASlave.Localization.UiMessage.Format("SA4B1C9F68078356F", configured.Value, configured.Key);
                 return false;
             }
-            if (!meetWorld.DataCenter.Equals(configured.Key, StringComparison.OrdinalIgnoreCase))
+            if (!meetWorld.Region.Equals(configuredRegion, StringComparison.OrdinalIgnoreCase))
             {
                 reason =
-                    global::XASlave.Localization.UiMessage.Format("SD1561434AF45F0AA", meetWorld.Name, meetWorld.DataCenter, configured.Key);
+                    global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key("Meeting world {0} must belong to region {1}."), meetWorld.Name, configuredRegion);
                 return false;
             }
         }
+
+        foreach (var tony in selectedTonys)
+            if (!TryValidateXagmanRegionalMeetForCharacterMessage(tony.CharacterNameWorld, out _, out reason))
+                return false;
 
         reason = global::XASlave.Localization.UiMessage.Raw(string.Empty);
         return true;
@@ -390,9 +431,13 @@ public partial class SlaveWindow
     private IEnumerable<string> GetXagmanPeerPendingDataCenters(XagmanPeerPresence peer)
     {
         if (peer.TotalCharacters <= 0) return Enumerable.Empty<string>();
-        if (IsXagmanSupplyCycleActive() && peer.SupplyCycleRevision == XagmanSupplyCycleRevision)
-            return peer.SupplyPendingDataCenters ?? Enumerable.Empty<string>();
-        return new[] { peer.ServerMatchingPendingDataCenter };
+        IEnumerable<string> pending = IsXagmanSupplyCycleActive() && peer.SupplyCycleRevision == XagmanSupplyCycleRevision
+            ? peer.SupplyPendingDataCenters ?? Enumerable.Empty<string>()
+            : new[] { peer.ServerMatchingPendingDataCenter };
+        // Presence retains home DC identity. Only the coordinator converts it to its pinned route.
+        return xagmanServerMatchingActive
+            ? pending.Select(GetXagmanRegionalMeetDataCenter).Distinct(StringComparer.OrdinalIgnoreCase)
+            : pending;
     }
 
     private List<string> GetXagmanFoNeededServers(bool includeCompletedSupplyPasses = false)
@@ -402,6 +447,7 @@ public partial class SlaveWindow
             return new List<string>();
         return plugin.XagmanPeers.Peers
             .Where(peer => peer.Role == XagmanRole.FranchiseOwner && peer.XagmanEnabled && IsXagmanPeerFresh(peer))
+            .Where(peer => !xagmanServerMatchingActive || peer.RegionalRouteRevision == XagmanRegionalRoutePolicy.Revision)
             .Where(IsXagmanPeerInCurrentRunPhase)
             .Where(IsXagmanSweepOwnerInCoordinatorScope)
             // A completed supplier pass may retain earlier partial DCs for the next Tony. They
@@ -430,6 +476,7 @@ public partial class SlaveWindow
             .Where(IsXagmanSweepOwnerInCoordinatorScope)
             .Where(peer =>
             {
+                if (peer.RegionalRouteRevision != XagmanRegionalRoutePolicy.Revision) return true;
                 var pending = GetXagmanPeerPendingDataCenters(peer).ToList();
                 if (pending.Count == 0)
                     return !(IsXagmanSupplyCycleActive() && peer.SupplyCycleRevision == XagmanSupplyCycleRevision
@@ -451,7 +498,7 @@ public partial class SlaveWindow
                 var pending = GetXagmanPeerPendingDataCenters(peer)
                     .Select(dc => string.IsNullOrWhiteSpace(dc) ? "<blank>" : dc)
                     .ToList();
-                return $"{peer.InstanceId}:{(pending.Count == 0 ? "<blank>" : string.Join("/", pending))}";
+                return $"{peer.InstanceId}:regional-revision={peer.RegionalRouteRevision}:{(pending.Count == 0 ? "<blank>" : string.Join("/", pending))}";
             }));
     }
 
@@ -555,7 +602,9 @@ public partial class SlaveWindow
     // Discovery loop: the Tony idles until it can see which servers owners are on, then commits.
     private void TryBeginXagmanSweepFromDiscovery()
     {
-        var commitResult = TryCommitXagmanSweepToFirstNeededRegion(null);
+        var invalidPendingPeers = GetXagmanInvalidPendingServerPeers();
+        var commitResult = invalidPendingPeers.Count == 0
+            ? TryCommitXagmanSweepToFirstNeededRegion(null) : XagmanSweepCommitResult.NoCandidate;
         if (commitResult == XagmanSweepCommitResult.Error)
         {
             xagmanSweepAwaitingStart = false;
@@ -568,9 +617,8 @@ public partial class SlaveWindow
         }
 
         var needed = GetXagmanFoNeededServers();
-        var invalidPendingPeers = GetXagmanInvalidPendingServerPeers();
         xagmanStatus = XagmanStatus.Paused;
-        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, (needed.Count == 0 && invalidPendingPeers.Count == 0 ? global::XASlave.Localization.UiMessage.Key("SBA182C05573D0771") : (invalidPendingPeers.Count > 0 ? global::XASlave.Localization.UiMessage.Key("S4502DFAD5F6EAE6E") : global::XASlave.Localization.UiMessage.Key("SBD906C505D7C27B1"))));
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, (needed.Count == 0 && invalidPendingPeers.Count == 0 ? global::XASlave.Localization.UiMessage.Authored("Server Matching: waiting to see which regions Franchise Owners need...") : (invalidPendingPeers.Count > 0 ? global::XASlave.Localization.UiMessage.Authored("Waiting for compatible clients and configured regional destinations. Update every participating XA Slave client.") : global::XASlave.Localization.UiMessage.Key("SBD906C505D7C27B1"))));
 
         // If owners are present but none are on a region we have a Tony for, give up after a grace
         // period so the run does not hang. Owners on unservable regions are skipped on completion.
@@ -583,7 +631,7 @@ public partial class SlaveWindow
             {
                 var invalidDetail = (invalidPendingPeers.Count == 0 ? global::XASlave.Localization.UiMessage.Raw(string.Empty) : global::XASlave.Localization.UiMessage.Format("SC1A2B760872353B2", DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers)));
                 ReportXagmanTravelRouteError(
-                    global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("S1A7059D304C1CD45"), invalidDetail));
+                    global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Authored("Regional matching cannot start: owners need unsupported regions, unconfigured destinations, or updated clients."), invalidDetail));
                 return;
             }
             plugin.TaskRunner.AddLog("Xagman: no selected Tony covers the regions where Franchise Owners are waiting; completing (those owners will be marked skipped).");
@@ -673,7 +721,7 @@ public partial class SlaveWindow
         if (TryHoldXagmanCollectionSweepForUnavailableExpectedPeers())
             return XagmanSweepStep.Blocked;
 
-        if (IsXagmanCollectionFirstCollectionPhase() || IsXagmanSupplyCycleActive())
+        if (xagmanServerMatchingActive)
         {
             var invalidPendingPeers = GetXagmanInvalidPendingServerPeers();
             if (invalidPendingPeers.Count > 0)
@@ -689,7 +737,7 @@ public partial class SlaveWindow
                 xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;
                 xagmanStatus = XagmanStatus.Paused;
                 xagmanStatusText =
-                    global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("S0C0EFC0574201EE1"));
+                    global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Authored("Waiting for compatible clients and configured regional destinations. Update every participating XA Slave client."));
                 if ((DateTime.UtcNow - xagmanInvalidPendingServerPeerSinceUtc).TotalSeconds
                     < XagmanSweepDiscoveryGiveUpSeconds)
                 {
@@ -697,7 +745,7 @@ public partial class SlaveWindow
                 }
 
                 ReportXagmanTravelRouteError(
-                    global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SFBC7FC21D5678A62"), global::XASlave.Localization.UiMessage.Value(DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers))));
+                    global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Authored("Regional matching is paused because clients or regional destinations are incompatible: "), global::XASlave.Localization.UiMessage.Value(DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers))));
                 return XagmanSweepStep.Error;
             }
 
@@ -724,35 +772,8 @@ public partial class SlaveWindow
 
         xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;
 
-        // Next server in the CURRENT region that still has pending owners (FO-driven, not config order).
-        var nextInRegion = GetXagmanFoNeededServers()
-            .FirstOrDefault(dc => string.Equals(WorldData.GetRegionOfDataCenter(dc), xagmanSweepRegion, StringComparison.OrdinalIgnoreCase)
-                && !dc.Equals(xagmanSweepDataCenter, StringComparison.OrdinalIgnoreCase));
-        if (nextInRegion != null)
-        {
-            var drainedServer = xagmanSweepDataCenter;
-            if (!TryValidateXagmanServerMatchingTonyRouteMessage(
-                    xagmanActiveCharacter,
-                    xagmanSweepRegion,
-                    nextInRegion,
-                    out var routeFailure))
-            {
-                ReportXagmanTravelRouteError(
-                    global::XASlave.Localization.UiMessage.Format("S5100A026D82BF5D6", xagmanActiveCharacter, drainedServer, nextInRegion, routeFailure));
-                return XagmanSweepStep.Error;
-            }
-
-            xagmanSweepDataCenter = nextInRegion;
-            SetXagmanActiveMeetDestination(
-                GetXagmanServerMeetWorld(nextInRegion),
-                GetXagmanSharedMeetLocation());
-            ResetXagmanTonyMeetRetryState();
-            plugin.TaskRunner.AddLog(
-                $"Xagman: server {drainedServer} fully processed; advancing Tony {xagmanActiveCharacter} sweep to {xagmanSweepDataCenter} ({GetXagmanTonySweepMeetWorld()}).");
-            PublishXagmanPresence();
-            return XagmanSweepStep.Advanced;
-        }
-
+        // Every home DC in this region maps to the same pinned meeting world.
+        // There is no intra-region destination hop after draining the regional queue.
         // A supplier pass can finish while its owners still need other items. The coordinator
         // waits for the whole cohort, then rotates within this region before advancing regions.
         // Blocked preserves its status text and any new task it starts on this same framework tick.
@@ -853,8 +874,7 @@ public partial class SlaveWindow
     {
         var leavingRegion = xagmanSweepRegion;
         var invalidPendingPeers = GetXagmanInvalidPendingServerPeers();
-        if ((IsXagmanCollectionFirstCollectionPhase() || IsXagmanSupplyCycleActive())
-            && invalidPendingPeers.Count > 0)
+        if (invalidPendingPeers.Count > 0)
         {
             if (xagmanInvalidPendingServerPeerSinceUtc == DateTime.MinValue)
                 xagmanInvalidPendingServerPeerSinceUtc = DateTime.UtcNow;
@@ -863,12 +883,12 @@ public partial class SlaveWindow
                 xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;
                 xagmanStatus = XagmanStatus.Paused;
                 xagmanStatusText =
-                    global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("S0C0EFC0574201EE1"));
+                    global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Authored("Waiting for compatible clients and configured regional destinations. Update every participating XA Slave client."));
                 return true;
             }
 
             ReportXagmanTravelRouteError(
-                global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Key("SFBC7FC21D5678A62"), global::XASlave.Localization.UiMessage.Value(DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers))));
+                global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Authored("Regional matching is paused because clients or regional destinations are incompatible: "), global::XASlave.Localization.UiMessage.Value(DescribeXagmanInvalidPendingServerPeers(invalidPendingPeers))));
             return true;
         }
 
@@ -911,6 +931,11 @@ public partial class SlaveWindow
 
     private bool IsXagmanServerMatchingTonyMeetReadyMessage(XagmanPeerPresence tony, out global::XASlave.Localization.UiMessage reason)
     {
+        if (tony.RegionalRouteRevision != XagmanRegionalRoutePolicy.Revision)
+        {
+            reason = global::XASlave.Localization.UiMessage.Authored("Regional matching requires updated XA Slave on every participating client.");
+            return false;
+        }
         if (tony.Status == XagmanStatus.Error)
         {
             reason = global::XASlave.Localization.UiMessage.Key("SFF14A93837E058D7");
@@ -1001,18 +1026,18 @@ public partial class SlaveWindow
                 : XagmanOwnerServerGate.Skip;
         }
 
-        if (string.Equals(tony.ServerMatchingActiveDataCenter, myDataCenter, StringComparison.OrdinalIgnoreCase))
+        if (IsXagmanSameRegion(tony.ServerMatchingActiveDataCenter, myDataCenter))
         {
             meetWorld = tony.MeetWorld;
             meetAetheryte = tony.MeetAetheryte;
-            reason = global::XASlave.Localization.UiMessage.Format("S3373DD0E6CDFD0AC", myDataCenter);
+            reason = global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key("Tony is serving region {0}."), WorldData.GetRegionOfDataCenter(myDataCenter));
             return XagmanOwnerServerGate.Proceed;
         }
 
-        var myOrdinal = WorldData.GetSweepOrdinal(myDataCenter);
-        if (tony.ServerMatchingSweepOrdinal < myOrdinal)
+        var myOrdinal = GetXagmanRegionOrdinal(myDataCenter);
+        if (GetXagmanRegionOrdinal(tony.ServerMatchingActiveDataCenter) < myOrdinal)
         {
-            reason = global::XASlave.Localization.UiMessage.Format("S50FEA64E4C3AE132", myDataCenter, tony.ServerMatchingActiveDataCenter);
+            reason = global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key("Waiting for region {0}; Tony is serving {1}."), WorldData.GetRegionOfDataCenter(myDataCenter), WorldData.GetRegionOfDataCenter(tony.ServerMatchingActiveDataCenter));
             return XagmanOwnerServerGate.Wait;
         }
 
@@ -1022,7 +1047,7 @@ public partial class SlaveWindow
             return XagmanOwnerServerGate.Wait;
         }
 
-        reason = global::XASlave.Localization.UiMessage.Format("SCB5759711C9D4286", myDataCenter, tony.ServerMatchingActiveDataCenter);
+        reason = global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key("Region {0} has already been processed; Tony is serving {1}."), WorldData.GetRegionOfDataCenter(myDataCenter), WorldData.GetRegionOfDataCenter(tony.ServerMatchingActiveDataCenter));
         return XagmanOwnerServerGate.Skip;
     }
 
@@ -1042,15 +1067,15 @@ public partial class SlaveWindow
     private bool IsXagmanOwnerCharPassedBySweep(string characterNameWorld)
     {
         var tony = GetXagmanServerMatchingTonyPeer();
-        if (tony == null || tony.ServerMatchingSweepOrdinal < 0
+        if (tony == null || !IsXagmanServerMatchingTonyMeetReady(tony, out _)
             || IsXagmanOwnerAwaitingSupplySweep(characterNameWorld, tony))
             return false;
         var myDataCenter = GetXagmanDataCenterOfChar(characterNameWorld);
         if (string.IsNullOrWhiteSpace(myDataCenter))
             return false;
-        if (string.Equals(tony.ServerMatchingActiveDataCenter, myDataCenter, StringComparison.OrdinalIgnoreCase))
+        if (IsXagmanSameRegion(tony.ServerMatchingActiveDataCenter, myDataCenter))
             return false;
-        return tony.ServerMatchingSweepOrdinal > WorldData.GetSweepOrdinal(myDataCenter);
+        return GetXagmanRegionOrdinal(tony.ServerMatchingActiveDataCenter) > GetXagmanRegionOrdinal(myDataCenter);
     }
 
     private void MarkXagmanOwnerSkipped(string characterNameWorld, string reason)

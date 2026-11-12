@@ -311,11 +311,11 @@ public class Configuration : IPluginConfiguration
     public List<string> XagmanOnhFriendTonyCharacters { get; set; } = new();
 
     // -- Xagman Server Matching --
-    // When enabled, the Tony meet world is chosen per server (data center) instead of one fixed world,
-    // and the Tony sweeps server-by-server within a region so Franchise Owners only world-travel
-    // (never DC travel). XagmanTargetAetheryte is reused as the single shared meet location.
+    // One meeting world per region; Lifestream owns travel within that region.
+    // XagmanTargetAetheryte remains the shared meeting location for connected and ONH runs.
     public bool XagmanServerMatchingEnabled { get; set; } = false;
-    // Key = data center / server name (e.g. "Aether"), value = selected meet world name (e.g. "Siren").
+    public Dictionary<string, string> XagmanRegionMeetWorlds { get; set; } = new();
+    // Legacy per-DC selections are retained for recovery, never silently chosen as regional destinations.
     public Dictionary<string, string> XagmanServerMeetWorlds { get; set; } = new();
 
     // -- FC Permissions Updater --
@@ -534,6 +534,9 @@ public class Configuration : IPluginConfiguration
     public bool InventorySearchShowUntradable { get; set; } = true;
     public bool InventorySearchShowBound { get; set; } = true;
     public bool InventorySearchShowUnique { get; set; } = true;
+    public int InventorySearchNonmatchingOpacityPercent { get; set; } = 50;
+    public bool InventorySearchFocusShortcutEnabled { get; set; } = false;
+    public bool InventorySearchShowTooltips { get; set; } = true;
     public BetterInventoryMoverModifierKey BetterInventoryMoverQuickMoveModifier { get; set; } = BetterInventoryMoverModifierKey.LeftShift;
     public bool BetterCompanyChestEnabled { get; set; } = false;
     public int BetterCompanyChestDefaultPage { get; set; } = 0;

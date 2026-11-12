@@ -23,6 +23,15 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.65 - 2026-11-12",
+            Lines =
+            [
+                "- Updated Inventory Search Options: Adjust nonmatching-item opacity, enable Ctrl+F focus and toggle hover help. Ctrl+F starts off; instructions remain in Options. Settings support all 14 languages and Toon Mods presets.",
+                "- Updated Xagman Regional Matching: Choose one meeting world per region for connected and ONH runs. Process NA, EU, JP and OCE without separate data-center stops. Select your regional worlds and update every participating client.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.64 - 2026-11-11",
             Lines =
             [

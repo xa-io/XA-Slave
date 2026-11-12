@@ -286,6 +286,9 @@ public sealed class XAModInventorySearchSettings
     public bool ShowUntradable { get; set; } = true;
     public bool ShowBound { get; set; } = true;
     public bool ShowUnique { get; set; } = true;
+    public int NonmatchingOpacityPercent { get; set; } = 50;
+    public bool FocusShortcutEnabled { get; set; } = false;
+    public bool ShowTooltips { get; set; } = true;
 }
 
 [Serializable]

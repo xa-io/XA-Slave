@@ -30121,4 +30121,148 @@ NamePlate就绪 + PlayerAvailable + 未在咏唱 + 未在战斗。</value>
     <value>正在等待ONH出售后返回确认。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
+  <data name="S52B4A5713FBEB34F" xml:space="preserve">
+    <value>不匹配物品的不透明度 (%)</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S4CA4F29E46D2EA44" xml:space="preserve">
+    <value>不透明度越高，不匹配的物品就越清晰。0%会隐藏它们；100%则保持原样。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDE2383214A858378" xml:space="preserve">
+    <value>启用Ctrl+F聚焦搜索框</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S1407E96D10298F45" xml:space="preserve">
+    <value>显示搜索和筛选提示</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SD98B136B96B18DCF" xml:space="preserve">
+    <value>Ctrl+F是可选功能，与XA Mod的开关快捷键相互独立。关闭此选项可将Ctrl+F留给其他插件使用。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SFCA1B5E87F4237D4" xml:space="preserve">
+    <value>按物品名称的字面文本或物品ID搜索。点击搜索框即可输入。Escape清除搜索和筛选条件。T：可交易；NT：不可交易；B：绑定（收藏品除外）；U：独占。筛选条件可与搜索组合使用；T和NT不能同时使用。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDC36A5470602E682" xml:space="preserve">
+    <value>启用后，Ctrl+F会聚焦当前储物窗口中的搜索框。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SA2A80A8A406CB7E4" xml:space="preserve">
+    <value>淡化不匹配的格子，不移动物品。可在选项中设置不透明度、Ctrl+F搜索聚焦、提示和筛选按钮。Escape清除搜索和筛选条件。物品名称使用游戏语言；文本按字面匹配。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDDD59D60CD6D194D" xml:space="preserve">
+    <value>请选择 {0} 区域的集合世界。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S1B6E1655281B5139" xml:space="preserve">
+    <value>集合世界 {0} 必须属于 {1} 区域。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S663F5E4361EA3FCE" xml:space="preserve">
+    <value>请为每个要处理的区域选择一个集合世界。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0B7F1B1C23120CC3" xml:space="preserve">
+    <value>未知集合区域：{0}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2896143637059D3B" xml:space="preserve">
+    <value>正在等待兼容客户端和已配置的区域目的地。请更新所有参与的 XA Slave 客户端。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6A30AF3374F55A9D" xml:space="preserve">
+    <value>区域匹配要求所有参与客户端使用更新后的 XA Slave。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S23ED53F28F90BB9A" xml:space="preserve">
+    <value>Tony 正在处理 {0} 区域。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SF3440248A0C17B69" xml:space="preserve">
+    <value>正在等待 {0} 区域；Tony 正在处理 {1}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S90E9C47C1B3AD21F" xml:space="preserve">
+    <value>{0} 区域已处理；Tony 正在处理 {1}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3DD244E6AD140E58" xml:space="preserve">
+    <value>区域集合世界：{0}；共用位置：{1}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S48F8D3E03A92AA55" xml:space="preserve">
+    <value>请选择区域集合世界和共用集合地点。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3ECD8BDC86C34D1A" xml:space="preserve">
+    <value>ONH 伙伴必须为每个区域选择相同的集合世界和地点。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S63B890283B3F5AAD" xml:space="preserve">
+    <value>每个区域选择一个集合世界。该区域所有已选角色将在那里集合。旧的数据中心选择会保留，但不再使用。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC3EBBCEF0F1ADF8E" xml:space="preserve">
+    <value>正在等待下一个所有者的区域信息</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SD1445CCD6B5813DA" xml:space="preserve">
+    <value>正在确认 ONH 完成。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC18D4F6D905DD48D" xml:space="preserve">
+    <value>正在等待 ONH 所有者确认完成。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S05AFE416A84DD7F1" xml:space="preserve">
+    <value>未确认 ONH 完成；剩余区域任务尚未标记为完成。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SDE3E59281B03AE88" xml:space="preserve">
+    <value>ONH 区域任务尚未完成，但此区域没有可用的 Tony。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S4C3BF2EC94735980" xml:space="preserve">
+    <value>ONH 区域匹配需要导入有效的角色名称和原始世界。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S7DD1348A71E4611A" xml:space="preserve">
+    <value>根据当前服务器状态，为每个区域选择一个可用的集合世界。开始前请检查选择；ONH 伙伴必须使用相同的世界。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S9502B1BCA79FD82F" xml:space="preserve">
+    <value>已为 {0} 个区域选择集合世界；其中 {1} 个区域有可用世界。状态检查时间：{2:g}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DB90C812ACEF736" xml:space="preserve">
+    <value> 这些区域未找到可用世界；请检查保留的选择或备用选择：{0}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SAE1A8D8361DC5A40" xml:space="preserve">
+    <value>服务器匹配（每个区域一个世界）</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SFCD09ABF8EB09D62" xml:space="preserve">
+    <value>请选择集合世界和地点，或为每个所需区域配置集合世界及共用地点。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6EA84D8C1349B0AC" xml:space="preserve">
+    <value>服务器匹配：正在等待 加盟业主 所需的区域信息...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2186AD7F50F80BA2" xml:space="preserve">
+    <value>无法开始区域匹配：所有者所需的区域不受支持、目的地未配置，或客户端需要更新。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S36475A5944385D99" xml:space="preserve">
+    <value>由于客户端或区域目的地不兼容，区域匹配已暂停： </value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DDA95DF13E8CA34" xml:space="preserve">
+    <value>补货轮次：正在等待加盟业主所需的区域信息...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
 </root>

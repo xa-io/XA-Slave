@@ -1961,16 +1961,28 @@ public partial class SlaveWindow
 
         void DrawInventorySearchBarOptions()
         {
+            var opacity = Math.Clamp(configuration.InventorySearchNonmatchingOpacityPercent, 0, 100);
+            var focusShortcut = configuration.InventorySearchFocusShortcutEnabled;
+            var showTooltips = configuration.InventorySearchShowTooltips;
+            var changed = UiNative.SliderInt(UiLocale.Native(UiLocale.Key("Nonmatching item opacity (%)")), ref opacity, 0, 100);
+            ImGui.TextWrapped(UiLocale.T("Higher opacity keeps nonmatching items clearer. 0% hides them; 100% leaves them unchanged."));
+            changed |= UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Enable Ctrl+F to focus search")), ref focusShortcut);
+            ImGui.TextWrapped(UiLocale.T("Ctrl+F is optional and separate from the XA Mod toggle hotkey. Leave it off to keep Ctrl+F available for other plugins."));
+            changed |= UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show search and filter tooltips")), ref showTooltips);
+
             var tradable = configuration.InventorySearchShowTradable;
             var untradable = configuration.InventorySearchShowUntradable;
             var bound = configuration.InventorySearchShowBound;
             var unique = configuration.InventorySearchShowUnique;
-            var changed = UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show T (tradable)")), ref tradable);
+            changed |= UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show T (tradable)")), ref tradable);
             changed |= UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show NT (untradable)")), ref untradable);
             changed |= UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show B (bound)")), ref bound);
             changed |= UiNative.Checkbox(UiLocale.Native(UiLocale.Key("Show U (unique)")), ref unique);
             if (changed)
             {
+                configuration.InventorySearchNonmatchingOpacityPercent = Math.Clamp(opacity, 0, 100);
+                configuration.InventorySearchFocusShortcutEnabled = focusShortcut;
+                configuration.InventorySearchShowTooltips = showTooltips;
                 configuration.InventorySearchShowTradable = tradable;
                 configuration.InventorySearchShowUntradable = untradable;
                 configuration.InventorySearchShowBound = bound;
@@ -1978,6 +1990,9 @@ public partial class SlaveWindow
                 SaveConfiguration();
             }
             ImGui.TextWrapped(UiLocale.T("Hidden filter buttons give the search field more space. Hiding a selected filter clears it."));
+            ImGui.Spacing();
+            ImGui.TextWrapped(InventorySearchBarService.LocalizedSearchInstructions);
+            ImGui.TextWrapped(InventorySearchBarService.LocalizedFocusInstructions);
         }
 
         void DrawBetterInventoryMoverOptions()
@@ -3447,7 +3462,7 @@ public partial class SlaveWindow
             plugin.InventorySearchBar.SetEnabled,
             applied => configuration.InventorySearchBarEnabled = applied,
             UiLocale.Native(UiLocale.Key("Search inventory, saddlebag, retainer and Free Company chest items by name, ID or item flags.")),
-            UiLocale.Native(UiLocale.Key("Dims nonmatching slots without moving items. Ctrl+F focuses search in the active inventory; Escape clears it. Names use the game language; text is matched literally.")),
+            UiLocale.Native(UiLocale.Key("Dims nonmatching slots without moving items. Options control opacity, Ctrl+F focus, tooltips and filter buttons. Escape clears search and filters. Names use the game language; text is matched literally.")),
             () => plugin.InventorySearchBar.LocalizedStatusText,
             searchTerms: ["inventory", "retainer", "search", "filter", "item name", "item ID", "Ctrl+F"],
             drawOptions: DrawInventorySearchBarOptions,

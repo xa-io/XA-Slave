@@ -130,7 +130,8 @@ public partial class SlaveWindow
             return true;
         }
         xagmanCapacityCollectionTonyRemainder = xagmanTonyRunList.ToList();
-        xagmanCapacityCollectionDataCenter = xagmanSweepDataCenter;
+        xagmanCapacityCollectionDataCenter = xagmanServerMatchingActive
+            ? GetXagmanRegionalMeetDataCenter(xagmanSweepDataCenter) : xagmanSweepDataCenter;
         xagmanCapacityCollectionPhaseTotal = xagmanPhaseTotalCharacters;
         xagmanCapacityCollectionPhaseResolved = xagmanPhaseResolvedCharacters;
         xagmanCapacityBlockedOnItems = fullInventory;
@@ -205,7 +206,7 @@ public partial class SlaveWindow
                 .Equals(xagmanCapacityRecoveryRegion, StringComparison.OrdinalIgnoreCase)));
             return true;
         }
-        var firstDataCenter = peers.SelectMany(peer => peer.SupplyPendingDataCenters)
+        var firstDataCenter = peers.SelectMany(GetXagmanPeerPendingDataCenters)
             .Where(dc => string.Equals(WorldData.GetRegionOfDataCenter(dc), xagmanCapacityRecoveryRegion, StringComparison.OrdinalIgnoreCase))
             .OrderBy(WorldData.GetSweepOrdinal).FirstOrDefault();
         // Even a region with no receivers joins an empty exact supplier pass. Every frozen
@@ -222,7 +223,8 @@ public partial class SlaveWindow
         xagmanTonyCompletedCharacters = 0;
         xagmanCurrentTonyIndex = 0;
         xagmanSweepRegion = xagmanCapacityRecoveryRegion;
-        if (xagmanServerMatchingActive) xagmanSweepDataCenter = firstDataCenter ?? xagmanCapacityCollectionDataCenter;
+        if (xagmanServerMatchingActive)
+            xagmanSweepDataCenter = firstDataCenter ?? GetXagmanRegionalMeetDataCenter(xagmanCapacityCollectionDataCenter);
         xagmanSweepAwaitingStart = false;
         xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;
         xagmanCapacityDrainReady = true;
@@ -519,7 +521,7 @@ public partial class SlaveWindow
         var nextTony = xagmanTonyRunList.Any(key => !key.Equals(xagmanActiveCharacter, StringComparison.OrdinalIgnoreCase)
             && !plugin.TaskRunner.FailedCharacters.Contains(key)
             && GetXagmanRegionOfChar(key).Equals(xagmanCapacityRecoveryRegion, StringComparison.OrdinalIgnoreCase));
-        var pendingSupply = owners.Any(peer => peer.SupplyPendingDataCenters.Any(dc => string.Equals(
+        var pendingSupply = owners.Any(peer => GetXagmanPeerPendingDataCenters(peer).Any(dc => string.Equals(
                 WorldData.GetRegionOfDataCenter(dc), xagmanCapacityRecoveryRegion, StringComparison.OrdinalIgnoreCase))
             || peer.PartialOwners.Any(state => state.RequestedItems.Count > 0
                 && GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(xagmanCapacityRecoveryRegion, StringComparison.OrdinalIgnoreCase)));
@@ -550,7 +552,8 @@ public partial class SlaveWindow
         xagmanPhaseTotalCharacters = xagmanCapacityCollectionPhaseTotal;
         xagmanPhaseResolvedCharacters = xagmanCapacityCollectionPhaseResolved;
         xagmanSweepRegion = xagmanCapacityRecoveryRegion;
-        xagmanSweepDataCenter = xagmanCapacityCollectionDataCenter;
+        xagmanSweepDataCenter = xagmanServerMatchingActive
+            ? GetXagmanRegionalMeetDataCenter(xagmanCapacityCollectionDataCenter) : xagmanCapacityCollectionDataCenter;
         xagmanSweepServerDrainedSinceUtc = DateTime.MinValue;
         xagmanCapacityDrainId = string.Empty;
         xagmanCapacityRecoveryEpoch++;

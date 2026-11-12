@@ -47,7 +47,12 @@ public partial class SlaveWindow
             && !xagmanCollectionFirstFailedCharacters.Contains(key) && !xagmanSkippedCharacters.Contains(key)
             && !xagmanOwnerCompletedKeys.Contains(key)
             && (!IsXagmanCollectionFirstCollectionPhase() || !xagmanCharDurationSeconds.ContainsKey(key))).ToList();
-        var routes = remaining.GroupBy(GetXagmanDataCenterOfChar, StringComparer.OrdinalIgnoreCase)
+        // ETA buckets describe processing order, not future travel destinations. Owners
+        // need not know Tony's other regional selections to report their remaining work.
+        var regionalMatching = xagmanServerMatchingActive || GetXagmanSupplyTonyPeer()?.ServerMatchingEnabled == true;
+        var routes = remaining.GroupBy(key => regionalMatching
+                ? XagmanEtaEstimator.GetRegionalRouteDataCenter(GetXagmanDataCenterOfChar(key))
+                : GetXagmanDataCenterOfChar(key), StringComparer.OrdinalIgnoreCase)
             .Select(group => new XagmanEtaRoute
             {
                 DataCenter = group.Key, RemainingCharacters = group.Count(), RemainingSeconds = group.Count() * average,
@@ -91,12 +96,12 @@ public partial class SlaveWindow
                 : GetXagmanActiveTradeCoordinationDataCenter();
         if (tony == null || !IsXagmanPeerFresh(tony) || tony.Status == XagmanStatus.Error || !tony.ServerMatchingEnabled
             || string.IsNullOrWhiteSpace(destination) || string.IsNullOrWhiteSpace(tony.ServerMatchingActiveDataCenter)
-            || destination.Equals(tony.ServerMatchingActiveDataCenter, StringComparison.OrdinalIgnoreCase)) return false;
-        var differentRegion = !string.Equals(WorldData.GetRegionOfDataCenter(destination),
-            WorldData.GetRegionOfDataCenter(tony.ServerMatchingActiveDataCenter), StringComparison.OrdinalIgnoreCase);
-        state = (differentRegion ? global::XASlave.Localization.UiMessage.Key("S049CBB216199D4F1") : global::XASlave.Localization.UiMessage.Key("S4B027EC29B7FFA92"));
-        if (WorldData.GetSweepOrdinal(destination) < WorldData.GetSweepOrdinal(tony.ServerMatchingActiveDataCenter))
-            state = (differentRegion ? global::XASlave.Localization.UiMessage.Key("SB0F0E82AA549083C") : global::XASlave.Localization.UiMessage.Key("SC3D9D0E4FBEF0D7D"));
+            || GetXagmanRegionOrdinal(destination) >= 999
+            || GetXagmanRegionOrdinal(tony.ServerMatchingActiveDataCenter) >= 999
+            || IsXagmanSameRegion(destination, tony.ServerMatchingActiveDataCenter)) return false;
+        state = global::XASlave.Localization.UiMessage.Key("S049CBB216199D4F1");
+        if (GetXagmanRegionOrdinal(destination) < GetXagmanRegionOrdinal(tony.ServerMatchingActiveDataCenter))
+            state = global::XASlave.Localization.UiMessage.Key("SB0F0E82AA549083C");
         var phase = IsXagmanCollectionFirstRunActive() ? xagmanRunPhase : XagmanRunPhase.Legacy;
         if (!XagmanEtaEstimator.IsUsable(tony.Eta, DateTime.UtcNow, phase, tony.InstanceId))
         { estimate = global::XASlave.Localization.UiMessage.Key("SD7D120621FB5D60C"); return true; }

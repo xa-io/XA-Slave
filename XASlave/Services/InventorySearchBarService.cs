@@ -23,6 +23,9 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
 {
     private readonly SlaveNativeUiLibrary library;
     private readonly Func<InventorySearchFilter> visibleFilters;
+    private readonly Func<int> nonmatchingOpacityPercent;
+    private readonly Func<bool> focusShortcutEnabled;
+    private readonly Func<bool> showTooltips;
     private readonly Action unavailable;
     private readonly Dictionary<string, long> epochs = new(StringComparer.Ordinal);
     private readonly Dictionary<string, SearchControl> controls = new(StringComparer.Ordinal);
@@ -36,8 +39,16 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
     internal string StatusText => StatusTextMessage.Original;
     internal string LocalizedStatusText => StatusTextMessage.Display;
 
-    internal InventorySearchBarService(SlaveNativeUiLibrary library, Func<InventorySearchFilter> visibleFilters, Action unavailable)
-    { this.library = library; this.visibleFilters = visibleFilters; this.unavailable = unavailable; }
+    internal InventorySearchBarService(SlaveNativeUiLibrary library, Func<InventorySearchFilter> visibleFilters,
+        Func<int> nonmatchingOpacityPercent, Func<bool> focusShortcutEnabled, Func<bool> showTooltips, Action unavailable)
+    {
+        this.library = library; this.visibleFilters = visibleFilters; this.unavailable = unavailable;
+        this.nonmatchingOpacityPercent = nonmatchingOpacityPercent;
+        this.focusShortcutEnabled = focusShortcutEnabled; this.showTooltips = showTooltips;
+    }
+
+    internal static string LocalizedSearchInstructions => UiLocale.T("Search by literal item name or item ID. Click the field to type. Escape clears search and filters. T: tradable; NT: untradable; B: bound (excluding collectables); U: unique. Filters combine with search; T and NT cannot be combined.");
+    internal static string LocalizedFocusInstructions => UiLocale.T("When enabled, Ctrl+F focuses search in the active storage window.");
 
     internal bool SetEnabled(bool value)
     {
@@ -158,7 +169,8 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
                     {
                         if (!library.EnsureReady()) continue;
                         if (!enabled || disposed || retiring) return;
-                        control = new SearchControl(host.Value, Epoch, itemNames, () => nextScan = 0, () => enabled && !disposed, visibleFilters);
+                        control = new SearchControl(host.Value, Epoch, itemNames, () => nextScan = 0, () => enabled && !disposed,
+                            visibleFilters, nonmatchingOpacityPercent, focusShortcutEnabled, showTooltips);
                         controls.Add(name, control);
                     }
                     control.Update();
@@ -174,6 +186,8 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
         var down = (GetAsyncKeyState(0x46) & 0x8000) != 0 && (GetAsyncKeyState(0x11) & 0x8000) != 0;
         var pressed = down && !controlFWasDown;
         controlFWasDown = down;
+        // Observe releases while disabled, but never focus or consume the key.
+        if (!focusShortcutEnabled()) return;
         if (!pressed || Volatile.Read(ref drawBlocked) || now - Interlocked.Read(ref drawTimestamp) is < 0 or > 500
             || (GetAsyncKeyState(0x12) & 0x8000) != 0 || (GetAsyncKeyState(0x10) & 0x8000) != 0) return;
         var input = UIInputData.Instance();
@@ -249,6 +263,9 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
         private readonly Dictionary<uint, string> names;
         private readonly Func<bool> ownerActive;
         private readonly Func<InventorySearchFilter> visibleFilters;
+        private readonly Func<int> nonmatchingOpacityPercent;
+        private readonly Func<bool> focusShortcutEnabled;
+        private readonly Func<bool> showTooltips;
         private readonly Dictionary<InventorySearchSlot, InventorySearchSlotDimState> dimmed = new();
         private readonly List<(InventorySearchFilter Filter, CompactFilterButton Node, string Tooltip, float Width)> filterButtons = new();
         private string query = string.Empty;
@@ -266,10 +283,14 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
             }
         }
 
-        internal SearchControl(InventorySearchHost host, Func<string, long> epoch, Dictionary<uint, string> names, Action changed, Func<bool> ownerActive, Func<InventorySearchFilter> visibleFilters)
+        internal SearchControl(InventorySearchHost host, Func<string, long> epoch, Dictionary<uint, string> names,
+            Action changed, Func<bool> ownerActive, Func<InventorySearchFilter> visibleFilters,
+            Func<int> nonmatchingOpacityPercent, Func<bool> focusShortcutEnabled, Func<bool> showTooltips)
         {
             Host = host; this.epoch = epoch; this.names = names; this.ownerActive = ownerActive;
             this.visibleFilters = visibleFilters;
+            this.nonmatchingOpacityPercent = nonmatchingOpacityPercent;
+            this.focusShortcutEnabled = focusShortcutEnabled; this.showTooltips = showTooltips;
             var addon = InventorySearchNative.Resolve(host, epoch, true);
             if (addon == null) throw UiMessage.CreateException(UiMessage.Key(UiLocale.Key("The inventory window changed before the search bar could be attached.")), text => new InvalidOperationException(text));
             input = new TextInputNode();
@@ -310,7 +331,7 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
             // Register ownership immediately so partial constructor failures retire every node.
             filterButtons.Add((filter, button, tooltip, width));
             button.Label.String = label;
-            button.CollisionNode.TextTooltip = UiLocale.T(tooltip);
+            button.CollisionNode.TextTooltip = showTooltips() ? UiLocale.T(tooltip) : string.Empty;
             button.OnClick = () =>
             {
                 if (retired || !ownerActive() || epoch(Host.Name) != Host.Epoch) return;
@@ -349,18 +370,21 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
             input.PlaceholderString = UiLocale.T("Search items...");
             // Keep hover events on the native focus target. Registering them on the
             // outer component makes it a competing mouse target above the text input.
-            input.CollisionNode.TextTooltip = UiLocale.T("Search by literal item name or item ID. Ctrl+F focuses search in the active storage window. T, NT, B, and U filter items. Escape clears search and filters.");
+            var tooltips = showTooltips();
+            input.CollisionNode.TextTooltip = tooltips
+                ? LocalizedSearchInstructions + (focusShortcutEnabled() ? " " + LocalizedFocusInstructions : string.Empty)
+                : string.Empty;
             input.IsVisible = true;
             var x = input.Position.X + input.Width;
             foreach (var button in filterButtons)
             {
                 button.Node.IsVisible = (visible & button.Filter) != 0;
                 button.Node.IsSelected = (filters & button.Filter) != 0;
+                button.Node.CollisionNode.TextTooltip = tooltips ? UiLocale.T(button.Tooltip) : string.Empty;
                 if (!button.Node.IsVisible) continue;
                 x += gap;
                 button.Node.Size = new Vector2(button.Width, 24);
                 button.Node.Position = new Vector2(x, input.Position.Y + 2);
-                button.Node.CollisionNode.TextTooltip = UiLocale.T(button.Tooltip);
                 x += button.Width;
             }
         }
@@ -381,6 +405,7 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
             var matches = InventorySearchNative.CaptureMatches(Host, epoch, query, names, filters);
             var current = matches.Select(match => match.Slot).ToHashSet();
             foreach (var old in dimmed.Keys.Where(slot => !current.Contains(slot)).ToArray()) Restore(old);
+            var opacityPercent = nonmatchingOpacityPercent();
             foreach (var match in matches)
             {
                 var node = InventorySearchNative.ResolveSlot(match.Slot, epoch);
@@ -393,7 +418,7 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
                 if (state.TryResetForItem(match.Item, node->Color.A, out var restored)) node->SetAlpha(restored);
                 // Read the actual current alpha again after restoring the previous
                 // content's owned appearance; do not reuse its captured value.
-                if (state.TryApply(node->Color.A, match.Dim, out var replacement)) node->SetAlpha(replacement);
+                if (state.TryApply(node->Color.A, match.Dim, out var replacement, opacityPercent)) node->SetAlpha(replacement);
                 if (!match.Dim) dimmed.Remove(match.Slot);
             }
         }

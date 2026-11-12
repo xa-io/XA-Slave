@@ -30121,4 +30121,148 @@ xafunc의 DoNavFlySequenceXA 논리와 같습니다(Player.CanFly 확인).</valu
     <value>ONH 판매 후 복귀 확인을 기다리는 중입니다.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
+  <data name="S52B4A5713FBEB34F" xml:space="preserve">
+    <value>일치하지 않는 아이템 불투명도 (%)</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S4CA4F29E46D2EA44" xml:space="preserve">
+    <value>불투명도가 높을수록 일치하지 않는 아이템이 더 선명하게 보입니다. 0%는 숨기고, 100%는 원래 모습으로 표시합니다.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDE2383214A858378" xml:space="preserve">
+    <value>Ctrl+F로 검색창에 초점 맞추기 활성화</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S1407E96D10298F45" xml:space="preserve">
+    <value>검색 및 필터 툴팁 표시</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SD98B136B96B18DCF" xml:space="preserve">
+    <value>Ctrl+F는 선택 사항이며 XA Mod를 켜고 끄는 단축키와 별개입니다. 다른 플러그인에서 Ctrl+F를 사용하려면 이 옵션을 꺼 두세요.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SFCA1B5E87F4237D4" xml:space="preserve">
+    <value>아이템 이름의 일반 텍스트 또는 아이템 ID로 검색합니다. 입력하려면 검색창을 클릭하세요. Escape는 검색과 필터를 초기화합니다. T: 거래 가능; NT: 거래 불가; B: 귀속(수집품 제외); U: 고유. 필터는 검색과 함께 적용되며, T와 NT는 동시에 사용할 수 없습니다.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDC36A5470602E682" xml:space="preserve">
+    <value>활성화하면 Ctrl+F가 현재 활성화된 보관함 창의 검색창에 초점을 맞춥니다.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SA2A80A8A406CB7E4" xml:space="preserve">
+    <value>아이템을 이동하지 않고 일치하지 않는 슬롯을 흐리게 표시합니다. 옵션에서 불투명도, Ctrl+F 검색 초점, 툴팁 및 필터 버튼을 설정할 수 있습니다. Escape는 검색과 필터를 초기화합니다. 이름은 게임 언어를 사용하며, 텍스트는 입력한 그대로 비교합니다.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDDD59D60CD6D194D" xml:space="preserve">
+    <value>{0} 지역의 만남 월드를 선택하세요.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S1B6E1655281B5139" xml:space="preserve">
+    <value>만남 월드 {0}은(는) {1} 지역에 속해야 합니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S663F5E4361EA3FCE" xml:space="preserve">
+    <value>처리할 각 지역의 만남 월드를 하나씩 선택하세요.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0B7F1B1C23120CC3" xml:space="preserve">
+    <value>알 수 없는 만남 지역: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2896143637059D3B" xml:space="preserve">
+    <value>호환 클라이언트 및 설정된 지역 목적지 대기 중. 참여하는 모든 XA Slave 클라이언트를 업데이트하세요.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6A30AF3374F55A9D" xml:space="preserve">
+    <value>지역 매칭을 사용하려면 참여하는 모든 클라이언트의 XA Slave를 업데이트해야 합니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S23ED53F28F90BB9A" xml:space="preserve">
+    <value>Tony가 {0} 지역을 처리 중입니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SF3440248A0C17B69" xml:space="preserve">
+    <value>{0} 지역 대기 중. Tony는 {1}을(를) 처리 중입니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S90E9C47C1B3AD21F" xml:space="preserve">
+    <value>{0} 지역은 이미 처리되었습니다. Tony는 {1}을(를) 처리 중입니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3DD244E6AD140E58" xml:space="preserve">
+    <value>지역별 만남 월드: {0}; 공통 위치: {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S48F8D3E03A92AA55" xml:space="preserve">
+    <value>지역별 만남 월드와 공통 만남 위치를 선택하세요.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3ECD8BDC86C34D1A" xml:space="preserve">
+    <value>ONH 파트너는 각 지역에서 같은 만남 월드와 위치를 선택해야 합니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S63B890283B3F5AAD" xml:space="preserve">
+    <value>지역마다 만남 월드를 하나 선택하세요. 해당 지역에서 선택된 모든 캐릭터가 그곳에 모입니다. 기존 데이터 센터별 선택은 보관되지만 사용되지 않습니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC3EBBCEF0F1ADF8E" xml:space="preserve">
+    <value>다음 소유자의 지역 정보 대기 중</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SD1445CCD6B5813DA" xml:space="preserve">
+    <value>ONH 완료 확인 중.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC18D4F6D905DD48D" xml:space="preserve">
+    <value>ONH 소유자의 완료 확인 대기 중.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S05AFE416A84DD7F1" xml:space="preserve">
+    <value>ONH 완료가 확인되지 않았습니다. 남은 지역 작업은 완료로 표시되지 않았습니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SDE3E59281B03AE88" xml:space="preserve">
+    <value>지역 내 ONH 작업이 남아 있지만 이 지역에서 사용 가능한 Tony가 없습니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S4C3BF2EC94735980" xml:space="preserve">
+    <value>ONH 지역 매칭에는 유효한 가져온 캐릭터 이름과 홈 월드가 필요합니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S7DD1348A71E4611A" xml:space="preserve">
+    <value>현재 서버 상태에서 지역마다 사용 가능한 만남 월드를 하나 선택합니다. 시작 전에 선택을 확인하세요. ONH 파트너는 같은 월드를 사용해야 합니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S9502B1BCA79FD82F" xml:space="preserve">
+    <value>{0}개 지역의 만남 월드를 선택했습니다. {1}개 지역에 사용 가능한 월드가 있습니다. 상태 확인: {2:g}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DB90C812ACEF736" xml:space="preserve">
+    <value> 다음 지역에서 사용 가능한 월드를 찾지 못했습니다. 유지된 선택 또는 대체 선택을 확인하세요: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SAE1A8D8361DC5A40" xml:space="preserve">
+    <value>서버 매칭(지역당 월드 하나)</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SFCD09ABF8EB09D62" xml:space="preserve">
+    <value>만남 월드와 위치를 선택하거나, 필요한 각 지역의 만남 월드와 공통 위치를 설정하세요.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6EA84D8C1349B0AC" xml:space="preserve">
+    <value>서버 매칭: 가맹 소유자에게 필요한 지역 정보 대기 중...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2186AD7F50F80BA2" xml:space="preserve">
+    <value>지역 매칭을 시작할 수 없습니다. 소유자에게 필요한 지역이 지원되지 않거나, 목적지가 설정되지 않았거나, 클라이언트 업데이트가 필요합니다.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S36475A5944385D99" xml:space="preserve">
+    <value>클라이언트 또는 지역 목적지가 호환되지 않아 지역 매칭이 일시 중지되었습니다: </value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DDA95DF13E8CA34" xml:space="preserve">
+    <value>재보급 단계: 가맹 소유자에게 필요한 지역 정보 대기 중...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
 </root>

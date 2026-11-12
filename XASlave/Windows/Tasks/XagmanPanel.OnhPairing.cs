@@ -16,6 +16,7 @@ public partial class SlaveWindow
     // Separate from capacity/control-signal revisions: old invitation peers cannot
     // accidentally negotiate this owner-led collection contract.
     private const int XagmanOnhPairingRevision = 1;
+    private const int XagmanOnhRegionalPairingRevision = 2;
     private string onhPairRequest = string.Empty;
     private string onhPairSession = string.Empty;
     private string onhPairPartnerCharacter = string.Empty;
@@ -29,6 +30,12 @@ public partial class SlaveWindow
     private readonly Dictionary<string, DateTime> onhDeferredTonys = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, string> onhClosedPairRequests = new(StringComparer.OrdinalIgnoreCase);
     private readonly Dictionary<string, DateTime> onhPairLastReplyUtc = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, (string Request, string Session, uint LocalEntity, uint PartnerEntity, string Slave, string Dropbox)>
+        onhCompletedPairReceipts = new(StringComparer.OrdinalIgnoreCase);
+    private bool onhOwnerCompletionAcknowledged;
+    private DateTime onhOwnerCompletionDeadlineUtc;
+    private DateTime onhOwnerCompletionNextSendUtc;
+    private DateTime onhLastTerminalOwnerUtc;
 
     private bool IsXagmanOnhPairReady => !onhCollectionHeld && !onhIncomingRefusalPending
         && onhPairReady && onhPairRequest.Length != 0
@@ -48,12 +55,16 @@ public partial class SlaveWindow
         onhPairPartnerEntityId = onhPairLocalEntityId = 0;
         onhPairCreatedUtc = onhPairExpiresUtc = onhPairNextSendUtc = DateTime.MinValue;
         onhPairConfirmed = onhPairReady = false;
+        onhOwnerCompletionAcknowledged = false;
+        onhOwnerCompletionDeadlineUtc = onhOwnerCompletionNextSendUtc = DateTime.MinValue;
         // Deferral is temporary and is deliberately retained by exchange resets.
         // Otherwise the nearest busy Tony would immediately win discovery again.
         if (!newRun) return;
         onhDeferredTonys.Clear();
         onhClosedPairRequests.Clear();
         onhPairLastReplyUtc.Clear();
+        onhCompletedPairReceipts.Clear();
+        onhLastTerminalOwnerUtc = DateTime.MinValue;
     }
 
     private static string GetXagmanOnhActorKey(IPlayerCharacter actor)
@@ -122,9 +133,19 @@ public partial class SlaveWindow
         actor = matches[0];
         var actorKey = GetXagmanOnhActorKey(actor);
         key = actorKey;
-        var roster = xagmanActiveRole == XagmanRole.Tony
-            ? plugin.Configuration.XagmanOnhFriendFoCharacters : plugin.Configuration.XagmanOnhFriendTonyCharacters;
-        return IsXagmanOnhFullKey(actorKey) && roster.Any(entry => entry.Trim().Equals(actorKey, StringComparison.OrdinalIgnoreCase));
+        var roster = GetXagmanOnhPartnerRoster();
+        return IsXagmanOnhFullKey(actorKey) && IsXagmanOnhPartnerInActiveRegion(actorKey)
+            && roster.Any(entry => entry.Trim().Equals(actorKey, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private bool TryGetXagmanOnhRegionalPairRoute(out string region, out uint worldId)
+    {
+        region = GetXagmanRegionOfChar(xagmanActiveCharacter);
+        var world = WorldData.Worlds.FirstOrDefault(w => w.Name.Equals(GetXagmanActiveMeetWorld(), StringComparison.OrdinalIgnoreCase));
+        worldId = world?.Id ?? 0;
+        return world != null && world.Region.Equals(region, StringComparison.OrdinalIgnoreCase)
+            && Plugin.ObjectTable.LocalPlayer?.CurrentWorld.RowId == worldId
+            && IsXagmanAtMeetDestination(GetXagmanActiveMeetWorld(), GetXagmanActiveMeetAetheryte());
     }
 
     private bool SendXagmanOnhPairingTell(string operation, string request, string session, string recipient)
@@ -135,7 +156,14 @@ public partial class SlaveWindow
         if (actor == null || local == null || local.EntityId == 0 || actor.EntityId == 0
             || !TryGetXagmanTradeVersions(out var slave, out var dropbox, out _)) return false;
         if (onhPairLastReplyUtc.TryGetValue(recipient, out var last) && (DateTime.UtcNow - last).TotalSeconds < 1) return false;
-        var text = FormattableString.Invariant($"/xa onh-pair {XagmanOnhPairingRevision} {operation} {request} {session} {local.EntityId} {actor.EntityId} {slave} {dropbox}");
+        var revision = xagmanOnhRegionalMatching ? XagmanOnhRegionalPairingRevision : XagmanOnhPairingRevision;
+        var text = FormattableString.Invariant($"/xa onh-pair {revision} {operation} {request} {session} {local.EntityId} {actor.EntityId} {slave} {dropbox}");
+        if (xagmanOnhRegionalMatching)
+        {
+            if (!IsXagmanOnhPartnerInActiveRegion(recipient)
+                || !TryGetXagmanOnhRegionalPairRoute(out var region, out var worldId)) return false;
+            text += FormattableString.Invariant($" {region} {worldId}");
+        }
         onhPairLastReplyUtc[recipient] = DateTime.UtcNow;
         return ChatHelper.TrySend($"/tell {GetXagmanOnhActorKey(actor)} {text}");
     }
@@ -235,6 +263,36 @@ public partial class SlaveWindow
         SendXagmanOnhPairingTell("reserve", onhPairRequest, onhPairSession, xagmanOnhEngagedPartner);
     }
 
+    private void BeginXagmanOnhCompletionConfirmation(bool owner)
+    {
+        onhOwnerCompletionAcknowledged = false;
+        onhOwnerCompletionDeadlineUtc = DateTime.UtcNow.AddSeconds(30);
+        onhOwnerCompletionNextSendUtc = DateTime.MinValue;
+        var phase = owner ? XagmanOnhPhase.FoConfirmCompletion : XagmanOnhPhase.TonyAwaitOwnerCompletion;
+        xagmanStatus = XagmanStatus.Queued;
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, GetXagmanOnhPhaseMessage(phase));
+        SetXagmanOnhPhase(phase);
+    }
+
+    private void DriveXagmanOnhCompletionConfirmation()
+    {
+        if (xagmanOnhPhase == XagmanOnhPhase.FoConfirmCompletion && onhOwnerCompletionAcknowledged)
+        {
+            AdvanceXagmanOnhCharacter(false);
+            return;
+        }
+        if (DateTime.UtcNow >= onhOwnerCompletionDeadlineUtc)
+        {
+            if (!plugin.TaskRunner.IncompleteCharacters.Contains(xagmanActiveCharacter))
+                plugin.TaskRunner.RecordIncompleteCharacter(xagmanActiveCharacter);
+            HoldXagmanOnhRegionalWork(global::XASlave.Localization.UiMessage.Authored("ONH completion was not confirmed; remaining regional work has not been marked complete."));
+            return;
+        }
+        if (xagmanOnhPhase != XagmanOnhPhase.FoConfirmCompletion || DateTime.UtcNow < onhOwnerCompletionNextSendUtc) return;
+        onhOwnerCompletionNextSendUtc = DateTime.UtcNow.AddSeconds(2);
+        SendXagmanOnhPairingTell("complete", onhPairRequest, onhPairSession, xagmanOnhEngagedPartner);
+    }
+
     private bool TryReceiveXagmanOnhPairingTell(PlayerPayload sender, string text)
     {
         var parts = text.Split(' ', StringSplitOptions.RemoveEmptyEntries);
@@ -244,8 +302,10 @@ public partial class SlaveWindow
             Plugin.RunOnGameThread(() => TryReceiveXagmanOnhPairingTell(sender, text));
             return true;
         }
-        if (onhCollectionHeld || onhIncomingRefusalPending || !TryRequireXagmanOnhProviderIdentity(out _) || parts.Length != 10
-            || parts[2] != XagmanOnhPairingRevision.ToString(CultureInfo.InvariantCulture)
+        var expectedRevision = xagmanOnhRegionalMatching ? XagmanOnhRegionalPairingRevision : XagmanOnhPairingRevision;
+        if (onhCollectionHeld || onhIncomingRefusalPending || !TryRequireXagmanOnhProviderIdentity(out _)
+            || parts.Length != (xagmanOnhRegionalMatching ? 12 : 10)
+            || parts[2] != expectedRevision.ToString(CultureInfo.InvariantCulture)
             || !XagmanTradeCapacityProtocol.IsRequestIdValid(parts[4])
             || !uint.TryParse(parts[6], NumberStyles.None, CultureInfo.InvariantCulture, out var senderEntity)
             || !uint.TryParse(parts[7], NumberStyles.None, CultureInfo.InvariantCulture, out var receiverEntity)
@@ -253,6 +313,11 @@ public partial class SlaveWindow
             || actor.EntityId != senderEntity || Plugin.ObjectTable.LocalPlayer?.EntityId != receiverEntity
             || !XagmanTradeVersionPolicy.TryNormalize(parts[8], out var slave)
             || !XagmanTradeVersionPolicy.TryNormalize(parts[9], out var dropbox)) return true;
+        if (xagmanOnhRegionalMatching
+            && (!TryGetXagmanOnhRegionalPairRoute(out var region, out var worldId)
+                || !parts[10].Equals(region, StringComparison.Ordinal)
+                || !uint.TryParse(parts[11], NumberStyles.None, CultureInfo.InvariantCulture, out var advertisedWorld)
+                || advertisedWorld != worldId || actor.CurrentWorld.RowId != worldId)) return true;
         var operation = parts[3];
         var request = parts[4];
         var session = parts[5];
@@ -262,6 +327,20 @@ public partial class SlaveWindow
         }
         else if (operation == "abandon" && session == "-") { }
         else if (!XagmanTradeCapacityProtocol.IsRequestIdValid(session)) return true;
+
+        // A lost final reply may be retried after this Tony has released the exchange.
+        // Only the exact completed request, actors, route and versions may replay its receipt.
+        if (xagmanOnhRegionalMatching && operation == "complete" && xagmanActiveRole == XagmanRole.Tony
+            && onhCompletedPairReceipts.TryGetValue(key, out var receipt)
+            && receipt.Request == request && receipt.Session == session
+            && receipt.LocalEntity == receiverEntity && receipt.PartnerEntity == senderEntity
+            && receipt.Slave == slave && receipt.Dropbox == dropbox
+            && TryGetXagmanTradeVersions(out var currentSlave, out var currentDropbox, out _)
+            && currentSlave == receipt.Slave && currentDropbox == receipt.Dropbox)
+        {
+            SendXagmanOnhPairingTell("complete-ack", request, session, key);
+            return true;
+        }
 
         if (operation == "request" && xagmanActiveRole == XagmanRole.Tony)
         {
@@ -305,6 +384,30 @@ public partial class SlaveWindow
 
         if (request != onhPairRequest || !key.Equals(xagmanOnhEngagedPartner, StringComparison.OrdinalIgnoreCase)
             || senderEntity != onhPairPartnerEntityId || receiverEntity != onhPairLocalEntityId) return true;
+        if (xagmanOnhRegionalMatching && session == onhPairSession)
+        {
+            if (operation == "complete" && xagmanActiveRole == XagmanRole.Tony
+                && xagmanOnhPhase == XagmanOnhPhase.TonyAwaitOwnerCompletion)
+            {
+                if (DateTime.UtcNow >= onhOwnerCompletionDeadlineUtc) return true;
+                if (!TryAcceptXagmanOnhPeerVersions(session, slave, dropbox, sender, false, out var failure))
+                { RejectXagmanOnhTradeVersions(failure); return true; }
+                if (!SendXagmanOnhPairingTell("complete-ack", request, session, key)) return true;
+                onhCompletedPairReceipts[key] = (Request: request, Session: session, LocalEntity: receiverEntity,
+                    PartnerEntity: senderEntity, Slave: slave, Dropbox: dropbox);
+                FinishXagmanOnhTonyEngagement();
+                return true;
+            }
+            if (operation == "complete-ack" && xagmanActiveRole == XagmanRole.FranchiseOwner
+                && xagmanOnhPhase == XagmanOnhPhase.FoConfirmCompletion)
+            {
+                if (DateTime.UtcNow >= onhOwnerCompletionDeadlineUtc) return true;
+                if (!TryAcceptXagmanOnhPeerVersions(session, slave, dropbox, sender, false, out var failure))
+                { RejectXagmanOnhTradeVersions(failure); return true; }
+                onhOwnerCompletionAcknowledged = true;
+                return true;
+            }
+        }
         if (operation == "abandon" && xagmanActiveRole == XagmanRole.Tony
             && (session == onhPairSession || (session == "-" && !onhPairConfirmed))
             && xagmanOnhPhase is XagmanOnhPhase.TonyAwaitConfirmation or XagmanOnhPhase.TonyReceiving

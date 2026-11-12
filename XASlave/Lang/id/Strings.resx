@@ -30121,4 +30121,148 @@ Sebaiknya lakukan saat pangkat Anda 6+ agar memiliki akses penawaran plot.</valu
     <value>Menunggu konfirmasi ONH kembali setelah menjual.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
+  <data name="S52B4A5713FBEB34F" xml:space="preserve">
+    <value>Opasitas item yang tidak cocok (%)</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S4CA4F29E46D2EA44" xml:space="preserve">
+    <value>Opasitas lebih tinggi membuat item yang tidak cocok lebih jelas. 0% menyembunyikannya; 100% membiarkannya seperti semula.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDE2383214A858378" xml:space="preserve">
+    <value>Aktifkan Ctrl+F untuk memfokuskan pencarian</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S1407E96D10298F45" xml:space="preserve">
+    <value>Tampilkan tooltip pencarian dan filter</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SD98B136B96B18DCF" xml:space="preserve">
+    <value>Ctrl+F bersifat opsional dan terpisah dari hotkey untuk mengaktifkan atau menonaktifkan XA Mod. Biarkan opsi ini nonaktif agar Ctrl+F tetap tersedia untuk plugin lain.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SFCA1B5E87F4237D4" xml:space="preserve">
+    <value>Cari berdasarkan teks nama item atau ID item. Klik kolom untuk mengetik. Escape menghapus pencarian dan filter. T: dapat ditukar; NT: tidak dapat ditukar; B: terikat (kecuali collectable); U: unik. Filter digabungkan dengan pencarian; T dan NT tidak dapat digunakan bersamaan.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDC36A5470602E682" xml:space="preserve">
+    <value>Saat diaktifkan, Ctrl+F memfokuskan pencarian di jendela penyimpanan yang aktif.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SA2A80A8A406CB7E4" xml:space="preserve">
+    <value>Meredupkan slot yang tidak cocok tanpa memindahkan item. Opsi mengatur opasitas, fokus pencarian dengan Ctrl+F, tooltip dan tombol filter. Escape menghapus pencarian dan filter. Nama menggunakan bahasa game; teks dicocokkan secara literal.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDDD59D60CD6D194D" xml:space="preserve">
+    <value>Pilih dunia pertemuan untuk wilayah {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S1B6E1655281B5139" xml:space="preserve">
+    <value>Dunia pertemuan {0} harus berada di wilayah {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S663F5E4361EA3FCE" xml:space="preserve">
+    <value>Pilih satu dunia pertemuan untuk setiap wilayah yang akan diproses.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0B7F1B1C23120CC3" xml:space="preserve">
+    <value>Wilayah pertemuan tidak dikenal: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2896143637059D3B" xml:space="preserve">
+    <value>Menunggu klien yang kompatibel dan tujuan wilayah yang dikonfigurasi. Perbarui setiap klien XA Slave yang berpartisipasi.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6A30AF3374F55A9D" xml:space="preserve">
+    <value>Pencocokan wilayah memerlukan XA Slave terbaru di setiap klien yang berpartisipasi.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S23ED53F28F90BB9A" xml:space="preserve">
+    <value>Tony sedang melayani wilayah {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SF3440248A0C17B69" xml:space="preserve">
+    <value>Menunggu wilayah {0}; Tony sedang melayani {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S90E9C47C1B3AD21F" xml:space="preserve">
+    <value>Wilayah {0} sudah diproses; Tony sedang melayani {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3DD244E6AD140E58" xml:space="preserve">
+    <value>Dunia pertemuan wilayah: {0}; lokasi bersama: {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S48F8D3E03A92AA55" xml:space="preserve">
+    <value>Pilih dunia pertemuan wilayah dan lokasi pertemuan bersama.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3ECD8BDC86C34D1A" xml:space="preserve">
+    <value>Mitra ONH harus memilih dunia dan lokasi pertemuan yang sama untuk setiap wilayah.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S63B890283B3F5AAD" xml:space="preserve">
+    <value>Pilih satu dunia pertemuan per wilayah. Semua karakter terpilih di wilayah itu bertemu di sana. Pilihan lama per pusat data disimpan tetapi tidak digunakan.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC3EBBCEF0F1ADF8E" xml:space="preserve">
+    <value>menunggu detail wilayah pemilik berikutnya</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SD1445CCD6B5813DA" xml:space="preserve">
+    <value>Mengonfirmasi penyelesaian ONH.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC18D4F6D905DD48D" xml:space="preserve">
+    <value>Menunggu konfirmasi penyelesaian pemilik ONH.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S05AFE416A84DD7F1" xml:space="preserve">
+    <value>Penyelesaian ONH belum dikonfirmasi; pekerjaan wilayah yang tersisa belum ditandai selesai.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SDE3E59281B03AE88" xml:space="preserve">
+    <value>Masih ada pekerjaan wilayah ONH, tetapi tidak ada Tony yang tersedia di wilayah ini.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S4C3BF2EC94735980" xml:space="preserve">
+    <value>Pencocokan wilayah ONH memerlukan nama karakter dan dunia asal impor yang valid.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S7DD1348A71E4611A" xml:space="preserve">
+    <value>Pilih satu dunia pertemuan yang tersedia per wilayah dari status server saat ini. Tinjau pilihan sebelum memulai; mitra ONH harus menggunakan dunia yang sama.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S9502B1BCA79FD82F" xml:space="preserve">
+    <value>Dunia pertemuan dipilih untuk {0} wilayah; {1} memiliki dunia yang tersedia. Status diperiksa {2:g}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DB90C812ACEF736" xml:space="preserve">
+    <value> Tidak ditemukan dunia yang tersedia untuk wilayah ini; tinjau pilihan yang dipertahankan atau cadangan: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SAE1A8D8361DC5A40" xml:space="preserve">
+    <value>Pencocokan server (satu dunia per wilayah)</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SFCD09ABF8EB09D62" xml:space="preserve">
+    <value>Pilih dunia dan lokasi pertemuan, atau atur dunia pertemuan untuk setiap wilayah yang diperlukan dan lokasi bersama.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6EA84D8C1349B0AC" xml:space="preserve">
+    <value>Pencocokan server: menunggu wilayah yang diperlukan Franchise Owner...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2186AD7F50F80BA2" xml:space="preserve">
+    <value>Pencocokan wilayah tidak dapat dimulai: pemilik memerlukan wilayah yang tidak didukung, tujuan yang belum dikonfigurasi, atau klien yang diperbarui.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S36475A5944385D99" xml:space="preserve">
+    <value>Pencocokan wilayah dijeda karena klien atau tujuan wilayah tidak kompatibel: </value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DDA95DF13E8CA34" xml:space="preserve">
+    <value>Tahap pengisian ulang: menunggu wilayah yang diperlukan Franchise Owner...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
 </root>

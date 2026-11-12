@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Numerics;
 using System.Text.Json;
@@ -19,10 +20,10 @@ public partial class SlaveWindow
     private bool CanApplyXagmanServerStatus()
         => !isDisposed && !xagmanRunning && !plugin.TaskRunner.IsRunning && !xagmanTradeSafetySessionActive
             && plugin.Configuration.XagmanRole == XagmanRole.Tony
-            && plugin.Configuration.XagmanServerMatchingEnabled && !plugin.Configuration.XagmanOutsideNetworkHelper;
+            && plugin.Configuration.XagmanServerMatchingEnabled;
 
     private string GetXagmanServerStatusSetupKey()
-        => JsonSerializer.Serialize(plugin.Configuration.XagmanServerMeetWorlds.OrderBy(pair => pair.Key).ToArray());
+        => JsonSerializer.Serialize((plugin.Configuration.XagmanRegionMeetWorlds ?? new Dictionary<string, string>()).OrderBy(pair => pair.Key).ToArray());
 
     private void DrawXagmanServerStatus()
     {
@@ -32,7 +33,7 @@ public partial class SlaveWindow
                 BeginXagmanServerStatusRequest();
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
-            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get("S5BE5C0ECB9214380"));
+            ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Get(global::XASlave.Localization.UiLocale.Key("Select one available meeting world per region from current server status. Review the choices before starting; ONH partners must use the same worlds.")));
         if (!string.IsNullOrWhiteSpace(xagmanServerStatusMessage))
         {
             using var color = ImRaii.PushColor(ImGuiCol.Text, xagmanServerStatusWarning
@@ -64,23 +65,25 @@ public partial class SlaveWindow
                         return;
                     }
                     var cfg = plugin.Configuration;
-                    var previousWorlds = cfg.XagmanServerMeetWorlds;
-                    cfg.XagmanServerMeetWorlds = AethertekServerStatus.CompleteSelections(result.Worlds, previousWorlds);
+                    var eligible = AethertekServerStatus.SelectRegionalWorlds(result.Worlds);
+                    var unavailable = WorldData.RegionOrder.Where(region => !eligible.ContainsKey(region)).ToList();
+                    var previousWorlds = cfg.XagmanRegionMeetWorlds;
+                    cfg.XagmanRegionMeetWorlds = AethertekServerStatus.CompleteRegionalSelections(eligible, previousWorlds);
                     try
                     {
                         cfg.Save();
                     }
                     catch
                     {
-                        cfg.XagmanServerMeetWorlds = previousWorlds;
+                        cfg.XagmanRegionMeetWorlds = previousWorlds;
                         throw;
                     }
                     StopXagmanTonyAutoSelection(global::XASlave.Localization.UiMessage.Key("SA63D8F44280EEA54"));
                     InvalidateXagmanTradeCapacityForecast();
-                    xagmanServerStatusWarning = result.UnavailableDataCenters.Count > 0;
-                    xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Format("S4A5338EC8808717F", cfg.XagmanServerMeetWorlds.Count, result.Worlds.Count, result.CheckedAt.ToLocalTime()));
-                    if (result.UnavailableDataCenters.Count > 0)
-                        xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref xagmanServerStatusMessageUiMessage, xagmanServerStatusMessage), global::XASlave.Localization.UiMessage.Format("SEA155AC43E3DF353", string.Join(", ", result.UnavailableDataCenters.Select(dc => $"{dc}: {cfg.XagmanServerMeetWorlds[dc]}")))));
+                    xagmanServerStatusWarning = unavailable.Count > 0;
+                    xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key("Selected meeting worlds for {0} regions; {1} have an available world. Status checked {2:g}."), cfg.XagmanRegionMeetWorlds.Count, eligible.Count, result.CheckedAt.ToLocalTime()));
+                    if (unavailable.Count > 0)
+                        xagmanServerStatusMessage = global::XASlave.Localization.UiMessage.Store(ref xagmanServerStatusMessageUiMessage, global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Capture(ref xagmanServerStatusMessageUiMessage, xagmanServerStatusMessage), global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key(" No available world was found for these regions; review the retained or fallback choices: {0}."), string.Join(", ", unavailable.Select(region => $"{region}: {cfg.XagmanRegionMeetWorlds[region]}")))));
                     plugin.TaskRunner.AddLog($"Xagman: Aethertek server status: {xagmanServerStatusMessage}");
                 }).ConfigureAwait(false);
             }

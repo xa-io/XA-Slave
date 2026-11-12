@@ -38,7 +38,7 @@ public partial class SlaveWindow
             cfg.XagmanTargetAetheryte,
             cfg.XagmanTonyGilMinimum,
             cfg.XagmanHonorArExclusions,
-            Routes = cfg.XagmanServerMeetWorlds.OrderBy(pair => pair.Key).ToArray(),
+            Routes = (cfg.XagmanRegionMeetWorlds ?? new Dictionary<string, string>()).OrderBy(pair => pair.Key).ToArray(),
             Roster = cfg.XagmanTonyCharacters.Select(entry => entry.CharacterNameWorld).ToArray(),
             Selected = xagmanTonySelectedIndices.OrderBy(index => index).ToArray(),
         });

@@ -468,6 +468,9 @@ public sealed class Plugin : IDalamudPlugin
                 | (Configuration.InventorySearchShowUntradable ? InventorySearchFilter.Untradable : InventorySearchFilter.None)
                 | (Configuration.InventorySearchShowBound ? InventorySearchFilter.Bound : InventorySearchFilter.None)
                 | (Configuration.InventorySearchShowUnique ? InventorySearchFilter.Unique : InventorySearchFilter.None),
+            () => Configuration.InventorySearchNonmatchingOpacityPercent,
+            () => Configuration.InventorySearchFocusShortcutEnabled,
+            () => Configuration.InventorySearchShowTooltips,
             () => { Configuration.InventorySearchBarEnabled = false; Configuration.Save(); });
         InspectOutfitTryOn = new InspectOutfitTryOnService(NativeUiLibrary, () => { Configuration.InspectOutfitTryOnEnabled = false; Configuration.Save(); }, Configuration, () => InspectOutfitHistoryWindow?.Open());
         ViewSingleItem = new ViewSingleItemService(ContextMenu, Log, SlaveDatabase.DbPath);
@@ -3523,6 +3526,9 @@ public sealed class Plugin : IDalamudPlugin
                     ShowUntradable = Configuration.InventorySearchShowUntradable,
                     ShowBound = Configuration.InventorySearchShowBound,
                     ShowUnique = Configuration.InventorySearchShowUnique,
+                    NonmatchingOpacityPercent = Math.Clamp(Configuration.InventorySearchNonmatchingOpacityPercent, 0, 100),
+                    FocusShortcutEnabled = Configuration.InventorySearchFocusShortcutEnabled,
+                    ShowTooltips = Configuration.InventorySearchShowTooltips,
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
             case "better-company-chest":
@@ -4040,6 +4046,9 @@ public sealed class Plugin : IDalamudPlugin
             Configuration.InventorySearchShowUntradable = inventorySearchSettings.ShowUntradable;
             Configuration.InventorySearchShowBound = inventorySearchSettings.ShowBound;
             Configuration.InventorySearchShowUnique = inventorySearchSettings.ShowUnique;
+            Configuration.InventorySearchNonmatchingOpacityPercent = Math.Clamp(inventorySearchSettings.NonmatchingOpacityPercent, 0, 100);
+            Configuration.InventorySearchFocusShortcutEnabled = inventorySearchSettings.FocusShortcutEnabled;
+            Configuration.InventorySearchShowTooltips = inventorySearchSettings.ShowTooltips;
         }
 
         if (TryDeserializeXAModSettings(modSettings, "better-company-chest", out XAModBetterCompanyChestSettings? companyChestSettings)
@@ -6578,5 +6587,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.64";
+    public const string Version = "0.0.0.65";
 }

@@ -521,7 +521,7 @@ public partial class SlaveWindow
             if (cfg.XagmanServerMatchingEnabled)
             {
                 var configuredServers = GetXagmanConfiguredSweepServers();
-                ImGui.TextDisabled(((configuredServers.Count > 0 && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte) ? global::XASlave.Localization.UiMessage.Format("SA15ADD67CCE17A3D", configuredServers.Count, cfg.XagmanTargetAetheryte) : global::XASlave.Localization.UiMessage.Key("S467ACD02813FCC8B"))).Display);
+                ImGui.TextDisabled(((configuredServers.Count > 0 && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte) ? global::XASlave.Localization.UiMessage.Format(global::XASlave.Localization.UiLocale.Key("Regional meeting worlds: {0}; shared location: {1}."), configuredServers.Count, cfg.XagmanTargetAetheryte) : global::XASlave.Localization.UiMessage.Authored("Select regional meeting worlds and a shared meeting location."))).Display);
             }
             else if (!string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld))
             {
@@ -537,8 +537,12 @@ public partial class SlaveWindow
             // In Outside Network Helper mode each side sets its own meet spot (there is no Tony relay).
             DrawXagmanWorldSelector(cfg);
             DrawXagmanAetheryteSelector(cfg);
+            DrawXagmanServerMatchingPicker(cfg);
             ImGui.Spacing();
-            ImGui.TextDisabled(((!string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld) ? global::XASlave.Localization.UiMessage.Format("S98442318ED153345", GetPrepLogisticsDestinationLabel(cfg.XagmanTargetWorld, cfg.XagmanTargetAetheryte)) : global::XASlave.Localization.UiMessage.Key("SA1DBA6095619BD75"))).Display);
+            if (cfg.XagmanServerMatchingEnabled)
+                ImGui.TextWrapped(global::XASlave.Localization.UiLocale.T("ONH partners must select the same meeting world and location for each region."));
+            else
+                ImGui.TextDisabled(((!string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld) ? global::XASlave.Localization.UiMessage.Format("S98442318ED153345", GetPrepLogisticsDestinationLabel(cfg.XagmanTargetWorld, cfg.XagmanTargetAetheryte)) : global::XASlave.Localization.UiMessage.Key("SA1DBA6095619BD75"))).Display);
         }
         else
         {
@@ -605,11 +609,11 @@ public partial class SlaveWindow
         var selectedTonyChars = GetSelectedXagmanTonyCharacters();
         var selectedFranchiseChars = GetSelectedXagmanFranchiseCharacters();
         var localXagmanPeerConnected = plugin.XagmanPeers.IsConnected;
-        var hasMeetDestination = HasXagmanServerMatchingMeetConfig()
-            || (!string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld) && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte));
-        // Outside Network Helper needs no peer hub and no Server Matching - just this side's own
-        // meet world + location (each partner picks their own and meets in game).
-        var hasOnhMeet = !string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld) && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte);
+        var hasMeetDestination = cfg.XagmanServerMatchingEnabled
+            ? HasXagmanServerMatchingMeetConfig()
+            : !string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld) && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte);
+        // ONH partners configure their own matching regional destinations without a peer hub.
+        var hasOnhMeet = hasMeetDestination;
         var hasGreenValueSelectors = HasXagmanGreenValueSelectors(cfg.XagmanItems);
         var canStartTony = !xagmanRunning && allRequired && selectedTonyChars.Count > 0
             && !(onh && hasGreenValueSelectors)
@@ -638,7 +642,7 @@ public partial class SlaveWindow
                         : !localXagmanPeerConnected
                             ? global::XASlave.Localization.UiLocale.Get("SB651A90292565045")
                         : !hasMeetDestination
-                            ? global::XASlave.Localization.UiLocale.Get("S6AA8A6AED71D256F")
+                            ? global::XASlave.Localization.UiLocale.Get(global::XASlave.Localization.UiLocale.Key("Select a meeting world and location, or configure a meeting world for each required region and a shared location."))
                             : global::XASlave.Localization.UiLocale.Get("S8C300AF250DC48A3"), displayButtonLabel: global::XASlave.Localization.UiLocale.FormatKey("S6FE36D883C6BE04C", selectedTonyChars.Count));
             DrawXagmanAutoCleanQueueOption();
             if (started)
@@ -2029,7 +2033,7 @@ public partial class SlaveWindow
         if (xagmanServerMatchingActive)
         {
             xagmanStatus = XagmanStatus.Paused;
-            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("S9037E56B8AD7EDE9"));
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Authored("Restock pass: waiting to see which regions Franchise Owners need..."));
             PublishXagmanPresence();
             return true;
         }
@@ -4450,7 +4454,7 @@ public partial class SlaveWindow
         ImGui.SetNextItemWidth(Scale(240f));
         ImGui.InputTextWithHint("##xagmanWorldFilter", global::XASlave.Localization.UiLocale.Get("S2F41446BE02C17D6"), ref xagmanWorldFilter, 128);
         ImGui.Separator();
-        if (global::XASlave.Localization.UiNative.Selectable(global::XASlave.Localization.UiLocale.Native("S3FE3F253317A649E"), cfg.XagmanServerMatchingEnabled))
+        if (global::XASlave.Localization.UiNative.Selectable(global::XASlave.Localization.UiLocale.Native(global::XASlave.Localization.UiLocale.Key("Server Matching (one world per region)")), cfg.XagmanServerMatchingEnabled))
         {
             cfg.XagmanServerMatchingEnabled = true;
             cfg.Save();
@@ -4496,51 +4500,43 @@ public partial class SlaveWindow
         }
     }
 
-    // Expandable in-place picker shown when "Server Matching" is selected: one meet world per server
-    // (data center), grouped Region -> Server. The shared meet location reuses XagmanTargetAetheryte.
+    // One explicit destination per region. Existing per-DC settings are preserved but not migrated.
     private void DrawXagmanServerMatchingPicker(Configuration cfg)
     {
         if (!cfg.XagmanServerMatchingEnabled)
             return;
 
-        if (cfg.XagmanRole == XagmanRole.Tony && !cfg.XagmanOutsideNetworkHelper)
+        if (cfg.XagmanRole == XagmanRole.Tony)
             DrawXagmanServerStatus();
 
         ImGui.Indent(Scale(8f));
-        ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S249FBDBCDB2C1DAA"));
+        ImGui.TextWrapped(global::XASlave.Localization.UiLocale.T("Choose one meeting world per region. All selected characters in that region meet there. Old per-data-center choices are kept but are not used."));
+        cfg.XagmanRegionMeetWorlds ??= new();
         foreach (var region in WorldData.RegionOrder)
         {
-            if (!WorldData.DataCenterOrder.TryGetValue(region, out var servers))
-                continue;
-            using var regionNode = ImRaii.TreeNode($"{region}##xagmanSm_{region}", ImGuiTreeNodeFlags.DefaultOpen);
-            if (!regionNode)
-                continue;
-            foreach (var dc in servers)
+            var current = XagmanRegionalRoutePolicy.GetMeetWorld(cfg.XagmanRegionMeetWorlds, region);
+            ImGui.TextUnformatted(region);
+            ImGui.SameLine(Scale(110f));
+            ImGui.SetNextItemWidth(Scale(240f));
+            var comboLabel = string.IsNullOrWhiteSpace(current) ? global::XASlave.Localization.UiLocale.Get("S552E423045FCBD94") : current;
+            using (var combo = ImRaii.Combo($"##xagmanRegionWorld_{region}", comboLabel))
+            if (combo)
             {
-                var current = GetXagmanServerMeetWorld(dc);
-                ImGui.TextUnformatted(dc);
-                ImGui.SameLine(Scale(110f));
-                ImGui.SetNextItemWidth(Scale(170f));
-                var comboLabel = ((string.IsNullOrWhiteSpace(current) ? global::XASlave.Localization.UiMessage.Key("S552E423045FCBD94") : global::XASlave.Localization.UiMessage.Raw(current))).Display;
-                using (var imguiScope4096 = ImRaii.Combo($"##xagmanSmWorld_{dc}", comboLabel))
-                if (imguiScope4096)
+                if (global::XASlave.Localization.UiNative.Selectable(global::XASlave.Localization.UiLocale.Native("S552E423045FCBD94"), string.IsNullOrWhiteSpace(current)))
                 {
-                    if (global::XASlave.Localization.UiNative.Selectable(global::XASlave.Localization.UiLocale.Native("S552E423045FCBD94"), string.IsNullOrWhiteSpace(current)))
+                    foreach (var key in cfg.XagmanRegionMeetWorlds.Keys.Where(key => key.Equals(region, StringComparison.OrdinalIgnoreCase)).ToArray())
+                        cfg.XagmanRegionMeetWorlds.Remove(key);
+                    cfg.Save();
+                }
+                foreach (var world in WorldData.Worlds.Where(w => w.Region == region).OrderBy(w => w.Name))
+                {
+                    if (ImGui.Selectable($"{world.Name} ({world.DataCenter})", string.Equals(current, world.Name, StringComparison.OrdinalIgnoreCase)))
                     {
-                        cfg.XagmanServerMeetWorlds.Remove(dc);
+                        foreach (var key in cfg.XagmanRegionMeetWorlds.Keys.Where(key => key.Equals(region, StringComparison.OrdinalIgnoreCase)).ToArray())
+                            cfg.XagmanRegionMeetWorlds.Remove(key);
+                        cfg.XagmanRegionMeetWorlds[region] = world.Name;
                         cfg.Save();
                     }
-
-                    foreach (var world in WorldData.Worlds.Where(w => w.DataCenter == dc).OrderBy(w => w.Name))
-                    {
-                        if (ImGui.Selectable(world.Name, string.Equals(current, world.Name, StringComparison.OrdinalIgnoreCase)))
-                        {
-                            cfg.XagmanServerMeetWorlds[dc] = world.Name;
-                            cfg.Save();
-                        }
-                    }
-
-
                 }
             }
         }
@@ -5756,8 +5752,8 @@ public partial class SlaveWindow
         var cfg = plugin.Configuration;
         var selected = GetSelectedXagmanTonyCharacters();
         ResetXagmanMeetRouteSnapshot();
-        var serverMatching = HasXagmanServerMatchingMeetConfig();
-        var hasSingleMeet = !string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld) && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte);
+        var serverMatching = cfg.XagmanServerMatchingEnabled;
+        var hasSingleMeet = !serverMatching && !string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld) && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte);
         if (selected.Count == 0 || (!serverMatching && !hasSingleMeet))
             return;
         if (!TryCaptureXagmanCustomMeetingSettings())
@@ -5866,7 +5862,7 @@ public partial class SlaveWindow
             xagmanActiveCharacter = string.Empty;
             xagmanPreferredTonyCharacter = string.Empty;
             xagmanStatus = XagmanStatus.Paused;
-            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("SBA182C05573D0771"));
+            xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Authored("Server Matching: waiting to see which regions Franchise Owners need..."));
             plugin.TaskRunner.AddLog("Xagman: Server Matching enabled; idling until Franchise Owners report which servers need processing.");
             PublishXagmanPresence();
         }
@@ -12794,8 +12790,8 @@ public partial class SlaveWindow
         out string meetAetheryte,
         string ownerCharacter = "")
     {
-        // Server Matching: only follow a Tony that is currently sweeping this owner character's own
-        // server, so the owner only ever world-travels inside its server (never DC-travels).
+        // Regional matching follows a compatible Tony serving this owner's home region.
+        // Lifestream chooses the travel route to the advertised regional meeting world.
         var serverMatchingTony = GetXagmanServerMatchingTonyPeer();
         if (serverMatchingTony != null
             && xagmanRunning
@@ -12819,7 +12815,7 @@ public partial class SlaveWindow
                 : ownerCharacter;
             var ownerDataCenter = GetXagmanDataCenterOfChar(routeOwner);
             if (!string.IsNullOrWhiteSpace(ownerDataCenter)
-                && string.Equals(serverMatchingTony.ServerMatchingActiveDataCenter, ownerDataCenter, StringComparison.OrdinalIgnoreCase)
+                && IsXagmanSameRegion(serverMatchingTony.ServerMatchingActiveDataCenter, ownerDataCenter)
                 && HasCompleteXagmanMeetDestination(serverMatchingTony.MeetWorld, serverMatchingTony.MeetAetheryte))
             {
                 meetWorld = serverMatchingTony.MeetWorld;
@@ -13111,6 +13107,7 @@ public partial class SlaveWindow
                     ? (publishTonyMeetDestination ? xagmanActiveMeetAetheryte : string.Empty)
                     : (xagmanRunning ? xagmanActiveMeetAetheryte : string.Empty),
                 ServerMatchingEnabled = role == XagmanRole.Tony && xagmanServerMatchingActive,
+                RegionalRouteRevision = XagmanRegionalRoutePolicy.Revision,
                 ServerMatchingSweepOrdinal = role == XagmanRole.Tony && xagmanServerMatchingActive ? GetXagmanCurrentSweepOrdinal() : -1,
                 ServerMatchingActiveDataCenter = role == XagmanRole.Tony && xagmanServerMatchingActive ? xagmanSweepDataCenter : string.Empty,
                 ServerMatchingPendingDataCenter = role == XagmanRole.FranchiseOwner
@@ -13274,12 +13271,10 @@ public partial class SlaveWindow
 
     private bool IsXagmanPeerInActiveTradeCoordinationScope(XagmanPeerPresence peer)
     {
+        if (!xagmanServerMatchingActive) return true;
         var activeDataCenter = GetXagmanActiveTradeCoordinationDataCenter();
-        return string.IsNullOrWhiteSpace(activeDataCenter)
-            || string.Equals(
-                GetXagmanPeerTradeCoordinationDataCenter(peer),
-                activeDataCenter,
-                StringComparison.OrdinalIgnoreCase);
+        return peer.RegionalRouteRevision == XagmanRegionalRoutePolicy.Revision
+            && IsXagmanSameRegion(GetXagmanPeerTradeCoordinationDataCenter(peer), activeDataCenter);
     }
 
      private List<XagmanPeerPresence> GetXagmanQueueForTony(string tonyCharacter)
@@ -13359,7 +13354,8 @@ public partial class SlaveWindow
                     && !peer.InstanceId.Equals(excludedTonyInstanceId, StringComparison.OrdinalIgnoreCase)))
             .Where(peer => string.IsNullOrWhiteSpace(activeDataCenter)
                 || (peer.ServerMatchingEnabled
-                    && peer.ServerMatchingActiveDataCenter.Equals(activeDataCenter, StringComparison.OrdinalIgnoreCase)))
+                    && peer.RegionalRouteRevision == XagmanRegionalRoutePolicy.Revision
+                    && IsXagmanSameRegion(peer.ServerMatchingActiveDataCenter, activeDataCenter)))
             .OrderByDescending(peer => !string.IsNullOrWhiteSpace(previousTonyInstanceId)
                 && peer.InstanceId.Equals(previousTonyInstanceId, StringComparison.OrdinalIgnoreCase))
             .ThenByDescending(peer => !string.IsNullOrWhiteSpace(preferredTony)

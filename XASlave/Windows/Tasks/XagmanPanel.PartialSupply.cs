@@ -113,7 +113,7 @@ public partial class SlaveWindow
         && !plugin.TaskRunner.FailedCharacters.Contains(owner) && !xagmanSkippedCharacters.Contains(owner);
 
     // Fixed-world legacy runs share one meetup across home regions. Travel dispatch still
-    // validates each character's route; server sweeps and phased recovery stay regional.
+    // validates each character's route; regional matching and phased recovery stay regional.
     private bool IsXagmanSupplyRegionScoped(bool serverMatching)
         => serverMatching || IsXagmanCollectionFirstRunActive() || IsXagmanCapacityDrainActive();
 
@@ -463,7 +463,7 @@ public partial class SlaveWindow
         string RouteLabel(string dataCenter)
         {
             var region = WorldData.GetRegionOfDataCenter(dataCenter);
-            return string.IsNullOrWhiteSpace(region) ? dataCenter : $"{dataCenter} ({region})";
+            return string.IsNullOrWhiteSpace(region) ? dataCenter : region;
         }
 
         var activeDataCenter = tony.ServerMatchingEnabled ? tony.ServerMatchingActiveDataCenter : string.Empty;
@@ -474,14 +474,14 @@ public partial class SlaveWindow
         var pendingDataCenter = tony.ServerMatchingEnabled ? GetXagmanSupplyPendingDataCenters().FirstOrDefault() : null;
         global::XASlave.Localization.UiMessage waiting;
         if (!string.IsNullOrWhiteSpace(pendingDataCenter)
-            && !pendingDataCenter.Equals(activeDataCenter, StringComparison.OrdinalIgnoreCase))
+            && !IsXagmanSameRegion(pendingDataCenter, activeDataCenter))
             waiting = global::XASlave.Localization.UiMessage.Format("S0A870FC4A9A7BC73", RouteLabel(pendingDataCenter));
         else if (xagmanOwnerSupplyContinuation)
             waiting = global::XASlave.Localization.UiMessage.Key("SF28EC30889DC4BD1");
         else if (!string.IsNullOrWhiteSpace(pendingDataCenter))
             waiting = global::XASlave.Localization.UiMessage.Format("SA0D6B8C874EF6F8A", RouteLabel(pendingDataCenter));
         else
-            waiting = (tony.ServerMatchingEnabled ? global::XASlave.Localization.UiMessage.Key("S643E6A5689078F50") : global::XASlave.Localization.UiMessage.Key("S6D40B519F2D21636"));
+            waiting = (tony.ServerMatchingEnabled ? global::XASlave.Localization.UiMessage.Authored("waiting for the next owner region details") : global::XASlave.Localization.UiMessage.Key("S6D40B519F2D21636"));
         return global::XASlave.Localization.UiMessage.Format("S946D0462D7885D37", location, waiting, summary);
     }
 
@@ -751,7 +751,7 @@ public partial class SlaveWindow
             return true;
         }
         var recallPending = owners.Any(peer => peer.PartialOwners.Any(state =>
-            (!IsXagmanServerSupplySweep() || GetXagmanDataCenterOfChar(state.CharacterNameWorld).Equals(xagmanSweepDataCenter, StringComparison.OrdinalIgnoreCase))
+            (!IsXagmanServerSupplySweep() || IsXagmanSameRegion(GetXagmanDataCenterOfChar(state.CharacterNameWorld), xagmanSweepDataCenter))
             && (!IsXagmanSupplyRegionScoped(xagmanServerMatchingActive)
                 || GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(GetXagmanRegionOfChar(xagmanActiveCharacter), StringComparison.OrdinalIgnoreCase))
             && HasXagmanUsefulSupplyIncrease(state.RequestedItems, stock,
@@ -778,7 +778,7 @@ public partial class SlaveWindow
         if (TryResumeXagmanLegacyTonyReceiving(owners, availableStock)) return true;
         if (AdvanceXagmanServerSupply(owners, availableStock)) return true;
         RetainXagmanLegacyTonyEligibility(owners, availableStock);
-        var pendingDcs = owners.SelectMany(peer => peer.SupplyPendingDataCenters).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        var pendingDcs = owners.SelectMany(GetXagmanPeerPendingDataCenters).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         var sameScopePending = !xagmanServerMatchingActive
             ? owners.Any(peer => peer.PartialOwners.Count > 0 || peer.CompletedCharacters < peer.TotalCharacters)
             : pendingDcs.Any(dc => string.Equals(WorldData.GetRegionOfDataCenter(dc), xagmanSweepRegion, StringComparison.OrdinalIgnoreCase));

@@ -30121,4 +30121,148 @@ NamePlate готов + PlayerAvailable + не применяет действи�
     <value>Ожидание подтверждения возврата ONH после продажи.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
+  <data name="S52B4A5713FBEB34F" xml:space="preserve">
+    <value>Непрозрачность неподходящих предметов (%)</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S4CA4F29E46D2EA44" xml:space="preserve">
+    <value>Более высокая непрозрачность делает неподходящие предметы лучше видимыми. 0% скрывает их; 100% оставляет без изменений.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDE2383214A858378" xml:space="preserve">
+    <value>Включить Ctrl+F для перехода к поиску</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S1407E96D10298F45" xml:space="preserve">
+    <value>Показывать подсказки поиска и фильтров</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SD98B136B96B18DCF" xml:space="preserve">
+    <value>Ctrl+F — необязательное сочетание, отдельное от горячей клавиши включения XA Mod. Оставьте эту опцию выключенной, чтобы Ctrl+F оставалось доступным для других плагинов.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SFCA1B5E87F4237D4" xml:space="preserve">
+    <value>Поиск по буквальному названию или ID предмета. Нажмите на поле для ввода. Escape очищает поиск и фильтры. T: можно обменять; NT: нельзя обменять; B: привязанные (кроме коллекционных); U: уникальные. Фильтры сочетаются с поиском; T и NT нельзя использовать вместе.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDC36A5470602E682" xml:space="preserve">
+    <value>Если опция включена, Ctrl+F переводит фокус в поиск активного окна хранилища.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SA2A80A8A406CB7E4" xml:space="preserve">
+    <value>Приглушает неподходящие ячейки, не перемещая предметы. Опции регулируют непрозрачность, переход к поиску через Ctrl+F, подсказки и кнопки фильтров. Escape очищает поиск и фильтры. Названия используют язык игры; текст сопоставляется буквально.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDDD59D60CD6D194D" xml:space="preserve">
+    <value>Выберите мир встречи для региона {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S1B6E1655281B5139" xml:space="preserve">
+    <value>Мир встречи {0} должен находиться в регионе {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S663F5E4361EA3FCE" xml:space="preserve">
+    <value>Выберите по одному миру встречи для каждого обрабатываемого региона.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0B7F1B1C23120CC3" xml:space="preserve">
+    <value>Неизвестный регион встречи: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2896143637059D3B" xml:space="preserve">
+    <value>Ожидание совместимых клиентов и настроенных региональных пунктов назначения. Обновите все участвующие клиенты XA Slave.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6A30AF3374F55A9D" xml:space="preserve">
+    <value>Для регионального сопоставления требуется обновлённый XA Slave на каждом участвующем клиенте.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S23ED53F28F90BB9A" xml:space="preserve">
+    <value>Tony обслуживает регион {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SF3440248A0C17B69" xml:space="preserve">
+    <value>Ожидание региона {0}; Tony обслуживает {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S90E9C47C1B3AD21F" xml:space="preserve">
+    <value>Регион {0} уже обработан; Tony обслуживает {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3DD244E6AD140E58" xml:space="preserve">
+    <value>Региональные миры встречи: {0}; общее место: {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S48F8D3E03A92AA55" xml:space="preserve">
+    <value>Выберите региональные миры встречи и общее место встречи.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3ECD8BDC86C34D1A" xml:space="preserve">
+    <value>Участники ONH должны выбрать одинаковые мир и место встречи для каждого региона.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S63B890283B3F5AAD" xml:space="preserve">
+    <value>Выберите один мир встречи на регион. Все выбранные персонажи этого региона встречаются там. Старые настройки по дата-центрам сохраняются, но не используются.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC3EBBCEF0F1ADF8E" xml:space="preserve">
+    <value>ожидание сведений о регионе следующего владельца</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SD1445CCD6B5813DA" xml:space="preserve">
+    <value>Подтверждение завершения ONH.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC18D4F6D905DD48D" xml:space="preserve">
+    <value>Ожидание подтверждения завершения от владельца ONH.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S05AFE416A84DD7F1" xml:space="preserve">
+    <value>Завершение ONH не подтверждено; оставшиеся задачи региона не отмечены как завершённые.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SDE3E59281B03AE88" xml:space="preserve">
+    <value>В регионе остались задачи ONH, но в этом регионе нет доступного Tony.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S4C3BF2EC94735980" xml:space="preserve">
+    <value>Для регионального сопоставления ONH требуются корректные импортированные имена персонажей и родные миры.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S7DD1348A71E4611A" xml:space="preserve">
+    <value>Выберите по одному доступному миру встречи на регион по текущему состоянию серверов. Проверьте выбор перед запуском; участники ONH должны использовать одинаковые миры.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S9502B1BCA79FD82F" xml:space="preserve">
+    <value>Миры встречи выбраны для {0} регионов; в {1} есть доступный мир. Состояние проверено: {2:g}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DB90C812ACEF736" xml:space="preserve">
+    <value> Для этих регионов не найден доступный мир; проверьте сохранённые или резервные варианты: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SAE1A8D8361DC5A40" xml:space="preserve">
+    <value>Сопоставление серверов (один мир на регион)</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SFCD09ABF8EB09D62" xml:space="preserve">
+    <value>Выберите мир и место встречи либо настройте мир встречи для каждого нужного региона и общее место.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6EA84D8C1349B0AC" xml:space="preserve">
+    <value>Сопоставление серверов: ожидание сведений о регионах, нужных Franchise Owners...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2186AD7F50F80BA2" xml:space="preserve">
+    <value>Не удалось запустить региональное сопоставление: владельцам нужны неподдерживаемые регионы, ненастроенные пункты назначения или обновлённые клиенты.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S36475A5944385D99" xml:space="preserve">
+    <value>Региональное сопоставление приостановлено из-за несовместимых клиентов или региональных пунктов назначения: </value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DDA95DF13E8CA34" xml:space="preserve">
+    <value>Проход пополнения: ожидание сведений о регионах, нужных Franchise Owners...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
 </root>

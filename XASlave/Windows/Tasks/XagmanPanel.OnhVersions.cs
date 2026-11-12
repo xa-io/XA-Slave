@@ -44,9 +44,9 @@ public partial class SlaveWindow
             || (sender != null && (!sender.PlayerName.Equals(actor.Name.TextValue, StringComparison.OrdinalIgnoreCase)
                 || sender.World.RowId != actor.HomeWorld.RowId))) return false;
         var key = $"{actor.Name.TextValue}@{actor.HomeWorld.Value.Name}";
-        var roster = xagmanActiveRole == XagmanRole.Tony
-            ? plugin.Configuration.XagmanOnhFriendFoCharacters : plugin.Configuration.XagmanOnhFriendTonyCharacters;
-        if (!roster.Any(entry => entry.Trim().Equals(key, StringComparison.OrdinalIgnoreCase))) return false;
+        var roster = GetXagmanOnhPartnerRoster();
+        if (!IsXagmanOnhPartnerInActiveRegion(key)
+            || !roster.Any(entry => entry.Trim().Equals(key, StringComparison.OrdinalIgnoreCase))) return false;
         character = key;
         entityId = actor.EntityId;
         return true;

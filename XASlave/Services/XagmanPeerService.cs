@@ -1274,6 +1274,7 @@ public sealed class XagmanPeerService : IDisposable
             MeetWorld = record.MeetWorld,
             MeetAetheryte = record.MeetAetheryte,
             ServerMatchingEnabled = record.ServerMatchingEnabled,
+            RegionalRouteRevision = record.RegionalRouteRevision,
             ServerMatchingSweepOrdinal = record.ServerMatchingSweepOrdinal,
             ServerMatchingActiveDataCenter = record.ServerMatchingActiveDataCenter,
             ServerMatchingPendingDataCenter = record.ServerMatchingPendingDataCenter,

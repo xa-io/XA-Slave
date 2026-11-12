@@ -24,7 +24,7 @@ public partial class SlaveWindow
 
     private bool IsXagmanOwnerInSupplyServer(string owner, XagmanPeerPresence tony) =>
         !tony.ServerMatchingEnabled || IsXagmanCollectionFirstRunActive()
-        || string.Equals(GetXagmanDataCenterOfChar(owner), tony.ServerMatchingActiveDataCenter, StringComparison.OrdinalIgnoreCase);
+        || IsXagmanSameRegion(GetXagmanDataCenterOfChar(owner), tony.ServerMatchingActiveDataCenter);
 
     // Forecasts are scheduling hints only. Missing/stale forecasts cannot prove depletion.
     // Include incoming work so a Balance/Give donor can still replenish this supplier.
@@ -46,7 +46,7 @@ public partial class SlaveWindow
 
     // Called only after every fresh cohort member acknowledged this exact pass at the menu,
     // and after useful same-Tony partial recalls were checked. Keep stocked suppliers eligible
-    // on later servers; completing one server must not consume the entire regional roster.
+    // until the entire region is covered or no selected supplier can advance its pending work.
     private bool AdvanceXagmanServerSupply(IReadOnlyList<XagmanPeerPresence> owners, IReadOnlyList<XagmanTradeRequestEntry> inventory)
     {
         if (!IsXagmanServerSupplySweep()) return false;
@@ -60,7 +60,7 @@ public partial class SlaveWindow
             Stock = CaptureXagmanSupplyStock(inventory),
             ObservedDemand = CaptureXagmanLegacyDemand(owners),
         };
-        var pending = owners.SelectMany(peer => peer.SupplyPendingDataCenters)
+        var pending = owners.SelectMany(GetXagmanPeerPendingDataCenters)
             .Where(dc => string.Equals(WorldData.GetRegionOfDataCenter(dc), xagmanSweepRegion, StringComparison.OrdinalIgnoreCase))
             .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(WorldData.GetSweepOrdinal).ToList();
         var currentPending = pending.Contains(xagmanSweepDataCenter, StringComparer.OrdinalIgnoreCase);
@@ -74,14 +74,14 @@ public partial class SlaveWindow
         var next = currentPending ? NextSupplier(xagmanSweepDataCenter) : null;
         if (next != null)
         {
-            plugin.TaskRunner.AddLog($"Xagman: rechecking all partial and unvisited owners on {xagmanSweepDataCenter} with next Tony {next} before leaving this server.");
+            plugin.TaskRunner.AddLog($"Xagman: rechecking all partial and unvisited owners in {xagmanSweepRegion} with next Tony {next} before leaving this region.");
             StartXagmanServerSupplyTony(next);
             return true;
         }
         xagmanServerSupplyFinished.Add(xagmanSweepDataCenter);
         plugin.TaskRunner.AddLog(currentPending
-            ? $"Xagman: server {xagmanSweepDataCenter} has unresolved owners after all useful selected suppliers; retaining shortages while checking the remaining servers."
-            : $"Xagman: server {xagmanSweepDataCenter} fully covered; all owner acknowledgements verified.");
+            ? $"Xagman: region {xagmanSweepRegion} has unresolved owners after all useful selected suppliers; retaining shortages while checking the remaining regions."
+            : $"Xagman: region {xagmanSweepRegion} fully covered; all owner acknowledgements verified.");
         foreach (var dc in pending.Where(dc => !xagmanServerSupplyFinished.Contains(dc)
             || NextSupplier(dc) != null))
         {
@@ -103,7 +103,7 @@ public partial class SlaveWindow
             else StartXagmanServerSupplyTony(next);
             return true;
         }
-        // All regional servers have either completed or exhausted useful suppliers. The
+        // The region has either completed or exhausted useful suppliers. The
         // existing transition retains warning results and owns final cohort cleanup.
         foreach (var partialState in xagmanPartialOwners.Values.Where(state =>
             GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(xagmanSweepRegion, StringComparison.OrdinalIgnoreCase)))
@@ -123,10 +123,10 @@ public partial class SlaveWindow
     {
         if (!xagmanServerSupplyAttempts.TryGetValue($"{dc}|{tony}", out var attempt)) return true;
         if (!xagmanServerSupplyStock.TryGetValue(tony, out var stock)) return false;
-        // Reopen an earlier server only for a newly useful opportunity, never an unchanged
+        // Reopen the region only for a newly useful opportunity, never an unchanged
         // failed attempt. A later Balance donor may replenish a previously exhausted Tony.
         return owners.Any(peer => peer.PartialOwners.Any(owner =>
-            GetXagmanDataCenterOfChar(owner.CharacterNameWorld).Equals(dc, StringComparison.OrdinalIgnoreCase)
+            IsXagmanSameRegion(GetXagmanDataCenterOfChar(owner.CharacterNameWorld), dc)
             && owner.RequestedItems.Any(item => item.SelectorKind == XagmanItemSelectorKind.ExactItem
                 && stock.Stock.GetValueOrDefault((item.ItemId, item.IsHq)) > 0
                 && (stock.Stock.GetValueOrDefault((item.ItemId, item.IsHq)) > attempt.Stock.GetValueOrDefault((item.ItemId, item.IsHq))

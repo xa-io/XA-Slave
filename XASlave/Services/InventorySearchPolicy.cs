@@ -103,26 +103,28 @@ internal sealed class InventorySearchDimState
     private byte original;
     private byte lastWritten;
 
-    internal bool TryApply(byte current, bool dim, out byte replacement)
+    internal bool TryApply(byte current, bool dim, out byte replacement, int opacityPercent = 50)
     {
         replacement = current;
         if (!dim)
             return TryRestore(current, out replacement);
         if (relinquished)
             return false;
-        if (owned)
+        if (owned && current != lastWritten)
         {
-            if (current == lastWritten)
-                return false;
             // An external writer has superseded this filter; do not fight it or restore over it.
             owned = false;
             relinquished = true;
             return false;
         }
-        original = current;
-        lastWritten = (byte)(current / 2);
-        if (lastWritten == current)
+        if (!owned)
+            original = current;
+        // Recompute from the captured original, including live option changes.
+        // Keep ownership through 100% so later changes cannot compound the alpha.
+        var desired = (byte)(original * Math.Clamp(opacityPercent, 0, 100) / 100);
+        if (desired == current)
             return false;
+        lastWritten = desired;
         owned = true;
         replacement = lastWritten;
         return true;
@@ -160,8 +162,8 @@ internal sealed class InventorySearchSlotDimState
 
     // The native owner must re-read alpha after applying TryResetForItem's
     // restoration. Unknown content is never a new basis for visual ownership.
-    internal bool TryApply(byte current, bool dim, out byte replacement)
-        => appearance.TryApply(current, dim && identity.HasValue, out replacement);
+    internal bool TryApply(byte current, bool dim, out byte replacement, int opacityPercent = 50)
+        => appearance.TryApply(current, dim && identity.HasValue, out replacement, opacityPercent);
 
     internal bool TryRestore(byte current, out byte restored)
     {

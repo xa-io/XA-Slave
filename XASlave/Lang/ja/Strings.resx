@@ -30121,4 +30121,148 @@ xafuncのDoNavFlySequenceXAのロジック（Player.CanFly確認）と同じで�
     <value>ONH売却後の帰還確認を待っています。</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
+  <data name="S52B4A5713FBEB34F" xml:space="preserve">
+    <value>一致しないアイテムの不透明度 (%)</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S4CA4F29E46D2EA44" xml:space="preserve">
+    <value>不透明度を高くすると、一致しないアイテムが見やすくなります。0%で非表示、100%で元の表示のままになります。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDE2383214A858378" xml:space="preserve">
+    <value>Ctrl+Fで検索欄にフォーカスする</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S1407E96D10298F45" xml:space="preserve">
+    <value>検索とフィルターのツールチップを表示</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SD98B136B96B18DCF" xml:space="preserve">
+    <value>Ctrl+Fは任意の設定で、XA Modの切り替えホットキーとは別です。他のプラグインでCtrl+Fを使う場合は、この設定をオフにしてください。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SFCA1B5E87F4237D4" xml:space="preserve">
+    <value>アイテム名の文字列またはアイテムIDで検索します。入力するには検索欄をクリックしてください。Escapeで検索とフィルターをクリアします。T：トレード可、NT：トレード不可、B：BIND（収集品を除く）、U：UNIQUE。フィルターは検索と組み合わせられますが、TとNTは併用できません。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDC36A5470602E682" xml:space="preserve">
+    <value>有効にすると、Ctrl+Fでアクティブな収納ウィンドウの検索欄にフォーカスします。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SA2A80A8A406CB7E4" xml:space="preserve">
+    <value>アイテムを移動せず、一致しないスロットを薄く表示します。オプションで不透明度、Ctrl+Fによる検索フォーカス、ツールチップ、フィルターボタンを設定できます。Escapeで検索とフィルターをクリアします。名前はゲームの言語を使用し、文字列をそのまま照合します。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDDD59D60CD6D194D" xml:space="preserve">
+    <value>リージョン{0}の集合ワールドを選択してください。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S1B6E1655281B5139" xml:space="preserve">
+    <value>集合ワールド{0}はリージョン{1}に属している必要があります。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S663F5E4361EA3FCE" xml:space="preserve">
+    <value>処理する各リージョンの集合ワールドを1つずつ選択してください。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0B7F1B1C23120CC3" xml:space="preserve">
+    <value>不明な集合リージョン：{0}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2896143637059D3B" xml:space="preserve">
+    <value>互換性のあるクライアントと設定済みのリージョン別目的地を待機中。参加するすべてのXA Slaveクライアントを更新してください。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6A30AF3374F55A9D" xml:space="preserve">
+    <value>リージョンマッチングには、参加するすべてのクライアントでXA Slaveの更新が必要です。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S23ED53F28F90BB9A" xml:space="preserve">
+    <value>Tonyはリージョン{0}を処理中です。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SF3440248A0C17B69" xml:space="preserve">
+    <value>リージョン{0}を待機中。Tonyは{1}を処理中です。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S90E9C47C1B3AD21F" xml:space="preserve">
+    <value>リージョン{0}は処理済みです。Tonyは{1}を処理中です。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3DD244E6AD140E58" xml:space="preserve">
+    <value>リージョン別集合ワールド：{0}、共通の集合場所：{1}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S48F8D3E03A92AA55" xml:space="preserve">
+    <value>リージョン別の集合ワールドと共通の集合場所を選択してください。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3ECD8BDC86C34D1A" xml:space="preserve">
+    <value>ONHの参加者は、各リージョンで同じ集合ワールドと集合場所を選択する必要があります。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S63B890283B3F5AAD" xml:space="preserve">
+    <value>リージョンごとに集合ワールドを1つ選択します。そのリージョンで選択されたすべてのキャラクターがそこに集合します。以前のデータセンター別設定は保存されますが、使用されません。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC3EBBCEF0F1ADF8E" xml:space="preserve">
+    <value>次のオーナーのリージョン情報を待機中</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SD1445CCD6B5813DA" xml:space="preserve">
+    <value>ONHの完了を確認中。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC18D4F6D905DD48D" xml:space="preserve">
+    <value>ONHオーナーの完了確認を待機中。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S05AFE416A84DD7F1" xml:space="preserve">
+    <value>ONHの完了を確認できませんでした。リージョン内の残りの作業は完了扱いになっていません。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SDE3E59281B03AE88" xml:space="preserve">
+    <value>リージョン内にONHの作業が残っていますが、このリージョンで利用できるTonyがいません。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S4C3BF2EC94735980" xml:space="preserve">
+    <value>ONHのリージョンマッチングには、インポートした有効なキャラクター名とホームワールドが必要です。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S7DD1348A71E4611A" xml:space="preserve">
+    <value>現在のサーバーステータスから、リージョンごとに利用可能な集合ワールドを1つ選択します。開始前に選択を確認してください。ONHの参加者は同じワールドを使用する必要があります。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S9502B1BCA79FD82F" xml:space="preserve">
+    <value>{0}リージョンの集合ワールドを選択しました。{1}リージョンに利用可能なワールドがあります。確認日時：{2:g}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DB90C812ACEF736" xml:space="preserve">
+    <value> これらのリージョンには利用可能なワールドが見つかりませんでした。保持された選択または代替の選択を確認してください：{0}。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SAE1A8D8361DC5A40" xml:space="preserve">
+    <value>サーバーマッチング（リージョンごとに1ワールド）</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SFCD09ABF8EB09D62" xml:space="preserve">
+    <value>集合ワールドと集合場所を選択するか、必要な各リージョンの集合ワールドと共通の集合場所を設定してください。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6EA84D8C1349B0AC" xml:space="preserve">
+    <value>サーバーマッチング：Franchise Ownerが必要とするリージョンの確認を待機中...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2186AD7F50F80BA2" xml:space="preserve">
+    <value>リージョンマッチングを開始できません。オーナーに必要なリージョンが未対応、目的地が未設定、またはクライアントの更新が必要です。</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S36475A5944385D99" xml:space="preserve">
+    <value>クライアントまたはリージョン別目的地に互換性がないため、リージョンマッチングを一時停止しています： </value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DDA95DF13E8CA34" xml:space="preserve">
+    <value>補充パス：Franchise Ownerが必要とするリージョンの確認を待機中...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
 </root>

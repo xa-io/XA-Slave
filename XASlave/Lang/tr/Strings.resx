@@ -30121,4 +30121,148 @@ Arsa tekliflerine erişebilmek için bunu 6. rütbe ve üzerindeyken yapmak en i
     <value>ONH satış sonrası dönüş onayı bekleniyor.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
+  <data name="S52B4A5713FBEB34F" xml:space="preserve">
+    <value>Eşleşmeyen eşyaların opaklığı (%)</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S4CA4F29E46D2EA44" xml:space="preserve">
+    <value>Daha yüksek opaklık, eşleşmeyen eşyaları daha net gösterir. 0% onları gizler; 100% değiştirmeden bırakır.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDE2383214A858378" xml:space="preserve">
+    <value>Aramaya odaklanmak için Ctrl+F&apos;yi etkinleştir</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S1407E96D10298F45" xml:space="preserve">
+    <value>Arama ve filtre ipuçlarını göster</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SD98B136B96B18DCF" xml:space="preserve">
+    <value>Ctrl+F isteğe bağlıdır ve XA Mod&apos;u açıp kapatan kısayoldan ayrıdır. Ctrl+F&apos;nin diğer eklentilerde kullanılabilmesi için bu seçeneği kapalı bırakın.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SFCA1B5E87F4237D4" xml:space="preserve">
+    <value>Eşya adının düz metniyle veya eşya kimliğiyle arayın. Yazmak için alana tıklayın. Escape, aramayı ve filtreleri temizler. T: takas edilebilir; NT: takas edilemez; B: bağlı (koleksiyon eşyaları hariç); U: benzersiz. Filtreler aramayla birlikte uygulanır; T ve NT birlikte kullanılamaz.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDC36A5470602E682" xml:space="preserve">
+    <value>Etkinleştirildiğinde Ctrl+F, etkin depolama penceresindeki aramaya odaklanır.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SA2A80A8A406CB7E4" xml:space="preserve">
+    <value>Eşyaları taşımadan eşleşmeyen yuvaları soluklaştırır. Seçeneklerden opaklığı, Ctrl+F ile aramaya odaklanmayı, ipuçlarını ve filtre düğmelerini ayarlayabilirsiniz. Escape, aramayı ve filtreleri temizler. Adlar oyun dilini kullanır; metin olduğu gibi eşleştirilir.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDDD59D60CD6D194D" xml:space="preserve">
+    <value>{0} bölgesi için bir buluşma dünyası seçin.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S1B6E1655281B5139" xml:space="preserve">
+    <value>{0} buluşma dünyası {1} bölgesine ait olmalıdır.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S663F5E4361EA3FCE" xml:space="preserve">
+    <value>İşlenecek her bölge için bir buluşma dünyası seçin.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0B7F1B1C23120CC3" xml:space="preserve">
+    <value>Bilinmeyen buluşma bölgesi: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2896143637059D3B" xml:space="preserve">
+    <value>Uyumlu istemciler ve yapılandırılmış bölgesel hedefler bekleniyor. Katılan tüm XA Slave istemcilerini güncelleyin.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6A30AF3374F55A9D" xml:space="preserve">
+    <value>Bölgesel eşleştirme, katılan her istemcide güncel XA Slave gerektirir.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S23ED53F28F90BB9A" xml:space="preserve">
+    <value>Tony {0} bölgesine hizmet veriyor.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SF3440248A0C17B69" xml:space="preserve">
+    <value>{0} bölgesi bekleniyor; Tony {1} bölgesine hizmet veriyor.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S90E9C47C1B3AD21F" xml:space="preserve">
+    <value>{0} bölgesi zaten işlendi; Tony {1} bölgesine hizmet veriyor.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3DD244E6AD140E58" xml:space="preserve">
+    <value>Bölgesel buluşma dünyaları: {0}; ortak konum: {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S48F8D3E03A92AA55" xml:space="preserve">
+    <value>Bölgesel buluşma dünyalarını ve ortak bir buluşma konumunu seçin.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3ECD8BDC86C34D1A" xml:space="preserve">
+    <value>ONH ortakları her bölge için aynı buluşma dünyasını ve konumunu seçmelidir.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S63B890283B3F5AAD" xml:space="preserve">
+    <value>Her bölge için bir buluşma dünyası seçin. O bölgedeki seçili tüm karakterler orada buluşur. Eski veri merkezi seçimleri saklanır ancak kullanılmaz.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC3EBBCEF0F1ADF8E" xml:space="preserve">
+    <value>sonraki sahibin bölge bilgileri bekleniyor</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SD1445CCD6B5813DA" xml:space="preserve">
+    <value>ONH tamamlanması doğrulanıyor.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC18D4F6D905DD48D" xml:space="preserve">
+    <value>ONH sahibinin tamamlanma onayı bekleniyor.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S05AFE416A84DD7F1" xml:space="preserve">
+    <value>ONH tamamlanması doğrulanmadı; bölgedeki kalan işler tamamlandı olarak işaretlenmedi.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SDE3E59281B03AE88" xml:space="preserve">
+    <value>Bölgede ONH işleri devam ediyor ancak bu bölgede kullanılabilir Tony yok.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S4C3BF2EC94735980" xml:space="preserve">
+    <value>ONH bölgesel eşleştirmesi, geçerli içe aktarılmış karakter adları ve ana dünyalar gerektirir.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S7DD1348A71E4611A" xml:space="preserve">
+    <value>Güncel sunucu durumuna göre her bölge için kullanılabilir bir buluşma dünyası seçin. Başlamadan önce seçimleri kontrol edin; ONH ortakları aynı dünyaları kullanmalıdır.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S9502B1BCA79FD82F" xml:space="preserve">
+    <value>{0} bölge için buluşma dünyaları seçildi; {1} bölgede kullanılabilir dünya var. Durum kontrolü: {2:g}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DB90C812ACEF736" xml:space="preserve">
+    <value> Bu bölgeler için kullanılabilir dünya bulunamadı; korunan veya yedek seçimleri kontrol edin: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SAE1A8D8361DC5A40" xml:space="preserve">
+    <value>Sunucu Eşleştirme (bölge başına bir dünya)</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SFCD09ABF8EB09D62" xml:space="preserve">
+    <value>Bir buluşma dünyası ve konumu seçin veya gereken her bölge için bir buluşma dünyası ve ortak konum yapılandırın.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6EA84D8C1349B0AC" xml:space="preserve">
+    <value>Sunucu Eşleştirme: Franchise Owner'lar için gereken bölgeler bekleniyor...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2186AD7F50F80BA2" xml:space="preserve">
+    <value>Bölgesel eşleştirme başlatılamıyor: sahiplerin desteklenmeyen bölgelere, yapılandırılmamış hedeflere veya güncel istemcilere ihtiyacı var.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S36475A5944385D99" xml:space="preserve">
+    <value>İstemciler veya bölgesel hedefler uyumsuz olduğu için bölgesel eşleştirme duraklatıldı: </value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DDA95DF13E8CA34" xml:space="preserve">
+    <value>Yeniden stoklama turu: Franchise Owner'lar için gereken bölgeler bekleniyor...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
 </root>

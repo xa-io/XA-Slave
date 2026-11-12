@@ -267,6 +267,8 @@ public sealed class XagmanPeerPresence
     // FOs engage only when their character's server matches; they wait (logged out) when the
     // sweep ordinal is below theirs, and treat themselves as skipped once it passes them.
     public bool ServerMatchingEnabled { get; set; }
+    // Zero/missing means the older per-data-center protocol; it cannot join a regional run.
+    public int RegionalRouteRevision { get; set; }
     public int ServerMatchingSweepOrdinal { get; set; } = -1;
     public string ServerMatchingActiveDataCenter { get; set; } = string.Empty;
     // FO advertises the server (data center) of the character it is currently processing or waiting on,

@@ -30121,4 +30121,148 @@ e avvia i salvataggi XA Database dopo ogni passaggio abitativo.</value>
     <value>In attesa della conferma del ritorno ONH dopo la vendita.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
+  <data name="S52B4A5713FBEB34F" xml:space="preserve">
+    <value>Opacità degli oggetti non corrispondenti (%)</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S4CA4F29E46D2EA44" xml:space="preserve">
+    <value>Un&apos;opacità maggiore rende più visibili gli oggetti non corrispondenti. 0% li nasconde; 100% li lascia invariati.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDE2383214A858378" xml:space="preserve">
+    <value>Abilita Ctrl+F per attivare il campo di ricerca</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S1407E96D10298F45" xml:space="preserve">
+    <value>Mostra i suggerimenti di ricerca e filtri</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SD98B136B96B18DCF" xml:space="preserve">
+    <value>Ctrl+F è facoltativo e indipendente dal tasto rapido che attiva o disattiva la XA Mod. Lascia questa opzione disattivata per mantenere Ctrl+F disponibile per gli altri plugin.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SFCA1B5E87F4237D4" xml:space="preserve">
+    <value>Cerca per nome letterale o ID dell&apos;oggetto. Fai clic nel campo per digitare. Escape cancella ricerca e filtri. T: scambiabile; NT: non scambiabile; B: vincolato (esclusi i collezionabili); U: unico. I filtri si combinano con la ricerca; T e NT non possono essere combinati.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDC36A5470602E682" xml:space="preserve">
+    <value>Quando è abilitato, Ctrl+F attiva il campo di ricerca nella finestra di deposito attiva.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SA2A80A8A406CB7E4" xml:space="preserve">
+    <value>Attenua gli slot non corrispondenti senza spostare gli oggetti. Le opzioni regolano opacità, attivazione della ricerca con Ctrl+F, suggerimenti e pulsanti dei filtri. Escape cancella ricerca e filtri. I nomi usano la lingua del gioco; il testo viene confrontato letteralmente.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDDD59D60CD6D194D" xml:space="preserve">
+    <value>Seleziona un mondo d’incontro per la regione {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S1B6E1655281B5139" xml:space="preserve">
+    <value>Il mondo d’incontro {0} deve appartenere alla regione {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S663F5E4361EA3FCE" xml:space="preserve">
+    <value>Seleziona un mondo d’incontro per ogni regione da elaborare.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0B7F1B1C23120CC3" xml:space="preserve">
+    <value>Regione d’incontro sconosciuta: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2896143637059D3B" xml:space="preserve">
+    <value>In attesa di client compatibili e destinazioni regionali configurate. Aggiorna ogni client XA Slave partecipante.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6A30AF3374F55A9D" xml:space="preserve">
+    <value>L’abbinamento regionale richiede XA Slave aggiornato su ogni client partecipante.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S23ED53F28F90BB9A" xml:space="preserve">
+    <value>Tony sta servendo la regione {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SF3440248A0C17B69" xml:space="preserve">
+    <value>In attesa della regione {0}; Tony sta servendo {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S90E9C47C1B3AD21F" xml:space="preserve">
+    <value>La regione {0} è già stata elaborata; Tony sta servendo {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3DD244E6AD140E58" xml:space="preserve">
+    <value>Mondi d’incontro regionali: {0}; luogo condiviso: {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S48F8D3E03A92AA55" xml:space="preserve">
+    <value>Seleziona i mondi d’incontro regionali e un luogo d’incontro condiviso.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3ECD8BDC86C34D1A" xml:space="preserve">
+    <value>I partner ONH devono selezionare lo stesso mondo e luogo d’incontro per ogni regione.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S63B890283B3F5AAD" xml:space="preserve">
+    <value>Scegli un mondo d’incontro per regione. Tutti i personaggi selezionati di quella regione si incontrano lì. Le vecchie scelte per centro dati vengono conservate, ma non utilizzate.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC3EBBCEF0F1ADF8E" xml:space="preserve">
+    <value>in attesa dei dettagli della regione del prossimo proprietario</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SD1445CCD6B5813DA" xml:space="preserve">
+    <value>Conferma del completamento ONH.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC18D4F6D905DD48D" xml:space="preserve">
+    <value>In attesa della conferma di completamento del proprietario ONH.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S05AFE416A84DD7F1" xml:space="preserve">
+    <value>Il completamento ONH non è stato confermato; le attività regionali rimanenti non sono state contrassegnate come completate.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SDE3E59281B03AE88" xml:space="preserve">
+    <value>Restano attività ONH nella regione, ma non è disponibile alcun Tony in questa regione.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S4C3BF2EC94735980" xml:space="preserve">
+    <value>L’abbinamento regionale ONH richiede nomi dei personaggi e mondi d’origine importati validi.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S7DD1348A71E4611A" xml:space="preserve">
+    <value>Seleziona un mondo d’incontro disponibile per regione in base allo stato attuale dei server. Controlla le scelte prima di iniziare; i partner ONH devono usare gli stessi mondi.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S9502B1BCA79FD82F" xml:space="preserve">
+    <value>Mondi d’incontro selezionati per {0} regioni; {1} hanno un mondo disponibile. Stato verificato il {2:g}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DB90C812ACEF736" xml:space="preserve">
+    <value> Non è stato trovato un mondo disponibile per queste regioni; controlla le scelte mantenute o alternative: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SAE1A8D8361DC5A40" xml:space="preserve">
+    <value>Abbinamento server (un mondo per regione)</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SFCD09ABF8EB09D62" xml:space="preserve">
+    <value>Seleziona un mondo e un luogo d’incontro oppure configura un mondo d’incontro per ogni regione richiesta e un luogo condiviso.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6EA84D8C1349B0AC" xml:space="preserve">
+    <value>Abbinamento server: in attesa delle regioni necessarie ai Titolari della franchigia...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2186AD7F50F80BA2" xml:space="preserve">
+    <value>Impossibile avviare l’abbinamento regionale: i proprietari richiedono regioni non supportate, destinazioni non configurate o client aggiornati.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S36475A5944385D99" xml:space="preserve">
+    <value>L’abbinamento regionale è in pausa perché i client o le destinazioni regionali sono incompatibili: </value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DDA95DF13E8CA34" xml:space="preserve">
+    <value>Passaggio di rifornimento: in attesa delle regioni necessarie ai Titolari della franchigia...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
 </root>

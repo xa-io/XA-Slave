@@ -270,7 +270,7 @@ public partial class SlaveWindow
                 ? peer.SupplyReceivingPolicyRegions.Contains(region, StringComparer.OrdinalIgnoreCase)
                 : peer.SupplyReceivingPolicyRegions.Count > 0;
             hasRemainingWork |= xagmanServerMatchingActive
-                ? peer.SupplyPendingDataCenters.Any(dc => string.Equals(WorldData.GetRegionOfDataCenter(dc), region, StringComparison.OrdinalIgnoreCase))
+                ? GetXagmanPeerPendingDataCenters(peer).Any(dc => string.Equals(WorldData.GetRegionOfDataCenter(dc), region, StringComparison.OrdinalIgnoreCase))
                     || peer.PartialOwners.Any(state => GetXagmanRegionOfChar(state.CharacterNameWorld).Equals(region, StringComparison.OrdinalIgnoreCase))
                 : peer.CompletedCharacters < peer.TotalCharacters || peer.PartialOwners.Count > 0;
         }
@@ -601,7 +601,7 @@ public partial class SlaveWindow
         ResetXagmanTonySupplyDrain();
         if (xagmanServerMatchingActive)
         {
-            var firstPendingDataCenter = owners.SelectMany(peer => peer.SupplyPendingDataCenters)
+            var firstPendingDataCenter = owners.SelectMany(GetXagmanPeerPendingDataCenters)
                 .Where(dc => string.Equals(WorldData.GetRegionOfDataCenter(dc), region, StringComparison.OrdinalIgnoreCase))
                 .OrderBy(WorldData.GetSweepOrdinal).FirstOrDefault();
             if (firstPendingDataCenter != null)

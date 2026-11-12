@@ -9,6 +9,14 @@ internal static class XagmanEtaEstimator
 {
     internal const double DefaultSecondsPerCharacter = 120;
 
+    // The representative DC is an ETA-only region key. It must never select a travel world.
+    internal static string GetRegionalRouteDataCenter(string dataCenter)
+    {
+        var region = WorldData.GetRegionOfDataCenter(dataCenter);
+        return region != null && WorldData.DataCenterOrder.TryGetValue(region, out var dataCenters)
+            ? dataCenters.FirstOrDefault() ?? string.Empty : string.Empty;
+    }
+
     internal static bool IsUsable(XagmanEtaReport? report, DateTime now, XagmanRunPhase phase, string coordinator)
         => report is { Revision: 1, Complete: true, Routes: not null }
             && report.Phase == phase && report.CoordinatorInstanceId == coordinator
@@ -41,7 +49,17 @@ internal static class XagmanEtaEstimator
                 : DefaultSecondsPerCharacter,
             // Accounts process concurrently: Tony's requested overall estimate is the longest account.
             RemainingSeconds = owners.Count == 0 ? 0 : owners.Max(owner => owner.RemainingSeconds),
-            Routes = owners.SelectMany(owner => owner.Routes)
+            // Combine each account's home DCs before taking the regional maximum across
+            // concurrent accounts. Tony's active DC remains the actual meetup destination.
+            Routes = owners.SelectMany(owner => owner.Routes
+                .GroupBy(route => string.IsNullOrWhiteSpace(activeDataCenter)
+                    ? route.DataCenter : GetRegionalRouteDataCenter(route.DataCenter), StringComparer.OrdinalIgnoreCase)
+                .Select(group => new XagmanEtaRoute
+                {
+                    DataCenter = group.Key,
+                    RemainingCharacters = (int)Math.Min(int.MaxValue, group.Sum(route => (long)route.RemainingCharacters)),
+                    RemainingSeconds = group.Sum(route => route.RemainingSeconds),
+                }))
                 .GroupBy(route => route.DataCenter, StringComparer.OrdinalIgnoreCase)
                 .Select(group => new XagmanEtaRoute
                 {
@@ -56,16 +74,17 @@ internal static class XagmanEtaEstimator
     {
         characters = 0;
         seconds = 0;
-        var current = WorldData.GetSweepOrdinal(report.ActiveDataCenter);
-        var target = WorldData.GetSweepOrdinal(destination);
+        var current = WorldData.GetSweepOrdinal(report.ActiveDataCenter) / 100;
+        var target = WorldData.GetSweepOrdinal(destination) / 100;
         // A return to an already-passed route requires a new supply sweep; its order is not yet known.
-        if (!report.Complete || current >= 900 || target >= 900 || target <= current) return false;
+        if (!report.Complete || current >= WorldData.RegionOrder.Length
+            || target >= WorldData.RegionOrder.Length || target <= current) return false;
         foreach (var route in report.Routes)
         {
-            var ordinal = WorldData.GetSweepOrdinal(route.DataCenter);
+            var ordinal = WorldData.GetSweepOrdinal(route.DataCenter) / 100;
             if (ordinal < current || ordinal >= target) continue;
             characters = (int)Math.Min(int.MaxValue, (long)characters + route.RemainingCharacters);
-            // Data centers are serial; accounts within each data center run concurrently.
+            // Regions are serial; accounts within each region run concurrently.
             seconds += route.RemainingSeconds;
         }
         return true;

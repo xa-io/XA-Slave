@@ -24,11 +24,13 @@ public partial class SlaveWindow
         FoGiving,            // a give sub-task is running; resume here when done
         FoSettle,            // collection reconciliation and resupply request
         FoSendDoneGil,       // a send-1-gil sub-task is running; resume here when done
+        FoConfirmCompletion, // regional completion requires the owner's verified-goal acknowledgement
 
         // Tony queue owner
         TonySearch,          // available; wait for an eligible owner request
         TonyAwaitConfirmation, // bind the requester before accepting any collection trade
         TonyReceiving,       // collect until the owner confirms its complete supply request
+        TonyAwaitOwnerCompletion,
 
         FoReceiving,
         FoSendFailed,
@@ -56,9 +58,11 @@ public partial class SlaveWindow
             XagmanOnhPhase.FoGiving => global::XASlave.Localization.UiMessage.Key("SEBDA7F07AABD3CD5"),
             XagmanOnhPhase.FoSettle => global::XASlave.Localization.UiMessage.Key("S036D9B29686E3551"),
             XagmanOnhPhase.FoSendDoneGil => global::XASlave.Localization.UiMessage.Key("S25B6F0ED1C76AB74"),
+            XagmanOnhPhase.FoConfirmCompletion => global::XASlave.Localization.UiMessage.Authored("Confirming ONH completion."),
             XagmanOnhPhase.TonySearch => global::XASlave.Localization.UiMessage.Key("SE46287AED3FC46F3"),
             XagmanOnhPhase.TonyAwaitConfirmation => global::XASlave.Localization.UiMessage.Authored("Waiting for ONH collection confirmation."),
             XagmanOnhPhase.TonyReceiving => global::XASlave.Localization.UiMessage.Key("S05F4BE0A4FF9EF83"),
+            XagmanOnhPhase.TonyAwaitOwnerCompletion => global::XASlave.Localization.UiMessage.Authored("Waiting for ONH owner completion confirmation."),
             XagmanOnhPhase.FoReceiving => global::XASlave.Localization.UiMessage.Key("S4B037E60B93FC1AF"),
             XagmanOnhPhase.FoSendFailed => global::XASlave.Localization.UiMessage.Key("SB6E103E230B3A249"),
             XagmanOnhPhase.TonySupplying => global::XASlave.Localization.UiMessage.Key("SC35B5A0F022884CA"),
@@ -79,6 +83,8 @@ public partial class SlaveWindow
     private XagmanOnhPhase xagmanOnhPhase = XagmanOnhPhase.Idle;
     private readonly List<string> xagmanOnhRunList = new();
     private int xagmanOnhIndex = -1;
+    private bool xagmanOnhRegionalMatching;
+    private readonly List<string> xagmanOnhPartnerRoster = new();
     private bool xagmanOnhSubTaskFailed;
     private bool xagmanOnhSubTaskCompleted;
 
@@ -110,6 +116,32 @@ public partial class SlaveWindow
     private static bool HasXagmanOnhMeetDestination(Configuration cfg)
         => !string.IsNullOrWhiteSpace(cfg.XagmanTargetWorld) && !string.IsNullOrWhiteSpace(cfg.XagmanTargetAetheryte);
 
+    private IReadOnlyList<string> GetXagmanOnhPartnerRoster()
+        => xagmanOnhRegionalMatching ? xagmanOnhPartnerRoster
+            : xagmanActiveRole == XagmanRole.Tony
+                ? plugin.Configuration.XagmanOnhFriendFoCharacters : plugin.Configuration.XagmanOnhFriendTonyCharacters;
+
+    private bool IsXagmanOnhPartnerInActiveRegion(string key)
+        => !xagmanOnhRegionalMatching
+            || (!string.IsNullOrWhiteSpace(GetXagmanRegionOfChar(xagmanActiveCharacter))
+                && GetXagmanRegionOfChar(key).Equals(GetXagmanRegionOfChar(xagmanActiveCharacter), StringComparison.OrdinalIgnoreCase));
+
+    private bool HasXagmanOnhNextTonyInRegion()
+        => xagmanOnhIndex + 1 < xagmanOnhRunList.Count
+            && (!xagmanOnhRegionalMatching || IsXagmanOnhPartnerInActiveRegion(xagmanOnhRunList[xagmanOnhIndex + 1]));
+
+    private bool IsXagmanOnhRegionComplete()
+        => xagmanOnhRegionalMatching
+            && GetXagmanOnhPartnerRoster().Where(IsXagmanOnhPartnerInActiveRegion)
+                .All(xagmanOnhCompletedPartners.Contains);
+
+    private void HoldXagmanOnhRegionalWork(global::XASlave.Localization.UiMessage reason)
+    {
+        // Preserve the pinned roster, goals and receipts until the operator explicitly stops.
+        HoldXagmanOnhCollection(reason.Original);
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, reason);
+    }
+
     // Entry point wired to the Start button when Outside Network Helper is enabled.
     private void StartXagmanOnhRun()
     {
@@ -120,7 +152,7 @@ public partial class SlaveWindow
         if (!TryCaptureXagmanCustomMeetingSettings())
             return;
 
-        if (!HasXagmanOnhMeetDestination(cfg))
+        if (!cfg.XagmanServerMatchingEnabled && !HasXagmanOnhMeetDestination(cfg))
         {
             SetXagmanOnhUiStatus(global::XASlave.Localization.UiMessage.Key("S6FDD70B9E13253C7"));
             return;
@@ -137,14 +169,30 @@ public partial class SlaveWindow
             SetXagmanOnhUiStatus(global::XASlave.Localization.UiMessage.Key("S057075F486F04288"));
             return;
         }
+        var partnerRoster = NormalizeXagmanOnhCharacterNames(
+            cfg.XagmanRole == XagmanRole.Tony ? cfg.XagmanOnhFriendFoCharacters : cfg.XagmanOnhFriendTonyCharacters);
+        if (cfg.XagmanServerMatchingEnabled
+            && (partnerRoster.Count == 0 || partnerRoster.Any(key => !IsXagmanOnhFullKey(key) || string.IsNullOrWhiteSpace(GetXagmanRegionOfChar(key)))))
+        {
+            SetXagmanOnhUiStatus(global::XASlave.Localization.UiMessage.Authored("ONH regional matching requires valid imported character names and home worlds."));
+            return;
+        }
+        ResetXagmanServerMatchingRunState();
+        PinXagmanMeetRouteSnapshot(cfg.XagmanServerMatchingEnabled);
         foreach (var character in runList)
         {
-            if (TryValidateXagmanMeetTravelMessage(character, cfg.XagmanTargetWorld, out var routeFailure))
+            var meetWorld = GetXagmanFixedMeetWorld();
+            global::XASlave.Localization.UiMessage routeFailure;
+            var valid = cfg.XagmanServerMatchingEnabled
+                ? TryValidateXagmanRegionalMeetForCharacterMessage(character, out meetWorld, out routeFailure)
+                : TryValidateXagmanMeetTravelMessage(character, meetWorld, out routeFailure);
+            if (valid)
                 continue;
 
             ReportXagmanTravelRouteError(
-                global::XASlave.Localization.UiMessage.Format("S9E9AAA3CCF5AEB1A", character, cfg.XagmanTargetWorld, routeFailure));
+                global::XASlave.Localization.UiMessage.Format("S9E9AAA3CCF5AEB1A", character, meetWorld, routeFailure));
             SetXagmanOnhUiStatus(global::XASlave.Localization.UiMessage.Capture(ref xagmanStatusTextUiMessage, xagmanStatusText));
+            ResetXagmanMeetRouteSnapshot();
             return;
         }
 
@@ -154,6 +202,7 @@ public partial class SlaveWindow
                     runList,
                     "Outside Network Helper Franchise Owner start"))
             {
+                ResetXagmanMeetRouteSnapshot();
                 return;
             }
         }
@@ -188,6 +237,14 @@ public partial class SlaveWindow
         AutoOpenTaskLogIfVerbose(ref xagmanShowLog);
 
         ResetXagmanOnhState();
+        xagmanOnhRegionalMatching = cfg.XagmanServerMatchingEnabled;
+        if (xagmanOnhRegionalMatching)
+        {
+            runList = NormalizeXagmanOnhCharacterNames(runList)
+                .OrderBy(key => Array.IndexOf(WorldData.RegionOrder, GetXagmanRegionOfChar(key)))
+                .ToList();
+            xagmanOnhPartnerRoster.AddRange(partnerRoster);
+        }
         xagmanOnhRunList.AddRange(runList);
         xagmanOnhIndex = 0;
 
@@ -200,6 +257,7 @@ public partial class SlaveWindow
                 xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Key("S0C5CB5A72A548814"));
             }
             plugin.TaskRunner.AddLog($"Xagman ONH: {xagmanStatusText}");
+            ResetXagmanMeetRouteSnapshot();
             return;
         }
 
@@ -208,7 +266,9 @@ public partial class SlaveWindow
         xagmanActiveCharacter = string.Empty;
         xagmanActiveTradePartner = string.Empty;
         xagmanObservedDropboxBusy = false;
-        SetXagmanActiveMeetDestination(cfg.XagmanTargetWorld, cfg.XagmanTargetAetheryte);
+        SetXagmanActiveMeetDestination(
+            xagmanOnhRegionalMatching ? GetXagmanRegionMeetWorld(GetXagmanRegionOfChar(runList[0])) : GetXagmanFixedMeetWorld(),
+            GetXagmanSharedMeetLocation());
         xagmanStatus = XagmanStatus.Preflight;
         xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SF5E0EB0E23ADFAD1", runList.Count));
 
@@ -258,6 +318,8 @@ public partial class SlaveWindow
         xagmanOnhPhase = XagmanOnhPhase.Idle;
         xagmanOnhRunList.Clear();
         xagmanOnhIndex = -1;
+        xagmanOnhRegionalMatching = false;
+        xagmanOnhPartnerRoster.Clear();
         xagmanOnhSubTaskFailed = false;
         xagmanOnhSubTaskCompleted = false;
         xagmanOnhEngagedPartner = string.Empty;
@@ -431,6 +493,15 @@ public partial class SlaveWindow
 
         var charKey = xagmanOnhRunList[xagmanOnhIndex];
         xagmanActiveCharacter = charKey;
+        if (xagmanOnhRegionalMatching)
+        {
+            if (!TryValidateXagmanRegionalMeetForCharacterMessage(charKey, out var meetWorld, out var routeFailure))
+            {
+                FailXagmanOnhRun(routeFailure);
+                return;
+            }
+            SetXagmanActiveMeetDestination(meetWorld, GetXagmanSharedMeetLocation());
+        }
         ResetXagmanOnhCharacterProtocol();
         ClearXagmanExpectedTravelLogoutWindow();
         xagmanOnhSubTaskFailed = false;
@@ -610,6 +681,7 @@ public partial class SlaveWindow
         {
             var name = key.Trim();
             if (!IsXagmanOnhFullKey(name) || exclude.Contains(name)
+                || !IsXagmanOnhPartnerInActiveRegion(name)
                 || (xagmanActiveRole == XagmanRole.FranchiseOwner && IsXagmanOnhTonyDeferred(name)))
                 continue;
             var actor = FindXagmanOnhPlayer(name);
@@ -641,6 +713,14 @@ public partial class SlaveWindow
 
     private void AdvanceXagmanOnhCharacter(bool failed, bool incomplete = false, bool rotateForFull = false)
     {
+        if (xagmanOnhRegionalMatching && xagmanActiveRole == XagmanRole.Tony
+            && !IsXagmanOnhRegionComplete() && !HasXagmanOnhNextTonyInRegion())
+        {
+            if (!plugin.TaskRunner.IncompleteCharacters.Contains(xagmanActiveCharacter))
+                plugin.TaskRunner.RecordIncompleteCharacter(xagmanActiveCharacter);
+            HoldXagmanOnhRegionalWork(global::XASlave.Localization.UiMessage.Authored("ONH regional work remains, but no Tony is available in this region."));
+            return;
+        }
         BeginXagmanOnhReturnHome(failed, incomplete, rotateForFull);
     }
 
@@ -665,6 +745,13 @@ public partial class SlaveWindow
         // A "full" rotation is not a completed unit of work for this Tony; keep the completed count
         // tied to the index but note in the log that this was a fill-rotation, not a finished Tony.
         xagmanOnhIndex++;
+        if (xagmanActiveRole == XagmanRole.Tony && IsXagmanOnhRegionComplete())
+        {
+            // Spare Tonys are capacity reserves, not additional passes through completed owners.
+            while (xagmanOnhIndex < xagmanOnhRunList.Count
+                && IsXagmanOnhPartnerInActiveRegion(xagmanOnhRunList[xagmanOnhIndex]))
+                xagmanOnhIndex++;
+        }
         if (xagmanActiveRole == XagmanRole.Tony)
             xagmanTonyCompletedCharacters = Math.Min(xagmanOnhIndex, xagmanTonyTotalCharacters);
         else
@@ -703,6 +790,7 @@ public partial class SlaveWindow
         var tradeSafetyClosed = TryEndXagmanTradeSafetySession("Outside Network Helper failure");
         ClearXagmanFocusTarget();
         SetXagmanRunning(false);
+        ResetXagmanMeetRouteSnapshot();
         ResetXagmanOnhState();
         xagmanStatus = XagmanStatus.Error;
         xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, (tradeSafetyClosed ? global::XASlave.Localization.UiMessage.Format("SF2F5692FC26C5994", reason) : (xagmanTradeSafetySessionActive ? global::XASlave.Localization.UiMessage.Format("S0B28A1FA80092370", reason) : global::XASlave.Localization.UiMessage.Format("S4F7FFB836308E5B6", reason))));

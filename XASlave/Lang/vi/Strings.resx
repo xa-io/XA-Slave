@@ -30121,4 +30121,148 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
     <value>Đang chờ xác nhận ONH quay lại sau khi bán.</value>
     <comment>Source: XASlave/Windows/Tasks/XagmanPanel.OnhRuntime.cs; XASlave/Windows/Tasks/XagmanPanel.OnhCollection.cs</comment>
   </data>
+  <data name="S52B4A5713FBEB34F" xml:space="preserve">
+    <value>Độ mờ đục của vật phẩm không khớp (%)</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S4CA4F29E46D2EA44" xml:space="preserve">
+    <value>Độ mờ đục càng cao, vật phẩm không khớp càng rõ. 0% sẽ ẩn chúng; 100% giữ nguyên hiển thị.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDE2383214A858378" xml:space="preserve">
+    <value>Bật Ctrl+F để chọn ô tìm kiếm</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="S1407E96D10298F45" xml:space="preserve">
+    <value>Hiện chú giải tìm kiếm và bộ lọc</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SD98B136B96B18DCF" xml:space="preserve">
+    <value>Ctrl+F là tùy chọn riêng, độc lập với phím tắt bật/tắt XA Mod. Tắt tùy chọn này để các plugin khác vẫn dùng được Ctrl+F.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SFCA1B5E87F4237D4" xml:space="preserve">
+    <value>Tìm theo văn bản tên vật phẩm hoặc ID vật phẩm. Nhấp vào ô để nhập. Escape xóa nội dung tìm kiếm và bộ lọc. T: có thể giao dịch; NT: không thể giao dịch; B: đã ràng buộc (trừ vật phẩm sưu tầm); U: độc nhất. Bộ lọc kết hợp với tìm kiếm; không thể dùng T và NT cùng lúc.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDC36A5470602E682" xml:space="preserve">
+    <value>Khi được bật, Ctrl+F chọn ô tìm kiếm trong cửa sổ kho đang hoạt động.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SA2A80A8A406CB7E4" xml:space="preserve">
+    <value>Làm mờ các ô không khớp mà không di chuyển vật phẩm. Các tùy chọn điều chỉnh độ mờ đục, chọn ô tìm kiếm bằng Ctrl+F, chú giải và nút lọc. Escape xóa nội dung tìm kiếm và bộ lọc. Tên dùng ngôn ngữ trò chơi; văn bản được so khớp nguyên dạng.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; XASlave/Services/InventorySearchBarService.cs</comment>
+  </data>
+  <data name="SDDD59D60CD6D194D" xml:space="preserve">
+    <value>Chọn thế giới gặp mặt cho khu vực {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S1B6E1655281B5139" xml:space="preserve">
+    <value>Thế giới gặp mặt {0} phải thuộc khu vực {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S663F5E4361EA3FCE" xml:space="preserve">
+    <value>Chọn một thế giới gặp mặt cho mỗi khu vực sẽ xử lý.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0B7F1B1C23120CC3" xml:space="preserve">
+    <value>Khu vực gặp mặt không xác định: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2896143637059D3B" xml:space="preserve">
+    <value>Đang chờ các máy khách tương thích và điểm đến khu vực đã cấu hình. Hãy cập nhật mọi máy khách XA Slave tham gia.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6A30AF3374F55A9D" xml:space="preserve">
+    <value>Ghép theo khu vực yêu cầu cập nhật XA Slave trên mọi máy khách tham gia.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S23ED53F28F90BB9A" xml:space="preserve">
+    <value>Tony đang phục vụ khu vực {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SF3440248A0C17B69" xml:space="preserve">
+    <value>Đang chờ khu vực {0}; Tony đang phục vụ {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S90E9C47C1B3AD21F" xml:space="preserve">
+    <value>Khu vực {0} đã được xử lý; Tony đang phục vụ {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3DD244E6AD140E58" xml:space="preserve">
+    <value>Các thế giới gặp mặt theo khu vực: {0}; địa điểm chung: {1}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S48F8D3E03A92AA55" xml:space="preserve">
+    <value>Chọn các thế giới gặp mặt theo khu vực và một địa điểm gặp mặt chung.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S3ECD8BDC86C34D1A" xml:space="preserve">
+    <value>Các đối tác ONH phải chọn cùng thế giới và địa điểm gặp mặt cho mỗi khu vực.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S63B890283B3F5AAD" xml:space="preserve">
+    <value>Chọn một thế giới gặp mặt cho mỗi khu vực. Tất cả nhân vật đã chọn trong khu vực đó sẽ gặp nhau tại đó. Lựa chọn cũ theo trung tâm dữ liệu được giữ lại nhưng không được sử dụng.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC3EBBCEF0F1ADF8E" xml:space="preserve">
+    <value>đang chờ thông tin khu vực của chủ sở hữu tiếp theo</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SD1445CCD6B5813DA" xml:space="preserve">
+    <value>Đang xác nhận hoàn tất ONH.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SC18D4F6D905DD48D" xml:space="preserve">
+    <value>Đang chờ chủ sở hữu ONH xác nhận hoàn tất.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S05AFE416A84DD7F1" xml:space="preserve">
+    <value>Chưa xác nhận hoàn tất ONH; công việc còn lại trong khu vực chưa được đánh dấu hoàn tất.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SDE3E59281B03AE88" xml:space="preserve">
+    <value>Vẫn còn công việc ONH trong khu vực, nhưng không có Tony nào sẵn sàng tại khu vực này.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S4C3BF2EC94735980" xml:space="preserve">
+    <value>Ghép theo khu vực ONH yêu cầu tên nhân vật và thế giới gốc đã nhập phải hợp lệ.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S7DD1348A71E4611A" xml:space="preserve">
+    <value>Chọn một thế giới gặp mặt khả dụng cho mỗi khu vực theo trạng thái máy chủ hiện tại. Kiểm tra lựa chọn trước khi bắt đầu; các đối tác ONH phải dùng cùng thế giới.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S9502B1BCA79FD82F" xml:space="preserve">
+    <value>Đã chọn thế giới gặp mặt cho {0} khu vực; {1} khu vực có thế giới khả dụng. Đã kiểm tra trạng thái lúc {2:g}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DB90C812ACEF736" xml:space="preserve">
+    <value> Không tìm thấy thế giới khả dụng cho các khu vực này; hãy kiểm tra lựa chọn được giữ lại hoặc thay thế: {0}.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SAE1A8D8361DC5A40" xml:space="preserve">
+    <value>Ghép máy chủ (một thế giới mỗi khu vực)</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="SFCD09ABF8EB09D62" xml:space="preserve">
+    <value>Chọn thế giới và địa điểm gặp mặt, hoặc cấu hình thế giới gặp mặt cho mỗi khu vực cần thiết và một địa điểm chung.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S6EA84D8C1349B0AC" xml:space="preserve">
+    <value>Ghép máy chủ: đang chờ các khu vực mà Các Chủ nhượng quyền cần...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S2186AD7F50F80BA2" xml:space="preserve">
+    <value>Không thể bắt đầu ghép theo khu vực: chủ sở hữu cần khu vực không được hỗ trợ, điểm đến chưa cấu hình hoặc máy khách đã cập nhật.</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S36475A5944385D99" xml:space="preserve">
+    <value>Ghép theo khu vực bị tạm dừng vì máy khách hoặc điểm đến khu vực không tương thích: </value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
+  <data name="S0DDA95DF13E8CA34" xml:space="preserve">
+    <value>Lượt bổ sung: đang chờ các khu vực mà các Chủ nhượng quyền cần...</value>
+    <comment>Source: Xagman regional matching; W506</comment>
+  </data>
 </root>

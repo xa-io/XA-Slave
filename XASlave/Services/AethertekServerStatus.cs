@@ -76,6 +76,30 @@ internal static class AethertekServerStatus
         return selected;
     }
 
+    internal static Dictionary<string, string> SelectRegionalWorlds(IReadOnlyDictionary<string, string> eligible)
+        => eligible.Values.Select(WorldData.GetByName).Where(world => world != null)
+            .OrderBy(world => world!.Name, StringComparer.OrdinalIgnoreCase)
+            .GroupBy(world => world!.Region, StringComparer.OrdinalIgnoreCase)
+            .ToDictionary(group => group.Key, group => group.First()!.Name, StringComparer.OrdinalIgnoreCase);
+
+    internal static Dictionary<string, string> CompleteRegionalSelections(
+        IReadOnlyDictionary<string, string> eligible, IReadOnlyDictionary<string, string>? previous)
+    {
+        var selected = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var region in WorldData.RegionOrder)
+        {
+            var saved = WorldData.GetByName(XagmanRegionalRoutePolicy.GetMeetWorld(previous, region));
+            selected[region] = eligible.TryGetValue(region, out var available)
+                && WorldData.GetByName(available) is { } known && known.Region.Equals(region, StringComparison.OrdinalIgnoreCase)
+                    ? known.Name
+                    : saved != null && saved.Region.Equals(region, StringComparison.OrdinalIgnoreCase)
+                        ? saved.Name
+                        : WorldData.Worlds.Where(world => world.Region.Equals(region, StringComparison.OrdinalIgnoreCase))
+                            .OrderBy(world => world.Name, StringComparer.OrdinalIgnoreCase).First().Name;
+        }
+        return selected;
+    }
+
     internal static AethertekWorldSelection Parse(string json, DateTimeOffset now)
     {
         using var document = JsonDocument.Parse(json);
