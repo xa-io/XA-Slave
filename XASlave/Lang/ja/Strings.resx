@@ -30265,4 +30265,105 @@ xafuncのDoNavFlySequenceXAのロジック（Player.CanFly確認）と同じで�
     <value>補充パス：Franchise Ownerが必要とするリージョンの確認を待機中...</value>
     <comment>Source: Xagman regional matching; W506</comment>
   </data>
+  <data name="S097C5978ED97CE4F" xml:space="preserve">
+    <value>Tonyが移動を終え、リージョンの集合場所で準備ができるまで待機しています。</value>
+  </data>
+  <data name="S5ED6649FCC6A5640" xml:space="preserve">
+    <value>30分以内にTonyがリージョンの集合場所で準備を完了しませんでした。フランチャイズオーナーの未完了の処理は、連携して再開できるよう保持されます。</value>
+  </data>
+  <data name="SA9FEB8B2896AF2AC" xml:space="preserve">
+    <value>リージョンの移動ルートの待機時間が上限に達しました。フランチャイズオーナーの未完了の処理は、連携して再開できるよう保持されます。</value>
+  </data>
+  <data name="S82FC0C0DA0723E2E" xml:space="preserve">
+    <value>ログイン復旧の再試行回数または制限時間に達しました。進行状況は保持されます。</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S48CA8992F9562ABF" xml:space="preserve">
+    <value>{0} の停止したログインを復旧中（{1}/2）。</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE73DA94B3BEAE032" xml:space="preserve">
+    <value>ログイン復旧でタイトル画面に戻れませんでした。進行状況は保持されます。</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S819DF61885C753E7" xml:space="preserve">
+    <value>ログイン復旧には管理者権限が必要です。進行状況は保持されます。</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S6734B14B0A70D4BF" xml:space="preserve">
+    <value>ログイン復旧でこのクライアントのゲーム接続をリセットできませんでした。進行状況は保持されます。</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S222E58450DA5E15D" xml:space="preserve">
+    <value>{0} のログインを再試行する前に、タイトル画面を待っています。</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE36F5C3A0D22618E" xml:space="preserve">
+    <value>復旧したログインを再開</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S200081D48C3503C2" xml:space="preserve">
+    <value>ログインを再試行する前に、Tony の現在の集合先を待っています。</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S68B413A26E1B3E49" xml:space="preserve">
+    <value>タイトル画面に戻り、「復旧したログインを再開」を選択して、保持されたタスクを続行してください。</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S24F512048EE719AD" xml:space="preserve">
+    <value>FFXIV</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S31D4DC5FE7E1F311" xml:space="preserve">
+    <value>ロード画面からの強制退出</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S940D1FC3A1D5404E" xml:space="preserve">
+    <value>このクライアントのゲームサーバー接続を切断し、停止したロード画面から抜け出します。Windows が管理者の承認を求める場合があります。</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S7D5811CA0DD7686C" xml:space="preserve">
+    <value>ロード画面からの強制退出は Windows の承認を待っています。</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S04477A84241EBAD2" xml:space="preserve">
+    <value>ロード画面からの強制退出はタイトル画面を待っています。</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SCDDCC2598C905AB3" xml:space="preserve">
+    <value>ロード画面からの強制退出でタイトル画面に戻りました。</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SF2DD9CC41EB0432C" xml:space="preserve">
+    <value>停止したロード画面は検出されませんでした。切断は試行されていません。</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S9755F56CBF815553" xml:space="preserve">
+    <value>ロード画面からの強制退出を使用する前に、他の実行中のタスクを停止してください。</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SB0D250DD44EE31E5" xml:space="preserve">
+    <value>ロード画面からの強制退出でクライアントを切断できませんでした。詳細はデバッグログを確認してください。</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SA1AE7EFB8CC368F9" xml:space="preserve">
+    <value>タイトル画面を確認できないまま、ロード画面からの強制退出が終了しました。詳細はデバッグログを確認してください。</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SFBCD16BD81AEAE87" xml:space="preserve">
+    <value>ロード画面からの強制退出を待っています。Xagman の進行状況は保持されます。</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SBD275944325C583A" xml:space="preserve">
+    <value>PvPで英語のエラーにより拒否された /hotbar display コマンドを処理します。ホットバー1が非表示でも利用できます。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SB990EB3FCDA847E9" xml:space="preserve">
+    <value>ロードの完了とホットバーの準備を最大5秒間待ちます。エリア移動、ログアウト、または機能の無効化で待機中のコマンドはキャンセルされます。HUDの非表示中やカットシーン中は変更できません。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
+    <value>/xa hotbar on で監視を有効にします。/xa hotbar off は待機中のコマンドをキャンセルし、HUDが利用可能になったら管理中のバーを復元します。メインバーを表示するには /xa hotbar 1 on を使用してください。</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
 </root>

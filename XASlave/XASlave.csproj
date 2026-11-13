@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.0.0.65</Version>
+    <Version>0.0.0.66</Version>
     <LangVersion>preview</LangVersion>
     <PackageProjectUrl>https://aethertek.io/</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
@@ -40,6 +40,7 @@
   </ItemGroup>
   <ItemGroup>
     <!-- Keep each locale in the host assembly so private/public distribution does not need satellites. -->
+    <EmbeddedResource Include="Services\LoadingScreenEjectionHelper.ps1" LogicalName="XASlave.Services.LoadingScreenEjectionHelper.ps1" />
     <EmbeddedResource Update="Lang\**\Strings.resx">
       <WithCulture>false</WithCulture>
       <LogicalName>XASlave.$([System.String]::Copy('%(Identity)').Replace('\', '.').Replace('/', '.').Replace('.resx', '.resources'))</LogicalName>

@@ -30265,4 +30265,105 @@ Il est préférable de le faire au rang 6 ou plus afin d’avoir accès aux ench
     <value>Passage de réapprovisionnement : en attente des régions nécessaires aux Propriétaires de franchise...</value>
     <comment>Source: Xagman regional matching; W506</comment>
   </data>
+  <data name="S097C5978ED97CE4F" xml:space="preserve">
+    <value>En attente que Tony termine son trajet et soit prêt au point de rendez-vous régional.</value>
+  </data>
+  <data name="S5ED6649FCC6A5640" xml:space="preserve">
+    <value>Tony n’était pas prêt au point de rendez-vous régional dans les 30 minutes. Le travail inachevé des propriétaires de franchise est conservé pour une reprise coordonnée.</value>
+  </data>
+  <data name="SA9FEB8B2896AF2AC" xml:space="preserve">
+    <value>Le délai d’attente de l’itinéraire régional a expiré. Le travail inachevé des propriétaires de franchise est conservé pour une reprise coordonnée.</value>
+  </data>
+  <data name="S82FC0C0DA0723E2E" xml:space="preserve">
+    <value>La récupération de connexion a atteint sa limite de tentatives ou de temps. La progression est conservée.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S48CA8992F9562ABF" xml:space="preserve">
+    <value>Récupération de la connexion bloquée pour {0} ({1}/2).</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE73DA94B3BEAE032" xml:space="preserve">
+    <value>La récupération de connexion n’a pas atteint l’écran titre. La progression est conservée.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S819DF61885C753E7" xml:space="preserve">
+    <value>La récupération de connexion nécessite les droits administrateur. La progression est conservée.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S6734B14B0A70D4BF" xml:space="preserve">
+    <value>La récupération de connexion n’a pas pu réinitialiser la connexion au jeu de ce client. La progression est conservée.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S222E58450DA5E15D" xml:space="preserve">
+    <value>En attente de l’écran titre avant de réessayer la connexion de {0}.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE36F5C3A0D22618E" xml:space="preserve">
+    <value>Reprendre la connexion récupérée</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S200081D48C3503C2" xml:space="preserve">
+    <value>En attente de la destination de rendez-vous actuelle de Tony avant de réessayer la connexion.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S68B413A26E1B3E49" xml:space="preserve">
+    <value>Retournez à l’écran titre, puis sélectionnez « Reprendre la connexion récupérée » pour continuer la tâche conservée.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S24F512048EE719AD" xml:space="preserve">
+    <value>FFXIV</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S31D4DC5FE7E1F311" xml:space="preserve">
+    <value>Sortie forcée de l’écran de chargement</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S940D1FC3A1D5404E" xml:space="preserve">
+    <value>Coupe les connexions de ce client aux serveurs de jeu pour sortir d’un écran de chargement bloqué. Windows peut demander une autorisation administrateur.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S7D5811CA0DD7686C" xml:space="preserve">
+    <value>La sortie forcée de l’écran de chargement attend l’autorisation de Windows.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S04477A84241EBAD2" xml:space="preserve">
+    <value>La sortie forcée de l’écran de chargement attend l’écran titre.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SCDDCC2598C905AB3" xml:space="preserve">
+    <value>La sortie forcée de l’écran de chargement a atteint l’écran titre.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SF2DD9CC41EB0432C" xml:space="preserve">
+    <value>Aucun écran de chargement bloqué n’a été détecté. Aucune déconnexion n’a été tentée.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S9755F56CBF815553" xml:space="preserve">
+    <value>Arrêtez les autres tâches actives avant d’utiliser la sortie forcée de l’écran de chargement.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SB0D250DD44EE31E5" xml:space="preserve">
+    <value>La sortie forcée de l’écran de chargement n’a pas déconnecté le client. Consultez le journal de débogage pour plus de détails.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SA1AE7EFB8CC368F9" xml:space="preserve">
+    <value>La sortie forcée de l’écran de chargement s’est terminée sans confirmation de l’écran titre. Consultez le journal de débogage pour plus de détails.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SFBCD16BD81AEAE87" xml:space="preserve">
+    <value>En attente de la sortie forcée de l’écran de chargement. La progression de Xagman est conservée.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SBD275944325C583A" xml:space="preserve">
+    <value>Gère les commandes /hotbar display bloquées en anglais en JcJ, même lorsque la barre 1 est masquée.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SB990EB3FCDA847E9" xml:space="preserve">
+    <value>Les demandes attendent jusqu’à 5 secondes la fin du chargement et la disponibilité des barres. Changer de zone, se déconnecter ou désactiver le module annule les commandes en attente. Un ATH masqué et les cinématiques empêchent les modifications.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
+    <value>/xa hotbar on active la surveillance. /xa hotbar off annule les commandes en attente et restaure les barres contrôlées lorsque l’ATH est disponible. Utilisez /xa hotbar 1 on pour afficher la barre principale.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
 </root>

@@ -735,7 +735,7 @@ public partial class SlaveWindow
                 return false;
             }
             if (!HasRunCharacter() || pauseState.PauseRequested) return false;
-            cityBusyLease ??= plugin.AutoBusyStatus.AcquireBusyLease("City Chat Flooder city travel");
+            cityBusyLease ??= plugin.AutoBusyStatus.AcquireTravelBusyLease("City Chat Flooder city travel");
             if (!HasRunCharacter() || PauseGate()) return false;
             var lease = cityBusyLease;
             if (lease == null) return false;

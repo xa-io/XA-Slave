@@ -23,6 +23,23 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.66 - 2026-11-13",
+            Lines =
+            [
+                "- Fixed PvP Hotbars: Commands work with the main bar hidden, wait briefly for loading and report specific readiness failures.",
+                "- Fixed Xagman Forecasts: Prevent JSON metadata errors when refreshing trade capacity and Tony selections in protected builds.",
+                "- Fixed City Chat Flooder: Renew temporary Busy protection between trips without carrying a previous status-change block into the next teleport.",
+                "- Added Xagman Login Recovery: Detect stalled Tony and owner logins, retain progress and retry after verified recovery. Automatic connection reset requires administrator access.",
+                "- Added Debug > XA Abuse > FFXIV > Loading Screen Ejection: Manually disconnect a stuck client, with Windows administrator approval when needed and title-screen confirmation.",
+                "- Fixed Xagman Handoffs: Normal owner departures no longer stop Tony; genuine version mismatches and cleanup failures still stop trading.",
+                "- Fixed Xagman Capacity Handoffs: Tony can rotate after a finished owner starts returning home, with clearer timeout diagnostics.",
+                "- Fixed Xagman Meetup Travel: Wait for a ready regional Tony, then verify the world and reach the meetup zone before trading.",
+                "- Fixed Xagman Readiness Waiting: Readiness timeouts retain unfinished owner work instead of marking an unsent teleport as failed.",
+                "- Fixed Xagman Travel Pauses: Local safety waits respect task pauses and recovery suspension.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.65 - 2026-11-12",
             Lines =
             [

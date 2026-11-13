@@ -30265,4 +30265,105 @@ Am besten erfolgt dies ab FG-Rang 6, damit Grundstücksgebote verfügbar sind.</
     <value>Auffülldurchlauf: Warten auf die von Franchise-Besitzern benötigten Regionen...</value>
     <comment>Source: Xagman regional matching; W506</comment>
   </data>
+  <data name="S097C5978ED97CE4F" xml:space="preserve">
+    <value>Warte, bis Tony seine Reise beendet hat und am regionalen Treffpunkt bereit ist.</value>
+  </data>
+  <data name="S5ED6649FCC6A5640" xml:space="preserve">
+    <value>Tony war innerhalb von 30 Minuten nicht am regionalen Treffpunkt bereit. Unerledigte Aufgaben der Franchise-Inhaber bleiben für eine koordinierte Fortsetzung erhalten.</value>
+  </data>
+  <data name="SA9FEB8B2896AF2AC" xml:space="preserve">
+    <value>Die Wartezeit auf die regionale Route ist abgelaufen. Unerledigte Aufgaben der Franchise-Inhaber bleiben für eine koordinierte Fortsetzung erhalten.</value>
+  </data>
+  <data name="S82FC0C0DA0723E2E" xml:space="preserve">
+    <value>Die Anmeldewiederherstellung hat die Wiederholungs- oder Zeitgrenze erreicht. Der Fortschritt bleibt erhalten.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S48CA8992F9562ABF" xml:space="preserve">
+    <value>Die festgefahrene Anmeldung für {0} wird wiederhergestellt ({1}/2).</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE73DA94B3BEAE032" xml:space="preserve">
+    <value>Die Anmeldewiederherstellung hat den Titelbildschirm nicht erreicht. Der Fortschritt bleibt erhalten.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S819DF61885C753E7" xml:space="preserve">
+    <value>Die Anmeldewiederherstellung benötigt Administratorrechte. Der Fortschritt bleibt erhalten.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S6734B14B0A70D4BF" xml:space="preserve">
+    <value>Die Anmeldewiederherstellung konnte die Spielverbindung dieses Clients nicht zurücksetzen. Der Fortschritt bleibt erhalten.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S222E58450DA5E15D" xml:space="preserve">
+    <value>Warte auf den Titelbildschirm, bevor die Anmeldung für {0} erneut versucht wird.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE36F5C3A0D22618E" xml:space="preserve">
+    <value>Wiederhergestellte Anmeldung fortsetzen</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S200081D48C3503C2" xml:space="preserve">
+    <value>Warte auf Tonys aktuelles Treffziel, bevor die Anmeldung erneut versucht wird.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S68B413A26E1B3E49" xml:space="preserve">
+    <value>Kehre zum Titelbildschirm zurück und wähle dann „Wiederhergestellte Anmeldung fortsetzen“, um die beibehaltene Aufgabe fortzusetzen.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S24F512048EE719AD" xml:space="preserve">
+    <value>FFXIV</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S31D4DC5FE7E1F311" xml:space="preserve">
+    <value>Ladebildschirm verlassen</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S940D1FC3A1D5404E" xml:space="preserve">
+    <value>Trennt die Verbindungen dieses Clients zum Spielserver, um einen festgefahrenen Ladebildschirm zu verlassen. Windows fragt möglicherweise nach einer Administratorbestätigung.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S7D5811CA0DD7686C" xml:space="preserve">
+    <value>„Ladebildschirm verlassen“ wartet auf die Bestätigung durch Windows.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S04477A84241EBAD2" xml:space="preserve">
+    <value>„Ladebildschirm verlassen“ wartet auf den Titelbildschirm.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SCDDCC2598C905AB3" xml:space="preserve">
+    <value>„Ladebildschirm verlassen“ hat den Titelbildschirm erreicht.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SF2DD9CC41EB0432C" xml:space="preserve">
+    <value>Es wurde kein festgefahrener Ladebildschirm erkannt. Es wurde kein Trennungsversuch unternommen.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S9755F56CBF815553" xml:space="preserve">
+    <value>Beende andere aktive Aufgaben, bevor du „Ladebildschirm verlassen“ verwendest.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SB0D250DD44EE31E5" xml:space="preserve">
+    <value>„Ladebildschirm verlassen“ hat die Verbindung des Clients nicht getrennt. Einzelheiten stehen im Debug-Protokoll.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SA1AE7EFB8CC368F9" xml:space="preserve">
+    <value>„Ladebildschirm verlassen“ wurde beendet, ohne den Titelbildschirm bestätigen zu können. Einzelheiten stehen im Debug-Protokoll.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SFBCD16BD81AEAE87" xml:space="preserve">
+    <value>Warte auf „Ladebildschirm verlassen“. Der Xagman-Fortschritt bleibt erhalten.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SBD275944325C583A" xml:space="preserve">
+    <value>Verarbeitet blockierte englische /hotbar display-Befehle im PvP, auch wenn Hotbar 1 ausgeblendet ist.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SB990EB3FCDA847E9" xml:space="preserve">
+    <value>Anfragen warten bis zu 5 Sekunden auf den Abschluss des Ladens und die Bereitschaft der Hotbars. Gebietswechsel, Abmelden oder Deaktivieren der Mod brechen wartende Befehle ab. Ein ausgeblendetes HUD und Zwischensequenzen verhindern Änderungen.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
+    <value>/xa hotbar on aktiviert die Überwachung. /xa hotbar off bricht wartende Befehle ab und stellt verwaltete Hotbars wieder her, sobald das HUD verfügbar ist. Mit /xa hotbar 1 on wird die Haupt-Hotbar eingeblendet.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
 </root>

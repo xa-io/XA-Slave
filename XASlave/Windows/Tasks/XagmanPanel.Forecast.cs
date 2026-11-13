@@ -342,30 +342,30 @@ public partial class SlaveWindow
         IReadOnlyList<XagmanPeerPresence> ownerPeers)
     {
         var cfg = plugin.Configuration;
-        return XagmanForecastRefreshState.SemanticKey(new
+        return XagmanForecastRefreshState.SemanticKey(new Dictionary<string, object?>
         {
-            Role = role,
-            Running = xagmanRunning,
-            IgnoreGilShortfalls = cfg.XagmanIgnoreGilShortfalls,
-            Setup = GetXagmanTonyAutoSetupKey(),
-            Owners = role == XagmanRole.FranchiseOwner
+            ["Role"] = role,
+            ["Running"] = xagmanRunning,
+            ["IgnoreGilShortfalls"] = cfg.XagmanIgnoreGilShortfalls,
+            ["Setup"] = GetXagmanTonyAutoSetupKey(),
+            ["Owners"] = role == XagmanRole.FranchiseOwner
                 ? GetXagmanForecastOwnerKeys().OrderBy(key => key, StringComparer.OrdinalIgnoreCase).ToArray()
                 : Array.Empty<string>(),
-            Items = role == XagmanRole.FranchiseOwner ? cfg.XagmanItems : null,
-            Partials = role == XagmanRole.FranchiseOwner && IsXagmanSupplyCycleActive()
+            ["Items"] = role == XagmanRole.FranchiseOwner ? cfg.XagmanItems : null,
+            ["Partials"] = role == XagmanRole.FranchiseOwner && IsXagmanSupplyCycleActive()
                 ? xagmanPartialOwners.OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase).ToArray() : null,
-            CollectionFirst = IsXagmanCollectionFirstRunActive(),
-            Restock = IsXagmanCollectionFirstRestockPhase(),
-            Peers = ownerPeers.OrderBy(peer => peer.InstanceId, StringComparer.Ordinal).Select(peer => new
+            ["CollectionFirst"] = IsXagmanCollectionFirstRunActive(),
+            ["Restock"] = IsXagmanCollectionFirstRestockPhase(),
+            ["Peers"] = ownerPeers.OrderBy(peer => peer.InstanceId, StringComparer.Ordinal).Select(peer => new Dictionary<string, object?>
             {
-                peer.InstanceId,
-                PresenceFresh = IsXagmanTradeCapacityPeerFresh(peer, now),
-                ForecastFresh = peer.TradeCapacityForecast != null
+                ["InstanceId"] = peer.InstanceId,
+                ["PresenceFresh"] = IsXagmanTradeCapacityPeerFresh(peer, now),
+                ["ForecastFresh"] = peer.TradeCapacityForecast != null
                     && IsXagmanTradeCapacityForecastFresh(peer.TradeCapacityForecast, now),
-                Forecast = peer.TradeCapacityForecast,
-                peer.CoordinationProtocolRevision,
-                peer.CollectionFirstRequested,
-                peer.HasConditionalItemPolicies,
+                ["Forecast"] = peer.TradeCapacityForecast,
+                ["CoordinationProtocolRevision"] = peer.CoordinationProtocolRevision,
+                ["CollectionFirstRequested"] = peer.CollectionFirstRequested,
+                ["HasConditionalItemPolicies"] = peer.HasConditionalItemPolicies,
             }).ToArray(),
         });
     }
@@ -376,18 +376,20 @@ public partial class SlaveWindow
             : plugin.Configuration.XagmanTonyCharacters.Select(entry => entry.CharacterNameWorld).ToArray();
         // Capture identity belongs to the query cache, not the visible content revision. A new
         // database capture must re-read items even when its aggregate quantities are unchanged.
-        return JsonSerializer.Serialize(new
+        return JsonSerializer.Serialize(new Dictionary<string, object?>
         {
-            Provider = GetXagmanForecastInventoryProviderIdentity(),
-            LocalContentId = Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ContentId : 0UL,
-            Characters = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Distinct(StringComparer.OrdinalIgnoreCase)
-                .OrderBy(key => key, StringComparer.OrdinalIgnoreCase).Select(key => new
+            ["Provider"] = GetXagmanForecastInventoryProviderIdentity(),
+            ["LocalContentId"] = Plugin.PlayerState.IsLoaded ? Plugin.PlayerState.ContentId : 0UL,
+            ["Characters"] = keys.Where(key => !string.IsNullOrWhiteSpace(key)).Distinct(StringComparer.OrdinalIgnoreCase)
+                .OrderBy(key => key, StringComparer.OrdinalIgnoreCase).Select(key => new Dictionary<string, object?>
                 {
-                    Key = key,
-                    Info = TryGetXagmanForecastCharacterInfo(key, out var info) ? new
+                    ["Key"] = key,
+                    ["Info"] = TryGetXagmanForecastCharacterInfo(key, out var info) ? new Dictionary<string, object?>
                     {
-                        info.XaDatabaseSnapshotUpdatedUtc, info.MainInventoryTotalSlots,
-                        info.MainInventoryFreeSlots, info.Gil, info.FCID, info.FcMemberRankSort,
+                        ["XaDatabaseSnapshotUpdatedUtc"] = info.XaDatabaseSnapshotUpdatedUtc,
+                        ["MainInventoryTotalSlots"] = info.MainInventoryTotalSlots,
+                        ["MainInventoryFreeSlots"] = info.MainInventoryFreeSlots, ["Gil"] = info.Gil,
+                        ["FCID"] = info.FCID, ["FcMemberRankSort"] = info.FcMemberRankSort,
                     } : null,
                 }).ToArray(),
         });
@@ -496,7 +498,10 @@ public partial class SlaveWindow
                 var forecast = BuildXagmanLocalTradeCapacityForecast(now, out var ownerForecastView);
                 if (!xagmanTradeCapacityQueryDeferred)
                 {
-                    var contentKey = XagmanForecastRefreshState.SemanticKey(new { forecast, ownerForecastView });
+                    var contentKey = XagmanForecastRefreshState.SemanticKey(new Dictionary<string, object?>
+                    {
+                        ["forecast"] = forecast, ["ownerForecastView"] = ownerForecastView,
+                    });
                     var changed = xagmanTradeCapacityRefreshState.Commit(inputKey, contentKey, now);
                     if (changed)
                         xagmanOwnerForecastView = ownerForecastView;

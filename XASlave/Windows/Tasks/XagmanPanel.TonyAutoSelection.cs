@@ -29,18 +29,19 @@ public partial class SlaveWindow
     private string GetXagmanTonyAutoSetupKey()
     {
         var cfg = plugin.Configuration;
-        return JsonSerializer.Serialize(new
+        // Dictionary keys are explicit wire names; protected anonymous constructors lose parameter metadata.
+        return JsonSerializer.Serialize(new Dictionary<string, object?>
         {
-            cfg.XagmanRole,
-            cfg.XagmanOutsideNetworkHelper,
-            cfg.XagmanServerMatchingEnabled,
-            cfg.XagmanTargetWorld,
-            cfg.XagmanTargetAetheryte,
-            cfg.XagmanTonyGilMinimum,
-            cfg.XagmanHonorArExclusions,
-            Routes = (cfg.XagmanRegionMeetWorlds ?? new Dictionary<string, string>()).OrderBy(pair => pair.Key).ToArray(),
-            Roster = cfg.XagmanTonyCharacters.Select(entry => entry.CharacterNameWorld).ToArray(),
-            Selected = xagmanTonySelectedIndices.OrderBy(index => index).ToArray(),
+            ["XagmanRole"] = cfg.XagmanRole,
+            ["XagmanOutsideNetworkHelper"] = cfg.XagmanOutsideNetworkHelper,
+            ["XagmanServerMatchingEnabled"] = cfg.XagmanServerMatchingEnabled,
+            ["XagmanTargetWorld"] = cfg.XagmanTargetWorld,
+            ["XagmanTargetAetheryte"] = cfg.XagmanTargetAetheryte,
+            ["XagmanTonyGilMinimum"] = cfg.XagmanTonyGilMinimum,
+            ["XagmanHonorArExclusions"] = cfg.XagmanHonorArExclusions,
+            ["Routes"] = (cfg.XagmanRegionMeetWorlds ?? new Dictionary<string, string>()).OrderBy(pair => pair.Key).ToArray(),
+            ["Roster"] = cfg.XagmanTonyCharacters.Select(entry => entry.CharacterNameWorld).ToArray(),
+            ["Selected"] = xagmanTonySelectedIndices.OrderBy(index => index).ToArray(),
         });
     }
 
@@ -252,17 +253,18 @@ public partial class SlaveWindow
             candidates.Add(candidate);
         }
         // Ignore timestamps/revisions: only changed requirements or candidate inventory invalidate a plan.
-        var inputKey = JsonSerializer.Serialize(new
+        var inputKey = JsonSerializer.Serialize(new Dictionary<string, object?>
         {
-            Demands = demands,
-            Candidates = candidates.Select(candidate => new
+            ["Demands"] = demands,
+            ["Candidates"] = candidates.Select(candidate => new Dictionary<string, object?>
             {
-                candidate.Index, candidate.Key, candidate.Region, candidate.FreeSlots, candidate.Gil,
-                Stock = candidate.Stock.OrderBy(pair => pair.Key.ItemId).ThenBy(pair => pair.Key.IsHq).ToArray(),
-                Headroom = candidate.Headroom.OrderBy(pair => pair.Key.ItemId).ThenBy(pair => pair.Key.IsHq).ToArray(),
+                ["Index"] = candidate.Index, ["Key"] = candidate.Key, ["Region"] = candidate.Region,
+                ["FreeSlots"] = candidate.FreeSlots, ["Gil"] = candidate.Gil,
+                ["Stock"] = candidate.Stock.OrderBy(pair => pair.Key.ItemId).ThenBy(pair => pair.Key.IsHq).ToArray(),
+                ["Headroom"] = candidate.Headroom.OrderBy(pair => pair.Key.ItemId).ThenBy(pair => pair.Key.IsHq).ToArray(),
             }).ToArray(),
-            Projection = xagmanTradeCapacityView!.ShowCollectionFirstProjection,
-            Unknown = unknown, BelowGilMinimum = belowGilMinimum,
+            ["Projection"] = xagmanTradeCapacityView!.ShowCollectionFirstProjection,
+            ["Unknown"] = unknown, ["BelowGilMinimum"] = belowGilMinimum,
         });
         if (xagmanTonyAutoTracking)
         {

@@ -23,6 +23,8 @@ public partial class SlaveWindow
         public bool ExpectedTravelLogout;
         public Action? BeforeReplay;
         public Func<bool>? Completed;
+        public Func<string?>? RefreshLoginCommand;
+        public XagmanLoginRecovery? LoginRecovery;
         public long ErrorSequence;
         public DateTime QuietSince;
         public DateTime NextPoll;
@@ -57,7 +59,8 @@ public partial class SlaveWindow
     }
 
     private void BeginXagmanLobbyOperation(string command, string character, global::XASlave.Localization.UiMessage label,
-        bool directLogin, bool expectedTravelLogout, Action? beforeReplay = null, Func<bool>? completed = null)
+        bool directLogin, bool expectedTravelLogout, Action? beforeReplay = null, Func<bool>? completed = null,
+        Func<string?>? refreshLoginCommand = null, XagmanLoginStallGuard? loginStallGuard = null)
     {
         var runner = plugin.TaskRunner;
         if (xagmanLobbyOperation is { } existing && existing.RunId == runner.CurrentRunId
@@ -71,8 +74,12 @@ public partial class SlaveWindow
             Command = command, Character = character, World = GetCurrentWorldName(), LabelMessage = label,
             DirectLogin = directLogin, ExpectedTravelLogout = expectedTravelLogout,
             BeforeReplay = beforeReplay, Completed = completed,
+            RefreshLoginCommand = refreshLoginCommand,
+            LoginRecovery = directLogin && runner.IsRunning
+                ? new XagmanLoginRecovery { Role = xagmanActiveRole, Character = character, Guard = loginStallGuard ?? new XagmanLoginStallGuard() } : null,
             ErrorSequence = plugin.LobbyErrorAutoClose.ErrorSequence,
         };
+        xagmanLobbyOperation.LoginRecovery?.Guard.ResetObservation();
         plugin.LobbyErrorAutoClose.SetRequiredByXagman(true);
         if (runner.IsRunning) runner.SuspendTick = PollXagmanLobbyRecovery;
         runner.AddLog($"Xagman: lobby monitor armed for {label}; character '{character}', command '/li {command}'.");
@@ -82,6 +89,7 @@ public partial class SlaveWindow
     {
         xagmanLobbyOperation?.Recovery?.Stop();
         xagmanLobbyOperation = null;
+        xagmanLoginRecoveryResumeRequested = false;
         plugin.TaskRunner.SuspendTick = null;
         plugin.LobbyErrorAutoClose.SetRequiredByXagman(false);
     }
@@ -99,6 +107,12 @@ public partial class SlaveWindow
 
     private void FailXagmanLobbyRecovery(global::XASlave.Localization.UiMessage reason)
     {
+        if (xagmanLobbyOperation is { LoginRecovery: { } loginRecovery } op
+            && (loginRecovery.Guard.Attempts > 0 || loginRecovery.ManualResume))
+        {
+            HoldXagmanLoginRecovery(op, reason, reason.Original);
+            return;
+        }
         if (IsXagmanNetworkRecoveryHolding)
         {
             HoldXagmanNetworkRecovery(reason.Original);
@@ -135,6 +149,8 @@ public partial class SlaveWindow
         var now = DateTime.UtcNow;
         var errors = plugin.LobbyErrorAutoClose;
         errors.ObserveDialogue();
+        ApplyXagmanLoginRecoveryResume(op);
+        if (PollXagmanLoginRecovery(op)) return true;
         if (op.ErrorSequence != errors.ErrorSequence)
         {
             op.ErrorSequence = errors.ErrorSequence;
@@ -294,6 +310,22 @@ public partial class SlaveWindow
             TimeoutSec = 30, OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key("S79E19584A111B368")),
         });
         bool errorsVisible() => AddonHelper.IsAddonVisible("Dialogue") || AddonHelper.IsAddonVisible("SelectOk") || AddonHelper.IsAddonVisible("SelectYesno");
+        // A recovering FO may have waited through a Tony handoff. Reacquire its
+        // current regional destination while retaining the same selected character.
+        steps.Add(new TaskStep
+        {
+            NameMessage = global::XASlave.Localization.UiMessage.Key(global::XASlave.Localization.UiLocale.Key("Waiting for Tony's current meeting destination before retrying login.")),
+            ShouldSkip = () => !op.DirectLogin || op.RefreshLoginCommand == null,
+            IsComplete = () =>
+            {
+                var command = op.RefreshLoginCommand?.Invoke();
+                if (string.IsNullOrWhiteSpace(command)) return false;
+                op.Command = command;
+                return true;
+            },
+            TimeoutSec = 120,
+            OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key(global::XASlave.Localization.UiLocale.Key("Waiting for Tony's current meeting destination before retrying login."))),
+        });
         var safePasses = 0;
         var nextPass = DateTime.MinValue;
         var relativeLogin = op.Command.Equals("fc", StringComparison.OrdinalIgnoreCase) || op.Command.Equals("home", StringComparison.OrdinalIgnoreCase)
@@ -328,8 +360,15 @@ public partial class SlaveWindow
             {
                 if (!Live()) return;
                 if (!plugin.IpcClient.TryGetLifestreamBusy(out var busy) || busy || errorsVisible()
+                    || (op.DirectLogin && !IsXagmanRecoveryTitleReady())
                     || (!op.DirectLogin && !IsXagmanLobbyCharacterReady(op.Character)))
                 { Fail(global::XASlave.Localization.UiMessage.Key("S259453F4D193F053")); return; }
+                if (op.DirectLogin && op.RefreshLoginCommand != null)
+                {
+                    var command = op.RefreshLoginCommand();
+                    if (string.IsNullOrWhiteSpace(command) || command != op.Command)
+                    { Fail(global::XASlave.Localization.UiMessage.Key(global::XASlave.Localization.UiLocale.Key("Waiting for Tony's current meeting destination before retrying login."))); return; }
+                }
                 op.BeforeReplay?.Invoke();
                 if (!Live()) return;
                 xagmanExpectedLogout = op.DirectLogin && Plugin.ClientState.IsLoggedIn;
@@ -339,6 +378,7 @@ public partial class SlaveWindow
                 if (!sent) { Fail(global::XASlave.Localization.UiMessage.Key("S64769DB1A90B01C0")); return; }
                 op.Pending = false;
                 op.Recovery = null;
+                OnXagmanLoginRecoveryReplayed(op);
                 runner.AddLog($"Xagman: replayed /li {op.Command}; resuming original completion checks.");
             },
             IsComplete = () => true, TimeoutSec = 1,

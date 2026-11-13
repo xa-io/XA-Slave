@@ -30265,4 +30265,105 @@ xafunc의 DoNavFlySequenceXA 논리와 같습니다(Player.CanFly 확인).</valu
     <value>재보급 단계: 가맹 소유자에게 필요한 지역 정보 대기 중...</value>
     <comment>Source: Xagman regional matching; W506</comment>
   </data>
+  <data name="S097C5978ED97CE4F" xml:space="preserve">
+    <value>Tony가 이동을 마치고 지역 집결 장소에서 준비될 때까지 기다리는 중입니다.</value>
+  </data>
+  <data name="S5ED6649FCC6A5640" xml:space="preserve">
+    <value>Tony가 30분 이내에 지역 집결 장소에서 준비되지 않았습니다. 프랜차이즈 소유자의 미완료 작업은 함께 재개할 수 있도록 보존됩니다.</value>
+  </data>
+  <data name="SA9FEB8B2896AF2AC" xml:space="preserve">
+    <value>지역 이동 경로 대기 시간이 만료되었습니다. 프랜차이즈 소유자의 미완료 작업은 함께 재개할 수 있도록 보존됩니다.</value>
+  </data>
+  <data name="S82FC0C0DA0723E2E" xml:space="preserve">
+    <value>로그인 복구의 재시도 횟수 또는 제한 시간에 도달했습니다. 진행 상황은 유지됩니다.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S48CA8992F9562ABF" xml:space="preserve">
+    <value>{0}의 멈춘 로그인을 복구하는 중입니다({1}/2).</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE73DA94B3BEAE032" xml:space="preserve">
+    <value>로그인 복구 중 타이틀 화면으로 돌아가지 못했습니다. 진행 상황은 유지됩니다.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S819DF61885C753E7" xml:space="preserve">
+    <value>로그인을 복구하려면 관리자 권한이 필요합니다. 진행 상황은 유지됩니다.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S6734B14B0A70D4BF" xml:space="preserve">
+    <value>로그인 복구 중 이 클라이언트의 게임 연결을 재설정하지 못했습니다. 진행 상황은 유지됩니다.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S222E58450DA5E15D" xml:space="preserve">
+    <value>{0}의 로그인을 다시 시도하기 전에 타이틀 화면을 기다리는 중입니다.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE36F5C3A0D22618E" xml:space="preserve">
+    <value>복구된 로그인 재개</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S200081D48C3503C2" xml:space="preserve">
+    <value>로그인을 다시 시도하기 전에 Tony의 현재 집결지를 기다리는 중입니다.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S68B413A26E1B3E49" xml:space="preserve">
+    <value>타이틀 화면으로 돌아간 뒤 '복구된 로그인 재개'를 선택하면 유지된 작업을 계속할 수 있습니다.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S24F512048EE719AD" xml:space="preserve">
+    <value>FFXIV</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S31D4DC5FE7E1F311" xml:space="preserve">
+    <value>로딩 화면 강제 탈출</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S940D1FC3A1D5404E" xml:space="preserve">
+    <value>이 클라이언트의 게임 서버 연결을 끊어 멈춘 로딩 화면에서 벗어납니다. Windows에서 관리자 승인을 요청할 수 있습니다.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S7D5811CA0DD7686C" xml:space="preserve">
+    <value>로딩 화면 강제 탈출이 Windows 승인을 기다리는 중입니다.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S04477A84241EBAD2" xml:space="preserve">
+    <value>로딩 화면 강제 탈출이 타이틀 화면을 기다리는 중입니다.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SCDDCC2598C905AB3" xml:space="preserve">
+    <value>로딩 화면 강제 탈출로 타이틀 화면에 도달했습니다.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SF2DD9CC41EB0432C" xml:space="preserve">
+    <value>멈춘 로딩 화면이 감지되지 않았습니다. 연결 끊기를 시도하지 않았습니다.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S9755F56CBF815553" xml:space="preserve">
+    <value>로딩 화면 강제 탈출을 사용하기 전에 다른 실행 중인 작업을 중지하세요.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SB0D250DD44EE31E5" xml:space="preserve">
+    <value>로딩 화면 강제 탈출이 클라이언트의 연결을 끊지 못했습니다. 자세한 내용은 디버그 로그를 확인하세요.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SA1AE7EFB8CC368F9" xml:space="preserve">
+    <value>타이틀 화면을 확인하지 못한 채 로딩 화면 강제 탈출이 종료되었습니다. 자세한 내용은 디버그 로그를 확인하세요.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SFBCD16BD81AEAE87" xml:space="preserve">
+    <value>로딩 화면 강제 탈출을 기다리는 중입니다. Xagman 진행 상황은 유지됩니다.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SBD275944325C583A" xml:space="preserve">
+    <value>PvP에서 영어 오류로 차단된 /hotbar display 명령을 처리합니다. 단축바 1이 숨겨져 있어도 사용할 수 있습니다.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SB990EB3FCDA847E9" xml:space="preserve">
+    <value>로딩 완료와 단축바 준비를 최대 5초간 기다립니다. 지역 이동, 로그아웃 또는 기능 비활성화 시 대기 중인 명령이 취소됩니다. HUD가 숨겨져 있거나 컷신 재생 중에는 변경할 수 없습니다.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
+    <value>/xa hotbar on으로 감시를 활성화합니다. /xa hotbar off는 대기 중인 명령을 취소하고 HUD를 사용할 수 있을 때 제어 중인 단축바를 복원합니다. 기본 단축바를 표시하려면 /xa hotbar 1 on을 사용하세요.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
 </root>

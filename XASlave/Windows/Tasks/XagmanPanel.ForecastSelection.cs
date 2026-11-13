@@ -63,12 +63,15 @@ public partial class SlaveWindow
             }).ToList() ?? new List<XagmanForecastItemDefinition>();
 
     private string GetXagmanTonyForecastSelectionSetupKey()
-        => JsonSerializer.Serialize(new
+        => JsonSerializer.Serialize(new Dictionary<string, object?>
         {
-            Setup = GetXagmanTonyAutoSetupKey(),
-            Item = xagmanTonyForecastSelectionItem,
-            Minimum = xagmanTonyForecastSelectionMinimum,
-            Items = GetXagmanTonyForecastSelectionItems().Select(item => new { item.ItemId, item.IsHq, item.ItemName }).ToArray(),
+            ["Setup"] = GetXagmanTonyAutoSetupKey(),
+            ["Item"] = xagmanTonyForecastSelectionItem,
+            ["Minimum"] = xagmanTonyForecastSelectionMinimum,
+            ["Items"] = GetXagmanTonyForecastSelectionItems().Select(item => new Dictionary<string, object?>
+            {
+                ["ItemId"] = item.ItemId, ["IsHq"] = item.IsHq, ["ItemName"] = item.ItemName,
+            }).ToArray(),
         });
 
     private void CancelXagmanTonyForecastSelection(UiMessage message)

@@ -1776,6 +1776,12 @@ public partial class SlaveWindow
 
         DrawPluginInspector();
 
+        if (global::XASlave.Localization.UiNative.CollapsingHeader((global::XASlave.Localization.UiLocale.Native(global::XASlave.Localization.UiLocale.Key("FFXIV")) + "##xaAbuseFfxiv")))
+        {
+            DrawXaAbuseFfxiv();
+            ImGui.Spacing();
+        }
+
         if (global::XASlave.Localization.UiNative.CollapsingHeader((global::XASlave.Localization.UiLocale.Native("SA8D85371E852AE36") + "##xaAbuse")))
         {
             ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S939AF4DA41F114ED"));

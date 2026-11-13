@@ -994,6 +994,38 @@ public partial class SlaveWindow
         return true;
     }
 
+    // Route discovery remains available during Tony startup. Owner travel admission
+    // additionally needs fresh serving evidence from that coordinator, not a local
+    // ObjectTable actor (the owner may still be in another world or territory).
+    private bool IsXagmanRegionalTonyServingMeetup(XagmanPeerPresence tony)
+    {
+        if (!tony.XagmanEnabled || !IsXagmanPeerFresh(tony)
+            || tony.Role != XagmanRole.Tony || !tony.ServerMatchingEnabled
+            || !IsXagmanPeerInCurrentRunPhase(tony) || !IsXagmanPeerInSupplyCoordinatorScope(tony)
+            || string.IsNullOrWhiteSpace(xagmanNetworkSession)
+            || tony.InstanceId != xagmanNetworkCoordinator
+            || tony.RecoveryCoordinatorInstanceId != xagmanNetworkCoordinator
+            || tony.RecoverySessionId != xagmanNetworkSession || tony.RecoveryEpoch != xagmanNetworkEpoch
+            || tony.RecoverySuspended || tony.TonySellLocationActive
+            || !tony.IsLoggedIn || tony.ContentId == 0
+            || tony.Status is not (XagmanStatus.AtMeetSpot or XagmanStatus.Called or XagmanStatus.Trading)
+            || !tony.ActiveCharacter.Equals($"{tony.CharacterName}@{tony.HomeWorld}", StringComparison.OrdinalIgnoreCase)
+            || !tony.CurrentWorld.Equals(tony.MeetWorld, StringComparison.OrdinalIgnoreCase))
+            return false;
+
+        var targetTerritory = AetheryteData.GetZoneIdForAetheryteWithFallback(tony.MeetAetheryte);
+        return targetTerritory != 0 && tony.TerritoryId == targetTerritory;
+    }
+
+    private bool IsXagmanOwnerWaitingForLaterRegion(string characterNameWorld)
+    {
+        var tony = GetXagmanServerMatchingTonyPeer();
+        var ownerDataCenter = GetXagmanDataCenterOfChar(characterNameWorld);
+        return tony != null && IsXagmanServerMatchingTonyMeetReady(tony, out _)
+            && !string.IsNullOrWhiteSpace(ownerDataCenter)
+            && GetXagmanRegionOrdinal(tony.ServerMatchingActiveDataCenter) < GetXagmanRegionOrdinal(ownerDataCenter);
+    }
+
     private XagmanOwnerServerGate EvaluateXagmanOwnerServerGate(string characterNameWorld, out string meetWorld, out string meetAetheryte, out string reason)
     {
         var result = EvaluateXagmanOwnerServerGateMessage(characterNameWorld, out meetWorld, out meetAetheryte, out var presentation);
@@ -1003,11 +1035,17 @@ public partial class SlaveWindow
 
     private XagmanOwnerServerGate EvaluateXagmanOwnerServerGateMessage(string characterNameWorld, out string meetWorld, out string meetAetheryte, out global::XASlave.Localization.UiMessage reason)
     {
+        return EvaluateXagmanOwnerServerGateForPeerMessage(characterNameWorld, GetXagmanServerMatchingTonyPeer(),
+            out meetWorld, out meetAetheryte, out reason);
+    }
+
+    private XagmanOwnerServerGate EvaluateXagmanOwnerServerGateForPeerMessage(string characterNameWorld,
+        XagmanPeerPresence? tony, out string meetWorld, out string meetAetheryte, out global::XASlave.Localization.UiMessage reason)
+    {
         meetWorld = string.Empty;
         meetAetheryte = string.Empty;
         reason = global::XASlave.Localization.UiMessage.Raw(string.Empty);
 
-        var tony = GetXagmanServerMatchingTonyPeer();
         if (tony == null)
         {
             reason = global::XASlave.Localization.UiMessage.Key("SE2B67F7838ECE136");

@@ -61,6 +61,17 @@ public unsafe sealed class AutoBusyStatusService : IDisposable
     public BusyStatusLease AcquireBusyLease(string owner)
         => Acquire(owner, false);
 
+    /// <summary>Start one independent teleport protection period without resetting another consumer's intent.</summary>
+    public BusyStatusLease AcquireTravelBusyLease(string owner)
+    {
+        lock (sync)
+        {
+            var lease = Acquire(owner, false);
+            lease.FreshTravelIntent = !lease.Released && !enabled && leases.Count == 1;
+            return lease;
+        }
+    }
+
     public BusyStatusLease AcquireTradeSuppression(string owner)
         => Acquire(owner, true);
 
@@ -84,6 +95,7 @@ public unsafe sealed class AutoBusyStatusService : IDisposable
         internal readonly bool Suppression;
         internal readonly ulong ContentId;
         internal bool Released;
+        internal bool FreshTravelIntent;
         internal ulong WaitingContentId;
         internal long WaitingSince;
         private UiMessage reason = UiMessage.Authored("Waiting for a ready character to update Busy.");
@@ -134,6 +146,7 @@ public unsafe sealed class AutoBusyStatusService : IDisposable
                     lease.WaitingSince = 0; lease.WaitingContentId = 0;
                     return lease.Report(BusyStatusReadiness.Pending, UiMessage.Authored("Waiting for a ready character to update Busy."));
                 }
+                PrepareTravelIntent(observed);
                 if (lease.WaitingContentId != observed.ContentId || lease.WaitingSince == 0)
                 {
                     lease.WaitingContentId = observed.ContentId;
@@ -182,6 +195,26 @@ public unsafe sealed class AutoBusyStatusService : IDisposable
         return new(contentId, safe, busy, safe);
     }
 
+    private void PrepareTravelIntent(BusyStatusObservation observed)
+    {
+        foreach (var lease in leases.Values)
+        {
+            if (!lease.FreshTravelIntent) continue;
+            // Observed shared use permanently revokes this request's exclusive reset opportunity.
+            if (enabled || leases.Count != 1 || lease.Released)
+            {
+                lease.FreshTravelIntent = false;
+                continue;
+            }
+            if (lease.ContentId == 0 || lease.ContentId != observed.ContentId || !observed.Readable || !observed.Safe)
+                continue;
+            // Never discard an outstanding on/off receipt or retry an uncertain failed command.
+            if (coordinator.Pending) continue;
+            lease.FreshTravelIntent = false;
+            coordinator.BeginTemporaryIntent(observed);
+        }
+    }
+
     private bool IsCurrent(long owner)
     {
         if (disposed || generation != owner || framework.IsFrameworkUnloading) return false;
@@ -204,6 +237,7 @@ public unsafe sealed class AutoBusyStatusService : IDisposable
                 if (!IsCurrent(owner)) return;
                 var observed = Capture();
                 if (!IsCurrent(owner)) return;
+                PrepareTravelIntent(observed);
                 var suppressed = leases.Values.Any(lease => lease.Suppression && !lease.Released);
                 var demand = enabled || leases.Values.Any(lease => !lease.Suppression && !lease.Released && lease.ContentId != 0 && lease.ContentId == observed.ContentId);
                 var command = coordinator.Advance(observed, demand, suppressed, now);

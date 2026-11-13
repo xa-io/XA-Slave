@@ -32,6 +32,19 @@ internal sealed class BusyStatusCoordinator
         if (!Pending) { attempts = 0; notBefore = 0; }
     }
 
+    internal void BeginTemporaryIntent(BusyStatusObservation observed)
+    {
+        if (Pending || Failed || observed.ContentId == 0 || !observed.Readable || !observed.Safe) return;
+        if (ContentId != observed.ContentId) ResetForCharacter(observed.ContentId);
+        // Reconcile the idle interval before applying a new temporary demand. Preserve Busy
+        // we still own, but never claim an existing manual Busy or inherit an old manual-off latch.
+        if (!observed.Busy) Owned = false;
+        externalBusy = observed.Busy && !Owned;
+        ManualChange = false;
+        attempts = 0; notBefore = 0;
+        State = BusyStatusState.Waiting;
+    }
+
     internal void CancelUnsent()
     {
         if (!Pending) return;

@@ -30265,4 +30265,105 @@ NamePlate готов + PlayerAvailable + не применяет действи�
     <value>Проход пополнения: ожидание сведений о регионах, нужных Franchise Owners...</value>
     <comment>Source: Xagman regional matching; W506</comment>
   </data>
+  <data name="S097C5978ED97CE4F" xml:space="preserve">
+    <value>Ожидание завершения путешествия Тони и его готовности в месте встречи региона.</value>
+  </data>
+  <data name="S5ED6649FCC6A5640" xml:space="preserve">
+    <value>Тони не был готов в месте встречи региона в течение 30 минут. Незавершённые задачи владельцев франшиз сохранены для согласованного возобновления.</value>
+  </data>
+  <data name="SA9FEB8B2896AF2AC" xml:space="preserve">
+    <value>Время ожидания регионального маршрута истекло. Незавершённые задачи владельцев франшиз сохранены для согласованного возобновления.</value>
+  </data>
+  <data name="S82FC0C0DA0723E2E" xml:space="preserve">
+    <value>Достигнут предел попыток или времени восстановления входа. Прогресс сохранён.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S48CA8992F9562ABF" xml:space="preserve">
+    <value>Восстановление зависшего входа для {0} ({1}/2).</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE73DA94B3BEAE032" xml:space="preserve">
+    <value>При восстановлении входа не удалось перейти на титульный экран. Прогресс сохранён.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S819DF61885C753E7" xml:space="preserve">
+    <value>Для восстановления входа требуются права администратора. Прогресс сохранён.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S6734B14B0A70D4BF" xml:space="preserve">
+    <value>При восстановлении входа не удалось сбросить игровое соединение этого клиента. Прогресс сохранён.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S222E58450DA5E15D" xml:space="preserve">
+    <value>Ожидание титульного экрана перед повторной попыткой входа для {0}.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE36F5C3A0D22618E" xml:space="preserve">
+    <value>Продолжить восстановленный вход</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S200081D48C3503C2" xml:space="preserve">
+    <value>Ожидание текущего места встречи Tony перед повторной попыткой входа.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S68B413A26E1B3E49" xml:space="preserve">
+    <value>Вернитесь на титульный экран, затем выберите «Продолжить восстановленный вход», чтобы продолжить сохранённую задачу.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S24F512048EE719AD" xml:space="preserve">
+    <value>FFXIV</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S31D4DC5FE7E1F311" xml:space="preserve">
+    <value>Выход из зависшего экрана загрузки</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S940D1FC3A1D5404E" xml:space="preserve">
+    <value>Разрывает соединения этого клиента с игровыми серверами для выхода из зависшего экрана загрузки. Windows может запросить разрешение администратора.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S7D5811CA0DD7686C" xml:space="preserve">
+    <value>Выход из зависшего экрана загрузки ожидает разрешения Windows.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S04477A84241EBAD2" xml:space="preserve">
+    <value>Выход из зависшего экрана загрузки ожидает появления титульного экрана.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SCDDCC2598C905AB3" xml:space="preserve">
+    <value>Выход из зависшего экрана загрузки завершён: титульный экран открыт.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SF2DD9CC41EB0432C" xml:space="preserve">
+    <value>Зависший экран загрузки не обнаружен. Попытка отключения не выполнялась.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S9755F56CBF815553" xml:space="preserve">
+    <value>Остановите другие активные задачи перед использованием выхода из зависшего экрана загрузки.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SB0D250DD44EE31E5" xml:space="preserve">
+    <value>Выход из зависшего экрана загрузки не отключил клиент. Подробности в журнале отладки.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SA1AE7EFB8CC368F9" xml:space="preserve">
+    <value>Выход из зависшего экрана загрузки завершён без подтверждения титульного экрана. Подробности в журнале отладки.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SFBCD16BD81AEAE87" xml:space="preserve">
+    <value>Ожидание выхода из зависшего экрана загрузки. Прогресс Xagman сохранён.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SBD275944325C583A" xml:space="preserve">
+    <value>Обрабатывает заблокированные команды /hotbar display с сообщением об ошибке на английском в PvP, даже если панель 1 скрыта.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SB990EB3FCDA847E9" xml:space="preserve">
+    <value>Запросы ожидают завершения загрузки и готовности панелей до 5 секунд. Смена зоны, выход из игры или отключение модуля отменяют команды в очереди. Скрытый интерфейс и видеоролики блокируют изменения.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
+    <value>/xa hotbar on включает отслеживание. /xa hotbar off отменяет команды в очереди и восстанавливает управляемые панели, когда интерфейс доступен. Используйте /xa hotbar 1 on, чтобы показать основную панель.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
 </root>

@@ -38,6 +38,26 @@ public partial class SlaveWindow
     private DateTime xagmanSupplyDrainStartedAtUtc = DateTime.MinValue;
     private DateTime xagmanSupplyDrainNextPollAtUtc = DateTime.MinValue;
     private DateTime xagmanSupplyDrainQuietSinceUtc = DateTime.MinValue;
+    private string xagmanSupplyDrainLastWaitReason = string.Empty;
+    private int xagmanSupplyDrainWaitLogCount;
+
+    private void ResetXagmanSupplyDrainWaitDiagnostics()
+    {
+        xagmanSupplyDrainLastWaitReason = string.Empty;
+        xagmanSupplyDrainWaitLogCount = 0;
+    }
+
+    // Original-English support diagnostics; the localized error/status stays unchanged.
+    private void RecordXagmanSupplyDrainWait(string reason)
+    {
+        if (xagmanSupplyDrainLastWaitReason.Equals(reason, StringComparison.Ordinal)) return;
+        xagmanSupplyDrainLastWaitReason = reason;
+        // A flickering peer/window cannot flood the task history. Retain the latest reason
+        // even after the per-operation log limit so the timeout still names its blocker.
+        if (xagmanSupplyDrainWaitLogCount >= 16) return;
+        xagmanSupplyDrainWaitLogCount++;
+        plugin.TaskRunner.AddLog($"Xagman: Tony capacity handoff waiting: {reason}.");
+    }
 
     // A new Tony resets the capacity latch, but must not reset any owner's Give goal.
     private void ResetXagmanTonySupplyDrain()
@@ -50,6 +70,7 @@ public partial class SlaveWindow
         xagmanSupplyDrainStartingStock.Clear();
         xagmanSupplyDrainCharacter = string.Empty;
         xagmanSupplyDrainStartedAtUtc = xagmanSupplyDrainNextPollAtUtc = xagmanSupplyDrainQuietSinceUtc = DateTime.MinValue;
+        ResetXagmanSupplyDrainWaitDiagnostics();
     }
 
     // Call only with the other run-state resets, never at a Tony/owner/pass transition.
@@ -245,12 +266,24 @@ public partial class SlaveWindow
     }
 
     private bool TryGetXagmanReceivingPolicyDemand(out bool hasReceivingPolicies, out bool hasRemainingWork)
+        => TryGetXagmanReceivingPolicyDemand(out hasReceivingPolicies, out hasRemainingWork, out _);
+
+    private bool TryGetXagmanReceivingPolicyDemand(out bool hasReceivingPolicies, out bool hasRemainingWork, out string waitReason)
     {
         hasReceivingPolicies = false;
         hasRemainingWork = false;
-        if (xagmanSupplyOwnerCohort.Count == 0) return false;
+        waitReason = string.Empty;
+        if (xagmanSupplyOwnerCohort.Count == 0)
+        {
+            waitReason = "remaining-owner demand cannot be read because the owner cohort is empty";
+            return false;
+        }
         var region = GetXagmanRegionOfChar(xagmanActiveCharacter);
-        if (string.IsNullOrWhiteSpace(region)) return false;
+        if (string.IsNullOrWhiteSpace(region))
+        {
+            waitReason = $"remaining-owner demand cannot be read because Tony {xagmanActiveCharacter} has no known region";
+            return false;
+        }
         var regionScoped = IsXagmanSupplyRegionScoped(xagmanServerMatchingActive);
         var peers = plugin.XagmanPeers.Peers;
         foreach (var instanceId in xagmanSupplyOwnerCohort)
@@ -265,7 +298,12 @@ public partial class SlaveWindow
                 || peer.SupplyCycleRevision != XagmanSupplyCycleRevision
                 || peer.SupplyCoordinatorInstanceId != plugin.InstanceId || !xagmanSupplyRunPassIds.Contains(peer.SupplyPassId)
                 || peer.SupplyReceivingPolicyRegions == null || peer.Status == XagmanStatus.Error)
+            {
+                waitReason = peer == null
+                    ? $"remaining-owner demand peer {instanceId} is missing"
+                    : $"remaining-owner demand peer {instanceId} is not usable: fresh={IsXagmanPeerFresh(peer)}, enabled={peer.XagmanEnabled}, role={peer.Role}, currentPhase={IsXagmanPeerInCurrentRunPhase(peer)}, revision={peer.SupplyCycleRevision}/{XagmanSupplyCycleRevision}, coordinator={peer.SupplyCoordinatorInstanceId}/{plugin.InstanceId}, knownPass={xagmanSupplyRunPassIds.Contains(peer.SupplyPassId)}, policyRegionsAvailable={peer.SupplyReceivingPolicyRegions != null}, status={peer.Status}";
                 return false;
+            }
             hasReceivingPolicies |= regionScoped
                 ? peer.SupplyReceivingPolicyRegions.Contains(region, StringComparer.OrdinalIgnoreCase)
                 : peer.SupplyReceivingPolicyRegions.Count > 0;
@@ -277,20 +315,31 @@ public partial class SlaveWindow
         return true;
     }
 
-    private bool IsXagmanCapacityRotationOwnerReady()
+    private bool IsXagmanCapacityRotationOwnerReady(out string waitReason)
     {
+        waitReason = string.Empty;
         if (string.IsNullOrWhiteSpace(xagmanActiveTradePartner)) return true;
         var owner = plugin.XagmanPeers.Peers.FirstOrDefault(peer => peer.InstanceId == xagmanActiveTradePartnerInstanceId
             && peer.Role == XagmanRole.FranchiseOwner && peer.XagmanEnabled && IsXagmanPeerFresh(peer)
             && IsXagmanPeerInCurrentRunPhase(peer) && peer.SupplyCoordinatorInstanceId == plugin.InstanceId
             && peer.SupplyPassId == xagmanSupplyPassId);
-        if (owner == null) return false;
+        if (owner == null)
+        {
+            var observedOwner = plugin.XagmanPeers.Peers.FirstOrDefault(peer => peer.InstanceId == xagmanActiveTradePartnerInstanceId);
+            waitReason = observedOwner == null
+                ? $"owner acknowledgement peer {xagmanActiveTradePartnerInstanceId} for {xagmanActiveTradePartner} is missing"
+                : $"owner acknowledgement peer {xagmanActiveTradePartnerInstanceId} for {xagmanActiveTradePartner} is not eligible: role={observedOwner.Role}, enabled={observedOwner.XagmanEnabled}, fresh={IsXagmanPeerFresh(observedOwner)}, currentPhase={IsXagmanPeerInCurrentRunPhase(observedOwner)}, coordinator={observedOwner.SupplyCoordinatorInstanceId}/{plugin.InstanceId}, pass={observedOwner.SupplyPassId}/{xagmanSupplyPassId}, status={observedOwner.Status}";
+            return false;
+        }
         // The last transfer can fill Tony exactly as the owner completes verification and
         // begins sendoff. Such an owner has already left trading and need not be cancelled.
         if (!owner.ActiveCharacter.Equals(xagmanActiveTradePartner, StringComparison.OrdinalIgnoreCase)
             || owner.Status is XagmanStatus.ReturningHome or XagmanStatus.Completed)
             return true;
-        return xagmanTonyRotationRequestedByOwnerStandby || TryObserveXagmanOwnerStandbyRotationRequest() == true;
+        var acknowledged = xagmanTonyRotationRequestedByOwnerStandby || TryObserveXagmanOwnerStandbyRotationRequest() == true;
+        if (!acknowledged)
+            waitReason = $"owner {owner.ActiveCharacter} has not acknowledged standby or sendoff: status={owner.Status}, client={owner.InstanceId}, pass={owner.SupplyPassId}";
+        return acknowledged;
     }
 
     // Forecasts choose scheduling eligibility, never successful owner completion. Null
@@ -431,6 +480,7 @@ public partial class SlaveWindow
         xagmanSupplyDrainCharacter = xagmanActiveCharacter;
         xagmanSupplyDrainStartedAtUtc = DateTime.UtcNow;
         xagmanSupplyDrainNextPollAtUtc = xagmanSupplyDrainQuietSinceUtc = DateTime.MinValue;
+        ResetXagmanSupplyDrainWaitDiagnostics();
         if (hasUsefulSupply) xagmanTonyRotationRequestedByOwnerStandby = false;
         if (xagmanSupplyCapacityRotationPending) xagmanStatus = XagmanStatus.Paused;
         xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, (hasUsefulSupply ? global::XASlave.Localization.UiMessage.Format("SAC67BE743661F524", xagmanActiveCharacter, ((fullInventory ? global::XASlave.Localization.UiMessage.Key("SD88A381E9CB39AA3") : global::XASlave.Localization.UiMessage.Key("SAA97BE7758A54A01")))) : global::XASlave.Localization.UiMessage.Format("S971D6129CCDEC01C", xagmanActiveCharacter, ((hasReceivingPolicies ? global::XASlave.Localization.UiMessage.Key("S3CF7B7747CBCF64A") : global::XASlave.Localization.UiMessage.Key("SD13FD0FDF77479C3"))))));
@@ -461,6 +511,10 @@ public partial class SlaveWindow
         }
         if ((now - xagmanSupplyDrainStartedAtUtc).TotalSeconds >= 15)
         {
+            var blocker = string.IsNullOrEmpty(xagmanSupplyDrainLastWaitReason)
+                ? "no handoff poll completed before the deadline"
+                : xagmanSupplyDrainLastWaitReason;
+            plugin.TaskRunner.AddLog($"Xagman: Tony capacity handoff timed out for {xagmanSupplyDrainCharacter}; last observed blocker: {blocker}.");
             FailXagmanSupplyCycle(global::XASlave.Localization.UiMessage.Key("SF8DBCD3A5717DF23"));
             return true;
         }
@@ -483,24 +537,36 @@ public partial class SlaveWindow
         {
             TryAbortXagmanTradeWindow();
             xagmanSupplyDrainQuietSinceUtc = DateTime.MinValue;
+            RecordXagmanSupplyDrainWait("the Trade window was open when receiver closure was requested");
             return true;
         }
         if (plugin.IpcClient.DropboxIsBusy())
         {
             xagmanSupplyDrainQuietSinceUtc = DateTime.MinValue;
+            RecordXagmanSupplyDrainWait("Dropbox still reports busy after receiver queue cleanup");
             return true;
         }
         if (xagmanSupplyDrainQuietSinceUtc == DateTime.MinValue)
             xagmanSupplyDrainQuietSinceUtc = now;
         if ((now - xagmanSupplyDrainQuietSinceUtc).TotalSeconds < 1)
+        {
+            RecordXagmanSupplyDrainWait("the closed Trade window and idle Dropbox have not yet stayed quiet for one second");
             return true;
+        }
         if (xagmanSupplyCapacityRotationPending)
         {
             // Paused makes the active FO cancel into its existing standby path, retaining
             // its exact character cursor and finite Give ledger. Do not rotate before ack.
-            if (!IsXagmanCapacityRotationOwnerReady())
+            if (!IsXagmanCapacityRotationOwnerReady(out var ownerWaitReason))
+            {
+                RecordXagmanSupplyDrainWait(ownerWaitReason);
                 return true;
-            if (!TryGetXagmanReceivingPolicyDemand(out var hasReceivingPolicies, out var hasRemainingWork)) return true;
+            }
+            if (!TryGetXagmanReceivingPolicyDemand(out var hasReceivingPolicies, out var hasRemainingWork, out var demandWaitReason))
+            {
+                RecordXagmanSupplyDrainWait(demandWaitReason);
+                return true;
+            }
             if (!hasRemainingWork)
             {
                 // The last owner may have completed during cleanup. Let the ordinary
@@ -517,7 +583,16 @@ public partial class SlaveWindow
                 // A final incoming trade can add useful stock while shutdown settles.
                 // Re-evaluate after closure before permanently discarding revisit eligibility.
                 xagmanSupplyInventoryCachedAtUtc = DateTime.MinValue;
-                if (!TryCaptureXagmanSupplyInventory(out var settledStock) || !TryGetXagmanLiveGil(out var settledGil)) return true;
+                if (!TryCaptureXagmanSupplyInventory(out var settledStock))
+                {
+                    RecordXagmanSupplyDrainWait("Tony's settled supply inventory is unreadable during rotation recheck");
+                    return true;
+                }
+                if (!TryGetXagmanLiveGil(out var settledGil))
+                {
+                    RecordXagmanSupplyDrainWait("Tony's live gil is unreadable during rotation recheck");
+                    return true;
+                }
                 var owners = plugin.XagmanPeers.Peers.Where(peer => xagmanSupplyOwnerCohort.Contains(peer.InstanceId)
                     && !IsXagmanOwnerClientCompleted(peer.InstanceId)).ToList();
                 if (GetXagmanForecastTonyUse(owners, CaptureXagmanSupplyStock(settledStock),
@@ -545,8 +620,16 @@ public partial class SlaveWindow
             }
         }
         xagmanSupplyInventoryCachedAtUtc = DateTime.MinValue;
-        if (!TryCaptureXagmanSupplyInventory(out var startingStock) || !TryGetXagmanLiveGil(out var startingGil))
+        if (!TryCaptureXagmanSupplyInventory(out var startingStock))
+        {
+            RecordXagmanSupplyDrainWait("Tony's settled supply inventory is unreadable before supply draining");
             return true;
+        }
+        if (!TryGetXagmanLiveGil(out var startingGil))
+        {
+            RecordXagmanSupplyDrainWait("Tony's live gil is unreadable before supply draining");
+            return true;
+        }
         // Capture after receiver cleanup and before permitting any outgoing supply. Unknown
         // native inventory never becomes evidence that receiving capacity was recovered.
         xagmanSupplyDrainStartingStock = CaptureXagmanSupplyStock(startingStock);

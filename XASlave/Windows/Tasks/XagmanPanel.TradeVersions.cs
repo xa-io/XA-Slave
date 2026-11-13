@@ -6,6 +6,8 @@ namespace XASlave.Windows;
 
 public partial class SlaveWindow
 {
+    private enum XagmanTradeVersionAdmission { Pending, Ready, Invalid }
+
     private sealed record XagmanReceiverVersionIntent(global::XASlave.Localization.UiMessage Context,
         XagmanRole Role, string Character, string Partner, string PartnerInstanceId, string Scope);
 
@@ -74,26 +76,56 @@ public partial class SlaveWindow
             && TryGetXagmanTradeCapacityConnectedPeer(local, out peer, out _);
     }
 
-    private bool TryRequireXagmanTradeVersions(out string failure)
+    private XagmanTradeVersionAdmission GetXagmanTradeVersionAdmission(out string failure)
     {
         if (plugin.Configuration.XagmanOutsideNetworkHelper)
-            return TryRequireXagmanOnhTradeVersions(out failure);
+            return TryRequireXagmanOnhTradeVersions(out failure)
+                ? XagmanTradeVersionAdmission.Ready : XagmanTradeVersionAdmission.Invalid;
         if (!TryGetXagmanTradeVersions(out var localSlave, out var localDropbox, out failure))
-            return false;
+            return XagmanTradeVersionAdmission.Invalid;
+        // Validate the versions from this one eligible peer snapshot. A later heartbeat
+        // may retire the pair normally; that is pending admission, not a version mismatch.
         if (!TryGetXagmanConnectedTradeVersionPeer(out var peer))
         {
             failure = "The active Tony/owner trade pair is not fresh or mutually bound.";
-            return false;
+            return XagmanTradeVersionAdmission.Pending;
         }
         if (peer.TradeVersionProtocolRevision != XagmanTradeVersionPolicy.Revision)
         {
             failure = "The trading partner does not support Tony's version handshake. Update XA Slave on that client.";
-            return false;
+            return XagmanTradeVersionAdmission.Invalid;
         }
         // Only the actual Tony in this reciprocal, scoped exchange supplies the required pair.
-        return xagmanActiveRole == XagmanRole.Tony
+        var matched = xagmanActiveRole == XagmanRole.Tony
             ? TryMatchXagmanTradeVersions(localSlave, localDropbox, peer.PluginVersion, peer.DropboxVersion, out failure)
             : TryMatchXagmanTradeVersions(peer.PluginVersion, peer.DropboxVersion, localSlave, localDropbox, out failure);
+        return matched ? XagmanTradeVersionAdmission.Ready : XagmanTradeVersionAdmission.Invalid;
+    }
+
+    private bool TryRequireXagmanTradeVersions(out string failure)
+        => GetXagmanTradeVersionAdmission(out failure) == XagmanTradeVersionAdmission.Ready;
+
+    private bool TryAdmitXagmanReceiverVersions(out bool waitingForPair)
+    {
+        var admission = GetXagmanTradeVersionAdmission(out var failure);
+        waitingForPair = admission == XagmanTradeVersionAdmission.Pending;
+        if (admission == XagmanTradeVersionAdmission.Invalid)
+            ReportXagmanTradeSafetyFailureOnce($"Xagman: Dropbox auto-accept stays closed: {failure}");
+        return admission == XagmanTradeVersionAdmission.Ready;
+    }
+
+    private bool DeferXagmanReceiverVersionIntent(XagmanReceiverVersionIntent intent)
+    {
+        var alreadyWaiting = xagmanDropboxAutoAcceptState == false
+            && xagmanVersionPendingReceiver is { } pending && IsXagmanReceiverVersionIntentCurrent(pending);
+        if (!alreadyWaiting && !TrySetXagmanDropboxAutoAcceptOrStop(false, intent.Context))
+            return false;
+        // Disable clears both intents. Preserve only the exchange that requested it;
+        // a partner, character, role or run change requires a fresh receiver request.
+        xagmanVersionPendingReceiver = null;
+        if (xagmanRunning && IsXagmanReceiverVersionIntentCurrent(intent))
+            xagmanVersionPendingReceiver = intent;
+        return true;
     }
 
     private bool FailXagmanTradeVersions(string failure)
@@ -118,13 +150,11 @@ public partial class SlaveWindow
             IsComplete = () =>
             {
                 if (!xagmanRunning) return true;
-                if (!TryGetXagmanTradeVersions(out _, out _, out var localFailure))
-                    return FailXagmanTradeVersions(localFailure);
                 // The call and reciprocal partner lock travel on separate heartbeats.
                 // Wait before preparing a queue; actual writes still recheck strictly.
-                if (!plugin.Configuration.XagmanOutsideNetworkHelper
-                    && !TryGetXagmanConnectedTradeVersionPeer(out _)) return false;
-                return TryRequireXagmanTradeVersions(out var failure) || FailXagmanTradeVersions(failure);
+                var admission = GetXagmanTradeVersionAdmission(out var failure);
+                if (admission == XagmanTradeVersionAdmission.Pending) return false;
+                return admission == XagmanTradeVersionAdmission.Ready || FailXagmanTradeVersions(failure);
             },
             TimeoutSec = 15f,
             OnTimeout = () => FailXagmanTradeVersions("Timed out waiting for the active Tony/owner version handshake."),
@@ -145,30 +175,33 @@ public partial class SlaveWindow
         if (xagmanDropboxAutoAcceptState == true)
         {
             var armed = xagmanVersionArmedReceiver;
-            if (armed == null || !IsXagmanReceiverVersionIntentCurrent(armed)
-                || !TryGetXagmanConnectedTradeVersionPeer(out _))
+            if (armed == null || !IsXagmanReceiverVersionIntentCurrent(armed))
             {
                 var waiting = global::XASlave.Localization.UiMessage.Authored("waiting for a version-compatible trading partner");
                 if (!TrySetXagmanDropboxAutoAcceptOrStop(false, waiting))
                     return true;
-                // A short presence gap may resume this exact receive exchange. A new
-                // partner or phase needs its own receiver request, never inherited intent.
-                if (armed != null && IsXagmanReceiverVersionIntentCurrent(armed))
-                    xagmanVersionPendingReceiver = armed;
             }
-            else if (!TryRequireXagmanTradeVersions(out var failure))
+            else
             {
-                FailXagmanTradeVersions(failure);
-                return true;
+                var admission = GetXagmanTradeVersionAdmission(out var failure);
+                if (admission == XagmanTradeVersionAdmission.Pending)
+                {
+                    if (!DeferXagmanReceiverVersionIntent(armed)) return true;
+                    return false; // Let Tony release a departed owner before another admission attempt.
+                }
+                if (admission == XagmanTradeVersionAdmission.Invalid)
+                {
+                    FailXagmanTradeVersions(failure);
+                    return true;
+                }
             }
         }
         if (xagmanVersionPendingReceiver is { } pending)
         {
             if (!IsXagmanReceiverVersionIntentCurrent(pending))
                 xagmanVersionPendingReceiver = null;
-            else if (TryGetXagmanConnectedTradeVersionPeer(out _))
+            else
             {
-                xagmanVersionPendingReceiver = null;
                 if (!TryRequireXagmanReceiverAutoAccept(pending.Context))
                     return true;
             }

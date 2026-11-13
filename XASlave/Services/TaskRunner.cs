@@ -68,6 +68,7 @@ public sealed class TaskRunner : IDisposable
     internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
     internal global::XASlave.Localization.UiMessage StatusTextMessage => global::XASlave.Localization.UiMessage.Capture(ref uiStatusText, StatusText);
     public int CurrentStep => stepMachine.CurrentStep;
+    internal float CurrentStepElapsedSeconds => stepMachine.CurrentStepElapsedSeconds;
     public int TotalSteps => stepMachine.TotalSteps;
 
     // Progress tracking

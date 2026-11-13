@@ -29,6 +29,13 @@ public unsafe sealed class PvpHotbarsService : IDisposable
     private readonly bool[] restoreIssued = new bool[10];
     private readonly bool[] restoreTimedOut = new bool[10];
     private const long ConfirmationTimeoutMs = 1000;
+    private const long ReadinessTimeoutMs = 5000;
+    private const int MaxPendingCommands = 32;
+    private readonly int[] pendingNumbers = new int[MaxPendingCommands];
+    private readonly bool?[] pendingStates = new bool?[MaxPendingCommands];
+    private readonly long[] pendingDeadlines = new long[MaxPendingCommands];
+    private int pendingCount;
+    private uint pendingTerritory;
     private bool enabled;
     private bool listening;
     private bool disposed;
@@ -44,6 +51,7 @@ public unsafe sealed class PvpHotbarsService : IDisposable
         if (!value)
         {
             enabled = false;
+            CancelPending("the mod was disabled");
             Plugin.ChatGui.CheckMessageHandled -= OnChatMessage;
             QueueRestoreAll(showOwnedBars: true);
             RestoreAll();
@@ -88,7 +96,7 @@ public unsafe sealed class PvpHotbarsService : IDisposable
     private void OnChatMessage(IHandleableChatMessage message)
     {
         if (!enabled || disposed || message.IsHandled || message.LogKind != XivChatType.ErrorMessage
-            || !string.IsNullOrEmpty(message.Sender.TextValue) || !Plugin.Framework.IsInFrameworkUpdateThread)
+            || !string.IsNullOrEmpty(message.Sender.TextValue))
             return;
         try
         {
@@ -101,9 +109,13 @@ public unsafe sealed class PvpHotbarsService : IDisposable
             var number = int.Parse(match.Groups["bar"].Value, CultureInfo.InvariantCulture);
             var state = match.Groups["state"].Value;
             bool? visible = state.Length == 0 ? null : state.Equals("on", StringComparison.OrdinalIgnoreCase);
-            if (!TryApplyDisplay(number, visible, requireVisibleMainBar: true, out _))
+            if (!TryRequestDisplay(number, visible, out var result))
+            {
+                Plugin.Log.Warning($"[XASlave] PVP Hotbars rejected blocked command: {result}");
                 return;
-            // Do not swallow unrelated/rejected operations, or resend a command and recurse.
+            }
+            // An accepted deferred request owns its eventual success/failure notification.
+            // Never resend the game's rejected command or suppress unrelated errors.
             message.PreventOriginal();
         }
         catch (Exception ex)
@@ -132,8 +144,7 @@ public unsafe sealed class PvpHotbarsService : IDisposable
         }
         try
         {
-            // Explicit XA commands can restore bar 1 even after it was hidden.
-            return TryApplyDisplay(number, visible, requireVisibleMainBar: false, out message);
+            return TryRequestDisplay(number, visible, out message);
         }
         catch (Exception ex)
         {
@@ -143,25 +154,144 @@ public unsafe sealed class PvpHotbarsService : IDisposable
         }
     }
 
-    private bool TryApplyDisplay(int number, bool? requestedVisibility, bool requireVisibleMainBar, out string message)
+    private bool TryGetReadyAddon(int number, out AtkUnitBase* addon, out string message, out bool retryable)
     {
+        addon = null;
+        retryable = false;
         message = "Enable PVP Hotbar Disabler first with /xa hotbar on.";
         if (!enabled || disposed)
             return false;
-        message = "Hotbar display requires the game thread, login and an active PvP HUD.";
-        if (number is < 1 or > 10 || !Plugin.Framework.IsInFrameworkUpdateThread
-            || !Plugin.ClientState.IsLoggedIn || !Plugin.ClientState.IsPvP || IsSuspended())
+        message = "Hotbar number must be between 1 and 10.";
+        if (number is < 1 or > 10)
             return false;
+        message = "Hotbar display must run on the game thread.";
+        if (!Plugin.Framework.IsInFrameworkUpdateThread)
+            return false;
+        message = "Hotbar display requires login.";
+        if (!Plugin.ClientState.IsLoggedIn)
+            return false;
+        message = "Hotbar display requires a PvP area.";
+        if (!Plugin.ClientState.IsPvP)
+            return false;
+        message = "Hotbar display is unavailable during a cutscene.";
+        if (Plugin.Condition[ConditionFlag.WatchingCutscene]
+            || Plugin.Condition[ConditionFlag.WatchingCutscene78]
+            || Plugin.Condition[ConditionFlag.OccupiedInCutSceneEvent])
+            return false;
+        // Loading often hides the HUD too. Defer that case, but not an intentionally hidden HUD.
+        message = "Hotbar display is waiting for area loading to finish.";
+        if (Plugin.Condition[ConditionFlag.BetweenAreas] || Plugin.Condition[ConditionFlag.BetweenAreas51])
+        {
+            retryable = true;
+            return false;
+        }
+        message = "Hotbar display is unavailable while the HUD is hidden.";
+        if (Plugin.GameGui.GameUiHidden)
+            return false;
+        retryable = true;
         var hotbars = RaptureHotbarModule.Instance();
+        message = "Hotbar display is waiting for the hotbar module.";
+        if (hotbars == null)
+            return false;
+        message = "Hotbar display is waiting for the PvP hotbar bank.";
+        if (!hotbars->PvPHotbarsActive)
+            return false;
         var mainBar = (AtkUnitBase*)Plugin.GameGui.GetAddonByName("_ActionBar").Address;
-        if (hotbars == null || !hotbars->PvPHotbarsActive || mainBar == null || !mainBar->IsReady
-            || (requireVisibleMainBar && !IsShown(mainBar)))
+        message = "Hotbar display is waiting for the main hotbar addon.";
+        if (mainBar == null || !mainBar->IsReady || mainBar->RootNode == null)
             return false;
         var index = number - 1;
-        var addon = (AtkUnitBase*)Plugin.GameGui.GetAddonByName(Names[index]).Address;
+        addon = (AtkUnitBase*)Plugin.GameGui.GetAddonByName(Names[index]).Address;
         message = $"Hotbar {number} is not ready.";
         if (addon == null || !addon->IsReady || addon->RootNode == null)
             return false;
+        retryable = false;
+        message = string.Empty;
+        return true;
+    }
+
+    private bool TryRequestDisplay(int number, bool? requestedVisibility, out string message)
+    {
+        var ready = TryGetReadyAddon(number, out _, out message, out var retryable);
+        if (!ready && !retryable)
+            return false;
+        if (pendingCount > 0 && pendingTerritory != Plugin.ClientState.TerritoryType)
+            CancelPending("the territory changed");
+        if (ready && pendingCount == 0)
+            return TryApplyDisplay(number, requestedVisibility, out message, out _);
+        if (pendingCount >= MaxPendingCommands)
+        {
+            message = "Hotbar command queue is full; wait before trying again.";
+            return false;
+        }
+        if (pendingCount == 0)
+            pendingTerritory = Plugin.ClientState.TerritoryType;
+        pendingNumbers[pendingCount] = number;
+        pendingStates[pendingCount] = requestedVisibility;
+        pendingDeadlines[pendingCount] = Environment.TickCount64 + ReadinessTimeoutMs;
+        pendingCount++;
+        message = $"Hotbar {number}: queued for up to 5 seconds while the PvP HUD becomes ready.";
+        return true;
+    }
+
+    private void RemovePending()
+    {
+        pendingCount--;
+        for (var index = 0; index < pendingCount; index++)
+        {
+            pendingNumbers[index] = pendingNumbers[index + 1];
+            pendingStates[index] = pendingStates[index + 1];
+            pendingDeadlines[index] = pendingDeadlines[index + 1];
+        }
+    }
+
+    private void CancelPending(string reason)
+    {
+        if (pendingCount == 0)
+            return;
+        Plugin.ChatGui.PrintError($"[XASlave] Cancelled {pendingCount} queued hotbar command(s): {reason}.");
+        pendingCount = 0;
+    }
+
+    private void ProcessPending()
+    {
+        if (pendingCount == 0)
+            return;
+        if (pendingTerritory != Plugin.ClientState.TerritoryType)
+        {
+            CancelPending("the territory changed");
+            return;
+        }
+        while (pendingCount > 0)
+        {
+            var number = pendingNumbers[0];
+            // Check the deadline before native access, even if the HUD became ready this frame.
+            if (Environment.TickCount64 >= pendingDeadlines[0])
+            {
+                TryGetReadyAddon(number, out _, out var reason, out _);
+                if (reason.Length == 0)
+                    reason = "the readiness deadline elapsed";
+                Plugin.ChatGui.PrintError($"[XASlave] Hotbar {number}: queued command expired. {reason}");
+                RemovePending();
+                continue;
+            }
+            if (TryApplyDisplay(number, pendingStates[0], out var message, out var retryable))
+            {
+                RemovePending();
+                continue;
+            }
+            if (retryable)
+                return;
+            Plugin.ChatGui.PrintError($"[XASlave] Hotbar {number}: queued command rejected. {message}");
+            RemovePending();
+        }
+    }
+
+    private bool TryApplyDisplay(int number, bool? requestedVisibility, out string message, out bool retryable)
+    {
+        if (!TryGetReadyAddon(number, out var addon, out message, out retryable))
+            return false;
+        var index = number - 1;
         // Consecutive commands in the same frame toggle the pending request; otherwise use applied state.
         var wasVisible = confirmationPending[index] && owned[index] == (nint)addon
             ? commandVisibility[index] ?? IsShown(addon)
@@ -243,6 +373,7 @@ public unsafe sealed class PvpHotbarsService : IDisposable
         {
             if (!Plugin.ClientState.IsLoggedIn)
             {
+                CancelPending("the character logged out");
                 for (var index = 0; index < Names.Length; index++)
                     ClearOwnership(index);
                 StopListenersIfIdle();
@@ -250,6 +381,7 @@ public unsafe sealed class PvpHotbarsService : IDisposable
                 return;
             }
 
+            ProcessPending();
             var hotbars = RaptureHotbarModule.Instance();
             var active = Plugin.ClientState.IsPvP && hotbars != null && hotbars->PvPHotbarsActive;
             var suspended = IsSuspended();

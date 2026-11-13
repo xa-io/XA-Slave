@@ -30265,4 +30265,105 @@ Sebaiknya lakukan saat pangkat Anda 6+ agar memiliki akses penawaran plot.</valu
     <value>Tahap pengisian ulang: menunggu wilayah yang diperlukan Franchise Owner...</value>
     <comment>Source: Xagman regional matching; W506</comment>
   </data>
+  <data name="S097C5978ED97CE4F" xml:space="preserve">
+    <value>Menunggu Tony menyelesaikan perjalanan dan siap di lokasi pertemuan regional.</value>
+  </data>
+  <data name="S5ED6649FCC6A5640" xml:space="preserve">
+    <value>Tony belum siap di lokasi pertemuan regional dalam 30 menit. Pekerjaan pemilik waralaba yang belum selesai disimpan untuk dilanjutkan secara terkoordinasi.</value>
+  </data>
+  <data name="SA9FEB8B2896AF2AC" xml:space="preserve">
+    <value>Waktu tunggu rute regional telah habis. Pekerjaan pemilik waralaba yang belum selesai disimpan untuk dilanjutkan secara terkoordinasi.</value>
+  </data>
+  <data name="S82FC0C0DA0723E2E" xml:space="preserve">
+    <value>Pemulihan login telah mencapai batas percobaan ulang atau waktu. Progres tetap dipertahankan.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S48CA8992F9562ABF" xml:space="preserve">
+    <value>Memulihkan login yang macet untuk {0} ({1}/2).</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE73DA94B3BEAE032" xml:space="preserve">
+    <value>Pemulihan login tidak berhasil mencapai layar judul. Progres tetap dipertahankan.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S819DF61885C753E7" xml:space="preserve">
+    <value>Pemulihan login memerlukan hak administrator. Progres tetap dipertahankan.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S6734B14B0A70D4BF" xml:space="preserve">
+    <value>Pemulihan login tidak dapat mengatur ulang koneksi game klien ini. Progres tetap dipertahankan.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S222E58450DA5E15D" xml:space="preserve">
+    <value>Menunggu layar judul sebelum mencoba login {0} lagi.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE36F5C3A0D22618E" xml:space="preserve">
+    <value>Lanjutkan login yang dipulihkan</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S200081D48C3503C2" xml:space="preserve">
+    <value>Menunggu tujuan pertemuan Tony saat ini sebelum mencoba login lagi.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S68B413A26E1B3E49" xml:space="preserve">
+    <value>Kembali ke layar judul, lalu pilih «Lanjutkan login yang dipulihkan» untuk melanjutkan tugas yang dipertahankan.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S24F512048EE719AD" xml:space="preserve">
+    <value>FFXIV</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S31D4DC5FE7E1F311" xml:space="preserve">
+    <value>Keluar paksa dari layar pemuatan</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S940D1FC3A1D5404E" xml:space="preserve">
+    <value>Memutus koneksi klien ini ke server game untuk keluar dari layar pemuatan yang macet. Windows mungkin meminta persetujuan administrator.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S7D5811CA0DD7686C" xml:space="preserve">
+    <value>Keluar paksa dari layar pemuatan sedang menunggu persetujuan Windows.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S04477A84241EBAD2" xml:space="preserve">
+    <value>Keluar paksa dari layar pemuatan sedang menunggu layar judul.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SCDDCC2598C905AB3" xml:space="preserve">
+    <value>Keluar paksa dari layar pemuatan berhasil mencapai layar judul.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SF2DD9CC41EB0432C" xml:space="preserve">
+    <value>Tidak ada layar pemuatan macet yang terdeteksi. Tidak ada pemutusan koneksi yang dicoba.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S9755F56CBF815553" xml:space="preserve">
+    <value>Hentikan tugas aktif lainnya sebelum menggunakan Keluar paksa dari layar pemuatan.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SB0D250DD44EE31E5" xml:space="preserve">
+    <value>Keluar paksa dari layar pemuatan tidak berhasil memutus koneksi klien. Lihat log debug untuk detailnya.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SA1AE7EFB8CC368F9" xml:space="preserve">
+    <value>Keluar paksa dari layar pemuatan selesai tanpa konfirmasi layar judul. Lihat log debug untuk detailnya.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SFBCD16BD81AEAE87" xml:space="preserve">
+    <value>Menunggu Keluar paksa dari layar pemuatan. Progres Xagman tetap dipertahankan.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SBD275944325C583A" xml:space="preserve">
+    <value>Menangani perintah /hotbar display yang diblokir dengan pesan bahasa Inggris di PvP, termasuk saat hotbar 1 disembunyikan.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SB990EB3FCDA847E9" xml:space="preserve">
+    <value>Permintaan menunggu hingga 5 detik sampai pemuatan selesai dan hotbar siap. Berpindah wilayah, keluar dari akun, atau menonaktifkan fitur akan membatalkan perintah dalam antrean. HUD tersembunyi dan adegan sinematik menghalangi perubahan.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
+    <value>/xa hotbar on mengaktifkan pemantauan. /xa hotbar off membatalkan perintah dalam antrean dan memulihkan hotbar yang dikendalikan saat HUD tersedia. Gunakan /xa hotbar 1 on untuk menampilkan hotbar utama.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
 </root>

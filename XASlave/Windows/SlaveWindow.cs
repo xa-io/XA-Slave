@@ -991,6 +991,7 @@ public partial class SlaveWindow : Window, IDisposable
             return;
 
         isDisposed = true;
+        DetachDuringDispose("Loading Screen Ejection", DisposeDebugLoadingScreenEjection);
         DetachDuringDispose("City Chat Flooder", DisposeCityChatFlooder);
 
         DetachDuringDispose("Worker cancellation", workerCts.Cancel);
@@ -1248,6 +1249,7 @@ public partial class SlaveWindow : Window, IDisposable
         if (isDisposed) return;
         UpdatePluginBuilderWindows();
         UpdateDebugNotificationTests();
+        UpdateDebugLoadingScreenEjection();
         var totalStopwatch = plugin.Configuration.VerboseTaskLogging
             ? Stopwatch.StartNew()
             : null;

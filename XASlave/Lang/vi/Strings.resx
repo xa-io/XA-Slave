@@ -30265,4 +30265,105 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
     <value>Lượt bổ sung: đang chờ các khu vực mà các Chủ nhượng quyền cần...</value>
     <comment>Source: Xagman regional matching; W506</comment>
   </data>
+  <data name="S097C5978ED97CE4F" xml:space="preserve">
+    <value>Đang chờ Tony hoàn tất di chuyển và sẵn sàng tại điểm hẹn của khu vực.</value>
+  </data>
+  <data name="S5ED6649FCC6A5640" xml:space="preserve">
+    <value>Tony chưa sẵn sàng tại điểm hẹn của khu vực trong vòng 30 phút. Công việc chưa hoàn thành của chủ nhượng quyền được giữ lại để tiếp tục đồng bộ.</value>
+  </data>
+  <data name="SA9FEB8B2896AF2AC" xml:space="preserve">
+    <value>Đã hết thời gian chờ lộ trình khu vực. Công việc chưa hoàn thành của chủ nhượng quyền được giữ lại để tiếp tục đồng bộ.</value>
+  </data>
+  <data name="S82FC0C0DA0723E2E" xml:space="preserve">
+    <value>Quá trình khôi phục đăng nhập đã đạt giới hạn số lần thử lại hoặc thời gian. Tiến độ được giữ lại.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S48CA8992F9562ABF" xml:space="preserve">
+    <value>Đang khôi phục lượt đăng nhập bị kẹt của {0} ({1}/2).</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE73DA94B3BEAE032" xml:space="preserve">
+    <value>Quá trình khôi phục đăng nhập không thể trở về màn hình tiêu đề. Tiến độ được giữ lại.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S819DF61885C753E7" xml:space="preserve">
+    <value>Khôi phục đăng nhập cần quyền quản trị viên. Tiến độ được giữ lại.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S6734B14B0A70D4BF" xml:space="preserve">
+    <value>Quá trình khôi phục đăng nhập không thể đặt lại kết nối trò chơi của máy khách này. Tiến độ được giữ lại.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S222E58450DA5E15D" xml:space="preserve">
+    <value>Đang chờ màn hình tiêu đề trước khi thử đăng nhập lại cho {0}.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE36F5C3A0D22618E" xml:space="preserve">
+    <value>Tiếp tục đăng nhập đã khôi phục</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S200081D48C3503C2" xml:space="preserve">
+    <value>Đang chờ điểm hẹn hiện tại của Tony trước khi thử đăng nhập lại.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S68B413A26E1B3E49" xml:space="preserve">
+    <value>Trở về màn hình tiêu đề, sau đó chọn «Tiếp tục đăng nhập đã khôi phục» để tiếp tục tác vụ đã được giữ lại.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S24F512048EE719AD" xml:space="preserve">
+    <value>FFXIV</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S31D4DC5FE7E1F311" xml:space="preserve">
+    <value>Thoát cưỡng bức màn hình tải</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S940D1FC3A1D5404E" xml:space="preserve">
+    <value>Ngắt các kết nối của máy khách này đến máy chủ trò chơi để thoát khỏi màn hình tải bị kẹt. Windows có thể yêu cầu phê duyệt của quản trị viên.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S7D5811CA0DD7686C" xml:space="preserve">
+    <value>Thoát cưỡng bức màn hình tải đang chờ Windows phê duyệt.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S04477A84241EBAD2" xml:space="preserve">
+    <value>Thoát cưỡng bức màn hình tải đang chờ màn hình tiêu đề.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SCDDCC2598C905AB3" xml:space="preserve">
+    <value>Thoát cưỡng bức màn hình tải đã trở về màn hình tiêu đề.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SF2DD9CC41EB0432C" xml:space="preserve">
+    <value>Không phát hiện màn hình tải bị kẹt. Không có thao tác ngắt kết nối nào được thử.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S9755F56CBF815553" xml:space="preserve">
+    <value>Dừng các tác vụ khác đang hoạt động trước khi dùng Thoát cưỡng bức màn hình tải.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SB0D250DD44EE31E5" xml:space="preserve">
+    <value>Thoát cưỡng bức màn hình tải không ngắt được kết nối của máy khách. Xem nhật ký gỡ lỗi để biết chi tiết.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SA1AE7EFB8CC368F9" xml:space="preserve">
+    <value>Thoát cưỡng bức màn hình tải đã kết thúc nhưng chưa xác nhận được màn hình tiêu đề. Xem nhật ký gỡ lỗi để biết chi tiết.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SFBCD16BD81AEAE87" xml:space="preserve">
+    <value>Đang chờ Thoát cưỡng bức màn hình tải. Tiến độ Xagman được giữ lại.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SBD275944325C583A" xml:space="preserve">
+    <value>Xử lý các lệnh /hotbar display bị chặn với thông báo tiếng Anh trong PvP, kể cả khi thanh phím tắt 1 bị ẩn.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SB990EB3FCDA847E9" xml:space="preserve">
+    <value>Yêu cầu chờ tối đa 5 giây để tải xong và thanh phím tắt sẵn sàng. Đổi khu vực, đăng xuất hoặc tắt tính năng sẽ hủy các lệnh đang chờ. Không thể thay đổi khi HUD bị ẩn hoặc đang có cảnh cắt.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
+    <value>/xa hotbar on bật theo dõi. /xa hotbar off hủy các lệnh đang chờ và khôi phục các thanh đang được điều khiển khi HUD khả dụng. Dùng /xa hotbar 1 on để hiện thanh chính.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
 </root>

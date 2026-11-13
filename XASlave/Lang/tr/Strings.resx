@@ -30265,4 +30265,105 @@ Arsa tekliflerine erişebilmek için bunu 6. rütbe ve üzerindeyken yapmak en i
     <value>Yeniden stoklama turu: Franchise Owner'lar için gereken bölgeler bekleniyor...</value>
     <comment>Source: Xagman regional matching; W506</comment>
   </data>
+  <data name="S097C5978ED97CE4F" xml:space="preserve">
+    <value>Tony’nin yolculuğunu tamamlayıp bölgesel buluşma yerinde hazır olması bekleniyor.</value>
+  </data>
+  <data name="S5ED6649FCC6A5640" xml:space="preserve">
+    <value>Tony 30 dakika içinde bölgesel buluşma yerinde hazır olmadı. Franchise sahiplerinin tamamlanmamış işleri, eşgüdümlü olarak devam ettirilmek üzere korunur.</value>
+  </data>
+  <data name="SA9FEB8B2896AF2AC" xml:space="preserve">
+    <value>Bölgesel rota için bekleme süresi doldu. Franchise sahiplerinin tamamlanmamış işleri, eşgüdümlü olarak devam ettirilmek üzere korunur.</value>
+  </data>
+  <data name="S82FC0C0DA0723E2E" xml:space="preserve">
+    <value>Giriş kurtarma, yeniden deneme veya süre sınırına ulaştı. İlerleme korunuyor.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S48CA8992F9562ABF" xml:space="preserve">
+    <value>{0} için takılı kalan giriş kurtarılıyor ({1}/2).</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE73DA94B3BEAE032" xml:space="preserve">
+    <value>Giriş kurtarma, başlık ekranına ulaşamadı. İlerleme korunuyor.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S819DF61885C753E7" xml:space="preserve">
+    <value>Giriş kurtarma için yönetici erişimi gerekiyor. İlerleme korunuyor.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S6734B14B0A70D4BF" xml:space="preserve">
+    <value>Giriş kurtarma, bu istemcinin oyun bağlantısını sıfırlayamadı. İlerleme korunuyor.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S222E58450DA5E15D" xml:space="preserve">
+    <value>{0} için giriş yeniden denenmeden önce başlık ekranı bekleniyor.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="SE36F5C3A0D22618E" xml:space="preserve">
+    <value>Kurtarılan girişi sürdür</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S200081D48C3503C2" xml:space="preserve">
+    <value>Giriş yeniden denenmeden önce Tony'nin mevcut buluşma hedefi bekleniyor.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S68B413A26E1B3E49" xml:space="preserve">
+    <value>Başlık ekranına dönün, ardından korunan göreve devam etmek için «Kurtarılan girişi sürdür» seçeneğini seçin.</value>
+    <comment>Source: Xagman stalled-login recovery; W509</comment>
+  </data>
+  <data name="S24F512048EE719AD" xml:space="preserve">
+    <value>FFXIV</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S31D4DC5FE7E1F311" xml:space="preserve">
+    <value>Yükleme ekranından zorla çıkış</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S940D1FC3A1D5404E" xml:space="preserve">
+    <value>Takılı kalan yükleme ekranından çıkmak için bu istemcinin oyun sunucularıyla olan bağlantılarını keser. Windows yönetici onayı isteyebilir.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S7D5811CA0DD7686C" xml:space="preserve">
+    <value>Yükleme ekranından zorla çıkış, Windows onayını bekliyor.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S04477A84241EBAD2" xml:space="preserve">
+    <value>Yükleme ekranından zorla çıkış, başlık ekranını bekliyor.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SCDDCC2598C905AB3" xml:space="preserve">
+    <value>Yükleme ekranından zorla çıkış, başlık ekranına ulaştı.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SF2DD9CC41EB0432C" xml:space="preserve">
+    <value>Takılı kalan bir yükleme ekranı algılanmadı. Bağlantıyı kesme girişiminde bulunulmadı.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="S9755F56CBF815553" xml:space="preserve">
+    <value>Yükleme ekranından zorla çıkışı kullanmadan önce diğer etkin görevleri durdurun.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SB0D250DD44EE31E5" xml:space="preserve">
+    <value>Yükleme ekranından zorla çıkış, istemcinin bağlantısını kesemedi. Ayrıntılar için hata ayıklama günlüğüne bakın.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SA1AE7EFB8CC368F9" xml:space="preserve">
+    <value>Yükleme ekranından zorla çıkış, başlık ekranı doğrulanmadan tamamlandı. Ayrıntılar için hata ayıklama günlüğüne bakın.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SFBCD16BD81AEAE87" xml:space="preserve">
+    <value>Yükleme ekranından zorla çıkış bekleniyor. Xagman ilerlemesi korunuyor.</value>
+    <comment>Source: Loading Screen Ejection; W509</comment>
+  </data>
+  <data name="SBD275944325C583A" xml:space="preserve">
+    <value>PvP'de İngilizce hata ile engellenen /hotbar display komutlarını işler; kısayol çubuğu 1 gizliyken de çalışır.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SB990EB3FCDA847E9" xml:space="preserve">
+    <value>İstekler yüklemenin bitmesini ve kısayol çubuklarının hazır olmasını en fazla 5 saniye bekler. Bölge değiştirmek, oturumu kapatmak veya özelliği devre dışı bırakmak kuyruktaki komutları iptal eder. Gizli HUD ve ara sahneler değişiklikleri engeller.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
+    <value>/xa hotbar on izlemeyi etkinleştirir. /xa hotbar off kuyruktaki komutları iptal eder ve HUD kullanılabilir olduğunda kontrol edilen çubukları geri yükler. Ana çubuğu göstermek için /xa hotbar 1 on kullanın.</value>
+    <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
 </root>

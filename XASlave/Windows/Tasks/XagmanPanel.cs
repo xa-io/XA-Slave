@@ -622,6 +622,7 @@ public partial class SlaveWindow
             && !(onh && hasGreenValueSelectors)
             && (onh ? hasOnhMeet : localXagmanPeerConnected);
         DrawXagmanNetworkRecoveryControls();
+        DrawXagmanLoginRecoveryControls();
         if (cfg.XagmanRole == XagmanRole.Tony)
         {
             var started = DrawPriorityTaskActionButton(
@@ -7956,6 +7957,7 @@ public partial class SlaveWindow
                 });
             }
 
+            var regionalMeetReadyWaitSinceUtc = DateTime.MinValue;
             steps.Add(new TaskStep
             {
                 NameMessage = global::XASlave.Localization.UiMessage.Format("S9880AA6F210F387E", charName),
@@ -8021,6 +8023,31 @@ public partial class SlaveWindow
 
                     xagmanOwnerSweepPendingDataCenter = GetXagmanDataCenterOfChar(charName);
                     var decision = EvaluateXagmanOwnerServerGateMessage(charName, out var gateMeetWorld, out var gateMeetAetheryte, out var gateReason);
+                    if (decision == XagmanOwnerServerGate.Proceed
+                        && !TryCaptureFreshXagmanOwnerMeetDestinationMessage(charName,
+                            out gateMeetWorld, out gateMeetAetheryte, out gateReason, out _))
+                    {
+                        decision = XagmanOwnerServerGate.Wait;
+                    }
+                    if (decision == XagmanOwnerServerGate.Wait)
+                    {
+                        // A proven later-region wait is ordinary fleet scheduling.
+                        // Missing, errored or malformed coordinator state is bounded.
+                        if (IsXagmanOwnerWaitingForLaterRegion(charName))
+                            regionalMeetReadyWaitSinceUtc = DateTime.MinValue;
+                        else
+                        {
+                            if (regionalMeetReadyWaitSinceUtc == DateTime.MinValue)
+                                regionalMeetReadyWaitSinceUtc = DateTime.UtcNow;
+                            if ((DateTime.UtcNow - regionalMeetReadyWaitSinceUtc).TotalSeconds >= 1800)
+                            {
+                                xagmanActiveCharacter = charName;
+                                xagmanOwnerCurrentCharacterIndex = charIndex - 1;
+                                HoldXagmanOwnerRegionalMeetupReadiness(charName);
+                                return false;
+                            }
+                        }
+                    }
                     switch (decision)
                     {
                         case XagmanOwnerServerGate.Proceed:
@@ -8050,6 +8077,13 @@ public partial class SlaveWindow
                     }
                 },
                 TimeoutSec = 86400f,
+                OnTimeout = () =>
+                {
+                    if (!xagmanServerMatchingActive) return;
+                    xagmanActiveCharacter = charName;
+                    xagmanOwnerCurrentCharacterIndex = charIndex - 1;
+                    HoldXagmanOwnerRegionalMeetupReadiness(charName, routeWaitExpired: true);
+                },
             });
             steps.Add(new TaskStep
             {
@@ -9082,6 +9116,9 @@ public partial class SlaveWindow
 
     private void AddXagmanRelogSteps(List<TaskStep> steps, string charName, TaskRunner runner, SysAction onEnter, SysAction onReady, SysAction onTimeout, Func<bool>? externalSkip = null, bool recoverOwnerLogout = false, Action<string>? onDestinationSkip = null)
     {
+        // Outer relog retries for this selected character must not replenish the
+        // automatic connection-reset count or its monotonic recovery deadline.
+        var loginStallGuard = new XagmanLoginStallGuard();
         var maxAttempts = recoverOwnerLogout ? 2 : XagmanRelogMaxAttempts;
         var currentAttempt = 0;
         var attemptInterrupted = false;
@@ -9287,6 +9324,10 @@ public partial class SlaveWindow
         {
             var capturedAttempt = attempt;
             Func<bool> skipAttempt = () => relogFailed || relogConfirmed || ShouldExternalSkip();
+            var loginDestinationReadyWaitSinceUtc = DateTime.MinValue;
+            var loginDestinationSession = string.Empty;
+            var loginDestinationCoordinator = string.Empty;
+            var loginDestinationEpoch = 0;
 
             steps.Add(new TaskStep
             {
@@ -9337,6 +9378,17 @@ public partial class SlaveWindow
                                 onDestinationSkip(reason);
                                 return true;
                             }
+                            if (xagmanServerMatchingActive && !plugin.Configuration.XagmanOutsideNetworkHelper)
+                            {
+                                if (loginDestinationReadyWaitSinceUtc == DateTime.MinValue)
+                                    loginDestinationReadyWaitSinceUtc = DateTime.UtcNow;
+                                if ((DateTime.UtcNow - loginDestinationReadyWaitSinceUtc).TotalSeconds >= 1800)
+                                {
+                                    relogFailed = true;
+                                    HoldXagmanOwnerRegionalMeetupReadiness(charName);
+                                    return false;
+                                }
+                            }
                             if (reason != lastDestinationWaitReason)
                             {
                                 runner.AddLog($"Xagman: login for {charName} is waiting without consuming an attempt: {reason}.");
@@ -9346,6 +9398,9 @@ public partial class SlaveWindow
                         }
                         SetXagmanActiveMeetDestination(world, area);
                         loginWorld = world;
+                        loginDestinationSession = xagmanNetworkSession;
+                        loginDestinationCoordinator = xagmanNetworkCoordinator;
+                        loginDestinationEpoch = xagmanNetworkEpoch;
                     }
                     else loginWorld = GetXagmanActiveMeetWorld();
                     if (string.IsNullOrWhiteSpace(loginWorld))
@@ -9355,7 +9410,16 @@ public partial class SlaveWindow
                     return true;
                 },
                 TimeoutSec = 86400f,
-                OnTimeout = () => FailLogin(global::XASlave.Localization.UiMessage.Key("S1A00CF2035820D95")),
+                OnTimeout = () =>
+                {
+                    if (recoverOwnerLogout && xagmanServerMatchingActive && !plugin.Configuration.XagmanOutsideNetworkHelper)
+                    {
+                        relogFailed = true;
+                        HoldXagmanOwnerRegionalMeetupReadiness(charName, routeWaitExpired: true);
+                        return;
+                    }
+                    FailLogin(global::XASlave.Localization.UiMessage.Key("S1A00CF2035820D95"));
+                },
             });
             steps.Add(new TaskStep
             {
@@ -9363,6 +9427,37 @@ public partial class SlaveWindow
                 ShouldSkip = skipAttempt,
                 OnEnter = () =>
                 {
+                    if (recoverOwnerLogout && xagmanServerMatchingActive && !plugin.Configuration.XagmanOutsideNetworkHelper)
+                    {
+                        var ready = TryCaptureFreshXagmanOwnerMeetDestination(charName,
+                            out var currentWorld, out var currentArea, out var reason, out var shouldSkip);
+                        if (shouldSkip && onDestinationSkip != null)
+                        {
+                            relogFailed = true;
+                            onDestinationSkip(reason);
+                            return;
+                        }
+                        if (!ready || !currentWorld.Equals(loginWorld, StringComparison.OrdinalIgnoreCase)
+                            || !currentArea.Equals(GetXagmanActiveMeetAetheryte(), StringComparison.OrdinalIgnoreCase)
+                            || loginDestinationSession != xagmanNetworkSession
+                            || loginDestinationCoordinator != xagmanNetworkCoordinator
+                            || loginDestinationEpoch != xagmanNetworkEpoch)
+                        {
+                            if (loginDestinationReadyWaitSinceUtc == DateTime.MinValue)
+                                loginDestinationReadyWaitSinceUtc = DateTime.UtcNow;
+                            if ((DateTime.UtcNow - loginDestinationReadyWaitSinceUtc).TotalSeconds >= 1800)
+                            {
+                                relogFailed = true;
+                                HoldXagmanOwnerRegionalMeetupReadiness(charName);
+                                return;
+                            }
+                            runner.AddLog($"Xagman: login destination/readiness changed for {charName} before dispatch; reacquiring the regional route without consuming attempt {capturedAttempt}/{maxAttempts}. {reason}");
+                            nextDestinationPollUtc = DateTime.MinValue;
+                            runner.ResumeAtStep(runner.CurrentStep - 1);
+                            return;
+                        }
+                        loginDestinationReadyWaitSinceUtc = DateTime.MinValue;
+                    }
                     if (!plugin.IpcClient.TryGetLifestreamBusy(out var busy) || busy)
                     { FailLogin(global::XASlave.Localization.UiMessage.Key("S02215CC2C694109C")); return; }
                     currentAttempt = capturedAttempt;
@@ -9389,7 +9484,30 @@ public partial class SlaveWindow
                     loginCommandSent = true;
                     BeginXagmanLobbyOperation(command, charName, global::XASlave.Localization.UiMessage.Format("SBD61363F73505F57", charName), true, false,
                         beforeReplay: () => { readyPasses = 0; nextReadyPassUtc = DateTime.UtcNow.AddSeconds(1); pendingLogoutFailure = global::XASlave.Localization.UiMessage.Raw(string.Empty); ArmOwnerRelogFailure(); loginTravelFailureToken = ArmXagmanTravelFailure(command, charName); },
-                        completed: () => GetCurrentWorldName().Equals(loginWorld, StringComparison.OrdinalIgnoreCase));
+                        completed: () => GetCurrentWorldName().Equals(loginWorld, StringComparison.OrdinalIgnoreCase),
+                        refreshLoginCommand: () =>
+                        {
+                            if (recoverOwnerLogout)
+                            {
+                                if (!TryCaptureFreshXagmanOwnerMeetDestination(charName, out var world, out var area, out _, out _))
+                                    return null;
+                                if (!TryValidateXagmanMeetTravelMessage(charName, world, out _)) return null;
+                                SetXagmanActiveMeetDestination(world, area);
+                                loginWorld = world;
+                                loginDestinationSession = xagmanNetworkSession;
+                                loginDestinationCoordinator = xagmanNetworkCoordinator;
+                                loginDestinationEpoch = xagmanNetworkEpoch;
+                            }
+                            else
+                            {
+                                var world = GetXagmanActiveMeetWorld();
+                                if (string.IsNullOrWhiteSpace(world) || !TryValidateXagmanMeetTravelMessage(charName, world, out _))
+                                    return null;
+                                loginWorld = world;
+                            }
+                            command = $"{charName} {loginWorld}";
+                            return command;
+                        }, loginStallGuard: loginStallGuard);
                     loginTravelFailureToken = ArmXagmanTravelFailure(command, charName);
                     if (!plugin.IpcClient.LifestreamExecuteCommand(command))
                         FailLogin(global::XASlave.Localization.UiMessage.Key("S78E44CF31CD7D6D9"));
@@ -9577,11 +9695,23 @@ public partial class SlaveWindow
 
         if (xagmanServerMatchingActive)
         {
-            var decision = EvaluateXagmanOwnerServerGateMessage(charName, out meetWorld, out meetAetheryte, out reason);
+            var decision = EvaluateXagmanOwnerServerGateForPeerMessage(charName, serverMatchingTony,
+                out meetWorld, out meetAetheryte, out reason);
             if (decision == XagmanOwnerServerGate.Proceed
                 && HasCompleteXagmanMeetDestination(meetWorld, meetAetheryte))
             {
-                return true;
+                // Evaluate the same captured peer's operational state and route.
+                // A rotated Tony need not be physically visible to this owner.
+                if (serverMatchingTony != null
+                    && serverMatchingTony.MeetWorld.Equals(meetWorld, StringComparison.OrdinalIgnoreCase)
+                    && serverMatchingTony.MeetAetheryte.Equals(meetAetheryte, StringComparison.OrdinalIgnoreCase)
+                    && IsXagmanRegionalTonyServingMeetup(serverMatchingTony))
+                {
+                    xagmanPreferredTonyCharacter = serverMatchingTony.ActiveCharacter;
+                    xagmanTonyMode = serverMatchingTony.TonyMode;
+                    return true;
+                }
+                reason = global::XASlave.Localization.UiMessage.Key("S097C5978ED97CE4F");
             }
 
             ownerShouldSkip = decision == XagmanOwnerServerGate.Skip;
@@ -9603,6 +9733,23 @@ public partial class SlaveWindow
         meetAetheryte = string.Empty;
         reason = global::XASlave.Localization.UiMessage.Key("SD931A3D738F3BCDF");
         return false;
+    }
+
+    private void HoldXagmanOwnerRegionalMeetupReadiness(string charName, bool routeWaitExpired = false)
+    {
+        var reason = routeWaitExpired
+            ? global::XASlave.Localization.UiMessage.Authored("The regional route wait expired. Unfinished owner work is retained for coordinated resume.")
+            : global::XASlave.Localization.UiMessage.Key("S5ED6649FCC6A5640");
+        plugin.TaskRunner.AddLog($"Xagman: owner {charName} regional {(routeWaitExpired ? "route" : "meetup readiness")} wait reached its {(routeWaitExpired ? 86400 : 1800)}-second bound before travel; retaining unfinished work without failing the character.");
+        if (!TryHoldXagmanOwnerForMissingTony())
+        {
+            // An unavailable checkpoint still cannot let the timed-out step advance
+            // into a login, teleport or completion callback.
+            plugin.TaskRunner.RequestHalt(reason.Original);
+            return;
+        }
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, reason);
+        PublishXagmanPresence();
     }
 
     private void AddXagmanOwnerMeetTravelSteps(
@@ -9790,6 +9937,9 @@ public partial class SlaveWindow
             var attemptDestinationLabel = string.Empty;
             var startObservationFailure = string.Empty;
             var preCommandWaitReason = string.Empty;
+            var preCommandSafetyStartedSeconds = 0f;
+            var preCommandSafetyLastElapsedSeconds = 0f;
+            var preCommandReadyWaitSinceUtc = DateTime.MinValue;
             var preCommandBusyLogged = false;
             var preCommandTransitionReason = string.Empty;
             var preCommandMismatchIdentity = string.Empty;
@@ -9886,6 +10036,8 @@ public partial class SlaveWindow
                     if (ShouldStopTravel())
                         return;
 
+                    preCommandSafetyStartedSeconds = runner.CurrentStepElapsedSeconds;
+                    preCommandSafetyLastElapsedSeconds = preCommandSafetyStartedSeconds;
                     xagmanStatus = XagmanStatus.Paused;
                     xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SE31C21BAF04885C4", charName));
                 },
@@ -9893,6 +10045,19 @@ public partial class SlaveWindow
                 {
                     if (ShouldStopTravel())
                         return true;
+                    // Use the task clock so manual pause freezes this safety wait and
+                    // recovery suspension restarts it, matching normal step timeouts.
+                    var safetyStepElapsed = runner.CurrentStepElapsedSeconds;
+                    if (safetyStepElapsed < preCommandSafetyLastElapsedSeconds)
+                        preCommandSafetyStartedSeconds = safetyStepElapsed;
+                    preCommandSafetyLastElapsedSeconds = safetyStepElapsed;
+                    if (safetyStepElapsed - preCommandSafetyStartedSeconds >= waitCompleteTimeoutSec)
+                    {
+                        FailTravelBeforeCommand(string.IsNullOrWhiteSpace(preCommandWaitReason)
+                            ? "owner travel safety did not become ready within 600 seconds before dispatch."
+                            : preCommandWaitReason);
+                        return true;
+                    }
                     if (plugin.IpcClient.LifestreamIsBusy())
                     {
                         ResetPreCommandIdentityConfirmation();
@@ -9983,6 +10148,23 @@ public partial class SlaveWindow
                                 return true;
                             }
 
+                            if (xagmanServerMatchingActive && !plugin.Configuration.XagmanOutsideNetworkHelper)
+                            {
+                                // Waiting for the coordinator is not a travel attempt.
+                                // Its own wall-clock bound is independent of local safety.
+                                preCommandSafetyStartedSeconds = safetyStepElapsed;
+                                if (preCommandReadyWaitSinceUtc == DateTime.MinValue)
+                                    preCommandReadyWaitSinceUtc = DateTime.UtcNow;
+                                if ((DateTime.UtcNow - preCommandReadyWaitSinceUtc).TotalSeconds >= 1800)
+                                {
+                                    EndTravelFailureObservation();
+                                    ClearXagmanExpectedTravelLogoutWindow();
+                                    travelFailed = true;
+                                    HoldXagmanOwnerRegionalMeetupReadiness(charName);
+                                    return false;
+                                }
+                            }
+
                             xagmanStatus = XagmanStatus.Paused;
                             xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S5FDF45FDEE18BE83", charName, destinationWaitMessage));
                             if (!destinationWaitLogged)
@@ -10047,10 +10229,26 @@ public partial class SlaveWindow
                         : $"Xagman: Lifestream command IPC invocation returned false for owner {charName} meetup travel attempt {capturedAttempt}/{maxAttempts}; waiting briefly before retry evaluation.");
                     return true;
                 },
-                TimeoutSec = waitCompleteTimeoutSec,
-                OnTimeout = () => FailTravelBeforeCommand(string.IsNullOrWhiteSpace(preCommandWaitReason)
-                    ? "a fresh complete meetup destination did not become available before the pre-dispatch timeout."
-                    : preCommandWaitReason),
+                // Runtime clocks above separate regional readiness from the existing
+                // 600-second local safety bound; no construction-time mode latch.
+                TimeoutSec = 86400f,
+                OnTimeout = () =>
+                {
+                    if (ShouldStopTravel()) return;
+                    if (xagmanServerMatchingActive && !plugin.Configuration.XagmanOutsideNetworkHelper
+                        && preCommandReadyWaitSinceUtc != DateTime.MinValue
+                        && string.IsNullOrWhiteSpace(attemptWorld))
+                    {
+                        EndTravelFailureObservation();
+                        ClearXagmanExpectedTravelLogoutWindow();
+                        travelFailed = true;
+                        HoldXagmanOwnerRegionalMeetupReadiness(charName, routeWaitExpired: true);
+                        return;
+                    }
+                    FailTravelBeforeCommand(string.IsNullOrWhiteSpace(preCommandWaitReason)
+                        ? "a fresh complete meetup destination did not become available before the pre-dispatch timeout."
+                        : preCommandWaitReason);
+                },
             });
             steps.Add(MonthlyReloggerTask.MakeDelay(
                 global::XASlave.Localization.UiMessage.Format("SA22D016700F75801", charName, capturedAttempt, maxAttempts),
@@ -12987,6 +13185,12 @@ public partial class SlaveWindow
         return baseLabel;
     }
 
+    private static bool ShouldPublishXagmanBusyAdmission(
+        bool running, XagmanRole role, XagmanStatus status, bool awaitingBusyAdmission)
+        => awaitingBusyAdmission
+            && !(running && role == XagmanRole.FranchiseOwner
+                && status is (XagmanStatus.ReturningHome or XagmanStatus.Completed));
+
     private void PublishXagmanPresence()
     {
         if (plugin.XagmanPeers == null || plugin.XagmanPeers.IsDisposed)
@@ -13005,6 +13209,11 @@ public partial class SlaveWindow
         var homeWorld = local == null ? string.Empty : WorldData.GetById(local.HomeWorld.RowId)?.Name ?? string.Empty;
         var localPositionAvailable = Plugin.PlayerState.IsLoaded && local != null && IsValidXagmanPosition(local.Position);
         var role = xagmanRunning ? xagmanActiveRole : plugin.Configuration.XagmanRole;
+        // Sendoff is lifecycle evidence for Tony's capacity handoff, not permission to trade.
+        // Keep it visible during FC travel while the admission gate still hides locks/queue
+        // and prevents new trade work until the current character is ready again.
+        var publishBusyAdmission = ShouldPublishXagmanBusyAdmission(
+            xagmanRunning, role, xagmanStatus, awaitingBusyAdmission);
         var preferredTony = role == XagmanRole.FranchiseOwner && !IsXagmanOwnerTonyLocked()
             ? string.Empty
             : (!string.IsNullOrWhiteSpace(xagmanPreferredTonyCharacter)
@@ -13080,8 +13289,8 @@ public partial class SlaveWindow
                 XagmanEnabled = xagmanRunning || role == XagmanRole.FranchiseOwner,
                 Role = role,
                 TonyMode = xagmanTonyMode,
-                Status = awaitingBusyAdmission ? XagmanStatus.Preflight : (xagmanRunning ? xagmanStatus : XagmanStatus.Idle),
-                StatusText = awaitingBusyAdmission ? xagmanBusyTradeLease!.ReasonMessage.Original : (xagmanRunning ? xagmanStatusText : "Idle"),
+                Status = publishBusyAdmission ? XagmanStatus.Preflight : (xagmanRunning ? xagmanStatus : XagmanStatus.Idle),
+                StatusText = publishBusyAdmission ? xagmanBusyTradeLease!.ReasonMessage.Original : (xagmanRunning ? xagmanStatusText : "Idle"),
                 CoordinationProtocolRevision = XagmanCollectionFirstCoordinationProtocolRevision,
                 GreenValueProtocolRevision = XagmanGreenValueProtocolRevision,
                 RunId = IsXagmanCollectionFirstRunActive() ? xagmanRunId : string.Empty,
@@ -13853,6 +14062,7 @@ public partial class SlaveWindow
 
     internal bool HandleUnexpectedXagmanLogout(ulong logoutContentId)
     {
+        if (TryConsumeXagmanLoginRecoveryLogout()) return true;
         if (TryHandleXagmanNetworkLogout()) return true;
         if (xagmanLobbyOperation is { } lobbyOperation && xagmanRunning
             && lobbyOperation.RunId == plugin.TaskRunner.CurrentRunId
@@ -14225,12 +14435,15 @@ public partial class SlaveWindow
     }
 
      private bool TrySetXagmanDropboxAutoAccept(bool enabled)
+        => TryApplyXagmanDropboxAutoAccept(enabled, out _);
+
+     private bool TryApplyXagmanDropboxAutoAccept(bool enabled, out bool waitingForPair)
     {
-        if (enabled && !TryRequireXagmanTradeVersions(out var versionFailure))
-        {
-            ReportXagmanTradeSafetyFailureOnce($"Xagman: Dropbox auto-accept stays closed: {versionFailure}");
+        waitingForPair = false;
+        var receiverIntent = enabled && !plugin.Configuration.XagmanOutsideNetworkHelper
+            ? CaptureXagmanReceiverVersionIntent(global::XASlave.Localization.UiMessage.Authored("the current receiver exchange")) : null;
+        if (enabled && !TryAdmitXagmanReceiverVersions(out waitingForPair))
             return false;
-        }
         if (!enabled)
         {
             xagmanBusyPendingReceiver = null;
@@ -14255,6 +14468,15 @@ public partial class SlaveWindow
             }
         }
 
+        // Refusal/provider preparation may span a peer update. Recheck immediately
+        // before enabling, preserving pending admission separately from a failed write.
+        if (receiverIntent != null && !IsXagmanReceiverVersionIntentCurrent(receiverIntent))
+        {
+            waitingForPair = true;
+            return false;
+        }
+        if (enabled && !TryAdmitXagmanReceiverVersions(out waitingForPair))
+            return false;
         if (!TryWriteXagmanDropboxAutoAccept(enabled))
         {
             xagmanDropboxAutoAcceptState = null;
@@ -14323,8 +14545,12 @@ public partial class SlaveWindow
         global::XASlave.Localization.UiMessage contextLabel,
         System.Action? beforeStop = null)
     {
-        if (TrySetXagmanDropboxAutoAccept(enabled))
+        var receiverIntent = enabled && !plugin.Configuration.XagmanOutsideNetworkHelper
+            ? CaptureXagmanReceiverVersionIntent(contextLabel) : null;
+        if (TryApplyXagmanDropboxAutoAccept(enabled, out var waitingForPair))
             return true;
+        if (waitingForPair && receiverIntent != null)
+            return DeferXagmanReceiverVersionIntent(receiverIntent);
 
         if (plugin.Configuration.XagmanOutsideNetworkHelper && onhCollectionHeld) return false;
 
@@ -14366,15 +14592,11 @@ public partial class SlaveWindow
                 return false;
             }
         }
-        if (!plugin.Configuration.XagmanOutsideNetworkHelper && !TryGetXagmanConnectedTradeVersionPeer(out _))
-        {
-            if (!TrySetXagmanDropboxAutoAcceptOrStop(false, contextLabel))
-                return false;
-            xagmanVersionPendingReceiver = CaptureXagmanReceiverVersionIntent(contextLabel);
-            return true;
-        }
+        var admission = GetXagmanTradeVersionAdmission(out var versionFailure);
+        if (admission == XagmanTradeVersionAdmission.Pending)
+            return DeferXagmanReceiverVersionIntent(CaptureXagmanReceiverVersionIntent(contextLabel));
         xagmanVersionPendingReceiver = null;
-        if (!TryRequireXagmanTradeVersions(out var versionFailure))
+        if (admission == XagmanTradeVersionAdmission.Invalid)
             return FailXagmanTradeVersions(versionFailure);
         // This guard also runs while waiting; reset only when entering receive mode.
         if (xagmanDropboxAutoAcceptState != true)
