@@ -29818,7 +29818,7 @@ Am besten erfolgt dies ab FG-Rang 6, damit Grundstücksgebote verfügbar sind.</
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
   </data>
   <data name="SFD7341BC66A257EF" xml:space="preserve">
-    <value>PvP-Aktionsleisten-Deaktivierung</value>
+    <value>Aktionsleisten-Verwaltung</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
   </data>
   <data name="S01E44E92B04C187C" xml:space="preserve">
@@ -30365,5 +30365,57 @@ Am besten erfolgt dies ab FG-Rang 6, damit Grundstücksgebote verfügbar sind.</
   <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
     <value>/xa hotbar on aktiviert die Überwachung. /xa hotbar off bricht wartende Befehle ab und stellt verwaltete Hotbars wieder her, sobald das HUD verfügbar ist. Mit /xa hotbar 1 on wird die Haupt-Hotbar eingeblendet.</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="S8BC066D2AAD6CED2" xml:space="preserve">
+    <value>Hotbar-Befehle bereit</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S858CCFF3342F1BBD" xml:space="preserve">
+    <value>Warte auf Hotbars</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S0DAC7B19060ADDCB" xml:space="preserve">
+    <value>Eine Hotbar in jeder Zone direkt anzeigen, ausblenden oder umschalten.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S496FC165C7EC6E96" xml:space="preserve">
+    <value>Hotbar-Steuerung aktivieren oder deaktivieren.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S943F7E99618C2B77" xml:space="preserve">
+    <value>Einen blockierten Hotbar-Anzeigebefehl in PvP ausführen.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SB125E87802A604A7" xml:space="preserve">
+    <value>Aktiviere zuerst diesen Mod. Erfordert die englische Fehlermeldung zur Nichtverfügbarkeit, einen angemeldeten Charakter sowie bereite Haupt- und Ziel-Hotbars. Ohne on/off wird umgeschaltet.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SE869C7AD09F25770" xml:space="preserve">
+    <value>/xa hotbar in jeder Zone verwenden; blockierte /hotbar display-Befehle in PvP verarbeiten.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S7B506E73F0DDE254" xml:space="preserve">
+    <value>Aktiviere zuerst diesen Mod. Ohne Zustand oder mit toggle wird umgeschaltet; on zeigt an, off blendet aus. Die Sichtbarkeit wird nach Bestätigung durch das HUD gemeldet.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S70BCCF028AEDEC45" xml:space="preserve">
+    <value>/xa hotbar on aktiviert direkte Befehle und die Überwachung von PvP-Fehlern. /xa hotbar off verwirft wartende Befehle und zeigt weiterhin vom Mod kontrollierte Leisten an, sobald das HUD verfügbar ist. Wiederhole off, um die Wiederherstellung erneut zu versuchen. Ohne on/off wird der Status angezeigt.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S67ABD8C831B57639" xml:space="preserve">
+    <value>Spielbefehle: /hotbar display 10 schaltet Leiste 10 um; mit on/off wird sie angezeigt oder ausgeblendet. Unterstützt Leisten 1 bis 10.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S617C84753E10C9E4" xml:space="preserve">
+    <value>Übernimmt die zuletzt bei bereitem HUD gewählte Hotbar-Sichtbarkeit zwischen PvE und PvP und wendet sie erneut an, sobald der aktive Satz bereit ist. Spätere Änderungen bei bereitem HUD werden zur neuen Auswahl. Beim Deaktivieren, Abmelden oder Wechsel von HUD-Layout oder Steuerungsmodus wird der Speicher geleert.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S07D39DEAD5B8548B" xml:space="preserve">
+    <value>Merkt sich getrennte Hotbar-Sichtbarkeitseinstellungen für PvE und PvP und stellt den aktiven Modus nach dem Laden wieder her. Beide Modi beginnen mit der aktuellen HUD-Sichtbarkeit; spätere Änderungen betreffen nur den aktiven Modus. Beim Deaktivieren, Abmelden oder Wechsel von HUD-Layout oder Steuerungsmodus wird der Speicher geleert.</value>
+    <comment>Source: independent PvE/PvP hotbar visibility; v0.0.0.68.</comment>
+  </data>
+  <data name="S6FA230F5AC6D7C00" xml:space="preserve">
+    <value>Aktionsleisten-Verwaltung</value>
+    <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
 </root>

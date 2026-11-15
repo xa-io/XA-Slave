@@ -29818,7 +29818,7 @@ It's best to do this when you're rank 6+ so you have access to plot bidding.</va
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
   </data>
   <data name="SFD7341BC66A257EF" xml:space="preserve">
-    <value>PVP Hotbar Disabler</value>
+    <value>Hotbar Maintainer</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
   </data>
   <data name="S01E44E92B04C187C" xml:space="preserve">
@@ -30365,5 +30365,57 @@ It's best to do this when you're rank 6+ so you have access to plot bidding.</va
   <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
     <value>/xa hotbar on enables monitoring. /xa hotbar off cancels queued commands and restores controlled bars when the HUD is available. Use /xa hotbar 1 on to show the main bar.</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="S8BC066D2AAD6CED2" xml:space="preserve">
+    <value>Hotbar commands ready</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S858CCFF3342F1BBD" xml:space="preserve">
+    <value>Waiting for hotbars</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S0DAC7B19060ADDCB" xml:space="preserve">
+    <value>Directly show, hide or toggle a hotbar in any zone.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S496FC165C7EC6E96" xml:space="preserve">
+    <value>Enable or disable hotbar controls.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S943F7E99618C2B77" xml:space="preserve">
+    <value>Apply a blocked hotbar display command in PvP.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SB125E87802A604A7" xml:space="preserve">
+    <value>Enable this mod first. Requires the English unavailable error, login and ready main/target hotbars. Omit on/off to toggle.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SE869C7AD09F25770" xml:space="preserve">
+    <value>Use /xa hotbar in any zone; handle blocked /hotbar display commands in PvP.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S7B506E73F0DDE254" xml:space="preserve">
+    <value>Enable this mod first. Omit the state or use toggle to switch; on shows; off hides. Visibility is reported after HUD confirmation.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S70BCCF028AEDEC45" xml:space="preserve">
+    <value>/xa hotbar on enables direct commands and PvP error monitoring. /xa hotbar off cancels queued commands and shows bars still controlled by the mod when the HUD is available. Repeat off to retry recovery. Omit on/off for status.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S67ABD8C831B57639" xml:space="preserve">
+    <value>Native commands: /hotbar display 10 toggles bar 10; add on/off to show or hide it. Supports bars 1 through 10.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S617C84753E10C9E4" xml:space="preserve">
+    <value>Shares the latest ready-HUD hotbar choices between PvE and PvP and reapplies them after the active bank is ready. Later ready-HUD edits become the new choices. Memory clears when disabled, logged out, or changing HUD layout or control mode.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S07D39DEAD5B8548B" xml:space="preserve">
+    <value>Remembers separate hotbar visibility settings for PvE and PvP and restores the active mode after loading. Both modes start from the current HUD visibility; later changes affect only the active mode. Memory clears when disabled, logged out, or changing HUD layout or control mode.</value>
+    <comment>Source: independent PvE/PvP hotbar visibility; v0.0.0.68.</comment>
+  </data>
+  <data name="S6FA230F5AC6D7C00" xml:space="preserve">
+    <value>Hotbar Maintainer</value>
+    <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
 </root>

@@ -29818,7 +29818,7 @@ xafunc의 DoNavFlySequenceXA 논리와 같습니다(Player.CanFly 확인).</valu
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
   </data>
   <data name="SFD7341BC66A257EF" xml:space="preserve">
-    <value>PvP 단축바 비활성화</value>
+    <value>단축바 관리</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
   </data>
   <data name="S01E44E92B04C187C" xml:space="preserve">
@@ -30365,5 +30365,57 @@ xafunc의 DoNavFlySequenceXA 논리와 같습니다(Player.CanFly 확인).</valu
   <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
     <value>/xa hotbar on으로 감시를 활성화합니다. /xa hotbar off는 대기 중인 명령을 취소하고 HUD를 사용할 수 있을 때 제어 중인 단축바를 복원합니다. 기본 단축바를 표시하려면 /xa hotbar 1 on을 사용하세요.</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="S8BC066D2AAD6CED2" xml:space="preserve">
+    <value>단축바 명령 준비 완료</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S858CCFF3342F1BBD" xml:space="preserve">
+    <value>단축바 대기 중</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S0DAC7B19060ADDCB" xml:space="preserve">
+    <value>모든 지역에서 단축바를 직접 표시하거나 숨기거나 전환합니다.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S496FC165C7EC6E96" xml:space="preserve">
+    <value>단축바 제어를 활성화하거나 비활성화합니다.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S943F7E99618C2B77" xml:space="preserve">
+    <value>PvP에서 차단된 단축바 표시 명령을 적용합니다.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SB125E87802A604A7" xml:space="preserve">
+    <value>먼저 이 모드를 활성화하세요. 영어 사용 불가 오류, 로그인, 기본 및 대상 단축바의 준비 완료가 필요합니다. on/off를 생략하면 전환합니다.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SE869C7AD09F25770" xml:space="preserve">
+    <value>모든 지역에서 /xa hotbar를 사용하고, PvP에서는 차단된 /hotbar display 명령을 처리합니다.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S7B506E73F0DDE254" xml:space="preserve">
+    <value>먼저 이 모드를 활성화하세요. 상태를 생략하거나 toggle을 사용하면 전환하고, on은 표시, off는 숨김입니다. HUD 확인 후 표시 상태를 알립니다.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S70BCCF028AEDEC45" xml:space="preserve">
+    <value>/xa hotbar on은 직접 명령과 PvP 오류 감시를 활성화합니다. /xa hotbar off는 대기 중인 명령을 취소하고 HUD를 사용할 수 있을 때 모드가 아직 제어 중인 단축바를 표시합니다. 복원을 재시도하려면 off를 반복하세요. on/off를 생략하면 상태를 표시합니다.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S67ABD8C831B57639" xml:space="preserve">
+    <value>게임 기본 명령: /hotbar display 10은 단축바 10을 전환합니다. on/off를 추가하면 표시하거나 숨깁니다. 단축바 1~10을 지원합니다.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S617C84753E10C9E4" xml:space="preserve">
+    <value>HUD가 준비된 상태에서 선택한 최신 단축바 표시 설정을 PvE와 PvP 간에 공유하고 활성 단축바 세트가 준비되면 다시 적용합니다. HUD가 준비된 뒤 변경한 내용이 새 선택이 됩니다. 비활성화, 로그아웃, HUD 배치 또는 조작 모드 변경 시 기억한 설정이 지워집니다.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S07D39DEAD5B8548B" xml:space="preserve">
+    <value>PvE와 PvP의 단축바 표시 설정을 따로 기억하고 로딩 후 활성 모드의 설정을 복원합니다. 두 모드 모두 현재 HUD 표시 상태로 시작하며, 이후 변경은 활성 모드에만 적용됩니다. 비활성화, 로그아웃, HUD 배치 또는 조작 모드 변경 시 기억한 설정이 지워집니다.</value>
+    <comment>Source: independent PvE/PvP hotbar visibility; v0.0.0.68.</comment>
+  </data>
+  <data name="S6FA230F5AC6D7C00" xml:space="preserve">
+    <value>단축바 관리</value>
+    <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
 </root>

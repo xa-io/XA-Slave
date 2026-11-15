@@ -1819,7 +1819,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return CreateStartupSurfaceStatus("Prevent Lobby Exit", Configuration.AutoPreventGameExitingFromLobbyErrorsEnabled, SystemWindowMods.PreventLobbyExitStatusText);
         yield return CreateStartupSurfaceStatus("Queue Position Display", Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.StatusText, "DisplayActualQueuePositionEnabled");
         yield return CreateStartupSurfaceStatus("Replace Unowned Mount Hotbars", Configuration.ReplaceUnownedMountHotbarsEnabled, ReplaceUnownedMountHotbars.StatusText, "ReplaceUnownedMountHotbarsEnabled");
-        yield return CreateStartupSurfaceStatus("PVP Hotbar Disabler", Configuration.PvpHotbarsEnabled, PvpHotbars.StatusText);
+        yield return CreateStartupSurfaceStatus("Hotbar Maintainer", Configuration.PvpHotbarsEnabled, PvpHotbars.StatusText);
         yield return CreateStartupSurfaceStatus("Disable Title Screen Movie", Configuration.DisableTitleScreenMovieEnabled, SystemWindowMods.DisableTitleScreenMovieStatusText);
         yield return CreateStartupSurfaceStatus("Auto Display IDs", Configuration.AutoDisplayIdsEnabled, AutoDisplayIds.StatusText);
         yield return CreateStartupSurfaceStatus("Display Network Latency", Configuration.AutoDisplayNetworkLatencyEnabled, AutoDisplayNetworkLatency.StatusText);
@@ -1889,7 +1889,7 @@ public sealed class Plugin : IDalamudPlugin
             return true;
         return name switch
         {
-            "PVP Hotbar Disabler" => statusText == "Monitoring blocked /hotbar display commands in PvP",
+            "Hotbar Maintainer" => statusText is "Monitoring blocked /hotbar display commands in PvP" or "Hotbar commands ready",
             "Inventory Search Bar" => statusText == "Inventory search ready. Open your inventory, saddlebag, a retainer inventory, or your Free Company chest.",
             "Notify When Friend Is Near" => statusText == "Scanning nearby players...",
             "Lock Game Window In Combat" => statusText == "Locked: game window position",
@@ -1906,7 +1906,7 @@ public sealed class Plugin : IDalamudPlugin
         // unsupported statuses must not be hidden by a broad substring match.
         return name switch
         {
-            "PVP Hotbar Disabler" => statusText is "Waiting for login" or "Waiting for PvP hotbars" or "Paused while the HUD is hidden or unavailable",
+            "Hotbar Maintainer" => statusText is "Waiting for login" or "Waiting for hotbars" or "Waiting for PvP hotbars" or "Paused while the HUD is hidden or unavailable",
             "Instant Teleport" => statusText == "Waiting for the framework thread.",
             "Notify When Friend Is Near" => statusText is "Waiting for login" or "Waiting for a valid local player",
             "Lock Game Window In Combat" => statusText is "Waiting for framework window admission" or "Waiting for game window",
@@ -2805,7 +2805,7 @@ public sealed class Plugin : IDalamudPlugin
         var value = arguments.Trim();
         if (value.Length == 0)
         {
-            message = $"PVP Hotbar Disabler: {(Configuration.PvpHotbarsEnabled ? "On" : "Off")}. {PvpHotbars.StatusText} Usage: /xa hotbar on|off or /xa hotbar <1-10> [on|off].";
+            message = $"Hotbar Maintainer: {(Configuration.PvpHotbarsEnabled ? "On" : "Off")}. {PvpHotbars.StatusText} Usage: /xa hotbar on|off or /xa hotbar <1-10> [on|off].";
             return true;
         }
         if (value.Equals("on", StringComparison.OrdinalIgnoreCase)
@@ -5875,7 +5875,7 @@ public sealed class Plugin : IDalamudPlugin
         yield return new("better-duty-finder", global::XASlave.Localization.UiLocale.Native("S023C4C5983AAE7D3"), XAModsRestoreScope.Ui, () => Configuration.BetterDutyFinderEnabled, BetterDutyFinder.SetEnabled, applied => Configuration.BetterDutyFinderEnabled = applied, () => BetterDutyFinder.StatusTextMessage);
         yield return new("display-actual-queue-position", global::XASlave.Localization.UiLocale.Native("SA67487F2DBAEAB93"), XAModsRestoreScope.Game, () => Configuration.DisplayActualQueuePositionEnabled, QueuePositionDisplay.SetEnabled, applied => Configuration.DisplayActualQueuePositionEnabled = applied, () => QueuePositionDisplay.StatusTextMessage);
         yield return new("replace-unowned-mount-hotbars", global::XASlave.Localization.UiLocale.Native("S6D3BD3F66D7757D7"), XAModsRestoreScope.Game, () => Configuration.ReplaceUnownedMountHotbarsEnabled, ReplaceUnownedMountHotbars.SetEnabled, applied => Configuration.ReplaceUnownedMountHotbarsEnabled = applied, () => ReplaceUnownedMountHotbars.StatusTextMessage);
-        yield return new("pvp-hotbars", global::XASlave.Localization.UiLocale.Native(global::XASlave.Localization.UiLocale.Key("PVP Hotbar Disabler")), XAModsRestoreScope.Game, () => Configuration.PvpHotbarsEnabled, PvpHotbars.SetEnabled, applied => Configuration.PvpHotbarsEnabled = applied, () => PvpHotbars.StatusTextMessage);
+        yield return new("pvp-hotbars", global::XASlave.Localization.UiLocale.Native(global::XASlave.Localization.UiLocale.Key("Hotbar Maintainer")), XAModsRestoreScope.Game, () => Configuration.PvpHotbarsEnabled, PvpHotbars.SetEnabled, applied => Configuration.PvpHotbarsEnabled = applied, () => PvpHotbars.StatusTextMessage);
         yield return new("target-command-fix", global::XASlave.Localization.UiLocale.Native("S762FC3E87F23DC97"), XAModsRestoreScope.Game, () => Configuration.TargetCommandFixEnabled, TargetCommandFix.SetEnabled, applied => Configuration.TargetCommandFixEnabled = applied, () => TargetCommandFix.StatusTextMessage);
         yield return new("copy-item-name-for-all", global::XASlave.Localization.UiLocale.Native("SE47CEA80BEEED0B2"), XAModsRestoreScope.Ui, () => Configuration.CopyItemNameForAllEnabled, CopyItemNameContextMenu.SetEnabled, applied => Configuration.CopyItemNameForAllEnabled = applied, () => CopyItemNameContextMenu.StatusTextMessage);
         yield return new("expanded-player-right-click-menu-search", global::XASlave.Localization.UiLocale.Native("SF6F93682DCAB79ED"), XAModsRestoreScope.Ui, () => Configuration.ExpandedPlayerRightClickMenuSearchEnabled, PlayerSearchContextMenu.SetEnabled, applied => Configuration.ExpandedPlayerRightClickMenuSearchEnabled = applied, () => PlayerSearchContextMenu.StatusTextMessage);
@@ -6587,5 +6587,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.67";
+    public const string Version = "0.0.0.68";
 }

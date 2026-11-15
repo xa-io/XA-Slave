@@ -29818,7 +29818,7 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
   </data>
   <data name="SFD7341BC66A257EF" xml:space="preserve">
-    <value>Tắt thanh kỹ năng PvP</value>
+    <value>Quản lý thanh kỹ năng</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
   </data>
   <data name="S01E44E92B04C187C" xml:space="preserve">
@@ -30365,5 +30365,57 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
   <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
     <value>/xa hotbar on bật theo dõi. /xa hotbar off hủy các lệnh đang chờ và khôi phục các thanh đang được điều khiển khi HUD khả dụng. Dùng /xa hotbar 1 on để hiện thanh chính.</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="S8BC066D2AAD6CED2" xml:space="preserve">
+    <value>Lệnh thanh kỹ năng đã sẵn sàng</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S858CCFF3342F1BBD" xml:space="preserve">
+    <value>Đang chờ thanh kỹ năng</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S0DAC7B19060ADDCB" xml:space="preserve">
+    <value>Trực tiếp hiện, ẩn hoặc chuyển trạng thái thanh kỹ năng ở mọi khu vực.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S496FC165C7EC6E96" xml:space="preserve">
+    <value>Bật hoặc tắt điều khiển thanh kỹ năng.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S943F7E99618C2B77" xml:space="preserve">
+    <value>Áp dụng lệnh hiển thị thanh kỹ năng bị chặn trong PvP.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SB125E87802A604A7" xml:space="preserve">
+    <value>Hãy bật mod này trước. Cần thông báo lỗi không khả dụng bằng tiếng Anh, đã đăng nhập và thanh chính cùng thanh mục tiêu đã sẵn sàng. Bỏ qua on/off để chuyển trạng thái.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SE869C7AD09F25770" xml:space="preserve">
+    <value>Dùng /xa hotbar ở mọi khu vực; xử lý lệnh /hotbar display bị chặn trong PvP.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S7B506E73F0DDE254" xml:space="preserve">
+    <value>Hãy bật mod này trước. Bỏ qua trạng thái hoặc dùng toggle để chuyển; on để hiện, off để ẩn. Trạng thái hiển thị được báo sau khi HUD xác nhận.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S70BCCF028AEDEC45" xml:space="preserve">
+    <value>/xa hotbar on bật lệnh trực tiếp và theo dõi lỗi PvP. /xa hotbar off hủy lệnh đang chờ và hiện các thanh vẫn do mod điều khiển khi HUD khả dụng. Lặp lại off để thử khôi phục lại. Bỏ qua on/off để xem trạng thái.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S67ABD8C831B57639" xml:space="preserve">
+    <value>Lệnh gốc của trò chơi: /hotbar display 10 chuyển trạng thái thanh 10; thêm on/off để hiện hoặc ẩn. Hỗ trợ thanh 1 đến 10.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S617C84753E10C9E4" xml:space="preserve">
+    <value>Dùng chung lựa chọn thanh kỹ năng mới nhất khi HUD sẵn sàng giữa PvE và PvP, rồi áp dụng lại khi bộ thanh hiện tại sẵn sàng. Các chỉnh sửa sau đó khi HUD sẵn sàng trở thành lựa chọn mới. Bộ nhớ được xóa khi tắt mod, đăng xuất hoặc thay đổi bố cục HUD hay chế độ điều khiển.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S07D39DEAD5B8548B" xml:space="preserve">
+    <value>Ghi nhớ cài đặt hiển thị thanh kỹ năng riêng cho PvE và PvP, rồi khôi phục chế độ hiện tại sau khi tải. Cả hai chế độ bắt đầu từ trạng thái hiển thị HUD hiện tại; các thay đổi sau đó chỉ ảnh hưởng chế độ đang hoạt động. Bộ nhớ được xóa khi tắt mod, đăng xuất hoặc thay đổi bố cục HUD hay chế độ điều khiển.</value>
+    <comment>Source: independent PvE/PvP hotbar visibility; v0.0.0.68.</comment>
+  </data>
+  <data name="S6FA230F5AC6D7C00" xml:space="preserve">
+    <value>Quản lý thanh kỹ năng</value>
+    <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
 </root>

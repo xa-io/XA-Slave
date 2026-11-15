@@ -29818,7 +29818,7 @@ Sebaiknya lakukan saat pangkat Anda 6+ agar memiliki akses penawaran plot.</valu
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
   </data>
   <data name="SFD7341BC66A257EF" xml:space="preserve">
-    <value>Penonaktif Hotbar PvP</value>
+    <value>Pengelola Hotbar</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
   </data>
   <data name="S01E44E92B04C187C" xml:space="preserve">
@@ -30365,5 +30365,57 @@ Sebaiknya lakukan saat pangkat Anda 6+ agar memiliki akses penawaran plot.</valu
   <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
     <value>/xa hotbar on mengaktifkan pemantauan. /xa hotbar off membatalkan perintah dalam antrean dan memulihkan hotbar yang dikendalikan saat HUD tersedia. Gunakan /xa hotbar 1 on untuk menampilkan hotbar utama.</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="S8BC066D2AAD6CED2" xml:space="preserve">
+    <value>Perintah hotbar siap</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S858CCFF3342F1BBD" xml:space="preserve">
+    <value>Menunggu hotbar</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S0DAC7B19060ADDCB" xml:space="preserve">
+    <value>Langsung tampilkan, sembunyikan, atau alihkan hotbar di zona mana pun.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S496FC165C7EC6E96" xml:space="preserve">
+    <value>Aktifkan atau nonaktifkan kontrol hotbar.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S943F7E99618C2B77" xml:space="preserve">
+    <value>Terapkan perintah tampilan hotbar yang diblokir saat PvP.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SB125E87802A604A7" xml:space="preserve">
+    <value>Aktifkan mod ini terlebih dahulu. Memerlukan galat tidak tersedia dalam bahasa Inggris, sudah masuk ke game, serta hotbar utama dan target yang siap. Hilangkan on/off untuk beralih.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SE869C7AD09F25770" xml:space="preserve">
+    <value>Gunakan /xa hotbar di zona mana pun; tangani perintah /hotbar display yang diblokir saat PvP.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S7B506E73F0DDE254" xml:space="preserve">
+    <value>Aktifkan mod ini terlebih dahulu. Hilangkan status atau gunakan toggle untuk beralih; on menampilkan, off menyembunyikan. Visibilitas dilaporkan setelah konfirmasi HUD.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S70BCCF028AEDEC45" xml:space="preserve">
+    <value>/xa hotbar on mengaktifkan perintah langsung dan pemantauan galat PvP. /xa hotbar off membatalkan perintah dalam antrean dan menampilkan hotbar yang masih dikendalikan mod saat HUD tersedia. Ulangi off untuk mencoba pemulihan lagi. Hilangkan on/off untuk melihat status.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S67ABD8C831B57639" xml:space="preserve">
+    <value>Perintah bawaan game: /hotbar display 10 mengalihkan hotbar 10; tambahkan on/off untuk menampilkan atau menyembunyikannya. Mendukung hotbar 1 hingga 10.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S617C84753E10C9E4" xml:space="preserve">
+    <value>Menggunakan pilihan hotbar terbaru saat HUD siap untuk PvE dan PvP, lalu menerapkannya kembali setelah set hotbar aktif siap. Perubahan berikutnya saat HUD siap menjadi pilihan baru. Ingatan dihapus saat dinonaktifkan, keluar dari game, atau mengganti tata letak HUD maupun mode kontrol.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S07D39DEAD5B8548B" xml:space="preserve">
+    <value>Mengingat pengaturan visibilitas hotbar terpisah untuk PvE dan PvP serta memulihkan mode aktif setelah pemuatan. Kedua mode dimulai dari visibilitas HUD saat ini; perubahan berikutnya hanya memengaruhi mode aktif. Ingatan dihapus saat dinonaktifkan, keluar dari game, atau mengganti tata letak HUD maupun mode kontrol.</value>
+    <comment>Source: independent PvE/PvP hotbar visibility; v0.0.0.68.</comment>
+  </data>
+  <data name="S6FA230F5AC6D7C00" xml:space="preserve">
+    <value>Pengelola Hotbar</value>
+    <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
 </root>

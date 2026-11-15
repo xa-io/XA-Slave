@@ -29818,7 +29818,7 @@ NamePlate готов + PlayerAvailable + не применяет действи�
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
   </data>
   <data name="SFD7341BC66A257EF" xml:space="preserve">
-    <value>Отключение панелей действий PvP</value>
+    <value>Управление панелями действий</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
   </data>
   <data name="S01E44E92B04C187C" xml:space="preserve">
@@ -30365,5 +30365,57 @@ NamePlate готов + PlayerAvailable + не применяет действи�
   <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
     <value>/xa hotbar on включает отслеживание. /xa hotbar off отменяет команды в очереди и восстанавливает управляемые панели, когда интерфейс доступен. Используйте /xa hotbar 1 on, чтобы показать основную панель.</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="S8BC066D2AAD6CED2" xml:space="preserve">
+    <value>Команды панелей готовы</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S858CCFF3342F1BBD" xml:space="preserve">
+    <value>Ожидание панелей</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S0DAC7B19060ADDCB" xml:space="preserve">
+    <value>Показать, скрыть или переключить панель напрямую в любой зоне.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S496FC165C7EC6E96" xml:space="preserve">
+    <value>Включить или отключить управление панелями.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S943F7E99618C2B77" xml:space="preserve">
+    <value>Применить заблокированную команду отображения панели в PvP.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SB125E87802A604A7" xml:space="preserve">
+    <value>Сначала включите этот мод. Требуются английская ошибка недоступности, вход в игру и готовность основной и целевой панелей. Без on/off видимость переключается.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SE869C7AD09F25770" xml:space="preserve">
+    <value>Используйте /xa hotbar в любой зоне; заблокированные команды /hotbar display обрабатываются в PvP.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S7B506E73F0DDE254" xml:space="preserve">
+    <value>Сначала включите этот мод. Без состояния или с toggle видимость переключается; on показывает, off скрывает. Результат сообщается после подтверждения HUD.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S70BCCF028AEDEC45" xml:space="preserve">
+    <value>/xa hotbar on включает прямые команды и отслеживание ошибок PvP. /xa hotbar off отменяет команды в очереди и показывает панели, которыми ещё управляет мод, когда HUD доступен. Повторите off для повторной попытки восстановления. Без on/off выводится состояние.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S67ABD8C831B57639" xml:space="preserve">
+    <value>Команды игры: /hotbar display 10 переключает панель 10; добавьте on/off, чтобы показать или скрыть её. Поддерживаются панели с 1 по 10.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S617C84753E10C9E4" xml:space="preserve">
+    <value>Использует последние настройки видимости панелей, выбранные при готовом HUD, и в PvE, и в PvP, повторно применяя их после готовности активного набора. Более поздние изменения при готовом HUD становятся новым выбором. Память очищается при отключении мода, выходе из игры, смене схемы HUD или режима управления.</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S07D39DEAD5B8548B" xml:space="preserve">
+    <value>Запоминает отдельные настройки видимости панелей для PvE и PvP и восстанавливает активный режим после загрузки. Оба режима начинают с текущей видимости HUD; дальнейшие изменения затрагивают только активный режим. Память очищается при отключении мода, выходе из игры, смене схемы HUD или режима управления.</value>
+    <comment>Source: independent PvE/PvP hotbar visibility; v0.0.0.68.</comment>
+  </data>
+  <data name="S6FA230F5AC6D7C00" xml:space="preserve">
+    <value>Управление панелями действий</value>
+    <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
 </root>

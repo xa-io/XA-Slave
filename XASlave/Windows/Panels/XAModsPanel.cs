@@ -3347,10 +3347,10 @@ public partial class SlaveWindow
             () => configuration.PvpHotbarsEnabled,
             plugin.PvpHotbars.SetEnabled,
             applied => configuration.PvpHotbarsEnabled = applied,
-            UiLocale.Native(UiLocale.Key("Handle blocked /hotbar display commands in PvP.")),
-            UiLocale.Native(UiLocale.Key("Enable chat monitoring while logged in with the main _ActionBar visible, then use /hotbar display commands.")),
+            UiLocale.Native(UiLocale.Key("Use /xa hotbar in any zone; handle blocked /hotbar display commands in PvP.")),
+            UiLocale.Native(UiLocale.Key("Directly show, hide or toggle a hotbar in any zone.")),
             () => plugin.PvpHotbars.LocalizedStatusText,
-            searchTerms: ["pvp", "hotbar", "display", "disabler", "monitor", "unavailable", "Wolves' Den"],
+            searchTerms: ["pvp", "pve", "hotbar", "maintainer", "display", "disabler", "monitor", "unavailable", "Wolves' Den"],
             drawOptions: DrawPvpHotbarsOptions);
         AddSavedFeatureEntry(
             ToonModsSection.GraphicMods,

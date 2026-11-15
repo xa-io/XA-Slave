@@ -29818,7 +29818,7 @@ xafuncのDoNavFlySequenceXAのロジック（Player.CanFly確認）と同じで�
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; option help.</comment>
   </data>
   <data name="SFD7341BC66A257EF" xml:space="preserve">
-    <value>PvPホットバー無効化</value>
+    <value>ホットバー管理</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs; feature title or help.</comment>
   </data>
   <data name="S01E44E92B04C187C" xml:space="preserve">
@@ -30365,5 +30365,57 @@ xafuncのDoNavFlySequenceXAのロジック（Player.CanFly確認）と同じで�
   <data name="SF8E02CF0CB5A55E1" xml:space="preserve">
     <value>/xa hotbar on で監視を有効にします。/xa hotbar off は待機中のコマンドをキャンセルし、HUDが利用可能になったら管理中のバーを復元します。メインバーを表示するには /xa hotbar 1 on を使用してください。</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.PvpHotbars.cs; readiness and recovery help.</comment>
+  </data>
+  <data name="S8BC066D2AAD6CED2" xml:space="preserve">
+    <value>ホットバーコマンド使用可能</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S858CCFF3342F1BBD" xml:space="preserve">
+    <value>ホットバーを待機中</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S0DAC7B19060ADDCB" xml:space="preserve">
+    <value>どのエリアでもホットバーの表示・非表示を直接切り替えます。</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S496FC165C7EC6E96" xml:space="preserve">
+    <value>ホットバー操作を有効または無効にします。</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S943F7E99618C2B77" xml:space="preserve">
+    <value>PvPでブロックされたホットバー表示コマンドを適用します。</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SB125E87802A604A7" xml:space="preserve">
+    <value>先にこのModを有効にしてください。英語の使用不可エラー、ログイン、およびメインと対象のホットバーの準備完了が必要です。on/offを省略すると表示を切り替えます。</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="SE869C7AD09F25770" xml:space="preserve">
+    <value>/xa hotbarは全エリアで使用可能です。PvPではブロックされた/hotbar displayコマンドも処理します。</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S7B506E73F0DDE254" xml:space="preserve">
+    <value>先にこのModを有効にしてください。状態を省略するかtoggleを指定すると切り替え、onで表示、offで非表示にします。HUDでの確認後に表示状態を報告します。</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S70BCCF028AEDEC45" xml:space="preserve">
+    <value>/xa hotbar onで直接コマンドとPvPエラー監視を有効にします。/xa hotbar offで待機中のコマンドを取り消し、HUDが利用可能になるとModがまだ制御中のバーを表示します。復元を再試行するにはoffを繰り返してください。on/offを省略すると状態を表示します。</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S67ABD8C831B57639" xml:space="preserve">
+    <value>ゲーム標準コマンド：/hotbar display 10でホットバー10を切り替えます。on/offを付けると表示・非表示を指定できます。ホットバー1～10に対応しています。</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S617C84753E10C9E4" xml:space="preserve">
+    <value>HUD準備完了時の最新のホットバー表示設定をPvEとPvPで共有し、使用中のホットバーセットの準備完了後に再適用します。HUD準備完了後の変更が新しい設定になります。無効化、ログアウト、HUDレイアウトまたは操作モードの変更で記憶を消去します。</value>
+    <comment>Source: hotbar commands in all zones; v0.0.0.68.</comment>
+  </data>
+  <data name="S07D39DEAD5B8548B" xml:space="preserve">
+    <value>PvEとPvPのホットバー表示設定を別々に記憶し、ロード後に現在のモードを復元します。両モードは現在のHUD表示状態から開始し、その後の変更は現在のモードにのみ反映されます。無効化、ログアウト、HUDレイアウトまたは操作モードの変更で記憶を消去します。</value>
+    <comment>Source: independent PvE/PvP hotbar visibility; v0.0.0.68.</comment>
+  </data>
+  <data name="S6FA230F5AC6D7C00" xml:space="preserve">
+    <value>ホットバー管理</value>
+    <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
 </root>

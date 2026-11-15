@@ -23,6 +23,15 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.68 - 2026-11-15",
+            Lines =
+            [
+                "- Updated Hotbar Maintainer: Renamed PVP Hotbar Disabler to reflect support for both PvE and PvP bars.",
+                "- Fixed Hotbar Commands: /xa hotbar works in every zone and remembers separate PvE and PvP visibility settings.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.67 - 2026-11-15",
             Lines =
             [
