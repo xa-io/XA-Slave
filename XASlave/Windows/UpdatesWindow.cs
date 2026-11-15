@@ -23,6 +23,15 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.67 - 2026-11-15",
+            Lines =
+            [
+                "- Fixed PvP Hotbar Visibility: Show/hide commands now update the game's hotbar display setting while preserving unrelated bars and later HUD changes.",
+                "- Fixed Inventory Search Shortcuts: Turning Ctrl+F off releases shortcut-acquired focus. Toggling the mod preserves your Ctrl+F choice, and click-to-type stays available.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.66 - 2026-11-13",
             Lines =
             [

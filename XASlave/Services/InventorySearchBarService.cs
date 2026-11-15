@@ -110,7 +110,10 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
             if (kind == AddonEvent.PostHide)
             {
                 if (controls.TryGetValue(args.AddonName, out var hidden) && hidden.Host.Address == args.Addon.Address)
+                {
+                    hidden.ReleaseInputFocus();
                     hidden.ClearQuery();
+                }
                 return;
             }
             // Restore before the addon releases native storage. A new epoch rejects reused addresses.
@@ -183,11 +186,17 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
 
     private void CheckFocusShortcut(long now)
     {
+        // A disabled shortcut must not sample or consume keyboard input. Keep the
+        // latch armed until a release is observed after the option is enabled.
+        if (!enabled || disposed || retiring || !focusShortcutEnabled())
+        {
+            controlFWasDown = true;
+            foreach (var control in controls.Values) control.ReleaseShortcutFocus();
+            return;
+        }
         var down = (GetAsyncKeyState(0x46) & 0x8000) != 0 && (GetAsyncKeyState(0x11) & 0x8000) != 0;
         var pressed = down && !controlFWasDown;
         controlFWasDown = down;
-        // Observe releases while disabled, but never focus or consume the key.
-        if (!focusShortcutEnabled()) return;
         if (!pressed || Volatile.Read(ref drawBlocked) || now - Interlocked.Read(ref drawTimestamp) is < 0 or > 500
             || (GetAsyncKeyState(0x12) & 0x8000) != 0 || (GetAsyncKeyState(0x10) & 0x8000) != 0) return;
         var input = UIInputData.Instance();
@@ -203,7 +212,14 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
             var host = InventorySearchNative.Resolve(control.Host, Epoch, true);
             if (host == null || focused->Id != host->Id && focused->ParentId != host->Id) continue;
             if (module->IsTextInputActive() && !control.IsFocused) return;
-            if (control.Focus()) Plugin.KeyState[VirtualKey.F] = false;
+            if (control.Focus())
+            {
+                // Options can change between the initial gate and native focus.
+                if (!enabled || disposed || retiring || !focusShortcutEnabled())
+                    control.ReleaseShortcutFocus();
+                else
+                    Plugin.KeyState[VirtualKey.F] = false;
+            }
             return;
         }
     }
@@ -270,7 +286,7 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
         private readonly List<(InventorySearchFilter Filter, CompactFilterButton Node, string Tooltip, float Width)> filterButtons = new();
         private string query = string.Empty;
         private InventorySearchFilter filters;
-        private bool retired, disposed, clearRequested;
+        private bool retired, disposed, clearRequested, shortcutOwnsFocus;
         internal InventorySearchHost Host { get; }
         internal bool IsRetainer => Host.Name.StartsWith("InventoryRetainer", StringComparison.Ordinal);
         internal bool IsFocused
@@ -298,6 +314,10 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
             {
                 input.MaxCharacters = 128; input.EnableCompletion = false; input.AutoSelectAll = false;
                 input.ShowLimitText = false; input.PlaceholderString = UiLocale.T("Search items...");
+                // A later mouse selection belongs to the user, even if this field
+                // was already focused by our shortcut. Never revoke that selection.
+                input.CollisionNode.AddEvent(AtkEventType.MouseDown, () => shortcutOwnsFocus = false);
+                input.OnUnfocused = () => shortcutOwnsFocus = false;
                 input.OnInputReceived = text =>
                 {
                     // Event callbacks only change managed input state. Native resolution and
@@ -397,8 +417,7 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
             if (clearRequested)
             {
                 clearRequested = false; ClearQuery();
-                var stage = AtkStage.Instance();
-                if (stage != null && stage->AtkInputManager != null) input.ClearFocus();
+                ReleaseInputFocus();
             }
             Position(addon);
             if (string.IsNullOrWhiteSpace(query) && filters == InventorySearchFilter.None) { RestoreAll(); return; }
@@ -425,12 +444,33 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
 
         internal bool Focus()
         {
+            if (retired || disposed || !ownerActive() || !focusShortcutEnabled()) return false;
             var addon = InventorySearchNative.Resolve(Host, epoch, true);
-            if (retired || !ownerActive() || addon == null) return false;
+            if (addon == null) return false;
             var stage = AtkStage.Instance();
             if (stage == null || stage->AtkInputManager == null) return false;
+            // Do not claim focus that was acquired by clicking or navigating here.
+            if (input.IsFocused || !ownerActive() || !focusShortcutEnabled()) return false;
             stage->AtkInputManager->SetFocus(input.FocusNode, addon, 0);
-            return input.IsFocused;
+            shortcutOwnsFocus = input.IsFocused;
+            return shortcutOwnsFocus;
+        }
+
+        internal void ReleaseShortcutFocus()
+        {
+            if (!shortcutOwnsFocus) return;
+            ReleaseInputFocus();
+        }
+
+        internal void ReleaseInputFocus()
+        {
+            shortcutOwnsFocus = false;
+            // Resolve the same addon lifetime before touching its owned input.
+            // A replacement addon or another focused field must remain untouched.
+            if (disposed || InventorySearchNative.Resolve(Host, epoch) == null) return;
+            var stage = AtkStage.Instance();
+            if (stage != null && stage->AtkInputManager != null && input.IsFocused)
+                input.ClearFocus();
         }
 
         internal void ClearQuery()
@@ -470,7 +510,7 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
 
         internal void StopCallbacks()
         {
-            retired = true; input.OnInputReceived = null; input.OnEscapeEntered = null;
+            retired = true; input.OnInputReceived = null; input.OnEscapeEntered = null; input.OnUnfocused = null;
             foreach (var button in filterButtons) button.Node.OnClick = null;
         }
 
@@ -491,7 +531,11 @@ internal sealed unsafe class InventorySearchBarService : IDisposable
         {
             if (disposed) return;
             StopCallbacks();
-            try { RestoreAll(); }
+            try
+            {
+                try { ReleaseInputFocus(); }
+                finally { RestoreAll(); }
+            }
             finally
             {
                 try { DisposeControls(); }
