@@ -30418,4 +30418,63 @@ xafuncのDoNavFlySequenceXAのロジック（Player.CanFly確認）と同じで�
     <value>ホットバー管理</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>/xllog に詳細な診断を表示</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>システムチャットメッセージを表示</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>どちらのオプションも初期設定ではオフです。詳細ログにはホットバーへの操作要求、HUD の状態のスナップショット、確認結果を記録します。システムチャットメッセージでは、ホットバーへの操作要求、結果、復旧を通知します。</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>エラーは引き続き /xllog に記録されます。チャットメッセージがオフでも、明示的な状態確認や無効なコマンドへの応答は表示されます。</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>代替処理が受け付けられると、コマンドを再送せずにエラーを処理します。システムチャットメッセージがオンの場合、HUD の確認後に表示・非表示の結果を通知します。アクションやキー割り当ては変更しません。</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>先にこのModを有効にしてください。状態を省略するかtoggleを指定すると切り替え、onで表示、offで非表示にします。</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>PvE と PvP で表示・非表示にするバーを個別に記憶し、モードを切り替えると復元します。</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 でバー 1 の表示を切り替えます。on または off を追加すると表示・非表示を指定できます。このModが有効な間、バー 1-10 で使用できます。</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Modを無効にする、ログアウトする、HUDレイアウトや操作モードを変更すると、記憶した設定がリセットされます。</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>両方の出力オプションは初期設定でオフです。エラーは引き続き /xllog に記録され、状態確認や失敗したコマンドへの応答はチャットに表示されます。</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>一連の取引の制限時間（分）</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>取引の進捗確認を開始するまでの時間（分）</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>この時間だけ実際に取引した後、30秒間隔の確認で5回連続して変化がなければ取引を停止します。</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>取引の制限時間は1時間です</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>取引の監視を停止しました。XA Databaseと取引相手を確認してから、残りの処理を再開してください。</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

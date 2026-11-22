@@ -30418,4 +30418,63 @@ Arsa tekliflerine erişebilmek için bunu 6. rütbe ve üzerindeyken yapmak en i
     <value>Kısayol Çubuğu Yöneticisi</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>/xllog içinde ayrıntılı tanılama göster</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Sistem sohbet mesajlarını göster</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>Her iki seçenek de varsayılan olarak kapalıdır. Ayrıntılı günlük kaydı, kısayol çubuğu isteklerini, HUD durum anlık görüntülerini ve onayları kaydeder. Sistem sohbet mesajları kısayol çubuğu isteklerini, sonuçlarını ve kurtarma işlemlerini bildirir.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Hatalar /xllog içinde kaydedilmeye devam eder. Sohbet mesajları kapalıyken açık durum sorguları ve geçersiz komut yanıtları kullanılabilir olmaya devam eder.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>Kabul edilen alternatif işlem, komutu tekrarlamadan hatayı işler. Sistem sohbet mesajları açıkken gösterme veya gizleme sonucu HUD onayından sonra bildirilir. Eylemler ve tuş atamaları değişmez.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Önce bu modu etkinleştirin. Durumu atlayın veya toggle kullanarak değiştirin; on gösterir, off gizler.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>PvE ve PvP'de gösterdiğiniz veya gizlediğiniz çubukları ayrı ayrı hatırlar ve mod değiştirdiğinizde geri yükler.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1, 1. çubuğun görünürlüğünü değiştirir. Göstermek veya gizlemek için on ya da off ekleyin. Bu mod etkinken 1-10 numaralı çubuklarda çalışır.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Modu devre dışı bıraktığınızda, oturumu kapattığınızda ya da HUD düzenini veya kontrol modunu değiştirdiğinizde tercihler sıfırlanır.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>Her iki çıktı seçeneği varsayılan olarak kapalıdır. Hatalar /xllog içinde kaydedilmeye devam eder; durum sorgularına ve başarısız komutlara verilen yanıtlar sohbette gösterilmeye devam eder.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Takas dizisi için zaman sınırı (dakika)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Takas ilerlemesini kontrol etmeye başlama süresi (dakika)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>Bu aktif takas süresinden sonra 30 saniye arayla yapılan beş kontrolde değişiklik görülmezse takas durdurulur.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>Takas zaman sınırı 1 saattir</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>Takas izleme durduruldu. XA Database ve takas ortağını kontrol edip kalan işlemleri sürdürün.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

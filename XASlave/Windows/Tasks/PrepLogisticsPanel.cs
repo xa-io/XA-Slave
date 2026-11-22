@@ -633,6 +633,7 @@ public partial class SlaveWindow
                     OnEnter = sw.OnEnter,
                     IsComplete = () => relogFailed || origComplete(),
                     TimeoutSec = sw.TimeoutSec,
+                    HasTimedOut = sw.HasTimedOut,
                 });
             }
 
@@ -716,6 +717,7 @@ public partial class SlaveWindow
                     OnEnter = sw.OnEnter,
                     IsComplete = () => relogFailed || origComplete(),
                     TimeoutSec = sw.TimeoutSec,
+                    HasTimedOut = sw.HasTimedOut,
                 });
             }
 

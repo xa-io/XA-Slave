@@ -211,7 +211,17 @@ internal sealed class StepMachine
 
         if (!IsRunning || generation != tickGeneration || pausedAt.HasValue)
             return StepMachineTickResult.Running;
-        if (elapsed <= step.TimeoutSec)
+        bool timedOut;
+        try
+        {
+            timedOut = step.HasTimedOut?.Invoke(elapsed) ?? elapsed > step.TimeoutSec;
+        }
+        catch (Exception ex)
+        {
+            ReportError(global::XASlave.Localization.UiMessage.Format("S980DF56051E02256", step.NameMessage), ex, $"Timeout check error in '{step.Name}': {ex.Message}");
+            return StepMachineTickResult.Running;
+        }
+        if (!IsRunning || generation != tickGeneration || pausedAt.HasValue || !timedOut)
             return StepMachineTickResult.Running;
 
         if (step.MaxRetries > 0 && step.RetryCount < step.MaxRetries)

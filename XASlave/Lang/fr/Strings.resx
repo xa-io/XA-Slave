@@ -30418,4 +30418,63 @@ Il est préférable de le faire au rang 6 ou plus afin d’avoir accès aux ench
     <value>Gestion des barres de raccourcis</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>Afficher les diagnostics détaillés dans /xllog</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Afficher les messages système dans le chat</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>Les deux options sont désactivées par défaut. La journalisation détaillée enregistre les demandes concernant les barres de raccourcis, les instantanés du HUD et les confirmations. Les messages système du chat indiquent les demandes, les résultats et les rétablissements des barres de raccourcis.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Les erreurs restent consignées dans /xllog. Les réponses aux demandes explicites de statut et aux commandes invalides restent disponibles lorsque les messages du chat sont désactivés.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>Le traitement de secours accepté gère l’erreur sans répéter la commande. Lorsque les messages système du chat sont activés, l’affichage ou le masquage est signalé après confirmation du HUD. Les actions et les raccourcis clavier restent inchangés.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Activez d’abord ce mod. Omettez l’état ou utilisez toggle pour basculer ; on affiche, off masque.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>Mémorise séparément les barres affichées ou masquées en PvE et en PvP, puis les rétablit lorsque vous changez de mode.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 bascule la barre 1. Ajoutez on ou off pour l’afficher ou la masquer. Fonctionne avec les barres 1-10 tant que ce mod est activé.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Les choix sont réinitialisés lorsque vous désactivez le mod, vous déconnectez ou changez la disposition du HUD ou le mode de contrôle.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>Les deux options de sortie sont désactivées par défaut. Les erreurs restent consignées dans /xllog ; les réponses aux demandes de statut et aux commandes ayant échoué restent affichées dans le chat.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Délai maximal pour une série d’échanges (minutes)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Vérifier la progression des échanges après (minutes)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>Après cette durée d’échange actif, cinq vérifications sans changement espacées de 30 secondes arrêtent l’échange.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>Le délai maximal d’échange est de 1 heure</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>La surveillance des échanges est arrêtée. Vérifiez XA Database et le partenaire d’échange, puis reprenez le travail restant.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

@@ -132,7 +132,7 @@ public unsafe sealed partial class PvpHotbarsService
                 if ((displayMemoryPendingMask & (1u << index)) != 0)
                 {
                     diagnostics.Event(index + 1, "bank-sync-expired", "The destination hotbar did not become ready within five seconds of bank synchronization.");
-                    Plugin.ChatGui.PrintError($"[XASlave] Hotbar {index + 1}: visibility synchronization expired. Use /xa hotbar {index + 1} on (or off) when the HUD is ready.");
+                    PrintChatMessage($"[XASlave] Hotbar {index + 1}: visibility synchronization expired. Use /xa hotbar {index + 1} on (or off) when the HUD is ready.", error: true);
                 }
             FinishDisplayMemoryTransition();
             return;
@@ -197,7 +197,7 @@ public unsafe sealed partial class PvpHotbarsService
                     continue;
                 displayMemoryPendingMask &= ~bit;
                 diagnostics.Event(index + 1, "bank-sync-rejected", reason);
-                Plugin.ChatGui.PrintError($"[XASlave] Hotbar {index + 1}: visibility synchronization rejected. {reason}");
+                PrintChatMessage($"[XASlave] Hotbar {index + 1}: visibility synchronization rejected. {reason}", error: true);
                 continue;
             }
             if (!TryReadDisplayConfiguration(out mask, out dataSet, out layout, out gamepadMode))
@@ -220,7 +220,7 @@ public unsafe sealed partial class PvpHotbarsService
             {
                 displayMemoryPendingMask &= ~bit;
                 diagnostics.Event(index + 1, "bank-sync-rejected", message);
-                Plugin.ChatGui.PrintError($"[XASlave] Hotbar {index + 1}: visibility synchronization rejected. {message}");
+                PrintChatMessage($"[XASlave] Hotbar {index + 1}: visibility synchronization rejected. {message}", error: true);
             }
         }
         // Do not classify our own setting notifications as later manual changes on the next frame.

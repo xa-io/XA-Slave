@@ -284,6 +284,7 @@ public class Configuration : IPluginConfiguration
     public bool XagmanUseDirectNpcSell { get; set; } = false;
     public bool XagmanAutoCleanQueueList { get; set; } = false;
     public bool XagmanEnableArMultiOnComplete { get; set; } = true;
+    public int XagmanTradeBatchTimeoutMinutes { get; set; } = 10;
     public bool XagmanLogoutOnComplete { get; set; } = false;
     public bool XagmanKillGameOnComplete { get; set; } = false;
     public bool XagmanUsePreflightOnFirstCharacter { get; set; } = true;
@@ -435,6 +436,8 @@ public class Configuration : IPluginConfiguration
     public bool DisplayActualQueuePositionEnabled { get; set; } = false;
     public bool ReplaceUnownedMountHotbarsEnabled { get; set; } = false;
     public bool PvpHotbarsEnabled { get; set; } = false;
+    public bool PvpHotbarsDetailedLoggingEnabled { get; set; } = false;
+    public bool PvpHotbarsChatMessagesEnabled { get; set; } = false;
     // Legacy manual selection retained for config round-tripping only; no runtime effect.
     public int PvpHotbarsMask { get; set; } = 1 << 2;
     public bool DisableBackgroundGameRenderingEnabled { get; set; } = false;

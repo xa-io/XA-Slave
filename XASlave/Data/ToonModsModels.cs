@@ -280,6 +280,13 @@ public sealed class XAModBetterInventoryMoverSettings
 }
 
 [Serializable]
+public sealed class XAModHotbarOutputSettings
+{
+    public bool DetailedLoggingEnabled { get; set; } = false;
+    public bool ChatMessagesEnabled { get; set; } = false;
+}
+
+[Serializable]
 public sealed class XAModInventorySearchSettings
 {
     public bool ShowTradable { get; set; } = true;

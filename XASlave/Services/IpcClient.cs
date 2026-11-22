@@ -54,6 +54,7 @@ public sealed class IpcClient
     private readonly ICallGateSubscriber<string> xaGetVersionSubscriber;
     private readonly ICallGateSubscriber<string> xaGetCharacterNameSubscriber;
     private readonly ICallGateSubscriber<int> xaGetGilSubscriber;
+    private readonly ICallGateSubscriber<ulong, string> xaTradeInventorySubscriber;
     private readonly ICallGateSubscriber<long> xaGetRetainerGilSubscriber;
     private readonly ICallGateSubscriber<string> xaGetFcInfoSubscriber;
     private readonly ICallGateSubscriber<string> xaGetPlotInfoSubscriber;
@@ -185,6 +186,7 @@ public sealed class IpcClient
         xaGetVersionSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetVersion");
         xaGetCharacterNameSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetCharacterName");
         xaGetGilSubscriber = pluginInterface.GetIpcSubscriber<int>("XA.Database.GetGil");
+        xaTradeInventorySubscriber = pluginInterface.GetIpcSubscriber<ulong, string>("XA.Database.GetTradeInventorySnapshotJson");
         xaGetRetainerGilSubscriber = pluginInterface.GetIpcSubscriber<long>("XA.Database.GetRetainerGil");
         xaGetFcInfoSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetFcInfo");
         xaGetPlotInfoSubscriber = pluginInterface.GetIpcSubscriber<string>("XA.Database.GetPlotInfo");
@@ -584,6 +586,12 @@ public sealed class IpcClient
     public string GetAccountCharacterListJson()
     {
         try { return xaGetAccountCharacterListJsonSubscriber.InvokeFunc(); }
+        catch { return string.Empty; }
+    }
+
+    public string GetTradeInventorySnapshotJson(ulong contentId)
+    {
+        try { return xaTradeInventorySubscriber.InvokeFunc(contentId) ?? string.Empty; }
         catch { return string.Empty; }
     }
 

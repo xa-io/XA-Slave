@@ -23,6 +23,19 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.69 - 2026-11-21",
+            Lines =
+            [
+                "- Added Hotbar Maintainer Output Options: Toggle detailed /xllog diagnostics and system chat messages independently; both default off.",
+                "- Updated Xagman Trade Timeouts: Monitor inventory, armoury, crystals and gil. After a configurable grace period, defaulting to 10 minutes, five unchanged 30-second scans trigger timeout.",
+                "- Fixed Xagman Queue Waiting: Pause active trade timing while Tony serves another owner and extend queue waits when trades progress.",
+                "- Fixed Xagman Timeout Cleanup: Reconcile late deliveries before failing a stalled transfer, preserving unfinished work.",
+                "- Updated Xagman ONH: Increased the transfer timeout to one hour.",
+                "- Updated Xagman Requirements: Update XA Slave and XA Database on every participating connected client.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.68 - 2026-11-15",
             Lines =
             [

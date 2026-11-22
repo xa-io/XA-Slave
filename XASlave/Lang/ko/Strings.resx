@@ -30418,4 +30418,63 @@ xafunc의 DoNavFlySequenceXA 논리와 같습니다(Player.CanFly 확인).</valu
     <value>단축바 관리</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>/xllog 상세 진단 표시</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>시스템 채팅 메시지 표시</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>두 옵션은 기본적으로 꺼져 있습니다. 상세 로그는 단축바 요청, HUD 상태 스냅샷 및 확인 결과를 기록합니다. 시스템 채팅 메시지는 단축바 요청, 결과 및 복구를 알립니다.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>오류는 계속 /xllog에 기록됩니다. 채팅 메시지가 꺼져 있어도 명시적인 상태 조회와 잘못된 명령에 대한 응답은 표시됩니다.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>대체 처리가 수락되면 명령을 반복하지 않고 오류를 처리합니다. 시스템 채팅 메시지가 켜져 있으면 HUD 확인 후 표시 또는 숨김 결과를 알립니다. 기술과 단축키 설정은 변경되지 않습니다.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>먼저 이 모드를 활성화하세요. 상태를 생략하거나 toggle을 사용하면 전환하고, on은 표시, off는 숨김입니다.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>PvE와 PvP에서 표시하거나 숨긴 단축바를 각각 기억하고, 모드를 전환하면 복원합니다.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1은 단축바 1의 표시를 전환합니다. on 또는 off를 추가하면 표시하거나 숨길 수 있습니다. 이 모드가 활성화된 동안 단축바 1-10에 사용할 수 있습니다.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>모드를 비활성화하거나 로그아웃하거나 HUD 배치 또는 조작 모드를 변경하면 기억한 설정이 초기화됩니다.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>두 출력 옵션은 기본적으로 꺼져 있습니다. 오류는 계속 /xllog에 기록되며, 상태 조회와 실패한 명령에 대한 응답은 채팅에 표시됩니다.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>일괄 거래 제한 시간(분)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>거래 진행 확인 시작 시간(분)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>실제 거래 시간이 이 값에 도달한 후, 30초 간격 확인에서 5회 연속 변화가 없으면 거래를 중지합니다.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>거래 제한 시간은 1시간입니다</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>거래 모니터링이 중지되었습니다. XA Database와 거래 상대를 확인한 후 남은 작업을 재개하세요.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

@@ -30418,4 +30418,63 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
     <value>Quản lý thanh kỹ năng</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>Hiển thị chẩn đoán chi tiết trong /xllog</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Hiển thị thông báo hệ thống trong chat</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>Cả hai tùy chọn đều tắt theo mặc định. Nhật ký chi tiết ghi lại yêu cầu thanh kỹ năng, ảnh chụp trạng thái HUD và xác nhận. Thông báo hệ thống trong chat báo cáo yêu cầu, kết quả và việc khôi phục thanh kỹ năng.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Lỗi vẫn được ghi trong /xllog. Phản hồi cho yêu cầu xem trạng thái trực tiếp và lệnh không hợp lệ vẫn hiển thị khi tắt thông báo chat.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>Cơ chế dự phòng được chấp nhận sẽ xử lý lỗi mà không lặp lại lệnh. Khi bật thông báo hệ thống trong chat, kết quả hiện hoặc ẩn sẽ được báo sau khi HUD xác nhận. Kỹ năng và phím tắt không thay đổi.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Hãy bật mod này trước. Bỏ qua trạng thái hoặc dùng toggle để chuyển; on để hiện, off để ẩn.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>Ghi nhớ riêng các thanh bạn hiện hoặc ẩn trong PvE và PvP, rồi khôi phục khi bạn chuyển chế độ.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 chuyển trạng thái hiển thị của thanh 1. Thêm on hoặc off để hiện hoặc ẩn. Dùng được với các thanh 1-10 khi mod này được bật.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Các lựa chọn được đặt lại khi bạn tắt mod, đăng xuất hoặc đổi bố cục HUD hay chế độ điều khiển.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>Cả hai tùy chọn đầu ra đều tắt theo mặc định. Lỗi vẫn được ghi trong /xllog; phản hồi cho yêu cầu xem trạng thái và lệnh thất bại vẫn xuất hiện trong chat.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Thời gian chờ cho một loạt giao dịch (phút)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Kiểm tra tiến độ giao dịch sau (phút)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>Sau khoảng thời gian giao dịch thực tế này, năm lần kiểm tra liên tiếp cách nhau 30 giây không có thay đổi sẽ dừng giao dịch.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>Thời gian chờ giao dịch là 1 giờ</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>Đã dừng theo dõi giao dịch. Hãy kiểm tra XA Database và đối tác giao dịch, rồi tiếp tục phần việc còn lại.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

@@ -30418,4 +30418,63 @@ NamePlate готов + PlayerAvailable + не применяет действи�
     <value>Управление панелями действий</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>Показывать подробную диагностику в /xllog</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Показывать системные сообщения в чате</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>Обе настройки по умолчанию выключены. Подробный журнал записывает запросы к панелям действий, снимки состояния HUD и подтверждения. Системные сообщения в чате сообщают о запросах, результатах и восстановлении панелей действий.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Ошибки по-прежнему записываются в /xllog. Ответы на явные запросы состояния и неверные команды остаются доступны при выключенных сообщениях в чате.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>Принятый резервный обработчик устраняет ошибку без повторной отправки команды. Если системные сообщения в чате включены, показ или скрытие панели сообщается после подтверждения HUD. Действия и привязки клавиш не меняются.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Сначала включите этот мод. Без состояния или с toggle видимость переключается; on показывает, off скрывает.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>Отдельно запоминает, какие панели вы показываете или скрываете в PvE и PvP, и восстанавливает их при смене режима.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 переключает видимость панели 1. Добавьте on или off, чтобы показать или скрыть её. Работает с панелями 1-10, пока этот мод включён.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Настройки сбрасываются при отключении мода, выходе из игрового сеанса, смене компоновки HUD или режима управления.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>Обе настройки вывода по умолчанию выключены. Ошибки по-прежнему записываются в /xllog; ответы на запросы состояния и неудачные команды продолжают отображаться в чате.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Лимит времени на серию обменов (минуты)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Проверять прогресс обмена через (минуты)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>После указанного времени активного обмена пять проверок без изменений с интервалом 30 секунд остановят обмен.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>Лимит времени обмена — 1 час</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>Наблюдение за обменом остановлено. Проверьте XA Database и партнёра по обмену, затем возобновите оставшуюся работу.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

@@ -16,6 +16,7 @@ internal sealed unsafe class PvpHotbarDiagnostics
     private readonly object sync = new();
     private readonly Trace?[] traces = new Trace?[10];
     private long nextTraceId;
+    private volatile bool enabled;
     private bool drawListening;
     private bool faultReported;
 
@@ -32,8 +33,27 @@ internal sealed unsafe class PvpHotbarDiagnostics
         internal bool NativeStateChangedAfterConfirmation;
     }
 
+    internal void SetEnabled(bool value)
+    {
+        lock (sync)
+        {
+            if (enabled == value && (value || !drawListening))
+                return;
+            enabled = value;
+            if (value)
+                return;
+            // Disabling diagnostics must not leave a trailing trace or a draw listener.
+            // Retrying a failed listener removal remains safe without reading game state.
+            for (var index = 0; index < traces.Length; index++)
+                traces[index] = null;
+            StopDrawListenerIfIdle();
+        }
+    }
+
     internal void Request(int number, bool? intent, string origin)
     {
+        if (!enabled)
+            return;
         Write(number, "request", $"origin={origin}; intent={(intent.HasValue ? intent.Value ? "show" : "hide" : "toggle")}");
     }
 
@@ -41,10 +61,12 @@ internal sealed unsafe class PvpHotbarDiagnostics
     {
         try
         {
-            if (!ValidNumber(number) || !Plugin.Framework.IsInFrameworkUpdateThread)
+            if (!enabled || !ValidNumber(number) || !Plugin.Framework.IsInFrameworkUpdateThread)
                 return;
             lock (sync)
             {
+                if (!enabled)
+                    return;
                 var index = number - 1;
                 if (traces[index] != null)
                     Write(number, "trace-ended", "reason=superseded by another native request");
@@ -64,12 +86,16 @@ internal sealed unsafe class PvpHotbarDiagnostics
 
     internal void Event(int number, string phase, string detail)
     {
+        if (!enabled)
+            return;
         try
         {
             if (phase == "confirmed" && ValidNumber(number) && Plugin.Framework.IsInFrameworkUpdateThread)
             {
                 lock (sync)
                 {
+                    if (!enabled)
+                        return;
                     var trace = traces[number - 1];
                     if (trace != null)
                     {
@@ -87,10 +113,12 @@ internal sealed unsafe class PvpHotbarDiagnostics
     {
         try
         {
-            if (!Plugin.Framework.IsInFrameworkUpdateThread)
+            if (!enabled || !Plugin.Framework.IsInFrameworkUpdateThread)
                 return;
             lock (sync)
             {
+                if (!enabled)
+                    return;
                 var now = Environment.TickCount64;
                 for (var index = 0; index < traces.Length; index++)
                 {
@@ -115,10 +143,12 @@ internal sealed unsafe class PvpHotbarDiagnostics
     {
         try
         {
-            if (type != AddonEvent.PostDraw || !Plugin.Framework.IsInFrameworkUpdateThread)
+            if (!enabled || type != AddonEvent.PostDraw || !Plugin.Framework.IsInFrameworkUpdateThread)
                 return;
             lock (sync)
             {
+                if (!enabled)
+                    return;
                 var index = Array.IndexOf(Names, args.AddonName);
                 if (index < 0)
                     return;
@@ -157,6 +187,8 @@ internal sealed unsafe class PvpHotbarDiagnostics
         {
             lock (sync)
             {
+                if (!enabled)
+                    return;
                 var index = Array.IndexOf(Names, name);
                 if (index < 0 || traces[index] == null)
                     return;
@@ -172,14 +204,16 @@ internal sealed unsafe class PvpHotbarDiagnostics
     {
         try
         {
-            // This must precede ClientState, Condition, GameGui, config and native access.
-            if (!Plugin.Framework.IsInFrameworkUpdateThread)
-            {
-                Plugin.Log.Information($"[XASlave] [PvP Hotbars] bar={number}; phase={phase}; {detail}; snapshot=skipped off framework thread");
-                return;
-            }
             lock (sync)
             {
+                // Both guards precede ClientState, Condition, GameGui, config and native access.
+                if (!enabled)
+                    return;
+                if (!Plugin.Framework.IsInFrameworkUpdateThread)
+                {
+                    Plugin.Log.Information($"[XASlave] [PvP Hotbars] bar={number}; phase={phase}; {detail}; snapshot=skipped off framework thread");
+                    return;
+                }
                 var snapshot = ValidNumber(number) ? Capture(number - 1) : "snapshot=invalid bar number";
                 Plugin.Log.Information($"[XASlave] [PvP Hotbars] bar={number}; phase={phase}; {TraceSummary(number)}; {detail}; {snapshot}");
             }
@@ -189,7 +223,15 @@ internal sealed unsafe class PvpHotbarDiagnostics
 
     private void WriteWithoutSnapshot(int number, string phase, string detail)
     {
-        try { Plugin.Log.Information($"[XASlave] [PvP Hotbars] bar={number}; phase={phase}; {TraceSummary(number)}; {detail}; snapshot=not read during cancellation"); }
+        try
+        {
+            lock (sync)
+            {
+                if (!enabled)
+                    return;
+                Plugin.Log.Information($"[XASlave] [PvP Hotbars] bar={number}; phase={phase}; {TraceSummary(number)}; {detail}; snapshot=not read during cancellation");
+            }
+        }
         catch (Exception ex) { ReportFailure(phase, ex); }
     }
 
@@ -331,7 +373,7 @@ internal sealed unsafe class PvpHotbarDiagnostics
 
     private void StartDrawListener()
     {
-        if (drawListening)
+        if (!enabled || drawListening)
             return;
         try
         {

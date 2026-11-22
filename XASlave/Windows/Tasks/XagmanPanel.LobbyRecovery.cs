@@ -262,7 +262,7 @@ public partial class SlaveWindow
             }
             steps.Add(new TaskStep
             {
-                NameMessage = step.NameMessage, OnEnter = step.OnEnter, TimeoutSec = step.TimeoutSec,
+                NameMessage = step.NameMessage, OnEnter = step.OnEnter, TimeoutSec = step.TimeoutSec, HasTimedOut = step.HasTimedOut,
                 ShouldSkip = () => !needsLogout,
                 OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key("S43F43F564D05FB01")),
                 IsComplete = () =>

@@ -30418,4 +30418,63 @@ Najlepiej zrobić to przy randze 6+, aby mieć dostęp do licytowania działek.<
     <value>Zarządzanie paskami akcji</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>Pokazuj szczegółową diagnostykę w /xllog</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Pokazuj komunikaty systemowe na czacie</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>Obie opcje są domyślnie wyłączone. Szczegółowe logowanie zapisuje żądania dotyczące pasków akcji, migawki stanu HUD i potwierdzenia. Komunikaty systemowe na czacie informują o żądaniach, wynikach i przywracaniu pasków akcji.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Błędy nadal są zapisywane w /xllog. Odpowiedzi na bezpośrednie zapytania o stan i nieprawidłowe polecenia pozostają dostępne po wyłączeniu komunikatów na czacie.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>Zaakceptowana obsługa awaryjna przetwarza błąd bez powtarzania polecenia. Gdy komunikaty systemowe na czacie są włączone, pokazanie lub ukrycie jest zgłaszane po potwierdzeniu przez HUD. Akcje i przypisania klawiszy pozostają bez zmian.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Najpierw włącz ten mod. Pomiń stan lub użyj toggle, aby przełączyć; on pokazuje, off ukrywa.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>Osobno zapamiętuje paski pokazywane i ukrywane w PvE oraz PvP i przywraca je po zmianie trybu.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 przełącza widoczność paska 1. Dodaj on lub off, aby go pokazać lub ukryć. Działa z paskami 1-10, gdy ten mod jest włączony.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Ustawienia są resetowane po wyłączeniu moda, wylogowaniu lub zmianie układu HUD albo trybu sterowania.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>Obie opcje wyjścia są domyślnie wyłączone. Błędy nadal są zapisywane w /xllog; odpowiedzi na zapytania o stan i nieudane polecenia wciąż pojawiają się na czacie.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Limit czasu serii wymian (minuty)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Sprawdzaj postęp wymiany po (minuty)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>Po tym czasie aktywnej wymiany pięć kontroli bez zmian w odstępach 30 sekund zatrzyma wymianę.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>Limit czasu wymiany wynosi 1 godzinę</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>Monitorowanie wymiany zatrzymano. Sprawdź XA Database i partnera wymiany, a następnie wznów pozostałą pracę.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

@@ -30418,4 +30418,63 @@ Am besten erfolgt dies ab FG-Rang 6, damit Grundstücksgebote verfügbar sind.</
     <value>Aktionsleisten-Verwaltung</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>Ausführliche Diagnose in /xllog anzeigen</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Systemnachrichten im Chat anzeigen</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>Beide Optionen sind standardmäßig ausgeschaltet. Die ausführliche Protokollierung erfasst Aktionsleisten-Anfragen, HUD-Momentaufnahmen und Bestätigungen. Systemnachrichten im Chat melden Aktionsleisten-Anfragen, Ergebnisse und Wiederherstellungen.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Fehler werden weiterhin in /xllog protokolliert. Antworten auf ausdrückliche Statusabfragen und ungültige Befehle bleiben auch bei ausgeschalteten Chatnachrichten verfügbar.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>Die akzeptierte Ersatzverarbeitung behandelt den Fehler, ohne den Befehl zu wiederholen. Bei eingeschalteten Systemnachrichten im Chat wird nach der HUD-Bestätigung gemeldet, ob die Leiste angezeigt oder ausgeblendet ist. Aktionen und Tastenbelegungen bleiben unverändert.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Aktiviere zuerst diesen Mod. Ohne Zustand oder mit toggle wird umgeschaltet; on zeigt an, off blendet aus.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>Merkt sich getrennt für PvE und PvP, welche Leisten du ein- oder ausblendest, und stellt diese Auswahl beim Wechsel wieder her.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 schaltet Leiste 1 um. Füge on oder off hinzu, um sie ein- oder auszublenden. Funktioniert für Leisten 1-10, solange dieser Mod aktiviert ist.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Die Auswahl wird zurückgesetzt, wenn du den Mod deaktivierst, dich ausloggst oder das HUD-Layout oder den Steuerungsmodus änderst.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>Beide Ausgabeoptionen sind standardmäßig aus. Fehler werden weiterhin in /xllog protokolliert; Antworten auf Statusabfragen und fehlgeschlagene Befehle erscheinen weiterhin im Chat.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Zeitlimit für eine Handelsserie (Minuten)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Fortschrittsprüfung beim Handel nach (Minuten)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>Nach dieser aktiven Handelszeit wird der Handel nach fünf unveränderten Prüfungen im Abstand von 30 Sekunden gestoppt.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>Das Zeitlimit für den Handel beträgt 1 Stunde</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>Die Handelsüberwachung wurde angehalten. Prüfe XA Database und den Handelspartner und setze dann die verbleibende Arbeit fort.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

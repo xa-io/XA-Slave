@@ -30418,4 +30418,63 @@ NamePlate就绪 + PlayerAvailable + 未在咏唱 + 未在战斗。</value>
     <value>热键栏管理</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>在 /xllog 中显示详细诊断</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>显示系统聊天消息</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>这两个选项默认关闭。详细日志记录热键栏操作请求、HUD 状态快照和确认结果。系统聊天消息报告热键栏操作请求、结果和恢复情况。</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>错误仍会记录在 /xllog 中。关闭聊天消息后，主动查询状态和无效命令的回复仍会显示。</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>备用处理被接受后，会处理错误而不重复发送命令。启用系统聊天消息时，会在 HUD 确认后报告显示或隐藏结果。技能和按键绑定保持不变。</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>请先启用此模组。省略状态或使用toggle可切换；on显示，off隐藏。</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>分别记住 PvE 和 PvP 中显示或隐藏的热键栏，并在切换时恢复。</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 切换热键栏 1 的显示状态。添加 on 或 off 可显示或隐藏它。启用此模组时，适用于热键栏 1-10。</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>禁用模组、登出或更改 HUD 布局或操作模式时，记忆的设置会重置。</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>两个输出选项默认关闭。错误仍会记录在 /xllog 中；状态查询和失败命令的回复仍会显示在聊天中。</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>批量交易超时（分钟）</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>开始检查交易进度的时间（分钟）</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>实际交易达到此时长后，每30秒检查一次，连续五次无变化则停止交易。</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>交易超时时间为1小时</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>交易监控已停止。请检查XA Database和交易对象，然后继续剩余任务。</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

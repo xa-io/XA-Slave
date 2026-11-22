@@ -1283,6 +1283,8 @@ public sealed class XagmanPeerService : IDisposable
             TotalCharacters = record.TotalCharacters,
             CompletedCharacters = record.CompletedCharacters,
             QueueNumber = record.QueueNumber,
+            TradeProgress = record.TradeProgress?.Copy(),
+            TradeSettlement = record.TradeSettlement?.Copy(),
             ActiveTradePartner = record.ActiveTradePartner,
             ActiveTradePartnerInstanceId = record.ActiveTradePartnerInstanceId,
             TonyRotationReady = record.TonyRotationReady,

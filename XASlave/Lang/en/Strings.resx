@@ -30418,4 +30418,63 @@ It's best to do this when you're rank 6+ so you have access to plot bidding.</va
     <value>Hotbar Maintainer</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>Show detailed /xllog diagnostics</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Show system chat messages</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>Both options are off by default. Detailed logging records hotbar requests, HUD snapshots and confirmations. System chat messages report hotbar requests, results and recovery.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Errors remain in /xllog. Explicit status and invalid-command replies remain available when chat messages are off.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>Accepted fallback handles the error without repeating the command. When system chat messages are enabled, shown/hidden is reported after HUD confirmation. Actions and keybinds stay unchanged.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Enable this mod first. Omit the state or use toggle to switch; on shows; off hides.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>Remembers which bars you show or hide separately in PvE and PvP, restoring them when you switch.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 toggles bar 1. Add on or off to show or hide it. Works with bars 1-10 while this mod is enabled.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Choices reset when you disable the mod, log out, or change HUD layout or control mode.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>Both output options default off. Errors remain in /xllog; status and failed-command replies still appear in chat.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Trade batch timeout (minutes)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Trade progress checks after (minutes)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>After this much active trading time, five unchanged scans at 30-second intervals stop the trade.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>Trade timeout is 1 hour</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>Trade monitoring stopped. Check XA Database and the trading partner, then resume the remaining work.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

@@ -30418,4 +30418,63 @@ e aciona o salvamento no XA Database após cada etapa de moradia.</value>
     <value>Gerenciador de barras de ações</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>Mostrar diagnóstico detalhado em /xllog</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Mostrar mensagens do sistema no chat</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>As duas opções ficam desativadas por padrão. O registro detalhado inclui solicitações das barras de ações, capturas do estado do HUD e confirmações. As mensagens do sistema no chat informam solicitações, resultados e recuperações das barras de ações.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Os erros continuam sendo registrados em /xllog. As respostas a consultas explícitas de status e a comandos inválidos continuam disponíveis quando as mensagens do chat estão desativadas.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>O tratamento alternativo aceito lida com o erro sem repetir o comando. Quando as mensagens do sistema no chat estão ativadas, a exibição ou ocultação é informada após a confirmação do HUD. Ações e atalhos de teclado permanecem inalterados.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Ative este mod primeiro. Omita o estado ou use toggle para alternar; on mostra e off oculta.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>Lembra separadamente quais barras você mostra ou oculta em PvE e PvP, restaurando-as ao trocar de modo.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 alterna a barra 1. Adicione on ou off para mostrá-la ou ocultá-la. Funciona com as barras 1-10 enquanto este mod estiver ativado.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>As preferências são redefinidas ao desativar o mod, encerrar a sessão ou mudar o layout do HUD ou o modo de controle.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>As duas opções de saída ficam desativadas por padrão. Os erros continuam registrados em /xllog; as respostas a consultas de status e comandos que falharam continuam aparecendo no chat.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Tempo limite do lote de trocas (minutos)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Verificar o progresso das trocas após (minutos)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>Após este tempo de troca ativa, cinco verificações sem alterações em intervalos de 30 segundos interrompem a troca.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>O tempo limite da troca é de 1 hora</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>O monitoramento da troca foi interrompido. Verifique o XA Database e o parceiro de troca, depois retome o trabalho restante.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

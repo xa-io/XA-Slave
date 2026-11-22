@@ -160,6 +160,8 @@ public partial class SlaveWindow
     private const double XagmanCollectionBarrierWarningSeconds = 30.0;
     private const double XagmanMissingCohortPeerFailSeconds = 60.0;
     private const int XagmanRelogMaxAttempts = 3;
+    private float XagmanTradeBatchTimeoutSeconds => plugin.Configuration.XagmanOutsideNetworkHelper
+        ? 3600f : Math.Max(1, plugin.Configuration.XagmanTradeBatchTimeoutMinutes) * 60f;
     private const float XagmanRelogTimeoutSeconds = 600f;
     private const double XagmanCompletionAckTimeoutSeconds = 30.0;
     private const double XagmanCompletionRebroadcastSeconds = 2.0;
@@ -769,6 +771,20 @@ public partial class SlaveWindow
             if (xagmanShowPeers)
                 DrawXagmanPeersTable();
             ImGui.Spacing();
+        }
+        if (onh)
+            ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Native("S2D372F35649D2B12"));
+        else
+        {
+            var batchTimeoutMinutes = Math.Max(1, cfg.XagmanTradeBatchTimeoutMinutes);
+            ImGui.SetNextItemWidth(Scale(140f));
+            if (global::XASlave.Localization.UiNative.InputInt(global::XASlave.Localization.UiLocale.Native("S945B7BAA483BE399") + "##xagmanTradeBatchTimeout", ref batchTimeoutMinutes))
+            {
+                cfg.XagmanTradeBatchTimeoutMinutes = Math.Max(1, batchTimeoutMinutes);
+                cfg.Save();
+            }
+            if (ImGui.IsItemHovered())
+                ImGui.SetTooltip(global::XASlave.Localization.UiLocale.Native("SCA43BB6F4331E12E"));
         }
         var logoutOnComplete = cfg.XagmanLogoutOnComplete;
         var killGameOnComplete = cfg.XagmanKillGameOnComplete;
@@ -6097,6 +6113,7 @@ public partial class SlaveWindow
             if (xagmanRunning && (xagmanMiniSnapshot.Running || !xagmanMiniSnapshot.HasRun))
                 UpdateXagmanMiniSnapshot(true);
             ResetXagmanRelogDatabasePull();
+            xagmanTradeWait = null;
             xagmanArMultiGuardActive = false;
             EndXagmanLobbyOperation();
             ClearXagmanExpectedTravelLogoutWindow();
@@ -6111,6 +6128,8 @@ public partial class SlaveWindow
         }
 
         xagmanRunning = value;
+        if (value)
+            xagmanSettledTradeProgress = null;
         UpdateXagmanTeleportHelperRequirement();
         InvalidateXagmanTradeCapacityForecast();
         plugin.TargetCommandFix.SetRequiredByXagman(value);
@@ -7405,6 +7424,7 @@ public partial class SlaveWindow
                         || HasXagmanActiveTonyTradeLock(charName)
                         || TryEnterStandby(),
                     TimeoutSec = 60f,
+                    HasTimedOut = CreateXagmanQueueTimeout(60f),
                     OnTimeout = () =>
                     {
                         if (shouldSkip() || standbyRequested)
@@ -7473,6 +7493,7 @@ public partial class SlaveWindow
             var ownerDrainCleanupSinceUtc = DateTime.MinValue;
             bool PollOwnerTradeWait()
             {
+                if (TryPollXagmanTradeTimeoutSettlement(out var settledComplete)) return settledComplete;
                 if (IsXagmanOwnerSupplyDraining())
                 {
                     BuildXagmanPendingGiveItems(charName);
@@ -7537,7 +7558,10 @@ public partial class SlaveWindow
                 }
 
                 if (HasXagmanOwnerCollectionTradeCompleted(cfg.XagmanItems, charName))
+                {
+                    MarkXagmanTradeProgressComplete();
                     return true;
+                }
                 if (!HasXagmanActiveTonyTradeLock(charName))
                 {
                     AdvertiseOwnerTradeLockWait("the next give pass");
@@ -7548,6 +7572,7 @@ public partial class SlaveWindow
 
             bool PollOwnerRequestedTradeWait()
             {
+                if (TryPollXagmanTradeTimeoutSettlement(out var settledComplete)) return settledComplete;
                 var capacitySenderActive = IsXagmanTradeCapacitySenderActive();
                 var failureKind = GetXagmanTradeFailureKind(out var matchedText);
                 if (failureKind != XagmanTradeFailureKind.None
@@ -7609,6 +7634,7 @@ public partial class SlaveWindow
                         return true;
                     if (remainingRequestsWithoutTradeLock.Count == 0)
                     {
+                        MarkXagmanTradeProgressComplete();
                         SetXagmanOwnerRequestedItems(
                             Array.Empty<XagmanTradeRequestEntry>(),
                             false,
@@ -7627,6 +7653,7 @@ public partial class SlaveWindow
                     return true;
                 if (remainingRequests.Count == 0)
                 {
+                    MarkXagmanTradeProgressComplete();
                     SetXagmanOwnerRequestedItems(
                         Array.Empty<XagmanTradeRequestEntry>(),
                         false,
@@ -7929,7 +7956,8 @@ public partial class SlaveWindow
                     ShouldSkip = () => relogFailed || standbyRequested || !ownerCollectionRetryRequested || repeatedCollectionQueuedEntries <= 0,
                     OnEnter = () => xagmanObservedDropboxBusy = plugin.IpcClient.DropboxIsBusy(),
                     IsComplete = () => relogFailed || standbyRequested || !ownerCollectionRetryRequested || repeatedCollectionQueuedEntries <= 0 || PollOwnerTradeWait() || TryEnterStandby(),
-                    TimeoutSec = 600f,
+                    TimeoutSec = XagmanTradeBatchTimeoutSeconds,
+                    HasTimedOut = CreateXagmanTradeTimeout(outgoing: true),
                     OnTimeout = () =>
                     {
                         if (standbyRequested)
@@ -8277,6 +8305,7 @@ public partial class SlaveWindow
                 // Large fleets: keep owners staged at the meet spot for up to 30 minutes while the Tony
                 // works through the queue before treating it as a failure.
                 TimeoutSec = 1800f,
+                HasTimedOut = CreateXagmanQueueTimeout(1800f),
                 OnTimeout = () =>
                 {
                     relogFailed = true;
@@ -8310,6 +8339,7 @@ public partial class SlaveWindow
                     return IsXagmanOwnerCalled(charName);
                 },
                 TimeoutSec = 3600f,
+                HasTimedOut = CreateXagmanQueueTimeout(3600f),
                 OnTimeout = () =>
                 {
                     relogFailed = true;
@@ -8514,7 +8544,8 @@ public partial class SlaveWindow
                 ShouldSkip = () => relogFailed || standbyRequested || ownerCollectionQueuedEntries <= 0,
                 OnEnter = () => xagmanObservedDropboxBusy = plugin.IpcClient.DropboxIsBusy(),
                 IsComplete = () => relogFailed || standbyRequested || ownerCollectionQueuedEntries <= 0 || PollOwnerTradeWait() || TryEnterStandby(),
-                TimeoutSec = 600f,
+                TimeoutSec = XagmanTradeBatchTimeoutSeconds,
+                HasTimedOut = CreateXagmanTradeTimeout(outgoing: true),
                 OnTimeout = () =>
                 {
                     if (standbyRequested)
@@ -8702,7 +8733,8 @@ public partial class SlaveWindow
                 ShouldSkip = () => relogFailed || standbyRequested || ownerPartial || xagmanOwnerRequestedItems.Count == 0,
                 OnEnter = () => xagmanObservedDropboxBusy = false,
                 IsComplete = () => relogFailed || standbyRequested || ownerPartial || xagmanOwnerRequestedItems.Count == 0 || PollOwnerRequestedTradeWait() || TryEnterStandby(),
-                TimeoutSec = 600f,
+                TimeoutSec = XagmanTradeBatchTimeoutSeconds,
+                HasTimedOut = CreateXagmanTradeTimeout(outgoing: false),
                 OnTimeout = () =>
                 {
                     if (standbyRequested)
@@ -9614,6 +9646,7 @@ public partial class SlaveWindow
                     OnEnter = recoveryStep.OnEnter,
                     IsComplete = recoveryStep.IsComplete,
                     TimeoutSec = recoveryStep.TimeoutSec,
+                    HasTimedOut = recoveryStep.HasTimedOut,
                     OnTimeout = () => StopRecovery(global::XASlave.Localization.UiMessage.Format("S47A37737E7B7373D", recoveryStep.Name)),
                 });
             }
@@ -10382,6 +10415,7 @@ public partial class SlaveWindow
                     OnEnter = safeWait.OnEnter,
                     IsComplete = () => ShouldSkipAttempt() || originalComplete(),
                     TimeoutSec = safeWait.TimeoutSec,
+                    HasTimedOut = safeWait.HasTimedOut,
                     MaxRetries = safeWait.MaxRetries,
                     OnTimeout = () =>
                     {
@@ -10794,6 +10828,7 @@ public partial class SlaveWindow
                 OnEnter = safeWait.OnEnter,
                 IsComplete = () => ShouldStopTeleport() || originalComplete(),
                 TimeoutSec = safeWait.TimeoutSec,
+                HasTimedOut = safeWait.HasTimedOut,
                 MaxRetries = safeWait.MaxRetries,
                 OnTimeout = () =>
                 {
@@ -11894,6 +11929,7 @@ public partial class SlaveWindow
             plugin.TaskRunner.AddLog($"Xagman: Tony will supply {supplyRequests.Count} requested item entr{(supplyRequests.Count == 1 ? "y" : "ies")} to {partnerName}.");
         bool PollTonyTradeWait()
         {
+            if (TryPollXagmanTradeTimeoutSettlement(out var settledComplete)) return settledComplete;
             var batchProgress = PollXagmanCapacityTrade(out var batchFailure);
             if (batchProgress == XagmanBatchProgress.Pending) return false;
             if (batchProgress is XagmanBatchProgress.Failed or XagmanBatchProgress.CapacityBlocked)
@@ -12129,7 +12165,8 @@ public partial class SlaveWindow
                 ShouldSkip = ShouldSkipTonyTradeFlow,
                 OnEnter = () => xagmanObservedDropboxBusy = false,
                 IsComplete = PollTonyTradeWait,
-                TimeoutSec = 600f,
+                TimeoutSec = XagmanTradeBatchTimeoutSeconds,
+                HasTimedOut = CreateXagmanTradeTimeout(outgoing: usingSupplyRequests),
                 OnTimeout = () => AbortTonyTrade(global::XASlave.Localization.UiMessage.Format("SA02094CC76E4EFB9", partnerName), true),
             },
             new()
@@ -13329,6 +13366,8 @@ public partial class SlaveWindow
                 TotalCharacters = totalCharacters,
                 CompletedCharacters = completedCharacters,
                 QueueNumber = queueNumber,
+                TradeProgress = awaitingBusyAdmission ? null : GetXagmanTradeProgressPresence(),
+                TradeSettlement = awaitingBusyAdmission ? null : GetXagmanTradeSettlementReceipt(),
                 ActiveTradePartner = awaitingBusyAdmission ? string.Empty : xagmanActiveTradePartner,
                 ActiveTradePartnerInstanceId = awaitingBusyAdmission ? string.Empty : xagmanActiveTradePartnerInstanceId,
                 TonyRotationReady = tonyRotationReady,
@@ -16270,6 +16309,7 @@ public partial class SlaveWindow
                 OnEnter = safeWait.OnEnter,
                 IsComplete = () => ShouldSkipSellStep() || originalComplete(),
                 TimeoutSec = safeWait.TimeoutSec,
+                HasTimedOut = safeWait.HasTimedOut,
                 MaxRetries = safeWait.MaxRetries,
                 OnTimeout = () => MarkSellFailed($"Xagman: CharacterSafeWait timed out after item selling for Tony {activeTony}."),
             });

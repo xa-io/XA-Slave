@@ -201,6 +201,24 @@ public sealed class XagmanTradeCapacityForecastItem
     public int UnknownOwnerCount { get; set; }
 }
 
+public sealed class XagmanTradeProgressPresence
+{
+    public string Session { get; set; } = string.Empty;
+    public string PartnerSession { get; set; } = string.Empty;
+    public bool Outgoing { get; set; }
+    public string Scope { get; set; } = string.Empty;
+    public string Character { get; set; } = string.Empty;
+    public string PartnerInstanceId { get; set; } = string.Empty;
+    public long ProgressSequence { get; set; }
+    public long ScanSequence { get; set; }
+    public bool Completed { get; set; }
+    public bool Settling { get; set; }
+    public bool Settled { get; set; }
+    public DateTime ObservedAtUtc { get; set; }
+    public double ScanAgeSeconds { get; set; } = double.MaxValue;
+    public XagmanTradeProgressPresence Copy() => (XagmanTradeProgressPresence)MemberwiseClone();
+}
+
 public sealed class XagmanPeerPresence
 {
     public string InstanceId { get; set; } = string.Empty;
@@ -279,6 +297,8 @@ public sealed class XagmanPeerPresence
     public int TotalCharacters { get; set; }
     public int CompletedCharacters { get; set; }
     public int QueueNumber { get; set; }
+    public XagmanTradeProgressPresence? TradeProgress { get; set; }
+    public XagmanTradeProgressPresence? TradeSettlement { get; set; }
     public string ActiveTradePartner { get; set; } = string.Empty;
     public string ActiveTradePartnerInstanceId { get; set; } = string.Empty;
     public bool TonyRotationReady { get; set; }

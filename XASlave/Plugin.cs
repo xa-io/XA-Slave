@@ -401,7 +401,7 @@ public sealed class Plugin : IDalamudPlugin
         BetterHighlightPotentialTargets = new BetterHighlightPotentialTargetsService(Framework, ObjectTable, TargetManager, ClientState, Log);
         SystemWindowMods = new SystemWindowModsService(SigScanner, GameInterop, Log, Framework, GameConfig, ClientState, () => IpcClient.AutoRetainerGetMultiModeEnabled());
         ReplaceUnownedMountHotbars = new ReplaceUnownedMountHotbarsService(GameInterop, Log);
-        PvpHotbars = new PvpHotbarsService();
+        PvpHotbars = new PvpHotbarsService(Configuration);
         LobbyErrorAutoClose = new LobbyErrorAutoCloseService(AddonLifecycle, Framework, ClientState, Log);
         QueuePositionDisplay = new QueuePositionDisplayService(Framework, SigScanner, GameInterop, Log);
         MsqProgressDisplay = new MsqProgressDisplayService(AddonLifecycle, DataManager, Log);
@@ -2452,7 +2452,7 @@ public sealed class Plugin : IDalamudPlugin
             || subcommand.Equals("pvpbotbar", StringComparison.OrdinalIgnoreCase)
             || subcommand.Equals("pvphotbar", StringComparison.OrdinalIgnoreCase))
         {
-            PrintCommandResult(TryExecuteHotbarCommand(subcommandArgs, out var hotbarMessage), hotbarMessage);
+            PrintHotbarCommandResult(TryExecuteHotbarCommand(subcommandArgs, out var hotbarMessage), subcommandArgs, hotbarMessage);
             return;
         }
 
@@ -2812,6 +2812,15 @@ public sealed class Plugin : IDalamudPlugin
             || value.Equals("off", StringComparison.OrdinalIgnoreCase))
             return SetXAModEnabled(GetXAModDefinition("pvp-hotbars"), value.Equals("on", StringComparison.OrdinalIgnoreCase), out message);
         return PvpHotbars.TryExecuteDisplayCommand(value, out message);
+    }
+
+    private void PrintHotbarCommandResult(bool success, string arguments, string message)
+    {
+        if (!success)
+            Log.Warning($"[XASlave] {message}");
+        // Explicit status/help and failed-command replies remain useful with routine chat off.
+        if (Configuration.PvpHotbarsChatMessagesEnabled || !success || string.IsNullOrWhiteSpace(arguments))
+            PrintCommandResult(success, message);
     }
 
     private static string NormalizeXaCommandInput(string rawCommand)
@@ -3519,6 +3528,13 @@ public sealed class Plugin : IDalamudPlugin
                     QuickMoveModifier = BetterInventoryMoverService.NormalizeModifier(Configuration.BetterInventoryMoverQuickMoveModifier).ToString(),
                 }, ToonModsPresetSerialization.JsonOptions);
                 return true;
+            case "pvp-hotbars":
+                snapshot = JsonSerializer.SerializeToElement(new XAModHotbarOutputSettings
+                {
+                    DetailedLoggingEnabled = Configuration.PvpHotbarsDetailedLoggingEnabled,
+                    ChatMessagesEnabled = Configuration.PvpHotbarsChatMessagesEnabled,
+                }, ToonModsPresetSerialization.JsonOptions);
+                return true;
             case "inventory-search-bar":
                 snapshot = JsonSerializer.SerializeToElement(new XAModInventorySearchSettings
                 {
@@ -4037,6 +4053,14 @@ public sealed class Plugin : IDalamudPlugin
         {
             Configuration.BetterInventoryMoverQuickMoveModifier = ParseBetterInventoryMoverModifier(inventoryMoverSettings.QuickMoveModifier);
             ApplyBetterInventoryMoverConfiguration(save: false);
+        }
+
+        if (TryDeserializeXAModSettings(modSettings, "pvp-hotbars", out XAModHotbarOutputSettings? hotbarOutputSettings)
+            && hotbarOutputSettings != null)
+        {
+            Configuration.PvpHotbarsDetailedLoggingEnabled = hotbarOutputSettings.DetailedLoggingEnabled;
+            Configuration.PvpHotbarsChatMessagesEnabled = hotbarOutputSettings.ChatMessagesEnabled;
+            PvpHotbars.ApplyConfiguration();
         }
 
         if (TryDeserializeXAModSettings(modSettings, "inventory-search-bar", out XAModInventorySearchSettings? inventorySearchSettings)
@@ -5981,7 +6005,11 @@ public sealed class Plugin : IDalamudPlugin
             return true;
         }
 
-        PrintCommandResult(SetXAModEnabled(commandDefinition.Definition, enabled, out message), message);
+        var success = SetXAModEnabled(commandDefinition.Definition, enabled, out message);
+        if (commandDefinition.Definition.Key == "pvp-hotbars")
+            PrintHotbarCommandResult(success, value, message);
+        else
+            PrintCommandResult(success, message);
         return true;
     }
 
@@ -6587,5 +6615,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.68";
+    public const string Version = "0.0.0.69";
 }

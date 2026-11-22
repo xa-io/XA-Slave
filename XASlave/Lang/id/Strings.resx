@@ -30418,4 +30418,63 @@ Sebaiknya lakukan saat pangkat Anda 6+ agar memiliki akses penawaran plot.</valu
     <value>Pengelola Hotbar</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>Tampilkan diagnostik terperinci di /xllog</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Tampilkan pesan sistem di chat</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>Kedua opsi dinonaktifkan secara default. Pencatatan terperinci merekam permintaan hotbar, cuplikan status HUD, dan konfirmasi. Pesan sistem di chat melaporkan permintaan hotbar, hasil, dan pemulihan.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Kesalahan tetap dicatat di /xllog. Balasan untuk permintaan status secara eksplisit dan perintah yang tidak valid tetap tersedia saat pesan chat dinonaktifkan.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>Penanganan cadangan yang diterima menangani kesalahan tanpa mengulangi perintah. Saat pesan sistem di chat diaktifkan, hasil tampil atau sembunyi dilaporkan setelah konfirmasi HUD. Aksi dan pengikatan tombol tidak berubah.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Aktifkan mod ini terlebih dahulu. Hilangkan status atau gunakan toggle untuk beralih; on menampilkan, off menyembunyikan.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>Mengingat secara terpisah hotbar yang Anda tampilkan atau sembunyikan di PvE dan PvP, lalu memulihkannya saat Anda berganti mode.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 mengubah tampilan hotbar 1. Tambahkan on atau off untuk menampilkan atau menyembunyikannya. Berlaku untuk hotbar 1-10 selama mod ini diaktifkan.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Pilihan direset saat Anda menonaktifkan mod, logout, atau mengubah tata letak HUD atau mode kontrol.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>Kedua opsi keluaran dinonaktifkan secara default. Kesalahan tetap dicatat di /xllog; balasan untuk permintaan status dan perintah yang gagal tetap muncul di chat.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Batas waktu rangkaian pertukaran (menit)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Periksa kemajuan pertukaran setelah (menit)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>Setelah waktu pertukaran aktif ini, lima pemeriksaan tanpa perubahan dengan interval 30 detik akan menghentikan pertukaran.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>Batas waktu pertukaran adalah 1 jam</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>Pemantauan pertukaran berhenti. Periksa XA Database dan mitra pertukaran, lalu lanjutkan pekerjaan yang tersisa.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

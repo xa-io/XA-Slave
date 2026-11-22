@@ -30418,4 +30418,63 @@ e avvia i salvataggi XA Database dopo ogni passaggio abitativo.</value>
     <value>Gestione delle barre delle azioni</value>
     <comment>Source: Hotbar Maintainer command title; v0.0.0.68. The original XA Mods widget identity is preserved.</comment>
   </data>
+  <data name="SB12CCE95090FD41C" xml:space="preserve">
+    <value>Mostra diagnostica dettagliata in /xllog</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S5483D72188EF8520" xml:space="preserve">
+    <value>Mostra messaggi di sistema in chat</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S331B9AFBFA11A128" xml:space="preserve">
+    <value>Entrambe le opzioni sono disattivate per impostazione predefinita. La registrazione dettagliata include richieste relative alle barre delle azioni, istantanee dell’HUD e conferme. I messaggi di sistema in chat riportano richieste, risultati e ripristini delle barre delle azioni.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S6CAC47285F208EF3" xml:space="preserve">
+    <value>Gli errori continuano a essere registrati in /xllog. Le risposte alle richieste esplicite di stato e ai comandi non validi restano disponibili quando i messaggi in chat sono disattivati.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S7F0C982756508A35" xml:space="preserve">
+    <value>La procedura alternativa accettata gestisce l’errore senza ripetere il comando. Quando i messaggi di sistema in chat sono attivi, la visualizzazione o l’occultamento viene segnalato dopo la conferma dell’HUD. Azioni e assegnazioni dei tasti restano invariate.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S649905FB6B2A4449" xml:space="preserve">
+    <value>Abilita prima questa mod. Ometti lo stato o usa toggle per alternare; on mostra, off nasconde.</value>
+    <comment>Source: Hotbar Maintainer output options; v0.0.0.69.</comment>
+  </data>
+  <data name="S4430BDC55321746B" xml:space="preserve">
+    <value>Ricorda separatamente quali barre mostri o nascondi in PvE e PvP, ripristinandole quando cambi modalità.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S332EB9820AE32049" xml:space="preserve">
+    <value>/xa hotbar 1 alterna la barra 1. Aggiungi on oppure off per mostrarla o nasconderla. Funziona con le barre 1-10 mentre questa mod è attiva.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S2926239D4FD288E1" xml:space="preserve">
+    <value>Le preferenze vengono reimpostate quando disattivi la mod, ti disconnetti o cambi la disposizione dell’HUD o la modalità di controllo.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="SDED995F1F4CBE498" xml:space="preserve">
+    <value>Entrambe le opzioni di output sono disattivate per impostazione predefinita. Gli errori restano registrati in /xllog; le risposte alle richieste di stato e ai comandi non riusciti compaiono comunque in chat.</value>
+    <comment>Source: concise Hotbar Maintainer options help; v0.0.0.69.</comment>
+  </data>
+  <data name="S812246DA4436C1A2" xml:space="preserve">
+    <value>Tempo massimo per una serie di scambi (minuti)</value>
+  </data>
+  <data name="S945B7BAA483BE399" xml:space="preserve">
+    <value>Controlla l’avanzamento degli scambi dopo (minuti)</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SCA43BB6F4331E12E" xml:space="preserve">
+    <value>Dopo questo tempo di scambio attivo, cinque controlli senza variazioni a intervalli di 30 secondi interrompono lo scambio.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="S2D372F35649D2B12" xml:space="preserve">
+    <value>Il tempo massimo per lo scambio è di 1 ora</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
+  <data name="SA070B7E639BBBEA1" xml:space="preserve">
+    <value>Monitoraggio degli scambi interrotto. Controlla XA Database e il partner di scambio, quindi riprendi il lavoro rimanente.</value>
+    <comment>Source: Xagman trade progress monitoring.</comment>
+  </data>
 </root>

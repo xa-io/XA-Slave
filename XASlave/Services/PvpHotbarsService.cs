@@ -20,6 +20,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
     private static readonly Regex BlockedDisplay = new(BlockedDisplayPattern, RegexOptions.Compiled | RegexOptions.IgnoreCase | RegexOptions.CultureInvariant, TimeSpan.FromMilliseconds(10));
     private static readonly string[] Names = ["_ActionBar", "_ActionBar01", "_ActionBar02", "_ActionBar03", "_ActionBar04", "_ActionBar05", "_ActionBar06", "_ActionBar07", "_ActionBar08", "_ActionBar09"];
     private readonly PvpHotbarDiagnostics diagnostics = new();
+    private readonly Configuration configuration;
     private readonly nint[] owned = new nint[10];
     private readonly nint[] ownedConfigDataSet = new nint[10];
     private readonly int[] ownedHudLayout = new int[10];
@@ -51,8 +52,34 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
     internal UiMessage StatusTextMessage => UiMessage.Authored(StatusText);
     internal string LocalizedStatusText => StatusTextMessage.Display;
 
+    public PvpHotbarsService(Configuration configuration)
+    {
+        this.configuration = configuration;
+        ApplyConfiguration();
+    }
+
+    public void ApplyConfiguration()
+    {
+        if (!disposed)
+            diagnostics.SetEnabled(configuration.PvpHotbarsDetailedLoggingEnabled);
+    }
+
+    private void PrintChatMessage(string message, bool error = false)
+    {
+        // Failures remain available even when optional chat and detailed traces are off.
+        if (error)
+            Plugin.Log.Warning(message);
+        if (!configuration.PvpHotbarsChatMessagesEnabled)
+            return;
+        if (error)
+            Plugin.ChatGui.PrintError(message);
+        else
+            Plugin.ChatGui.Print(message);
+    }
+
     public bool SetEnabled(bool value)
     {
+        ApplyConfiguration();
         if (disposed || (value && enabled))
             return enabled;
         if (!value)
@@ -137,6 +164,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
 
     public bool TryExecuteDisplayCommand(string arguments, out string message)
     {
+        ApplyConfiguration();
         const string usage = "Usage: /xa hotbar <1-10> [on|off|toggle], or /xa hotbar on|off to enable/disable the mod.";
         message = usage;
         if (arguments.Length > 128)
@@ -284,7 +312,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
             return;
         for (var index = 0; index < pendingCount; index++)
             diagnostics.Event(pendingNumbers[index], "cancelled", reason);
-        Plugin.ChatGui.PrintError($"[XASlave] Cancelled {pendingCount} queued hotbar command(s): {reason}.");
+        PrintChatMessage($"[XASlave] Cancelled {pendingCount} queued hotbar command(s): {reason}.");
         pendingCount = 0;
     }
 
@@ -304,7 +332,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
             if (pendingInPvp[0] != Plugin.ClientState.IsPvP)
             {
                 diagnostics.Event(number, "cancelled", "The PvP context changed before the command was applied.");
-                Plugin.ChatGui.PrintError($"[XASlave] Hotbar {number}: queued command cancelled because the PvP context changed.");
+                PrintChatMessage($"[XASlave] Hotbar {number}: queued command cancelled because the PvP context changed.");
                 RemovePending();
                 continue;
             }
@@ -315,7 +343,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
                 if (reason.Length == 0)
                     reason = "the readiness deadline elapsed";
                 diagnostics.Event(number, "expired", reason);
-                Plugin.ChatGui.PrintError($"[XASlave] Hotbar {number}: queued command expired. {reason}");
+                PrintChatMessage($"[XASlave] Hotbar {number}: queued command expired. {reason}", error: true);
                 RemovePending();
                 continue;
             }
@@ -327,7 +355,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
             if (retryable)
                 return;
             diagnostics.Event(number, "rejected", message);
-            Plugin.ChatGui.PrintError($"[XASlave] Hotbar {number}: queued command rejected. {message}");
+            PrintChatMessage($"[XASlave] Hotbar {number}: queued command rejected. {message}", error: true);
             RemovePending();
         }
     }
@@ -533,6 +561,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
         try
         {
             // Diagnostics outlive command ownership briefly and must observe suspension/overrides too.
+            ApplyConfiguration();
             diagnostics.Observe();
             if (!Plugin.ClientState.IsLoggedIn)
             {
@@ -619,7 +648,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
                 {
                     confirmationPending[index] = false;
                     diagnostics.Event(index + 1, "confirmed", "HUD display setting, native draw gate and requested/applied/root state matched. Follow-up trace records draw activity; pixels remain unverified.");
-                    Plugin.ChatGui.Print($"[XASlave] Hotbar {index + 1}: {(visible.Value ? "shown" : "hidden")}.");
+                    PrintChatMessage($"[XASlave] Hotbar {index + 1}: {(visible.Value ? "shown" : "hidden")}.");
                     // A confirmed choice belongs to the user in both banks; keep only the remembered intent.
                     ClearOwnership(index);
                 }
@@ -627,7 +656,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
                 {
                     confirmationPending[index] = false;
                     diagnostics.Event(index + 1, "unconfirmed", "HUD display setting, native draw gate or addon state did not confirm within one second.");
-                    Plugin.ChatGui.PrintError($"[XASlave] Hotbar {index + 1}: the HUD did not confirm the visibility change. Try an explicit on/off command.");
+                    PrintChatMessage($"[XASlave] Hotbar {index + 1}: the HUD did not confirm the visibility change. Try an explicit on/off command.", error: true);
                 }
             }
             MonitorDisplayMemory(activePvpBank);
@@ -745,8 +774,7 @@ public unsafe sealed partial class PvpHotbarsService : IDisposable
         {
             restoreTimedOut[index] = true;
             diagnostics.Event(index + 1, "restore-unconfirmed", "The HUD did not confirm restoration within one second.");
-            Plugin.Log.Warning($"[XASlave] Hotbar {index + 1} restoration was not confirmed; /xa hotbar off retries recovery.");
-            Plugin.ChatGui.PrintError($"[XASlave] Hotbar {index + 1}: restoration was not confirmed. Use /xa hotbar off to retry when the HUD is available.");
+            PrintChatMessage($"[XASlave] Hotbar {index + 1}: restoration was not confirmed. Use /xa hotbar off to retry when the HUD is available.", error: true);
         }
     }
 

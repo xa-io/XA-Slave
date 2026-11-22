@@ -382,7 +382,10 @@ public sealed class TaskRunner : IDisposable
     private void LogStepStart(int index, TaskStep step)
     {
         if (IsVerboseTaskLoggingEnabled())
-            AddLog($"STEP START {FormatStepLabel(index, step)} (timeout {step.TimeoutSec:0.##}s)");
+        {
+            var timeoutLabel = step.HasTimedOut == null ? $"{step.TimeoutSec:0.##}s" : "adaptive";
+            AddLog($"STEP START {FormatStepLabel(index, step)} (timeout {timeoutLabel})");
+        }
     }
 
     private void LogStepComplete(int index, TaskStep step, float elapsed)
@@ -449,8 +452,9 @@ public sealed class TaskRunner : IDisposable
             },
             onTimeout: (index, step, elapsed) =>
             {
-                AddLog($"STEP TIMEOUT {FormatStepLabel(index, step)} after {elapsed:0.00}s (limit {step.TimeoutSec:0.##}s) - skipping.");
-                log.Warning($"[XASlave] TaskRunner step '{step.Name}' timed out after {step.TimeoutSec}s.");
+                var timeoutLabel = step.HasTimedOut == null ? $"limit {step.TimeoutSec:0.##}s" : "adaptive timeout confirmed";
+                AddLog($"STEP TIMEOUT {FormatStepLabel(index, step)} after {elapsed:0.00}s ({timeoutLabel}) - skipping.");
+                log.Warning($"[XASlave] TaskRunner step '{step.Name}' timed out after {elapsed:0.00}s ({timeoutLabel}).");
             });
 
         if (!hasActiveRun || tickGeneration != runGeneration) return;
@@ -676,6 +680,7 @@ public class TaskStep
     public Func<bool> IsComplete { get; init; } = () => true;
     public Func<bool>? ShouldSkip { get; init; }
     public float TimeoutSec { get; init; } = 10f;
+    public Func<float, bool>? HasTimedOut { get; init; }
     public int MaxRetries { get; init; } = 0;
     public Action? OnTimeout { get; init; }
     internal int RetryCount { get; set; } = 0;

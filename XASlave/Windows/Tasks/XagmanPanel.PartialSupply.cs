@@ -842,7 +842,7 @@ public partial class SlaveWindow
             if (step.Name != "Logout Confirm") { steps.Add(MonthlyReloggerTask.WithSkip(step, () => failed || !needsLogout)); continue; }
             steps.Add(new TaskStep
             {
-                NameMessage = step.NameMessage, ShouldSkip = () => failed || !needsLogout, OnEnter = step.OnEnter, TimeoutSec = step.TimeoutSec,
+                NameMessage = step.NameMessage, ShouldSkip = () => failed || !needsLogout, OnEnter = step.OnEnter, TimeoutSec = step.TimeoutSec, HasTimedOut = step.HasTimedOut,
                 OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key("SA83CE11732A52BCC")),
                 IsComplete = () =>
                 {

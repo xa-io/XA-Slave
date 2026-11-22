@@ -934,7 +934,7 @@ public partial class SlaveWindow
                 if ((DateTime.UtcNow - onhPhaseSince).TotalSeconds < 10) return false;
                 onhTransferFailed = true;
                 return true;
-            }, TimeoutSec = 600,
+            }, TimeoutSec = 3600f,
             OnTimeout = () => { onhTransferFailed = true; CleanupXagmanDropboxTradeAttempt(global::XASlave.Localization.UiMessage.Key("S89826927007964E4")); },
         });
         steps.Add(new TaskStep

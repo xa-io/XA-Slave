@@ -141,6 +141,7 @@ public sealed class MonthlyReloggerTask
                     },
                     IsComplete = () => relogState.ShouldHalt || origComplete(),
                     TimeoutSec = action.TimeoutSec,
+                    HasTimedOut = action.HasTimedOut,
                     MaxRetries = origMaxRetries,
                     OnTimeout = () =>
                     {
@@ -2191,6 +2192,7 @@ public sealed class MonthlyReloggerTask
             IsComplete = step.IsComplete,
             ShouldSkip = inner == null ? extraSkip : () => extraSkip() || inner(),
             TimeoutSec = step.TimeoutSec,
+            HasTimedOut = step.HasTimedOut,
             MaxRetries = step.MaxRetries,
             OnTimeout = step.OnTimeout,
         };

@@ -43,6 +43,25 @@ public partial class SlaveWindow
     private XagmanTradeBatchRun? xagmanTradeBatch;
     private XagmanTradeFailureKind xagmanBatchLegacyFailureKind;
 
+    private bool ReconcileXagmanTradeBatchForTimeout()
+    {
+        var run = xagmanTradeBatch;
+        if (run == null) return true;
+        if (!run.Trading)
+        {
+            CancelXagmanTradeBatch();
+            return true;
+        }
+        if (!plugin.DropboxQueue.IsXagmanProviderIdentityCurrent(run.ProviderIdentity, out _)
+            || !plugin.DropboxQueue.TryCaptureXagmanTradeStacks(out var stacks, out _)) return false;
+        var result = XagmanTradeBatchAccounting.Reconcile(run.Remaining, run.Offered, run.Before, SumXagmanTradeStacks(stacks));
+        if (!result.IsValid) return false;
+        run.Remaining = result.Remaining.ToList();
+        plugin.TaskRunner.AddLog($"Xagman: settled timeout reconciliation delivered {result.DeliveredQuantity}; {run.Remaining.Count} item goals remain.");
+        CancelXagmanTradeBatch();
+        return true;
+    }
+
     private void CancelXagmanTradeBatch()
     {
         xagmanTradeBatch = null;
