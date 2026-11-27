@@ -30477,4 +30477,10 @@ e avvia i salvataggi XA Database dopo ogni passaggio abitativo.</value>
     <value>Monitoraggio degli scambi interrotto. Controlla XA Database e il partner di scambio, quindi riprendi il lavoro rimanente.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Rimani connesso tra le consegne (sconsigliato)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>In attesa della prossima visita di rifornimento in gioco.</value>
+  </data>
 </root>

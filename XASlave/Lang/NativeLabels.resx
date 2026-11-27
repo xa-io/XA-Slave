@@ -31027,4 +31027,10 @@ It's best to do this when you're rank 6+ so you have access to plot bidding.</va
     <value>Trade monitoring stopped. Check XA Database and the trading partner, then resume the remaining work.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Stay logged in between deliveries (except for OCE travel)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>Waiting in game for the next supply visit.</value>
+  </data>
 </root>

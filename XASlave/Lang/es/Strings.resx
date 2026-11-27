@@ -30477,4 +30477,10 @@ Es mejor hacerlo a partir del rango 6 para tener acceso a las pujas por parcelas
     <value>Se detuvo la supervisión del intercambio. Comprueba XA Database y al participante del intercambio, y reanuda el trabajo pendiente.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Mantener la sesión entre entregas (no se recomienda)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>Esperando en el juego la próxima visita de suministro.</value>
+  </data>
 </root>

@@ -30477,4 +30477,10 @@ NamePlate就绪 + PlayerAvailable + 未在咏唱 + 未在战斗。</value>
     <value>交易监控已停止。请检查XA Database和交易对象，然后继续剩余任务。</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>在两次交货之间保持登录（不推荐）</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>正在游戏中等待下一次补给。</value>
+  </data>
 </root>

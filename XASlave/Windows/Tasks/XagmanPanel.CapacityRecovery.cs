@@ -347,7 +347,7 @@ public partial class SlaveWindow
             if (tony.CapacityDrainId == xagmanCapacityDrainId && tony.CapacityRecoveryEpoch == xagmanCapacityRecoveryEpoch) return false;
             if (!string.IsNullOrWhiteSpace(tony.CapacityDrainId) || tony.CapacityRecoveryEpoch != xagmanCapacityRecoveryEpoch + 1
                 || tony.SupplyPassId != xagmanOwnerSupplyPassId
-                || !xagmanOwnerSupplyPassComplete || !xagmanOwnerSupplyAtMenu)
+                || !xagmanOwnerSupplyPassComplete || !xagmanOwnerSupplyWaitReady)
             {
                 FailXagmanCapacityRecovery(global::XASlave.Localization.UiMessage.Key("SDE04EDB87DCF7754"));
                 return true;
@@ -443,7 +443,7 @@ public partial class SlaveWindow
         xagmanQueueRequestedAtUtc = xagmanTonyCompletionRequestedAtUtc = DateTime.MinValue;
         SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
         xagmanOwnerSupplyPassId = string.Empty;
-        xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyWaiting = xagmanOwnerSupplyAtMenu = xagmanOwnerSupplyContinuation = false;
+        xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyWaiting = xagmanOwnerSupplyWaitReady = xagmanOwnerSupplyContinuation = false;
         xagmanSupplyVisitedOwners.Clear();
         xagmanSupplyOwnerStockAtVisit.Clear();
         ResetXagmanTravelFailureMonitor();
@@ -588,9 +588,10 @@ public partial class SlaveWindow
             && !string.IsNullOrWhiteSpace(directive.SupplyPassId)
             && directive.SupplyPassId == xagmanOwnerSupplyPassId
             && xagmanExpectedFranchiseOwnerInstanceIds.SetEquals(directive.ExpectedFranchiseOwnerInstanceIds)
-            && xagmanOwnerSupplyPassComplete && xagmanOwnerSupplyAtMenu
-            && !plugin.TaskRunner.IsRunning && !Plugin.ClientState.IsLoggedIn
-            && AddonHelper.IsAddonReady("_TitleMenu") && AddonHelper.IsAddonVisible("_TitleMenu")
+            && xagmanOwnerSupplyPassComplete && xagmanOwnerSupplyWaitReady
+            && !plugin.TaskRunner.IsRunning
+            && (Plugin.ClientState.IsLoggedIn ? CharacterSafetyHelper.IsCharacterSafeWaitReady()
+                : AddonHelper.IsAddonReady("_TitleMenu") && AddonHelper.IsAddonVisible("_TitleMenu"))
             && !AddonHelper.IsAddonVisible("Trade") && !AddonHelper.IsAddonVisible("SelectYesno")
             && !AddonHelper.IsAddonVisible("SelectOk") && !plugin.IpcClient.DropboxIsBusy()
             && !plugin.IpcClient.LifestreamIsBusy();

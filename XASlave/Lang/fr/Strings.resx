@@ -30477,4 +30477,10 @@ Il est préférable de le faire au rang 6 ou plus afin d’avoir accès aux ench
     <value>La surveillance des échanges est arrêtée. Vérifiez XA Database et le partenaire d’échange, puis reprenez le travail restant.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Rester connecté entre les livraisons (déconseillé)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>En attente du prochain ravitaillement en jeu.</value>
+  </data>
 </root>

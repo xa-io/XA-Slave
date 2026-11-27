@@ -370,7 +370,7 @@ public partial class SlaveWindow
             xagmanOwnerRunList = owners;
             xagmanOwnerCurrentCharacterIndex = 0;
         }
-        xagmanOwnerSupplyWaiting = xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyAtMenu = xagmanOwnerSupplyContinuation = false;
+        xagmanOwnerSupplyWaiting = xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyWaitReady = xagmanOwnerSupplyContinuation = false;
         if (startIndex >= owners.Count && collectionOnly && xagmanPhaseComplete)
         { PublishXagmanPresence(); reason = string.Empty; return true; }
         var steps = BuildXagmanFranchiseSteps(owners, startIndex);
@@ -401,7 +401,7 @@ public partial class SlaveWindow
             && tony.CapacityRecoveryEpoch == (long)xagmanCapacityRecoveryEpoch + 1
             && !string.IsNullOrWhiteSpace(xagmanOwnerSupplyPassId)
             && tony.SupplyPassId == xagmanOwnerSupplyPassId
-            && xagmanOwnerSupplyPassComplete && xagmanOwnerSupplyAtMenu;
+            && xagmanOwnerSupplyPassComplete && xagmanOwnerSupplyWaitReady;
 
     private void ResetXagmanNetworkTransientTimers()
     {

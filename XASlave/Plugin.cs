@@ -2565,7 +2565,7 @@ public sealed class Plugin : IDalamudPlugin
         }
     }
 
-    private bool TryRequestItemSort(string arguments, out string message) => TryRequestItemSortLocalizedCore(out _, arguments, out message);
+    private bool TryRequestItemSort(string arguments, out string message) => TryRequestItemSortLocalizedCore(out _, arguments, out message, reportCompletionInChat: true);
     private bool TryRequestItemSortMessage(string arguments, out global::XASlave.Localization.UiMessage message)
     {
         var success = TryRequestItemSortLocalizedCore(out var presentation, arguments, out var originalReply);
@@ -2573,7 +2573,7 @@ public sealed class Plugin : IDalamudPlugin
         return success;
     }
 
-    private bool TryRequestItemSortLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message)
+    private bool TryRequestItemSortLocalizedCore(out global::XASlave.Localization.UiMessage? replyPresentation, string arguments, out string message, bool reportCompletionInChat = false)
     {
         replyPresentation = null;
         if (!string.IsNullOrWhiteSpace(arguments))
@@ -2591,7 +2591,7 @@ public sealed class Plugin : IDalamudPlugin
             message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("S7536DFE013F18A70"));
             return false;
         }
-        AutoSortItems.SortNow();
+        AutoSortItems.SortNow(reportCompletionInChat);
         message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, AutoSortItems.StatusTextMessage);
         return AutoSortItems.IsRunning;
     }
@@ -6615,5 +6615,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.69";
+    public const string Version = "0.0.0.70";
 }

@@ -30477,4 +30477,10 @@ xafunc의 DoNavFlySequenceXA 논리와 같습니다(Player.CanFly 확인).</valu
     <value>거래 모니터링이 중지되었습니다. XA Database와 거래 상대를 확인한 후 남은 작업을 재개하세요.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>배송 사이에 로그인 유지 (권장하지 않음)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>다음 보급 방문까지 게임 안에서 대기 중입니다.</value>
+  </data>
 </root>

@@ -30477,4 +30477,10 @@ Arsa tekliflerine erişebilmek için bunu 6. rütbe ve üzerindeyken yapmak en i
     <value>Takas izleme durduruldu. XA Database ve takas ortağını kontrol edip kalan işlemleri sürdürün.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Teslimatlar arasında oyunda kal (önerilmez)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>Sonraki ikmal ziyareti için oyunda bekleniyor.</value>
+  </data>
 </root>

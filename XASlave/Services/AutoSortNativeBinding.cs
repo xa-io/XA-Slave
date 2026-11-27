@@ -15,6 +15,7 @@ internal sealed class AutoSortNativeBinding
     private const string NovemberGameSha256 = "CEB4260B2574476ACF72E7B6105D0A4F8D1BD78B4E7CAB5D8115C453F2F39339";
     private const string NovemberClientStructsSha256 = "2D268F54FB6C75B511C349BA49B00E8D197C09FF64FF380ACABDCAE42A1F7D9B";
     private const string NovemberStableClientStructsSha256 = "28488F18AD05FDCD12373A83756EAB275C291B09C6AF061EF7F846AA06A36E29";
+    private const string NovemberStableHotfixClientStructsSha256 = "FD39ED3C6D69E8292E1C458BA4688C101E63AEAB3EE2F6248852D55746FB4306";
     private readonly Dictionary<nint, byte[]> proofs = new();
     private readonly Dictionary<AutoSortFunction, nint> functions = new();
     internal nint ModuleBase { get; }
@@ -28,7 +29,7 @@ internal sealed class AutoSortNativeBinding
         var module = Plugin.SigScanner.Module;
         var bytes = File.ReadAllBytes(module.FileName);
         var gameHash = Convert.ToHexString(SHA256.HashData(bytes));
-        var november = gameHash == NovemberGameSha256 && sdkHash is (NovemberClientStructsSha256 or NovemberStableClientStructsSha256);
+        var november = gameHash == NovemberGameSha256 && sdkHash is (NovemberClientStructsSha256 or NovemberStableClientStructsSha256 or NovemberStableHotfixClientStructsSha256);
         if (!november)
         {
             if (sdkHash is not ("A47750CE4BE1910C8783231F398559BCCE43E4A6AE8D255351B3BBA8247D6F9D" or "98795452ED0636E3613850176310AEF1E4E8B85AE47A3E722FF2C325CF2801D2" or "F5A2C68CCECD3E199BDA572050E98902B2E7594066C95DC7826C2D4297CD0564"))

@@ -7,6 +7,8 @@ namespace XASlave.Services;
 
 internal sealed class AutoSortItemsService : IDisposable
 {
+    private sealed record Completion(long Generation, AutoSortItemsSettings Settings, bool ReplyInChat);
+
     private readonly Configuration configuration;
     private readonly TaskRunner runner;
     private AutoSortNativeAdapter? adapter;
@@ -16,6 +18,7 @@ internal sealed class AutoSortItemsService : IDisposable
     private long generation, frameworkSequence, runnerId, notBefore, deadline;
     private bool enabled, disposed, pending, running, enableIntent;
     private bool waitingForSorters;
+    private bool replyInChat;
     internal string StatusText { get; private set; } = global::XASlave.Localization.UiLocale.Native("S75081B593D15CF6E");
     private global::XASlave.Localization.UiMessage? uiStatusText = global::XASlave.Localization.UiMessage.Key("S75081B593D15CF6E");
     internal string LocalizedStatusText => global::XASlave.Localization.UiMessage.Resolve(ref uiStatusText, StatusText);
@@ -81,15 +84,16 @@ internal sealed class AutoSortItemsService : IDisposable
     private void Schedule(long delay)
     {
         if (disposed || !enabled || IsRunning) return;
-        generation++; pending = true; requested = null;
+        generation++; pending = true; requested = null; replyInChat = false;
         var now = Environment.TickCount64; notBefore = now + delay; deadline = now + 15000;
         StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, (delay == 0 ? global::XASlave.Localization.UiMessage.Key("S64992D3848E22900") : global::XASlave.Localization.UiMessage.Key("S91ECFCCF9D7AA07B")));
     }
 
-    internal void SortNow()
+    internal void SortNow(bool reportCompletionInChat = false)
     {
         if (!enabled || disposed || IsRunning) return;
         Schedule(0);
+        replyInChat = reportCompletionInChat;
     }
 
     private void Update(IFramework framework)
@@ -126,6 +130,7 @@ internal sealed class AutoSortItemsService : IDisposable
     private void StartTask()
     {
         var owner = generation;
+        Completion? completion = null;
         requested = Settings; pending = false; running = true; runnerId = 0; waitingForSorters = false;
         try
         {
@@ -143,8 +148,8 @@ internal sealed class AutoSortItemsService : IDisposable
             {
                 NameMessage = global::XASlave.Localization.UiMessage.Key("S60DC306423680F75"), IsComplete = () => Tick(owner),
                 TimeoutSec = 16, MaxRetries = 0, OnTimeout = () => Stop(global::XASlave.Localization.UiMessage.Key("S78EABA4C292143AB")),
-            }], onFinished: () => Finished(owner), suppressCompletionReport: true, totalItems: 13,
-                suppressLogoutCancel: false, onTerminal: () => Terminal(owner), haltOnStepError: true);
+            }], onFinished: () => Finished(completion), suppressCompletionReport: true, totalItems: 13,
+                suppressLogoutCancel: false, onTerminal: () => completion = Terminal(owner), haltOnStepError: true);
             if (!accepted)
             {
                 if (owner == generation) Stop(global::XASlave.Localization.UiMessage.Key("SB31FEFCAE8445E49"));
@@ -209,27 +214,33 @@ internal sealed class AutoSortItemsService : IDisposable
         }
     }
 
-    private void Finished(long owner)
+    private void Finished(Completion? completion)
     {
-        if (owner != generation || !running || (transaction?.Complete) != true || requested == null) return;
-        var output = requested;
-        // Completion is already proved by two distinct consecutive native snapshots.
-        // Retire ownership before local output can invoke reentrant plugin handlers.
-        running = false; runnerId = 0; generation++;
+        if (completion == null || disposed || !enabled || generation != completion.Generation) return;
+        var output = completion.Settings;
+        // Terminal has already retired the native observer. Consume this result
+        // before local output can invoke reentrant plugin handlers.
+        generation++;
         var completedOwner = generation;
-        Release();
-        if (disposed || !enabled || generation != completedOwner) return;
         StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, global::XASlave.Localization.UiMessage.Key("S68B0BDE8EDA235EF"));
-        if (output.SendChat) Plugin.ChatGui.Print(global::XASlave.Localization.UiMessage.Key("S63ED90CB90CEF231").Original);
+        if (completion.ReplyInChat || output.SendChat) Plugin.ChatGui.Print(global::XASlave.Localization.UiMessage.Key("S63ED90CB90CEF231").Original);
         if (output.SendNotification && !disposed && enabled && generation == completedOwner) Plugin.NotificationManager.AddNotification(new Notification
         {
             Title = global::XASlave.Localization.UiMessage.Key("SA318747875972AD1").Original, Content = global::XASlave.Localization.UiMessage.Key("S68B0BDE8EDA235EF").Original, Type = NotificationType.Success,
         });
     }
 
-    private void Terminal(long owner)
+    private Completion? Terminal(long owner)
     {
-        if (owner == generation && running) Stop(global::XASlave.Localization.UiMessage.Key("SF3829E822FE2710B"));
+        if (owner != generation || !running) return null;
+        // TaskRunner always cleans up before its success continuation. Keep only
+        // the verified result, never the native transaction, across that boundary.
+        // Cancellation also retires immediately but does not invoke Finished.
+        var completion = transaction?.Complete == true && requested != null
+            ? new Completion(generation + 1, requested, replyInChat)
+            : null;
+        Stop(global::XASlave.Localization.UiMessage.Key("SF3829E822FE2710B"));
+        return completion;
     }
 
     internal void Stop() => Stop(global::XASlave.Localization.UiMessage.Key("S2F8793B60B6AD941"));
@@ -237,7 +248,7 @@ internal sealed class AutoSortItemsService : IDisposable
     internal void Stop(global::XASlave.Localization.UiMessage reason)
     {
         var ownedRun = runnerId;
-        generation++; pending = false; running = false; enableIntent = false; runnerId = 0;
+        generation++; pending = false; running = false; enableIntent = false; runnerId = 0; replyInChat = false;
         StatusText = global::XASlave.Localization.UiMessage.Store(ref uiStatusText, reason);
         try { if (ownedRun != 0 && runner.IsRunning && runner.CurrentRunId == ownedRun) runner.Cancel(); }
         finally { Release(); }

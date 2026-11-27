@@ -30477,4 +30477,10 @@ e aciona o salvamento no XA Database após cada etapa de moradia.</value>
     <value>O monitoramento da troca foi interrompido. Verifique o XA Database e o parceiro de troca, depois retome o trabalho restante.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Continuar conectado entre entregas (não recomendado)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>Aguardando a próxima visita de abastecimento no jogo.</value>
+  </data>
 </root>

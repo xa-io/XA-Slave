@@ -28,7 +28,7 @@ public partial class SlaveWindow
     private string xagmanOwnerSupplyRegion = string.Empty;
     private bool xagmanOwnerSupplyPassComplete;
     private bool xagmanOwnerSupplyWaiting;
-    private bool xagmanOwnerSupplyAtMenu;
+    private bool xagmanOwnerSupplyWaitReady;
     private bool xagmanOwnerSupplyContinuation;
     private string xagmanDeferredOwnerCharacter = string.Empty;
     private string xagmanDeferredOwnerInstanceId = string.Empty;
@@ -68,7 +68,7 @@ public partial class SlaveWindow
         xagmanSupplyDeferredStockByOwner.Clear();
         xagmanSupplyPassId = xagmanOwnerSupplyPassId = xagmanOwnerSupplyTonyInstance = xagmanOwnerSupplyRegion = string.Empty;
         xagmanOwnerSupplyStartTonyInstance = string.Empty;
-        xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyWaiting = xagmanOwnerSupplyAtMenu = false;
+        xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyWaiting = xagmanOwnerSupplyWaitReady = false;
         xagmanOwnerSupplyContinuation = false;
         xagmanDeferredOwnerCharacter = xagmanDeferredOwnerInstanceId = string.Empty;
         xagmanDeferredOwnerSinceUtc = xagmanSupplyBarrierSinceUtc = xagmanSupplyMissingPeerSinceUtc = DateTime.MinValue;
@@ -120,12 +120,12 @@ public partial class SlaveWindow
     private List<string> GetXagmanSupplyPendingDataCenters()
     {
         if (!IsXagmanSupplyCycleActive() || xagmanActiveRole != XagmanRole.FranchiseOwner) return new();
-        if (xagmanOwnerSupplyWaiting && !xagmanOwnerSupplyAtMenu && !xagmanOwnerSupplyPassComplete)
+        if (xagmanOwnerSupplyWaiting && !xagmanOwnerSupplyWaitReady && !xagmanOwnerSupplyPassComplete)
         {
             var drainingDataCenter = GetXagmanSupplyTonyPeer()?.ServerMatchingActiveDataCenter;
             if (!string.IsNullOrWhiteSpace(drainingDataCenter)) return new() { drainingDataCenter };
         }
-        var continuationTony = xagmanOwnerSupplyWaiting && xagmanOwnerSupplyAtMenu && xagmanOwnerSupplyContinuation
+        var continuationTony = xagmanOwnerSupplyWaiting && xagmanOwnerSupplyWaitReady && xagmanOwnerSupplyContinuation
             ? GetXagmanSupplyTonyPeer() : null;
         var frontier = continuationTony != null ? GetXagmanUsefulUnvisitedOwners(continuationTony)
             : xagmanOwnerSupplyPassComplete ? xagmanOwnerRunPlan
@@ -190,7 +190,7 @@ public partial class SlaveWindow
         xagmanOwnerSupplyRegion = IsXagmanSupplyRegionScoped(tony.ServerMatchingEnabled)
             ? GetXagmanRegionOfChar(tony.ActiveCharacter) : string.Empty;
         xagmanPreferredTonyCharacter = tony.ActiveCharacter;
-        xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyWaiting = xagmanOwnerSupplyAtMenu = false;
+        xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyWaiting = xagmanOwnerSupplyWaitReady = false;
         xagmanOwnerSupplyWaitSinceUtc = DateTime.MinValue;
         xagmanSupplyVisitedOwners.Clear();
         xagmanSupplyOwnerStockAtVisit.Clear();
@@ -370,16 +370,16 @@ public partial class SlaveWindow
         var tony = GetXagmanSupplyTonyPeer();
         xagmanOwnerSupplyContinuation = tony != null && tony.SupplyInventoryComplete
             && GetXagmanUsefulUnvisitedOwners(tony).Any();
-        // Completion is advertised only after the final logged-in owner reaches the menu.
+        // Advertise completion only after the owner reaches the selected safe wait state.
         xagmanOwnerSupplyPassComplete = false;
-        xagmanOwnerSupplyAtMenu = false;
+        xagmanOwnerSupplyWaitReady = false;
         xagmanOwnerSupplyWaitSinceUtc = DateTime.UtcNow;
         xagmanQueueRequestedAtUtc = DateTime.MinValue;
         xagmanActiveTradePartner = xagmanActiveTradePartnerInstanceId = string.Empty;
         SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
         xagmanPhaseComplete = false;
         xagmanStatus = XagmanStatus.Paused;
-        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, (xagmanOwnerSupplyContinuation ? global::XASlave.Localization.UiMessage.Format("S5CED47FEE798A7A8", xagmanPartialOwners.Count) : global::XASlave.Localization.UiMessage.Format("SF39D9578CD8FBE1C", xagmanPartialOwners.Count)));
+        xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, (CanXagmanWaitInGame() ? global::XASlave.Localization.UiMessage.Key("SD6E71305F0461061") : xagmanOwnerSupplyContinuation ? global::XASlave.Localization.UiMessage.Format("S5CED47FEE798A7A8", xagmanPartialOwners.Count) : global::XASlave.Localization.UiMessage.Format("SF39D9578CD8FBE1C", xagmanPartialOwners.Count)));
         PublishXagmanPresence();
     }
 
@@ -388,7 +388,7 @@ public partial class SlaveWindow
         if (!IsXagmanSupplyCycleActive() || !xagmanOwnerSupplyWaiting || plugin.TaskRunner.IsRunning || xagmanStatus == XagmanStatus.Error) return;
         if (UpdateXagmanLocalOwnerCompletion()) return;
         if (TryFinishXagmanLocalOwnerRun()) return;
-        if (!xagmanOwnerSupplyAtMenu) { StartXagmanSupplyMenuWait(); return; }
+        if (!xagmanOwnerSupplyWaitReady) { StartXagmanSupplyMenuWait(); return; }
         var tony = plugin.XagmanPeers.Peers.FirstOrDefault(peer => peer.Role == XagmanRole.Tony && peer.XagmanEnabled
             && peer.InstanceId == xagmanOwnerSupplyTonyInstance && IsXagmanPeerInCurrentRunPhase(peer) && IsXagmanPeerFresh(peer));
         xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, GetXagmanOwnerSupplyMenuStatus(tony));
@@ -407,7 +407,9 @@ public partial class SlaveWindow
                 or XagmanStatus.Relogging or XagmanStatus.Traveling) return;
         var continuing = tony.SupplyPassId == xagmanOwnerSupplyPassId;
         var remaining = (continuing ? GetXagmanUsefulUnvisitedOwners(tony) : xagmanOwnerRunPlan.Where(IsXagmanSupplyOwnerUnresolved))
-            .OrderBy(owner => WorldData.GetSweepOrdinalForWorld(GetWorldFromKey(owner))).ThenBy(owner => owner, StringComparer.OrdinalIgnoreCase).ToList();
+            .OrderByDescending(owner => CanXagmanWaitInGame() && IsXagmanCurrentLocalCharacter(owner)
+                && GetCurrentWorldName().Equals(tony.MeetWorld, StringComparison.OrdinalIgnoreCase))
+            .ThenBy(owner => WorldData.GetSweepOrdinalForWorld(GetWorldFromKey(owner))).ThenBy(owner => owner, StringComparer.OrdinalIgnoreCase).ToList();
         if (continuing && remaining.Count == 0)
         {
             // Another owner can use the newly observed stock while this client logs out. Do not
@@ -436,7 +438,7 @@ public partial class SlaveWindow
         if (!TryBindXagmanOwnerSupplyPass()) return;
         if (continuing)
             xagmanSupplyVisitedOwners.ExceptWith(remaining);
-        xagmanOwnerSupplyWaiting = xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyAtMenu = xagmanOwnerSupplyContinuation = false;
+        xagmanOwnerSupplyWaiting = xagmanOwnerSupplyPassComplete = xagmanOwnerSupplyWaitReady = xagmanOwnerSupplyContinuation = false;
         PublishXagmanPresence();
         var steps = BuildXagmanFranchiseSteps(remaining, 0);
         plugin.TaskRunner.Start(global::XASlave.Localization.UiMessage.Key("S0A1690A11A18319C"), steps, onFinished: OnXagmanFranchiseTaskFinished,
@@ -454,6 +456,8 @@ public partial class SlaveWindow
 
     private global::XASlave.Localization.UiMessage GetXagmanOwnerSupplyMenuStatus(XagmanPeerPresence? tony)
     {
+        if (Plugin.ClientState.IsLoggedIn && xagmanOwnerSupplyWaitReady)
+            return global::XASlave.Localization.UiMessage.Key("SD6E71305F0461061");
         var partialCount = xagmanPartialOwners.Values.Count(state => state.RequestedItems.Count > 0);
         var collectionPendingCount = xagmanPartialOwners.Values.Count(state => state.RequestedItems.Count == 0 && state.PendingGiveItems.Count > 0);
         var summary = global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Concat(global::XASlave.Localization.UiMessage.Format("S751D4665BB35E24B", partialCount), ((collectionPendingCount > 0 ? global::XASlave.Localization.UiMessage.Format("SF4F055CB5C47EE05", collectionPendingCount) : global::XASlave.Localization.UiMessage.Value(string.Empty)))), global::XASlave.Localization.UiMessage.Key("SCDB4EE2AEA69CC6A"));
@@ -813,19 +817,36 @@ public partial class SlaveWindow
         return true;
     }
 
+    private bool CanXagmanWaitInGame()
+    {
+        if (!plugin.Configuration.XagmanStayLoggedInBetweenDeliveries || !Plugin.ClientState.IsLoggedIn)
+            return false;
+        var current = WorldData.GetByName(GetCurrentWorldName())?.Region;
+        var meet = WorldData.GetByName(GetXagmanActiveMeetWorld())?.Region;
+        return current != null && meet != null && (current == "OCE") == (meet == "OCE");
+    }
+
     private void AddXagmanSupplyPassMenuWaitSteps(List<TaskStep> steps)
     {
         var menuStepsStart = steps.Count;
         var runner = plugin.TaskRunner;
         var needsLogout = false;
+        var waitInGame = false;
+        ulong waitingContentId = 0;
         var failed = false;
         void Fail(global::XASlave.Localization.UiMessage reason) { failed = true; FailXagmanSupplyCycle(reason); }
         steps.Add(new TaskStep
         {
             NameMessage = global::XASlave.Localization.UiMessage.Key("SA4B7230824048DEE"),
-            OnEnter = () => needsLogout = Plugin.ClientState.IsLoggedIn,
-            IsComplete = () => !needsLogout || (!plugin.IpcClient.DropboxIsBusy() && !AddonHelper.IsAddonVisible("Trade")
-                && !AddonHelper.IsAddonVisible("SelectYesno") && !plugin.IpcClient.LifestreamIsBusy() && CharacterSafetyHelper.IsCharacterSafeWaitReady()),
+            OnEnter = () =>
+            {
+                waitInGame = CanXagmanWaitInGame();
+                waitingContentId = waitInGame ? Plugin.PlayerState.ContentId : 0;
+                needsLogout = Plugin.ClientState.IsLoggedIn && !waitInGame;
+            },
+            IsComplete = () => (!needsLogout && !waitInGame) || (!plugin.IpcClient.DropboxIsBusy() && !AddonHelper.IsAddonVisible("Trade")
+                && !AddonHelper.IsAddonVisible("SelectYesno") && !plugin.IpcClient.LifestreamIsBusy() && CharacterSafetyHelper.IsCharacterSafeWaitReady()
+                && (!waitInGame || (TryReadXagmanNetworkDropboxQueue(out var accepting, out var queued) && !accepting && !queued))),
             TimeoutSec = 60, OnTimeout = () => Fail(global::XASlave.Localization.UiMessage.Key("S864873FACF0F0983")),
         });
         steps.Add(new TaskStep
@@ -859,6 +880,9 @@ public partial class SlaveWindow
             NameMessage = global::XASlave.Localization.UiMessage.Key("SB67C664A2C42002F"), ShouldSkip = () => failed,
             IsComplete = () =>
             {
+                if (waitInGame)
+                    return waitingContentId != 0 && Plugin.PlayerState.ContentId == waitingContentId
+                        && Plugin.ClientState.IsLoggedIn && CharacterSafetyHelper.IsCharacterSafeWaitReady();
                 if (Plugin.ClientState.IsLoggedIn || AddonHelper.IsAddonVisible("SelectYesno") || AddonHelper.IsAddonVisible("SelectOk")) return false;
                 var characterSelect = AddonHelper.IsAddonVisible("CharaSelect") || AddonHelper.IsAddonVisible("_CharaSelectListMenu");
                 var dcSelect = AddonHelper.IsAddonVisible("TitleDCWorldMap");
@@ -880,9 +904,9 @@ public partial class SlaveWindow
             OnEnter = () =>
             {
                 if (failed || !xagmanRunning || !xagmanOwnerSupplyWaiting || xagmanStatus == XagmanStatus.Error) return;
-                xagmanOwnerSupplyAtMenu = true;
+                xagmanOwnerSupplyWaitReady = true;
                 var tony = GetXagmanSupplyTonyPeer();
-                // Refresh after logout: later owners may have supplied this Tony, or consumed
+                // Refresh before acknowledging: later owners may have supplied this Tony, or consumed
                 // the stock that originally made a continuation useful.
                 xagmanOwnerSupplyContinuation = tony != null && tony.SupplyInventoryComplete
                     && tony.SupplyPassId == xagmanOwnerSupplyPassId && GetXagmanUsefulUnvisitedOwners(tony).Any();

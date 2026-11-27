@@ -288,6 +288,7 @@ public class Configuration : IPluginConfiguration
     public bool XagmanLogoutOnComplete { get; set; } = false;
     public bool XagmanKillGameOnComplete { get; set; } = false;
     public bool XagmanUsePreflightOnFirstCharacter { get; set; } = true;
+    public bool XagmanStayLoggedInBetweenDeliveries { get; set; }
     public bool XagmanAutoReturnToFc { get; set; } = true;
     public bool XagmanIgnoreGilInMatchingSelection { get; set; } = false;
     public bool XagmanIgnoreGilShortfalls { get; set; } = false;

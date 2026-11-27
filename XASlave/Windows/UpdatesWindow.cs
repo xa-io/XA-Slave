@@ -23,6 +23,17 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.70 - 2026-11-27",
+            Lines =
+            [
+                "- Fixed Xagman trade monitoring. When XA Database cannot supply a snapshot, Xagman checks live gil and item counts. Failed reads now respect the configured grace period.",
+                "- Added the default-off franchise owner option: Stay logged in between deliveries (not recommended).",
+                "- Fixed Auto Sort Items: Restored automatic and manual sorting with Dalamud 15.0.4.1.",
+                "- Fixed Auto Sort Completion Feedback: /xa sort now confirms completion in chat; automatic completion chat and notifications work as configured.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.69 - 2026-11-21",
             Lines =
             [

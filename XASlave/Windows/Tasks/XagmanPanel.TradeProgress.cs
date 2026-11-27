@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using Dalamud.Game.ClientState.Conditions;
+using FFXIVClientStructs.FFXIV.Client.Game;
 using XASlave.Data;
 using XASlave.Localization;
 using XASlave.Services;
@@ -34,6 +36,8 @@ public partial class SlaveWindow
         internal bool Settled;
         internal bool Completed;
         internal bool CaptureFailed;
+        internal bool UsingLocalInventory;
+        internal bool ReportedSnapshotFailure;
         internal bool FinalReconciled;
         internal bool PeerReadyToSettle;
         internal string RemoteSession = string.Empty;
@@ -125,21 +129,69 @@ public partial class SlaveWindow
         };
     }
 
-    private XagmanTradeInventorySnapshot? CaptureXagmanTradeProgressSnapshot(XagmanTradeWaitState state)
+    private unsafe XagmanTradeInventorySnapshot? CaptureXagmanTradeProgressSnapshot(XagmanTradeWaitState state)
     {
+        bool CurrentCharacter() => state.ContentId != 0 && Plugin.PlayerState.IsLoaded
+            && Plugin.ClientState.IsLoggedIn && Plugin.PlayerState.ContentId == state.ContentId
+            && Plugin.ObjectTable.LocalPlayer != null && !Plugin.Condition[ConditionFlag.BetweenAreas]
+            && !Plugin.Condition[ConditionFlag.BetweenAreas51];
+        if (!CurrentCharacter()) return null;
+        if (state.UsingLocalInventory && CaptureLocal() is { } live)
+            return CurrentCharacter() ? live : null;
         var requestedAt = DateTime.UtcNow;
-        var json = plugin.IpcClient.GetTradeInventorySnapshotJson(state.ContentId);
-        return Plugin.PlayerState.IsLoaded && state.ContentId == Plugin.PlayerState.ContentId
-            && XagmanTradeInventorySnapshot.TryRead(json, state.ContentId, requestedAt, out var snapshot)
-            ? snapshot : null;
+        var json = plugin.IpcClient.GetTradeInventorySnapshotJson(state.ContentId, out var error);
+        if (XagmanTradeInventorySnapshot.TryRead(json, state.ContentId, requestedAt, out var snapshot))
+        {
+            if (!CurrentCharacter()) return null;
+            if (state.UsingLocalInventory) state.Monitor.ResetBaseline();
+            state.UsingLocalInventory = false;
+            return snapshot;
+        }
+        if (!state.ReportedSnapshotFailure)
+        {
+            plugin.TaskRunner.AddLog($"Xagman: XA Database trade snapshot unavailable ({error ?? "empty or invalid snapshot"}); checking live local inventory.");
+            state.ReportedSnapshotFailure = true;
+        }
+        var result = state.UsingLocalInventory ? null : CaptureLocal();
+        if (result == null || !CurrentCharacter()) return null;
+        if (!state.UsingLocalInventory) state.Monitor.ResetBaseline();
+        state.UsingLocalInventory = true;
+        return result;
+
+        XagmanTradeInventorySnapshot? CaptureLocal()
+        {
+            var manager = InventoryManager.Instance();
+            if (manager == null || !NativeArrayAccess.TryGetInventoryContainer(manager, InventoryType.Currency, out var currency)
+                || currency->Size <= 0 || !TryGetXagmanLiveGil(out var gil) || gil is < 0 or > 999999999) return null;
+            var local = new XagmanTradeInventorySnapshot();
+            local.Quantities[(1, false)] = gil;
+            var green = plugin.Configuration.XagmanItems.Any(entry => IsXagmanGreenValueSelector(entry.SelectorKind));
+            IEnumerable<InventoryType> containers = Array.Empty<InventoryType>();
+            if (green) containers = XagmanGreenValueInventoryTypes;
+            else if (state.Watched.Any(key => key.ItemId > 19)) containers = XagmanMainInventoryTypes;
+            if (state.Watched.Any(key => key.ItemId is >= 2 and <= 19))
+                containers = containers.Concat(XagmanCrystalInventoryTypes);
+            foreach (var type in containers)
+            {
+                if (!NativeArrayAccess.TryGetInventoryContainer(manager, type, out var bag) || bag->Size <= 0) return null;
+                for (var i = 0; i < bag->Size; i++)
+                {
+                    if (!NativeArrayAccess.TryGetInventorySlot(bag, i, out var item)) return null;
+                    if (item->ItemId == 0 || item->IsSymbolic) continue;
+                    var key = (item->GetBaseItemId(), item->IsHighQuality());
+                    local.Quantities[key] = local.Quantities.GetValueOrDefault(key) + item->Quantity;
+                }
+            }
+            return local;
+        }
     }
 
-    private void BeginXagmanTradeTimeoutSettlement(XagmanTradeWaitState state, bool captureFailed)
+    private void BeginXagmanTradeTimeoutSettlement(XagmanTradeWaitState state, bool captureFailed, bool peerRequested = false)
     {
         state.Settling = true;
         state.CaptureFailed = captureFailed;
         state.SettlementSince = state.LastElapsed;
-        plugin.TaskRunner.AddLog(captureFailed
+        plugin.TaskRunner.AddLog(peerRequested ? "Xagman: the trading partner requested settlement of the current transfer." : captureFailed
             ? "Xagman: inventory capture or reciprocal trade ownership is unavailable; settling the current transfer before holding."
             : "Xagman: five fresh inventory scans showed no trade progress; settling the current transfer before timeout.");
         PublishXagmanPresence();
@@ -159,7 +211,7 @@ public partial class SlaveWindow
         if (remote.Settling || remote.Settled || remote.Completed)
             state.PeerReadyToSettle = true;
         if (remote.Settling && !state.Settling)
-            BeginXagmanTradeTimeoutSettlement(state, captureFailed: false);
+            BeginXagmanTradeTimeoutSettlement(state, captureFailed: false, peerRequested: true);
     }
 
     // Runs before the ordinary completion poll, so a stopped queue cannot falsely finish the batch.
@@ -212,7 +264,7 @@ public partial class SlaveWindow
         var finalSnapshot = CaptureXagmanTradeProgressSnapshot(state);
         if (finalSnapshot == null)
         {
-            HoldXagmanTradeProgress("XA Database could not provide the final inventory snapshot; progress is retained.");
+            HoldXagmanTradeProgress("The final live inventory snapshot is unavailable; progress is retained.");
             return true;
         }
         if (!ReconcileXagmanTradeBatchForTimeout()

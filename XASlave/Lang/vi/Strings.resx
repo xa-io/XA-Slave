@@ -30477,4 +30477,10 @@ Nên làm khi FC cấp 6 trở lên để có quyền đấu giá lô đất.</v
     <value>Đã dừng theo dõi giao dịch. Hãy kiểm tra XA Database và đối tác giao dịch, rồi tiếp tục phần việc còn lại.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Giữ đăng nhập giữa các lần giao hàng (không khuyến nghị)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>Đang chờ lần tiếp tế tiếp theo trong trò chơi.</value>
+  </data>
 </root>

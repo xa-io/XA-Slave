@@ -589,10 +589,11 @@ public sealed class IpcClient
         catch { return string.Empty; }
     }
 
-    public string GetTradeInventorySnapshotJson(ulong contentId)
+    public string GetTradeInventorySnapshotJson(ulong contentId, out string? error)
     {
+        error = null;
         try { return xaTradeInventorySubscriber.InvokeFunc(contentId) ?? string.Empty; }
-        catch { return string.Empty; }
+        catch (Exception ex) { error = ex.Message; return string.Empty; }
     }
 
     public string GetLastSnapshotResultJson()

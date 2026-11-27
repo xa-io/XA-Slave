@@ -30477,4 +30477,10 @@ xafuncのDoNavFlySequenceXAのロジック（Player.CanFly確認）と同じで�
     <value>取引の監視を停止しました。XA Databaseと取引相手を確認してから、残りの処理を再開してください。</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>配送の合間もログインしたまま待機（非推奨）</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>次の補給までゲーム内で待機しています。</value>
+  </data>
 </root>

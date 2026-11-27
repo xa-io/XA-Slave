@@ -30477,4 +30477,10 @@ NamePlate готов + PlayerAvailable + не применяет действи�
     <value>Наблюдение за обменом остановлено. Проверьте XA Database и партнёра по обмену, затем возобновите оставшуюся работу.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Оставаться в игре между доставками (не рекомендуется)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>Ожидание следующей поставки в игре.</value>
+  </data>
 </root>

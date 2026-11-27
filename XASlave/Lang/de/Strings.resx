@@ -30477,4 +30477,10 @@ Am besten erfolgt dies ab FG-Rang 6, damit Grundstücksgebote verfügbar sind.</
     <value>Die Handelsüberwachung wurde angehalten. Prüfe XA Database und den Handelspartner und setze dann die verbleibende Arbeit fort.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Zwischen Lieferungen eingeloggt bleiben (nicht empfohlen)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>Warte im Spiel auf die nächste Versorgung.</value>
+  </data>
 </root>

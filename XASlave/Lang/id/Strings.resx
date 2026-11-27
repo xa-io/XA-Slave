@@ -30477,4 +30477,10 @@ Sebaiknya lakukan saat pangkat Anda 6+ agar memiliki akses penawaran plot.</valu
     <value>Pemantauan pertukaran berhenti. Periksa XA Database dan mitra pertukaran, lalu lanjutkan pekerjaan yang tersisa.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Tetap masuk di antara pengiriman (tidak disarankan)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>Menunggu kunjungan pemasok berikutnya di dalam gim.</value>
+  </data>
 </root>

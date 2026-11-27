@@ -30477,4 +30477,10 @@ Najlepiej zrobić to przy randze 6+, aby mieć dostęp do licytowania działek.<
     <value>Monitorowanie wymiany zatrzymano. Sprawdź XA Database i partnera wymiany, a następnie wznów pozostałą pracę.</value>
     <comment>Source: Xagman trade progress monitoring.</comment>
   </data>
+  <data name="S0D0805E75E1BAA6D" xml:space="preserve">
+    <value>Pozostań w grze między dostawami (niezalecane)</value>
+  </data>
+  <data name="SD6E71305F0461061" xml:space="preserve">
+    <value>Oczekiwanie w grze na kolejną dostawę.</value>
+  </data>
 </root>

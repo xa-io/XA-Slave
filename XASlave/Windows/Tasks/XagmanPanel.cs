@@ -563,6 +563,13 @@ public partial class SlaveWindow
             cfg.XagmanAutoReturnToFc = autoReturnToFc;
             cfg.Save();
         }
+        var stayLoggedIn = cfg.XagmanStayLoggedInBetweenDeliveries;
+        if (!onh && cfg.XagmanRole == XagmanRole.FranchiseOwner
+            && global::XASlave.Localization.UiNative.Checkbox(global::XASlave.Localization.UiLocale.Native("S0D0805E75E1BAA6D") + "##xagmanStayLoggedIn", ref stayLoggedIn))
+        {
+            cfg.XagmanStayLoggedInBetweenDeliveries = stayLoggedIn;
+            cfg.Save();
+        }
         var ignoreGilInMatchSelection = cfg.XagmanIgnoreGilInMatchingSelection;
         if (global::XASlave.Localization.UiNative.Checkbox((global::XASlave.Localization.UiLocale.Native("S8E3A49EFB547FB94") + "##xagmanIgnoreGilMatch"), ref ignoreGilInMatchSelection))
         {
@@ -8824,7 +8831,7 @@ public partial class SlaveWindow
                         xagmanStatus = XagmanStatus.ReturningHome;
                         xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SDC6AFF65DED1945E", charName));
                     },
-                    () => relogFailed || standbyRequested || charSkipped,
+                    () => relogFailed || standbyRequested || charSkipped || (ownerPartial && CanXagmanWaitInGame()),
                     expectCrossDataCenterLogout: true);
             }
             steps.Add(new TaskStep

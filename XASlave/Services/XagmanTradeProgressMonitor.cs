@@ -62,6 +62,12 @@ internal sealed class XagmanTradeProgressMonitor
     internal bool Stalled => IdleScans >= IdleScanLimit;
     internal bool CaptureFailed => FailedScans >= IdleScanLimit;
 
+    internal void ResetBaseline()
+    {
+        baseline = null;
+        IdleScans = 0;
+    }
+
     internal void Tick(float elapsed, bool active)
     {
         var delta = Math.Max(0, elapsed - previousElapsed);
@@ -86,7 +92,7 @@ internal sealed class XagmanTradeProgressMonitor
         nextScanAt = ActiveSeconds + ScanSeconds;
         if (snapshot == null)
         {
-            FailedScans++;
+            if (ActiveSeconds >= graceSeconds) FailedScans++;
             return;
         }
         FailedScans = 0;
