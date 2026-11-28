@@ -1331,7 +1331,7 @@ public sealed class Plugin : IDalamudPlugin
         SlaveWindow = new SlaveWindow(this);
         WindowSystem.AddWindow(SlaveWindow);
         SlaveWindow.InitializePluginBuilder(PluginBuilder);
-        XagmanMiniWindow = new XagmanMiniWindow(SlaveWindow.GetXagmanMiniSnapshot);
+        XagmanMiniWindow = new XagmanMiniWindow(SlaveWindow.GetXagmanMiniSnapshot, Configuration);
         WindowSystem.AddWindow(XagmanMiniWindow);
 
         NearbyPlayersWindow = new NearbyPlayersWindow(NearbyPlayers, XAPeep);
@@ -2485,6 +2485,8 @@ public sealed class Plugin : IDalamudPlugin
         return started;
     }
 
+    internal void CloseXagmanMiniWindow() => XagmanMiniWindow.IsOpen = false;
+
     private bool TryHandleXagmanCommand(string subcommandArgs, out string message) => TryHandleXagmanCommandLocalizedCore(out _, subcommandArgs, out message);
     private bool TryHandleXagmanCommandMessage(string subcommandArgs, out global::XASlave.Localization.UiMessage message)
     {
@@ -2499,6 +2501,7 @@ public sealed class Plugin : IDalamudPlugin
         if (subcommandArgs.Equals("mini", StringComparison.OrdinalIgnoreCase)
             || subcommandArgs.Equals("m", StringComparison.OrdinalIgnoreCase))
         {
+            SlaveWindow.InvalidateXagmanMiniClose();
             XagmanMiniWindow.Toggle();
             message = global::XASlave.Localization.UiMessage.Store(ref replyPresentation, global::XASlave.Localization.UiMessage.Key("SE36CBCCE01F937EE"));
             return true;
@@ -6615,5 +6618,5 @@ public sealed class Plugin : IDalamudPlugin
 
 internal static class BuildInfo
 {
-    public const string Version = "0.0.0.70";
+    public const string Version = "0.0.0.71";
 }

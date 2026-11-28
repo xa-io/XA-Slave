@@ -255,16 +255,29 @@ public sealed class CleanChatService : IDisposable
         var normalized = text.Normalize(NormalizationForm.FormKC).ToLowerInvariant().Replace('0', 'o').Replace('|', 'l');
         const string host = "okaygold.com";
         var hostIndex = normalized.IndexOf(host, StringComparison.Ordinal);
-        if (hostIndex < 2 || hostIndex > 64) return false;
+        if (hostIndex < 0) hostIndex = normalized.IndexOf("okaygold,com", StringComparison.Ordinal);
+        if (hostIndex < 2) return false;
         var prefix = normalized[..hostIndex].Trim();
-        if (prefix.Length < 2 || prefix.Any(c => c != '-')) return false;
         var tail = normalized[(hostIndex + host.Length)..].TrimStart();
-        if (!tail.StartsWith("--", StringComparison.Ordinal)) return false;
-        var commercial = new string(tail.Where(char.IsAsciiLetterOrDigit).ToArray());
-        return commercial.Contains("usd", StringComparison.Ordinal)
-            && commercial.Contains("stock", StringComparison.Ordinal)
-            && commercial.Contains("min", StringComparison.Ordinal)
-            && commercial.Any(char.IsAsciiDigit);
+        if (prefix.Length < 2) return false;
+        if (prefix.All(c => c == '-'))
+        {
+            if (hostIndex > 64 || !tail.StartsWith("--", StringComparison.Ordinal)) return false;
+            var offer = new string(tail.Where(char.IsAsciiLetterOrDigit).ToArray());
+            return offer.Contains("usd", StringComparison.Ordinal) && offer.Contains("stock", StringComparison.Ordinal)
+                && offer.Contains("min", StringComparison.Ordinal) && offer.Any(char.IsAsciiDigit);
+        }
+
+        if (!prefix.StartsWith("--", StringComparison.Ordinal) && !prefix.StartsWith("hi,---", StringComparison.Ordinal)) return false;
+        if (prefix.EndsWith("wvvw.", StringComparison.Ordinal))
+            prefix = prefix[..^5].TrimEnd();
+        if (!prefix.TrimEnd('《').EndsWith("--", StringComparison.Ordinal)
+            || !tail.TrimStart('》').StartsWith("-", StringComparison.Ordinal)) return false;
+
+        var terms = new string(prefix.Where(char.IsAsciiLetterOrDigit).ToArray());
+        return prefix.Contains('=') && (prefix.Contains('$') || terms.Contains("usd", StringComparison.Ordinal))
+            && (terms.Contains("stock", StringComparison.Ordinal) || terms.Contains("cheapgil", StringComparison.Ordinal))
+            && terms.Contains("min", StringComparison.Ordinal) && terms.Any(char.IsAsciiDigit);
     }
 
     internal static bool IsEligibleChannel(XivChatType channel) => IsSystemChannel(channel) || IsPlayerChannel(channel);

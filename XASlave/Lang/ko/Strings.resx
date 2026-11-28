@@ -22520,6 +22520,10 @@ SQLite 데이터베이스에서 직접 가져옵니다.</value>
     <value>완료 시 창 닫기</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs</comment>
   </data>
+  <data name="SE0FEABC984E67734" xml:space="preserve">
+    <value>완료 시 미니 창 닫기</value>
+    <comment>Source: XASlave/Windows/XagmanMiniWindow.cs</comment>
+  </data>
   <data name="SC5F512B1D65A47A6" xml:space="preserve">
     <value>로컬 임시 캐릭터 선택 대기 시간을 해제합니다.</value>
     <comment>Source: XASlave/Windows/Panels/CommandsPanel.cs</comment>

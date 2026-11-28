@@ -22520,6 +22520,10 @@ Desteklenmeyen konumlar veya 990.000.000+ gil satıcı satışını engeller; Xa
     <value>Tamamlanınca pencereyi kapat</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs</comment>
   </data>
+  <data name="SE0FEABC984E67734" xml:space="preserve">
+    <value>Tamamlanınca mini pencereyi kapat</value>
+    <comment>Source: XASlave/Windows/XagmanMiniWindow.cs</comment>
+  </data>
   <data name="SC5F512B1D65A47A6" xml:space="preserve">
     <value>Yerel geçici karakter seçimi bekleme süresini temizler.</value>
     <comment>Source: XASlave/Windows/Panels/CommandsPanel.cs</comment>

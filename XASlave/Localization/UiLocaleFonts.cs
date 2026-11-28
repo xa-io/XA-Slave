@@ -129,9 +129,6 @@ internal sealed class UiLocaleFonts : IDisposable
         var cjk = required.Where(IsCjk).ToArray();
         var cjkRanges = FontAtlasBuildToolkitUtilities.ToGlyphRange(cjk.AsSpan(), true, true);
         var face = language switch { "ko" => 1, "zh-Hans" => 2, _ => 0 };
-        var fontsDirectory = Environment.GetFolderPath(Environment.SpecialFolder.Fonts);
-        var textFont = Path.Combine(fontsDirectory, "segoeui.ttf");
-        var symbolFont = Path.Combine(fontsDirectory, "seguisym.ttf");
 
         // One font per managed registration avoids Dalamud's multiple-font warning.
         // Keep this handle local to the pair so asynchronous rebuilds use the same language.
@@ -155,10 +152,8 @@ internal sealed class UiLocaleFonts : IDisposable
 
                     // Merge mode fills missing glyphs, preserving the user's existing Latin body face.
                     var supplement = new SafeFontConfig { SizePx = size, MergeFont = font, GlyphRanges = ranges };
-                    if (File.Exists(textFont))
-                        build.AddFontFromFile(textFont, supplement);
-                    if (File.Exists(symbolFont))
-                        build.AddFontFromFile(symbolFont, supplement);
+                    AddBundledFont(build, "selawk.ttf", supplement);
+                    AddBundledFont(build, "DejaVuSans.ttf", supplement);
                     build.AttachExtraGlyphsForDalamudLanguage(supplement);
                 });
 
@@ -188,6 +183,13 @@ internal sealed class UiLocaleFonts : IDisposable
             regional.Dispose();
             throw;
         }
+    }
+
+    private static void AddBundledFont(IFontAtlasBuildToolkitPreBuild build, string file, SafeFontConfig config)
+    {
+        using var stream = typeof(UiLocaleFonts).Assembly.GetManifestResourceStream("XASlave.Fonts." + file)
+            ?? throw new FileNotFoundException("Missing embedded XA Slave font.", file);
+        build.AddFontFromStream(stream, config, true, file);
     }
 
     private static bool IsCjk(char character) => character is >= '\u2E80' and <= '\uA4CF'

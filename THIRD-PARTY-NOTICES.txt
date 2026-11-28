@@ -7,6 +7,13 @@ no plugin build or runtime loading was performed for this notice review.
 XA Slave remains AGPL-3.0-or-later. Its full license is supplied as LICENSE.
 This file does not relicense any dependency or claim ownership of upstream work.
 
+Embedded UI fonts
+- Selawik Regular, Copyright 2015 Microsoft Corporation, SIL Open Font License 1.1.
+  https://github.com/microsoft/Selawik
+- DejaVu Sans, DejaVu/Bitstream Vera license. https://dejavu-fonts.github.io/
+  Both original license files accompany the fonts under XASlave/Fonts and are
+  embedded in XASlave.dll alongside the unmodified font files.
+
 Runtime dependency inventory (pinning authority: XASlave/packages.lock.json)
 - Microsoft.Data.Sqlite and Microsoft.Data.Sqlite.Core 10.0.9: MIT.
   Copyright (c) Microsoft Corporation. All rights reserved.

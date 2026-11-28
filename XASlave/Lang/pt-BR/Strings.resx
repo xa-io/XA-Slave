@@ -22520,6 +22520,10 @@ Locais incompatíveis ou 990.000.000+ gil impedem vendas a comerciantes; o Xagma
     <value>Fechar janela ao concluir</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs</comment>
   </data>
+  <data name="SE0FEABC984E67734" xml:space="preserve">
+    <value>Fechar a minijanela ao concluir</value>
+    <comment>Source: XASlave/Windows/XagmanMiniWindow.cs</comment>
+  </data>
   <data name="SC5F512B1D65A47A6" xml:space="preserve">
     <value>Limpa o intervalo temporário local da seleção de personagens.</value>
     <comment>Source: XASlave/Windows/Panels/CommandsPanel.cs</comment>

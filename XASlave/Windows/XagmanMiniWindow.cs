@@ -4,17 +4,20 @@ using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
 using Dalamud.Interface.Windowing;
 using XASlave.Data;
+using XASlave.Localization;
 
 namespace XASlave.Windows;
 
 internal sealed class XagmanMiniWindow : Window
 {
     private readonly Func<XagmanMiniSnapshot> getSnapshot;
+    private readonly Configuration configuration;
 
-    internal XagmanMiniWindow(Func<XagmanMiniSnapshot> getSnapshot)
+    internal XagmanMiniWindow(Func<XagmanMiniSnapshot> getSnapshot, Configuration configuration)
         : base(global::XASlave.Localization.UiLocale.Get("S3906DF9883EAF5F0") + "###XASlaveXagmanMini", ImGuiWindowFlags.AlwaysAutoResize)
     {
         this.getSnapshot = getSnapshot;
+        this.configuration = configuration;
     }
 
     public override void PreDraw() => WindowName = global::XASlave.Localization.UiLocale.Get("S3906DF9883EAF5F0") + "###XASlaveXagmanMini";
@@ -26,6 +29,7 @@ internal sealed class XagmanMiniWindow : Window
         {
             ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.Get("SAF99E2CC3B71E057"));
             ImGui.TextDisabled(global::XASlave.Localization.UiLocale.Get("S40FC50EBC71B3FF0"));
+            DrawCloseOnCompletionCheckbox();
             return;
         }
 
@@ -45,5 +49,16 @@ internal sealed class XagmanMiniWindow : Window
         ImGui.PushTextWrapPos(ImGui.GetCursorPosX() + 420f * ImGuiHelpers.GlobalScale);
         ImGui.TextUnformatted(global::XASlave.Localization.UiLocale.FormatKey("S11E98CD46A83A309", snapshot.Estimate.Display));
         ImGui.PopTextWrapPos();
+        DrawCloseOnCompletionCheckbox();
+    }
+
+    private void DrawCloseOnCompletionCheckbox()
+    {
+        var enabled = configuration.XagmanCloseMiniWindowOnCompletion;
+        if (UiNative.Checkbox(UiLocale.Native("SE0FEABC984E67734"), ref enabled))
+        {
+            configuration.XagmanCloseMiniWindowOnCompletion = enabled;
+            configuration.Save();
+        }
     }
 }

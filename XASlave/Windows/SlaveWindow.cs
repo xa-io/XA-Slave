@@ -1010,7 +1010,7 @@ public partial class SlaveWindow : Window, IDisposable
 
         DetachDuringDispose("CancelScheduledAutoCollection", () => CancelScheduledAutoCollection(true));
         DetachDuringDispose("ReleaseRefreshSubsArSuppression", ReleaseRefreshSubsArSuppression);
-        DetachDuringDispose("StopXagmanTask", StopXagmanTask);
+        DetachDuringDispose("StopXagmanTask", () => StopXagmanTask());
 
         xaAbuseEnabled = false;
         DetachDuringDispose("NamePlateGui.RequestRedraw", Plugin.NamePlateGui.RequestRedraw);

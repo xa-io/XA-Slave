@@ -22520,6 +22520,10 @@ Lượt chạy cũ thử bán nếu được bật trước khi loại Tony đ�
     <value>Đóng cửa sổ khi hoàn tất</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs</comment>
   </data>
+  <data name="SE0FEABC984E67734" xml:space="preserve">
+    <value>Đóng cửa sổ nhỏ khi hoàn tất</value>
+    <comment>Source: XASlave/Windows/XagmanMiniWindow.cs</comment>
+  </data>
   <data name="SC5F512B1D65A47A6" xml:space="preserve">
     <value>Xóa thời gian chờ tạm thời tại màn hình chọn nhân vật ở phía cục bộ.</value>
     <comment>Source: XASlave/Windows/Panels/CommandsPanel.cs</comment>

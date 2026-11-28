@@ -22520,6 +22520,10 @@ Unsupported locations or 990,000,000+ gil prevent vendor selling; Xagman rotates
     <value>Close window on completion</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs</comment>
   </data>
+  <data name="SE0FEABC984E67734" xml:space="preserve">
+    <value>Close Mini Window On Completion</value>
+    <comment>Source: XASlave/Windows/XagmanMiniWindow.cs</comment>
+  </data>
   <data name="SC5F512B1D65A47A6" xml:space="preserve">
     <value>Clears the local temporary character-select cooldown.</value>
     <comment>Source: XASlave/Windows/Panels/CommandsPanel.cs</comment>

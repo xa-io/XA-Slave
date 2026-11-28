@@ -39,7 +39,68 @@ public partial class SlaveWindow
 
     private XagmanMiniSnapshot xagmanMiniSnapshot = XagmanMiniSnapshot.Empty;
     private readonly HashSet<string> xagmanMiniOwnerKeys = new(StringComparer.OrdinalIgnoreCase);
+    private readonly Dictionary<string, bool> xagmanMiniOwnerResults = new(StringComparer.OrdinalIgnoreCase);
     private long xagmanMiniNextUpdate;
+    private long xagmanMiniCloseGeneration;
+    private bool xagmanCompletionHadWarning;
+
+    internal void InvalidateXagmanMiniClose() => xagmanMiniCloseGeneration++;
+
+    private void MarkXagmanCompletionWarning() => xagmanCompletionHadWarning = true;
+
+    private bool HasCleanXagmanCompletion()
+        => !xagmanCompletionHadWarning && xagmanStatus != XagmanStatus.Error && !xagmanTravelRouteFatalError
+            && !IsXagmanCapacityWarningCompletion() && xagmanPartialOwners.Count == 0
+            && xagmanSkippedCharacters.Count == 0 && xagmanCollectionFirstFailedCharacters.Count == 0
+            && plugin.TaskRunner.FailedCharacters.Count == 0 && plugin.TaskRunner.IncompleteCharacters.Count == 0;
+
+    private bool HasXagmanCompletedOwnerPlan()
+    {
+        var plan = IsXagmanCollectionFirstRunActive() ? xagmanCollectionFirstOwnerFullPlan : xagmanOwnerRunPlan;
+        return plan.Count > 0 && plan.All(xagmanOwnerCompletedKeys.Contains);
+    }
+
+    private bool? GetXagmanOwnerRosterSucceeded()
+    {
+        if (plugin.Configuration.XagmanOutsideNetworkHelper
+            || (!xagmanRunning && xagmanStatus != XagmanStatus.Completed)
+            || (xagmanOwnerRunPlan.Count == 0 && xagmanCollectionFirstOwnerFullPlan.Count == 0))
+            return null;
+        return !IsXagmanCollectionFirstCollectionPhase() && !xagmanOwnerStandbyPending
+            && (xagmanStatus == XagmanStatus.Completed || xagmanPhaseComplete || xagmanOwnerSupplyPassComplete)
+            && xagmanQueueRequestedAtUtc == DateTime.MinValue && string.IsNullOrWhiteSpace(xagmanActiveTradePartner)
+            && HasXagmanCompletedOwnerPlan() && HasCleanXagmanCompletion();
+    }
+
+    private void ObserveXagmanMiniOwnerResults()
+    {
+        if (xagmanActiveRole != XagmanRole.Tony || string.IsNullOrEmpty(xagmanNetworkSession)) return;
+        foreach (var peer in plugin.XagmanPeers.Peers)
+        {
+            if (peer.Role != XagmanRole.FranchiseOwner || !IsXagmanPeerFresh(peer)) continue;
+            if (peer.RecoverySessionId == xagmanNetworkSession && peer.RecoveryCoordinatorInstanceId == plugin.InstanceId)
+            {
+                if (peer.OwnerRosterSucceeded is bool result)
+                    xagmanMiniOwnerResults[peer.InstanceId] = result;
+                else if (peer.TotalCharacters > 0)
+                    xagmanMiniOwnerResults[peer.InstanceId] = false;
+            }
+            else if (string.IsNullOrEmpty(peer.RecoverySessionId)
+                && xagmanTonyRunStartedAtUtc != DateTime.MinValue && peer.LastSeenUtc >= xagmanTonyRunStartedAtUtc
+                && (peer.TotalCharacters > 0 || peer.TonyCompletionRequestedAtUtc >= xagmanTonyRunStartedAtUtc)
+                && (xagmanNetworkParticipants.Contains(peer.InstanceId)
+                    || xagmanTonyRunPlan.Contains(peer.PreferredTonyCharacter, StringComparer.OrdinalIgnoreCase)))
+            {
+                // An older participant can advertise processed characters without proving success.
+                xagmanMiniOwnerResults.TryAdd(peer.InstanceId, false);
+            }
+        }
+    }
+
+    private bool HasVerifiedXagmanOwnerResults()
+        => xagmanMiniOwnerResults.Count > 0 && xagmanMiniOwnerResults.Values.All(success => success)
+            && xagmanExpectedFranchiseOwnerInstanceIds.All(xagmanMiniOwnerResults.ContainsKey)
+            && xagmanSupplyOwnerCohort.All(xagmanMiniOwnerResults.ContainsKey);
 
     internal XagmanMiniSnapshot GetXagmanMiniSnapshot()
     {
@@ -65,6 +126,9 @@ public partial class SlaveWindow
 
     private void ClearXagmanMiniSnapshot()
     {
+        xagmanMiniOwnerResults.Clear();
+        InvalidateXagmanMiniClose();
+        xagmanCompletionHadWarning = false;
         xagmanMiniSnapshot = XagmanMiniSnapshot.Empty;
         xagmanMiniOwnerKeys.Clear();
         xagmanPublishedEta = null;
@@ -76,6 +140,7 @@ public partial class SlaveWindow
         if (isDisposed || (!force && Environment.TickCount64 < xagmanMiniNextUpdate))
             return;
         xagmanMiniNextUpdate = Environment.TickCount64 + 250;
+        ObserveXagmanMiniOwnerResults();
         if (!xagmanRunning && !force)
         {
             if (xagmanMiniSnapshot.HasRun)

@@ -469,10 +469,7 @@ public partial class SlaveWindow
         {
             if (global::XASlave.Localization.UiNative.Button((global::XASlave.Localization.UiLocale.Native("S658431DD798692FF") + "##xagmanPullXa")))
             {
-                if (Plugin.PlayerState.IsLoaded)
-                    BeginXagmanXaDatabaseRefreshAndPull();
-                else
-                    PullXaDatabaseInfo(ClearXagmanMatchingSelectionCaches);
+                PullXagmanDatabaseInfo();
             }
         }
         if (ImGui.IsItemHovered(ImGuiHoveredFlags.AllowWhenDisabled))
@@ -5581,7 +5578,7 @@ public partial class SlaveWindow
         RefreshXagmanTradeCapacityInventorySnapshots();
     }
 
-    private void BeginXagmanXaDatabaseRefreshAndPull()
+    private void BeginXagmanXaDatabaseRefreshAndPull(SysAction? onApplied = null)
     {
         if (System.Threading.Interlocked.CompareExchange(ref xagmanManualXaDatabasePullRunning, 1, 0) != 0)
         {
@@ -5662,7 +5659,14 @@ public partial class SlaveWindow
                             verification.SavedAtUtc);
                         Plugin.Log.Information(
                             $"[XASlave] Xagman confirmed XA Database Refresh + Save for content ID {expectedContentId}; pulling committed character rows.");
-                        PullXaDatabaseInfo(ClearXagmanMatchingSelectionCaches);
+                        // An earlier read may already have captured pre-save rows.
+                        if (System.Threading.Volatile.Read(ref xaDbPullRunning) != 0)
+                        {
+                            xagmanCommittedRowsPending = true;
+                            xagmanCommittedRowsApplied += onApplied;
+                        }
+                        else
+                            PullXagmanCommittedRows(onApplied);
                     });
                     return;
                 }
@@ -6136,7 +6140,10 @@ public partial class SlaveWindow
 
         xagmanRunning = value;
         if (value)
+        {
+            InvalidateXagmanMiniClose();
             xagmanSettledTradeProgress = null;
+        }
         UpdateXagmanTeleportHelperRequirement();
         InvalidateXagmanTradeCapacityForecast();
         plugin.TargetCommandFix.SetRequiredByXagman(value);
@@ -6174,7 +6181,8 @@ public partial class SlaveWindow
                 plugin.TaskRunner.AddLog("Xagman: could not send Tony completion signal before shutdown.");
             }
         }
-        ScheduleXagmanLocalShutdown("Franchise Owner completion");
+        ScheduleXagmanLocalShutdown("Franchise Owner completion",
+            closeMiniOnSuccess: xagmanTonyCompletionRequestedAtUtc != DateTime.MinValue && HasXagmanCompletedOwnerPlan());
     }
 
     private void StartXagmanTonyStartup(XagmanTonyCharacterEntry entry, bool includePreflight)
@@ -6521,8 +6529,9 @@ public partial class SlaveWindow
         return steps;
     }
 
-    private void StopXagmanTask()
+    private void StopXagmanTask(bool closeMiniOnSuccess = false, bool refreshCompletionDatabase = false)
     {
+        InvalidateXagmanMiniClose();
         MarkXagmanOnhLocalTradeCleanup();
         CancelXagmanTradeBatch();
         ResetXagmanNetworkRecovery();
@@ -6535,6 +6544,8 @@ public partial class SlaveWindow
         if (xagmanRunning || xagmanOwnerRunPlan.Count > 0 || xagmanTonyRunPlan.Count > 0)
             CaptureXagmanRunSnapshot();
         RetainXagmanMiniResultBeforeStop();
+        var closeMini = closeMiniOnSuccess && plugin.Configuration.XagmanCloseMiniWindowOnCompletion
+            && HasCleanXagmanCompletion();
         if (plugin.TaskRunner.IsRunning && plugin.TaskRunner.CurrentTaskName.Equals("Xagman", StringComparison.OrdinalIgnoreCase))
             plugin.TaskRunner.Cancel();
         ResetXagmanTonyMeetRetryState();
@@ -6583,6 +6594,19 @@ public partial class SlaveWindow
         ResetXagmanCollectionFirstRunState();
         PublishXagmanPresence();
         UpdatePriorityTaskExternalStatus();
+        if (refreshCompletionDatabase)
+        {
+            var generation = xagmanMiniCloseGeneration;
+            void CloseMiniAfterApply()
+            {
+                if (!isDisposed && !xagmanRunning && generation == xagmanMiniCloseGeneration
+                    && plugin.Configuration.XagmanCloseMiniWindowOnCompletion)
+                    plugin.CloseXagmanMiniWindow();
+            }
+            QueueXagmanCompletionDatabasePull(closeMini && tradeSafetyClosed ? CloseMiniAfterApply : null);
+        }
+        else if (closeMini && tradeSafetyClosed)
+            plugin.CloseXagmanMiniWindow();
     }
 
     private bool DisconnectXagmanPeerService()
@@ -6594,11 +6618,11 @@ public partial class SlaveWindow
         return true;
     }
 
-    private void FinalizeXagmanLocalShutdown(string reason, bool disconnectBeforeStop = false)
+    private void FinalizeXagmanLocalShutdown(string reason, bool disconnectBeforeStop = false, bool closeMiniOnSuccess = false)
     {
         if (disconnectBeforeStop)
             DisconnectXagmanPeerService();
-        StopXagmanTask();
+        StopXagmanTask(closeMiniOnSuccess);
         if (!disconnectBeforeStop)
             DisconnectXagmanPeerService();
         plugin.TaskRunner.AddLog($"Xagman: finalized local shutdown after {reason}.");
@@ -6645,14 +6669,21 @@ public partial class SlaveWindow
         });
     }
 
-    private void ScheduleXagmanLocalShutdown(string reason, int delayMs = 1000, bool disconnectBeforeStop = false)
+    private void ScheduleXagmanLocalShutdown(string reason, bool closeMiniOnSuccess)
     {
+        var generation = xagmanMiniCloseGeneration;
+        var completedPlan = xagmanOwnerRunPlan;
         _ = System.Threading.Tasks.Task.Run(async () =>
         {
             try
             {
-                await System.Threading.Tasks.Task.Delay(delayMs).ConfigureAwait(false);
-                await Plugin.RunOnGameThread(() => FinalizeXagmanLocalShutdown(reason, disconnectBeforeStop)).ConfigureAwait(false);
+                await System.Threading.Tasks.Task.Delay(1000).ConfigureAwait(false);
+                await Plugin.RunOnGameThread(() =>
+                {
+                    if (!isDisposed && !xagmanRunning && xagmanStatus == XagmanStatus.Completed
+                        && ReferenceEquals(completedPlan, xagmanOwnerRunPlan))
+                        FinalizeXagmanLocalShutdown(reason, closeMiniOnSuccess: closeMiniOnSuccess && generation == xagmanMiniCloseGeneration);
+                }).ConfigureAwait(false);
             }
             catch
             {
@@ -7024,6 +7055,7 @@ public partial class SlaveWindow
                 OnTimeout = () => HaltRecall(global::XASlave.Localization.UiMessage.Key("SD3F81B3FDC4F2172")),
             });
         }
+        if (tonyCapacityExhausted) AddXagmanCompletionDatabasePullStep(steps);
         if (!tonyCapacityExhausted || cfg.XagmanAutoReturnToFc)
         {
             AddXagmanTeleportSteps(
@@ -7130,6 +7162,7 @@ public partial class SlaveWindow
                 global::XASlave.Localization.UiMessage.Key("SDD73548F1CCE0B6D"),
                 2.5f));
         }
+        AddXagmanCompletionDatabasePullStep(steps);
         if (cfg.XagmanAutoReturnToFc && !alreadyAtMenu && !localOwnersFinished)
         {
             AddXagmanTeleportSteps(
@@ -7154,6 +7187,7 @@ public partial class SlaveWindow
                 {
                     xagmanStatus = XagmanStatus.ReturningHome;
                     xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SDC6AFF65DED1945E", localCharacter));
+                    MarkXagmanCompletionWarning();
                 },
                 expectCrossDataCenterLogout: true);
         }
@@ -7173,8 +7207,10 @@ public partial class SlaveWindow
             runner,
             "Franchise Owner peer completion",
             MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(cfg.XagmanLogoutOnComplete && !alreadyAtMenu, cfg.XagmanKillGameOnComplete));
-        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete && !alreadyAtMenu, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete);
-        plugin.TaskRunner.Start(global::XASlave.Localization.UiMessage.Key("S0A1690A11A18319C"), steps, onFinished: () => FinalizeXagmanLocalShutdown("Franchise Owner peer completion"), onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"), preserveRunHistory: true);
+        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete && !alreadyAtMenu, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete, MarkXagmanCompletionWarning);
+        plugin.TaskRunner.Start(global::XASlave.Localization.UiMessage.Key("S0A1690A11A18319C"), steps,
+            onFinished: () => FinalizeXagmanLocalShutdown("Franchise Owner peer completion", closeMiniOnSuccess: HasXagmanCompletedOwnerPlan()),
+            onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"), preserveRunHistory: true);
     }
 
     private List<TaskStep> BuildXagmanFranchiseSteps(List<string> characters, int startIndex)
@@ -8821,6 +8857,7 @@ public partial class SlaveWindow
                     {
                         if (relogFailed || standbyRequested)
                             return;
+                        MarkXagmanCompletionWarning();
                         if (xagmanCharacterFailureReasons.ContainsKey(charName))
                         {
                             relogFailed = true;
@@ -8832,7 +8869,12 @@ public partial class SlaveWindow
                         xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("SDC6AFF65DED1945E", charName));
                     },
                     () => relogFailed || standbyRequested || charSkipped || (ownerPartial && CanXagmanWaitInGame()),
-                    expectCrossDataCenterLogout: true);
+                    expectCrossDataCenterLogout: true,
+                    onObservedTravelFailure: () =>
+                    {
+                        relogFailed = true;
+                        ReleaseXagmanFailedOwnerTravel();
+                    });
             }
             steps.Add(new TaskStep
             {
@@ -8902,6 +8944,11 @@ public partial class SlaveWindow
                     if (relogFailed)
                     {
                         var reason = xagmanCharacterFailureReasons.GetValueOrDefault(charName, global::XASlave.Localization.UiMessage.Capture(ref xagmanStatusTextUiMessage, xagmanStatusText));
+                        if (xagmanStatus == XagmanStatus.Idle && runner.FailedCharacters.Contains(charName))
+                        {
+                            xagmanOwnerCurrentCharacterIndex = charIndex;
+                            PublishXagmanPresence();
+                        }
                         runner.AddLog($"Xagman: owner {charName} failed: {reason} Moving to the next owner.");
                         RecordXagmanOwnerProcessingEnd(charName);
                     }
@@ -9059,12 +9106,13 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
+        AddXagmanCompletionDatabasePullStep(steps, () => xagmanOwnerStandbyPending || xagmanStatus != XagmanStatus.Completed);
         AddXagmanTradeSafetyCompletionStep(
             steps,
             runner,
             "Franchise Owner completion",
             MonthlyReloggerTask.ShouldKeepLogoutCancelSuppressed(cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete));
-        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete);
+        MonthlyReloggerTask.AddSharedCompletionSteps(steps, runner, cfg.XagmanLogoutOnComplete, cfg.XagmanKillGameOnComplete, cfg.XagmanEnableArMultiOnComplete, MarkXagmanCompletionWarning);
         return steps;
     }
 
@@ -9134,6 +9182,19 @@ public partial class SlaveWindow
         xagmanTravelFailureToken = 0;
     }
 
+    private void ReleaseXagmanFailedOwnerTravel()
+    {
+        if (xagmanTravelRouteFatalError) return;
+        // The monitor recorded this character as failed. Leave the supply pass runnable.
+        MarkXagmanCompletionWarning();
+        xagmanQueueRequestedAtUtc = DateTime.MinValue;
+        xagmanActiveTradePartner = xagmanActiveTradePartnerInstanceId = string.Empty;
+        xagmanObservedDropboxBusy = false;
+        xagmanTradeQuantitySnapshot.Clear();
+        SetXagmanOwnerRequestedItems(Array.Empty<XagmanTradeRequestEntry>(), false);
+        xagmanStatus = XagmanStatus.Idle;
+    }
+
     private bool TryTakeXagmanTravelFailure(long token, TaskRunner runner, string label)
     {
         if (xagmanTravelFailureMonitor == null
@@ -9188,7 +9249,7 @@ public partial class SlaveWindow
             EndLoginTravelObservation();
             return true;
         }
-        void FailLogin(global::XASlave.Localization.UiMessage reason)
+        void FailLogin(global::XASlave.Localization.UiMessage reason, bool observedTravelFailure = false)
         {
             if (relogFailed)
                 return;
@@ -9208,6 +9269,8 @@ public partial class SlaveWindow
             onTimeout();
             if (cleanupFailed)
                 runner.RequestHalt("Lifestream login cleanup could not be confirmed; recovery commands were blocked.");
+            else if (recoverOwnerLogout && observedTravelFailure)
+                ReleaseXagmanFailedOwnerTravel();
         }
         void ArmOwnerRelogFailure()
         {
@@ -9228,7 +9291,7 @@ public partial class SlaveWindow
                 xagmanSkipFcReturnAfterFailureCharacter = failure.ExpectedCharacter;
                 ClearXagmanExpectedTravelLogoutWindow();
                 runner.AddLog($"Xagman: login travel failed for {failure.ExpectedCharacter}; command '{failure.Command}', message: {failure.Message}");
-                FailLogin(failure.ReasonMessage);
+                FailLogin(failure.ReasonMessage, observedTravelFailure: true);
             }
             if (!relogFailed && !string.IsNullOrEmpty(pendingLogoutFailure.Original))
             {
@@ -9841,7 +9904,7 @@ public partial class SlaveWindow
             global::XASlave.Localization.UiMessage? failureStatusTextUiPresentation = null;
             var failureStatusText = global::XASlave.Localization.UiMessage.Store(ref failureStatusTextUiPresentation, global::XASlave.Localization.UiMessage.Capture(ref xagmanStatusTextUiMessage, xagmanStatusText));
             onFailure();
-            xagmanStatus = XagmanStatus.Error;
+            ReleaseXagmanFailedOwnerTravel();
             xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Capture(ref failureStatusTextUiPresentation, failureStatusText));
             return true;
         }
@@ -10614,7 +10677,7 @@ public partial class SlaveWindow
         }
     }
 
-    private void AddXagmanTeleportSteps(List<TaskStep> steps, global::XASlave.Localization.UiMessage label, Func<string> commandProvider, TaskRunner runner, Func<bool>? alreadyThere, bool allowNoBusy, SysAction onEnter, SysAction onReady, SysAction onTimeout, Func<bool>? externalSkip = null, float waitStartTimeoutSec = 0f, bool reissueWhileWaiting = false, bool expectCrossDataCenterLogout = false, Func<string>? travelSourceCharacterProvider = null, Func<string>? travelDestinationWorldProvider = null)
+    private void AddXagmanTeleportSteps(List<TaskStep> steps, global::XASlave.Localization.UiMessage label, Func<string> commandProvider, TaskRunner runner, Func<bool>? alreadyThere, bool allowNoBusy, SysAction onEnter, SysAction onReady, SysAction onTimeout, Func<bool>? externalSkip = null, float waitStartTimeoutSec = 0f, bool reissueWhileWaiting = false, bool expectCrossDataCenterLogout = false, Func<string>? travelSourceCharacterProvider = null, Func<string>? travelDestinationWorldProvider = null, SysAction? onObservedTravelFailure = null)
     {
         var skipTeleport = false;
         var sawBusy = false;
@@ -10657,7 +10720,8 @@ public partial class SlaveWindow
             teleportFailed = true;
             EndTravelFailureObservation();
             ClearExpectedTravelLogout();
-            onTimeout();
+            if (onObservedTravelFailure != null) onObservedTravelFailure();
+            else onTimeout();
             return true;
         }
 
@@ -10815,7 +10879,11 @@ public partial class SlaveWindow
                 if (ShouldStopTeleport())
                     return;
                 ClearExpectedTravelLogout();
-                if (allowNoBusy || (alreadyThere?.Invoke() ?? false))
+                // A command that stayed busy for the whole travel window never confirmed arrival.
+                var arrived = alreadyThere?.Invoke() ?? false;
+                if (sawBusy && !arrived)
+                    MarkXagmanCompletionWarning();
+                if (allowNoBusy || arrived)
                 {
                     skipTeleport = true;
                     return;
@@ -10871,7 +10939,8 @@ public partial class SlaveWindow
         UpdateXagmanTeleportHelperRequirement();
         UpdateXagmanCustomMovementOwnership();
         UpdateXagmanMiniSnapshot();
-        ProcessXagmanRelogDatabasePull();
+        ProcessXagmanCompletionDatabasePull();
+        if (!XagmanDatabasePullBusy) ProcessXagmanRelogDatabasePull();
         if (xagmanRunning && xagmanArMultiGuardActive
             && Environment.TickCount64 >= xagmanArMultiNextCheck)
         {
@@ -11597,6 +11666,9 @@ public partial class SlaveWindow
         var completionSupplyPassId = supplyCompletion ? xagmanSupplyPassId : string.Empty;
         var completionCapacityDrainId = capacityCompletion ? xagmanCapacityDrainId : string.Empty;
         var completionCapacityRecoveryEpoch = capacityCompletion ? xagmanCapacityRecoveryEpoch : 0;
+        var tradeComplete = string.IsNullOrWhiteSpace(xagmanActiveTradePartner);
+        ObserveXagmanMiniOwnerResults();
+        var fcReturnComplete = !cfg.XagmanAutoReturnToFc;
         System.Threading.Tasks.Task<bool>? peerCompletionTask = null;
         var peerCompletionDeliveryFailed = false;
         var steps = new List<TaskStep>();
@@ -11604,10 +11676,12 @@ public partial class SlaveWindow
         void MarkPeerCompletionDeliveryFailed(global::XASlave.Localization.UiMessage messagePresentation)
         {
             var message = messagePresentation.Original;
-            if (peerCompletionDeliveryFailed || !coordinatedCompletion)
+            if (peerCompletionDeliveryFailed)
                 return;
 
             peerCompletionDeliveryFailed = true;
+            if (!coordinatedCompletion)
+                return;
             SetXagmanRunning(true);
             xagmanActiveRole = XagmanRole.Tony;
             xagmanStatus = XagmanStatus.Error;
@@ -11691,6 +11765,7 @@ public partial class SlaveWindow
             IsComplete = () => true,
             TimeoutSec = 1f,
         });
+        AddXagmanCompletionDatabasePullStep(steps);
         if (cfg.XagmanAutoReturnToFc)
         {
             AddXagmanTeleportSteps(
@@ -11710,6 +11785,7 @@ public partial class SlaveWindow
                     xagmanStatus = XagmanStatus.ReturningHome;
                     xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S4FA334438BFC9400", tonyCharacter));
                     RememberXagmanRecentFcReturn(tonyCharacter);
+                    fcReturnComplete = true;
                 },
                 () =>
                 {
@@ -11737,6 +11813,7 @@ public partial class SlaveWindow
             ShouldSkip = () => coordinatedCompletion && peerCompletionDeliveryFailed,
             OnEnter = () =>
             {
+                ObserveXagmanMiniOwnerResults();
                 if (!DisconnectXagmanPeerService())
                     runner.AddLog("Xagman: local TCP peer service was already disconnected before Tony completion cleanup.");
             },
@@ -11765,7 +11842,8 @@ public partial class SlaveWindow
                 runner,
                 cfg.XagmanLogoutOnComplete,
                 cfg.XagmanKillGameOnComplete,
-                cfg.XagmanEnableArMultiOnComplete);
+                cfg.XagmanEnableArMultiOnComplete,
+                MarkXagmanCompletionWarning);
             steps.AddRange(sharedCompletionSteps.Select(step =>
                 MonthlyReloggerTask.WithSkip(step, () => peerCompletionDeliveryFailed)));
         }
@@ -11776,7 +11854,8 @@ public partial class SlaveWindow
                 runner,
                 cfg.XagmanLogoutOnComplete,
                 cfg.XagmanKillGameOnComplete,
-                cfg.XagmanEnableArMultiOnComplete);
+                cfg.XagmanEnableArMultiOnComplete,
+                MarkXagmanCompletionWarning);
         }
         plugin.TaskRunner.Start(
             global::XASlave.Localization.UiMessage.Key("S0A1690A11A18319C"),
@@ -11793,7 +11872,10 @@ public partial class SlaveWindow
                     return;
                 }
 
-                FinalizeXagmanLocalShutdown("Tony completion", disconnectBeforeStop: true);
+                var ownerWorkComplete = tradeComplete && HasVerifiedXagmanOwnerResults();
+                var fullySuccessful = !completedWithWarnings && !capacityCompletion && ownerWorkComplete
+                    && fcReturnComplete && !peerCompletionDeliveryFailed;
+                FinalizeXagmanLocalShutdown("Tony completion", disconnectBeforeStop: true, closeMiniOnSuccess: fullySuccessful);
             },
             onLog: message => Plugin.Log.Information($"[TaskLogs] {message}"),
             preserveRunHistory: true);
@@ -13372,6 +13454,7 @@ public partial class SlaveWindow
                 TonyCompletionRequestedAtUtc = xagmanTonyCompletionRequestedAtUtc,
                 TotalCharacters = totalCharacters,
                 CompletedCharacters = completedCharacters,
+                OwnerRosterSucceeded = role == XagmanRole.FranchiseOwner ? GetXagmanOwnerRosterSucceeded() : null,
                 QueueNumber = queueNumber,
                 TradeProgress = awaitingBusyAdmission ? null : GetXagmanTradeProgressPresence(),
                 TradeSettlement = awaitingBusyAdmission ? null : GetXagmanTradeSettlementReceipt(),

@@ -2040,6 +2040,9 @@ public sealed class MonthlyReloggerTask
     }
 
     public static void AddLogoutOnCompleteSteps(List<TaskStep> steps, TaskRunner runner)
+        => AddLogoutOnCompleteSteps(steps, runner, null);
+
+    private static void AddLogoutOnCompleteSteps(List<TaskStep> steps, TaskRunner runner, Action? onFailure)
     {
         var logoutConfirmStart = DateTime.MinValue;
         var logoutConfirmed = false;
@@ -2075,18 +2078,27 @@ public sealed class MonthlyReloggerTask
                 if (AddonHelper.IsAddonReady("SelectYesno"))
                 {
                     runner.AddLog("Confirming logout via SelectYesno...");
-                    AddonHelper.ClickYesNo(true);
+                    if (!AddonHelper.ClickYesNo(true))
+                        onFailure?.Invoke();
                     logoutConfirmed = true;
                     return true;
                 }
 
-                return (DateTime.UtcNow - logoutConfirmStart).TotalSeconds >= 5;
+                if ((DateTime.UtcNow - logoutConfirmStart).TotalSeconds < 5)
+                    return false;
+                if (onFailure != null && Plugin.ClientState.IsLoggedIn)
+                    onFailure();
+                return true;
             },
             TimeoutSec = 6f,
+            OnTimeout = onFailure,
         });
     }
 
     public static void AddKillGameOnCompleteSteps(List<TaskStep> steps, TaskRunner runner)
+        => AddKillGameOnCompleteSteps(steps, runner, null);
+
+    private static void AddKillGameOnCompleteSteps(List<TaskStep> steps, TaskRunner runner, Action? onFailure)
     {
         steps.Add(new TaskStep
         {
@@ -2097,7 +2109,10 @@ public sealed class MonthlyReloggerTask
                 if (Plugin.Instance!.InstantLogout.RequestKillGame(force: true))
                     runner.AddLog("XA kill-game flow requested.");
                 else
+                {
                     runner.AddLog("XA kill-game flow could not start.");
+                    onFailure?.Invoke();
+                }
             },
             IsComplete = () => true,
             TimeoutSec = 2f,
@@ -2107,11 +2122,14 @@ public sealed class MonthlyReloggerTask
     }
 
     public static void AddSharedCompletionSteps(List<TaskStep> steps, TaskRunner runner, bool logoutOnComplete, bool killGameOnComplete, bool enableArMultiOnComplete)
+        => AddSharedCompletionSteps(steps, runner, logoutOnComplete, killGameOnComplete, enableArMultiOnComplete, null);
+
+    internal static void AddSharedCompletionSteps(List<TaskStep> steps, TaskRunner runner, bool logoutOnComplete, bool killGameOnComplete, bool enableArMultiOnComplete, Action? onFailure)
     {
         if (logoutOnComplete)
-            AddLogoutOnCompleteSteps(steps, runner);
+            AddLogoutOnCompleteSteps(steps, runner, onFailure);
         else if (killGameOnComplete)
-            AddKillGameOnCompleteSteps(steps, runner);
+            AddKillGameOnCompleteSteps(steps, runner, onFailure);
 
         if (!enableArMultiOnComplete)
             return;
@@ -2122,7 +2140,8 @@ public sealed class MonthlyReloggerTask
             OnEnter = () =>
             {
                 runner.AddLog("Re-enabling AutoRetainer Multi Mode...");
-                Plugin.Instance!.IpcClient.AutoRetainerSetMultiModeEnabled(true);
+                if (!Plugin.Instance!.IpcClient.AutoRetainerSetMultiModeEnabled(true))
+                    onFailure?.Invoke();
             },
             IsComplete = () => true,
             TimeoutSec = 3f,

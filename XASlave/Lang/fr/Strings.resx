@@ -22520,6 +22520,10 @@ Les lieux non pris en charge ou 990 000 000 gils et plus empêchent la vente aux
     <value>Fermer la fenêtre à la fin</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs</comment>
   </data>
+  <data name="SE0FEABC984E67734" xml:space="preserve">
+    <value>Fermer la mini-fenêtre à la fin</value>
+    <comment>Source: XASlave/Windows/XagmanMiniWindow.cs</comment>
+  </data>
   <data name="SC5F512B1D65A47A6" xml:space="preserve">
     <value>Efface le délai temporaire local de sélection de personnage.</value>
     <comment>Source: XASlave/Windows/Panels/CommandsPanel.cs</comment>

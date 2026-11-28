@@ -22520,6 +22520,10 @@ Nicht unterstützte Orte oder mindestens 990.000.000 Gil verhindern Händlerverk
     <value>Fenster nach Abschluss schließen</value>
     <comment>Source: XASlave/Windows/Panels/XAModsPanel.cs</comment>
   </data>
+  <data name="SE0FEABC984E67734" xml:space="preserve">
+    <value>Minifenster nach Abschluss schließen</value>
+    <comment>Source: XASlave/Windows/XagmanMiniWindow.cs</comment>
+  </data>
   <data name="SC5F512B1D65A47A6" xml:space="preserve">
     <value>Löscht die lokale temporäre Abklingzeit der Charakterauswahl.</value>
     <comment>Source: XASlave/Windows/Panels/CommandsPanel.cs</comment>

@@ -23,6 +23,18 @@ public sealed class UpdatesWindow : Window
     {
         new VersionEntry
         {
+            Header = "v0.0.0.71 - 2026-11-27",
+            Lines =
+            [
+                "- Bundled the fonts XA Slave needs to open its windows on Linux and Wine when Windows fonts are missing.",
+                "- Updated Clean Chat to catch gil-seller ads that put the website after the offer or disguise its address with a comma.",
+                "- Fixed Xagman: An owner who cannot teleport due to insufficient gil is recorded as failed. Processing continues with the next owner or finishes the pass with a warning.",
+                "- Updated Xagman: Franchise Owners and Tonys automatically pull XA Database info at completion to update their roster totals.",
+                "- Added Close Mini Window On Completion to Xagman Mini. Enable it to close the mini window after a fully successful run.",
+            ],
+        },
+        new VersionEntry
+        {
             Header = "v0.0.0.70 - 2026-11-27",
             Lines =
             [

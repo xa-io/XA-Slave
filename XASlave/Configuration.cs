@@ -283,6 +283,7 @@ public class Configuration : IPluginConfiguration
     public bool XagmanSellWhenInventoryFull { get; set; } = false;
     public bool XagmanUseDirectNpcSell { get; set; } = false;
     public bool XagmanAutoCleanQueueList { get; set; } = false;
+    public bool XagmanCloseMiniWindowOnCompletion { get; set; } = false;
     public bool XagmanEnableArMultiOnComplete { get; set; } = true;
     public int XagmanTradeBatchTimeoutMinutes { get; set; } = 10;
     public bool XagmanLogoutOnComplete { get; set; } = false;

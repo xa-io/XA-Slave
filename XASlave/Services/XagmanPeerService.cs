@@ -1282,6 +1282,7 @@ public sealed class XagmanPeerService : IDisposable
             TonyCompletionRequestedAtUtc = record.TonyCompletionRequestedAtUtc,
             TotalCharacters = record.TotalCharacters,
             CompletedCharacters = record.CompletedCharacters,
+            OwnerRosterSucceeded = record.OwnerRosterSucceeded,
             QueueNumber = record.QueueNumber,
             TradeProgress = record.TradeProgress?.Copy(),
             TradeSettlement = record.TradeSettlement?.Copy(),

@@ -296,6 +296,8 @@ public sealed class XagmanPeerPresence
     public DateTime TonyCompletionRequestedAtUtc { get; set; } = DateTime.MinValue;
     public int TotalCharacters { get; set; }
     public int CompletedCharacters { get; set; }
+    // A roster result is absent for idle clients and older peers. Processed counts include skips.
+    public bool? OwnerRosterSucceeded { get; set; }
     public int QueueNumber { get; set; }
     public XagmanTradeProgressPresence? TradeProgress { get; set; }
     public XagmanTradeProgressPresence? TradeSettlement { get; set; }

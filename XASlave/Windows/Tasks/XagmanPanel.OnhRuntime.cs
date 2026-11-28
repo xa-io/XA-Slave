@@ -487,7 +487,7 @@ public partial class SlaveWindow
     {
         if (xagmanOnhIndex < 0 || xagmanOnhIndex >= xagmanOnhRunList.Count)
         {
-            CompleteXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SEE16A13BC9967CA3"));
+            CompleteXagmanOnhRun(global::XASlave.Localization.UiMessage.Key("SEE16A13BC9967CA3"), finishedRoster: false);
             return;
         }
 
@@ -762,20 +762,25 @@ public partial class SlaveWindow
         {
             if (rotateForFull)
                 plugin.TaskRunner.AddLog("Xagman ONH: no more Tony characters to rotate to after filling up.");
-            CompleteXagmanOnhRun((rotateForFull ? global::XASlave.Localization.UiMessage.Key("SF2E4827831242F27") : global::XASlave.Localization.UiMessage.Key("SEE16A13BC9967CA3")));
+            CompleteXagmanOnhRun(rotateForFull ? global::XASlave.Localization.UiMessage.Key("SF2E4827831242F27") : global::XASlave.Localization.UiMessage.Key("SEE16A13BC9967CA3"),
+                finishedRoster: !failed && !incomplete && !rotateForFull);
             return;
         }
         SetXagmanOnhPhase(XagmanOnhPhase.StartCharacter);
     }
 
-    private void CompleteXagmanOnhRun(global::XASlave.Localization.UiMessage reason)
+    private void CompleteXagmanOnhRun(global::XASlave.Localization.UiMessage reason, bool finishedRoster)
     {
+        var fullySuccessful = finishedRoster
+            && onhFailedOwners.Count == 0
+            && (xagmanActiveRole != XagmanRole.Tony || (xagmanOnhCompletedPartners.Count > 0
+                && GetXagmanOnhPartnerRoster().All(xagmanOnhCompletedPartners.Contains)));
         plugin.TaskRunner.AddLog($"Xagman ONH: run complete ({reason}).");
         xagmanStatus = XagmanStatus.Completed;
         xagmanStatusText = global::XASlave.Localization.UiMessage.Store(ref xagmanStatusTextUiMessage, global::XASlave.Localization.UiMessage.Format("S095D250E9CFA75A3", reason));
         SetXagmanOnhPhase(XagmanOnhPhase.Completed);
         AutoCleanXagmanQueueResults();
-        StopXagmanTask();
+        StopXagmanTask(closeMiniOnSuccess: fullySuccessful, refreshCompletionDatabase: true);
     }
 
     private void FailXagmanOnhRun(global::XASlave.Localization.UiMessage reason)
